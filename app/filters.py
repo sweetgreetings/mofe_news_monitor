@@ -3,6 +3,9 @@
 PHOTO_HINT_WORDS = ["포토", "[포토]", "사진", "화보", "포토뉴스", "PHOTO"]
 # [추가: 2026-07-24] "[속보]"는 아무리 단신이어도 예외로 항상 남긴다 (규칙12)
 BREAKING_NEWS_MARK = "[속보]"
+# [추가: 2026-07-26] 인사 발령 기사(짧은 이름·직함 나열이라 소제목 분류·요약에 잘 안 맞음)
+# 제외 마크 — exclude_photo_articles와 같은 패턴(app.config.DEFAULT_INCLUDE_PERSONNEL_IN_SCRAP).
+PERSONNEL_NOTICE_MARK = "[인사]"
 
 
 def filter_by_outlet_whitelist(articles: list[dict], whitelist: list[str]) -> list[dict]:
@@ -37,6 +40,15 @@ def exclude_photo_articles(articles: list[dict]) -> list[dict]:
     return result
 
 
+def exclude_personnel_articles(articles: list[dict]) -> list[dict]:
+    """제목이 "[인사]"로 시작하는 인사 발령 기사를 제외한다.
+
+    exclude_photo_articles와 달리 [속보] 예외는 두지 않는다 — 인사 발령이 속보로
+    나오는 경우는 사실상 없어서 그 교차 케이스를 신경 쓸 실익이 없다.
+    """
+    return [a for a in articles if PERSONNEL_NOTICE_MARK not in a["title"]]
+
+
 def deduplicate_by_title(articles: list[dict]) -> list[dict]:
     """
     제목이 완전히 동일한 기사는 처음 나온 1건만 남긴다.
@@ -54,9 +66,3 @@ def deduplicate_by_title(articles: list[dict]) -> list[dict]:
         seen_titles.add(article["title"])
         unique_articles.append(article)
     return unique_articles
-
-
-def filter_articles(articles: list[dict]) -> list[dict]:
-    """검색 결과에 [포토] 제외 -> 완전 동일 제목 중복 제거 순서로 적용한다."""
-    articles = exclude_photo_articles(articles)
-    return deduplicate_by_title(articles)

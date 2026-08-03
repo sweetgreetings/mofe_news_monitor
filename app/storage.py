@@ -52,6 +52,17 @@ def load_latest_run() -> Optional[dict]:
     return max(runs, key=lambda run: run["run_at"])
 
 
+def is_today(run: dict, now: Optional[datetime] = None) -> bool:
+    """이 회차가 오늘(로컬 날짜) 저장됐는지 확인한다.
+
+    [추가: 2026-07-26] 자정이 지나 어제 회차만 남아있는데도 load_latest_run()은 여전히
+    그 회차를 "가장 최근"으로 돌려주므로, 화면에 그대로 쓰기 전에 이 함수로 한 번 더
+    걸러야 한다(app.renderer.generate_screen 참고). now는 테스트에서 주입할 수 있다.
+    """
+    now = now or datetime.now()
+    return run["run_at"][:10] == now.strftime("%Y-%m-%d")
+
+
 def list_all_runs() -> list[dict]:
     """저장된 모든 회차를 최신순(run_at 내림차순)으로 돌려준다 (PRD.md 기능2 규칙 6, 지난 기사 조회용).
 
@@ -71,6 +82,26 @@ def list_all_runs() -> list[dict]:
             continue
         runs.append(run)
     return sorted(runs, key=lambda run: run["run_at"], reverse=True)
+
+
+def load_today_runs(date_str: Optional[str] = None) -> list[dict]:
+    """오늘(또는 지정한 날짜) 저장된 모든 회차를 시간순으로 돌려준다 (진입 화면 워드클라우드 당일 누적용).
+
+    list_all_runs와 같은 방어적 파싱(깨진 파일 건너뛰기)을 쓰되, 날짜 필터만 다르다.
+    파일명이 아니라 run_at의 날짜로 판단한다 (자정 넘겨 보충 실행해도 정확히 걸러진다).
+    """
+    date_str = date_str or datetime.now().strftime("%Y-%m-%d")
+    runs = []
+    for path in ARTICLES_DIR.glob("*.json"):
+        try:
+            run = json.loads(path.read_text(encoding="utf-8"))
+            run_at = datetime.fromisoformat(run["run_at"])
+            run["articles"]
+        except (json.JSONDecodeError, KeyError, ValueError, TypeError):
+            continue
+        if run_at.strftime("%Y-%m-%d") == date_str:
+            runs.append(run)
+    return sorted(runs, key=lambda run: run["run_at"])
 
 
 def _find_run_file(run_at: str, run_slot: str) -> Optional[Path]:

@@ -12,19 +12,30 @@ from app.config import (
     COLOR_CARD,
     COLOR_ERROR,
     COLOR_HEADER,
+    COLOR_HOVER,
     COLOR_TEXT,
     COLOR_TEXT_MUTED,
+    CUTE_FONT_BASE64,
+    CUTE_FONT_NAME,
     DEFAULT_ARTICLE_LINE_TEMPLATE,
     DEFAULT_HIGHLIGHT_KEYWORDS,
     FONT_STACK,
     HISTORY_HTML_PATH,
+    SETTINGS_SERVER_HOST,
     SETTINGS_SERVER_PORT,
 )
 from app.atomic_write import atomic_write_text
-from app.curation import filter_hidden
+from app.curation import display_group_name, filter_hidden, load_group_labels
 from app.renderer import render_article
 from app.settings import load_settings
 from app.storage import list_all_runs
+
+# [추가: 2026-07-26] "뉴스가 잠잠" 빈 상태 문구용 손글씨체 — app.renderer와 동일 규칙(오프라인
+# 대비 base64 내장). 파일별로 독립적인 이 앱의 렌더러 구조를 따라 여기서도 따로 정의한다.
+_CUTE_FONT_FACE_CSS = (
+    f"@font-face {{ font-family: '{CUTE_FONT_NAME}'; "
+    f"src: url(data:font/woff2;base64,{CUTE_FONT_BASE64}) format('woff2'); font-display: swap; }}"
+)
 
 _PAGE_TEMPLATE = """<!DOCTYPE html>
 <html lang="ko">
@@ -33,6 +44,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>지난 기사 더보기</title>
 <style>
+  {cute_font_face}
   body {{ margin: 0; background: {bg}; color: {text}; font-family: {font_stack}; }}
   .container {{
     max-width: 800px; margin: 24px auto; padding: 24px; background: {card};
@@ -40,10 +52,19 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
   h1 {{ font-size: 1.3rem; color: {header}; }}
   .empty {{ color: {muted}; margin-top: 12px; }}
+  .slot-empty {{ text-align: center; color: {muted}; padding: 8px 0; }}
+  .cute-caption {{ font-family: '{cute_font_name}', sans-serif; font-size: 1.1rem; margin-top: 4px; }}
   details.date {{ margin: 10px 0; border-bottom: 1px solid {border}; padding-bottom: 8px; }}
   details.date > summary {{ cursor: pointer; font-size: 1.1rem; color: {header}; }}
   details.slot {{ margin: 8px 0 8px 20px; }}
   details.slot > summary {{ cursor: pointer; }}
+  /* [추가: 2026-07-30] 저장 시점의 소제목 구성(group 필드)이 있는 회차는 이 제목으로
+     묶어서 보여준다 — 재분류가 아니라 저장해둔 결과를 그대로 복원하는 것뿐이다. */
+  .history-group {{ margin-top: 14px; }}
+  .history-group h3 {{
+    font-size: 1rem; color: {header}; border-bottom: 1px solid {border};
+    padding-bottom: 4px; margin: 0 0 6px 20px;
+  }}
   .article {{ margin: 10px 0 10px 20px; line-height: 1.5; }}
   .article summary {{ cursor: pointer; }}
   .article summary::marker {{ color: {muted}; }}
@@ -55,24 +76,34 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     cursor: pointer; padding: 2px 6px; user-select: none; -webkit-user-select: none;
   }}
   .hide-btn:hover {{ color: {error}; }}
-  .back {{
-    display: inline-block; margin-top: 24px; background: {accent}; color: #fff; border: none;
-    border-radius: 4px; padding: 6px 14px; text-decoration: none; user-select: none; -webkit-user-select: none;
+  /* [추가: 2026-07-26] 다른 화면들과 같은 상단 고정 바 — HOME만(이 화면엔 다른
+     이동할 곳이 마땅치 않아 index.html/live.html처럼 한 항목만 둔다). */
+  .container {{ padding-top: 60px; }}
+  .topbar {{
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    background: {card}; border-bottom: 1px solid {border}; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   }}
-  .back:hover {{ background: {header}; }}
+  .topbar-inner {{
+    max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+  }}
+  .topbar a {{ color: {accent}; text-decoration: none; font-size: 0.92rem; font-weight: 600; padding: 6px 10px; border-radius: 6px; }}
+  .topbar a:hover {{ background: {hover}; }}
 </style>
 </head>
 <body>
+<div class="topbar"><div class="topbar-inner">
+  <a href="home.html">홈</a>
+</div></div>
 <div class="container">
   <h1>📅 지난 기사 더보기 (최근 7일)</h1>
   {body}
-  <p><a class="back" href="index.html">메인 화면으로</a></p>
 </div>
 <script>
 function hideArticle(btn) {{
   var url = btn.dataset.url;
   var article = btn.closest(".article");
-  fetch("http://127.0.0.1:{settings_port}/hide-article", {{
+  fetch("http://{settings_host}:{settings_port}/hide-article", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{url: url}})
@@ -89,12 +120,30 @@ function hideArticle(btn) {{
 """
 
 
-def _render_slot(run: dict, index: int, highlight_words: list, line_template: str) -> str:
-    """회차 하나(시간대)를 토글로 렌더링한다. 소제목 재분류는 하지 않고 언론사
-    우선순위 순 목록만 보여준다 (당시 화면을 그대로 복원할 필요는 없어 단순화)."""
+def _render_slot(run: dict, index: int, highlight_words: list, line_template: str, labels: dict) -> str:
+    """회차 하나(시간대)를 토글로 렌더링한다.
+
+    [수정: 2026-07-30] 예전엔 소제목 재분류를 안 하고 언론사 우선순위 순 평평한
+    목록만 보여줬는데("당시 화면을 그대로 복원할 필요는 없어 단순화"), 저장 시점에
+    함께 저장해둔 소제목 구성("group" 필드, app.classifier.snapshot_group_names)이
+    있으면 그걸 그대로 써서 소제목별로 묶어 보여준다 — 재분류가 아니라 이미 저장된
+    결과를 복원하는 것뿐이라 큐레이션 버튼(✏️/↑/↓)은 여전히 없다. 이 필드가 생기기
+    전에 저장된 옛 회차(레거시 데이터)는 group 필드가 없으므로, 그때는 예전 방식대로
+    평평한 목록으로 대체 표시한다(하위 호환).
+    """
     articles = filter_hidden(run["articles"])
     if not articles:
-        body = '<p class="empty">하나도 없어요</p>'
+        body = '<div class="slot-empty">💤<div class="cute-caption">뉴스가 잠잠</div></div>'
+    elif all("group" in a for a in articles):
+        grouped: "OrderedDict" = OrderedDict()
+        for a in articles:
+            grouped.setdefault(a["group"], []).append(a)
+        sections = []
+        for name, group_articles in grouped.items():
+            display_name = html.escape(display_group_name(name, labels))
+            articles_html = "\n".join(render_article(a, highlight_words, line_template) for a in group_articles)
+            sections.append(f'<div class="history-group"><h3>&lt;{display_name}&gt;</h3>{articles_html}</div>')
+        body = "\n".join(sections)
     else:
         body = "\n".join(render_article(a, highlight_words, line_template) for a in articles)
     label = html.escape(f"{index}. {run['run_slot']}")
@@ -109,6 +158,9 @@ def _theme() -> dict:
     """이 페이지 템플릿이 공유하는 색상·폰트·포트 값. `.format(**_theme(), ...)`로 채운다."""
     return {
         "font_stack": FONT_STACK,
+        "cute_font_face": _CUTE_FONT_FACE_CSS,
+        "cute_font_name": CUTE_FONT_NAME,
+        "settings_host": SETTINGS_SERVER_HOST,
         "settings_port": SETTINGS_SERVER_PORT,
         "bg": COLOR_BG,
         "card": COLOR_CARD,
@@ -117,6 +169,7 @@ def _theme() -> dict:
         "text": COLOR_TEXT,
         "muted": COLOR_TEXT_MUTED,
         "border": COLOR_BORDER,
+        "hover": COLOR_HOVER,
         "error": COLOR_ERROR,
     }
 
@@ -140,6 +193,7 @@ def render_history_page(
             **_theme(),
         )
 
+    labels = load_group_labels()
     today = datetime.now().date()
     grouped: "OrderedDict" = OrderedDict()
     for run in runs:
@@ -150,7 +204,7 @@ def render_history_page(
     for run_date in sorted(grouped, reverse=True):
         day_runs = sorted(grouped[run_date], key=lambda r: r["run_slot"])
         slots_html = "\n".join(
-            _render_slot(r, i, highlight_words, line_template) for i, r in enumerate(day_runs, start=1)
+            _render_slot(r, i, highlight_words, line_template, labels) for i, r in enumerate(day_runs, start=1)
         )
         date_label = html.escape(_date_label(run_date, today))
         sections.append(f'<details class="date"><summary>{date_label}</summary>{slots_html}</details>')

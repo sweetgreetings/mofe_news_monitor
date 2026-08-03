@@ -15,22 +15,42 @@ from app.tokenizer import STOPWORDS, tokenize
 _SENTENCE_PATTERN = re.compile(r"[^.!?]*[.!?]|[^.!?]+$")
 
 
-def _rank_keywords_by_frequency(articles: list, keywords: Optional[list], use_summary: bool = False) -> list:
+def _rank_keywords_by_frequency(
+    articles: list,
+    keywords: Optional[list],
+    use_summary: bool = False,
+    exclude_keywords: bool = True,
+    extra_exclude: Optional[list] = None,
+) -> list:
     """전체 기사의 단어를 문서빈도 내림차순으로 정렬해 (단어, 빈도) 쌍 목록을 돌려준다.
 
-    검색 키워드는 거의 모든 제목/요약에 있어 제외한다. 빈도가 같으면 먼저 등장한 단어를
-    우선하고, 그것도 같으면 단어 자체로 정렬해 결과를 결정적으로 만든다.
-    extract_keywords·extract_keyword_frequencies가 공유하는 내부 로직이다.
+    검색 키워드는 거의 모든 제목/요약에 있어(특히 AND 모드) 소제목·주요 키워드로는
+    쓸모없어 기본적으로 제외한다. 빈도가 같으면 먼저 등장한 단어를 우선하고, 그것도
+    같으면 단어 자체로 정렬해 결과를 결정적으로 만든다. extract_keywords·
+    extract_keyword_frequencies가 공유하는 내부 로직이다.
 
     use_summary: [추가: 2026-07-24] True면 제목 대신 네이버 요약(description)에서 단어를
     뽑는다 — 진입 화면 워드클라우드용. 소제목 분류(classifier.py)와 같은 이유로, 요약문이
     보도자료 내용을 더 통일되게 옮겨써서 겹치는 단어가 잘 드러난다.
+
+    exclude_keywords: [수정: 2026-07-25] False면 검색 키워드도 그대로 집계에 포함한다 —
+    워드클라우드는 OR 검색에서 특정 키워드(예: 인물명)가 실제로 얼마나 자주 언급되는지도
+    보여주고 싶다는 요청으로, 워드클라우드(extract_keyword_frequencies)만 이 값을 꺼둔다.
+    소제목 분류·기사 하단 "🤖 주요 키워드"(extract_keywords)는 그대로 제외 유지 —
+    부서명 같은 키워드가 소제목이 되면 기사 전체가 한 그룹으로 뭉쳐버리기 때문이다.
+
+    extra_exclude: [추가: 2026-07-25] 설정 화면 "☁️ 워드클라우드 제외어"에서 사용자가
+    직접 등록한 단어 목록. exclude_keywords와 무관하게 항상 추가로 제외한다.
     """
     if not articles:
         return []
 
     keywords = keywords if keywords is not None else DEFAULT_KEYWORDS
-    stopwords = STOPWORDS | {k.lower() for k in keywords}
+    stopwords = (
+        STOPWORDS
+        | ({k.lower() for k in keywords} if exclude_keywords else set())
+        | {w.lower() for w in (extra_exclude or [])}
+    )
 
     if use_summary:
         token_sets = [tokenize(a.get("summary") or a["title"], stopwords) for a in articles]
@@ -64,13 +84,19 @@ def extract_keyword_frequencies(
     articles: list,
     keywords: Optional[list] = None,
     top_n: int = MAIN_KEYWORD_COUNT,
+    exclude_words: Optional[list] = None,
 ) -> list:
     """진입 화면 워드클라우드용으로, (단어, 빈도) 쌍을 top_n개까지 돌려준다 (PRD.md 기능3 규칙 3).
 
     [수정: 2026-07-24] 제목이 아니라 요약(description)에서 단어를 뽑도록 변경 — 소제목
-    분류 기준을 요약으로 바꾼 것과 같은 이유(규칙 참고).
+    분류 기준을 요약으로 바꾼 것과 같은 이유(규칙 참고). [수정: 2026-07-25] 검색
+    키워드도 제외하지 않고 그대로 집계한다(exclude_keywords=False) — 화면에서 색을
+    다르게 표시해 구분한다(app.landing_renderer.render_word_cloud). exclude_words는
+    사용자가 설정 화면에서 직접 등록한 워드클라우드 제외어 목록.
     """
-    ranked = _rank_keywords_by_frequency(articles, keywords, use_summary=True)
+    ranked = _rank_keywords_by_frequency(
+        articles, keywords, use_summary=True, exclude_keywords=False, extra_exclude=exclude_words
+    )
     return ranked[:top_n]
 
 

@@ -1,38 +1,96 @@
 # Design Ref: PRD.md 기능1 규칙 19·21, 기능2 규칙 8 — 기사 숨김/되돌리기, 소제목 순서·경계 넘나들기, 소제목 이름 바꾸기
 import json
+from datetime import datetime
 from typing import Optional, Tuple
 
 from app.atomic_write import atomic_write_text
 from app.classifier import classify_articles
 from app.config import GROUP_LABELS_FILE, GROUP_OVERRIDES_FILE, HIDDEN_ARTICLES_FILE
+from app.custom_groups import load_custom_groups
 
 
-def load_hidden_urls() -> set:
-    """숨긴 기사의 URL 집합을 읽어온다. 파일이 없거나 손상됐으면 빈 집합으로 취급한다."""
+def _today_str(now: Optional[datetime] = None) -> str:
+    return (now or datetime.now()).strftime("%Y-%m-%d")
+
+
+def _load_records(now: Optional[datetime] = None) -> list:
+    """오늘 숨긴 기록만 [{"url":..., "hidden_at":...}, ...] 형태로 읽어온다.
+
+    [수정: 2026-07-26] 익일 0시가 지나면 전부 비워진다(사용자 요청) — 숨김은 "오늘
+    화면만 정리하는" 용도라 다음날까지 남겨둘 필요가 없다는 판단. app.manual_articles와
+    같은 패턴으로, 파일을 그 자리에서 지우진 않고 읽을 때 오늘 것만 걸러내며, 다음
+    hide_article/unhide_article 호출 때 오늘치로 자연히 덮어써진다. 옛 형식(평평한
+    URL 문자열 목록)은 애초에 언제 숨겼는지 알 수 없어 이 새 정책상 그냥 버려진다
+    (오늘 것이라고 확신할 수 없으므로).
+    """
     if not HIDDEN_ARTICLES_FILE.exists():
-        return set()
+        return []
     try:
-        return set(json.loads(HIDDEN_ARTICLES_FILE.read_text(encoding="utf-8")))
-    except (json.JSONDecodeError, TypeError):
-        return set()
+        raw = json.loads(HIDDEN_ARTICLES_FILE.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
+    if raw and isinstance(raw[0], str):
+        return []
+    today = _today_str(now)
+    return [record for record in raw if record.get("hidden_at", "").startswith(today)]
 
 
-def _write(urls: set) -> None:
-    atomic_write_text(HIDDEN_ARTICLES_FILE, json.dumps(sorted(urls), ensure_ascii=False, indent=2))
+def _write_records(records: list) -> None:
+    atomic_write_text(HIDDEN_ARTICLES_FILE, json.dumps(records, ensure_ascii=False, indent=2))
 
 
-def hide_article(url: str) -> None:
-    """기사 하나를 숨김 처리한다. 원본 회차 JSON은 그대로 두고, 화면에 그릴 때만 제외한다."""
-    urls = load_hidden_urls()
-    urls.add(url)
-    _write(urls)
+def load_hidden_urls(now: Optional[datetime] = None) -> set:
+    """숨긴 기사의 URL 집합을 읽어온다(순서·시각과 무관 — filter_hidden의 빠른 포함 여부 확인용)."""
+    return {record["url"] for record in _load_records(now)}
 
 
-def unhide_article(url: str) -> None:
+def load_hidden_records(now: Optional[datetime] = None) -> list:
+    """오늘 숨긴 기록을 최근에 숨긴 순서대로(hidden_at 내림차순) 돌려준다.
+
+    "숨긴 기사 관리" 화면 전용 — filter_hidden처럼 포함 여부만 필요한 곳은
+    load_hidden_urls()의 set을 그대로 쓰면 된다.
+    """
+    return sorted(_load_records(now), key=lambda record: record["hidden_at"], reverse=True)
+
+
+def hide_article(
+    url: str,
+    now: Optional[datetime] = None,
+    outlet: Optional[str] = None,
+    title: Optional[str] = None,
+    pub_date: Optional[str] = None,
+) -> None:
+    """기사 하나를 숨김 처리한다. 원본 회차 JSON은 그대로 두고, 화면에 그릴 때만 제외한다.
+
+    [추가: 2026-07-27] outlet/title/pub_date를 넘기면 숨긴 기록에 같이 저장한다 —
+    "다음 회차 초안"(app.preview_renderer)에서 숨긴 기사는 정식 회차로 저장된 적이 없어
+    "숨긴 기사 관리" 화면이 기존 방식(정식 회차에서 URL로 역조회, app.settings_server
+    ._known_articles_by_url)으로는 언론사·제목을 못 찾아 URL만 보였다 — 숨기는 시점에
+    화면에 이미 떠 있는 정보를 그대로 실어 보내면 어디서 숨겼든 항상 보여줄 수 있다.
+    생략하면(기존 호출부·정식 회차에서 숨긴 경우) None으로 저장되고, 화면 쪽이 그때는
+    기존 방식대로 정식 회차 역조회로 대체한다(하위 호환).
+    """
+    records = _load_records(now)
+    if not any(record["url"] == url for record in records):
+        # [수정: 2026-07-26] 초 단위(timespec="seconds")가 아니라 마이크로초까지 그대로
+        # 남긴다 — 사용자가 여러 기사를 1초 안에 연달아 숨기면 초 단위로는 시각이 같아져,
+        # 정렬(내림차순)이 안정 정렬 특성상 오히려 먼저 숨긴 게 위로 가는 사고가 난다.
+        records.append(
+            {
+                "url": url,
+                "hidden_at": (now or datetime.now()).isoformat(),
+                "outlet": outlet,
+                "title": title,
+                "pub_date": pub_date,
+            }
+        )
+        _write_records(records)
+
+
+def unhide_article(url: str, now: Optional[datetime] = None) -> None:
     """숨김을 해제해 다시 화면에 보이게 한다."""
-    urls = load_hidden_urls()
-    urls.discard(url)
-    _write(urls)
+    records = [record for record in _load_records(now) if record["url"] != url]
+    _write_records(records)
 
 
 def load_group_overrides() -> dict:
@@ -73,13 +131,23 @@ def move_article(
     overrides: 지금까지 쌓인 강제 배정 기록. classify_articles에 그대로 반영해 "현재
     화면에 실제로 보이는 소제목 구성" 기준으로 위/아래를 판단한다.
 
+    [수정: 2026-07-27] classify_articles에는 articles를 그대로 넘기지 않고
+    filter_hidden(articles)를 넘긴다 — 안 그러면 숨긴 기사가 여전히 같은 소제목의
+    "보이지 않는 이웃"으로 남아있어, 화면에는 기사가 1개만 보이는 소제목인데도
+    백엔드는 여전히 2개짜리로 보고 "같은 소제목 내 순서 변경"으로 처리해버린다 —
+    그 순서 변경 대상이 숨긴(안 보이는) 기사라 화면엔 아무 변화가 없어 "이동이 안 된다"는
+    버그가 났다. 소제목 경계 판단(group_index/target_index)은 항상 화면에 보이는
+    구성 기준이어야 하고, 실제 순서를 맞바꿀 때는(아래) 원본 articles 전체에서 위치를
+    찾으므로 숨긴 기사도 원래 저장 순서 그대로 남는다(삭제되지 않는다).
     반환: (new_articles, new_override).
       - new_override가 None이면 new_articles만 반영하면 된다 (같은 소제목 내 순서 변경).
       - new_override가 (url, 소제목이름) 튜플이면, 호출하는 쪽이 set_group_override로
         저장해야 한다 (소제목 경계를 넘은 경우). 이때 new_articles는 원본과 동일하다.
       - 더 옮길 곳이 없거나 url을 못 찾으면 (articles, None)을 그대로 돌려준다.
     """
-    groups = classify_articles(articles, keywords, forced_groups=overrides)
+    groups = classify_articles(
+        filter_hidden(articles), keywords, forced_groups=overrides, custom_group_names=load_custom_groups()
+    )
     group_index = next(
         (i for i, g in enumerate(groups) if any(a["url"] == url for a in g["articles"])), None
     )
@@ -103,6 +171,20 @@ def move_article(
         return articles, None  # 맨 처음/맨 마지막 소제목이라 더 옮길 곳이 없음
 
     return articles, (url, groups[target_index]["name"])
+
+
+def bulk_reassign_group(urls: list, target_group: str) -> None:
+    """체크박스로 선택한 기사 여러 개를 한 번에 target_group으로 옮긴다
+    (스크랩 초안의 "선택한 기사 옮기기" 하단 바, 기사별 "다른 소제목으로" 드롭다운).
+
+    move_article과 달리 "이웃과 스왑"이 아니라 "그냥 이 소제목으로 배정"이라 순서
+    계산이 필요 없다 — 이미 있는 set_group_override를 URL 개수만큼 반복 호출하면
+    끝이고, 그 안에서 몇 번째로 보일지는(입력 순서 유지 원칙) app.classifier
+    ._apply_forced_groups가 알아서 정한다.
+    """
+    for url in urls:
+        if url:
+            set_group_override(url, target_group)
 
 
 def load_group_labels() -> dict:

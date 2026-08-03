@@ -8,6 +8,8 @@ data/
 /index.html
 /history.html
 /home.html
+/live.html
+/preview.html
 
 # 개발 중 임시로 옮겨둔 파일(사용자 검토 후 직접 삭제하는 폴더)
 trash-can/

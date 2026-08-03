@@ -25,14 +25,41 @@ def _assign(articles: list, token_sets: list, topic_words: list) -> tuple:
     return used, leftover
 
 
-def _apply_forced_groups(groups: list, forced_groups: dict) -> list:
+def _apply_forced_groups(
+    groups: list, forced_groups: dict, order_index: dict, custom_group_names: Optional[list] = None
+) -> list:
     """사용자가 소제목 경계를 넘어 수동으로 옮긴 기사를 지정된 소제목으로 강제 이동한다
     (PRD.md 기능1 규칙 21 — ↑/↓로 소제목 자체를 바꾸는 경우).
 
     지정된 소제목이 이번 회차 자동 분류 결과에 없으면(예: 그 사이 관련 기사가 다
     숨겨지거나 삭제돼 그 소제목 자체가 사라짐) 조용히 무시하고 자동 분류를 그대로
     둔다 — 사라진 소제목을 억지로 되살리지 않는다(자기 치유적 동작).
+
+    [수정: 2026-07-30] 강제로 옮긴 기사를 예전엔 target["articles"]의 맨 끝에 무조건
+    append했다 — 그래서 소제목을 넘어간 기사는 항상 그 소제목 맨 아래에 꽂히고, 그 뒤
+    ↑로 아무리 옮기려 해도(app.curation.move_article이 같은 소제목 내 순서를 바꿔
+    저장해도) classify_articles가 다시 호출될 때마다 이 함수가 또 맨 끝으로 되돌려놔서
+    사실상 그 기사만 위/아래 조정이 먹통이 되는 버그였다("그룹 내 기사 순서는 입력
+    순서를 유지한다"는 원칙이 강제 이동 기사에는 적용되지 않았던 것). order_index
+    (원본 articles 리스트에서의 위치)로 최종 정렬해, 강제 이동 기사도 다른 기사와
+    똑같이 "입력 순서 유지" 원칙을 따르게 한다 — 이후 위/아래 이동이 입력 순서를 바꾸는
+    방식(같은 소제목 내 스왑)으로 저장되면 다음 렌더링에도 그 순서가 그대로 반영된다.
+
+    [추가: 2026-07-30] custom_group_names(app.custom_groups로 사용자가 "+ 새 소제목
+    만들기"로 미리 만들어둔 이름)는 위 "자동 분류 결과에 없으면 무시" 규칙의 예외다 —
+    자동 분류로는 절대 안 나오는 이름이라 항상 "결과에 없는" 상태일 텐데, 그렇다고
+    무시해버리면 사용자가 일부러 만든 소제목으로는 기사를 영영 옮길 수 없게 된다.
+    이 이름들은 미리 빈 소제목으로 끼워넣어 두고, 끝까지 아무 기사도 안 들어오면
+    마지막 필터(어차피 빈 그룹은 버림)에서 자연히 걸러진다.
     """
+    groups = list(groups)
+    if custom_group_names:
+        existing = {g["name"] for g in groups}
+        for name in custom_group_names:
+            if name not in existing:
+                groups.append({"name": name, "articles": []})
+                existing.add(name)
+
     group_by_name = {g["name"]: g for g in groups}
     for url, target_name in forced_groups.items():
         target = group_by_name.get(target_name)
@@ -49,6 +76,7 @@ def _apply_forced_groups(groups: list, forced_groups: dict) -> list:
                 break
         if moved is not None and moved not in target["articles"]:
             target["articles"].append(moved)
+            target["articles"].sort(key=lambda a: order_index[a["url"]])
     return [g for g in groups if g["articles"]]
 
 
@@ -57,6 +85,7 @@ def classify_articles(
     keywords: Optional[list] = None,
     max_subheadings: int = MAX_SUBHEADINGS,
     forced_groups: Optional[dict] = None,
+    custom_group_names: Optional[list] = None,
 ) -> list:
     """기사 목록을 소제목별로 분류한다.
 
@@ -71,6 +100,10 @@ def classify_articles(
 
     forced_groups: {기사 url: 소제목 이름} — 자동 분류 결과와 무관하게 이 소제목으로
     강제 이동한다(규칙21). 자동 분류를 모두 마친 뒤 마지막에 적용한다.
+    custom_group_names: [추가: 2026-07-30] 사용자가 "+ 새 소제목 만들기"로 직접 만든
+    소제목 이름 목록(app.custom_groups) — 자동 분류로는 절대 안 나오는 이름이라
+    _apply_forced_groups에 미리 빈 그룹으로 끼워 넣어야 이 소제목으로의 강제 이동이
+    (자동 분류 결과에 없다는 이유로) 조용히 무시되지 않는다.
     """
     if not articles:
         return []
@@ -105,5 +138,26 @@ def classify_articles(
     if leftover:
         result.append({"name": "기타", "articles": leftover})
     if forced_groups:
-        result = _apply_forced_groups(result, forced_groups)
+        order_index = {a["url"]: i for i, a in enumerate(articles)}
+        result = _apply_forced_groups(result, forced_groups, order_index, custom_group_names)
     return result
+
+
+def snapshot_group_names(
+    articles: list,
+    keywords: Optional[list] = None,
+    forced_groups: Optional[dict] = None,
+    custom_group_names: Optional[list] = None,
+) -> list:
+    """지금 이 순간의 소제목 분류 결과를 각 기사에 "group" 필드로 붙여 돌려준다
+    (저장된 회차가 나중에 "지난 기사 더보기"에서 당시 소제목 구성 그대로 복원할 수
+    있도록 — app.history_renderer, app.scraper.collect_run, app.settings_server의
+    최신 회차 큐레이션 핸들러 참고).
+
+    최신 회차는 화면에 보이는 동안 재분류가 계속 다시 일어나므로(app.renderer.render_page가
+    매번 classify_articles를 새로 부름), 이 스냅샷은 "지금 저장하는 시점"의 결과일 뿐이다 —
+    이후 이 회차가 최신 회차로 남아있는 동안 숨기기·이동 등으로 다시 바뀌면, 그때마다
+    호출하는 쪽이 이 함수를 다시 불러 저장된 값을 최신으로 갱신해야 한다.
+    """
+    groups = classify_articles(articles, keywords, forced_groups=forced_groups, custom_group_names=custom_group_names)
+    return [{**a, "group": g["name"]} for g in groups for a in g["articles"]]
