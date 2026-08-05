@@ -183,15 +183,49 @@ _OG_TITLE_PATTERN = re.compile(
     r'|<meta[^>]+content=["\']([^"\']*)["\'][^>]+property=["\']og:title["\']',
     re.IGNORECASE,
 )
+# [추가: 2026-08-05] "🔄 원문에서 다시 가져오기" 버튼이 요약을 보완할 때 쓴다 —
+# og:description은 언론사가 직접 써둔 완결된 문장인 경우가 많아, 네이버 API의
+# description(기사 중간 아무 데서나 잘린 스니펫)보다 자연스럽다.
+_OG_DESC_PATTERN = re.compile(
+    r'<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']*)["\']'
+    r'|<meta[^>]+content=["\']([^"\']*)["\'][^>]+property=["\']og:description["\']',
+    re.IGNORECASE,
+)
+
+
+def _best_title_from_html(text: str) -> Optional[str]:
+    """og:title과 <title> 태그를 둘 다 확인해 더 완전해 보이는 쪽을 고른다.
+
+    [수정: 2026-08-05] og:title이 있으면 무조건 그걸 썼는데, 실제로 언론사 CMS 쪽
+    버그로 og:title 자체가 문장 중간에서 잘려 있는 경우가 있었다(한국일보,
+    n.news.naver.com/mnews/article/469/0000946328 — og:title은 "...6070에 "에서
+    끊기는데 같은 페이지의 <title> 태그엔 전체 문장이 다 있었다). 그래서 og:title이
+    있어도 <title> 태그(언론사명이 붙어 있을 수 있음)와 길이를 비교해 더 긴 쪽을
+    쓴다 — 정상적인 경우 <title>은 " - 언론사명"이 붙어 og:title보다 짧을 이유가
+    없으므로, 이 비교만으로 잘린 케이스를 걸러낼 수 있다.
+    """
+    og_match = _OG_TITLE_PATTERN.search(text)
+    og_title = None
+    if og_match:
+        og_title = (og_match.group(1) or og_match.group(2) or "").strip() or None
+    title_match = _TITLE_TAG_PATTERN.search(text)
+    title_tag = None
+    if title_match:
+        title_tag = title_match.group(1).strip() or None
+    if og_title and title_tag:
+        best = og_title if len(og_title) >= len(title_tag) else title_tag
+    else:
+        best = og_title or title_tag
+    return html.unescape(best) if best else None
 
 
 def _fetch_full_title(url: str) -> Optional[str]:
     """네이버 API가 "..."로 잘라 보낸 제목을, 그 기사의 실제 페이지에서 다시 가져온다.
 
-    본문 전체를 읽는 게 아니라 <head>의 og:title/title 태그 한 줄만 뽑아오는 용도다
-    (PRD.md "본문 크롤링 없음" 원칙과는 다른 성격 — 제목만 보완). og:title을 먼저
-    찾는다(대개 언론사명 접미사 없이 순수 제목만 담김), 없으면 <title> 태그로 대신한다
-    (언론사명이 붙어 있을 수 있지만 잘린 것보단 낫다는 판단).
+    본문 전체를 읽는 게 아니라 <head>의 og:title/title 태그만 뽑아오는 용도다
+    (PRD.md "본문 크롤링 없음" 원칙과는 다른 성격 — 제목만 보완). 둘 중 더 완전해
+    보이는 쪽을 고른다(_best_title_from_html 참고 — og:title이 있어도 무조건 우선하지
+    않는다).
 
     실패(접속 오류·타임아웃·태그 없음)하면 조용히 None을 돌려준다 — 호출하는 쪽은
     실패 시 원래(잘린) 제목을 그대로 쓰므로, 이 함수가 실패해도 전체 수집은 멈추지
@@ -206,18 +240,46 @@ def _fetch_full_title(url: str) -> Optional[str]:
     # 잘못 짐작해 한글이 깨진다 — apparent_encoding(내용 기반 추정)으로 보정한다.
     if not response.encoding or response.encoding.lower() == "iso-8859-1":
         response.encoding = response.apparent_encoding
+    return _best_title_from_html(response.text)
+
+
+def fetch_full_title_and_summary(url: str) -> Optional[dict]:
+    """"🔄 원문에서 다시 가져오기" 버튼(app.settings_server._handle_refetch_summary)이
+    호출한다 — 그 기사 하나만 원문 페이지의 og:title/og:description으로 제목·요약을
+    보완한다. _fetch_full_title과 같은 방식(og 메타태그, 접속 오류는 조용히 None)이지만,
+    이건 자동이 아니라 사용자가 직접 버튼을 눌렀을 때만 호출되므로 전체 수집 시간에는
+    영향이 없다 — 그래서 title뿐 아니라 summary도 항상 같이 시도한다("..."로 끝날 때만
+    보완하는 _fetch_full_title과 달리 조건이 없다).
+
+    title·summary 중 하나만 찾아도(다른 하나가 없어도) 찾은 것만 담아 돌려준다. 언론사
+    페이지 태그 표기가 제각각이라 og 메타 자체가 없을 수 있고, 그러면 그 필드는 그냥
+    없는 채로(None) 반환한다 — 호출하는 쪽(app.summary_overrides.set_summary_override)이
+    있는 값만 저장한다. 원문 접속 자체가 실패하면(타임아웃 등) None을 돌려준다.
+    """
+    try:
+        response = requests.get(url, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
+        response.raise_for_status()
+    except requests.exceptions.RequestException:
+        return None
+    if not response.encoding or response.encoding.lower() == "iso-8859-1":
+        response.encoding = response.apparent_encoding
     text = response.text
-    og_match = _OG_TITLE_PATTERN.search(text)
-    if og_match:
-        title = (og_match.group(1) or og_match.group(2) or "").strip()
-        if title:
-            return html.unescape(title)
-    title_match = _TITLE_TAG_PATTERN.search(text)
-    if title_match:
-        title = title_match.group(1).strip()
-        if title:
-            return html.unescape(title)
-    return None
+
+    # [수정: 2026-08-05] og:title을 무조건 우선하지 않는다 — _best_title_from_html
+    # 참고(언론사 CMS 버그로 og:title 자체가 잘려 있던 실제 사례).
+    title = _best_title_from_html(text)
+
+    summary = None
+    og_desc = _OG_DESC_PATTERN.search(text)
+    if og_desc:
+        summary = (og_desc.group(1) or og_desc.group(2) or "").strip() or None
+
+    if not title and not summary:
+        return None
+    return {
+        "title": title,
+        "summary": html.unescape(summary) if summary else None,
+    }
 
 
 def _parse_pub_date(pub_date_str: str) -> Optional[datetime]:

@@ -1,5 +1,6 @@
 # Design Ref: PRD.md 기능1 규칙 19·21, 기능2 규칙 8 — 기사 숨김/되돌리기, 소제목 순서·경계 넘나들기, 소제목 이름 바꾸기
 import json
+import threading
 from datetime import datetime
 from typing import Optional, Tuple
 
@@ -7,6 +8,14 @@ from app.atomic_write import atomic_write_text
 from app.classifier import classify_articles
 from app.config import GROUP_LABELS_FILE, GROUP_OVERRIDES_FILE, HIDDEN_ARTICLES_FILE
 from app.custom_groups import load_custom_groups
+
+# [추가: 2026-08-05] hide_article/unhide_article는 파일을 통째로 읽어 고쳐 다시 쓰는
+# 방식이라, ThreadingHTTPServer(app.settings_server)가 동시에 여러 요청을 처리하면
+# (예: 체크박스로 여러 기사를 한꺼번에 숨기는 bulkHideSelected가 /hide-article을
+# 병렬로 여러 번 호출) 두 요청이 같은 "숨기기 전" 상태를 읽어버려 나중에 쓴 쪽이
+# 먼저 쓴 쪽의 결과를 덮어써 일부 기사가 숨겨지지 않는 경합이 실제로 발생했다.
+# 이 잠금으로 읽기-수정-쓰기 전체를 한 번에 하나씩만 실행되게 한다.
+_hidden_lock = threading.Lock()
 
 
 def _today_str(now: Optional[datetime] = None) -> str:
@@ -70,27 +79,29 @@ def hide_article(
     생략하면(기존 호출부·정식 회차에서 숨긴 경우) None으로 저장되고, 화면 쪽이 그때는
     기존 방식대로 정식 회차 역조회로 대체한다(하위 호환).
     """
-    records = _load_records(now)
-    if not any(record["url"] == url for record in records):
-        # [수정: 2026-07-26] 초 단위(timespec="seconds")가 아니라 마이크로초까지 그대로
-        # 남긴다 — 사용자가 여러 기사를 1초 안에 연달아 숨기면 초 단위로는 시각이 같아져,
-        # 정렬(내림차순)이 안정 정렬 특성상 오히려 먼저 숨긴 게 위로 가는 사고가 난다.
-        records.append(
-            {
-                "url": url,
-                "hidden_at": (now or datetime.now()).isoformat(),
-                "outlet": outlet,
-                "title": title,
-                "pub_date": pub_date,
-            }
-        )
-        _write_records(records)
+    with _hidden_lock:
+        records = _load_records(now)
+        if not any(record["url"] == url for record in records):
+            # [수정: 2026-07-26] 초 단위(timespec="seconds")가 아니라 마이크로초까지 그대로
+            # 남긴다 — 사용자가 여러 기사를 1초 안에 연달아 숨기면 초 단위로는 시각이 같아져,
+            # 정렬(내림차순)이 안정 정렬 특성상 오히려 먼저 숨긴 게 위로 가는 사고가 난다.
+            records.append(
+                {
+                    "url": url,
+                    "hidden_at": (now or datetime.now()).isoformat(),
+                    "outlet": outlet,
+                    "title": title,
+                    "pub_date": pub_date,
+                }
+            )
+            _write_records(records)
 
 
 def unhide_article(url: str, now: Optional[datetime] = None) -> None:
     """숨김을 해제해 다시 화면에 보이게 한다."""
-    records = [record for record in _load_records(now) if record["url"] != url]
-    _write_records(records)
+    with _hidden_lock:
+        records = [record for record in _load_records(now) if record["url"] != url]
+        _write_records(records)
 
 
 def load_group_overrides() -> dict:
@@ -173,6 +184,60 @@ def move_article(
     return articles, (url, groups[target_index]["name"])
 
 
+def bulk_move_articles(
+    articles: list, keywords: Optional[list], urls: list, direction: str, overrides: Optional[dict] = None
+) -> list:
+    """체크박스로 선택한 기사 여러 개(3~4개 등)를 같은 소제목 안에서 통째로 한 칸
+    위/아래로 옮긴다(하단 "일괄 이동" 바의 ↑/↓, 2026-08-04 추가).
+
+    move_article과 달리 소제목 경계는 넘지 않는다 — 여러 개를 한꺼번에 옮기다 일부만
+    다른 소제목으로 넘어가면 "묶음"이라는 개념이 깨지므로, 선택된 기사가 전부 같은
+    소제목 안에 있어야 하고(하나라도 다른 소제목이면 아무것도 안 바꾸고 원본 그대로
+    돌려준다) 그 소제목의 맨 위/아래에 닿으면 조용히 무시한다(개별 기사 ↑/↓와 달리
+    여기선 그게 자연스러운 한계 — 호출하는 쪽 JS가 애초에 버튼을 비활성화해 이 경우가
+    거의 안 생기지만, 서버도 한 번 더 확인한다).
+
+    묶음을 한 칸 미는 방법: 선택된 기사를 소제목 안 현재 순서대로 정렬한 뒤, "위로"는
+    맨 위부터 아래로, "아래로"는 맨 아래부터 위로 순서대로 바로 이웃과 하나씩 맞바꿔
+    나간다 — 이 순서로 해야 묶음 전체가 한 칸 밀린 것과 같은 결과가 된다(거꾸로 하면
+    중간에 꼬인다. 예: [A,B*,C*,D*,E]에서 "위로"는 B->C->D 순으로 각자 위 이웃과
+    맞바꿔야 [B,C,D,A,E]가 된다).
+    """
+    groups = classify_articles(
+        filter_hidden(articles), keywords, forced_groups=overrides, custom_group_names=load_custom_groups()
+    )
+    url_set = set(urls)
+    group = next((g for g in groups if any(a["url"] in url_set for a in g["articles"])), None)
+    if group is None:
+        return articles
+    group_urls = [a["url"] for a in group["articles"]]
+    if not url_set.issubset(set(group_urls)):
+        return articles  # 선택 대상이 두 소제목 이상에 걸쳐 있음 — 묶음 이동 불가
+
+    positions = sorted(group_urls.index(u) for u in url_set)
+    if direction == "up":
+        if positions[0] == 0:
+            return articles
+        ordered_urls = [group_urls[p] for p in positions]
+    else:
+        if positions[-1] == len(group_urls) - 1:
+            return articles
+        ordered_urls = [group_urls[p] for p in reversed(positions)]
+
+    new_articles = list(articles)
+    index_by_url = {a["url"]: i for i, a in enumerate(new_articles)}
+    current_group_urls = list(group_urls)
+    for u in ordered_urls:
+        pos = current_group_urls.index(u)
+        swap_with = pos - 1 if direction == "up" else pos + 1
+        other_url = current_group_urls[swap_with]
+        i, j = index_by_url[u], index_by_url[other_url]
+        new_articles[i], new_articles[j] = new_articles[j], new_articles[i]
+        index_by_url[u], index_by_url[other_url] = j, i
+        current_group_urls[pos], current_group_urls[swap_with] = current_group_urls[swap_with], current_group_urls[pos]
+    return new_articles
+
+
 def bulk_reassign_group(urls: list, target_group: str) -> None:
     """체크박스로 선택한 기사 여러 개를 한 번에 target_group으로 옮긴다
     (스크랩 초안의 "선택한 기사 옮기기" 하단 바, 기사별 "다른 소제목으로" 드롭다운).
@@ -220,6 +285,27 @@ def set_group_label(topic_word: str, label: str) -> None:
     else:
         labels[topic_word] = label
     _write_labels(labels)
+
+
+def display_name_in_use(display_name: str, active_names: set, exclude_name: Optional[str] = None) -> bool:
+    """이 표시 이름이 지금 같은 화면에 함께 나타나는 다른 소제목과 겹치는지 확인한다.
+
+    원래 단어(topic word)가 서로 다른 두 소제목이 이름표(label)만 같아지면, 분류상으로는
+    별개인데 화면엔 완전히 똑같은 소제목이 두 개로 보인다 — 실제로 "기타"와 "비판 의견"이
+    둘 다 "우리부 관련 및 기타"로 이름표가 붙어 발생했던 문제(2026-08-04).
+
+    [수정: 2026-08-04] 처음엔 group_labels.json 전체 이력(지난 회차 포함)을 훑었는데,
+    "회차 안에서만 중복이면 문제고, 회차끼리는 같은 이름이어도 상관없다"는 피드백에 따라
+    범위를 좁혔다 — active_names는 호출하는 쪽(지금 그 화면)이 현재 DOM에 실제로 그려진
+    소제목들의 원래 단어를 모아 넘긴다(app.renderer/app.preview_renderer의 getAllGroups()
+    JS와 같은 소스). 그 목록에 없는, 지난 회차에서만 쓰였던 이름표는 검사 대상이 아니다.
+    exclude_name은 지금 이름을 바꾸려는 소제목 자기 자신(원래 단어)을 검사에서 빼는 용도다.
+    """
+    labels = load_group_labels()
+    for topic_word in active_names:
+        if topic_word != exclude_name and display_group_name(topic_word, labels) == display_name:
+            return True
+    return False
 
 
 def display_group_name(name: str, labels: dict) -> str:

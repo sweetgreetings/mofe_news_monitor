@@ -18,12 +18,14 @@ from app.config import (
     COLOR_TEXT,
     COLOR_TEXT_MUTED,
     FONT_STACK,
+    HIGHLIGHT_COLORS,
     LIVE_HTML_PATH,
     SETTINGS_SERVER_HOST,
     SETTINGS_SERVER_PORT,
 )
 from app.atomic_write import atomic_write_text
 from app.curation import load_hidden_urls
+from app.summary_overrides import apply_summary_overrides
 from app.filters import exclude_personnel_articles, exclude_photo_articles
 from app.highlight import highlight_keywords
 from app.live_cache import load_live_cache, save_live_cache
@@ -69,6 +71,35 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
   .bottombar a {{ color: {accent}; text-decoration: none; font-size: 1.1rem; padding: 6px 10px; border-radius: 6px; }}
   .bottombar a:hover {{ background: {hover}; }}
+  /* [추가: 2026-08-03] app.renderer와 동일한 이유 — 하단바 🖍️ 형광펜 편집 팝오버. 이
+     화면은 {{hover}}가 실시간 배지용 붉은 톤(COLOR_LIVE_BG)이라 여기서만 다른 화면과
+     같은 파란 hover색(#EFF6FF)을 직접 쓴다 — {{hover}}를 그대로 쓰면 이 버튼만 빨갛게
+     hover되어 다른 두 화면과 어긋나 보인다. */
+  .highlight-wrap {{ position: relative; }}
+  .highlight-toggle {{
+    background: transparent; border: none; font-size: 1.1rem; cursor: pointer;
+    padding: 6px 10px; border-radius: 6px;
+  }}
+  .highlight-toggle:hover {{ background: #EFF6FF; }}
+  .highlight-popover {{
+    display: none; position: absolute; bottom: 100%; right: 0; margin-bottom: 8px;
+    background: {card}; border: 1px solid {border}; border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); padding: 12px; width: 220px; z-index: 30;
+  }}
+  .highlight-popover.is-open {{ display: block; }}
+  .highlight-chips {{ display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }}
+  .highlight-chip {{
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 14px;
+    font-size: 0.82rem; color: {text}; cursor: pointer;
+  }}
+  .highlight-chip button {{
+    background: transparent; border: none; padding: 0; font-size: 0.8rem; cursor: pointer;
+    color: inherit; line-height: 1;
+  }}
+  .highlight-empty {{ color: {muted}; font-size: 0.8rem; margin: 0 0 8px; }}
+  .highlight-add-form {{ display: flex; gap: 6px; }}
+  .highlight-add-form input {{ flex: 1; font-size: 0.85rem; padding: 5px 8px; min-width: 0; }}
+  .highlight-add-form button {{ font-size: 0.82rem; padding: 5px 10px; white-space: nowrap; }}
   .live-head {{ display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }}
   .live-badge {{ display: inline-flex; align-items: center; gap: 6px; color: {error}; font-size: 1.25rem; font-weight: 600; }}
   .pulse {{ width: 8px; height: 8px; border-radius: 50%; background: {error}; }}
@@ -97,6 +128,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
     padding: 12px 12px 12px 14px; border-top: 1px solid {border}; border-left: 3px solid transparent;
   }}
+  /* [추가: 2026-08-05] app.renderer와 동일 — 마우스 오버 시 연한 회색 표시. 아래 상태별
+     배경색(스크랩됨/숨김/담아둠 등) 규칙보다 먼저 둬서, 상태가 있는 줄은 마우스를
+     올려도 그 상태 색이 그대로 우선한다(평범한 줄만 회색이 보인다). */
+  .live-row:hover {{ background: #F3F4F6; }}
   /* [수정: 2026-07-27] 오늘 이미 스크랩된(자동+수동) 기사는 왼쪽 초록 색띠 + 옅은 초록
      배경으로 "이미 잘 담겼다"는 완료 느낌을 준다 — 회색 음영만으로는 존재감이 약했다.
      색띠는 형광펜(제목 안쪽 텍스트 배경색)과 자리가 겹치지 않아 서로 안 부딕친다. */
@@ -158,6 +193,25 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     cursor: pointer; padding: 4px 6px;
   }}
   .hide-from-live-btn:hover {{ color: {error}; }}
+  /* [추가: 2026-08-05] 원문 다시 가져오기 버튼 — app.renderer.render_article과 동일한
+     이유·동작(평소 숨김, 그 행에 마우스를 올리면 나타남). */
+  .refetch-btn {{
+    flex-shrink: 0; background: transparent; border: none; color: {muted}; font-size: 1rem;
+    cursor: pointer; padding: 4px 6px; opacity: 0; transition: opacity 0.15s;
+  }}
+  .live-row:hover .refetch-btn {{ opacity: 1; }}
+  .refetch-btn:disabled {{ opacity: 0.35 !important; cursor: not-allowed; }}
+  /* [추가: 2026-08-05] app.renderer와 동일 — ✏️ 직접 수정 인라인 편집 칸. */
+  .edit-summary-form {{
+    margin: 8px 0 4px 20px; padding: 10px 12px; border: 1px solid {accent}; border-radius: 8px;
+    display: flex; flex-direction: column; gap: 8px;
+  }}
+  .edit-summary-form input, .edit-summary-form textarea {{
+    width: 100%; box-sizing: border-box; padding: 6px 10px; border: 1px solid {border}; border-radius: 6px;
+    font-size: 0.88rem; color: {text}; background: {card}; font-family: inherit;
+  }}
+  .edit-summary-form .edit-summary-actions {{ display: flex; justify-content: flex-end; gap: 8px; }}
+  .edit-summary-form button {{ font-size: 0.82rem; padding: 5px 12px; }}
   .empty {{ text-align: center; margin: 60px 0; font-size: 1.2rem; color: {muted}; }}
   .error-box {{ text-align: center; margin: 60px 0; color: {muted}; font-size: 0.95rem; line-height: 1.7; }}
 </style>
@@ -176,9 +230,97 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   {body}
 </div>
 <div class="bottombar"><div class="bottombar-inner">
+  <div class="highlight-wrap">
+    <button type="button" class="highlight-toggle" onclick="toggleHighlightPopover()" title="형광펜 단어 편집">🖍️</button>
+    <div class="highlight-popover" id="highlight-popover">
+      <div class="highlight-chips" id="highlight-chips"></div>
+      <form class="highlight-add-form" onsubmit="return addHighlightWord(event);">
+        <input type="text" id="highlight-new-word" placeholder="단어 추가" maxlength="20">
+        <button type="submit">추가</button>
+      </form>
+    </div>
+  </div>
   <a href="{hidden_href}" title="숨긴 기사 관리">🗑️</a>
 </div></div>
 <script>
+// [추가: 2026-08-03] app.renderer와 동일한 이유·동작 — 하단바 🖍️ 형광펜 팝오버.
+const HIGHLIGHT_WORDS = {highlight_words_json};
+function renderHighlightChips() {{
+  var wrap = document.getElementById("highlight-chips");
+  if (!HIGHLIGHT_WORDS.length) {{
+    wrap.innerHTML = '<p class="highlight-empty">등록된 형광펜 단어가 없어요.</p>';
+    return;
+  }}
+  wrap.innerHTML = HIGHLIGHT_WORDS.map(function(item) {{
+    var word = item.word.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    var attr = item.word.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    // [수정: 2026-08-05] app.renderer와 동일 — 칩 클릭으로 색 순환.
+    return '<span class="highlight-chip" data-word="' + attr + '" style="background:' + item.color_hex +
+      '" onclick="cycleChipColor(this)" title="클릭하면 색이 바뀝니다">' + word +
+      '<button type="button" data-word="' + attr + '" onclick="event.stopPropagation(); removeHighlightWord(this)" title="제거">×</button></span>';
+  }}).join("");
+}}
+function toggleHighlightPopover() {{
+  var pop = document.getElementById("highlight-popover");
+  var opening = !pop.classList.contains("is-open");
+  pop.classList.toggle("is-open");
+  if (opening) {{ renderHighlightChips(); }}
+}}
+// [추가: 2026-08-05] app.renderer와 동일 — 팝오버 바깥 클릭 시 닫힘.
+document.addEventListener("click", function(e) {{
+  var pop = document.getElementById("highlight-popover");
+  if (pop.classList.contains("is-open") && !e.target.closest(".highlight-wrap")) {{
+    pop.classList.remove("is-open");
+  }}
+}});
+function _postToggleHighlight(word) {{
+  return fetch("http://{settings_host}:{settings_port}/keywords/toggle-highlight", {{
+    method: "POST", keepalive: true,
+    headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
+    body: new URLSearchParams({{word: word}})
+  }});
+}}
+function removeHighlightWord(btn) {{
+  _postToggleHighlight(btn.dataset.word).then(function(res) {{
+    if (res.ok) {{ location.reload(); }}
+    else {{ alert("삭제에 실패했습니다. 다시 시도해주세요."); }}
+  }}).catch(function() {{
+    alert("삭제에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  }});
+}}
+function addHighlightWord(evt) {{
+  evt.preventDefault();
+  var input = document.getElementById("highlight-new-word");
+  var word = input.value.trim();
+  if (!word) {{ return false; }}
+  _postToggleHighlight(word).then(function(res) {{
+    if (res.ok) {{ location.reload(); }}
+    else {{ alert("추가에 실패했습니다 — 형광펜 단어는 최대 개수까지 등록돼 있을 수 있어요."); }}
+  }}).catch(function() {{
+    alert("추가에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  }});
+  return false;
+}}
+// [수정: 2026-08-05] app.renderer와 동일 — 팝오버 칩 클릭으로 색 순환(본문 클릭 방식은 삭제).
+function cycleChipColor(chip) {{
+  var word = chip.dataset.word;
+  fetch("http://{settings_host}:{settings_port}/keywords/cycle-highlight-color", {{
+    method: "POST", keepalive: true,
+    headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
+    body: new URLSearchParams({{word: word}})
+  }}).then(function(res) {{
+    if (!res.ok) {{ alert("색 변경에 실패했습니다. 다시 시도해주세요."); return null; }}
+    return res.json();
+  }}).then(function(data) {{
+    if (!data) return;
+    chip.style.background = data.color_hex;
+    document.querySelectorAll('.hl-word[data-word="' + CSS.escape(word) + '"]').forEach(function(span) {{
+      span.style.backgroundColor = data.color_hex;
+    }});
+  }}).catch(function() {{
+    alert("색 변경에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  }});
+}}
 function addToScrap(btn) {{
   var params = new URLSearchParams({{
     outlet: btn.dataset.outlet, title: btn.dataset.title,
@@ -235,6 +377,72 @@ function hideFromLive(btn) {{
   }}).catch(function() {{
     alert("숨기지 못했습니다 — 앱이 실행 중인지 확인해주세요.");
   }});
+}}
+// [추가: 2026-08-05] app.renderer.render_article과 동일 — 원문에서 다시 가져오기.
+// 실시간 현황은 평소 hideFromLive처럼 DOM만 갈아끼우는 화면이지만, 여기서는 새로고침을
+// 쓴다 — 하이라이트 적용된 HTML을 자바스크립트로 다시 만드는 것보다 훨씬 간단하고,
+// 어차피 자주 누를 버튼이 아니라 새로고침 한 번(=실시간 재검색 한 번)의 비용이 크지 않다.
+function refetchSummary(btn) {{
+  var url = btn.dataset.url;
+  btn.disabled = true;
+  fetch("http://{settings_host}:{settings_port}/refetch-summary", {{
+    method: "POST", keepalive: true,
+    headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
+    body: new URLSearchParams({{url: url}})
+  }}).then(function(res) {{
+    if (res.ok) {{ location.reload(); }}
+    else if (res.status === 404) {{ alert("원문에서 더 나은 제목·요약을 찾지 못했어요."); btn.disabled = false; }}
+    else {{ alert("다시 가져오기에 실패했습니다. 다시 시도해주세요."); btn.disabled = false; }}
+  }}).catch(function() {{
+    alert("다시 가져오기에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+    btn.disabled = false;
+  }});
+}}
+// [추가: 2026-08-05] app.renderer와 동일 — ✏️ 직접 수정. live.html은 카드 구조가
+// 달라서(.article/.article-summary가 아니라 .live-row/.live-summary) 그 부분만 다르다.
+function editSummary(btn) {{
+  var row = btn.closest(".live-row");
+  if (row.querySelector(".edit-summary-form")) {{ return; }}
+  var url = btn.dataset.url;
+  var form = document.createElement("div");
+  form.className = "edit-summary-form";
+  var titleInput = document.createElement("input");
+  titleInput.type = "text";
+  titleInput.value = btn.dataset.title;
+  var summaryInput = document.createElement("textarea");
+  summaryInput.rows = 2;
+  summaryInput.value = btn.dataset.summary;
+  var actions = document.createElement("div");
+  actions.className = "edit-summary-actions";
+  var cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "clear-btn";
+  cancelBtn.textContent = "취소";
+  cancelBtn.onclick = function(e) {{ e.stopPropagation(); form.remove(); }};
+  var saveBtn = document.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.textContent = "저장";
+  saveBtn.onclick = function(e) {{
+    e.stopPropagation();
+    fetch("http://{settings_host}:{settings_port}/edit-summary", {{
+      method: "POST", keepalive: true,
+      headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
+      body: new URLSearchParams({{url: url, title: titleInput.value, summary: summaryInput.value}})
+    }}).then(function(res) {{
+      if (res.ok) {{ location.reload(); }}
+      else {{ alert("저장하지 못했습니다. 다시 시도해주세요."); }}
+    }}).catch(function() {{
+      alert("저장하지 못했습니다 — 앱이 실행 중인지 확인해주세요.");
+    }});
+  }};
+  actions.appendChild(cancelBtn);
+  actions.appendChild(saveBtn);
+  form.appendChild(titleInput);
+  form.appendChild(summaryInput);
+  form.appendChild(actions);
+  var details = row.querySelector(".live-title");
+  details.open = true;
+  row.querySelector(".live-summary").insertAdjacentElement("afterend", form);
 }}
 function unpinFromLive(btn) {{
   var params = new URLSearchParams({{url: btn.dataset.url}});
@@ -340,6 +548,18 @@ def _theme() -> dict:
         "auto_teal": "#0D9488",
         "auto_teal_bg": "#F0FDFA",
     }
+
+
+def _highlight_words_json(highlight_words: list) -> str:
+    """하단바 🖍️ 팝오버에 실어 보낼 형광펜 단어 목록 — app.renderer/app.preview_renderer와
+    동일한 형식({"word":..., "color_hex":...})."""
+    return json.dumps(
+        [
+            {"word": item["word"], "color_hex": HIGHLIGHT_COLORS[item.get("color", 0) % len(HIGHLIGHT_COLORS)]}
+            for item in highlight_words
+        ],
+        ensure_ascii=False,
+    ).replace("</", "<\\/")
 
 
 def _home_href() -> str:
@@ -563,6 +783,18 @@ def _render_row(
             f'data-pub-date="{html.escape(pub_date or "")}" '
             'onclick="hideFromLive(this)" title="이 기사 숨기기 (되돌리기 가능)">🗑️</button>'
         )
+    # [추가: 2026-08-05] app.renderer.render_article과 동일 — 원문에서 다시 가져오기.
+    refetch_btn_html = (
+        f'<button class="refetch-btn" type="button" data-url="{url}" '
+        'onclick="refetchSummary(this)" title="원문에서 다시 가져오기">🔄</button>'
+    )
+    # [추가: 2026-08-05] app.renderer.render_article과 동일 — ✏️ 직접 수정(🔄가 원문에서도
+    # 못 찾는 경우의 최후 수단).
+    edit_btn_html = (
+        f'<button class="refetch-btn" type="button" data-url="{url}" '
+        f'data-title="{title_attr_escaped}" data-summary="{summary_attr}" '
+        'onclick="editSummary(this)" title="제목·요약 직접 수정">✏️</button>'
+    )
     return (
         f'<div class="{row_class}" data-outlet="{outlet}">'
         f'<div class="live-row-text"><span class="outlet-tag">{outlet_display}</span>{pub_time_html}'
@@ -575,7 +807,7 @@ def _render_row(
         f'<button class="{btn_class}" type="button" data-outlet="{outlet}" data-title="{title_attr_escaped}" '
         f'data-url="{url}" data-summary="{summary_attr}" data-pub-date="{html.escape(pub_date or "")}" '
         f'onclick="{btn_onclick}"{disabled} title="{title_attr}">{btn_label}</button>'
-        f"{hide_icon_html}"
+        f"{refetch_btn_html}{edit_btn_html}{hide_icon_html}"
         "</div>"
         "</div>"
     )
@@ -646,6 +878,7 @@ def render_live_page(
         settings_host=SETTINGS_SERVER_HOST,
         settings_port=SETTINGS_SERVER_PORT,
         outlet_order_json=json.dumps(outlet_order, ensure_ascii=False),
+        highlight_words_json=_highlight_words_json(highlight_words),
     )
 
 
@@ -664,6 +897,7 @@ def render_live_error_page() -> str:
         settings_host=SETTINGS_SERVER_HOST,
         settings_port=SETTINGS_SERVER_PORT,
         outlet_order_json="[]",
+        highlight_words_json=_highlight_words_json(load_settings().get("highlight_keywords", [])),
     )
 
 
@@ -748,6 +982,7 @@ def generate_live_page() -> Path:
     # app.naver_api._search_one_keyword가 KST로 통일해 isoformat() 문자열로 채워주므로,
     # 그대로 문자열 비교만 해도 시간 순서와 일치한다(굳이 다시 파싱할 필요 없음).
     articles = sorted(articles, key=lambda a: a.get("pub_date") or "", reverse=True)
+    articles = apply_summary_overrides(articles)
 
     can_add = load_latest_run() is not None
     html_text = render_live_page(

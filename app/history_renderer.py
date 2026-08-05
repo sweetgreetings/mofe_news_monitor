@@ -26,6 +26,7 @@ from app.config import (
 )
 from app.atomic_write import atomic_write_text
 from app.curation import display_group_name, filter_hidden, load_group_labels
+from app.summary_overrides import apply_summary_overrides
 from app.renderer import render_article
 from app.settings import load_settings
 from app.storage import list_all_runs
@@ -65,7 +66,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     font-size: 1rem; color: {header}; border-bottom: 1px solid {border};
     padding-bottom: 4px; margin: 0 0 6px 20px;
   }}
-  .article {{ margin: 10px 0 10px 20px; line-height: 1.5; }}
+  .article {{ margin: 10px 0 10px 20px; line-height: 1.5; padding: 4px 6px; border-radius: 8px; }}
+  /* [추가: 2026-08-05] app.renderer와 동일 — 마우스 오버 시 연한 회색 표시. */
+  .article:hover {{ background: #F3F4F6; }}
   .article summary {{ cursor: pointer; }}
   .article summary::marker {{ color: {muted}; }}
   .article-summary {{ margin: 6px 0 4px 20px; color: {text}; font-size: 0.95rem; }}
@@ -76,6 +79,25 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     cursor: pointer; padding: 2px 6px; user-select: none; -webkit-user-select: none;
   }}
   .hide-btn:hover {{ color: {error}; }}
+  /* [추가: 2026-08-05] app.renderer와 동일 — 원문 다시 가져오기 버튼, 평소 숨김. */
+  .refetch-btn {{
+    flex-shrink: 0; background: transparent; border: none; color: {muted}; font-size: 1rem;
+    cursor: pointer; padding: 2px 6px; user-select: none; -webkit-user-select: none;
+    opacity: 0; transition: opacity 0.15s;
+  }}
+  .article:hover .refetch-btn {{ opacity: 1; }}
+  .refetch-btn:disabled {{ opacity: 0.35 !important; cursor: not-allowed; }}
+  /* [추가: 2026-08-05] app.renderer와 동일 — ✏️ 직접 수정 인라인 편집 칸. */
+  .edit-summary-form {{
+    margin: 8px 0 4px 20px; padding: 10px 12px; border: 1px solid {accent}; border-radius: 8px;
+    display: flex; flex-direction: column; gap: 8px;
+  }}
+  .edit-summary-form input, .edit-summary-form textarea {{
+    width: 100%; box-sizing: border-box; padding: 6px 10px; border: 1px solid {border}; border-radius: 6px;
+    font-size: 0.88rem; color: {text}; background: {card}; font-family: inherit;
+  }}
+  .edit-summary-form .edit-summary-actions {{ display: flex; justify-content: flex-end; gap: 8px; }}
+  .edit-summary-form button {{ font-size: 0.82rem; padding: 5px 12px; }}
   /* [추가: 2026-07-26] 다른 화면들과 같은 상단 고정 바 — HOME만(이 화면엔 다른
      이동할 곳이 마땅치 않아 index.html/live.html처럼 한 항목만 둔다). */
   .container {{ padding-top: 60px; }}
@@ -114,6 +136,68 @@ function hideArticle(btn) {{
     alert("숨기기에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
   }});
 }}
+// [추가: 2026-08-05] app.renderer와 동일 — 원문에서 다시 가져오기.
+function refetchSummary(btn) {{
+  var url = btn.dataset.url;
+  btn.disabled = true;
+  fetch("http://{settings_host}:{settings_port}/refetch-summary", {{
+    method: "POST", keepalive: true,
+    headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
+    body: new URLSearchParams({{url: url}})
+  }}).then(function(res) {{
+    if (res.ok) {{ location.reload(); }}
+    else if (res.status === 404) {{ alert("원문에서 더 나은 제목·요약을 찾지 못했어요."); btn.disabled = false; }}
+    else {{ alert("다시 가져오기에 실패했습니다. 다시 시도해주세요."); btn.disabled = false; }}
+  }}).catch(function() {{
+    alert("다시 가져오기에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+    btn.disabled = false;
+  }});
+}}
+// [추가: 2026-08-05] app.renderer와 동일 — ✏️ 직접 수정.
+function editSummary(btn) {{
+  var article = btn.closest(".article");
+  if (article.querySelector(".edit-summary-form")) {{ return; }}
+  var url = btn.dataset.url;
+  var form = document.createElement("div");
+  form.className = "edit-summary-form";
+  var titleInput = document.createElement("input");
+  titleInput.type = "text";
+  titleInput.value = btn.dataset.title;
+  var summaryInput = document.createElement("textarea");
+  summaryInput.rows = 2;
+  summaryInput.value = btn.dataset.summary;
+  var actions = document.createElement("div");
+  actions.className = "edit-summary-actions";
+  var cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "clear-btn";
+  cancelBtn.textContent = "취소";
+  cancelBtn.onclick = function(e) {{ e.stopPropagation(); form.remove(); }};
+  var saveBtn = document.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.textContent = "저장";
+  saveBtn.onclick = function(e) {{
+    e.stopPropagation();
+    fetch("http://{settings_host}:{settings_port}/edit-summary", {{
+      method: "POST", keepalive: true,
+      headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
+      body: new URLSearchParams({{url: url, title: titleInput.value, summary: summaryInput.value}})
+    }}).then(function(res) {{
+      if (res.ok) {{ location.reload(); }}
+      else {{ alert("저장하지 못했습니다. 다시 시도해주세요."); }}
+    }}).catch(function() {{
+      alert("저장하지 못했습니다 — 앱이 실행 중인지 확인해주세요.");
+    }});
+  }};
+  actions.appendChild(cancelBtn);
+  actions.appendChild(saveBtn);
+  form.appendChild(titleInput);
+  form.appendChild(summaryInput);
+  form.appendChild(actions);
+  var details = article.querySelector("details");
+  details.open = true;
+  article.querySelector(".article-summary").insertAdjacentElement("afterend", form);
+}}
 </script>
 </body>
 </html>
@@ -131,7 +215,7 @@ def _render_slot(run: dict, index: int, highlight_words: list, line_template: st
     전에 저장된 옛 회차(레거시 데이터)는 group 필드가 없으므로, 그때는 예전 방식대로
     평평한 목록으로 대체 표시한다(하위 호환).
     """
-    articles = filter_hidden(run["articles"])
+    articles = apply_summary_overrides(filter_hidden(run["articles"]))
     if not articles:
         body = '<div class="slot-empty">💤<div class="cute-caption">뉴스가 잠잠</div></div>'
     elif all("group" in a for a in articles):

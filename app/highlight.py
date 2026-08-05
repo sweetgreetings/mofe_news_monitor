@@ -43,8 +43,17 @@ def highlight_keywords(text: str, keywords: list[dict]) -> str:
     for match in pattern.finditer(text):
         result.append(html.escape(text[last_end:match.start()]))
         matched_text = html.escape(match.group())
-        color = color_by_keyword[match.group().lower()]
-        result.append(f'<span style="background-color:{color};color:{HIGHLIGHT_TEXT_COLOR}">{matched_text}</span>')
+        word_key = match.group().lower()
+        color = color_by_keyword[word_key]
+        # [수정: 2026-08-05] 본문 안 단어를 직접 클릭해 색을 바꾸던 기능은 삭제 요청에
+        # 따라 없앴다 — 색 순환은 이제 "🖍️ 형광펜 단어 편집" 팝오버의 칩에서만 가능하다
+        # (cycleChipColor). data-word는 그대로 남겨둔다 — 팝오버에서 색을 바꿀 때 같은
+        # 단어가 나온 모든 자리(제목·요약, 다른 기사)를 한 번에 찾아 배경색을 갱신하는 데
+        # 여전히 필요하다.
+        result.append(
+            f'<span class="hl-word" data-word="{html.escape(word_key)}" '
+            f'style="background-color:{color};color:{HIGHLIGHT_TEXT_COLOR}">{matched_text}</span>'
+        )
         last_end = match.end()
     result.append(html.escape(text[last_end:]))
     return "".join(result)

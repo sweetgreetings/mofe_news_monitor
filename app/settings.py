@@ -419,6 +419,26 @@ def toggle_highlight_keyword(word: str) -> dict:
     return settings
 
 
+def cycle_highlight_color(word: str) -> str:
+    """[추가: 2026-08-04] 본문에서 형광펜 단어를 직접 클릭하면 그 단어의 색을 팔레트
+    안에서 다음 색으로 바꾼다 — 색 하나가 그 단어에 전역으로 묶여 있으므로(제목·요약,
+    모든 기사에 공통), 여기서 바뀐 색은 등장하는 모든 자리에 똑같이 반영돼야 한다
+    (호출하는 쪽이 반환값으로 받은 색을 data-word가 같은 모든 요소에 즉시 적용).
+    등록되지 않은 단어면 아무것도 하지 않고 빈 문자열을 돌려준다(호출하는 쪽에서
+    실패로 처리).
+    """
+    settings = load_settings()
+    items = settings.get("highlight_keywords", [])
+    index = next((i for i, item in enumerate(items) if item["word"].lower() == word.lower()), None)
+    if index is None:
+        return ""
+    next_color = (items[index].get("color", 0) + 1) % len(HIGHLIGHT_COLORS)
+    items[index]["color"] = next_color
+    settings["highlight_keywords"] = items
+    _write(settings)
+    return HIGHLIGHT_COLORS[next_color]
+
+
 def add_highlight_keyword(word: str) -> dict:
     """형광펜 화면의 "+ 추가" 입력창 — 검색 키워드에 없는 단어도 형광펜에 바로 등록할 수
     있게 한다. [추가: 2026-07-26] toggle_highlight_keyword와 달리 이미 있으면 조용히

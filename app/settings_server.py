@@ -34,7 +34,9 @@ from app.config import (
 )
 from app.classifier import classify_articles, snapshot_group_names
 from app.curation import (
+    bulk_move_articles,
     bulk_reassign_group,
+    display_name_in_use,
     filter_hidden,
     hide_article,
     load_group_overrides,
@@ -45,18 +47,22 @@ from app.curation import (
     unhide_article,
 )
 from app.custom_groups import add_custom_group, load_custom_groups, remove_custom_group
+from app.group_order import save_group_order
 from app.draft_articles import add_draft_pending_article
 from app.history_renderer import generate_history_page
 from app.landing_renderer import generate_landing_page
 from app.live_renderer import generate_live_page
 from app.manual_articles import add_manual_article, pop_manual_article
-from app.naver_api import OUTLET_CATEGORIES, outlet_display_label
-from app.preview_renderer import generate_preview_page, preview_move_article
+from app.manual_keyword_note import save_manual_keyword_note
+from app.naver_api import OUTLET_CATEGORIES, fetch_full_title_and_summary, outlet_display_label
+from app.summary_overrides import set_summary_override
+from app.preview_renderer import generate_preview_page, preview_bulk_move_articles, preview_move_article
 from app.renderer import apply_line_template, generate_screen
 from app.settings import (
     SettingsError,
     add_highlight_keyword,
     all_search_keywords,
+    cycle_highlight_color,
     load_settings,
     move_outlet,
     save_article_line_template,
@@ -109,11 +115,13 @@ _BASE_STYLE = """
   .save-bar button {{ width: 100%; }}
   /* [수정: 2026-08-03] app.renderer와 동일한 이유 — button은 a와 달리 font-family를
      상속받지 않고, appearance:auto(네이티브 OS 버튼 껍데기)까지 남아있어 폰트만 맞춰선
-     완전히 똑같이 안 보인다. */
+     완전히 똑같이 안 보인다. 크롬이 button 텍스트만 내부적으로 수직 중앙 정렬해주는
+     것까지 발견해 align-items: center를 직접 지정했다. */
   button, a.btn {{
     background: {accent}; color: #ffffff; border: none; border-radius: 4px;
-    padding: 8px 16px; font-size: 1rem; font-family: inherit; cursor: pointer; text-decoration: none; display: inline-block;
+    padding: 8px 16px; font-size: 1rem; font-family: inherit; cursor: pointer; text-decoration: none;
     appearance: none; -webkit-appearance: none;
+    display: inline-flex; align-items: center; justify-content: center;
   }}
   button:hover, a.btn:hover {{ background: {header}; }}
   button:disabled {{ background: {border}; color: {muted}; cursor: not-allowed; }}
@@ -144,9 +152,12 @@ _TOP_BAR_HTML = (
 # [수정: 2026-07-27] 숨긴 기사 관리 화면은 설정으로 갈 일이 없다 — 여기서 되돌리기(↩️)를
 # 누른 뒤에는 바로 스크랩 결과 화면으로 돌아가는 게 자연스러워서 오른쪽 링크를
 # "스크랩 보기"(index.html)로 바꿨다.
+# [수정: 2026-08-05] 왼쪽도 "홈"(home.html)이 아니라 "📝 스크랩 초안"(preview.html)으로
+# 바꿨다 — 숨긴 기사 관리에서 되돌리기 후 주로 가는 곳은 초안 아니면 완성본이지, 로고만
+# 있는 진입 화면(홈)으로 갈 일은 거의 없다는 피드백.
 _HIDDEN_TOP_BAR_HTML = (
     '<div class="topbar"><div class="topbar-inner">'
-    '<a href="{index_href}">홈</a>'
+    '<a href="{preview_href}">📝 스크랩 초안</a>'
     '<a href="{scrap_href}">📗 스크랩 완성본</a>'
     "</div></div>"
 )
@@ -1194,6 +1205,10 @@ def _scrap_href() -> str:
     return f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/index.html"
 
 
+def _preview_href() -> str:
+    return f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/preview.html"
+
+
 def render_menu_page() -> str:
     """설정 메뉴 화면을 렌더링한다 (PRD.md 기능1 규칙 17)."""
     return _MENU_TEMPLATE.format(**_theme(), index_href=_home_href())
@@ -1464,7 +1479,7 @@ def render_hidden_page() -> str:
             )
         rows_html = "\n".join(rows)
     return _HIDDEN_TEMPLATE.format(
-        **_theme(), rows_html=rows_html, index_href=_home_href(), scrap_href=_scrap_href()
+        **_theme(), rows_html=rows_html, preview_href=_preview_href(), scrap_href=_scrap_href()
     )
 
 
@@ -1522,6 +1537,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_add_highlight_word(form)
         elif self.path == "/keywords/toggle-highlight":
             self._handle_toggle_highlight(form)
+        elif self.path == "/keywords/cycle-highlight-color":
+            self._handle_cycle_highlight_color(form)
         elif self.path == "/save-format":
             self._handle_save_format(form)
         elif self.path == "/save-schedule":
@@ -1556,6 +1573,16 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_preview_move_article(form)
         elif self.path == "/bulk-move-article":
             self._handle_bulk_move_article(form)
+        elif self.path == "/bulk-move-order":
+            self._handle_bulk_move_order(form)
+        elif self.path == "/preview-bulk-move-order":
+            self._handle_preview_bulk_move_order(form)
+        elif self.path == "/refetch-summary":
+            self._handle_refetch_summary(form)
+        elif self.path == "/edit-summary":
+            self._handle_edit_summary(form)
+        elif self.path == "/save-manual-keyword-note":
+            self._handle_save_manual_keyword_note(form)
         elif self.path == "/add-custom-group":
             self._handle_add_custom_group(form)
         elif self.path == "/remove-custom-group":
@@ -1566,6 +1593,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_telegram_send_draft(form)
         elif self.path == "/telegram-send-scrap":
             self._handle_telegram_send_scrap(form)
+        elif self.path == "/save-group-order":
+            self._handle_save_group_order(form)
         else:
             self.send_response(404)
             self.end_headers()
@@ -1711,16 +1740,41 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         self._redirect("/highlight")
 
     def _handle_toggle_highlight(self, form: dict) -> None:
-        """검색 키워드 화면의 🖍️ 버튼이 fetch로 호출한다 — 이미 형광펜에 있으면 빼고,
-        없으면 다음 순번 색으로 추가한다(app.settings.toggle_highlight_keyword)."""
+        """검색 키워드 화면의 🖍️ 버튼과, 완성본·초안·실시간 화면 하단의 🖍️ 형광펜 팝오버가
+        fetch로 호출한다 — 이미 형광펜에 있으면 빼고, 없으면 다음 순번 색으로 추가한다
+        (app.settings.toggle_highlight_keyword).
+
+        [수정: 2026-08-03] 버그 수정 — 최대 개수 초과로 실패해도 항상 204(성공)를 돌려줘서,
+        호출하는 쪽(toggleHighlight의 !res.ok 분기)이 실패 안내를 절대 보여줄 수 없었다.
+        이제 실패하면 400을 돌려줘 호출하는 쪽이 정상적으로 실패를 알 수 있다.
+        """
         word = form.get("word", [""])[0]
-        if word.strip():
+        if not word.strip():
+            self.send_response(400)
+        else:
             try:
                 toggle_highlight_keyword(word)
+                self.send_response(204)
             except SettingsError:
-                pass  # 최대 개수 초과 — 조용히 무시(버튼 상태가 그대로 유지됨)
-        self.send_response(204)
+                self.send_response(400)  # 최대 개수 초과
         self.end_headers()
+
+    def _handle_cycle_highlight_color(self, form: dict) -> None:
+        """"🖍️ 형광펜 단어 편집" 팝오버의 칩을 클릭하면 fetch로 호출한다
+        (cycleChipColor) — 그 단어의 색을 팔레트 다음 순번으로 바꾸고
+        (app.settings.cycle_highlight_color), 새 색을 JSON으로 돌려줘 호출하는 쪽이
+        새로고침 없이 같은 단어가 나온 모든 자리를 즉시 갱신할 수 있게 한다. 등록되지
+        않은 단어(word가 빈 문자열 반환)면 404로 알린다 — 이론상 화면에 있는 단어는
+        항상 등록돼 있어야 하지만, 팝오버로 그 사이에 삭제됐을 수도 있다.
+        """
+        word = form.get("word", [""])[0]
+        color_hex = cycle_highlight_color(word) if word.strip() else ""
+        if not color_hex:
+            self.send_response(404)
+            self.end_headers()
+            return
+        self._regenerate_screens()
+        self._respond_json({"color_hex": color_hex})
 
     def _handle_save_wordcloud_exclude(self, form: dict) -> None:
         words = [form.get(f"exclude{i + 1}", [""])[0] for i in range(MAX_WORDCLOUD_EXCLUDE_WORDS)]
@@ -1778,6 +1832,27 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self.send_response(204)
         else:
             self.send_response(502)
+        self.end_headers()
+
+    def _handle_save_group_order(self, form: dict) -> None:
+        """소제목 헤더의 ↑/↓ 버튼이 fetch로 호출한다.
+
+        화면(자바스크립트)이 이미 "지금 보이는 소제목 순서에서 인접한 두 개를 맞바꾼"
+        전체 순서를 JSON 배열로 계산해 보내주므로, 서버는 그대로 저장하기만 한다
+        (app.group_order.save_group_order). 완성본·초안 어느 화면에서 눌렀든 다음 번
+        정적 화면 생성에도 반영되도록 _regenerate_screens를 호출한다.
+        """
+        raw_order = form.get("order", [""])[0]
+        try:
+            order = json.loads(raw_order)
+        except json.JSONDecodeError:
+            order = None
+        if isinstance(order, list):
+            save_group_order(order)
+            self._regenerate_screens()
+            self.send_response(204)
+        else:
+            self.send_response(400)
         self.end_headers()
 
     def _handle_save_format(self, form: dict) -> None:
@@ -1925,13 +2000,26 @@ class _SettingsHandler(BaseHTTPRequestHandler):
 
         name(원래 소제목 단어)은 그대로 두고 표시 이름만 바꾼다 — 분류 로직에는
         영향이 없다.
+
+        [추가: 2026-08-04] 원래 단어가 다른 소제목끼리 이름표만 같아지면 화면엔 완전히
+        똑같은 소제목이 두 개로 보인다("기타"·"비판 의견"이 둘 다 "우리부 관련 및
+        기타"로 붙어 실제로 발생했던 문제) — display_name_in_use로 막고 409로 알린다.
+        [수정: 2026-08-04] 검사 범위를 "이 화면에 지금 같이 떠 있는 소제목"으로 좁혔다 —
+        피드백: 회차 안에서 중복이면 안 되지만 회차끼리는(예: 완성본 vs 지난 회차)
+        같은 이름이어도 상관없다. active_names는 클라이언트가 지금 그려진 소제목
+        원래 단어를 모아 보낸 목록(getAllGroups() JS)이다.
         """
         name = form.get("name", [""])[0]
         label = form.get("label", [""])[0].strip()
-        if name and label:
+        active_names = set(form.get("active_names", []))
+        if not name or not label:
+            self.send_response(204)
+        elif display_name_in_use(label, active_names, exclude_name=name):
+            self.send_response(409)
+        else:
             set_group_label(name, label)
             self._regenerate_screens()
-        self.send_response(204)
+            self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
 
@@ -2105,15 +2193,117 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         self.send_response(204)
         self.end_headers()
 
+    def _handle_bulk_move_order(self, form: dict) -> None:
+        """완성본(index.html) 체크박스 하단 "일괄 이동" 바의 새 ↑/↓가 fetch로
+        호출한다(bulkMoveOrder, 2026-08-04 추가) — 여러 기사를 3~4개씩 체크해 같은
+        소제목 안에서 통째로 한 칸 옮기는 용도. app.curation.bulk_move_articles가
+        소제목 경계를 넘는 조합이면 아무 것도 안 바꾸므로, 여기서는 결과가 실제로
+        달라졌을 때만 저장한다. app.settings_server._handle_move_article과 같은
+        이유로 snapshot_group_names를 다시 붙여 저장한다.
+        """
+        urls = [u for u in form.get("urls", []) if u]
+        direction = form.get("direction", [""])[0]
+        if urls and direction in ("up", "down"):
+            run = load_latest_run()
+            if run is not None:
+                keywords = all_search_keywords(load_settings())
+                overrides = load_group_overrides()
+                new_articles = bulk_move_articles(run["articles"], keywords, urls, direction, overrides)
+                if new_articles is not run["articles"]:
+                    snapshot = snapshot_group_names(new_articles, keywords, overrides, load_custom_groups())
+                    if update_run_articles(run, snapshot):
+                        self._regenerate_screens()
+        self.send_response(204)
+        self.end_headers()
+
+    def _handle_preview_bulk_move_order(self, form: dict) -> None:
+        """스크랩 초안(preview.html) 쪽의 같은 기능 — app.preview_renderer
+        .preview_bulk_move_articles가 실제 계산·저장을 맡는다(완성본과 달리 저장된
+        회차가 없어 preview_order.json에 저장한다).
+        """
+        urls = [u for u in form.get("urls", []) if u]
+        direction = form.get("direction", [""])[0]
+        if urls and direction in ("up", "down"):
+            preview_bulk_move_articles(urls, direction)
+        self.send_response(204)
+        self.end_headers()
+
+    def _handle_refetch_summary(self, form: dict) -> None:
+        """기사 카드에 마우스를 올리면 나타나는 "🔄 원문에서 다시 가져오기" 버튼이
+        fetch로 호출한다(refetchSummary, 완성본·초안·실시간 현황 공통) — 네이버 API의
+        제목/요약이 사진 설명이나 문장 중간처럼 이상한 지점에서 잘려 있을 때, 그 기사
+        원문 페이지의 og:title/og:description으로 그 기사 하나만 다시 가져온다
+        (app.naver_api.fetch_full_title_and_summary). 찾은 값이 있으면
+        app.summary_overrides에 저장해 어느 화면에서 봐도 계속 반영되게 한다.
+
+        원문에서 아무것도 못 찾았거나(태그 없음) 접속 자체가 실패하면 404로 알린다 —
+        자동이 아니라 사용자가 직접 누른 동작이라, 실패를 조용히 무시하지 않고 알려준다.
+        """
+        url = form.get("url", [""])[0]
+        if not url:
+            self.send_response(400)
+            self.end_headers()
+            return
+        result = fetch_full_title_and_summary(url)
+        if not result or not (result.get("title") or result.get("summary")):
+            self.send_response(404)
+            self.end_headers()
+            return
+        set_summary_override(url, result.get("title"), result.get("summary"))
+        self._regenerate_screens()
+        self.send_response(204)
+        self.end_headers()
+
+    def _handle_edit_summary(self, form: dict) -> None:
+        """✏️ 직접 수정 버튼이 fetch로 호출한다(editSummary) — 🔄가 원문에서도 못 찾는
+        경우의 최후 수단으로, 사용자가 직접 타이핑한 제목·요약을 그대로 저장한다.
+        저장 형식·적용 범위는 🔄와 완전히 같다(app.summary_overrides, 부분 저장 —
+        비워둔 칸은 기존 값을 그대로 둔다).
+        """
+        url = form.get("url", [""])[0]
+        title = form.get("title", [""])[0].strip()
+        summary = form.get("summary", [""])[0].strip()
+        if not url or not (title or summary):
+            self.send_response(400)
+            self.end_headers()
+            return
+        set_summary_override(url, title or None, summary or None)
+        self._regenerate_screens()
+        self.send_response(204)
+        self.end_headers()
+
+    def _handle_save_manual_keyword_note(self, form: dict) -> None:
+        """"+ 직접 키워드 작성하기"의 저장/삭제 버튼이 fetch로 호출한다(saveKeywordNote/
+        clearKeywordNote) — AI가 추출한 하단 키워드 블록과 무관한, 이용자가 자유
+        서식으로 적어두는 메모 한 줄을 저장한다(app.manual_keyword_note). 완성본은
+        정적 파일이라 즉시 다시 그려야 다음 접속에도 바로 보인다(초안·실시간 현황은
+        요청마다 새로 계산되므로 별도 처리가 필요 없다).
+        """
+        text = form.get("text", [""])[0]
+        save_manual_keyword_note(text)
+        self._regenerate_screens()
+        self.send_response(204)
+        self.end_headers()
+
     def _handle_add_custom_group(self, form: dict) -> None:
         """"+ 새 소제목 만들기" 버튼이 fetch로 호출한다(createCustomGroup) — 자동
         분류로는 나오지 않는 이름을 미리 만들어, 기사가 없어도 화면에 띄워둔다.
         초안·완성본 둘 다에서 보여야 하므로(전역 목록) 완성본도 즉시 다시 그린다.
+
+        [추가: 2026-08-04] 새로 만들 이름이 지금 이 화면에 이미 떠 있는 다른 소제목의
+        표시 이름과 같으면(app.curation.display_name_in_use) 화면에 똑같은 소제목이
+        두 개로 보이니 409로 막는다. [수정: 2026-08-04] 검사 범위는 app.settings_server
+        ._handle_rename_group과 같은 이유로 "이 화면에 지금 같이 떠 있는 소제목"으로
+        좁혔다 — 회차끼리는 같은 이름이어도 상관없다.
         """
-        name = form.get("name", [""])[0]
-        add_custom_group(name)
-        self._regenerate_screens()
-        self.send_response(204)
+        name = form.get("name", [""])[0].strip()
+        active_names = set(form.get("active_names", []))
+        if name and display_name_in_use(name, active_names):
+            self.send_response(409)
+        else:
+            add_custom_group(name)
+            self._regenerate_screens()
+            self.send_response(204)
         self.end_headers()
 
     def _handle_remove_custom_group(self, form: dict) -> None:

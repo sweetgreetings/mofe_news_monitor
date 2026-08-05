@@ -143,6 +143,21 @@ GROUP_LABELS_FILE = DATA_DIR / "group_labels.json"
 # group_labels.json처럼 자정에 비워지지 않고 계속 유지된다 — 사용자가 🗑️로 직접 지우기
 # 전까지는 다음날에도 그대로 남아있어야 "미리 만들어두고 나중에 채운다"가 가능하다.
 CUSTOM_GROUPS_FILE = DATA_DIR / "custom_groups.json"
+# [추가: 2026-08-03] 사용자가 ↑/↓로 직접 정한 소제목 화면 순서(이름 목록). group_labels.json
+# 처럼 이름 기준으로 저장하고, 사라진 소제목은 조용히 무시한다(app.group_order).
+GROUP_ORDER_FILE = DATA_DIR / "group_order.json"
+# [추가: 2026-08-05] 기사 줄에 마우스를 올리면 나오는 "🔄 원문에서 다시 가져오기" 버튼이
+# 저장하는 곳 — 네이버 API의 title/description은 가끔 이상한 지점(사진 설명, 문장 중간)에서
+# 잘려 있는데, 이 버튼을 누르면 원문 페이지의 og:title/og:description으로 그 기사 하나만
+# 덮어쓴다. {url: {"title": ..., "summary": ...}} 형태 — 두 필드 중 실제로 더 나은 값을
+# 찾은 쪽만 저장한다(app.summary_overrides).
+SUMMARY_OVERRIDES_FILE = DATA_DIR / "summary_overrides.json"
+# [추가: 2026-08-05] "+ 직접 키워드 작성하기" — AI가 추출한 키워드와 별개로, 이용자가
+# 직접 자유 서식으로 적어두는 메모/키워드 한 줄. 완성본·초안 화면 상단(소제목 목록 위)에
+# 보이고, 헤더 바로 아래 "- {text}" 줄로 복사/txt/텔레그램 텍스트에도 그대로 포함된다.
+# {"text": "..."} 형태의 전역 값 하나(회차별로 나뉘지 않음) — 초안에 적어두면 그 회차가
+# 완성본으로 넘어갈 때도 같은 문구가 자연스럽게 이어진다(app.manual_keyword_note).
+MANUAL_KEYWORD_NOTE_FILE = DATA_DIR / "manual_keyword_note.json"
 # [추가: 2026-07-25] 실시간 기사 현황에서 "→ 스크랩" 버튼으로 담아둔 기사 목록. 예정된
 # 회차 데이터(articles/*.json)와 별개로, 당일 자정까지만 유지되고 자정이 지나면 자동으로 비워진다.
 MANUAL_ARTICLES_FILE = DATA_DIR / "manual_articles.json"

@@ -18,6 +18,9 @@ STOPWORDS = {
     # 막는 안전장치에 걸려) _EOMI로는 못 걸러지는 것들 — 워드클라우드에 뜻 없는 용언
     # 활용형이 그대로 뜨는 문제(예: "깎아주"·"따르면")로 발견된 것부터 하나씩 등록한다.
     "따르", "따르면", "따른", "깎아주", "없다", "있다", "위한",
+    # [추가: 2026-08-03] "OOO를 비롯해/비롯한"처럼 나열할 때 쓰는 연결 표현 — 내용이
+    # 아니라 문장 구조상의 상투어라 워드클라우드에서 제외한다.
+    "비롯해", "비롯한", "비롯하여", "비롯",
 }
 
 # 제거할 대표적인 한국어 조사 (긴 것부터 떼어내야 정확하다).
@@ -26,7 +29,11 @@ STOPWORDS = {
 # 대신 커버해준다). "과"·"도"·"로"·"만" 등도 같은 종류 위험(예: "회의"→"회")이 있을 수
 # 있어, 실제 운영하며 비슷한 오분리가 또 보이면 그때 하나씩 더 빼기로 한다.
 _JOSA = ("으로써", "에서의", "으로", "에서", "에게", "까지", "부터", "라며", "이라",
-         "은", "는", "이", "을", "를", "의", "에", "와", "과", "도", "로", "만")
+         "은", "는", "이", "을", "를", "의", "에", "와", "과", "도", "로", "만",
+         # [추가: 2026-08-03] "참모들"·"장관들"처럼 복수 접미사 "들"이 그대로 남아
+         # 워드클라우드에 뜨는 문제 — 조사는 아니지만 같은 방식(끝에서 제거)으로
+         # 처리할 수 있어 이 목록에 함께 둔다.
+         "들")
 
 # [추가: 2026-07-25] 동사/형용사 활용 어미. _JOSA(체언 조사)만으로는 "시행한"(시행+한),
 # "선정된데"(선정+되+ㄴ데)처럼 용언이 활용된 형태가 그대로 단어로 남아, 소제목·워드클라우드에
@@ -63,6 +70,12 @@ _SPLIT_PATTERN = re.compile(r"[\s\[\]()<>·,…\"'“”‘’!?.·:;/\\|~\-—]
 # 추가하는 대신 패턴으로 걸러낸다.
 _DATE_TIME_PATTERN = re.compile(r"^\d+(일|월|년|시|분|초|주)$")
 
+# [추가: 2026-08-03] "것"은 그 자체로 뜻이 없는 의존명사라, 조사가 붙은 "것으로"·"것은"
+# 같은 형태가 워드클라우드에 그대로 뜨면 안 된다. _JOSA로 이미 정의된 조사 목록을 그대로
+# 재사용해 "것" + (조사 없음 또는 그중 하나)로 끝나는 토큰을 잡는다 — 조사 목록이 바뀌면
+# 이 패턴도 자동으로 함께 갱신된다.
+_BOUND_NOUN_PATTERN = re.compile(r"^것(" + "|".join(_JOSA) + r")?$")
+
 
 # [추가: 2026-07-31] "회의"는 조사 "의"가 명사 뒤에 붙은 형태가 아니라, "경제관계장관회의"
 # ·"비상경제본부회의"처럼 그 자체가 하나의 고유명사(회의체 이름)의 일부다. 조사 "의"를
@@ -74,12 +87,38 @@ _PROTECTED_UI_ENDINGS = ("회의",)
 
 
 def _strip_suffix(word: str, suffixes: tuple) -> str:
+    """긴 접미사부터 검사해 맞는 것을 떼어낸다.
+
+    [수정: 2026-08-03] 버그 수정 — 예전엔 "맞는 접미사인데 너무 짧아서 못 뗀다"(안전장치)와
+    "이 접미사가 아니다"를 구분하지 않고 둘 다 "다음 접미사 계속 찾기"로 처리했다. 그래서
+    "것으로"처럼 긴 접미사("으로")가 안전장치에 걸려 못 떼어지면, 그 접미사의 꼬리 글자만
+    담은 더 짧은 접미사("로")가 목록 뒤쪽에 있으면 그게 대신 걸려 "것으"처럼 말이 안 되는
+    조각이 남았다. 이제는 word가 어떤 접미사로 "끝나기는" 하면(그 접미사가 맞는 경계라는
+    뜻) 안전하게 뗄 수 있을 때만 떼고, 아니면 그 시점에서 바로 원래 단어를 그대로 돌려준다
+    — 뒤쪽의 더 짧은 접미사로 계속 넘어가지 않는다.
+    """
     for suffix in suffixes:
         if suffix == "의" and word.endswith(_PROTECTED_UI_ENDINGS):
             continue
-        if len(word) > len(suffix) + 1 and word.endswith(suffix):
-            return word[: -len(suffix)]
+        if word.endswith(suffix):
+            if len(word) > len(suffix) + 1:
+                return word[: -len(suffix)]
+            return word
     return word
+
+
+def _strip_suffix_repeated(word: str, suffixes: tuple) -> str:
+    """_strip_suffix를 더 뗄 게 없을 때까지 반복한다.
+
+    [추가: 2026-08-03] "참모들과"처럼 접미사가 여러 겹 붙은 경우("들"+"과") 한 번만
+    떼면 "참모들"에서 멈춘다 — _strip_suffix는 한 겹만 떼도록 만들어져 있어서다.
+    매번 떼어낸 만큼 단어가 짧아지므로 무한 루프에 빠지지 않는다.
+    """
+    while True:
+        stripped = _strip_suffix(word, suffixes)
+        if stripped == word:
+            return word
+        word = stripped
 
 
 def tokenize(title: str, stopwords: set) -> set:
@@ -89,7 +128,12 @@ def tokenize(title: str, stopwords: set) -> set:
         word = raw.strip()
         if not word or word in _JOSA:
             continue  # [수정: 2026-07-25] "에서"처럼 조사 하나만 통째로 떨어져 나온 토큰은 버린다
-        word = _strip_suffix(_strip_suffix(word, _JOSA), _EOMI).lower()
-        if len(word) >= 2 and word not in stopwords and not _DATE_TIME_PATTERN.match(word):
+        word = _strip_suffix_repeated(_strip_suffix_repeated(word, _JOSA), _EOMI).lower()
+        if (
+            len(word) >= 2
+            and word not in stopwords
+            and not _DATE_TIME_PATTERN.match(word)
+            and not _BOUND_NOUN_PATTERN.match(word)
+        ):
             tokens.add(word)
     return tokens
