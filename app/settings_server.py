@@ -21,6 +21,7 @@ from app.config import (
     HISTORY_HTML_PATH,
     LANDING_HTML_PATH,
     LOGO_PATH,
+    MAX_EMAIL_RECIPIENTS,
     MAX_HIGHLIGHT_KEYWORDS,
     MAX_KEYWORD_GROUPS,
     MAX_KEYWORDS_PER_GROUP,
@@ -47,6 +48,9 @@ from app.curation import (
     unhide_article,
 )
 from app.custom_groups import add_custom_group, load_custom_groups, remove_custom_group
+from app.email_recipients import active_recipient_emails, load_email_recipients, save_email_recipients
+from app.email_sender import is_configured as email_is_configured
+from app.email_sender import send_text as email_send_text
 from app.group_order import save_group_order
 from app.draft_articles import add_draft_pending_article
 from app.history_renderer import generate_history_page
@@ -71,6 +75,7 @@ from app.settings import (
     save_outlet_selection,
     save_scrap_page_settings,
     save_schedule_groups,
+    save_email_settings,
     save_telegram_settings,
     save_wordcloud_exclude_words,
     toggle_highlight_keyword,
@@ -225,6 +230,7 @@ _MENU_TEMPLATE = (
     <div class="menu">
       <a href="/wordcloud-exclude"><span class="menu-icon">워</span>워드클라우드 제외어<span class="menu-chev">›</span></a>
       <a href="/telegram"><span class="menu-icon">텔</span>텔레그램 전송<span class="menu-chev">›</span></a>
+      <a href="/email"><span class="menu-icon">메</span>이메일 전송<span class="menu-chev">›</span></a>
     </div>
   </div>
 </div>
@@ -822,6 +828,77 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
 """
 )
 
+# [추가: 2026-08-06] 정기 회차 스크랩 완료 시 이메일로도 자동 전송할지 + 받는 사람
+# 목록을 관리하는 화면. 텔레그램(챗 아이디 1개 고정)과 달리 이메일은 주소만 알면 바로
+# 등록되므로 여러 명을 둘 수 있다 — 받는 사람 각자를 지우지 않고 켜고 끌 수 있는 토글
+# 스위치는 app.settings_server의 키워드 on/off 토글과 같은 마크업(.toggle/.track)을
+# 그대로 재사용한다.
+_EMAIL_SETTINGS_TEMPLATE = (
+    """<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>이메일 전송</title>
+<style>"""
+    + _BASE_STYLE
+    + """
+  .checkbox-row {{ margin: 16px 0; display: flex; align-items: center; gap: 8px; }}
+  .checkbox-row label {{ font-size: 1rem; }}
+  .status {{ margin: 4px 0 20px; padding: 10px 14px; border-radius: 6px; font-size: 0.88rem; }}
+  .status-ok {{ background: #EFF6FF; color: {accent}; }}
+  .status-warn {{ background: #FEF2F2; color: {error}; }}
+  .keyword-row {{ margin: 8px 0; display: flex; align-items: center; gap: 8px; }}
+  .recipient-row input[type=text] {{ width: 130px; }}
+  .add-row {{ margin: 4px 0 0; }}
+  .add-row button {{ background: {card}; color: {accent}; border: 1px solid {accent}; }}
+  .add-row button:hover {{ background: {hover}; }}
+  .add-row button:disabled {{ background: {border}; color: {muted}; border-color: {border}; }}
+  .toggle {{ position: relative; display: inline-flex; align-items: center; flex-shrink: 0; cursor: pointer; }}
+  .toggle input {{ position: absolute; opacity: 0; width: 0; height: 0; }}
+  .toggle .track {{
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 24px; background: {border}; border-radius: 4px; transition: background 0.15s;
+  }}
+  .toggle input:checked ~ .track {{ background: {accent}; }}
+  .toggle-text {{ font-size: 0.68rem; font-weight: 700; }}
+  .toggle-text.on {{ display: none; color: #ffffff; }}
+  .toggle-text.off {{ display: inline; color: {muted}; }}
+  .toggle input:checked ~ .track .toggle-text.on {{ display: inline; }}
+  .toggle input:checked ~ .track .toggle-text.off {{ display: none; }}
+  .container {{ padding-bottom: 88px; }}
+</style>
+</head>
+<body>
+"""
+    + _TOP_BAR_HTML
+    + """
+<div class="container">
+  <h1>📧 이메일 전송</h1>
+  <p class="hint">
+    정기 스크랩(예정된 회차)이 끝날 때마다 완성본을 이메일로도 보냅니다. 초안·완성본
+    화면의 "Email" 버튼은 이 설정과 무관하게 항상 켜져 있습니다.
+  </p>
+  <div class="status {status_class}">{status_text}</div>
+  <form method="POST" action="/save-email">
+    <div class="checkbox-row">
+      <input type="checkbox" id="email_auto_send" name="email_auto_send" value="1"{auto_send_checked}>
+      <label for="email_auto_send">정기 스크랩 완료 시 이메일로 자동 전송</label>
+    </div>
+    <p class="caption">받는 사람 (최대 {max_recipients}명) — 꺼두면(OFF) 지우지 않고도 잠깐 전송 대상에서 뺄 수 있습니다.</p>
+    {recipient_rows}
+    <p class="add-row">
+      <button type="submit" formaction="/email/add-recipient-slot"{add_disabled}>+ 받는 사람 추가</button>
+    </p>
+    <div class="save-bar"><div class="save-bar-inner"><button type="submit">저장</button></div></div>
+  </form>
+</div>
+{clear_script}
+</body>
+</html>
+"""
+)
+
 
 _HIDDEN_TEMPLATE = (
     """<!DOCTYPE html>
@@ -1406,6 +1483,62 @@ def render_telegram_settings(settings: dict) -> str:
     )
 
 
+def _render_email_recipient_rows(recipients: list, slots: int) -> str:
+    """받는 사람 입력칸을 렌더링한다 — 검색 키워드 칸과 같은 "저장된 개수만큼만 보여주고
+    + 버튼으로 늘리는" 방식(app.settings_server.render_wordcloud_exclude_page 참고)."""
+    rows = []
+    for i in range(slots):
+        recipient = recipients[i] if i < len(recipients) else {}
+        name = html.escape(recipient.get("name", ""))
+        email = html.escape(recipient.get("email", ""))
+        enabled_checked = " checked" if recipient.get("enabled", True) else ""
+        rows.append(
+            '<div class="keyword-row recipient-row">'
+            '<label class="toggle" title="전송 대상에서 켜고 끕니다(삭제 아님)">'
+            f'<input type="checkbox" name="recipient{i + 1}_enabled" value="1"{enabled_checked}>'
+            '<span class="track"><span class="toggle-text on">ON</span><span class="toggle-text off">OFF</span></span>'
+            "</label>"
+            f'<input type="text" name="recipient{i + 1}_name" value="{name}" placeholder="이름">'
+            f'<input type="text" name="recipient{i + 1}_email" value="{email}" placeholder="이메일 주소">'
+            f'<button type="button" class="del-btn" onclick="removeRow(this)" title="이 칸 지우기">del</button>'
+            "</div>"
+        )
+    return "\n".join(rows)
+
+
+def render_email_settings(settings: dict, slots: Optional[int] = None, recipients: Optional[list] = None) -> str:
+    """이메일 자동 전송·받는 사람 설정 화면을 렌더링한다.
+
+    slots/recipients를 생략하면 저장된 받는 사람 목록 그대로 보여준다(하나도 없으면
+    빈 칸 1개) — "+ 받는 사람 추가"를 누르면 지금 입력 중이던 값을 유지한 채 slots만
+    1 늘려 다시 렌더링한다(app.settings_server._handle_add_email_recipient_slot).
+    """
+    if recipients is None:
+        recipients = load_email_recipients()
+    if slots is None:
+        slots = max(len(recipients), 1)
+    slots = min(max(slots, len(recipients)), MAX_EMAIL_RECIPIENTS)
+    auto_send_checked = " checked" if settings.get("email_auto_send", False) else ""
+    if email_is_configured():
+        status_class, status_text = "status-ok", "✅ .env에 SMTP 서버·보내는 사람 주소가 설정돼 있습니다."
+    else:
+        status_class, status_text = (
+            "status-warn",
+            "⚠️ .env에 EMAIL_SMTP_HOST / EMAIL_SENDER_ADDRESS / EMAIL_SENDER_PASSWORD가 없습니다 — 켜도 전송되지 않습니다.",
+        )
+    return _EMAIL_SETTINGS_TEMPLATE.format(
+        **_theme(),
+        auto_send_checked=auto_send_checked,
+        status_class=status_class,
+        status_text=status_text,
+        max_recipients=MAX_EMAIL_RECIPIENTS,
+        recipient_rows=_render_email_recipient_rows(recipients, slots),
+        add_disabled=" disabled" if slots >= MAX_EMAIL_RECIPIENTS else "",
+        clear_script=_CLEAR_FIELD_SCRIPT,
+        index_href=_home_href(),
+    )
+
+
 def _known_articles_by_url() -> dict:
     """숨긴 기사의 언론사·제목을 보여주려고, 최근 7일 회차에서 URL로 원본 정보를 찾는다
     (숨긴 목록 자체는 URL만 저장하므로)."""
@@ -1509,6 +1642,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._respond(render_scrap_page_settings(load_settings()))
         elif self.path == "/telegram":
             self._respond(render_telegram_settings(load_settings()))
+        elif self.path == "/email":
+            self._respond(render_email_settings(load_settings()))
         else:
             self.send_response(404)
             self.end_headers()
@@ -1595,6 +1730,14 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_telegram_send_scrap(form)
         elif self.path == "/save-group-order":
             self._handle_save_group_order(form)
+        elif self.path == "/save-email":
+            self._handle_save_email_settings(form)
+        elif self.path == "/email/add-recipient-slot":
+            self._handle_add_email_recipient_slot(form)
+        elif self.path == "/email-send-draft":
+            self._handle_email_send_draft(form)
+        elif self.path == "/email-send-scrap":
+            self._handle_email_send_scrap(form)
         else:
             self.send_response(404)
             self.end_headers()
@@ -1829,6 +1972,67 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         """
         text = form.get("text", [""])[0]
         if text and telegram_send_text(text):
+            self.send_response(204)
+        else:
+            self.send_response(502)
+        self.end_headers()
+
+    def _handle_save_email_settings(self, form: dict) -> None:
+        """이메일 설정 화면의 "저장" — 자동 전송 체크박스와 받는 사람 목록을 함께 저장한다.
+
+        받는 사람은 검색 키워드 칸과 같은 규칙으로, del로 지워져 폼에서 아예 빠진
+        칸은 자연히 목록에서도 빠진다(app.email_recipients.save_email_recipients가
+        이메일이 비어있는 항목도 마저 걸러낸다).
+        """
+        save_email_settings("email_auto_send" in form)
+        recipients = [
+            {
+                "name": form.get(f"recipient{i}_name", [""])[0],
+                "email": form.get(f"recipient{i}_email", [""])[0],
+                "enabled": f"recipient{i}_enabled" in form,
+            }
+            for i in range(1, MAX_EMAIL_RECIPIENTS + 1)
+            if f"recipient{i}_email" in form
+        ]
+        save_email_recipients(recipients)
+        self._redirect("/email")
+
+    def _handle_add_email_recipient_slot(self, form: dict) -> None:
+        """"+ 받는 사람 추가" 버튼 — 저장하지 않고 입력칸을 하나 더 보여준다(지금 입력
+        중이던 값은 그대로 유지, app.settings_server._handle_add_wordcloud_exclude_slot과
+        같은 패턴)."""
+        recipients = [
+            {
+                "name": form.get(f"recipient{i}_name", [""])[0],
+                "email": form.get(f"recipient{i}_email", [""])[0],
+                "enabled": f"recipient{i}_enabled" in form,
+            }
+            for i in range(1, MAX_EMAIL_RECIPIENTS + 1)
+            if f"recipient{i}_email" in form
+        ]
+        slots = min(len(recipients) + 1, MAX_EMAIL_RECIPIENTS)
+        self._respond(render_email_settings(load_settings(), slots=slots, recipients=recipients))
+
+    def _handle_email_send_draft(self, form: dict) -> None:
+        """초안 화면(preview.html)의 "Email" 버튼이 fetch로 호출한다.
+
+        텔레그램과 같은 이유로 서버가 상태를 다시 계산하지 않고, 화면이 이미 갖고
+        있던 PLAIN_TEXT를 그대로 받아 전송한다 — 첫 줄("언론 모니터링 [시각] 기준")을
+        메일 제목으로, 전체를 본문으로 쓴다.
+        """
+        text = form.get("text", [""])[0]
+        recipients = active_recipient_emails()
+        if text and recipients and email_send_text(text.split("\n", 1)[0], text, recipients):
+            self.send_response(204)
+        else:
+            self.send_response(502)
+        self.end_headers()
+
+    def _handle_email_send_scrap(self, form: dict) -> None:
+        """스크랩 완성본(index.html)의 "Email" 버튼이 fetch로 호출한다(_handle_email_send_draft와 같은 이유)."""
+        text = form.get("text", [""])[0]
+        recipients = active_recipient_emails()
+        if text and recipients and email_send_text(text.split("\n", 1)[0], text, recipients):
             self.send_response(204)
         else:
             self.send_response(502)

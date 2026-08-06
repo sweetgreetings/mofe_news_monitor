@@ -374,8 +374,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     <h1>언론 모니터링 {run_slot} 기준</h1>
     <div class="actions">
       <button onclick="copyPlainText()">복사</button>
-      <a class="btn" href="data:text/plain;charset=utf-8,{export_href}" download="{export_filename}">txt로 저장</a>
-      <button onclick="sendToTelegram(this)">📤 Telegram 전송</button>
+      <a class="btn" href="data:text/plain;charset=utf-8,{export_href}" download="{export_filename}">다운로드</a>
+      <button onclick="sendToTelegram(this)">Telegram</button>
+      <button onclick="sendToEmail(this)">Email</button>
       <a class="btn" href="history.html">지난 기사</a>
       <select class="view-mode-select" onchange="applyViewMode(this.value)" title="소제목 구성은 그대로 두고 화면에 나열하는 순서만 바꿉니다">
         <option value="subheading" selected>소제목별</option>
@@ -435,6 +436,22 @@ function sendToTelegram(btn) {{
   }}).then(function(res) {{
     if (res.ok) {{ alert("텔레그램으로 보냈습니다."); }}
     else {{ alert("전송에 실패했습니다 — 설정 화면에서 텔레그램 연결 상태를 확인해주세요."); }}
+  }}).catch(function() {{
+    alert("전송에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  }}).finally(function() {{
+    btn.disabled = false;
+  }});
+}}
+// [추가: 2026-08-06] app.renderer의 sendToTelegram과 같은 이유·동작 — 이메일판.
+function sendToEmail(btn) {{
+  btn.disabled = true;
+  fetch("http://{settings_host}:{settings_port}/email-send-scrap", {{
+    method: "POST",
+    headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
+    body: new URLSearchParams({{text: PLAIN_TEXT}})
+  }}).then(function(res) {{
+    if (res.ok) {{ alert("이메일로 보냈습니다."); }}
+    else {{ alert("전송에 실패했습니다 — 설정 화면에서 이메일 연결 상태·받는 사람을 확인해주세요."); }}
   }}).catch(function() {{
     alert("전송에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
   }}).finally(function() {{
@@ -503,6 +520,10 @@ function buildTocPopover() {{
     var a = document.createElement("a");
     a.href = "#";
     a.textContent = sec.dataset.tocName;
+    // [추가: 2026-08-05] 사용자가 직접 만든 소제목(.subheading-custom, 화면에서 하늘색
+    // 점선 테두리로 표시되는 것과 같은 기준)은 목차에서도 볼드로 표시해 자동 분류
+    // 소제목과 구분되게 한다.
+    if (sec.classList.contains("subheading-custom")) {{ a.style.fontWeight = "700"; }}
     a.onclick = function(e) {{ e.preventDefault(); scrollToSubheading(sec.id); }};
     var btns = document.createElement("span");
     btns.className = "toc-row-btns";

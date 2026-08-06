@@ -21,6 +21,15 @@ if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
+# [추가: 2026-08-06] 이메일 전송 기능용 — 텔레그램과 같은 이유로 선택 사항(기본 꺼짐)이라
+# 없어도 앱 실행을 막지 않는다(app.email_sender.is_configured가 미설정을 감지해 전송만
+# 조용히 건너뛴다). SMTP 호스트/포트를 고정하지 않고 .env에서 읽어, 네이버 메일·구글
+# 메일·회사 메일 서버 등 어떤 SMTP든 쓸 수 있게 했다(포트 기본값만 흔한 587로 둠).
+EMAIL_SMTP_HOST = os.getenv("EMAIL_SMTP_HOST")
+EMAIL_SMTP_PORT = int(os.getenv("EMAIL_SMTP_PORT", "587"))
+EMAIL_SENDER_ADDRESS = os.getenv("EMAIL_SENDER_ADDRESS")
+EMAIL_SENDER_PASSWORD = os.getenv("EMAIL_SENDER_PASSWORD")
+
 # PRD.md 기능1 규칙 2 — [수정: 2026-07-25] 키워드 그룹 기능 도입. [수정: 2026-07-25]
 # 처음엔 "기관 정보" 그룹을 삭제·수정 불가로 고정했었는데, "이용자 소속 기관이 바뀔 수도
 # 있다"는 피드백으로 다른 그룹과 완전히 동등하게(이름·키워드·OR/AND 수정, 그룹 자체
@@ -114,6 +123,8 @@ DEFAULT_INCLUDE_PERSONNEL_IN_SCRAP = False
 # 여부. 기본은 꺼짐 — TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID(.env)가 없으면 켜도 전송만
 # 조용히 건너뛴다(app.telegram_bot.send_text).
 DEFAULT_TELEGRAM_AUTO_SEND = False
+# [추가: 2026-08-06] 텔레그램과 같은 이유·같은 기본값(꺼짐) — 이메일 전송판.
+DEFAULT_EMAIL_AUTO_SEND = False
 # [수정: 2026-07-25] 5 -> 20으로 확대 — 형광펜 단어를 이제 검색 키워드 화면의 🖍️ 버튼으로만
 # 추가하게 되면서(직접 입력 없음), 검색 키워드가 많아지면 형광펜도 그만큼 늘 수 있다.
 # 팔레트는 여전히 5색뿐이라 6번째 단어부터는 자연히 같은 색을 여러 단어가 나눠 쓴다.
@@ -158,6 +169,11 @@ SUMMARY_OVERRIDES_FILE = DATA_DIR / "summary_overrides.json"
 # {"text": "..."} 형태의 전역 값 하나(회차별로 나뉘지 않음) — 초안에 적어두면 그 회차가
 # 완성본으로 넘어갈 때도 같은 문구가 자연스럽게 이어진다(app.manual_keyword_note).
 MANUAL_KEYWORD_NOTE_FILE = DATA_DIR / "manual_keyword_note.json"
+# [추가: 2026-08-06] 이메일 받는 사람 목록 — [{"name":..., "email":..., "enabled": bool}, ...].
+# 텔레그램(챗 아이디 1개 고정)과 달리 이메일은 주소만 알면 바로 등록할 수 있어 여러 명을
+# 둘 수 있다. enabled로 지우지 않고 켜고 끄기만 해서, 휴가 등으로 잠깐 다른 사람에게만
+# 보내고 싶을 때 삭제·재등록 없이 토글만으로 바꿀 수 있다(app.email_recipients).
+EMAIL_RECIPIENTS_FILE = DATA_DIR / "email_recipients.json"
 # [추가: 2026-07-25] 실시간 기사 현황에서 "→ 스크랩" 버튼으로 담아둔 기사 목록. 예정된
 # 회차 데이터(articles/*.json)와 별개로, 당일 자정까지만 유지되고 자정이 지나면 자동으로 비워진다.
 MANUAL_ARTICLES_FILE = DATA_DIR / "manual_articles.json"
@@ -211,6 +227,10 @@ SETTINGS_SERVER_HOST = os.getenv("SERVER_HOST", "127.0.0.1").strip() or "127.0.0
 # [추가: 2026-07-25] 워드클라우드에서 직접 빼고 싶은 단어(검색 키워드와 별개, 최소
 # 개수 제한 없음 — 하나도 안 넣는 것도 유효). 검색 키워드 설정과 같은 방식·최대 개수.
 MAX_WORDCLOUD_EXCLUDE_WORDS = 15
+
+# [추가: 2026-08-06] 이메일 받는 사람 최대 인원 — 담당자 한 명이 여러 동료에게 전달하는
+# 용도라 팀 규모를 넘어설 일이 거의 없다고 보고 넉넉히 잡았다.
+MAX_EMAIL_RECIPIENTS = 15
 
 # PRD.md 기능1 규칙 18 — 우선 Pretendard, 없으면 Noto Sans KR, 그래도 없으면 시스템 기본
 FONT_STACK = "'Pretendard', 'Noto Sans KR', sans-serif"

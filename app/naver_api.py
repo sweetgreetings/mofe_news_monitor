@@ -1,6 +1,8 @@
 # Design Ref: PRD.md 기능1 규칙 2 — 키워드 그룹 중 하나라도 조건을 만족하면 수집(그룹간 OR), 건수 제한 없음, 당일 기사만
 import html
+import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import Optional
@@ -10,9 +12,19 @@ import requests
 
 from app.config import COLOR_ERROR, NAVER_CLIENT_ID, NAVER_CLIENT_SECRET
 
+logger = logging.getLogger(__name__)
+
 NAVER_NEWS_API_URL = "https://openapi.naver.com/v1/search/news.json"
 _MAX_DISPLAY = 100  # 네이버 API가 허용하는 1회 요청 최대 건수
 _MAX_START = 1000  # 네이버 API가 허용하는 최대 조회 시작 위치 (이 이상은 API 자체가 지원 안 함)
+# [추가: 2026-08-06] 키워드별 검색을 동시에 몇 개까지 허용할지 — 실시간 현황(live.html)이
+# 등록된 키워드를 하나씩 순서대로 물어봐 13개 기준 약 24초가 걸리던 것을 동시 처리로
+# 줄이기 위해 도입했다(사용자 실측: "정부" 6.97초, "재정경제부" 3.80초 등). 무제한 동시
+# 요청은 네이버 API의 초당 호출 제한에 걸릴 위험이 있어(순차일 때는 자연스럽게 벌어져
+# 있던 요청 간격이 사라짐), 5개 정도로 제한해 위험과 속도 개선 사이 절충했다 — 어차피
+# 가장 느린 키워드 하나(예: "정부" 7초)가 전체 시간의 하한이라, 5보다 더 늘려도 이 이상은
+# 빨라지지 않는다(계산상 13개 기준 약 24초 -> 약 7초로 줄어듦).
+_MAX_CONCURRENT_KEYWORD_SEARCHES = 5
 
 _TAG_PATTERN = re.compile(r"</?b>")
 
@@ -116,6 +128,10 @@ OUTLET_DOMAINS = {
     # 도메인이라 별도 항목 없이는 조선일보로 잘못 잡혔다. 저장된 기록에서 2건 확인됨
     # (2026-07-28 14:00, 2026-07-29 17:00 회차).
     "realty.chosun.com": "땅집고",
+    # [추가: 2026-08-05] IT조선 — 마찬가지로 조선일보(chosun.com)의 하위 도메인이라
+    # 별도 항목 없이는 조선일보로 잘못 잡혔다(it.chosun.com 기사가 실제로 "(조선일보)"로
+    # 표시된 것을 사용자가 확인해 요청).
+    "it.chosun.com": "IT조선",
     # [추가: 2026-08-03] 조세일보 — 사용자 요청으로 경제일간 카테고리 맨 끝에 추가.
     "joseilbo.com": "조세일보",
 }
@@ -137,7 +153,7 @@ OUTLET_CATEGORIES = {
     # [수정: 2026-07-29] "통신사"에서 "통신사 및 종합 일간지"로 이름 변경 — 통신사가
     # 아닌 노컷뉴스·뉴스핌·더팩트까지 이 카테고리에 함께 담기게 되어 이름 범위를 넓혔다.
     "통신사 및 종합 일간지": ("연합뉴스", "뉴시스", "뉴스1", "노컷뉴스", "뉴스핌", "더팩트"),
-    "전문일간": ("전자신문", "디지털타임스"),
+    "전문일간": ("전자신문", "디지털타임스", "IT조선"),
     "기타 언론사": ("프레시안", "데일리안", "매일신문", "농민신문", "땅집고"),
     # [추가: 2026-07-29] 신규 카테고리 — 주간지. 매경이코노미는 아직 도메인을 확인하지
     # 못해 OUTLET_DOMAINS에는 등록하지 못했다(사용자 확인 필요) — 이름만 선택 목록에
@@ -465,9 +481,22 @@ def search_articles_by_groups(
                 seen_keywords.add(keyword)
                 unique_keywords.append(keyword)
 
-    results_by_keyword = {
-        keyword: _search_one_keyword(keyword, after=after, before=before) for keyword in unique_keywords
-    }
+    # [수정: 2026-08-06] 키워드를 하나씩 순서대로 검색하면 키워드 수만큼 대기 시간이
+    # 그대로 더해진다(13개 기준 약 24초 실측) — 동시에 최대 _MAX_CONCURRENT_KEYWORD_
+    # SEARCHES개까지 병렬로 검색해, 가장 느린 키워드 하나의 시간(실측 약 7초)까지만
+    # 기다리면 되도록 줄였다. 키워드 하나가 실패(타임아웃·네트워크 오류)해도 나머지
+    # 결과는 그대로 살리고 빈 목록으로 대체한다 — 병렬화 전엔 한 키워드 실패가 곧
+    # 전체 검색 실패였는데, 여러 개를 동시에 돌리면서 그 실패가 상대적으로 더 자주
+    # 눈에 띌 수 있어 이 기회에 격리했다.
+    def _search_safely(keyword: str) -> list[dict]:
+        try:
+            return _search_one_keyword(keyword, after=after, before=before)
+        except requests.exceptions.RequestException:
+            logger.exception("키워드 검색 실패, 빈 결과로 대체합니다: %r", keyword)
+            return []
+
+    with ThreadPoolExecutor(max_workers=_MAX_CONCURRENT_KEYWORD_SEARCHES) as executor:
+        results_by_keyword = dict(zip(unique_keywords, executor.map(_search_safely, unique_keywords)))
 
     seen_urls: set = set()
     articles: list[dict] = []

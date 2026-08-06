@@ -8,6 +8,7 @@ from app.config import (
     BASE_GROUP_KEYWORDS,
     BASE_GROUP_NAME,
     DEFAULT_ARTICLE_LINE_TEMPLATE,
+    DEFAULT_EMAIL_AUTO_SEND,
     DEFAULT_HIGHLIGHT_KEYWORDS,
     DEFAULT_INCLUDE_PERSONNEL_IN_SCRAP,
     DEFAULT_INCLUDE_PHOTO_IN_SCRAP,
@@ -77,6 +78,7 @@ def _default_settings() -> dict:
         "include_photo_in_scrap": DEFAULT_INCLUDE_PHOTO_IN_SCRAP,
         "include_personnel_in_scrap": DEFAULT_INCLUDE_PERSONNEL_IN_SCRAP,
         "telegram_auto_send": DEFAULT_TELEGRAM_AUTO_SEND,
+        "email_auto_send": DEFAULT_EMAIL_AUTO_SEND,
     }
 
 
@@ -140,6 +142,7 @@ def load_settings() -> dict:
     settings.setdefault("include_photo_in_scrap", DEFAULT_INCLUDE_PHOTO_IN_SCRAP)
     settings.setdefault("include_personnel_in_scrap", DEFAULT_INCLUDE_PERSONNEL_IN_SCRAP)
     settings.setdefault("telegram_auto_send", DEFAULT_TELEGRAM_AUTO_SEND)
+    settings.setdefault("email_auto_send", DEFAULT_EMAIL_AUTO_SEND)
 
     # [추가: 2026-07-25] 형광펜 단어가 색 인덱스 없이 문자열 목록뿐이던 옛 형식이면,
     # 그때와 같은 규칙(등록 순서대로 색 배정)으로 옮겨 처음 보는 화면이 갑자기 색이
@@ -493,6 +496,14 @@ def save_telegram_settings(auto_send: bool) -> dict:
     """정기 회차 스크랩 완료 시 텔레그램 자동 전송 여부를 저장한다."""
     settings = load_settings()
     settings["telegram_auto_send"] = bool(auto_send)
+    _write(settings)
+    return settings
+
+
+def save_email_settings(auto_send: bool) -> dict:
+    """정기 회차 스크랩 완료 시 이메일 자동 전송 여부를 저장한다."""
+    settings = load_settings()
+    settings["email_auto_send"] = bool(auto_send)
     _write(settings)
     return settings
 

@@ -399,6 +399,22 @@ function sendToTelegram(btn) {{
     btn.disabled = false;
   }});
 }}
+// [추가: 2026-08-06] app.renderer의 sendToEmail과 같은 이유·동작.
+function sendToEmail(btn) {{
+  btn.disabled = true;
+  fetch("http://{settings_host}:{settings_port}/email-send-draft", {{
+    method: "POST",
+    headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
+    body: new URLSearchParams({{text: PLAIN_TEXT}})
+  }}).then(function(res) {{
+    if (res.ok) {{ alert("이메일로 보냈습니다."); }}
+    else {{ alert("전송에 실패했습니다 — 설정 화면에서 이메일 연결 상태·받는 사람을 확인해주세요."); }}
+  }}).catch(function() {{
+    alert("전송에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  }}).finally(function() {{
+    btn.disabled = false;
+  }});
+}}
 // [추가: 2026-08-03] app.renderer와 동일한 이유·동작 — 하단바 🖍️ 형광펜 팝오버.
 const HIGHLIGHT_WORDS = {highlight_words_json};
 function renderHighlightChips() {{
@@ -450,6 +466,8 @@ function buildTocPopover() {{
     var a = document.createElement("a");
     a.href = "#";
     a.textContent = sec.dataset.tocName;
+    // [추가: 2026-08-05] app.renderer와 동일 — 사용자가 직접 만든 소제목은 목차에서도 볼드로.
+    if (sec.classList.contains("subheading-custom")) {{ a.style.fontWeight = "700"; }}
     a.onclick = function(e) {{ e.preventDefault(); scrollToSubheading(sec.id); }};
     var btns = document.createElement("span");
     btns.className = "toc-row-btns";
@@ -1404,8 +1422,9 @@ def _actions_html(plain_text: str, slot_end: str, generated_at: str) -> str:
     return (
         '<button onclick="copyPlainText()">복사</button>'
         f'<a class="btn" href="data:text/plain;charset=utf-8,{quote(plain_text)}" '
-        f'download="{html.escape(export_filename)}">txt로 저장</a>'
-        '<button onclick="sendToTelegram(this)">📤 Telegram 전송</button>'
+        f'download="{html.escape(export_filename)}">다운로드</a>'
+        '<button onclick="sendToTelegram(this)">Telegram</button>'
+        '<button onclick="sendToEmail(this)">Email</button>'
         '<select class="view-mode-select" onchange="applyViewMode(this.value)" '
         'title="소제목 구성은 그대로 두고 화면에 나열하는 순서만 바꿉니다">'
         '<option value="subheading" selected>소제목별</option>'
