@@ -69,8 +69,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .article {{ margin: 10px 0 10px 20px; line-height: 1.5; padding: 4px 6px; border-radius: 8px; }}
   /* [추가: 2026-08-05] app.renderer와 동일 — 마우스 오버 시 연한 회색 표시. */
   .article:hover {{ background: #F3F4F6; }}
-  .article summary {{ cursor: pointer; }}
+  .article summary {{ cursor: pointer; -webkit-tap-highlight-color: transparent; }}
   .article summary::marker {{ color: {muted}; }}
+  /* [추가: 2026-08-07] app.renderer와 동일 — 모바일 사파리 탭 하이라이트 잔상 방지. */
+  .title-line {{ color: {text}; -webkit-tap-highlight-color: transparent; }}
   .article-summary {{ margin: 6px 0 4px 20px; color: {text}; font-size: 0.95rem; }}
   .article-footer {{ display: flex; align-items: center; gap: 8px; }}
   .article .url {{ flex: 1; color: {muted}; font-size: 0.9rem; word-break: break-all; text-decoration: underline; }}

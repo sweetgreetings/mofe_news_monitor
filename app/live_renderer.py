@@ -164,8 +164,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .live-row-actions {{ display: flex; align-items: center; gap: 6px; flex-shrink: 0; }}
   .outlet-tag {{ color: {muted}; font-size: 0.8rem; }}
   .pub-time {{ color: {muted}; font-size: 0.78rem; margin-left: 6px; }}
-  .live-title {{ font-size: 0.95rem; margin: 2px 0 2px; overflow-wrap: anywhere; }}
-  .live-title summary {{ cursor: pointer; }}
+  .live-title {{ font-size: 0.95rem; margin: 2px 0 2px; overflow-wrap: anywhere; color: {text}; }}
+  .live-title summary {{ cursor: pointer; -webkit-tap-highlight-color: transparent; color: {text}; }}
   .live-title summary::marker {{ color: {muted}; }}
   .live-summary {{ margin: 6px 0 4px 20px; color: {text}; font-size: 0.9rem; }}
   .live-url {{ font-size: 0.78rem; overflow-wrap: anywhere; }}

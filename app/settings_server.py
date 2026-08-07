@@ -22,6 +22,7 @@ from app.config import (
     LANDING_HTML_PATH,
     LOGO_PATH,
     MAX_EMAIL_RECIPIENTS,
+    MAX_TELEGRAM_RECIPIENTS,
     MAX_HIGHLIGHT_KEYWORDS,
     MAX_KEYWORD_GROUPS,
     MAX_KEYWORDS_PER_GROUP,
@@ -82,6 +83,11 @@ from app.settings import (
 )
 from app.telegram_bot import is_configured as telegram_is_configured
 from app.telegram_bot import send_text as telegram_send_text
+from app.telegram_recipients import (
+    active_recipient_chat_ids as telegram_active_recipient_chat_ids,
+    load_telegram_recipients,
+    save_telegram_recipients,
+)
 from app.storage import list_all_runs, load_latest_run, update_run_articles
 
 # 페이지마다 공통으로 쓰는 스타일 조각. 아직 .format()으로 값을 채우기 전(중괄호가 전부
@@ -786,6 +792,9 @@ _SCRAP_PAGE_SETTINGS_TEMPLATE = (
 # [추가: 2026-08-03] 정기 회차 스크랩 완료 시 텔레그램으로도 자동 전송할지 설정하는 화면.
 # .env에 토큰/챗아이디가 없으면 켜도 조용히 건너뛰므로(app.telegram_bot.send_text),
 # 그 상태를 status_html로 미리 알려줘 "켰는데 왜 안 오지"를 방지한다.
+# [수정: 2026-08-07] 챗 아이디 1개(.env) 고정 방식에서 이메일과 같은 "여러 받는 사람 +
+# 켜고 끄기" 방식으로 바꿨다(app.telegram_recipients) — 토글 방식이 추가/삭제 방식보다
+# 낫다는 사용자 선택. 새로 chat id를 발급받는 법을 몰라 헤맬 수 있어 안내 박스를 추가했다.
 _TELEGRAM_SETTINGS_TEMPLATE = (
     """<!DOCTYPE html>
 <html lang="ko">
@@ -801,6 +810,29 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
   .status {{ margin: 4px 0 20px; padding: 10px 14px; border-radius: 6px; font-size: 0.88rem; }}
   .status-ok {{ background: #EFF6FF; color: {accent}; }}
   .status-warn {{ background: #FEF2F2; color: {error}; }}
+  .help-box {{ background: {hover}; border-radius: 6px; padding: 10px 14px; margin: 0 0 20px; font-size: 0.85rem; color: {text}; }}
+  .help-box p {{ margin: 0 0 6px; font-weight: 600; }}
+  .help-box ol {{ margin: 0; padding-left: 18px; }}
+  .help-box li {{ margin: 4px 0; }}
+  .help-box code {{ background: {card}; padding: 1px 5px; border-radius: 4px; font-size: 0.82rem; word-break: break-all; }}
+  .keyword-row {{ margin: 8px 0; display: flex; align-items: center; gap: 8px; }}
+  .recipient-row input[type=text] {{ width: 130px; }}
+  .add-row {{ margin: 4px 0 0; }}
+  .add-row button {{ background: {card}; color: {accent}; border: 1px solid {accent}; }}
+  .add-row button:hover {{ background: {hover}; }}
+  .add-row button:disabled {{ background: {border}; color: {muted}; border-color: {border}; }}
+  .toggle {{ position: relative; display: inline-flex; align-items: center; flex-shrink: 0; cursor: pointer; }}
+  .toggle input {{ position: absolute; opacity: 0; width: 0; height: 0; }}
+  .toggle .track {{
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 24px; background: {border}; border-radius: 4px; transition: background 0.15s;
+  }}
+  .toggle input:checked ~ .track {{ background: {accent}; }}
+  .toggle-text {{ font-size: 0.68rem; font-weight: 700; }}
+  .toggle-text.on {{ display: none; color: #ffffff; }}
+  .toggle-text.off {{ display: inline; color: {muted}; }}
+  .toggle input:checked ~ .track .toggle-text.on {{ display: inline; }}
+  .toggle input:checked ~ .track .toggle-text.off {{ display: none; }}
   .container {{ padding-bottom: 88px; }}
 </style>
 </head>
@@ -811,18 +843,32 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
 <div class="container">
   <h1>📤 텔레그램 전송</h1>
   <p class="hint">
-    정기 스크랩(예정된 회차)이 끝날 때마다 완성본을 텔레그램으로도 보냅니다. 초안 화면의
-    "텔레로 보내기" 버튼은 이 설정과 무관하게 항상 켜져 있습니다.
+    정기 스크랩(예정된 회차)이 끝날 때마다 완성본을 텔레그램으로도 보냅니다. 초안·완성본
+    화면의 "Telegram" 버튼은 이 설정과 무관하게 항상 켜져 있습니다.
   </p>
   <div class="status {status_class}">{status_text}</div>
+  <div class="help-box">
+    <p>받는 사람의 chat id 확인하는 법</p>
+    <ol>
+      <li>받을 사람이 텔레그램에서 이 봇을 찾아 대화를 시작합니다(아무 메시지나 1개 이상 전송).</li>
+      <li>브라우저에서 <code>https://api.telegram.org/bot&lt;.env의 봇 토큰&gt;/getUpdates</code>를 열어 방금 보낸 메시지의 <code>chat.id</code> 값을 확인합니다.</li>
+      <li>확인한 숫자를 아래 "받는 사람"에 등록합니다.</li>
+    </ol>
+  </div>
   <form method="POST" action="/save-telegram">
     <div class="checkbox-row">
       <input type="checkbox" id="telegram_auto_send" name="telegram_auto_send" value="1"{auto_send_checked}>
       <label for="telegram_auto_send">정기 스크랩 완료 시 텔레그램으로 자동 전송</label>
     </div>
+    <p class="caption">받는 사람 (최대 {max_recipients}명) — 꺼두면(OFF) 지우지 않고도 잠깐 전송 대상에서 뺄 수 있습니다.</p>
+    {recipient_rows}
+    <p class="add-row">
+      <button type="submit" formaction="/telegram/add-recipient-slot"{add_disabled}>+ 받는 사람 추가</button>
+    </p>
     <div class="save-bar"><div class="save-bar-inner"><button type="submit">저장</button></div></div>
   </form>
 </div>
+{clear_script}
 </body>
 </html>
 """
@@ -1464,21 +1510,53 @@ def render_scrap_page_settings(settings: dict) -> str:
     )
 
 
-def render_telegram_settings(settings: dict) -> str:
-    """텔레그램 자동 전송 설정 화면을 렌더링한다."""
+def _render_telegram_recipient_rows(recipients: list, slots: int) -> str:
+    """받는 사람 입력칸을 렌더링한다 — app.settings_server._render_email_recipient_rows와
+    완전히 동일한 패턴, 필드 이름만 chat_id로 다르다."""
+    rows = []
+    for i in range(slots):
+        recipient = recipients[i] if i < len(recipients) else {}
+        name = html.escape(recipient.get("name", ""))
+        chat_id = html.escape(recipient.get("chat_id", ""))
+        enabled_checked = " checked" if recipient.get("enabled", True) else ""
+        rows.append(
+            '<div class="keyword-row recipient-row">'
+            '<label class="toggle" title="전송 대상에서 켜고 끕니다(삭제 아님)">'
+            f'<input type="checkbox" name="tg_recipient{i + 1}_enabled" value="1"{enabled_checked}>'
+            '<span class="track"><span class="toggle-text on">ON</span><span class="toggle-text off">OFF</span></span>'
+            "</label>"
+            f'<input type="text" name="tg_recipient{i + 1}_name" value="{name}" placeholder="이름">'
+            f'<input type="text" name="tg_recipient{i + 1}_chat_id" value="{chat_id}" placeholder="chat id">'
+            f'<button type="button" class="del-btn" onclick="removeRow(this)" title="이 칸 지우기">del</button>'
+            "</div>"
+        )
+    return "\n".join(rows)
+
+
+def render_telegram_settings(settings: dict, slots: Optional[int] = None, recipients: Optional[list] = None) -> str:
+    """텔레그램 자동 전송·받는 사람 설정 화면을 렌더링한다(app.settings_server.render_email_settings와 동일한 패턴)."""
+    if recipients is None:
+        recipients = load_telegram_recipients()
+    if slots is None:
+        slots = max(len(recipients), 1)
+    slots = min(max(slots, len(recipients)), MAX_TELEGRAM_RECIPIENTS)
     auto_send_checked = " checked" if settings.get("telegram_auto_send", False) else ""
     if telegram_is_configured():
-        status_class, status_text = "status-ok", "✅ .env에 봇 토큰·챗아이디가 설정돼 있습니다."
+        status_class, status_text = "status-ok", "✅ .env에 봇 토큰이 설정돼 있습니다."
     else:
         status_class, status_text = (
             "status-warn",
-            "⚠️ .env에 TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID가 없습니다 — 켜도 전송되지 않습니다.",
+            "⚠️ .env에 TELEGRAM_BOT_TOKEN이 없습니다 — 켜도 전송되지 않습니다.",
         )
     return _TELEGRAM_SETTINGS_TEMPLATE.format(
         **_theme(),
         auto_send_checked=auto_send_checked,
         status_class=status_class,
         status_text=status_text,
+        max_recipients=MAX_TELEGRAM_RECIPIENTS,
+        recipient_rows=_render_telegram_recipient_rows(recipients, slots),
+        add_disabled=" disabled" if slots >= MAX_TELEGRAM_RECIPIENTS else "",
+        clear_script=_CLEAR_FIELD_SCRIPT,
         index_href=_home_href(),
     )
 
@@ -1738,6 +1816,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_email_send_draft(form)
         elif self.path == "/email-send-scrap":
             self._handle_email_send_scrap(form)
+        elif self.path == "/telegram/add-recipient-slot":
+            self._handle_add_telegram_recipient_slot(form)
         else:
             self.send_response(404)
             self.end_headers()
@@ -1945,12 +2025,38 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         self._redirect("/scrap-page")
 
     def _handle_save_telegram_settings(self, form: dict) -> None:
-        """"정기 스크랩 완료 시 텔레그램 자동 전송" 체크박스를 저장한다."""
+        """텔레그램 설정 화면의 "저장" — 자동 전송 체크박스와 받는 사람 목록을 함께
+        저장한다(app.settings_server._handle_save_email_settings와 동일한 패턴)."""
         save_telegram_settings("telegram_auto_send" in form)
+        recipients = [
+            {
+                "name": form.get(f"tg_recipient{i}_name", [""])[0],
+                "chat_id": form.get(f"tg_recipient{i}_chat_id", [""])[0],
+                "enabled": f"tg_recipient{i}_enabled" in form,
+            }
+            for i in range(1, MAX_TELEGRAM_RECIPIENTS + 1)
+            if f"tg_recipient{i}_chat_id" in form
+        ]
+        save_telegram_recipients(recipients)
         self._redirect("/telegram")
 
+    def _handle_add_telegram_recipient_slot(self, form: dict) -> None:
+        """"+ 받는 사람 추가" 버튼 — 저장하지 않고 입력칸을 하나 더 보여준다
+        (app.settings_server._handle_add_email_recipient_slot과 동일한 패턴)."""
+        recipients = [
+            {
+                "name": form.get(f"tg_recipient{i}_name", [""])[0],
+                "chat_id": form.get(f"tg_recipient{i}_chat_id", [""])[0],
+                "enabled": f"tg_recipient{i}_enabled" in form,
+            }
+            for i in range(1, MAX_TELEGRAM_RECIPIENTS + 1)
+            if f"tg_recipient{i}_chat_id" in form
+        ]
+        slots = min(len(recipients) + 1, MAX_TELEGRAM_RECIPIENTS)
+        self._respond(render_telegram_settings(load_settings(), slots=slots, recipients=recipients))
+
     def _handle_telegram_send_draft(self, form: dict) -> None:
-        """초안 화면(preview.html)의 "텔레로 보내기" 버튼이 fetch로 호출한다.
+        """초안 화면(preview.html)의 "Telegram" 버튼이 fetch로 호출한다.
 
         초안 상태를 서버가 다시 계산하지 않고, 화면이 이미 갖고 있던 PLAIN_TEXT를 그대로
         받아 전송한다 — 재정렬·숨김 직후처럼 화면과 저장된 상태 사이에 미묘한 시차가
@@ -1958,20 +2064,22 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         preview.html은 이 서버와 같은 출처(127.0.0.1:{port})라 CORS 헤더가 필요 없다.
         """
         text = form.get("text", [""])[0]
-        if text and telegram_send_text(text):
+        chat_ids = telegram_active_recipient_chat_ids()
+        if text and chat_ids and telegram_send_text(text, chat_ids):
             self.send_response(204)
         else:
             self.send_response(502)
         self.end_headers()
 
     def _handle_telegram_send_scrap(self, form: dict) -> None:
-        """스크랩 완성본(index.html)의 "텔레로 보내기" 버튼이 fetch로 호출한다.
+        """스크랩 완성본(index.html)의 "Telegram" 버튼이 fetch로 호출한다.
 
         초안과 동일하게, 서버가 최신 회차를 다시 계산하지 않고 화면의 PLAIN_TEXT를
         그대로 받아 전송한다(_handle_telegram_send_draft와 같은 이유).
         """
         text = form.get("text", [""])[0]
-        if text and telegram_send_text(text):
+        chat_ids = telegram_active_recipient_chat_ids()
+        if text and chat_ids and telegram_send_text(text, chat_ids):
             self.send_response(204)
         else:
             self.send_response(502)

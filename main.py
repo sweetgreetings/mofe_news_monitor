@@ -13,6 +13,7 @@ from app.settings import load_settings
 from app.settings_server import run_settings_server
 from app.storage import delete_expired_runs, is_today, load_latest_run
 from app.telegram_bot import send_text
+from app.telegram_recipients import active_recipient_chat_ids
 from app.email_recipients import active_recipient_emails
 from app.email_sender import send_text as send_email_text
 
@@ -47,9 +48,11 @@ def _scrape_and_render(run_slot: str, window_start: str) -> dict:
         # 까지 보내면 방금 회차가 아니라 예전 회차 내용을 다시 보내는 꼴이라 혼란만 준다.
         settings = load_settings()
         if settings.get("telegram_auto_send", False):
-            plain_text = build_latest_plain_text()
-            if plain_text:
-                send_text(plain_text)
+            chat_ids = active_recipient_chat_ids()
+            if chat_ids:
+                plain_text = build_latest_plain_text()
+                if plain_text:
+                    send_text(plain_text, chat_ids)
         # [추가: 2026-08-06] 텔레그램과 같은 이유·같은 조건(화면이 실제로 갱신될 때만) —
         # 이메일판. 받는 사람이 하나도 없으면(app.email_recipients) 굳이 시도하지 않는다.
         if settings.get("email_auto_send", False):

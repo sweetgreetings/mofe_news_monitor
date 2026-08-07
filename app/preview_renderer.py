@@ -162,7 +162,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
   .toc-order-btn:hover {{ background: {hover}; }}
   .toc-order-btn:disabled {{ opacity: 0.3; cursor: default; }}
-  .toc-row.toc-row-moved {{ background: #DCFCE7; }}
+  .toc-row.toc-row-moved {{ background: #E7EFE8; }}
   .toc-empty {{ color: {muted}; font-size: 0.82rem; padding: 6px 8px; }}
   /* [추가: 2026-07-30] 체크박스로 기사를 선택했을 때만 나타나는 "일괄 이동" 바 —
      장바구니처럼 화면 하단에 붙어있다가, 선택이 하나도 없으면 숨어서 원래 있던
@@ -253,14 +253,16 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .article.just-promoted {{ background: #FFF9C4; }}
   /* [수정: 2026-08-05] app.renderer와 동일 — 순서 이동은 노란색(승격·새 기사 도착과 겹침)
      대신 연두색을 쓴다. */
-  .article.just-moved {{ background: #DCFCE7; }}
+  .article.just-moved {{ background: #E7EFE8; }}
   /* [수정: 2026-07-30] 🗑️를 제목 바로 옆에 붙인다 — space-between이면 창이 넓을 때
      제목이 짧을수록 버튼이 화면 오른쪽 끝까지 멀어져 잘못 누를 위험이 있었다. */
   .article summary {{
     cursor: pointer; display: flex; align-items: baseline; justify-content: flex-start; gap: 8px;
+    -webkit-tap-highlight-color: transparent;
   }}
   .article summary::marker {{ color: {muted}; }}
-  .title-line {{ min-width: 0; overflow-wrap: anywhere; }}
+  /* [추가: 2026-08-07] app.renderer와 동일 — 모바일 사파리 탭 하이라이트 잔상 방지. */
+  .title-line {{ min-width: 0; overflow-wrap: anywhere; color: {text}; -webkit-tap-highlight-color: transparent; }}
   /* [수정: 2026-08-05] app.renderer와 동일 — 액션 묶음만 margin-left: auto로 항상 줄
      오른쪽 끝에 붙인다. */
   .article-actions {{ margin-left: auto; display: flex; align-items: center; gap: 4px; flex-shrink: 0; }}
@@ -730,7 +732,9 @@ function applyViewMode(mode) {{
 // 읽어서, 값(value)엔 원본 이름을, 화면엔 이름표(data-current)를 쓴다.
 function getAllGroups() {{
   return Array.prototype.map.call(document.querySelectorAll(".subheading h2 .rename-btn[data-current]"), function(btn) {{
-    return {{value: btn.dataset.name, label: btn.dataset.current}};
+    // [추가: 2026-08-07] app.renderer와 동일 — 사용자가 만든 소제목 여부도 같이 읽는다.
+    var custom = btn.closest(".subheading").classList.contains("subheading-custom");
+    return {{value: btn.dataset.name, label: btn.dataset.current, custom: custom}};
   }});
 }}
 // [추가: 2026-08-03] app.renderer와 동일한 이유·동작 — 소제목 화면 순서를 바꾼다.
@@ -771,6 +775,7 @@ function updateBulkMoveBar() {{
     var opt = document.createElement("option");
     opt.value = g.value;
     opt.textContent = g.label;
+    if (g.custom) {{ opt.style.fontWeight = "700"; }}
     options += opt.outerHTML;
   }});
   select.innerHTML = options;
@@ -1229,19 +1234,25 @@ def _compute_preview_articles(settings: dict, slot: dict) -> list:
     return apply_preview_order(articles, load_preview_order())
 
 
-def _group_select_html(current_name: str, all_names: list, labels: dict) -> str:
+def _group_select_html(current_name: str, all_names: list, labels: dict, custom_names: Optional[set] = None) -> str:
     """"다른 소제목으로" 드롭다운 — 지금 속한 소제목은 옵션에서 빼고 나머지를 보여준다.
 
     [추가: 2026-07-30] 체크박스 하단 바와 별개로, 기사 하나만 바로 다른 소제목에
     옮기고 싶을 때 쓴다(경계를 여러 번 넘나들며 ↑/↓를 반복할 필요 없이 한 번에 이동).
     고르는 즉시 반영되고(onchange), 옮길 곳이 아예 없으면(소제목이 이거 하나뿐)
     빈 문자열을 돌려줘 드롭다운 자체를 숨긴다.
+
+    [추가: 2026-08-07] app.renderer._group_select_html과 동일 — 사용자가 만든
+    소제목만 볼드로 표시해 자동 분류 소제목과 구분한다.
     """
+    custom_names = custom_names or set()
     others = [n for n in all_names if n != current_name]
     if not others:
         return ""
     options = "".join(
-        f'<option value="{html.escape(n)}">{html.escape(_group_option_label(n, labels))}</option>'
+        f'<option value="{html.escape(n)}"'
+        + (' style="font-weight:700"' if n in custom_names else "")
+        + f'>{html.escape(_group_option_label(n, labels))}</option>'
         for n in others
     )
     return (
@@ -1286,7 +1297,7 @@ def _render_preview_groups(
             )
         else:
             last_index = len(group["articles"]) - 1
-            group_select = _group_select_html(group["name"], all_names, labels)
+            group_select = _group_select_html(group["name"], all_names, labels, custom_names)
             body = "\n".join(
                 render_article(
                     a,

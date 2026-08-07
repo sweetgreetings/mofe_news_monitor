@@ -152,7 +152,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [추가: 2026-08-05] 방금 순서를 옮긴 항목을 기사의 "방금 승격" 표시와 같은 노란색으로
      한 번 표시한다 — 팝오버가 새로고침 후 자동으로 다시 열리는 동안, 여러 개를 연달아
      옮길 때 방금 뭘 옮겼는지 헷갈리지 않게. */
-  .toc-row.toc-row-moved {{ background: #DCFCE7; }}
+  .toc-row.toc-row-moved {{ background: #E7EFE8; }}
   .toc-empty {{ color: {muted}; font-size: 0.82rem; padding: 6px 8px; }}
   /* [추가: 2026-07-30] app.preview_renderer와 동일한 체크박스 일괄이동 바 —
      평소엔 숨어있다가 체크박스를 선택하면 왼쪽에 나타나고, 🗑️는 그대로 오른쪽에 남는다. */
@@ -273,16 +273,22 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      기사까지 같은 노란색을 쓰면 세 가지 서로 다른 의미가 한 색으로 겹쳐 헷갈린다는
      피드백. 순서 이동 전용으로 연두색을 새로 뺐다(기존 팔레트의 형광펜용 라임색
      #C6FF00과도 톤이 달라 헷갈리지 않는다). */
-  .article.just-moved {{ background: #DCFCE7; }}
+  .article.just-moved {{ background: #E7EFE8; }}
   /* [수정: 2026-07-30] 🗑️를 제목 바로 옆에 붙인다 — space-between으로 두면 창이 넓을 때
      제목이 짧으면 버튼이 화면 오른쪽 끝까지 멀리 떨어져 보여서(제목-버튼 간 시각적 연결이
      끊김) 잘못된 행을 누를 위험이 있었다. flex-start로 바꿔 제목 길이와 무관하게 버튼이
      항상 제목 바로 뒤에 붙게 한다. */
   .article summary {{
     cursor: pointer; display: flex; align-items: baseline; justify-content: flex-start; gap: 8px;
+    -webkit-tap-highlight-color: transparent;
   }}
   .article summary::marker {{ color: {muted}; }}
-  .title-line {{ min-width: 0; overflow-wrap: anywhere; }}
+  /* [추가: 2026-08-07] 모바일 사파리에서 제목(summary)을 눌러 펼치면 그 뒤로 제목 글자가
+     보라색으로 바뀌어 보인다는 제보 — 이 앱 CSS가 지정한 색이 아니라, 사파리가 탭할 때
+     보여주는 하이라이트 효과(-webkit-tap-highlight-color)가 제대로 안 지워지고 남는
+     것으로 보인다(iOS 사파리에서 종종 나타나는 현상). 색을 투명 처리해 아예 안 나타나게
+     막는다. */
+  .title-line {{ min-width: 0; overflow-wrap: anywhere; color: {text}; -webkit-tap-highlight-color: transparent; }}
   /* [수정: 2026-08-05] 제목 길이에 따라 "다른 소제목"/🔄/✏️/🗑️/↑↓가 매번 다른 자리에
      떠서 줄마다 위치가 들쭉날쭉하다는 피드백 — 이 묶음만 margin-left: auto로 항상 줄
      오른쪽 끝에 붙게 했다. 체크박스·제목·게시 시각은 그대로 flex-start로 왼쪽에 붙어
@@ -801,7 +807,10 @@ function applyViewMode(mode) {{
 // 읽어서 쓴다 — 이름표(rename)가 붙어 있어도 서버에는 항상 원본 이름으로 보내야 한다.
 function getAllGroups() {{
   return Array.prototype.map.call(document.querySelectorAll(".subheading h2 .rename-btn[data-current]"), function(btn) {{
-    return {{value: btn.dataset.name, label: btn.dataset.current}};
+    // [추가: 2026-08-07] 일괄이동 바 드롭다운도 사용자가 만든 소제목을 볼드로
+    // 표시하기 위해, 그 소제목 카드에 이미 붙어있는 subheading-custom 클래스를 같이 읽는다.
+    var custom = btn.closest(".subheading").classList.contains("subheading-custom");
+    return {{value: btn.dataset.name, label: btn.dataset.current, custom: custom}};
   }});
 }}
 // [추가: 2026-08-03] 소제목 자체의 화면 순서를 바꾼다 — 서버가 "지금 순서"를 다시 계산할
@@ -845,6 +854,7 @@ function updateBulkMoveBar() {{
     var opt = document.createElement("option");
     opt.value = g.value;
     opt.textContent = g.label;
+    if (g.custom) {{ opt.style.fontWeight = "700"; }}
     options += opt.outerHTML;
   }});
   select.innerHTML = options;
@@ -1338,17 +1348,27 @@ def render_article(
     )
 
 
-def _group_select_html(current_name: str, all_names: list, labels: dict) -> str:
+def _group_select_html(current_name: str, all_names: list, labels: dict, custom_names: Optional[set] = None) -> str:
     """"다른 소제목으로" 드롭다운 — app.preview_renderer._group_select_html과 동일한
     이유·동작(스크랩 초안과 완성본 양쪽 다 자동분류가 완벽하지 않아 여러 개를 바로
     잡아야 하는 경우가 있어 붙였다). 지금 속한 소제목은 옵션에서 빼고, 옮길 곳이
     아예 없으면(소제목이 이거 하나뿐) 빈 문자열을 돌려줘 드롭다운을 숨긴다.
+
+    [추가: 2026-08-07] 자동 분류 소제목과 사용자가 만든 소제목이 텍스트만 봐서는
+    구분이 안 돼 헷갈린다는 피드백 — 화면 카드에 이미 쓰는 하늘색 점선 테두리 표식과
+    같은 기준(custom_names)으로, 사용자가 만든 소제목만 볼드로 보여준다. 네이티브
+    <select>는 배경색·아이콘 같은 꾸밈은 못 넣어도 font-weight 같은 글자 스타일은
+    입력해도 되어(대부분의 데스크톱 브라우저에서 실제로 렌더링됨), 이 정도 구분에는
+    충분하다.
     """
+    custom_names = custom_names or set()
     others = [n for n in all_names if n != current_name]
     if not others:
         return ""
     options = "".join(
-        f'<option value="{html.escape(n)}">{html.escape(_group_option_label(n, labels))}</option>'
+        f'<option value="{html.escape(n)}"'
+        + (' style="font-weight:700"' if n in custom_names else "")
+        + f'>{html.escape(_group_option_label(n, labels))}</option>'
         for n in others
     )
     return (
@@ -1406,7 +1426,7 @@ def _render_groups(
             )
         else:
             last_index = len(group["articles"]) - 1
-            group_select = _group_select_html(group["name"], all_names, labels)
+            group_select = _group_select_html(group["name"], all_names, labels, custom_names)
             articles_html = "\n".join(
                 render_article(
                     a,

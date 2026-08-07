@@ -103,7 +103,12 @@ COLOR_LIVE_BG = "#FEF2F2"
 # "자리"에 붙어 있었기 때문. 그래서 각 단어에 색 인덱스를 직접 저장해 고정한다(사용자가
 # 팔레트에서 직접 골라 바꿈, 자유 색상 선택은 아님 — 비슷한 색을 골라 헷갈리는 사고를
 # 막기 위해 이 5색 팔레트 안에서만 고른다).
-HIGHLIGHT_COLORS = ["#C6FF00", "#FDBA74", "#7DD3FC", "#F9A8D4", "#C4B5FD"]
+# [수정: 2026-08-07] 기존 5색(네온 라임·비비드 오렌지·비비드 하늘색·비비드 핑크·비비드
+# 보라)이 특히 "재정경제부"처럼 거의 모든 기사에 등장하는 단어에 쓰이면 화면 전체가 너무
+# 튀어 눈이 피로하다는 피드백 — 톤을 낮춘 더스티 파스텔 5색으로 교체했다. 인덱스(순서)는
+# 그대로라 이미 저장된 단어별 색 배정(highlight_keywords의 "color": 인덱스)은 그대로
+# 유지되고 실제 렌더링 색만 바뀐다.
+HIGHLIGHT_COLORS = ["#DCE4C3", "#E8D2BA", "#C7D9E4", "#E5D0D8", "#DAD4E8"]
 # [추가: 2026-07-24] 하이라이트 배경 위 글자색. 기본 글자색을 그대로 쓰면 밝은 배경과
 # 대비가 약해 잘 안 보이므로, 짙은 색으로 바꿔 대비를 준다. 팔레트 5색 모두 파스텔 톤이라
 # 이 짙은 글자색 하나로 다섯 색 전부 대비가 충분하다.
@@ -174,6 +179,11 @@ MANUAL_KEYWORD_NOTE_FILE = DATA_DIR / "manual_keyword_note.json"
 # 둘 수 있다. enabled로 지우지 않고 켜고 끄기만 해서, 휴가 등으로 잠깐 다른 사람에게만
 # 보내고 싶을 때 삭제·재등록 없이 토글만으로 바꿀 수 있다(app.email_recipients).
 EMAIL_RECIPIENTS_FILE = DATA_DIR / "email_recipients.json"
+# [추가: 2026-08-07] 텔레그램도 이메일과 같은 방식(여러 받는 사람 + 켜고 끄기)으로
+# 바꾸면서 생긴 파일 — [{"name":..., "chat_id":..., "enabled": bool}, ...].
+# app.telegram_recipients가 최초 1회, 기존 .env의 TELEGRAM_CHAT_ID를 "나"라는 이름으로
+# 자동으로 이 목록에 옮겨 담아준다(이미 쓰고 있던 받는 사람을 잃지 않도록).
+TELEGRAM_RECIPIENTS_FILE = DATA_DIR / "telegram_recipients.json"
 # [추가: 2026-07-25] 실시간 기사 현황에서 "→ 스크랩" 버튼으로 담아둔 기사 목록. 예정된
 # 회차 데이터(articles/*.json)와 별개로, 당일 자정까지만 유지되고 자정이 지나면 자동으로 비워진다.
 MANUAL_ARTICLES_FILE = DATA_DIR / "manual_articles.json"
@@ -231,6 +241,8 @@ MAX_WORDCLOUD_EXCLUDE_WORDS = 15
 # [추가: 2026-08-06] 이메일 받는 사람 최대 인원 — 담당자 한 명이 여러 동료에게 전달하는
 # 용도라 팀 규모를 넘어설 일이 거의 없다고 보고 넉넉히 잡았다.
 MAX_EMAIL_RECIPIENTS = 15
+# [추가: 2026-08-07] 텔레그램도 이메일과 같은 이유·같은 상한.
+MAX_TELEGRAM_RECIPIENTS = 15
 
 # PRD.md 기능1 규칙 18 — 우선 Pretendard, 없으면 Noto Sans KR, 그래도 없으면 시스템 기본
 FONT_STACK = "'Pretendard', 'Noto Sans KR', sans-serif"
