@@ -271,7 +271,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .article .url {{ flex: 1; color: {muted}; font-size: 0.9rem; word-break: break-all; text-decoration: underline; }}
   /* [수정: 2026-07-30] "이미 확인함"을 영구 기억(localStorage)하지 않고 "지금 펼쳐서
      보고 있는 기사"에만 실시간 적용 — app.renderer와 같은 이유·같은 방식(:has()). */
-  .article:has(details[open]) .title-line, .article:has(details[open]) .url {{ color: {seen_purple}; }}
+  .article:has(details[open]) .title-line, .article:has(details[open]) .url {{ color: {seen_color}; }}
   /* [추가: 2026-07-29] 지난번 이 화면을 봤을 때는 없다가 이번에 새로 들어온 기사 —
      초안은 새로고침할 때마다 다시 검색하므로 뭐가 새로 섞였는지 표시해준다
      (app.preview_renderer._compute_preview_articles가 매번 새로 검색·병합한 결과). */
@@ -321,9 +321,11 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .manual-zone-hint {{ font-size: 0.75rem; color: {muted}; }}
   .manual-zone .article:first-child {{ margin-top: 10px; }}
   /* [추가: 2026-08-05] app.renderer와 동일 — 직접 키워드 작성 메모 칸. */
+  /* [수정: 2026-08-07] app.renderer와 동일 — 스크롤 중에도 계속 보이도록 sticky 고정. */
   .keyword-note-zone {{
     display: none; align-items: center; gap: 8px; border: 1px dashed {border}; border-radius: 8px;
     padding: 10px 14px; margin: 10px 0 4px; flex-wrap: wrap;
+    position: sticky; top: 60px; z-index: 15; background: {card};
   }}
   .keyword-note-zone.is-open {{ display: flex; }}
   .keyword-note-zone .keyword-note-label {{ font-weight: 600; color: {text}; font-size: 0.85rem; white-space: nowrap; }}
@@ -1118,8 +1120,10 @@ def _theme() -> dict:
         "border": COLOR_BORDER,
         "hover": COLOR_HOVER,
         "error": COLOR_ERROR,
-        # [추가: 2026-07-28] "이미 확인한 기사" 표시 전용 색 — app.renderer와 통일.
-        "seen_purple": "#A855F7",
+        # [추가: 2026-07-28, 톤다운: 2026-08-07] "이미 확인한 기사" 표시 전용 색 —
+        # app.renderer와 통일. 원래 보라색(#A855F7)이 너무 튄다는 피드백으로 밝은
+        # 남색으로 교체했다.
+        "seen_color": "#3B5FA0",
         # [추가: 2026-07-29] "지난번 봤을 때는 없었는데 이번에 새로 들어온 기사" 표시 전용
         # 색 — 초안은 열 때마다 다시 검색해 새 기사가 계속 섞여 들어오므로, 뭐가 방금
         # 추가됐는지 눈에 띄게 한다. 옅은 노랑(경고색 아님, 그냥 참고 정보) — 진한 톤은

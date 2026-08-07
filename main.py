@@ -16,6 +16,7 @@ from app.telegram_bot import send_text
 from app.telegram_recipients import active_recipient_chat_ids
 from app.email_recipients import active_recipient_emails
 from app.email_sender import send_text as send_email_text
+from app.export import export_latest_run
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,15 @@ def _scrape_and_render(run_slot: str, window_start: str) -> dict:
     result = collect_run_with_retry(run_slot, window_start)
     if result["articles"] or not had_today_run:
         generate_screen()
+        # [추가: 2026-08-07] media_report(별도 프로젝트)로 넘길 export도 화면이 실제로
+        # 갱신될 때(=위 조건과 동일)마다 자동으로 함께 만든다 — 텔레그램/이메일과 달리
+        # 로컬 파일 쓰기뿐이라 비용 걱정이 없어 별도 on/off 설정 없이 항상 실행한다.
+        # 실패해도 스크랩 자체는 계속돼야 하므로 예외를 삼킨다(담당자가 화면의
+        # "📤 보고서로 내보내기" 버튼으로 언제든 다시 시도할 수 있다).
+        try:
+            export_latest_run()
+        except Exception:
+            logger.exception("media_report export 실패 — 회차 저장/화면 갱신은 정상 진행됩니다")
         # [추가: 2026-08-03] 정기 회차가 실제로 화면에 반영될 때만(=위 조건과 동일) 텔레그램
         # 자동 전송도 함께 시도한다 — 화면 갱신을 건너뛴 경우(0건+오늘 이미 다른 회차 있음)
         # 까지 보내면 방금 회차가 아니라 예전 회차 내용을 다시 보내는 꼴이라 혼란만 준다.

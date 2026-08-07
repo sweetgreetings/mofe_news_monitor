@@ -303,7 +303,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      전부 보라색으로 남아 화면이 정신없어진다는 피드백에 따른 변경. details가 열려있는
      동안에만 :has()로 색을 입히므로(자바스크립트 불필요), 닫거나 다른 기사를 열면 이
      기사는 자동으로 원래 색으로 돌아간다. */
-  .article:has(details[open]) .title-line, .article:has(details[open]) .url {{ color: {seen_purple}; }}
+  .article:has(details[open]) .title-line, .article:has(details[open]) .url {{ color: {seen_color}; }}
   /* [수정: 2026-08-03] 게시 시각은 복사/내보내기 텍스트(_build_plain_text)에는 원래도
      포함되지 않지만, 화면에서 마우스로 직접 드래그해 복사할 땐 화면에 보이는 대로
      같이 딸려왔다 — user-select: none으로 이 부분만 드래그 선택 자체가 안 되게 한다
@@ -356,9 +356,14 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [추가: 2026-08-05] "+ 직접 키워드 작성하기" — AI 키워드 블록과 별개로, 이용자가
      자유 서식으로 적어두는 메모 한 줄. 저장된 메모가 있으면 처음부터 열려서 보이고,
      없으면 버튼을 눌러야 나타난다(is-open 토글). */
+  /* [수정: 2026-08-07] 스크롤해서 기사를 읽다가 메모를 적으려면 위로 되돌아가야 했던
+     문제 — sticky로 고정해 상단 바(topbar, 높이만큼 top: 60px) 바로 아래 붙어서 화면에
+     계속 보이게 한다. background를 명시해야 아래로 스크롤된 기사 카드들이 비쳐 보이지
+     않는다. */
   .keyword-note-zone {{
     display: none; align-items: center; gap: 8px; border: 1px dashed {border}; border-radius: 8px;
     padding: 10px 14px; margin: 10px 0 4px; flex-wrap: wrap;
+    position: sticky; top: 60px; z-index: 15; background: {card};
   }}
   .keyword-note-zone.is-open {{ display: flex; }}
   .keyword-note-zone .keyword-note-label {{ font-weight: 600; color: {text}; font-size: 0.85rem; white-space: nowrap; }}
@@ -383,6 +388,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
       <a class="btn" href="data:text/plain;charset=utf-8,{export_href}" download="{export_filename}">다운로드</a>
       <button onclick="sendToTelegram(this)">Telegram</button>
       <button onclick="sendToEmail(this)">Email</button>
+      <button onclick="exportReport(this)" title="media_report 앱으로 이 회차를 내보냅니다">📤 보고서로 내보내기</button>
       <a class="btn" href="history.html">지난 기사</a>
       <select class="view-mode-select" onchange="applyViewMode(this.value)" title="소제목 구성은 그대로 두고 화면에 나열하는 순서만 바꿉니다">
         <option value="subheading" selected>소제목별</option>
@@ -393,13 +399,13 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
       <button class="create-group-btn" type="button" onclick="createCustomGroup()">+ 새 소제목 만들기</button>
       <button class="create-group-btn" type="button" onclick="toggleKeywordNote()">+ 직접 키워드 작성하기</button>
     </div>
-    <div class="keyword-note-zone{note_open_class}" id="keyword-note-zone">
-      <span class="keyword-note-label">키워드 작성 :</span>
-      <input type="text" id="keyword-note-input" value="{note_value_attr}" placeholder="키워드 a, 키워드 b, 키워드 c...">
-      <button type="button" onclick="saveKeywordNote()">저장</button>
-      <button class="clear-btn" type="button" onclick="clearKeywordNote()">삭제</button>
-    </div>
   </header>
+  <div class="keyword-note-zone{note_open_class}" id="keyword-note-zone" data-run-slot="{run_slot_raw}">
+    <span class="keyword-note-label">키워드 작성 :</span>
+    <input type="text" id="keyword-note-input" value="{note_value_attr}" placeholder="키워드 a, 키워드 b, 키워드 c...">
+    <button type="button" onclick="saveKeywordNote()">저장</button>
+    <button class="clear-btn" type="button" onclick="clearKeywordNote()">삭제</button>
+  </div>
   {body}
 </div>
 <button type="button" class="toc-toggle-btn" onclick="toggleTocPopover()" title="소제목 목차">☰</button>
@@ -447,6 +453,21 @@ function sendToTelegram(btn) {{
   }}).finally(function() {{
     btn.disabled = false;
   }});
+}}
+// [추가: 2026-08-07] media_report(별도 프로젝트) export 계약 — 서버가 최신 회차를
+// 다시 계산해 data/export/에 JSON으로 저장한다. PLAIN_TEXT를 보내는 Telegram/Email과
+// 달리 본문을 클라이언트가 만들지 않는다(app.export.export_latest_run 참고).
+function exportReport(btn) {{
+  btn.disabled = true;
+  fetch("http://{settings_host}:{settings_port}/export-report", {{ method: "POST" }})
+    .then(function(res) {{
+      if (res.ok) {{ alert("보고서 앱으로 내보냈습니다."); }}
+      else {{ alert("내보내기에 실패했습니다."); }}
+    }}).catch(function() {{
+      alert("내보내기에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+    }}).finally(function() {{
+      btn.disabled = false;
+    }});
 }}
 // [추가: 2026-08-06] app.renderer의 sendToTelegram과 같은 이유·동작 — 이메일판.
 function sendToEmail(btn) {{
@@ -983,10 +1004,11 @@ function toggleKeywordNote() {{
 }}
 function saveKeywordNote() {{
   var text = document.getElementById("keyword-note-input").value;
+  var runSlot = document.getElementById("keyword-note-zone").dataset.runSlot;
   fetch("http://{settings_host}:{settings_port}/save-manual-keyword-note", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
-    body: new URLSearchParams({{text: text}})
+    body: new URLSearchParams({{text: text, run_slot: runSlot}})
   }}).then(function(res) {{
     if (res.ok) {{ location.reload(); }}
     else {{ alert("저장하지 못했습니다. 다시 시도해주세요."); }}
@@ -1558,7 +1580,7 @@ def _build_plain_text(run_slot: str, groups: list, line_template: str, labels: d
     # [추가: 2026-08-05] "+ 직접 키워드 작성하기"로 적어둔 메모가 있으면 헤더 바로 아래
     # "- {메모}" 한 줄로 끼워 넣는다 — AI 키워드 블록(하단)과 달리 이건 화면 맨 위에 있고,
     # 내보내기 텍스트에서도 항상 헤더 다음 줄에 온다.
-    note = load_manual_keyword_note()
+    note = load_manual_keyword_note((datetime.now().strftime("%Y-%m-%d"), run_slot))
     if note:
         lines.append(f"- {note}")
     lines.append("")
@@ -1664,9 +1686,10 @@ def render_page(
     plain_text = _build_plain_text(run_slot, groups, line_template, labels)
     export_filename = f"언론모니터링_{run_slot.replace(':', '-')}.txt"
 
-    manual_keyword_note = load_manual_keyword_note()
+    manual_keyword_note = load_manual_keyword_note((datetime.now().strftime("%Y-%m-%d"), run_slot))
     return _PAGE_TEMPLATE.format(
         run_slot=html.escape(format_slot_time_kr(run_slot)),
+        run_slot_raw=html.escape(run_slot),
         body=body,
         note_open_class=" is-open" if manual_keyword_note else "",
         note_value_attr=html.escape(manual_keyword_note),
@@ -1699,10 +1722,11 @@ def render_page(
         border=COLOR_BORDER,
         hover=COLOR_HOVER,
         error=COLOR_ERROR,
-        # [추가: 2026-07-28] "이미 확인한 기사"(제목 펼침/링크 클릭) 표시 전용 색 —
-        # 사용자가 준 스크린샷의 보라색을 참고했다. 이 화면에서만 쓰는 상태 표시라
-        # 공용 COLOR_* 팔레트에는 넣지 않고 여기서 상수로 둔다.
-        seen_purple="#A855F7",
+        # [추가: 2026-07-28, 톤다운: 2026-08-07] "이미 확인한 기사"(제목 펼침/링크 클릭)
+        # 표시 전용 색 — 원래 보라색(#A855F7)이 너무 튄다는 피드백으로 밝은 남색으로
+        # 교체했다. 이 화면에서만 쓰는 상태 표시라 공용 COLOR_* 팔레트에는 넣지 않고
+        # 여기서 상수로 둔다.
+        seen_color="#3B5FA0",
         # [추가: 2026-08-03] 액션 툴바 버튼 리디자인(시안 B/A, 사용자 선택) 전용 색 —
         # accent(#2563EB)를 옅게 탄 톤온톤 hover와, 고스트 아웃라인용 연한 테두리.
         # 둘 다 이 툴바에서만 쓰는 값이라 공용 COLOR_* 팔레트에는 넣지 않는다.

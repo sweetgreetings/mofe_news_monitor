@@ -71,7 +71,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      것을, 화살표로 이은 가로 파이프라인 한 줄로 바꿨다. 설정은 그 아래 작은 텍스트
      링크로 낮춰서 나머지 셋과 뎁스가 같아 보이지 않게 했다. */
   .flow-a {{ display: flex; align-items: center; justify-content: center; gap: 0; margin: 0 auto 32px; flex-wrap: wrap; }}
-  .flow-a a {{
+  .flow-a a, .flow-a .box {{
     text-decoration: none; display: flex; flex-direction: column; align-items: center; gap: 4px;
     padding: 12px 18px; border-radius: 10px; min-width: 108px;
   }}
@@ -85,6 +85,21 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .flow-a a.done {{ background: {tonal_hover}; }}
   .flow-a a.done .label {{ color: {header}; }}
   .flow-a .arrow {{ color: {border}; font-size: 1.3rem; padding: 0 4px; }}
+  /* [추가: 2026-08-07] "동향 보고" 흐름 — 백엔드(다른 폴더에서 별도 구현 예정)가 아직
+     없어 UI만 먼저 얹어둔다. <a>가 아닌 <div>라 클릭이 안 되고, "준비 중" 배지로
+     지금은 눌러도 아무 일도 안 일어난다는 걸 알려준다. */
+  .flow-section-label {{ font-size: 0.7rem; color: {text_muted}; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.02em; }}
+  .flow-divider {{ border-top: 1px dashed {border}; margin: 0 0 24px; }}
+  .flow-a .box {{ cursor: default; position: relative; }}
+  .flow-a .box.material {{ background: {material_bg}; }}
+  .flow-a .box.material .label {{ color: {material_text}; }}
+  .flow-a .box.brief {{ background: {brief_bg}; }}
+  .flow-a .box.brief .label {{ color: {brief_text}; }}
+  .flow-a .box .soon-badge {{
+    position: absolute; top: -6px; right: -6px; font-size: 0.58rem; font-weight: 700;
+    color: {text_muted}; background: {card}; border: 1px solid {border}; border-radius: 8px;
+    padding: 1px 5px;
+  }}
   /* [수정: 2026-08-03] 설정 링크를 화면 우측 하단(워드클라우드~문의 이메일 사이)으로 옮김 */
   .settings-link {{ display: flex; justify-content: flex-end; margin: 4px 0 22px; }}
   .settings-link a {{ font-size: 0.95rem; color: {text_muted}; text-decoration: none; }}
@@ -122,19 +137,38 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <body>
 <div class="container">
   {logo_html}
-  <h1>온라인 기사 모아보기</h1>
+  <h1>AI 기반 뉴스 모니터링 및 언론동향 보고</h1>
+  <div class="flow-section-label">자동 스크랩</div>
   <div class="flow-a">
     <a class="live" href="http://{settings_host}:{settings_port}/live.html">
       <span class="icon">🔴</span><span class="label">실시간 현황</span><span class="sub">지금 들어오는 기사</span>
     </a>
     <span class="arrow">→</span>
     <a class="draft" href="http://{settings_host}:{settings_port}/preview.html">
-      <span class="icon">📝</span><span class="label">스크랩 초안</span><span class="sub">다음 회차 미리보기</span>
+      <span class="icon">⛏️</span><span class="label">스크랩 초안</span><span class="sub">다음 회차 미리보기</span>
     </a>
     <span class="arrow">→</span>
     <a class="done" href="index.html">
-      <span class="icon">📗</span><span class="label">스크랩 완성본</span><span class="sub">가장 최근 확정본</span>
+      <span class="icon">💎</span><span class="label">스크랩 완성본</span><span class="sub">가장 최근 확정본</span>
     </a>
+  </div>
+  <div class="flow-divider"></div>
+  <div class="flow-section-label">동향 보고</div>
+  <div class="flow-a">
+    <div class="box material">
+      <span class="soon-badge">준비 중</span>
+      <span class="icon">🗂️</span><span class="label">AI 분석</span><span class="sub">스크랩을 AI가 분석</span>
+    </div>
+    <span class="arrow">→</span>
+    <div class="box brief">
+      <span class="soon-badge">준비 중</span>
+      <span class="icon">📝</span><span class="label">동향 초안</span><span class="sub">AI가 작성한 보고서</span>
+    </div>
+    <span class="arrow">→</span>
+    <div class="box brief">
+      <span class="soon-badge">준비 중</span>
+      <span class="icon">📑</span><span class="label">동향 확정본</span><span class="sub">보고서 템플릿에 반영</span>
+    </div>
   </div>
   {wordcloud_html}
   <p class="wc-caption">*0시 이후 현재까지 주요 언급어</p>
@@ -223,6 +257,12 @@ def render_landing_page(freqs: list, search_keywords: Optional[list] = None) -> 
         # [추가: 2026-08-03] 세그먼트 위젯 "완성본" 칸 배경 — 버튼 리디자인(시안 B)과 톤 통일
         # 위해 같은 값을 쓰되, 여기서만 쓰는 값이라 공용 COLOR_* 팔레트에는 넣지 않는다.
         tonal_hover="#DCEAFE",
+        # [추가: 2026-08-07] "동향 보고" 흐름(백엔드 없는 UI 자리만 먼저 배치) 전용 색 —
+        # 스크랩 흐름(빨강/파랑/남색)과 겹치지 않도록 회색·보라 톤으로 구분했다.
+        material_bg="#F1EFE8",
+        material_text="#57564F",
+        brief_bg="#F0EAFB",
+        brief_text="#4A3F8F",
     )
 
 

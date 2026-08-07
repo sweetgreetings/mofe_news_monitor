@@ -52,6 +52,7 @@ from app.custom_groups import add_custom_group, load_custom_groups, remove_custo
 from app.email_recipients import active_recipient_emails, load_email_recipients, save_email_recipients
 from app.email_sender import is_configured as email_is_configured
 from app.email_sender import send_text as email_send_text
+from app.export import export_latest_run
 from app.group_order import save_group_order
 from app.draft_articles import add_draft_pending_article
 from app.history_renderer import generate_history_page
@@ -1806,6 +1807,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_telegram_send_draft(form)
         elif self.path == "/telegram-send-scrap":
             self._handle_telegram_send_scrap(form)
+        elif self.path == "/export-report":
+            self._handle_export_report(form)
         elif self.path == "/save-group-order":
             self._handle_save_group_order(form)
         elif self.path == "/save-email":
@@ -2080,6 +2083,21 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         text = form.get("text", [""])[0]
         chat_ids = telegram_active_recipient_chat_ids()
         if text and chat_ids and telegram_send_text(text, chat_ids):
+            self.send_response(204)
+        else:
+            self.send_response(502)
+        self.end_headers()
+
+    def _handle_export_report(self, form: dict) -> None:
+        """스크랩 완성본(index.html)의 "보고서로 내보내기" 버튼이 fetch로 호출한다.
+
+        Telegram/Email 전송과 달리 클라이언트의 PLAIN_TEXT를 받지 않고 서버가 최신 회차를
+        다시 계산한다(app.export.export_latest_run) — media_report가 소비할 JSON은 텍스트
+        한 줄이 아니라 소제목·기사 구조를 그대로 보존해야 하기 때문이다. index.html이 이미
+        같은 계산 결과로 렌더링돼 있으므로 화면과 내보낸 내용은 항상 같다.
+        """
+        path = export_latest_run()
+        if path is not None:
             self.send_response(204)
         else:
             self.send_response(502)
@@ -2590,9 +2608,17 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         서식으로 적어두는 메모 한 줄을 저장한다(app.manual_keyword_note). 완성본은
         정적 파일이라 즉시 다시 그려야 다음 접속에도 바로 보인다(초안·실시간 현황은
         요청마다 새로 계산되므로 별도 처리가 필요 없다).
+
+        [수정: 2026-08-07] 완성본(index.html)에서 저장할 때는 그 화면이 보여주는
+        회차(run_slot)를 폼에 같이 실어 보낸다 — 안 실어 보내면(초안에서 저장할 때)
+        "지금 진행 중인 회차" 기준으로 자동 판단한다(app.manual_keyword_note
+        ._current_round_key). 완성본은 이미 끝난 회차를 보여주므로 자동 판단에
+        맡기면 그새 시작된 다음 회차로 잘못 붙을 수 있어, 명시적으로 넘겨야 한다.
         """
         text = form.get("text", [""])[0]
-        save_manual_keyword_note(text)
+        run_slot = form.get("run_slot", [""])[0].strip()
+        run_key = (datetime.now().strftime("%Y-%m-%d"), run_slot) if run_slot else None
+        save_manual_keyword_note(text, run_key)
         self._regenerate_screens()
         self.send_response(204)
         self.end_headers()

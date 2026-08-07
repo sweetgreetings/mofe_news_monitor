@@ -11,8 +11,12 @@ from app.storage import delete_expired_runs, run_exists
 
 logger = logging.getLogger(__name__)
 
-# 폴링 간격(초). 1분마다 현재 시각을 확인해 실행할 회차가 있는지 본다.
-POLL_INTERVAL_SEC = 60
+# 폴링 간격(초). [수정: 2026-08-07] 60초일 때 "정시 실행"이 최대 60초까지 늦어질 수 있어
+# (예: 매 정각 30분 슬롯을 30분 59초에 확인하면 그 tick은 놓치고 다음 tick인 31분 59초에야
+# 감지) 텔레그램/이메일 자동 전송이 "31분에 온다"는 사용자 체감으로 이어졌다. 이 확인 자체는
+# 설정 파일을 한 번 읽고 시각을 비교하는 가벼운 작업이라(로컬 단일 사용자 앱) 10초로 줄여도
+# 비용 증가는 무시할 만하고, 최악 지연을 10초 이내로 낮춘다.
+POLL_INTERVAL_SEC = 10
 
 
 def _resolve_schedule_times(schedule_times: Optional[List[dict]]) -> List[dict]:
