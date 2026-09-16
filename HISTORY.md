@@ -635,7 +635,7 @@ CLAUDE.md "본업 화면은 자기를 해명하지 않는다"에 정면으로 �
 없고, 그 덕에 부제를 통째로 지워도 카드가 성립한다 — 사용자가 원한 "덜어내기"를
 %보다 더 많이 해내면서 격차는 남긴다. 정확한 건수는 `title` 툴팁에만 남겼다(값을
 완전히 버리지는 않는다). 시안 다섯 개(현재/A: 건수 없음/B: %/C: 막대만/D: 회색 숫자/
-E: 막대+숫자)를 [HOME_ISSUE_CARD_MOCKUP.html](HOME_ISSUE_CARD_MOCKUP.html)로 만들어
+E: 막대+숫자)를 [HOME_ISSUE_CARD_MOCKUP.html](mockups/HOME_ISSUE_CARD_MOCKUP.html)로 만들어
 비교한 뒤 C를 골랐다.
 
 **③은 ①과 세트라 자연히 따라왔다.** "기타 N건" 줄의 존재 이유는 "TOP5 합계 + 기타 =
@@ -657,7 +657,7 @@ E: 막대+숫자)를 [HOME_ISSUE_CARD_MOCKUP.html](HOME_ISSUE_CARD_MOCKUP.html)�
 글자 크기가 아니라 덩어리 수에서 왔고, 그대로 키우면 26개가 커질 뿐이다 — 시안 A로 실제로
 그려 보여줬다. **덜어내야 키울 자리가 생긴다.**
 
-**시안 네 개**([HOME_FLOW_CLEAN_MOCKUP.html](HOME_FLOW_CLEAN_MOCKUP.html)):
+**시안 네 개**([HOME_FLOW_CLEAN_MOCKUP.html](mockups/HOME_FLOW_CLEAN_MOCKUP.html)):
 - A 글자만 키움 — 위 이유로 비교용.
 - B 건수 줄·줄 제목·화살표 설명을 다 빼고 이름만 크게, 3칸 격자, 보관함은 흰 바탕+테두리.
 - C B + 칸 안에 "누르면 무엇이 나오나" 한 줄(`11:00 회차 진행 중`, `인사청문회` 등).
@@ -682,7 +682,7 @@ E: 막대+숫자)를 [HOME_ISSUE_CARD_MOCKUP.html](HOME_ISSUE_CARD_MOCKUP.html)�
 **말풍선 문구는 사용자가 나중에 일괄로 고치기로 했다** — 그래서 고정 문구를
 `_FLOW_TIPS` 표 한 곳에 모았다.
 
-**같은 날 2차 — 가운데 정렬 + 실시간을 정기 줄로** ([HOME_FLOW_ALIGN_MOCKUP.html](HOME_FLOW_ALIGN_MOCKUP.html)).
+**같은 날 2차 — 가운데 정렬 + 실시간을 정기 줄로** ([HOME_FLOW_ALIGN_MOCKUP.html](mockups/HOME_FLOW_ALIGN_MOCKUP.html)).
 두 가지 지적이 이어졌다:
 - "너무 쏠려 있어서 가운데 정렬은?" — 칸 폭 241px에 이름이 80~120px라 오른쪽 절반이 비어
   있었다. 가운데 정렬(B)을 채택. 아이콘 위·이름 아래(C)는 칸이 60 → 84px로 커져 "시원하게"와
@@ -699,7 +699,7 @@ E: 막대+숫자)를 [HOME_ISSUE_CARD_MOCKUP.html](HOME_ISSUE_CARD_MOCKUP.html)�
   동안에도 가로 스크롤을 만들었다**(시안에서 실제로 보였다). 좁은 창에서만 끝 칸 말풍선을 칸
   끝에 맞춘다.
 
-**같은 날 4차 — 줄 이름표 「정기」「수시」** ([HOME_FLOW_ROWLABEL_MOCKUP.html](HOME_FLOW_ROWLABEL_MOCKUP.html)).
+**같은 날 4차 — 줄 이름표 「정기」「수시」** ([HOME_FLOW_ROWLABEL_MOCKUP.html](mockups/HOME_FLOW_ROWLABEL_MOCKUP.html)).
 제보: "이 화면에서 사람들은 '정기'와 '수시'를 잘 구별 못하는 것 같아. 카테고리를 나누면 될지 메뉴
 이름을 바꾸면 될지?"
 - **원인**: 두 말이 화면에 나오는 곳이 맨 오른쪽 보관함 두 칸뿐이었다. 두 줄은 모양(조건 → 기사가
@@ -911,7 +911,7 @@ E: 막대+숫자)를 [HOME_ISSUE_CARD_MOCKUP.html](HOME_ISSUE_CARD_MOCKUP.html)�
   24~58줄이었고, `.np-list`에 `max-height: 250px; overflow-y: auto`가 **이미 걸려 있어서**
   창 크기는 그대로였다(도입 때 걸어둔 값이라 새로 할 일이 없었다 — "높이 제한을 같이 걸어야
   한다"고 했던 최초 판단이 틀렸다). 최신 회차순이라 위 8줄이 곧 직전 회차다.
-  **시안 셋을 실물로 비교했다**([NAME_PICKER_RANGE_MOCKUP.html](NAME_PICKER_RANGE_MOCKUP.html),
+  **시안 셋을 실물로 비교했다**([NAME_PICKER_RANGE_MOCKUP.html](mockups/NAME_PICKER_RANGE_MOCKUP.html),
   실제 CSS·실제 저장된 소제목 이름). A(지금 방식) / B(평평한 한 줄 목록) / C(회차 구분선).
   담당자가 C를 골랐다. 다만 **구분선은 기본 목록에만 둔다** — 검색 결과는 대개 1~3건인데
   서로 다른 회차라, 치는 순간에도 구분선을 그리면 `개각` 2건 → 4줄, `TF` 3건 → 5줄로 **줄만
@@ -1392,7 +1392,7 @@ before/after 비교 시안을 먼저 만들어 검토받았다. 시안에서 정
 확정본·초안·수시 수집 결과에는 그 중간 층이 없었다(사용자 제안).
 
 소제목 헤더(`<h2>`)의 아이콘 묶음 **맨 앞**에 📋을 붙였다. 목업
-([SUBHEADING_COPY_MOCKUP.html](SUBHEADING_COPY_MOCKUP.html))으로 두 자리를 비교해
+([SUBHEADING_COPY_MOCKUP.html](mockups/SUBHEADING_COPY_MOCKUP.html))으로 두 자리를 비교해
 고른 결과다 — 맨 앞이면 "보는 동작(📋) → 고치는 동작(✏️🗑️) → 옮기는 동작(▲▼)"
 순서가 되고, 뒤에 두면 파괴적인 🗑️ 바로 옆에 무해한 📋이 붙어 손이 미끄러지는 자리가
 된다. 소제목 헤더에 컨트롤이 하나 더 늘어나는 부담(체크박스·이름·배지·건수까지 7개)은
@@ -3724,7 +3724,7 @@ oid 실측이 필요). 이건 화면 문제가 아니라 데이터 표 문제다
 ### 표시 방식 — 세 안을 실물로 비교했다
 
 담당자가 물었다. "이동한 기사는 아래로 내리는 게 좋겠니, 음영처리만 짙게 하는 게
-좋겠니?" 실물 목업([ADHOC_SENT_MARK_MOCKUP.html](ADHOC_SENT_MARK_MOCKUP.html))으로
+좋겠니?" 실물 목업([ADHOC_SENT_MARK_MOCKUP.html](mockups/ADHOC_SENT_MARK_MOCKUP.html))으로
 셋을 나란히 놓고 비교했다 — **보낸 기사를 2·4·7번째로 흩어놓은 게 핵심**이었다(몰려
 있으면 세 안이 다 비슷해 보인다).
 
@@ -4300,7 +4300,7 @@ launchd.err.log          → 오류 0건
 ⓘ 툴팁으로 내렸다 — 툴팁 둘째 줄이 그 반박을 선제로 답한다(`네이버 뉴스 화면에는 이미
 보이더라도 검색 결과에는 아직 없을 수 있습니다`).
 
-**색·자리 — 목업으로 정했다** ([LATE_PICKUP_MOCKUP.html](LATE_PICKUP_MOCKUP.html)).
+**색·자리 — 목업으로 정했다** ([LATE_PICKUP_MOCKUP.html](mockups/LATE_PICKUP_MOCKUP.html)).
 앰버/중립 회색/파랑 3안을 실제 목록에 섞어 비교했다. 회색은 `📷 사진 추정` 칩과 색이 같아
 구분이 안 됐고, 파랑은 "누르는 것"·"확정본 상태"라는 다른 뜻을 이미 갖고 있었다. **앰버**는
 회차 마감 배너가 쓰는 *"지금 보고 있는 게 네가 생각하는 그거랑 조금 다르다"* 와 뜻이 정확히
@@ -5022,7 +5022,7 @@ MBC·조선일보…) 기사가 든 소제목이 맨 위에 왔다. 가나다처
 `/wordcloud-exclude`는 입력칸 한 줄에 `del` 버튼 하나씩을 세로로 쌓는 화면이었다(단어 4개면
 4줄, 칸을 늘리려면 `+ 제외어 추가`가 폼 전체를 POST해 페이지를 다시 그렸다). 사용자가
 "UI가 너무 구리다, 칩을 나란히 넣고 x로 지우자"고 해 시안 둘을 만들었다
-([WORDCLOUD_EXCLUDE_MOCKUP.html](WORDCLOUD_EXCLUDE_MOCKUP.html)) — A: 칩 + ×만, B: A + 「오늘
+([WORDCLOUD_EXCLUDE_MOCKUP.html](mockups/WORDCLOUD_EXCLUDE_MOCKUP.html)) — A: 칩 + ×만, B: A + 「오늘
 워드클라우드에 뜬 단어」에서 눌러 빼기. **B로 결정**(사용자).
 
 ### B를 붙인 이유 — 실측
@@ -5066,7 +5066,7 @@ MBC·조선일보…) 기사가 든 소제목이 맨 위에 왔다. 가나다처
 `/keywords` 화면에서 세 가지를 짚었다: ① 칩·칸이 글자 크기에 비해 위아래 여백이 많다
 ② 개요·설명이 장황하고, 개요의 `🔴 실시간 현황` 칩 색이 와닿지 않는다 ③ 특히 카드마다의
 정기 스크랩 체크 문구가 너무 길어 안 읽힌다(카드 폭이 반이 되며 3줄로 접혔다 — 위 항목의
-"감수한 것" 마지막 줄이 바로 이것). 시안 둘([KEYWORDS_COMPACT_MOCKUP.html](KEYWORDS_COMPACT_MOCKUP.html))
+"감수한 것" 마지막 줄이 바로 이것). 시안 둘([KEYWORDS_COMPACT_MOCKUP.html](mockups/KEYWORDS_COMPACT_MOCKUP.html))
 — A: 정기 체크를 카드 아래 한 줄에 다섯 자로 / B: 머리줄의 `✓ 정기` 알약으로 — 중 **A로 결정**(사용자).
 
 ### 무엇을 바꿨나
@@ -5112,7 +5112,7 @@ MBC·조선일보…) 기사가 든 소제목이 맨 위에 왔다. 가나다처
 남아 있던 괄호의 근거는 "제목의 약 25%가 `[단독]`·따옴표로 시작해 경계가 안 보인다" 하나였다.
 그 경계는 문장부호가 아니라 색·크기로도 나눌 수 있다.
 
-**세 안을 실물로 비교했다** ([OUTLET_TITLE_MOCKUP.html](OUTLET_TITLE_MOCKUP.html), 9/11 11:00
+**세 안을 실물로 비교했다** ([OUTLET_TITLE_MOCKUP.html](mockups/OUTLET_TITLE_MOCKUP.html), 9/11 11:00
 회차 실제 기사 19건 + 실제 확정본 CSS):
 
 | | 데스크탑 800 제목 줄 합계 | 폰 390 |
@@ -5151,7 +5151,7 @@ MBC·조선일보…) 기사가 든 소제목이 맨 위에 왔다. 가나다처
 20자 초과 17건·최대 38자였다. 평소엔 멀쩡하다가 매칭이 많은 기사에서만 깨지는 모양.
 
 **고정 폭으로 자르면 칩 붙은 행이 안 풀린다.** 실시간처럼 `max-width` 하나로 자르는 안(A)을
-목업([KW_CHIP_MOCKUP.html](KW_CHIP_MOCKUP.html))에서 재보니, 칩 없는 행이 안 밀리는 최대값
+목업([KW_CHIP_MOCKUP.html](mockups/KW_CHIP_MOCKUP.html))에서 재보니, 칩 없는 행이 안 밀리는 최대값
 (260px)으로도 칩 붙은 긴 행은 칩 폭(약 110px)만큼 모자라 여전히 밀렸다. 칩까지 감안해 폭을
 줄이면 칩 없는 96%의 행에서 괜히 자른다. 그래서 **남는 자리만큼 줄어드는** 방식으로 갔다
 (B·C). 800px 기준 밀린 행: 지금 3/7 → A 1/7 → B·C 0/7.
@@ -5198,7 +5198,7 @@ flex-basis 0이면 줄바꿈 판단에 검색어 길이가 안 들어가 버튼�
 `app.trend_chart` 한 곳이라 /trend 짧은 기간에서도 같이 빠진다. 그 화면은 호버하면 그 날짜에
 점이 뜨므로 값을 읽는 데 지장이 없다. 「집계 중」 마지막 칸의 빈 원만 남겼다.
 
-**시안.** [TREND_LINE_ONLY_MOCKUP.html](TREND_LINE_ONLY_MOCKUP.html) — 실제 데이터·실제
+**시안.** [TREND_LINE_ONLY_MOCKUP.html](mockups/TREND_LINE_ONLY_MOCKUP.html) — 실제 데이터·실제
 그래프 함수로 A 지금 / B 선만 / C 선만 4개를 비교. 선 밑에 흰 테두리를 까는 안도
 그려봤는데 홈 크기에선 B와 거의 구분이 안 돼 뺐다.
 
@@ -5258,7 +5258,7 @@ flex-basis 0이면 줄바꿈 판단에 검색어 길이가 안 들어가 버튼�
 - **이미 거의 그렇게 돼 있었다** — 편집 창의 끝 칸은 열 때마다 지금 시각으로 미리 채워진다
   (2026-08-25). 모자랐던 건 그 버튼이 접힌 창 **안에** 있다는 것 하나라, 같은 동작을 창 밖으로
   꺼낸 버튼 하나로 풀었다(`to_now=1`, 시작 그대로 · 끝은 서버가 누른 순간 시각).
-- **자리 셋을 목업으로 비교했다**([ADHOC_RELOAD_NOW_MOCKUP.html](ADHOC_RELOAD_NOW_MOCKUP.html)):
+- **자리 셋을 목업으로 비교했다**([ADHOC_RELOAD_NOW_MOCKUP.html](mockups/ADHOC_RELOAD_NOW_MOCKUP.html)):
   A 편집 옆(칩 줄 끝) / B 시간 칩에 반쪽 버튼으로 붙이기 / C 헤더 줄 오른쪽. A가 뜻은 제일
   잘 읽혔지만 **1100px 창에서도 이 카드의 칩 줄이 두 줄로 넘어갔다**(24 → 55px, 칩 줄은 검색어가
   늘수록 길어진다). B는 한 줄에 들어가지만 버튼 글자가 1분마다 바뀌고 이 앱에 없던 모양이
@@ -5282,7 +5282,7 @@ flex-basis 0이면 줄바꿈 판단에 검색어 길이가 안 들어가 버튼�
 - **문제**: 바가 툴바 바로 밑(목록 맨 위) 흐름 안에만 있어서, 스크롤을 내려 아래쪽 기사를 체크하면
   바가 이미 떠 있는데도 화면 밖이었다. 체크했다는 신호는 행 배경색뿐이고, 옮기거나 보내려면 맨 위까지
   다시 올라가야 했다.
-- **두 안을 목업으로 비교했다**([ADHOC_BULK_BAR_MOCKUP.html](ADHOC_BULK_BAR_MOCKUP.html)): A 정기
+- **두 안을 목업으로 비교했다**([ADHOC_BULK_BAR_MOCKUP.html](mockups/ADHOC_BULK_BAR_MOCKUP.html)): A 정기
   확정본·초안의 하단 흰 띠(`.bottombar`)와 같은 모양 / B 지금의 연파랑 상자를 그대로 아래에 띄우기.
   B는 체크한 행과 색이 이어지는 장점이 있지만 같은 버튼들이 정기와 수시에서 다른 옷을 입게 되고,
   좌하단 쓰레기통을 피하느라 폭이 줄어 좁은 창에서 먼저 두 줄로 접힌다. **A로 정했다(사용자 결정)** —
@@ -5351,7 +5351,7 @@ flex-basis 0이면 줄바꿈 판단에 검색어 길이가 안 들어가 버튼�
   맞는 도구다. xlsx는 엑셀을 열어 다시 다듬어야 한다. 반대 근거도 적어 둔다 — 그날 실제 라벨은
   4건·3개뿐이었고 `사진 아님`은 보고서 재료가 아니라 사진 추정 오탐을 적어 두는 메모로 보였다.
   효용이 증명된 건 아니지만 새 엔드포인트 없이(공용 `/download-text`) 만들 수 있어 넣었다.
-- **목업**([LABEL_EXPORT_MOCKUP.html](LABEL_EXPORT_MOCKUP.html))으로 두 가지를 정했다(사용자 결정, 둘 다 추천안):
+- **목업**([LABEL_EXPORT_MOCKUP.html](mockups/LABEL_EXPORT_MOCKUP.html))으로 두 가지를 정했다(사용자 결정, 둘 다 추천안):
   - **머리줄 = 라벨명에 소제목 형식을 입힌 것**(`<사진 아님>`). 붙여 넣으면 소제목 한 칸처럼 읽히고,
     소제목 형식을 바꾸면 따라간다. 기각한 안: 라벨명 그대로(태그라서 소제목 모양을 빌리는 게 뜻이
     어긋난다고 볼 수 있지만, 담당자가 붙여 넣은 뒤 괄호를 손으로 다는 일이 생긴다).
@@ -5546,7 +5546,7 @@ flex-basis 0이면 줄바꿈 판단에 검색어 길이가 안 들어가 버튼�
   네 조합이 전부 뜻이 있고, 「초안·확정본만」이 새로 생긴다 — 실시간을 뒤덮는 넓은 검색어를
   실시간에선 빼고 보고서에만 남기는 쓰임. 연동(초안·확정본을 켜면 실시간도 켜짐)은 안 했다 —
   스위치 하나가 다른 스위치를 움직이면 "갈라져 보인다"가 모양만 바꿔 돌아온다.
-- **시안** [KEYWORDS_TWO_SWITCH_MOCKUP.html](KEYWORDS_TWO_SWITCH_MOCKUP.html): A(머리줄 이름표 스위치 둘) ·
+- **시안** [KEYWORDS_TWO_SWITCH_MOCKUP.html](mockups/KEYWORDS_TWO_SWITCH_MOCKUP.html): A(머리줄 이름표 스위치 둘) ·
   B(머리줄 ✓ 알약 둘 — 9/11 「머리줄 정기 알약」을 기각한 이유(그룹 스위치와 헷갈림)는 사라졌지만
   바로 아래 키워드 칩과 모양 계열이 비슷했다) · C(아랫줄 체크 둘 — 가장 적게 바뀌지만 훑을 때 덜 걸림).
   이름은 `초안·확정본` / `정기 스크랩` / `보고서`를 비교. 사용자가 **A · 초안·확정본**을 골랐다.
@@ -5583,7 +5583,7 @@ flex-basis 0이면 줄바꿈 판단에 검색어 길이가 안 들어가 버튼�
   저절로** 넘기는 시간 경계다. 수시엔 마감이 없어 「확정」 버튼을 새로 만들어야 하고, 같은 이름에 다른
   동작이 붙는다 — 📌 담아두기를 없앤 것과 같은 함정이고, 사용자가 걱정한 "정기 쓰는 사람이 헷갈린다"의
   실체가 이것이다.
-- **시안** [ADHOC_RAW_TRASH_ROUND_MOCKUP.html](ADHOC_RAW_TRASH_ROUND_MOCKUP.html) — 원본·확정본·보관함을
+- **시안** [ADHOC_RAW_TRASH_ROUND_MOCKUP.html](mockups/ADHOC_RAW_TRASH_ROUND_MOCKUP.html) — 원본·확정본·보관함을
   한 화면에서 실제로 눌러 보는 시안. 비교한 두 축:
   - **확정본 나누기**: 하나로 계속(그때까지의 동작) / **보낼 때마다**(사용자의 두 번째 제안 — 15시에
     보낸 것과 16시에 보낸 것을 따로) / **불러올 때마다**. 「보낼 때마다」는 보내기가 기사 한 건씩 누르는

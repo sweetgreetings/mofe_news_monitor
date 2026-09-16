@@ -682,7 +682,7 @@ AND는 URL 교집합이다(`app/naver_api.py` `_match_group`) — 텍스트 매�
 #### 보낸 기사 표시 — 「띠 + 흐리기 + 칩」 세 겹 [담당자 결정: 2026-09-02]
 
 원본 목록에서 이미 보낸 기사를 어떻게 표시할지. 세 안을 실물로 비교한 뒤
-([ADHOC_SENT_MARK_MOCKUP.html](ADHOC_SENT_MARK_MOCKUP.html)) **B안**으로 정했다.
+([ADHOC_SENT_MARK_MOCKUP.html](mockups/ADHOC_SENT_MARK_MOCKUP.html)) **B안**으로 정했다.
 
 | 겹 | 언제 일하나 | 값 |
 |---|---|---|
