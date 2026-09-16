@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>🔴 실시간 현황 — 「미선정 기사」 이름 바꾸기 목업</title>
+<style>
+  :root {
+    --bg: #F8FAFC; --card: #FFFFFF; --header: #1E3A5F; --accent: #2563EB;
+    --text: #1F2937; --muted: #6B7280; --border: #E5E7EB; --hover: #EFF6FF;
+    --live-bg: #FEF2F2; --row-hover: #F3F4F6; --pin-gray: #9AA4B2;
+    --pin-gray-bg: #F3F5F7; --ai-text: #4A3F8F; --ai-bg: #F0EAFB;
+    --text-soft: #4B5563; --text-faint: #9CA3AF;
+    --warn-text: #92400E; --warn-bg: #FFFBEB; --warn-border: #FDE68A;
+  }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'Pretendard', 'Noto Sans KR', -apple-system, sans-serif; }
+  .page { max-width: 860px; margin: 20px auto 80px; padding: 0 20px; }
+  h1 { font-size: 1.2rem; color: var(--header); margin: 0 0 6px; }
+  .lede { color: var(--muted); font-size: 0.85rem; margin: 0 0 16px; line-height: 1.7; }
+  .lede b { color: var(--header); }
+
+  /* 목업 전용 — 후보 전환 바 */
+  .bar { position: sticky; top: 0; z-index: 5; background: var(--card);
+    border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 8px;
+    padding: 12px 16px; margin: 0 0 14px; display: flex; align-items: center; gap: 8px;
+    flex-wrap: wrap; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+  .bar b { font-size: 0.84rem; color: var(--header); margin-right: 2px; }
+  .bar button { font-size: 0.79rem; padding: 5px 12px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--card); color: var(--text-soft); font-family: inherit; }
+  .bar button:hover { border-color: var(--accent); color: var(--accent); }
+  .bar button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .vdesc { font-size: 0.83rem; line-height: 1.75; color: var(--text-soft);
+    background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--accent);
+    border-radius: 6px; padding: 11px 15px; margin: 0 0 6px; }
+  .vdesc b { color: var(--header); }
+  .tipline { font-size: 0.8rem; color: var(--muted); margin: 0 0 14px; padding-left: 16px; line-height: 1.6; }
+  .tipline code { background: var(--card); border: 1px solid var(--border); border-radius: 4px;
+    padding: 1px 6px; font-size: 0.78rem; color: var(--text-soft); }
+
+  /* ---- 아래부터는 app/live_renderer.py의 실제 CSS 값 그대로 ---- */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px 6px; }
+  .filter-row { margin: 14px 0 4px; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .filter-row label { font-size: 0.92rem; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .filter-row label.target { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 3px; }
+  .live-filter-bar { flex-direction: column; align-items: stretch; gap: 8px; }
+  .filter-search-input { width: 100%; box-sizing: border-box; font-size: 0.9rem; padding: 7px 10px;
+    border: 1px solid var(--border); border-radius: 6px; font-family: inherit; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .group-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 160px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 999px; padding: 5px 11px; font-size: 0.82rem;
+    color: var(--text); cursor: pointer; font-family: inherit; }
+  .group-chip .chip-count { color: var(--muted); }
+  .kw-breakdown-toggle { background: transparent; border: none; color: var(--muted); font-size: 0.8rem;
+    cursor: pointer; padding: 5px 4px; margin-left: auto; font-family: inherit; }
+  .stat-card { background: var(--live-bg); border-radius: 8px; padding: 14px 18px; margin: 16px 0 4px;
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .stat-num { font-size: 1.6rem; font-weight: 600; color: var(--header); }
+  .stat-label { font-size: 0.85rem; color: var(--muted); }
+  .live-row { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px 12px 12px 14px; border-top: 1px solid var(--border); border-left: 3px solid transparent; }
+  .live-row:hover { background: var(--row-hover); }
+  .live-row.is-scrapped { border-left-color: var(--accent); background: var(--hover); opacity: 0.86; }
+  .live-row.is-hidden { opacity: 0.5; text-decoration: line-through; }
+  .live-row.is-pinned { border-left-color: var(--pin-gray); background: var(--pin-gray-bg); opacity: 0.86; }
+  .live-row.is-auto-drafted { border-left-color: var(--ai-text); background: var(--ai-bg); opacity: 0.86; }
+  .live-row.is-hidden-by-filter { display: none; }
+  .live-row-text { min-width: 0; }
+  .live-row-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .outlet-tag { color: var(--muted); font-size: 0.8rem; }
+  .row-group-tag { display: inline-block; margin-left: 6px; max-width: 90px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; vertical-align: -2px; padding: 1px 7px; border-radius: 999px;
+    font-size: 0.69rem; color: var(--accent); background: var(--live-bg); border: 1px solid var(--border); }
+  .pub-time { color: var(--muted); font-size: 0.78rem; margin-left: 6px; }
+  .kw-inline { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px;
+    font-size: 0.78rem; color: var(--muted); vertical-align: -1px; }
+  .kw-inline .kw-v { color: var(--text-soft); }
+  .live-title { font-size: 0.95rem; margin: 2px 0 2px; color: var(--text); }
+  .live-title summary { cursor: pointer; color: var(--text); }
+  .live-url { font-size: 0.78rem; }
+  .live-url a { color: var(--accent); text-decoration: underline; }
+  .add-btn { flex-shrink: 0; background: var(--card); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 9px; font-size: 0.8rem; cursor: pointer; white-space: nowrap;
+    min-width: 84px; text-align: center; font-family: inherit; }
+  .add-btn:disabled { color: var(--muted); cursor: not-allowed; }
+  .add-btn.added { color: var(--accent); border-color: var(--accent); }
+  .add-btn.is-scrapped-btn { color: var(--accent); border-color: var(--accent); background: var(--hover); }
+  .add-btn.is-pinned-btn { color: var(--pin-gray); border-color: var(--pin-gray); background: var(--pin-gray-bg); }
+  .add-btn.is-auto-drafted-btn { color: var(--ai-text); border-color: var(--ai-text); background: var(--ai-bg); }
+  .copy-btn, .more-btn, .hide-btn { flex-shrink: 0; background: var(--card); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 0.8rem;
+    cursor: pointer; font-family: inherit; }
+  .more-btn, .hide-btn { border: none; background: transparent; color: var(--muted); }
+
+  .note { font-size: 0.8rem; color: var(--muted); line-height: 1.8; margin: 14px 2px 0; }
+  .note b { color: var(--text-soft); }
+  .count-note { font-size: 0.79rem; color: var(--warn-text); background: var(--warn-bg);
+    border: 1px solid var(--warn-border); border-radius: 6px; padding: 9px 13px; margin: 12px 0 0; line-height: 1.65; }
+  table.diff { width: 100%; border-collapse: collapse; margin: 14px 0 0; font-size: 0.82rem; }
+  table.diff th, table.diff td { border: 1px solid var(--border); padding: 7px 10px; text-align: left; }
+  table.diff th { background: var(--bg); color: var(--header); font-weight: 600; }
+  table.diff td.n { text-align: right; color: var(--text-soft); }
+  .dropped { margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--border);
+    font-size: 0.8rem; color: var(--muted); line-height: 1.8; }
+  .dropped b { color: var(--text-soft); }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>🔴 실시간 현황 — 「미선정 기사」 이름 바꾸기</h1>
+  <p class="lede">
+    <b>기능은 한 줄도 안 바뀝니다</b> — 체크박스가 하는 일(4개 상태를 한꺼번에 제외)은 그대로고,
+    바뀌는 건 <b>라벨 문자열과 툴팁 문자열 두 개</b>뿐입니다.<br>
+    아래 버튼으로 후보를 바꿔가며 실제 줄에서 어떻게 보이는지 확인하세요. 체크박스는 실제로 동작합니다.
+  </p>
+
+  <div class="bar">
+    <b>후보</b>
+    <button id="btn-1" class="on" onclick="setName(1)">1. 이미 처리한 기사 제외 (추천)</button>
+    <button id="btn-2" onclick="setName(2)">2. 처리한 기사 제외</button>
+    <button id="btn-3" onclick="setName(3)">3. 손댄 기사 제외</button>
+    <button id="btn-0" onclick="setName(0)">지금: 미선정 기사</button>
+  </div>
+
+  <div class="vdesc" id="vdesc"></div>
+  <p class="tipline" id="tipline"></p>
+
+  <div class="card">
+    <div class="filter-row">
+      <label title="스크랩 언론사 화이트리스트 대상만"><input type="checkbox" onchange="applyFilters()" id="f-outlet">선택 언론사만</label>
+      <label><input type="checkbox" onchange="applyFilters()" id="f-scoop">[단독]</label>
+      <label><input type="checkbox" onchange="applyFilters()" id="f-flash">[속보]</label>
+      <label class="target" id="box-target" title=""><input type="checkbox" onchange="applyFilters()" id="f-unclaimed"><span id="target-label"></span></label>
+    </div>
+
+    <div class="filter-row live-filter-bar">
+      <input class="filter-search-input" placeholder="제목 검색" oninput="applyFilters()" id="f-q">
+      <div class="chip-row">
+        <button class="group-chip">기관 정보 (기본) <span class="chip-count">1,204</span></button>
+        <button class="group-chip">예산·재정 <span class="chip-count">861</span></button>
+        <button class="group-chip">세제 <span class="chip-count">432</span></button>
+        <button class="kw-breakdown-toggle">키워드별 건수 ▾</button>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <span class="stat-num" id="stat-count">5건</span>
+      <span class="stat-label">당일 0시 이후 ~ 현재(14:22) 누적, <span>전체 언론사</span></span>
+    </div>
+
+    <div class="live-row" data-status="normal" data-headline="">
+      <div class="live-row-text">
+        <span class="outlet-tag">한국경제</span><span class="row-group-tag">예산·재정</span>
+        <span class="pub-time">14:18 · 4분 전</span>
+        <span class="kw-inline">🔍 <span class="kw-v">추경, 예산안</span></span>
+        <details class="live-title"><summary>정부, 2027년 예산안 국회 제출… 총지출 증가율 4.1%</summary></details>
+        <div class="live-url"><a href="#">https://www.hankyung.com/article/2026090112</a></div>
+      </div>
+      <div class="live-row-actions">
+        <button class="add-btn">📌 담아두기</button>
+        <button class="copy-btn">복사</button><button class="more-btn">⋯</button><button class="hide-btn">🗑</button>
+      </div>
+    </div>
+
+    <div class="live-row is-scrapped" data-status="scrapped" data-headline="">
+      <div class="live-row-text">
+        <span class="outlet-tag">연합뉴스</span><span class="row-group-tag">기관 정보 (기본)</span>
+        <span class="pub-time">13:52 · 30분 전</span>
+        <span class="kw-inline">🔍 <span class="kw-v">재정경제부</span></span>
+        <details class="live-title"><summary>재정경제부, 하반기 경제정책방향 브리핑</summary></details>
+        <div class="live-url"><a href="#">https://www.yna.co.kr/view/AKR2026090100</a></div>
+      </div>
+      <div class="live-row-actions">
+        <button class="add-btn added is-scrapped-btn" disabled>✔️ 스크랩됨</button>
+        <button class="copy-btn">복사</button><button class="more-btn">⋯</button><button class="hide-btn">🗑</button>
+      </div>
+    </div>
+
+    <div class="live-row is-pinned" data-status="pinned" data-headline="단독">
+      <div class="live-row-text">
+        <span class="outlet-tag">중앙일보</span><span class="row-group-tag">세제</span>
+        <span class="pub-time">13:40 · 42분 전</span>
+        <span class="kw-inline">🔍 <span class="kw-v">상속세</span></span>
+        <details class="live-title"><summary><span style="color:#B91C1C;font-weight:800">[단독]</span> 상속세 개편안, 이달 말 당정협의 상정</summary></details>
+        <div class="live-url"><a href="#">https://www.joongang.co.kr/article/25260901</a></div>
+      </div>
+      <div class="live-row-actions">
+        <button class="add-btn added is-pinned-btn">📌 담아둠</button>
+        <button class="copy-btn">복사</button><button class="more-btn">⋯</button><button class="hide-btn">🗑</button>
+      </div>
+    </div>
+
+    <div class="live-row is-auto-drafted" data-status="auto-drafted" data-headline="">
+      <div class="live-row-text">
+        <span class="outlet-tag">KBS</span><span class="row-group-tag">예산·재정</span>
+        <span class="pub-time">13:31 · 51분 전</span>
+        <span class="kw-inline">🔍 <span class="kw-v">국고채</span></span>
+        <details class="live-title"><summary>9월 국고채 발행 계획 확정… 물량 소폭 축소</summary></details>
+        <div class="live-url"><a href="#">https://news.kbs.co.kr/news/view.do?ncd=8260901</a></div>
+      </div>
+      <div class="live-row-actions">
+        <button class="add-btn added is-auto-drafted-btn" disabled>🤖 자동 선별</button>
+        <button class="copy-btn">복사</button><button class="more-btn">⋯</button><button class="hide-btn">🗑</button>
+      </div>
+    </div>
+
+    <div class="live-row is-hidden" data-status="hidden" data-headline="">
+      <div class="live-row-text">
+        <span class="outlet-tag">뉴시스</span><span class="row-group-tag">기관 정보 (기본)</span>
+        <span class="pub-time">13:12 · 70분 전</span>
+        <span class="kw-inline">🔍 <span class="kw-v">기재부</span></span>
+        <details class="live-title"><summary>[포토] 국회 예결위 출석한 부총리</summary></details>
+        <div class="live-url"><a href="#">https://newsis.com/view/NISX20260901</a></div>
+      </div>
+      <div class="live-row-actions">
+        <button class="add-btn added">🗑️ 숨김</button>
+        <button class="copy-btn">복사</button><button class="more-btn">⋯</button>
+      </div>
+    </div>
+  </div>
+
+  <table class="diff">
+    <tr><th>이 체크박스를 켜면 사라지는 상태</th><th>행 버튼 라벨</th><th>오늘 실측</th></tr>
+    <tr><td>숨김</td><td>🗑️ 숨김</td><td class="n">263건</td></tr>
+    <tr><td>스크랩됨</td><td>✔️ 스크랩됨</td><td class="n">333건</td></tr>
+    <tr><td>담아둠</td><td>📌 담아둠</td><td class="n">12건</td></tr>
+    <tr><td>자동 선별</td><td>🤖 자동 선별</td><td class="n">약 204건</td></tr>
+  </table>
+  <p class="note">
+    후보 1·2·3이 <b>넷을 다 포괄하는 말</b>인 이유가 이 표입니다 — 라벨에 일부만 나열하면
+    (예: “숨겨둔 기사, 자동선별 기사 제외”) 적히지 않은 <b>스크랩됨 333건</b>이 말없이 사라집니다.
+    모호한 라벨은 툴팁을 확인하게 만들지만, <b>절반만 맞는 목록은 확인할 생각조차 없애기</b> 때문에
+    지금보다 나빠질 수 있습니다.
+  </p>
+
+  <div class="count-note">
+    ⚠️ 이건 이름 변경이라 기존 동작이 그대로 남습니다 — 상단 <b>“당일 0시 이후 누적 N건”</b>은
+    지금도 <b>보이는 행만</b> 세므로, 이 체크박스를 켜면 누적 숫자도 같이 줄어듭니다(기존 필터 전부 동일).
+    <b>기본값 꺼짐</b>도 그대로 유지됩니다.
+  </div>
+
+  <div class="dropped">
+    <b>기각한 시안 (기록용)</b><br>
+    · <b>A. 통합 체크박스 1개</b>(숨김+스크랩됨만 제외) / <b>B. 분리 2개</b> — 한 줄 안에서
+    “~만 보기”와 “~빼고 보기”가 섞여 방향이 어긋남.<br>
+    · <b>D. 빼고 보기 칩 4개</b> — 바로 아래 그룹 칩과 모양이 같은데 뜻이 정반대(그룹 칩=켜면 그것만 보임).<br>
+    · <b>D′. 빼고 보기 체크박스 4개</b> — 모양 충돌은 없지만, 📌 담아둔 기사를 남겨두고 훑을 일이
+    없다는 판단이라 기능을 쪼갤 이유 자체가 사라짐.
+  </div>
+</div>
+
+<script>
+var NAMES = {
+  1: { label: "이미 처리한 기사 제외",
+       tip: "숨김·스크랩됨·담아둠·자동 선별 — 담당자나 앱이 이미 손댄 기사를 모두 뺍니다",
+       desc: "<b>1. 이미 처리한 기사 제외 (추천)</b> — 넷을 다 포괄하면서 거짓말을 안 하는 말입니다. “처리”가 담당자(숨김·담아둠)와 앱(스크랩됨·자동 선별) 양쪽을 함께 덮고, 「손 안 댄 기사」의 정확한 반대말이라 뜻이 어긋나지 않습니다." },
+  2: { label: "처리한 기사 제외",
+       tip: "숨김·스크랩됨·담아둠·자동 선별 — 담당자나 앱이 이미 손댄 기사를 모두 뺍니다",
+       desc: "<b>2. 처리한 기사 제외</b> — 1에서 “이미”만 뺀 짧은 판. 줄이 좁을 때 유리하지만, “이미”가 빠지면 <b>지금 처리한다</b>는 동작으로 읽힐 여지가 조금 생깁니다(체크하면 뭔가 처리되는 건가?)." },
+  3: { label: "손댄 기사 제외",
+       tip: "숨김·스크랩됨·담아둠·자동 선별 — 담당자나 앱이 이미 손댄 기사를 모두 뺍니다",
+       desc: "<b>3. 손댄 기사 제외</b> — 가장 구어에 가깝고 짧습니다. 코드 주석이 쓰던 말(“담당자·컴퓨터 둘 다 아직 손대지 않은 상태”)과 같은 어휘라 뜻은 정확한데, 앱의 다른 화면 문구들보다 말투가 캐주얼한 편입니다." },
+  0: { label: "미선정 기사",
+       tip: "담아둠·자동 선별·숨김이 아닌 기사만",
+       desc: "<b>지금 상태</b> — “미선정”이 무엇에 선정되지 않았다는 건지 화면 어디에도 없습니다. 게다가 방향이 반대(‘~만 보기’)라 옆의 다른 체크박스들과 읽는 방식이 다릅니다. 참고로 <b>지금 툴팁도 틀려 있습니다</b> — 스크랩됨이 빠져 있는데 실제로는 스크랩됨도 제외됩니다." }
+};
+function setName(k) {
+  [0,1,2,3].forEach(function(i){ document.getElementById("btn-"+i).classList.toggle("on", i===k); });
+  var n = NAMES[k];
+  document.getElementById("target-label").textContent = n.label;
+  document.getElementById("box-target").title = n.tip;
+  document.getElementById("vdesc").innerHTML = n.desc;
+  document.getElementById("tipline").innerHTML = "↳ 마우스를 올리면 뜨는 툴팁: <code>" + n.tip + "</code>";
+}
+// 실제 applyLiveFilters와 같은 구조 — 로직은 한 줄도 안 바뀐다.
+function applyFilters() {
+  var onlyUnclaimed = document.getElementById("f-unclaimed").checked;
+  var wantScoop = document.getElementById("f-scoop").checked;
+  var wantFlash = document.getElementById("f-flash").checked;
+  var q = document.getElementById("f-q").value.trim().toLowerCase();
+  var visible = 0;
+  document.querySelectorAll(".live-row").forEach(function (row) {
+    var st = row.dataset.status;
+    var hide = false;
+    if (wantScoop || wantFlash) {
+      var h = row.dataset.headline || "";
+      if (!((wantScoop && h === "단독") || (wantFlash && h === "속보"))) hide = true;
+    }
+    if (!hide && onlyUnclaimed && st !== "normal") hide = true;
+    if (!hide && q) {
+      var t = row.querySelector(".live-title summary").textContent.toLowerCase();
+      if (t.indexOf(q) === -1) hide = true;
+    }
+    row.classList.toggle("is-hidden-by-filter", hide);
+    if (!hide) visible++;
+  });
+  document.getElementById("stat-count").textContent = visible + "건";
+}
+setName(1);
+</script>
+</body>
+</html>

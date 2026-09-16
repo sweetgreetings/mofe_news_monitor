@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>보관함 삭제 — 시안</title>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { background: #F8FAFC; color: #1F2937; margin: 0; padding: 28px 24px 80px;
+         font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+        stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+  h1.mk { font-size: 1.15rem; color: #1E3A5F; margin: 0 0 6px; }
+  .mk-sub { color: #6B7280; font-size: 0.85rem; margin: 0 0 18px; line-height: 1.65; max-width: 1080px; }
+  .mk-sub b { color: #1F2937; }
+  .ctl { display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
+         background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px;
+         padding: 10px 14px; margin-bottom: 22px; font-size: 0.83rem; max-width: 1080px; }
+  .ctl b { color: #1E3A5F; font-weight: 700; margin-right: 2px; }
+  .ctl button { font: inherit; font-size: 0.82rem; padding: 5px 13px; border: 1px solid #E5E7EB;
+                background: #FFFFFF; color: #6B7280; border-radius: 999px; cursor: pointer; }
+  .ctl button.on { background: #2563EB; border-color: #2563EB; color: #fff; font-weight: 700; }
+  .ctl .sp { flex: 1; }
+  .ctl .reset { border-style: dashed; }
+  .wrap { display: flex; gap: 22px; align-items: flex-start; flex-wrap: wrap; }
+  .screen { width: 720px; max-width: 100%; }
+  .notes { width: 336px; max-width: 100%; font-size: 0.82rem; line-height: 1.7; color: #374151;
+           background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 14px 16px;
+           position: sticky; top: 16px; }
+  .notes h3 { font-size: 0.88rem; color: #1E3A5F; margin: 0 0 8px; }
+  .notes ol { margin: 0; padding-left: 18px; }
+  .notes li { margin-bottom: 8px; }
+  .notes li b { color: #1F2937; }
+  .notes code { font-size: 0.76rem; background: #F1F5F9; padding: 0 4px; border-radius: 4px; }
+  .notes .warnbox { margin-top: 10px; background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E;
+                    border-radius: 8px; padding: 8px 10px; font-size: 0.78rem; }
+  .notes .tbl { width: 100%; border-collapse: collapse; font-size: 0.78rem; margin: 2px 0 12px; }
+  .notes .tbl th, .notes .tbl td { border: 1px solid #E5E7EB; padding: 5px 7px; text-align: left; vertical-align: top; }
+  .notes .tbl th { background: #F8FAFC; color: #1E3A5F; font-weight: 700; }
+
+  /* ── 실제 화면 재현 ─────────────────────────────────────────── */
+  .scr-top { background: #FFFFFF; border: 1px solid #E5E7EB; border-bottom: none; border-radius: 12px 12px 0 0;
+             padding: 9px 18px; font-size: 0.88rem; }
+  .scr-top a { color: #2563EB; font-weight: 600; text-decoration: none; }
+  .card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 0 0 12px 12px; padding: 20px 22px 22px; }
+  .page-title { color: #1E3A5F; font-size: 1.2rem; margin: 0 0 4px; }
+  .page-sub { color: #6B7280; font-size: 0.82rem; margin: 0 0 14px; }
+  .period-bar { border: 1px solid #E5E7EB; border-radius: 10px; padding: 9px 12px; background: #F8FAFC;
+                display: flex; gap: 10px; align-items: center; font-size: 0.8rem; color: #6B7280; }
+  .period-bar .fake-input { flex: 1; border: 1px solid #E5E7EB; background: #fff; border-radius: 7px; padding: 5px 10px; color: #9CA3AF; }
+  .seg { display: inline-flex; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; background: #FFFFFF; }
+  .seg span { padding: 5px 12px; border-right: 1px solid #E5E7EB; }
+  .seg span:last-child { border-right: none; }
+  .seg span.on { background: #2563EB; color: #fff; font-weight: 600; }
+
+  .result-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 2px 8px; min-height: 30px; }
+  .result-line { font-size: 0.82rem; color: #6B7280; flex: 1; min-width: 0; margin: 0; }
+  .result-line b { color: #1E3A5F; }
+  .exp { display: inline-flex; gap: 4px; flex: none; margin-left: auto; }
+  .exp button { border: 1px solid #E5E7EB; background: #FFFFFF; color: #6B7280; border-radius: 6px;
+    padding: 4px 11px; font-size: 0.75rem; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .exp button:hover { background: #EFF6FF; color: #2563EB; border-color: #BFDBFE; }
+
+  /* 「선택 삭제」 진입 버튼 — 복사·txt·xlsx와 같은 회색 고스트. 여러 개를 한꺼번에 지울 때만 쓴다. */
+  .tidy-btn { border: 1px solid #E5E7EB; background: #FFFFFF; color: #6B7280; border-radius: 6px;
+    padding: 4px 11px; font-size: 0.75rem; cursor: pointer; font-family: inherit; display: inline-flex; gap: 5px; align-items: center; }
+  .tidy-btn:hover { border-color: #FECACA; color: #DC2626; background: #FEF2F2; }
+  .tidy-bar { display: none; align-items: center; gap: 8px; margin-left: auto; font-size: 0.78rem; color: #6B7280; }
+  .pick-empty { border: 1px dashed #CBD5E1; background: #FFFFFF; color: #374151; border-radius: 6px;
+    padding: 4px 11px; font-size: 0.75rem; cursor: pointer; font-family: inherit; }
+  .pick-empty:hover { border-color: #2563EB; color: #2563EB; border-style: solid; }
+  .pick-empty:disabled { opacity: .45; cursor: default; border-color: #CBD5E1; color: #374151; border-style: dashed; }
+  .done-btn { border: 1px solid #2563EB; background: #2563EB; color: #fff; border-radius: 6px;
+    padding: 4px 12px; font-size: 0.75rem; cursor: pointer; font-family: inherit; font-weight: 600; }
+  .tidy .tidy-bar { display: inline-flex; }
+  .tidy .normal-only { display: none !important; }
+
+  /* 선택 바 — 확정본·초안의 일괄이동 바, /hidden의 일괄 복구 바와 같은 규칙: 고른 게 있을 때만 뜬다 */
+  .selbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px;
+    background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; padding: 8px 12px; margin: 0 0 8px;
+    font-size: 0.83rem; color: #7F1D1D; box-shadow: 0 2px 8px rgba(15,23,42,0.08); }
+  .selbar b { color: #991B1B; }
+  .selbar .sp { flex: 1; }
+  .selbar .clear { border: none; background: none; color: #6B7280; font: inherit; font-size: 0.78rem; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  .del-btn { border: 1px solid #DC2626; background: #DC2626; color: #fff; border-radius: 6px;
+    padding: 5px 13px; font-size: 0.8rem; cursor: pointer; font-family: inherit; font-weight: 700; display: inline-flex; gap: 5px; align-items: center; }
+  .del-btn:hover { filter: brightness(1.08); }
+
+  input.cb { display: none; width: 15px; height: 15px; margin: 0; accent-color: #DC2626; flex: none; cursor: pointer; }
+  .tidy input.cb { display: inline-block; }
+  input.cb:disabled { cursor: not-allowed; opacity: .45; }
+  .cb-sp { display: none; width: 15px; flex: none; }
+  .tidy .cb-sp { display: inline-block; }
+  .lock { display: none; font-size: 0.72rem; color: #6B7280; font-weight: 400; }
+  .tidy .lock { display: inline; }
+
+  /* 줄 끝 🗑 — 확정본 기사 행의 🗑와 같은 무게: 평소 회색, hover만 빨강. 선택 삭제 중엔 체크박스가 대신한다. */
+  .row-del { border: none; background: none; color: #9CA3AF; cursor: pointer; font-size: 0.95rem;
+    padding: 3px 6px; border-radius: 5px; line-height: 1; display: inline-flex; flex: none; }
+  .row-del:hover { color: #DC2626; background: #FEF2F2; }
+  .tidy .row-del { display: none; }
+
+  /* 수시 — 사안 ▸ 날짜 ▸ 회차 */
+  details.issue-block { border: 1px solid #E5E7EB; border-radius: 10px; margin-bottom: 8px; overflow: hidden; background: #fff; }
+  details.issue-block > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+  details.issue-block > summary::-webkit-details-marker, details.day-block > summary::-webkit-details-marker,
+  details.date > summary::-webkit-details-marker { display: none; }
+  details.issue-block > summary::before { content: "▸"; color: #6B7280; font-size: 0.75rem; }
+  details.issue-block[open] > summary::before { content: "▾"; }
+  details.issue-block > summary:hover { background: #F3F4F6; }
+  .issue-block .nm { font-weight: 700; color: #1E3A5F; }
+  .issue-block .nm.noname { font-weight: 600; font-style: italic; color: #6B7280; }
+  .issue-block .kw { font-size: 0.78rem; color: #6B7280; }
+  .issue-block .n { font-size: 0.78rem; color: #6B7280; margin-left: auto; white-space: nowrap; }
+  details.day-block { border-top: 1px solid #F1F5F9; background: #F1F5F9; }
+  details.day-block > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 30px; font-size: 0.85rem; }
+  details.day-block > summary::before { content: "▸"; color: #6B7280; font-size: 0.72rem; }
+  details.day-block[open] > summary::before { content: "▾"; }
+  details.day-block > summary:hover { background: #E9EEF4; }
+  .day-block .d { font-weight: 600; color: #1E3A5F; min-width: 96px; }
+  .day-block .dcnt { font-size: 0.78rem; color: #6B7280; }
+  .run-row { display: flex; align-items: center; gap: 12px; padding: 6px 8px 6px 54px; border-top: 1px solid #F1F5F9;
+             background: #fff; font-size: 0.84rem; cursor: pointer; min-height: 37px; }
+  .run-row:hover { background: #F3F4F6; }
+  .run-row .win { color: #6B7280; font-size: 0.79rem; min-width: 104px; font-variant-numeric: tabular-nums; }
+  .run-row .rn { color: #1F2937; }
+  .run-row .rn.zero { color: #9CA3AF; }
+  .run-row .go { color: #2563EB; font-size: 0.78rem; margin-left: auto; }
+  .tidy .run-row .go { display: none; }
+  .run-row.gone { cursor: default; background: #F8FAFC; color: #9CA3AF; }
+  .run-row.gone:hover { background: #F8FAFC; }
+  .run-row.gone .win, .run-row.gone .rn { color: #9CA3AF; }
+  .run-row.gone .restore { margin-left: auto; }
+  .chip-today { font-size: 0.7rem; border-radius: 10px; padding: 0 8px; border: 1px solid #BFDBFE; background: #EFF6FF; color: #2563EB; font-weight: 600; }
+  .run-row.sel, .slot-row.sel { background: #FEF2F2; }
+  .run-row.sel:hover, .slot-row.sel:hover { background: #FEE2E2; }
+
+  /* 수시 — 최근 삭제(맨 아래 한 곳) */
+  details.recent { margin-top: 14px; border: 1px dashed #CBD5E1; border-radius: 10px; background: #F8FAFC; }
+  details.recent > summary { list-style: none; cursor: pointer; padding: 9px 12px; font-size: 0.82rem; color: #6B7280; display: flex; gap: 8px; align-items: center; }
+  details.recent > summary::-webkit-details-marker { display: none; }
+  details.recent > summary::before { content: "▸"; font-size: 0.72rem; }
+  details.recent[open] > summary::before { content: "▾"; }
+  .rbatch { border-top: 1px solid #E5E7EB; padding: 6px 12px 8px; }
+  .rbatch-h { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: #6B7280; margin: 2px 0 4px; }
+  .rrow { display: flex; align-items: center; gap: 10px; padding: 4px 0 4px 14px; font-size: 0.82rem; color: #6B7280; }
+  .rrow .rnm { color: #374151; }
+  .restore { border: none; background: none; color: #2563EB; font: inherit; font-size: 0.78rem; cursor: pointer; padding: 0; margin-left: auto; }
+  .restore:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .gone-tag { font-size: 0.72rem; border: 1px dashed #CBD5E1; border-radius: 10px; padding: 0 8px; color: #6B7280; background: #fff; }
+
+  /* 정기 — 날짜 ▸ 회차 (history.html과 같은 모양) */
+  details.date { margin: 0; border-top: 1px solid #E5E7EB; }
+  details.date > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px;
+    padding: 10px 4px; font-size: 1.05rem; color: #1E3A5F; font-weight: 600; }
+  details.date > summary::before { content: "▸"; color: #6B7280; font-size: 0.8rem; font-weight: 400; }
+  details.date[open] > summary::before { content: "▾"; }
+  details.date > summary:hover { background: #EFF6FF; }
+  .date .exp { font-weight: 400; }
+  .chip-mini { font-size: 0.72rem; border-radius: 10px; padding: 1px 9px; border: 1px solid; font-weight: 600; }
+  .chip-mini.today { background: #EFF6FF; color: #2563EB; border-color: #BFDBFE; }
+  .chip-mini.gone { background: #F3F4F6; color: #6B7280; border-color: #E5E7EB; font-weight: 500; }
+  .slot-row { margin: 0 0 0 22px; border-top: 1px solid #E5E7EB; padding: 5px 4px; min-height: 38px; display: flex; align-items: center; gap: 10px; font-size: 0.92rem; cursor: pointer; }
+  .slot-row::before { content: "▸"; color: #6B7280; font-size: 0.75rem; }
+  .tidy .slot-row::before { display: none; }
+  .slot-row:hover { background: #EFF6FF; }
+  .slot-label { flex: none; white-space: nowrap; }
+  .slot-cnt { display: none; font-size: 0.78rem; color: #6B7280; min-width: 36px; font-variant-numeric: tabular-nums; }
+  .slot-cnt.zero { color: #B45309; font-weight: 700; }
+  .tidy .slot-cnt { display: inline; }
+  .slot-note { font-size: 0.82rem; color: #6B7280; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .slot-missing, .slot-gone { margin: 0 0 0 22px; border-top: 1px solid #E5E7EB; padding: 8px 4px; display: flex; align-items: center; gap: 10px; color: #6B7280; font-size: 0.92rem; }
+  .slot-missing::before, .slot-gone::before { content: "·"; color: #6B7280; font-size: 0.75rem; }
+  .tidy .slot-missing, .tidy .slot-gone { padding-left: 29px; }
+  .tidy .slot-missing::before, .tidy .slot-gone::before { display: none; }
+  .slot-gone { background: #F8FAFC; }
+  .slot-gone .when { font-size: 0.76rem; color: #9CA3AF; }
+  .slot-gone .restore { margin-left: auto; }
+  .slot-row.today-row { cursor: default; }
+
+  /* 확인창(실제로는 브라우저 confirm() — 여기선 문구만 보이게 그린다) */
+  .modal-back { position: fixed; inset: 0; background: rgba(15,23,42,0.28); display: none; align-items: flex-start; justify-content: center; z-index: 50; }
+  .modal-back.on { display: flex; }
+  .modal { margin-top: 14vh; width: 420px; max-width: calc(100vw - 32px); background: #fff; border-radius: 12px;
+           box-shadow: 0 10px 30px rgba(15,23,42,0.25); padding: 18px 20px 14px; }
+  .modal .cap { font-size: 0.7rem; color: #9CA3AF; margin: 0 0 8px; }
+  .modal h4 { margin: 0 0 10px; color: #1F2937; font-size: 1rem; }
+  .modal p { margin: 0 0 7px; font-size: 0.86rem; color: #374151; line-height: 1.6; white-space: pre-line; }
+  .modal .muted { color: #6B7280; font-size: 0.8rem; }
+  .modal .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .modal .row button { font: inherit; font-size: 0.84rem; padding: 6px 14px; border-radius: 7px; cursor: pointer; }
+  .modal .cancel { border: 1px solid #E5E7EB; background: #fff; color: #374151; }
+  .modal .ok { border: 1px solid #DC2626; background: #DC2626; color: #fff; font-weight: 700; }
+
+  /* 기각한 안 */
+  .rej { max-width: 1080px; margin-top: 34px; }
+  .rej h2 { font-size: 0.95rem; color: #1E3A5F; margin: 0 0 10px; }
+  .rej-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+  .rej-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 12px 14px; font-size: 0.8rem; color: #374151; line-height: 1.65; }
+  .rej-card h4 { margin: 0 0 8px; font-size: 0.85rem; color: #6B7280; }
+  .rej-card h4 s { text-decoration-color: #CBD5E1; }
+  .mini { border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; margin-bottom: 8px; font-size: 0.78rem; }
+  .mini div { display: flex; gap: 10px; padding: 5px 10px; border-top: 1px solid #F1F5F9; align-items: center; color: #6B7280; }
+  .mini div:first-child { border-top: none; }
+</style></head>
+<body>
+
+<h1 class="mk">보관함 삭제 — 시안 (2차)</h1>
+<p class="mk-sub">
+  지우는 길이 둘입니다. <b>하나만 지울 땐 줄 끝 회색 🗑</b> — 확인창 없이 바로 지워지고 그 자리에 「삭제함 · 되살리기」가 남아요.
+  <b>여러 개를 한꺼번에 지울 땐 [선택 삭제]</b> — 체크박스로 고른 뒤 확인창 한 번. 확정본에서 기사 🗑(바로 숨김)와
+  체크박스 일괄 숨기기(확인창)가 나뉘어 있는 것과 같은 짝이에요. 두 화면 모두 실제 데이터(2026-09-11 기준)이고 직접 눌러볼 수 있어요.
+</p>
+
+<div class="ctl">
+  <b>화면</b>
+  <button class="on" data-tab="adhoc" onclick="showTab('adhoc')">수시 보관함</button>
+  <button data-tab="reg" onclick="showTab('reg')">정기 보관함</button>
+  <span class="sp"></span>
+  <button onclick="reopen()" title="지운 직후의 제자리 줄이, 화면을 다시 열면 어디로 가는지 보여줍니다">화면 다시 열기 (흉내)</button>
+  <button class="reset" onclick="resetAll()">처음 상태로</button>
+</div>
+
+<!-- ═════════════════ 수시 ═════════════════ -->
+<div class="wrap" id="tab-adhoc">
+  <div class="screen" id="adhoc-screen">
+    <div class="scr-top"><a>홈</a></div>
+    <div class="card">
+      <h2 class="page-title">수시 보관함</h2>
+      <p class="page-sub">사안별로 쌓인 수집 · 1년간 보관됩니다</p>
+      <div class="period-bar"><span>사안명</span><span class="fake-input">사안 이름 일부만 넣어도 됩니다 (예: 세수)</span>
+        <span class="seg"><span>1일</span><span>7일</span><span>1개월</span><span class="on">전체</span></span></div>
+      <div class="result-bar">
+        <p class="result-line" id="adhoc-line"></p>
+        <span class="normal-only" style="display:inline-flex;gap:6px;margin-left:auto">
+          <button class="tidy-btn" onclick="enterTidy('adhoc')">선택 삭제</button>
+          <span class="exp" style="margin-left:0"><button>복사</button><button>txt</button><button>xlsx</button></span>
+        </span>
+        <span class="tidy-bar">
+          <span>지울 회차를 고르세요</span>
+          <button class="pick-empty" id="adhoc-pick-empty" onclick="pickEmpty('adhoc')"></button>
+          <button class="done-btn" onclick="exitTidy('adhoc')">완료</button>
+        </span>
+      </div>
+      <div class="selbar" id="adhoc-selbar" hidden>
+        <span id="adhoc-seltext"></span><span class="sp"></span>
+        <button class="clear" onclick="clearSel('adhoc')">선택 해제</button>
+        <button class="del-btn" id="adhoc-delbtn" onclick="askDelete('adhoc')"></button>
+      </div>
+      <div id="adhoc-list"></div>
+      <details class="recent" id="adhoc-recent" hidden>
+        <summary id="adhoc-recent-sum"></summary>
+        <div id="adhoc-recent-body"></div>
+      </details>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>수시 보관함 — 규칙</h3>
+    <table class="tbl">
+      <tr><th></th><th>줄 끝 🗑</th><th>[선택 삭제]</th></tr>
+      <tr><td>지우는 양</td><td>회차 하나</td><td>고른 만큼 (사안·날짜째도)</td></tr>
+      <tr><td>확인창</td><td>없음</td><td>한 번</td></tr>
+      <tr><td>되돌리기</td><td colspan="2">그 자리 「되살리기」 → 다시 열면 맨 아래 「최근 삭제」</td></tr>
+    </table>
+    <ol>
+      <li><b>🗑는 회차 줄에만 단다.</b> 사안·날짜 줄에 달면 한 번 눌러 회차 여러 개가 가는데, 그 무게에 확인창 없는 버튼은 안 맞다 —
+        그건 [선택 삭제]에서 사안·날짜 줄을 체크하는 길로 둔다.</li>
+      <li><b>🗑에 확인창이 없는 이유</b>: 지운 자리에 바로 「삭제함 · 되살리기」가 남아 실수를 그 자리에서 되돌린다.
+        확정본에서 기사 🗑가 확인창 없이 숨기는 것과 같은 무게. (지금 카드 화면의 삭제는 되살릴 길이 없어서 확인창에 "되돌릴 수 없어요"라고 쓰고 있다.)</li>
+      <li><b>[선택 삭제]를 누르면</b> 복사·txt·xlsx와 줄 끝 🗑가 숨고 모든 줄 앞에 체크박스가 생긴다. 줄을 누르면 열리지 않고 체크되고,
+        사안·날짜 줄 체크 = 그 아래 회차 전부. 하나라도 고르면 위에 빨간 바가 뜨고, 삭제는 확인창 한 번. [완료]로 원래 화면.</li>
+      <li><b>[빈 회차 모두 고르기 (N)]</b> — 0건 회차가 있을 때만 그린다. 오늘 만든 카드는 수집 전일 수 있어 안 센다.</li>
+      <li><b>제자리 줄은 지운 직후 화면에만.</b> 다시 열면 그 회차는 목록에서 빠지고(회차가 0개가 된 사안도 같이) 맨 아래 「최근 삭제」로 간다 —
+        위 [화면 다시 열기]로 흉내. 삭제 = trash로 옮기기(<code>delete_card</code> 그대로)라 trash를 직접 비우기 전까지 되살릴 수 있다.</li>
+      <li><b>새로 보이는 「이름 없는 사안」</b> — 사안 정보(<code>issues.json</code>)가 없는 8/21 시험 카드 6개. 지금은 보관함에 안 보이는데
+        상단 합계(회차 23건)엔 들어가 있다. 지우려면 보여야 해서 맨 아래 한 묶음으로 둔다.</li>
+    </ol>
+  </div>
+</div>
+
+<!-- ═════════════════ 정기 ═════════════════ -->
+<div class="wrap" id="tab-reg" hidden>
+  <div class="screen" id="reg-screen">
+    <div class="scr-top"><a>홈</a></div>
+    <div class="card">
+      <h2 class="page-title">정기 보관함</h2>
+      <p class="page-sub">날짜별로 쌓인 정기 스크랩 · 1년 보관됩니다</p>
+      <div class="period-bar"><span>기간</span>
+        <span class="seg"><span>1일</span><span class="on">7일</span><span>1개월</span><span>전체</span></span>
+        <span class="fake-input" style="flex:none;width:130px">2026-09-05</span>~<span class="fake-input" style="flex:none;width:130px">2026-09-11</span></div>
+      <div class="result-bar">
+        <p class="result-line">최근 7일</p>
+        <span class="normal-only" style="display:inline-flex;gap:6px;margin-left:auto">
+          <button class="tidy-btn" onclick="enterTidy('reg')">선택 삭제</button>
+          <span class="exp" style="margin-left:0"><button>복사</button><button>txt</button><button>xlsx</button></span>
+        </span>
+        <span class="tidy-bar">
+          <span>지울 회차를 고르세요</span>
+          <button class="pick-empty" id="reg-pick-empty" onclick="pickEmpty('reg')"></button>
+          <button class="done-btn" onclick="exitTidy('reg')">완료</button>
+        </span>
+      </div>
+      <div class="selbar" id="reg-selbar" hidden>
+        <span id="reg-seltext"></span><span class="sp"></span>
+        <button class="clear" onclick="clearSel('reg')">선택 해제</button>
+        <button class="del-btn" id="reg-delbtn" onclick="askDelete('reg')"></button>
+      </div>
+      <div id="reg-list"></div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>정기 보관함 — 규칙</h3>
+    <ol>
+      <li><b>수시와 같은 두 길</b> — 줄 끝 🗑(하나, 확인창 없음) / [선택 삭제](여러 개, 확인창). 두 보관함을 오갈 때 같은 자리에 같은 것이 있어야 한다.</li>
+      <li><b>오늘 회차는 못 지운다</b> — 🗑를 아예 안 그리고, 선택 삭제 중엔 체크박스를 잠그고 날짜 줄에 한 줄 안내.
+        파일이 없어지면 스케줄러가 "아직 안 돈 회차"로 보고(<code>run_exists</code>) <b>10초 안에 다시 수집</b>하고 확정본 화면도 바뀐다 —
+        지우는 게 아니라 "다시 모으기"가 돼 버린다.</li>
+      <li><b>지운 자리는 「수집 기록 없음」이 아니라 「삭제함 · 되살리기」</b>이고, 수시와 달리 <b>다시 열어도 그 자리에 남는다</b>.
+        정기는 빈 자리가 어차피 한 줄로 그려지니(<code>_render_missing_slot</code>) 그 줄 문구만 바꾸면 되고, 안 바꾸면 앱이 못 모은 날처럼 보인다.</li>
+      <li><b>선택 삭제 중에만 회차별 건수를 보인다.</b> 평소엔 찾는 기준이 아니라 뺐지만(2026-08-21), 지울지 판단할 땐 그게 근거다. 0건은 앰버 굵게.</li>
+      <li><b>되살리면 전부 돌아온다</b> — 회차 파일째 옮기므로 발송 기록도 같이 오고, 키워드 메모는 애초에 다른 파일이라 안 건드린다.
+        지워져 있는 동안엔 홈 「정책 단어 추이」·엑셀에서 그 회차가 빠진다. 라벨 보관함은 영향 없음.</li>
+    </ol>
+    <div class="warnbox"><b>9월 8일 19:30 · 0건</b> — 그날 <b>오전 09:02</b>에 0건으로 저장된 회차. 이 파일이 먼저 생기는 바람에
+      그날 저녁 진짜 19:30 수집이 건너뛰어졌을 가능성이 크다(원인 조사는 별도 작업 칩).</div>
+  </div>
+</div>
+
+<!-- 기각한 안 -->
+<div class="rej">
+  <h2>기각한 안</h2>
+  <div class="rej-grid">
+    <div class="rej-card">
+      <h4><s>A. 🗑 하나마다 확인창</s></h4>
+      <div class="mini"><div>"삭제할까요?" → 확인 → "삭제할까요?" → 확인 … × 7</div></div>
+      시험 카드 7개를 치우는 데 확인창 7번. 되살리기가 제자리에 바로 있으면 확인창은 한 번 더 누르게 할 뿐이다 — 여러 개일 때만 묻는다.
+    </div>
+    <div class="rej-card">
+      <h4><s>B. 체크박스를 늘 보이게 (모드 없이)</s></h4>
+      <div class="mini"><div>☐ 재경위 · 9월 3일 · 62건</div><div>☐ 재경위 · 8월 25일 · 43건</div></div>
+      확정본은 기사를 옮기고 숨기는 작업대라 체크박스가 늘 있는 게 맞지만, 보관함은 찾아서 꺼내는 곳이라 모든 줄 앞 체크박스가 매일 보이는 잡음이 된다.
+    </div>
+    <div class="rej-card">
+      <h4><s>C. 정기는 "보관함에서만 숨기기"</s></h4>
+      <div class="mini"><div>파일은 그대로 · archived_hidden: true</div></div>
+      보관함에선 사라지는데 홈 정책 단어 추이·엑셀 등 다른 곳엔 계속 잡혀 "지웠는데 어딘가 튀어나오는" 상태가 된다.
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="modal"><div class="modal">
+  <p class="cap">실제로는 브라우저 확인창(confirm)으로 뜬다 — 문구 시안</p>
+  <h4 id="modal-title"></h4>
+  <div id="modal-body"></div>
+  <div class="row"><button class="cancel" onclick="closeModal()">취소</button><button class="ok" onclick="doDelete()">삭제</button></div>
+</div></div>
+
+<script>
+const TODAY = '2026-09-11';
+const WD = ['일','월','화','수','목','금','토'];
+const TRASH = '<svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>';
+function dkr(d){ const t=new Date(d+'T00:00:00'); return `${t.getMonth()+1}월 ${t.getDate()}일 (${WD[t.getDay()]})`; }
+function dshort(d){ const t=new Date(d+'T00:00:00'); return `${t.getMonth()+1}월 ${t.getDate()}일`; }
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+let nowTick = 0;
+function nowLabel(){ nowTick++; const m = 12 + nowTick; return `오늘 10:${String(m).padStart(2,'0')}`; }
+
+/* ── 수시 데이터 (data/adhoc/cards 실측) ── */
+const ADHOC_INIT = [
+  {iid:'dae', name:'대정부질문', kw:'재정경제부 · 대정부질문', cards:[{id:'cc94',date:'2026-09-11',win:'06:47~09:47',n:0}]},
+  {iid:'jae', name:'재경위', kw:'재경위 · 재정경제기획위원회', cards:[
+    {id:'6320',date:'2026-09-03',win:'14:27~17:27',n:62},{id:'ae31',date:'2026-08-25',win:'12:11~16:57',n:43},
+    {id:'e230',date:'2026-08-24',win:'12:00~13:28',n:64},{id:'430c',date:'2026-08-21',win:'12:41~15:41',n:8}]},
+  {iid:'lee', name:'이형일', kw:'재정경제부 · 이형일', cards:[
+    {id:'37e8',date:'2026-09-02',win:'11:30~13:23',n:57},{id:'0429',date:'2026-09-02',win:'10:23~13:23',n:71},{id:'f439',date:'2026-09-02',win:'10:23~13:23',n:44}]},
+  {iid:'ham', name:'햄버거', kw:'햄버거 · 감자튀김', cards:[{id:'6bdd',date:'2026-09-02',win:'08:03~11:03',n:5},{id:'ceed',date:'2026-09-02',win:'08:03~11:03',n:3}]},
+  {iid:'bud', name:'9/1 부동산세제개편', kw:'비거주 · 1주택', cards:[{id:'e905',date:'2026-09-01',win:'15:00~16:44',n:178}]},
+  {iid:'sae', name:'세재개편안 확정', kw:'세재개편안 · 재정경제부', cards:[{id:'0239',date:'2026-09-01',win:'13:32~14:32',n:0}]},
+  {iid:'min', name:'9/1 민생대책', kw:'민생대책 · 디지털온누리상품권', cards:[{id:'8fb0',date:'2026-09-01',win:'09:00~13:41',n:20},{id:'9457',date:'2026-09-01',win:'09:00~13:26',n:125}]},
+  {iid:'guk', name:'9/1 국무회의', kw:'재정경제부 · 국무회의', cards:[{id:'31b0',date:'2026-09-01',win:'10:11~13:11',n:517}]},
+  {iid:'t3', name:'테스트3', kw:'햄버거 · 돈까스', cards:[{id:'bbbd',date:'2026-08-25',win:'13:57~16:57',n:5}]},
+  {iid:'ye', name:'예결위', kw:'예결위 · 예산결산특별위원회', cards:[{id:'6a3b',date:'2026-08-25',win:'09:57~10:57',n:41}]},
+  {iid:'none', name:null, kw:'사안 정보 없음', cards:['c8e6','28aa','65b9','d01c','a5f9','3cb8'].map(id=>({id,date:'2026-08-21',win:'09:00~10:00',n:0}))},
+];
+/* ── 정기 데이터 (data/articles 실측, 최근 7일) ── */
+const NOTES = {'2026-09-11|09:30':'경제분야 대정부질문 등.','2026-09-10|09:30':'우리 경제 회복세, 국민소득 4만불, 철강산업 고도화, 무역실적 등',
+  '2026-09-10|11:00':'경제관계장관회의 보도 지속.','2026-09-10|14:00':'장관 후보자 비거주 1주택 등.','2026-09-10|17:00':'로봇 핵심부품 620억, 정부 실증 지원 등.',
+  '2026-09-09|11:00':'청년 고용 부진 등.','2026-09-09|14:00':'추석 농축산물 할인, 수산물 2만 2000톤, 기간 연장 등.','2026-09-09|17:00':'내년 예산안 호평, 재정건정성, 한-아프리카 AI 등.'};
+const WEEKDAY = ['19:30','17:00','14:00','11:00','09:30','06:00'], WEEKEND = ['16:00','13:00','10:00'];
+const REG_INIT = [
+  {date:'2026-09-11', runs:{'09:30':6,'06:00':17}, expected:['09:30','06:00']},
+  {date:'2026-09-10', runs:{'19:30':31,'17:00':62,'14:00':25,'11:00':27,'09:30':71,'06:00':18}, expected:WEEKDAY},
+  {date:'2026-09-09', runs:{'17:00':73,'14:00':91,'11:00':80,'09:30':26,'06:00':9}, expected:WEEKDAY},
+  {date:'2026-09-08', runs:{'19:30':0,'17:00':71,'14:00':48,'11:00':25,'09:30':14,'06:00':26}, expected:WEEKDAY},
+  {date:'2026-09-07', runs:{'17:00':89,'14:00':64,'11:00':24,'09:30':36,'06:00':17}, expected:WEEKDAY},
+  {date:'2026-09-06', runs:{'16:00':25,'13:00':10,'10:00':15}, expected:WEEKEND},
+  {date:'2026-09-05', runs:{'16:00':5,'13:00':3,'10:00':22}, expected:WEEKEND},
+];
+
+let S;
+function freshState(){
+  return {
+    adhoc: {issues: JSON.parse(JSON.stringify(ADHOC_INIT)), sel: new Set(), tidy:false, trash:[], open:new Set(['dae','jae','jae|2026-09-03'])},
+    reg: {days: JSON.parse(JSON.stringify(REG_INIT)).map(d=>({...d, gone:{}})), sel:new Set(), tidy:false, open:new Set(['2026-09-11','2026-09-10','2026-09-08'])},
+    pending: null,
+  };
+}
+
+/* ═════ 수시 렌더 ═════ */
+// 살아 있는 회차만 (방금 지워 제자리 줄로 남은 것은 뺀다)
+function adhocCards(){ return S.adhoc.issues.flatMap(i=>i.cards.filter(c=>!c.gone).map(c=>({...c, iid:i.iid, iname:i.name}))); }
+function exp(){ return `<span class="exp normal-only"><button onclick="event.preventDefault()">복사</button><button onclick="event.preventDefault()">txt</button><button onclick="event.preventDefault()">xlsx</button></span>`; }
+function renderAdhoc(){
+  const st = S.adhoc, box = document.getElementById('adhoc-list');
+  document.getElementById('adhoc-screen').classList.toggle('tidy', st.tidy);
+  const all = adhocCards();
+  const visIssues = st.issues.filter(i=>i.cards.length);
+  document.getElementById('adhoc-line').innerHTML =
+    `전체 기간 · 사안 <b>${visIssues.filter(i=>i.cards.some(c=>!c.gone)).length}</b>개 · 회차 <b>${all.length}</b>건 · 기사 <b>${all.reduce((a,c)=>a+c.n,0).toLocaleString()}</b>건`;
+  box.innerHTML = visIssues.map(i=>{
+    const live = i.cards.filter(c=>!c.gone);
+    const byDate = {};
+    i.cards.forEach(c=>(byDate[c.date] ||= []).push(c));
+    const dates = Object.keys(byDate).sort().reverse();
+    const allSel = live.length>0 && live.every(c=>st.sel.has(c.id));
+    const n = live.reduce((a,c)=>a+c.n,0);
+    const nm = i.name ? `<span class="nm">${esc(i.name)}</span>` : `<span class="nm noname">이름 없는 사안</span>`;
+    return `<details class="issue-block" ${st.open.has(i.iid)?'open':''} ontoggle="rememberOpen('adhoc',this,'${i.iid}')">
+      <summary><input type="checkbox" class="cb" ${allSel?'checked':''} ${live.length?'':'disabled'} onclick="event.stopPropagation()" onchange="selIssue('${i.iid}',this.checked)">
+        ${nm}<span class="kw">${esc(i.kw)}</span>
+        ${live.length ? `<span class="n">날짜 ${new Set(live.map(c=>c.date)).size} · 회차 ${live.length} · ${n}건</span>${exp()}` : '<span class="n"><span class="gone-tag">삭제함</span></span>'}</summary>
+      ${dates.map(d=>{
+        const cs = byDate[d], lv = cs.filter(c=>!c.gone), dsel = lv.length>0 && lv.every(c=>st.sel.has(c.id)), key=i.iid+'|'+d;
+        return `<details class="day-block" ${st.open.has(key)||st.tidy?'open':''} ontoggle="rememberOpen('adhoc',this,'${key}')">
+          <summary><input type="checkbox" class="cb" ${dsel?'checked':''} ${lv.length?'':'disabled'} onclick="event.stopPropagation()" onchange="selDay('${i.iid}','${d}',this.checked)">
+            <span class="d">${dkr(d)}</span>${d===TODAY?'<span class="chip-today">오늘</span>':''}
+            ${lv.length ? `<span class="dcnt">회차 ${lv.length} · ${lv.reduce((a,c)=>a+c.n,0)}건</span>${exp()}` : '<span class="gone-tag">삭제함</span>'}</summary>
+          ${cs.map(c=> c.gone
+            ? `<div class="run-row gone"><span class="cb-sp"></span><span class="win">${c.win}</span><span class="rn">${c.n}건</span>
+                 <span class="gone-tag">삭제함</span><button class="restore" onclick="restoreInline('${c.id}')">되살리기</button></div>`
+            : `<div class="run-row ${st.sel.has(c.id)?'sel':''}" onclick="rowClick('adhoc','${c.id}')">
+                 <input type="checkbox" class="cb" ${st.sel.has(c.id)?'checked':''} onclick="event.stopPropagation()" onchange="toggleSel('adhoc','${c.id}',this.checked)">
+                 <span class="win">${c.win}</span><span class="rn ${c.n?'':'zero'}">${c.n}건</span><span class="go">열기 →</span>
+                 <button class="row-del" title="이 회차 삭제" onclick="event.stopPropagation(); delOne('adhoc','${c.id}')">${TRASH}</button></div>`
+          ).join('')}
+        </details>`;}).join('')}
+    </details>`;
+  }).join('');
+  const zeros = all.filter(c=>c.n===0 && c.date!==TODAY);
+  const pe = document.getElementById('adhoc-pick-empty');
+  pe.hidden = zeros.length===0;
+  pe.textContent = `빈 회차(0건) 모두 고르기 (${zeros.length})`;
+  pe.disabled = zeros.every(c=>st.sel.has(c.id));
+  renderSelbar('adhoc');
+  renderRecent();
+}
+function renderRecent(){
+  const st = S.adhoc, det = document.getElementById('adhoc-recent');
+  const total = st.trash.reduce((a,b)=>a+b.cards.length,0);
+  det.hidden = total===0;
+  document.getElementById('adhoc-recent-sum').innerHTML = `${TRASH} 최근 삭제 · 회차 ${total}개`;
+  document.getElementById('adhoc-recent-body').innerHTML = st.trash.map((b,bi)=>`
+    <div class="rbatch"><div class="rbatch-h">${b.when}에 삭제 · 회차 ${b.cards.length}개
+      ${b.cards.length>1?`<button class="restore" onclick="restoreBatch(${bi})">모두 되살리기</button>`:''}</div>
+      ${b.cards.map((c,ci)=>`<div class="rrow"><span class="rnm">${c.iname?esc(c.iname):'<i>이름 없는 사안</i>'}</span>
+        <span>${dshort(c.date)} ${c.win} · ${c.n}건</span><button class="restore" onclick="restoreOne(${bi},${ci})">되살리기</button></div>`).join('')}
+    </div>`).join('');
+}
+
+/* ═════ 정기 렌더 ═════ */
+function regRunKey(d,s){ return d+'|'+s; }
+function renderReg(){
+  const st = S.reg, box = document.getElementById('reg-list');
+  document.getElementById('reg-screen').classList.toggle('tidy', st.tidy);
+  box.innerHTML = st.days.map(day=>{
+    const isToday = day.date===TODAY;
+    const live = Object.keys(day.runs);
+    const slots = [...new Set([...day.expected, ...live, ...Object.keys(day.gone)])].sort().reverse();
+    const allSel = live.length>0 && live.every(s=>st.sel.has(regRunKey(day.date,s)));
+    const allGone = live.length===0 && Object.keys(day.gone).length>0;
+    return `<details class="date" ${st.open.has(day.date)?'open':''} ontoggle="rememberOpen('reg',this,'${day.date}')">
+      <summary><input type="checkbox" class="cb" ${allSel?'checked':''} ${isToday||!live.length?'disabled':''}
+          title="${isToday?'오늘 회차는 지울 수 없어요':''}" onclick="event.stopPropagation()" onchange="selRegDay('${day.date}',this.checked)">
+        <span class="d">${dkr(day.date)}</span>${isToday?'<span class="chip-mini today">오늘</span>':''}
+        ${allGone?'<span class="chip-mini gone">모두 삭제함</span>':''}
+        ${isToday?'<span class="lock">🔒 오늘 회차는 지울 수 없어요 — 지우면 앱이 곧바로 다시 수집해요</span>':''}
+        ${exp()}</summary>
+      ${slots.map(s=>{
+        const k = regRunKey(day.date,s);
+        if (s in day.runs) {
+          const n = day.runs[s], note = NOTES[k]||'';
+          return `<div class="slot-row ${st.sel.has(k)?'sel':''} ${isToday?'today-row':''}" onclick="${isToday?'':`rowClick('reg','${k}')`}">
+            <input type="checkbox" class="cb" ${st.sel.has(k)?'checked':''} ${isToday?'disabled title="오늘 회차는 지울 수 없어요"':''}
+              onclick="event.stopPropagation()" onchange="toggleSel('reg','${k}',this.checked)">
+            <span class="slot-label">${s} 기준</span><span class="slot-cnt ${n?'':'zero'}">${n}건</span>
+            <span class="slot-note">${esc(note)}</span>
+            ${isToday?'':`<button class="row-del" title="이 회차 삭제" onclick="event.stopPropagation(); delOne('reg','${k}')">${TRASH}</button>`}</div>`;
+        }
+        if (s in day.gone) {
+          return `<div class="slot-gone"><span class="slot-label">${s} 기준</span><span class="gone-tag">삭제함</span>
+            <span class="when">${day.gone[s].when}</span><button class="restore" onclick="restoreReg('${day.date}','${s}')">되살리기</button></div>`;
+        }
+        if (isToday) return '';
+        return `<div class="slot-missing" title="이 시각에 저장된 회차가 없어요"><span class="slot-label">${s} 기준</span> · 수집 기록 없음</div>`;
+      }).join('')}
+    </details>`;
+  }).join('');
+  const zeros = st.days.filter(d=>d.date!==TODAY).flatMap(d=>Object.entries(d.runs).filter(([s,n])=>n===0).map(([s])=>regRunKey(d.date,s)));
+  const pe = document.getElementById('reg-pick-empty');
+  pe.hidden = zeros.length===0;
+  pe.textContent = `빈 회차(0건) 모두 고르기 (${zeros.length})`;
+  pe.disabled = zeros.every(k=>st.sel.has(k));
+  renderSelbar('reg');
+}
+
+/* ═════ 공통 동작 ═════ */
+function rememberOpen(which, el, key){ el.open ? S[which].open.add(key) : S[which].open.delete(key); }
+function render(){ renderAdhoc(); renderReg(); }
+function enterTidy(w){ S[w].tidy = true; render(); }
+function exitTidy(w){ S[w].tidy = false; S[w].sel.clear(); render(); }
+function clearSel(w){ S[w].sel.clear(); render(); }
+function toggleSel(w,id,on){ on ? S[w].sel.add(id) : S[w].sel.delete(id); render(); }
+function rowClick(w,id){ if (!S[w].tidy) return; toggleSel(w,id,!S[w].sel.has(id)); }
+function liveOf(iid){ return S.adhoc.issues.find(x=>x.iid===iid).cards.filter(c=>!c.gone); }
+function selIssue(iid,on){ liveOf(iid).forEach(c=>on?S.adhoc.sel.add(c.id):S.adhoc.sel.delete(c.id)); if(on) S.adhoc.open.add(iid); render(); }
+function selDay(iid,d,on){ liveOf(iid).filter(c=>c.date===d).forEach(c=>on?S.adhoc.sel.add(c.id):S.adhoc.sel.delete(c.id)); render(); }
+function selRegDay(d,on){ const day=S.reg.days.find(x=>x.date===d); Object.keys(day.runs).forEach(s=>on?S.reg.sel.add(regRunKey(d,s)):S.reg.sel.delete(regRunKey(d,s))); if(on) S.reg.open.add(d); render(); }
+function pickEmpty(w){
+  if (w==='adhoc') adhocCards().filter(c=>c.n===0 && c.date!==TODAY).forEach(c=>{ S.adhoc.sel.add(c.id); S.adhoc.open.add(c.iid); });
+  else S.reg.days.filter(d=>d.date!==TODAY).forEach(d=>Object.entries(d.runs).forEach(([s,n])=>{ if(n===0){ S.reg.sel.add(regRunKey(d.date,s)); S.reg.open.add(d.date);} }));
+  render();
+}
+function selectedAdhoc(){ return adhocCards().filter(c=>S.adhoc.sel.has(c.id)); }
+function selectedReg(){ return [...S.reg.sel].map(k=>{ const [d,s]=k.split('|'); const day=S.reg.days.find(x=>x.date===d); return {key:k, date:d, slot:s, n:day.runs[s]}; }).filter(x=>x.n!==undefined); }
+function renderSelbar(w){
+  const list = w==='adhoc' ? selectedAdhoc() : selectedReg();
+  const bar = document.getElementById(w+'-selbar');
+  bar.hidden = !S[w].tidy || list.length===0;
+  const n = list.reduce((a,c)=>a+c.n,0);
+  document.getElementById(w+'-seltext').innerHTML = `회차 <b>${list.length}</b>개 · 기사 <b>${n.toLocaleString()}</b>건 골랐어요`;
+  document.getElementById(w+'-delbtn').innerHTML = `${TRASH} ${list.length}개 삭제`;
+}
+
+/* 지우기 — 🗑 하나든 선택 삭제든 결과는 같다: 제자리에 「삭제함 · 되살리기」 */
+function markGone(w, ids){
+  const when = nowLabel();
+  if (w==='adhoc') S.adhoc.issues.forEach(i=>i.cards.forEach(c=>{ if(ids.includes(c.id)) c.gone = when; }));
+  else ids.forEach(k=>{ const [d,s]=k.split('|'); const day=S.reg.days.find(x=>x.date===d); day.gone[s]={n:day.runs[s], when}; delete day.runs[s]; });
+  ids.forEach(id=>S[w].sel.delete(id));
+  render();
+}
+function delOne(w,id){ markGone(w,[id]); }  // 확인창 없음 — 되살리기가 바로 그 자리에 있다
+
+function askDelete(w){
+  S.pending = w;
+  const t = document.getElementById('modal-title'), b = document.getElementById('modal-body');
+  if (w==='adhoc'){
+    const list = selectedAdhoc(), n = list.reduce((a,c)=>a+c.n,0);
+    const goneIssues = S.adhoc.issues.filter(i=>{ const lv=i.cards.filter(c=>!c.gone); return lv.length && lv.every(c=>S.adhoc.sel.has(c.id)); }).map(i=>i.name||'이름 없는 사안');
+    t.textContent = `회차 ${list.length}개를 삭제할까요?`;
+    b.innerHTML = `<p>기사 ${n.toLocaleString()}건${goneIssues.length?` · 사안 ${goneIssues.length}개가 목록에서 사라져요\n(${goneIssues.map(esc).join(', ')})`:''}</p>`
+      + `<p class="muted">지운 자리에서 바로 되살릴 수 있어요.</p>`;
+  } else {
+    const list = selectedReg(), n = list.reduce((a,c)=>a+c.n,0);
+    t.textContent = `회차 ${list.length}개를 삭제할까요?`;
+    const lines = list.slice(0,4).map(x=>`${dshort(x.date)} ${x.slot} 기준 · ${x.n}건`).join('\n') + (list.length>4?`\n외 ${list.length-4}개`:'');
+    b.innerHTML = `<p>${lines}</p><p class="muted">지운 자리에 「삭제함」이 남고, 거기서 되살릴 수 있어요.</p>`;
+  }
+  document.getElementById('modal').classList.add('on');
+}
+function closeModal(){ document.getElementById('modal').classList.remove('on'); S.pending=null; }
+function doDelete(){
+  const w = S.pending; closeModal();
+  markGone(w, w==='adhoc' ? selectedAdhoc().map(c=>c.id) : selectedReg().map(x=>x.key));
+}
+
+/* 되살리기 */
+function restoreInline(id){ S.adhoc.issues.forEach(i=>i.cards.forEach(c=>{ if(c.id===id) delete c.gone; })); render(); }
+function putBack(c){ const i=S.adhoc.issues.find(x=>x.iid===c.iid); i.cards.push({id:c.id,date:c.date,win:c.win,n:c.n}); i.cards.sort((a,b)=>(b.date+b.win).localeCompare(a.date+a.win)); }
+function restoreOne(bi,ci){ const b=S.adhoc.trash[bi]; putBack(b.cards[ci]); b.cards.splice(ci,1); if(!b.cards.length) S.adhoc.trash.splice(bi,1); render(); }
+function restoreBatch(bi){ S.adhoc.trash[bi].cards.forEach(putBack); S.adhoc.trash.splice(bi,1); render(); }
+function restoreReg(d,s){ const day=S.reg.days.find(x=>x.date===d); day.runs[s]=day.gone[s].n; delete day.gone[s]; render(); }
+
+/* 화면 다시 열기 — 수시의 제자리 줄은 맨 아래 「최근 삭제」로 옮겨가고, 정기의 「삭제함」 줄은 그대로 남는다 */
+function reopen(){
+  const batches = {};
+  S.adhoc.issues.forEach(i=>{
+    i.cards.filter(c=>c.gone).forEach(c=>(batches[c.gone] ||= []).push({...c, iid:i.iid, iname:i.name}));
+    i.cards = i.cards.filter(c=>!c.gone);
+  });
+  Object.keys(batches).sort().reverse().forEach(when=>S.adhoc.trash.unshift({when, cards:batches[when]}));
+  S.adhoc.trash.sort((a,b)=>b.when.localeCompare(a.when));
+  S.adhoc.sel.clear(); S.reg.sel.clear(); S.adhoc.tidy = false; S.reg.tidy = false;
+  render();
+}
+
+function showTab(t){
+  document.querySelectorAll('.ctl [data-tab]').forEach(b=>b.classList.toggle('on', b.dataset.tab===t));
+  document.getElementById('tab-adhoc').hidden = t!=='adhoc';
+  document.getElementById('tab-reg').hidden = t!=='reg';
+}
+function resetAll(){ S = freshState(); nowTick = 0; render(); }
+resetAll();
+</script>
+</body></html>

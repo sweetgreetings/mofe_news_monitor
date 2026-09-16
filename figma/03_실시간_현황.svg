@@ -1,0 +1,737 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="4000" viewBox="0 0 1440 4000">
+<rect width="100%" height="100%" fill="#F8FAFC"/>
+<g id="topbar">
+<rect x="0" y="0" width="1425" height="54.5" fill="#FFFFFF"/>
+<text x="322.5" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">홈</text>
+<text x="687" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">초안</text>
+<text x="1064.3" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">확정본</text>
+</g>
+<g id="Page">
+<rect x="287.5" y="24" width="850" height="205965.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+</g>
+<g id="live-head">
+<rect x="312.5" y="93" width="8" height="8" rx="4" fill="#DC2626"/>
+<rect x="1014.5" y="85" width="98" height="33.5" rx="6" fill="#FFFFFF" stroke="#2563EB" stroke-width="1"/>
+<g transform="translate(1029.5,93.8) scale(0.5999,0.5999)" fill="none" stroke="#2563EB" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path><path d="M3 21v-5h5"></path></g>
+<text x="326.5" y="103" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="20" font-weight="600" fill="#DC2626" xml:space="preserve">실시간</text>
+<text x="1043.9" y="106.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="500" fill="#2563EB" xml:space="preserve">새로고침</text>
+</g>
+<g id="filter-row">
+<rect x="312.5" y="132.5" width="800" height="41" rx="8" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="331.5" y="146.5" width="13" height="13" fill="none"/>
+<rect x="449.8" y="146.5" width="13" height="13" fill="none"/>
+<rect x="523.3" y="146.5" width="13" height="13" fill="none"/>
+<rect x="596.8" y="146.5" width="13" height="13" fill="none"/>
+<text x="355.5" y="157.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="400" fill="#1F2937" xml:space="preserve">선택 언론사만</text>
+<text x="473.8" y="157.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="400" fill="#1F2937" xml:space="preserve">[단독]</text>
+<text x="547.3" y="157.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="400" fill="#1F2937" xml:space="preserve">[속보]</text>
+<text x="620.8" y="157.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="400" fill="#1F2937" xml:space="preserve">미선정 기사</text>
+</g>
+<g id="filter-row 2">
+<rect x="312.5" y="187.5" width="800" height="92.5" rx="8" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="327.5" y="198.5" width="770" height="34.5" fill="#FFFFFF" stroke="#767676" stroke-width="2"/>
+<text x="339.5" y="220.8" font-family="Arial" font-size="14.4" font-weight="400" fill="#000000" xml:space="preserve">제목 검색</text>
+<rect x="327.5" y="241" width="134" height="28" rx="14" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="467.5" y="241" width="73.6" height="28" rx="14" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="547.1" y="241" width="73.6" height="28" rx="14" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="626.7" y="241" width="118.6" height="28" rx="14" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="381" y="258.4" text-anchor="middle" font-family="Arial" font-size="13.1" font-weight="400" fill="#1F2937" xml:space="preserve">재정경제부 관련</text>
+<text x="438.5" y="258.7" text-anchor="middle" font-family="Arial" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">591</text>
+<text x="490.8" y="258.4" text-anchor="middle" font-family="Arial" font-size="13.1" font-weight="400" fill="#1F2937" xml:space="preserve">기타</text>
+<text x="518.1" y="258.7" text-anchor="middle" font-family="Arial" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">310</text>
+<text x="570.4" y="258.4" text-anchor="middle" font-family="Arial" font-size="13.1" font-weight="400" fill="#1F2937" xml:space="preserve">현안</text>
+<text x="597.7" y="258.7" text-anchor="middle" font-family="Arial" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">148</text>
+<text x="668.9" y="258.4" text-anchor="middle" font-family="Arial" font-size="13.1" font-weight="400" fill="#1F2937" xml:space="preserve">추가 검색어</text>
+<text x="718.7" y="258.7" text-anchor="middle" font-family="Arial" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">1703</text>
+<text x="1052.6" y="258.6" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">키워드별 건수 ▾</text>
+</g>
+<g id="stat-card">
+<rect x="312.5" y="296" width="800" height="58.5" rx="8" fill="#FEF2F2"/>
+<text x="330.5" y="332.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="25.6" font-weight="600" fill="#1E3A5F" xml:space="preserve">2476건</text>
+<text x="417.4" y="333.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">당일 0시 이후 ~ 현재(19:10) 누적,</text>
+<text x="601.2" y="333.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">전체 언론사</text>
+</g>
+<g id="live-row">
+<rect x="312.5" y="358.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="444.8" y="371.5" width="85.8" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="342.6" y="394" width="39.4" height="18" fill="#93CDF5"/>
+<rect x="937.7" y="385.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,392.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,391.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,391.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="387.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">news.einfomax.co.kr</text>
+<text x="452.8" y="383.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">재정경제부 관련</text>
+<text x="536.5" y="387" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">19:08 ·</text>
+<text x="576.8" y="387" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">2분 전</text>
+<text x="342.6" y="407.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">재경부</text>
+<text x="382" y="407.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">, 이달 국고채 20·30년 경과물 5천억원 모집 발행</text>
+<text x="329.5" y="425" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://news.einfomax.co.kr/news/articleView.html?idxno=4431065</text>
+<text x="990.1" y="403.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 2">
+<rect x="312.5" y="440.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="379.8" y="453.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="467.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,474.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,473.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,473.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="469.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">국민일보</text>
+<text x="387.8" y="465.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="452.4" y="469" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">19:07 ·</text>
+<text x="491.3" y="469" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">3분 전</text>
+<text x="342.6" y="489.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">美 나랏빚 사상 첫 40조달러 돌파… 10년도 안 돼 2배 넘게 증가</text>
+<text x="329.5" y="507" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/005/0001868064</text>
+<text x="990.1" y="485.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 3">
+<rect x="312.5" y="522.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="379.8" y="535.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="382" y="558" width="26.3" height="18" fill="#C9A3EE"/>
+<rect x="937.7" y="549.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,556.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,555.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,555.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="551.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">국민일보</text>
+<text x="387.8" y="547.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="452.4" y="551" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">19:05 ·</text>
+<text x="491.8" y="551" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">5분 전</text>
+<text x="342.6" y="571.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">이재명</text>
+<text x="382" y="571.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">정부</text>
+<text x="408.3" y="571.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">부동산 공급 대책 후속 법안 놓고 여야 강대강 대치</text>
+<text x="329.5" y="589" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/005/0001868063</text>
+<text x="990.1" y="567.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 4">
+<rect x="312.5" y="604.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="397" y="617.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="640.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,647.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,646.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,646.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="633.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">ngonews.kr</text>
+<text x="405" y="629.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="469.7" y="633" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">19:04 ·</text>
+<text x="509.7" y="633" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">6분 전</text>
+<text x="342.6" y="653.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">“영유아 재정, 미래대응기금에 담아야”…보육계 400여명 국회서 국가책임 촉구 &lt; NGO 뉴스 &lt;</text>
+<text x="329.5" y="671.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">NGO &lt; 기사본문 - 한국NGO신문</text>
+<text x="329.5" y="689" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://www.ngonews.kr/news/articleView.html?idxno=235931</text>
+<text x="990.1" y="658.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 5">
+<rect x="312.5" y="704.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="368.7" y="717.5" width="35.1" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="409.8" y="717.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="731.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,738.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,737.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,737.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="733.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">한겨레</text>
+<text x="376.7" y="729.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">현안</text>
+<text x="417.8" y="729.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="482.5" y="733" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">19:02 ·</text>
+<text x="522.1" y="733" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">8분 전</text>
+<text x="342.6" y="753.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">주룽지 총리가 누린 네 가지, 놓친 네 가지 [세상읽기]</text>
+<text x="329.5" y="771" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/028/0002819453</text>
+<text x="990.1" y="749.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 6">
+<rect x="312.5" y="786.5" width="800" height="82" fill="#F0FDFA"/>
+<rect x="379.8" y="799.5" width="35.1" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="813.3" width="92" height="29.5" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1"/>
+<g transform="translate(951.6,820.9) scale(0.5332,0.5332)" fill="none" stroke="#0D9488" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5.4" r="1.4"></circle><path d="M12 6.8v2.3"></path><rect x="4.5" y="9.1" width="15" height="10.9" rx="4"></rect><circle cx="9" cy="14.3" r="1" fill="#0D9488" stroke="none"></circle><circle cx="15" cy="14.3" r="1" fill="#0D9488" stroke="none"></circle><path d="M9 17.3h6"></path><path d="M4.5 13.2h-2M19.5 13.2h2"></path></g>
+<g transform="translate(1042.7,819.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,819.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="815.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">세계일보</text>
+<text x="387.8" y="811.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">기타</text>
+<text x="420.9" y="815" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">19:01 ·</text>
+<text x="458.3" y="815" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">9분 전</text>
+<text x="342.6" y="835.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">당정, 미래대응기금 규모·운영 협의</text>
+<text x="329.5" y="853" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/022/0004152436</text>
+<text x="990.1" y="831.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#0D9488" xml:space="preserve">자동 선별</text>
+</g>
+<g id="live-row 7">
+<rect x="312.5" y="868.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="361.7" y="881.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="895.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,902.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,901.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,901.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="897.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">MBN</text>
+<text x="369.7" y="893.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="434.4" y="897" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">19:01 ·</text>
+<text x="471.8" y="897" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">9분 전</text>
+<text x="342.6" y="917.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">하닉 '주주환원' 카드에 코스피 5.89% 급등</text>
+<text x="329.5" y="935" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/057/0001964681</text>
+<text x="990.1" y="913.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 8">
+<rect x="312.5" y="950.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="401.9" y="963.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="977.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,984.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,983.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,983.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="979.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">파이낸셜뉴스</text>
+<text x="409.9" y="975.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="474.6" y="979" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">19:01 ·</text>
+<text x="512" y="979" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">9분 전</text>
+<text x="342.6" y="999.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">실수요 몰린'10억 이하'… 서울 외곽 신고가 속출</text>
+<text x="329.5" y="1017" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/014/0005564345</text>
+<text x="990.1" y="995.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 9">
+<rect x="312.5" y="1032.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="397" y="1045.5" width="85.8" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="488.8" y="1045.5" width="35.1" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="529.9" y="1045.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="1068.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,1075.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,1074.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,1074.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="1061.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">ngonews.kr</text>
+<text x="405" y="1057.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">재정경제부 관련</text>
+<text x="496.8" y="1057.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">현안</text>
+<text x="537.9" y="1057.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="602.5" y="1061" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">19:00 ·</text>
+<text x="643.5" y="1061" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">10분 전</text>
+<text x="342.6" y="1081.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">종부세 손질했지만…“이대로는 안 된다” 세제개편안 토론회서 쏟아진 '우려' &lt; NGO 뉴스 &lt; NGO &lt;</text>
+<text x="329.5" y="1099.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">기사본문 - 한국NGO신문</text>
+<text x="329.5" y="1117" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://www.ngonews.kr/news/articleView.html?idxno=235937</text>
+<text x="990.1" y="1086.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 10">
+<rect x="312.5" y="1132.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="408.1" y="1145.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="1159.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,1166.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,1165.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,1165.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="1161.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">betanews.net</text>
+<text x="416.1" y="1157.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="480.7" y="1161" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">19:00 ·</text>
+<text x="521.7" y="1161" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">10분 전</text>
+<text x="342.6" y="1181.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">코스피, 반도체 강세에 5%대 상승 마감...6800선 회복</text>
+<text x="329.5" y="1199" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://www.betanews.net/article/view/beta202608200088</text>
+<text x="990.1" y="1177.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 11">
+<rect x="312.5" y="1214.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="402.4" y="1227.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="1241.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,1248.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,1247.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,1247.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="1243.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">newsen.com</text>
+<text x="410.4" y="1239.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="475.1" y="1243" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:58 ·</text>
+<text x="514" y="1243" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">12분 전</text>
+<text x="342.6" y="1263.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">혐한·혐중 발언 파묘된 日인기 만화가 결국 사과…中소설 콜라보 발표 2일만에 백지화</text>
+<text x="329.5" y="1281" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://m.entertain.naver.com/article/609/0001159129</text>
+<text x="990.1" y="1259.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 12">
+<rect x="312.5" y="1296.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="379.8" y="1309.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="1323.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,1330.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,1329.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,1329.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="1325.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">연합뉴스</text>
+<text x="387.8" y="1321.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="452.4" y="1325" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:56 ·</text>
+<text x="491.1" y="1325" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">14분 전</text>
+<text x="342.6" y="1345.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">씨티 &quot;환율 1,390원 아래선 국민연금 환헤지 확대 멈출 수도&quot;</text>
+<text x="329.5" y="1363" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/001/0016262478</text>
+<text x="990.1" y="1341.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 13">
+<rect x="312.5" y="1378.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="426.9" y="1391.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="1405.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,1412.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,1411.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,1411.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="1407.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">econotelling.com</text>
+<text x="434.9" y="1403.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="499.6" y="1407" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:56 ·</text>
+<text x="538.2" y="1407" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">14분 전</text>
+<text x="342.6" y="1427.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">'삼전닉스' 반도체 투톱이 증시 급반등 이끌어</text>
+<text x="329.5" y="1445" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">http://www.econotelling.com/news/articleView.html?idxno=21154</text>
+<text x="990.1" y="1423.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 14">
+<rect x="312.5" y="1460.5" width="800" height="82" fill="#F0FDFA"/>
+<rect x="401.9" y="1473.5" width="85.8" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="1487.3" width="92" height="29.5" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1"/>
+<g transform="translate(951.6,1494.9) scale(0.5332,0.5332)" fill="none" stroke="#0D9488" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5.4" r="1.4"></circle><path d="M12 6.8v2.3"></path><rect x="4.5" y="9.1" width="15" height="10.9" rx="4"></rect><circle cx="9" cy="14.3" r="1" fill="#0D9488" stroke="none"></circle><circle cx="15" cy="14.3" r="1" fill="#0D9488" stroke="none"></circle><path d="M9 17.3h6"></path><path d="M4.5 13.2h-2M19.5 13.2h2"></path></g>
+<g transform="translate(1042.7,1493.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,1493.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="1489.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">파이낸셜뉴스</text>
+<text x="409.9" y="1485.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">재정경제부 관련</text>
+<text x="493.7" y="1489" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:55 ·</text>
+<text x="531.7" y="1489" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">15분 전</text>
+<text x="342.6" y="1509.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">국유지 푼다… 강서 군부지에 청년주택 900호 공급</text>
+<text x="329.5" y="1527" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/014/0005564335</text>
+<text x="990.1" y="1505.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#0D9488" xml:space="preserve">자동 선별</text>
+</g>
+<g id="live-row 15">
+<rect x="312.5" y="1542.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="362.2" y="1555.5" width="35.1" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="403.3" y="1555.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="1569.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,1576.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,1575.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,1575.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="1571.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">뉴스1</text>
+<text x="370.2" y="1567.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">현안</text>
+<text x="411.3" y="1567.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="476" y="1571" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:54 ·</text>
+<text x="514.7" y="1571" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">16분 전</text>
+<text x="342.6" y="1591.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">[인터뷰]조정훈 &quot;중진들이 1.5선 장동혁 훈계하는 그림 안 좋아&quot;</text>
+<text x="329.5" y="1609" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/421/0009124644</text>
+<text x="990.1" y="1587.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 16">
+<rect x="312.5" y="1624.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="379.8" y="1637.5" width="85.8" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="1651.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,1658.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,1657.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,1657.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="1653.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">대전일보</text>
+<text x="387.8" y="1649.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">재정경제부 관련</text>
+<text x="471.5" y="1653" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:52 ·</text>
+<text x="510" y="1653" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18분 전</text>
+<text x="342.6" y="1673.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">군 전력은 내려보내고 공항은 재검증…서산공항 2028년 개항 흔들</text>
+<text x="329.5" y="1691" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/656/0000184594</text>
+<text x="990.1" y="1669.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 17">
+<rect x="312.5" y="1706.5" width="800" height="82" fill="#F0FDFA"/>
+<rect x="401.9" y="1719.5" width="85.8" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="1733.3" width="92" height="29.5" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1"/>
+<g transform="translate(951.6,1740.9) scale(0.5332,0.5332)" fill="none" stroke="#0D9488" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5.4" r="1.4"></circle><path d="M12 6.8v2.3"></path><rect x="4.5" y="9.1" width="15" height="10.9" rx="4"></rect><circle cx="9" cy="14.3" r="1" fill="#0D9488" stroke="none"></circle><circle cx="15" cy="14.3" r="1" fill="#0D9488" stroke="none"></circle><path d="M9 17.3h6"></path><path d="M4.5 13.2h-2M19.5 13.2h2"></path></g>
+<g transform="translate(1042.7,1739.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,1739.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="1735.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">파이낸셜뉴스</text>
+<text x="409.9" y="1731.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">재정경제부 관련</text>
+<text x="493.7" y="1735" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:52 ·</text>
+<text x="532.1" y="1735" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18분 전</text>
+<text x="342.6" y="1755.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">인도, 자국車 키우려 中 규제… 韓 전기차는 세액공제서도 빠져</text>
+<text x="329.5" y="1773" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/014/0005564333</text>
+<text x="990.1" y="1751.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#0D9488" xml:space="preserve">자동 선별</text>
+</g>
+<g id="live-row 18">
+<rect x="312.5" y="1788.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="379.8" y="1801.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="1815.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,1822.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,1821.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,1821.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="1817.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">서울경제</text>
+<text x="387.8" y="1813.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="452.4" y="1817" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:52 ·</text>
+<text x="490.9" y="1817" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18분 전</text>
+<text x="342.6" y="1837.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">[로터리] 기후위기 시대, 식량은 곧 안보다</text>
+<text x="329.5" y="1855" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/011/0004653641</text>
+<text x="990.1" y="1833.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 19">
+<rect x="312.5" y="1870.5" width="800" height="82" fill="#F0FDFA"/>
+<rect x="362.2" y="1883.5" width="85.8" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="1897.3" width="92" height="29.5" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1"/>
+<g transform="translate(951.6,1904.9) scale(0.5332,0.5332)" fill="none" stroke="#0D9488" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5.4" r="1.4"></circle><path d="M12 6.8v2.3"></path><rect x="4.5" y="9.1" width="15" height="10.9" rx="4"></rect><circle cx="9" cy="14.3" r="1" fill="#0D9488" stroke="none"></circle><circle cx="15" cy="14.3" r="1" fill="#0D9488" stroke="none"></circle><path d="M9 17.3h6"></path><path d="M4.5 13.2h-2M19.5 13.2h2"></path></g>
+<g transform="translate(1042.7,1903.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,1903.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="1899.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">뉴스1</text>
+<text x="370.2" y="1895.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">재정경제부 관련</text>
+<text x="454" y="1899" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:49 ·</text>
+<text x="493.1" y="1899" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">21분 전</text>
+<text x="342.6" y="1919.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">이천시의회, 경기도 법인지방소득세 공동세원화에 ‘반대’</text>
+<text x="329.5" y="1937" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/421/0009124639</text>
+<text x="990.1" y="1915.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#0D9488" xml:space="preserve">자동 선별</text>
+</g>
+<g id="live-row 20">
+<rect x="312.5" y="1952.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="394.6" y="1965.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="1979.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,1986.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,1985.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,1985.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="1981.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">연합뉴스TV</text>
+<text x="402.6" y="1977.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="467.3" y="1981" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:49 ·</text>
+<text x="506.4" y="1981" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">21분 전</text>
+<text x="342.6" y="2001.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">40조 주주환원에 '삼전닉스' 초강세…코스피 6% 가까이 급등</text>
+<text x="329.5" y="2019" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/422/0000897773</text>
+<text x="990.1" y="1997.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 21">
+<rect x="312.5" y="2034.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="394" y="2047.5" width="35.1" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="496.2" y="2070" width="26.3" height="18" fill="#C9A3EE"/>
+<rect x="937.7" y="2061.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,2068.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,2067.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,2067.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="2063.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">ggilbo.com</text>
+<text x="402" y="2059.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">기타</text>
+<text x="435.1" y="2063" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:48 ·</text>
+<text x="474.7" y="2063" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">22분 전</text>
+<text x="342.6" y="2083.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">'내국세 연동 교부금 폐지'</text>
+<text x="496.2" y="2083.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">정부</text>
+<text x="522.5" y="2083.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">안 확정…교육계 반발</text>
+<text x="329.5" y="2101" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://www.ggilbo.com/news/articleView.html?idxno=1176614</text>
+<text x="990.1" y="2079.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 22">
+<rect x="312.5" y="2116.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="401.9" y="2129.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="2143.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,2150.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,2149.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,2149.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="2145.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">파이낸셜뉴스</text>
+<text x="409.9" y="2141.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="474.6" y="2145" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:48 ·</text>
+<text x="514.2" y="2145" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">22분 전</text>
+<text x="342.6" y="2165.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">트럼프 &quot;경제 좋아 금리 내려야&quot;… 연준 &quot;물가 안 잡히면 인상&quot; [美 채무에 기준금리 향방은]</text>
+<text x="329.5" y="2183" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/014/0005564328</text>
+<text x="990.1" y="2161.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 23">
+<rect x="312.5" y="2198.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="401.9" y="2211.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="2225.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,2232.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,2231.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,2231.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="2227.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">파이낸셜뉴스</text>
+<text x="409.9" y="2223.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="474.6" y="2227" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:48 ·</text>
+<text x="514.2" y="2227" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">22분 전</text>
+<text x="342.6" y="2247.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">SK하이닉스 자사주 소각이 살린 증시, 글로벌 금리 악재 속 추가반등 나올까</text>
+<text x="329.5" y="2265" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/014/0005564329</text>
+<text x="990.1" y="2243.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 24">
+<rect x="312.5" y="2280.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="394.6" y="2293.5" width="85.8" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="486.4" y="2293.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="2307.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,2314.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,2313.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,2313.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="2309.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">연합뉴스TV</text>
+<text x="402.6" y="2305.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">재정경제부 관련</text>
+<text x="494.4" y="2305.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="559" y="2309" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:46 ·</text>
+<text x="598.4" y="2309" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">24분 전</text>
+<text x="342.6" y="2329.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">과일 폭염 피해 99%가 경남…추석 성수품 물가 '촉각'</text>
+<text x="329.5" y="2347" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/422/0000897770</text>
+<text x="990.1" y="2325.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 25">
+<rect x="312.5" y="2362.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="429.1" y="2375.5" width="35.1" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="2398.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,2405.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,2404.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,2404.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="2391.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">weeklytoday.com</text>
+<text x="437.1" y="2387.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">기타</text>
+<text x="470.2" y="2391" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:46 ·</text>
+<text x="509.6" y="2391" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">24분 전</text>
+<text x="342.6" y="2411.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">[위클리오늘] 송형곤 전남광주특별시의회 의장ㆍ전남광주특별시의회(8.20) &lt; 광주·전남 &lt; 전국지</text>
+<text x="329.5" y="2429.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">사 &lt; 기사본문 - 위클리오늘</text>
+<text x="329.5" y="2447" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">http://www.weeklytoday.com/news/articleView.html?idxno=791081</text>
+<text x="990.1" y="2416.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 26">
+<rect x="312.5" y="2462.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="379.8" y="2475.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="2489.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,2496.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,2495.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,2495.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="2491.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">매일경제</text>
+<text x="387.8" y="2487.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="452.4" y="2491" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:46 ·</text>
+<text x="491.8" y="2491" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">24분 전</text>
+<text x="342.6" y="2511.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">반도체만 보면 더 오를 것 같지만…“코스피 6000에 사고 7000에 팔아라” [머니닥터 시장진단]</text>
+<text x="329.5" y="2529" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/009/0005723759</text>
+<text x="990.1" y="2507.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 27">
+<rect x="312.5" y="2544.5" width="800" height="82" fill="#F0FDFA"/>
+<rect x="401.9" y="2557.5" width="85.8" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="493.7" y="2557.5" width="35.1" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="534.8" y="2557.5" width="35.1" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="575.9" y="2557.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="2571.3" width="92" height="29.5" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1"/>
+<g transform="translate(951.6,2578.9) scale(0.5332,0.5332)" fill="none" stroke="#0D9488" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5.4" r="1.4"></circle><path d="M12 6.8v2.3"></path><rect x="4.5" y="9.1" width="15" height="10.9" rx="4"></rect><circle cx="9" cy="14.3" r="1" fill="#0D9488" stroke="none"></circle><circle cx="15" cy="14.3" r="1" fill="#0D9488" stroke="none"></circle><path d="M9 17.3h6"></path><path d="M4.5 13.2h-2M19.5 13.2h2"></path></g>
+<g transform="translate(1042.7,2577.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,2577.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="2573.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">파이낸셜뉴스</text>
+<text x="409.9" y="2569.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">재정경제부 관련</text>
+<text x="501.7" y="2569.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">기타</text>
+<text x="542.8" y="2569.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">현안</text>
+<text x="583.9" y="2569.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="648.6" y="2573" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:44 ·</text>
+<text x="688.2" y="2573" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">26분 전</text>
+<text x="342.6" y="2593.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">당정 &quot;서울 용산공원·서리풀 등에 공공주택 공급&quot; 공식화</text>
+<text x="329.5" y="2611" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/014/0005564324</text>
+<text x="990.1" y="2589.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#0D9488" xml:space="preserve">자동 선별</text>
+</g>
+<g id="live-row 28">
+<rect x="312.5" y="2626.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="401.9" y="2639.5" width="35.1" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="2653.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,2660.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,2659.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,2659.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="2655.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">파이낸셜뉴스</text>
+<text x="409.9" y="2651.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">기타</text>
+<text x="443" y="2655" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:44 ·</text>
+<text x="482.6" y="2655" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">26분 전</text>
+<text x="342.6" y="2675.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">국힘 정책위의장에 3선 임이자… 의총서 추인</text>
+<text x="329.5" y="2693" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/014/0005564323</text>
+<text x="990.1" y="2671.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 29">
+<rect x="312.5" y="2708.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="404.9" y="2721.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="2735.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,2742.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,2741.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,2741.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="2737.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">ajunews.com</text>
+<text x="412.9" y="2733.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="477.5" y="2737" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:42 ·</text>
+<text x="516.5" y="2737" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">28분 전</text>
+<text x="342.6" y="2757.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">'땡큐 SK하이닉스'…코스피, 381p 뛰어 6800선 단숨에 탈환</text>
+<text x="329.5" y="2775" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://www.ajunews.com/view/20260820155709244</text>
+<text x="990.1" y="2753.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 30">
+<rect x="312.5" y="2790.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="444.8" y="2803.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="2817.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,2824.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,2823.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,2823.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="2819.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">news.einfomax.co.kr</text>
+<text x="452.8" y="2815.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="517.4" y="2819" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:42 ·</text>
+<text x="556.4" y="2819" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">28분 전</text>
+<text x="342.6" y="2839.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">[외환-마감] 하락 관성에 1,390원대서 낙폭 확대…5.10원↓</text>
+<text x="329.5" y="2857" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://news.einfomax.co.kr/news/articleView.html?idxno=4431059</text>
+<text x="990.1" y="2835.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 31">
+<rect x="312.5" y="2872.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="379.8" y="2885.5" width="35.1" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="420.9" y="2885.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="2899.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,2906.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,2905.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,2905.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="2901.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">매일경제</text>
+<text x="387.8" y="2897.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">현안</text>
+<text x="428.9" y="2897.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="493.5" y="2901" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:39 ·</text>
+<text x="532.5" y="2901" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">31분 전</text>
+<text x="342.6" y="2921.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">압구정 현대 열흘새 호가 5억 뚝…강남·서초 집값 ‘세제개편 후폭풍’</text>
+<text x="329.5" y="2939" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/009/0005723757</text>
+<text x="990.1" y="2917.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 32">
+<rect x="312.5" y="2954.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="379.8" y="2967.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="2981.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,2988.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,2987.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,2987.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="2983.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">국제신문</text>
+<text x="387.8" y="2979.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="452.4" y="2983" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:38 ·</text>
+<text x="491.8" y="2983" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">32분 전</text>
+<text x="342.6" y="3003.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">[증시와이드] 변동성 증시, 맹신도 공포도 경계를</text>
+<text x="329.5" y="3021" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/658/0000152934</text>
+<text x="990.1" y="2999.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 33">
+<rect x="312.5" y="3036.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="379.8" y="3049.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="3063.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,3070.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,3069.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,3069.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="3065.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">서울경제</text>
+<text x="387.8" y="3061.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="452.4" y="3065" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:36 ·</text>
+<text x="491.6" y="3065" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">34분 전</text>
+<text x="342.6" y="3085.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">압구정신현대 40억 ‘털썩’…강남 초고가 집값 조정 본격화</text>
+<text x="329.5" y="3103" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/011/0004653632</text>
+<text x="990.1" y="3081.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 34">
+<rect x="312.5" y="3118.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="379.8" y="3131.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="3145.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,3152.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,3151.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,3151.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="3147.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">한국경제</text>
+<text x="387.8" y="3143.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="452.4" y="3147" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:35 ·</text>
+<text x="490.9" y="3147" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">35분 전</text>
+<text x="342.6" y="3167.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">2분기 순대외자산 7536억→640억弗…최대폭 감소</text>
+<text x="329.5" y="3185" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/015/0005322998</text>
+<text x="990.1" y="3163.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 35">
+<rect x="312.5" y="3200.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="397" y="3213.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="3236.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,3243.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,3242.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,3242.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="3229.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">news.ifm.kr</text>
+<text x="405" y="3225.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="469.7" y="3229" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:34 ·</text>
+<text x="508.8" y="3229" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">36분 전</text>
+<text x="342.6" y="3249.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">[오늘의증시] 코스피 5.9% 급반등…삼성전자·SK하이닉스 ‘주주환원’이 끌어올렸다 &lt; 경제 &lt; 서울 &lt;</text>
+<text x="329.5" y="3267.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">기사본문 - 경인방송</text>
+<text x="329.5" y="3285" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://news.ifm.kr/news/articleView.html?idxno=477624</text>
+<text x="990.1" y="3254.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 36">
+<rect x="312.5" y="3300.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="401.4" y="3313.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="3336.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,3343.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,3342.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,3342.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="3329.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">etoday.co.kr</text>
+<text x="409.4" y="3325.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="474.1" y="3329" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:32 ·</text>
+<text x="512.7" y="3329" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">38분 전</text>
+<text x="342.6" y="3349.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">‘반등’ 코스피 거래대금은 급등기 절반 수준…삼전ㆍSK하닉 등 주도주 5곳에 거래 62% 쏠려 - 이투</text>
+<text x="329.5" y="3367.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">데이</text>
+<text x="329.5" y="3385" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://www.etoday.co.kr/news/view/2616510</text>
+<text x="990.1" y="3354.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 37">
+<rect x="312.5" y="3400.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="379.8" y="3413.5" width="35.1" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="608.7" y="3436" width="39.4" height="18" fill="#FFA8A8"/>
+<rect x="937.7" y="3427.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,3434.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,3433.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,3433.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="3429.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">서울경제</text>
+<text x="387.8" y="3425.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">현안</text>
+<text x="420.9" y="3429" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:31 ·</text>
+<text x="457.6" y="3429" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">39분 전</text>
+<text x="342.6" y="3449.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">세 부담 덜겠다더니…與 토론회서 “20억대도</text>
+<text x="608.7" y="3449.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">보유세</text>
+<text x="648.1" y="3449.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">인상”</text>
+<text x="329.5" y="3467" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/011/0004653628</text>
+<text x="990.1" y="3445.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 38">
+<rect x="312.5" y="3482.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="401.9" y="3495.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="3509.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,3516.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,3515.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,3515.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="3511.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">파이낸셜뉴스</text>
+<text x="409.9" y="3507.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="474.6" y="3511" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:31 ·</text>
+<text x="511.3" y="3511" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">39분 전</text>
+<text x="342.6" y="3531.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">외국인 투심 안 꺾였다… 반도체 팔고 제약·뷰티 '줍줍'</text>
+<text x="329.5" y="3549" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/014/0005564306</text>
+<text x="990.1" y="3527.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 39">
+<rect x="312.5" y="3564.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="401.9" y="3577.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="3591.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,3598.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,3597.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,3597.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="3593.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">파이낸셜뉴스</text>
+<text x="409.9" y="3589.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="474.6" y="3593" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:31 ·</text>
+<text x="511.3" y="3593" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">39분 전</text>
+<text x="342.6" y="3613.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">동전주 상장사들 주식 합치고 자구책 고심</text>
+<text x="329.5" y="3631" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/014/0005564305</text>
+<text x="990.1" y="3609.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 40">
+<rect x="312.5" y="3646.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="426.2" y="3659.5" width="85.8" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="3673.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,3680.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,3679.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,3679.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="3675.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">namdonews.com</text>
+<text x="434.2" y="3671.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">재정경제부 관련</text>
+<text x="517.9" y="3675" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:30 ·</text>
+<text x="558" y="3675" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">40분 전</text>
+<text x="342.6" y="3695.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">광주 군공항 이전 다시 속도…28일 후보지 선정위</text>
+<text x="329.5" y="3713" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://www.namdonews.com/news/articleView.html?idxno=920692</text>
+<text x="990.1" y="3691.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 41">
+<rect x="312.5" y="3728.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="393.3" y="3741.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="3755.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,3762.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,3761.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,3761.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="3757.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">nspna.com</text>
+<text x="401.3" y="3753.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="466" y="3757" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:30 ·</text>
+<text x="506.1" y="3757" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">40분 전</text>
+<text x="342.6" y="3777.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">[업앤다운]게임주 상승…미투온↑·썸에이지↓</text>
+<text x="329.5" y="3795" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://www.nspna.com/news/?mode=view&amp;newsid=825002</text>
+<text x="990.1" y="3773.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 42">
+<rect x="312.5" y="3810.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="402.5" y="3823.5" width="35.1" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="3846.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,3853.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,3852.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,3852.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="3839.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">newsgn.com</text>
+<text x="410.5" y="3835.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">기타</text>
+<text x="443.6" y="3839" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:26 ·</text>
+<text x="482.6" y="3839" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">44분 전</text>
+<text x="342.6" y="3859.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">비수도권상공회의소, 국회 방문해 법인세·근로소득세 차등 적용 법안 통과 촉구 &lt; 경제 &lt; 기사본문</text>
+<text x="329.5" y="3877.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">- 뉴스경남</text>
+<text x="329.5" y="3895" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://www.newsgn.com/news/articleView.html?idxno=568946</text>
+<text x="990.1" y="3864.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 43">
+<rect x="312.5" y="3910.5" width="800" height="1" fill="#E5E7EB"/>
+<rect x="379.8" y="3923.5" width="66.7" height="17.5" rx="8.8" fill="#FEF2F2" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="937.7" y="3937.3" width="92" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(953.4,3944.9) scale(0.5332,0.5332)" fill="none" stroke="#1F2937" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></g>
+<g transform="translate(1042.7,3943.5) scale(0.6999,0.6999)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></g>
+<g transform="translate(1078.5,3943.6) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path></g>
+<text x="329.5" y="3939.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">세계일보</text>
+<text x="387.8" y="3935.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11" font-weight="400" fill="#2563EB" xml:space="preserve">추가 검색어</text>
+<text x="452.4" y="3939" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">18:26 ·</text>
+<text x="491.4" y="3939" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">44분 전</text>
+<text x="342.6" y="3959.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">‘용산 청년주택’ 힘 싣는 與, 오세훈에 “주거난 대안 내놔라” 역공 [뉴스 투데이]</text>
+<text x="329.5" y="3977" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#2563EB" xml:space="preserve">https://n.news.naver.com/mnews/article/022/0004152421</text>
+<text x="990.1" y="3955.1" text-anchor="middle" font-family="Arial" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">담아두기</text>
+</g>
+<g id="live-row 44">
+<rect x="312.5" y="3992.5" width="800" height="1" fill="#E5E7EB"/>
+</g>
+</svg>

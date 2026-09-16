@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>🔍 검색어 말줄임 목업</title>
+<style>
+  :root {
+    --bg: #F8FAFC; --card: #FFFFFF; --header: #1E3A5F; --accent: #2563EB;
+    --text: #1F2937; --muted: #6B7280; --border: #E5E7EB; --hover: #EFF6FF;
+    --text-soft: #4B5563; --text-faint: #9CA3AF; --error: #DC2626;
+    --warn-bg: #FEF3C7; --warn-border: #FCD34D; --warn-text: #92400E;
+  }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+  }
+  .page { max-width: 940px; margin: 24px auto 80px; padding: 0 20px; }
+  h1 { font-size: 1.25rem; color: var(--header); margin: 0 0 6px; }
+  .lede { color: var(--muted); font-size: 0.88rem; margin: 0 0 26px; line-height: 1.6; }
+  h2 {
+    font-size: 1rem; color: var(--header); margin: 34px 0 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  h2 .tag {
+    font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border);
+  }
+  h2 .tag.ok { background: #DCFCE7; color: #166534; border-color: #86EFAC; }
+  .note { color: var(--muted); font-size: 0.82rem; margin: 0 0 12px; line-height: 1.6; }
+
+  /* ── 확정본 카드 재현 (app/renderer.py의 실제 값) ── */
+  .container {
+    max-width: 800px; margin: 0; padding: 24px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 8px;
+  }
+  .article { margin: 10px 0; line-height: 1.5; padding: 6px 8px; border-radius: 8px; }
+  .article:hover { background: #F3F4F6; }
+  .article summary { cursor: pointer; display: flex; flex-direction: column; gap: 4px; list-style: none; }
+  .article summary::-webkit-details-marker { display: none; }
+  .title-row { display: flex; align-items: baseline; justify-content: flex-start; gap: 8px; }
+  .action-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 4px; }
+  .article:has(.article-select) .action-row { padding-left: 28px; }
+  .title-line { min-width: 0; overflow-wrap: anywhere; color: var(--text); }
+  .article-actions {
+    margin-left: auto; display: flex; align-items: center; justify-content: flex-end;
+    gap: 4px; flex-shrink: 0; flex-wrap: wrap; row-gap: 4px;
+  }
+  .pub-time { flex-shrink: 0; color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+  .time-sep { color: var(--muted); font-size: 0.8rem; margin: 0 2px; }
+  .origin-link-text {
+    flex-shrink: 0; color: var(--accent); font-size: 0.8rem; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 2px; white-space: nowrap;
+  }
+  .origin-link-icon { width: 0.75em; height: 0.75em; }
+  .kw-inline { font-size: 0.8rem; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+  .kw-inline .kw-ic { width: 0.75em; height: 0.75em; color: var(--text-faint); flex-shrink: 0; }
+  .kw-inline .kw-v { color: var(--text-soft); }
+  .group-move-select {
+    flex-shrink: 0; width: 100px; border: 1px solid var(--border); border-radius: 4px;
+    padding: 2px 4px; font-size: 0.78rem; color: var(--muted); background: var(--card);
+  }
+  .move-btn, .hide-btn, .copy-btn {
+    flex-shrink: 0; background: transparent; border: none; color: var(--muted);
+    font-size: 1rem; cursor: pointer; padding: 2px 6px;
+    display: inline-flex; align-items: center;
+  }
+  .more-btn, .lab-btn {
+    background: transparent; border: none; color: var(--muted); font-size: 1.05rem;
+    line-height: 1; cursor: pointer; padding: 3px 7px; border-radius: 4px;
+    display: inline-flex; align-items: center; flex-shrink: 0;
+  }
+  .more-btn:hover, .lab-btn:hover, .copy-btn:hover { background: var(--hover); color: var(--accent); }
+  .article-select { flex-shrink: 0; }
+
+  /* ── 제안: 폭으로 자른다 ── */
+  .fixed .kw-inline { min-width: 0; }
+  .fixed .kw-inline .kw-v {
+    display: inline-block; max-width: var(--kw-max, 200px);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    vertical-align: -3px;
+  }
+
+  /* 밀려난 액션 줄을 눈에 띄게 */
+  .broken .article-actions { outline: 2px dashed var(--error); outline-offset: 3px; }
+  .fixed .article-actions { outline: 2px dashed #16A34A; outline-offset: 3px; }
+
+  /* ── 조절 바 ── */
+  .panel {
+    position: sticky; top: 0; z-index: 5; background: var(--card);
+    border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 8px;
+    padding: 14px 18px; margin: 0 0 8px;
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  }
+  .panel label { font-size: 0.85rem; color: var(--text); font-weight: 600; }
+  .panel input[type=range] { width: 260px; accent-color: var(--accent); vertical-align: middle; }
+  .panel .val {
+    font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent);
+    min-width: 62px; display: inline-block;
+  }
+  .panel .readout {
+    font-size: 0.85rem; color: var(--text-soft); margin-left: auto;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px;
+  }
+  .panel .readout b { color: var(--header); font-variant-numeric: tabular-nums; }
+  .panel .preset {
+    font-size: 0.78rem; padding: 4px 10px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--card); color: var(--text-soft);
+    font-family: inherit;
+  }
+  .panel .preset:hover { border-color: var(--accent); color: var(--accent); }
+
+  .panel .preset.find { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .found {
+    margin: 0 0 10px; padding: 10px 14px; font-size: 0.86rem; line-height: 1.6;
+    background: #DCFCE7; border: 1px solid #86EFAC; border-radius: 6px; color: #166534;
+  }
+  .found b { font-variant-numeric: tabular-nums; font-size: 1.05em; }
+  .callout {
+    background: var(--bg); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent); border-radius: 6px;
+    padding: 13px 16px; margin: 14px 0 0; font-size: 0.85rem; line-height: 1.75; color: var(--text-soft);
+  }
+  .callout b { color: var(--header); }
+  code {
+    background: #F1F5F9; border: 1px solid var(--border); border-radius: 4px;
+    padding: 1px 5px; font-size: 0.82em; color: #334155;
+  }
+  pre {
+    background: #0F172A; color: #E2E8F0; border-radius: 8px; padding: 14px 16px;
+    font-size: 0.78rem; line-height: 1.65; overflow-x: auto; margin: 10px 0 0;
+  }
+  pre .c { color: #64748B; }
+  pre .k { color: #7DD3FC; }
+  .truncated-mark { color: var(--error); font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>🔍 검색어 말줄임 — 확정본·초안 액션 줄</h1>
+<p class="lede">
+  아래 두 구역은 <b>같은 기사 6건</b>을 같은 카드 폭(800px)·같은 폰트로 그린 것이다.
+  실제 <code>app/renderer.py</code>의 CSS 값을 그대로 옮겼다 —
+  카드 폭 800px, 액션 줄 <code>padding-left: 28px</code>, 검색어 0.8rem.
+  <span style="color:var(--error)">빨간 점선</span>은 밀려난 액션 묶음,
+  <span style="color:#16A34A">초록 점선</span>은 제자리에 고정된 액션 묶음.
+</p>
+
+<h2>지금 <span class="tag">액션 줄이 밀려난다</span></h2>
+<p class="note">검색어에 폭 제한이 없어 <code>.article-actions</code>(<code>flex-shrink: 0</code>)를 통째로 다음 줄로 밀어낸다. 스크린샷의 그 상태.</p>
+<div class="container broken" id="broken"></div>
+
+<h2>제안 — 폭으로 자른다 <span class="tag ok">액션 줄 고정</span></h2>
+<p class="note">
+  <code>max-width</code> + <code>text-overflow: ellipsis</code>. 슬라이더로 폭을 바꿔가며
+  <b>몇 건이 잘리는지</b> 직접 재보고 값을 정하면 된다. 잘린 행은 마우스를 올리면 전체 검색어가 툴팁으로 뜬다(안 잘린 행은 원래 설명 툴팁 유지).
+</p>
+<div class="panel">
+  <label for="kwmax">자르는 폭</label>
+  <input type="range" id="kwmax" min="90" max="400" step="1" value="200" />
+  <span class="val" id="kwmaxval">200px</span>
+  <button class="preset" data-v="150">150</button>
+  <button class="preset" data-v="200">200</button>
+  <button class="preset" data-v="210">210 (실시간과 동일)</button>
+  <button class="preset" data-v="260">260</button>
+  <button class="preset find" id="findmax">↳ 밀림 0을 유지하는 상한 찾기</button>
+  <span class="readout">이 폭에서 <b id="trunc">0</b> / <b>6</b>건 잘림 · 액션 밀림 <b id="pushed">0</b>건</span>
+</div>
+<p class="found" id="found" hidden></p>
+<div class="container fixed" id="fixed"></div>
+
+<div class="callout">
+  <b>읽는 법.</b> 폭을 줄이면 잘리는 건수가 늘고, 늘리면 어느 지점부터 다시 액션 줄이 밀리기 시작한다.
+  <b>"액션 밀림 0건"을 유지하는 가장 큰 값"</b>이 상한이고, 그보다 여유를 조금 더 두는 게 안전하다 —
+  제목 길이·언론사명 길이는 매번 다르지만 액션 묶음 폭은 항상 같으니, 이 상한은 카드 폭이 바뀌지 않는 한 고정이다.
+  <br>
+  실시간현황의 210px을 그대로 쓰면 안 되는 이유도 여기서 보인다 — 이 화면은 액션 묶음에
+  <code>「다른 소제목」</code> 드롭다운(100px)이 하나 더 있어 여유가 그만큼 적다.
+  <br>
+  <b>초안(preview.html)도 같은 값을 쓰면 된다</b> — 같은 <code>render_article()</code>을 그대로 import하고
+  컨테이너도 똑같이 800px이라 상한이 동일하다. 값 하나로 두 화면이 다 덮인다.
+</div>
+
+<h2>실제로 들어갈 CSS</h2>
+<pre><span class="c">/* app/renderer.py — .kw-inline 아래 */</span>
+.kw-inline {{ font-size: 0.8rem; color: {muted};
+  display: inline-flex; align-items: center; gap: 4px;
+  <span class="k">min-width: 0;</span>  <span class="c">/* flex 자식이라 이게 없으면 ellipsis가 안 먹는다 */</span>
+}}
+.kw-inline .kw-v {{ color: {text_soft};
+  <span class="k">display: inline-block; max-width: ???px;</span>
+  <span class="k">overflow: hidden; text-overflow: ellipsis; white-space: nowrap;</span>
+  <span class="k">vertical-align: -3px;</span>  <span class="c">/* inline-block이 되며 baseline이 틀어지는 보정 */</span>
+}}</pre>
+<p class="note" style="margin-top:10px">
+  그리고 실시간현황의 <code>markTruncatedKeywords()</code>와 같은 JS 한 조각 —
+  <code>scrollWidth &gt; clientWidth</code>인 행에만 title을 전체 검색어로 바꾼다.
+  글자수 추정이 아니라 이 브라우저·이 폰트 기준 실제 잘림 여부다.
+</p>
+
+</div>
+
+<script>
+// 실제 확정본에 나올 법한 표본. 2번이 스크린샷의 그 행.
+var ROWS = [
+  { outlet: "헤럴드경제", title: "[사설] 2기 개각, 민심 듣고 성과 내야…잘못된 정책은 과감히 전환을",
+    kw: "재정경제부, 재경부, 구윤철, 이형일" },
+  { outlet: "아시아경제", title: "李, 예상 밖 중폭개각…1년 만에 짙어진 진보색",
+    kw: "재정경제부, 재경부, 구윤철, 이형일, 재정경제기획위원회" },
+  { outlet: "KBS", title: "정부, 내년 예산안 728조 편성…12년 만의 최대 증가폭",
+    kw: "기재부" },
+  { outlet: "매일경제", title: "국가재정전략회의 개최…\"지출 구조조정 없인 재정준칙 무의미\"",
+    kw: "재정경제부, 국가재정전략회의" },
+  { outlet: "연합뉴스", title: "구윤철 부총리 \"세제개편안, 다음 달 초 국회 제출\"",
+    kw: "재정경제부, 재경부, 구윤철, 이형일, 재정경제기획위원회, 세제개편, 예산안, 추경" },
+  { outlet: "서울경제", title: "[단독] 예결위, 결산 심사 일정 재조정 착수",
+    kw: "예결위, 결산" },
+];
+
+var ICON_SEARCH = '<svg class="ic kw-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
+var ICON_EXT = '<svg class="origin-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 4h6v6"/><path d="M20 4l-8 8"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';
+var ICON_COPY = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+var ICON_TAG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 11V4a1 1 0 0 1 1-1h7l9 9-8 8z"/><circle cx="7.5" cy="7.5" r="1.3" fill="currentColor" stroke="none"/></svg>';
+var ICON_TRASH = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16"/><path d="M9 6V4h6v2"/><path d="M6 6l1 14h10l1-14"/></svg>';
+var ICON_UP = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg>';
+var ICON_DOWN = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M18 13l-6 6-6-6"/></svg>';
+
+function rowHtml(r) {
+  return '<div class="article">' +
+    '<details><summary>' +
+      '<div class="title-row">' +
+        '<input type="checkbox" class="article-select">' +
+        '<span class="title-line">(' + r.outlet + ') ' + r.title + '</span>' +
+      '</div>' +
+      '<div class="action-row">' +
+        '<span class="pub-time">11:05 · 2시간 전</span>' +
+        '<span class="time-sep">·</span>' +
+        '<a class="origin-link-text" href="#" onclick="return false">' + ICON_EXT + ' 원문보기</a>' +
+        '<span class="time-sep">·</span>' +
+        '<span class="kw-inline" title="이 기사가 수집된 검색어입니다">' + ICON_SEARCH +
+          '<span class="kw-v">' + r.kw + '</span></span>' +
+        '<span class="article-actions">' +
+          '<select class="group-move-select"><option>다른 소제목</option></select>' +
+          '<button class="copy-btn">' + ICON_COPY + '</button>' +
+          '<button class="lab-btn">' + ICON_TAG + '</button>' +
+          '<button class="more-btn">⋯</button>' +
+          '<button class="hide-btn">' + ICON_TRASH + '</button>' +
+          '<button class="move-btn">' + ICON_UP + '</button>' +
+          '<button class="move-btn">' + ICON_DOWN + '</button>' +
+        '</span>' +
+      '</div>' +
+    '</summary></details>' +
+  '</div>';
+}
+
+var html = ROWS.map(rowHtml).join("");
+document.getElementById("broken").innerHTML = html;
+document.getElementById("fixed").innerHTML = html;
+
+var fixed = document.getElementById("fixed");
+var slider = document.getElementById("kwmax");
+var valEl = document.getElementById("kwmaxval");
+var truncEl = document.getElementById("trunc");
+var pushedEl = document.getElementById("pushed");
+
+function measure() {
+  var px = slider.value;
+  fixed.style.setProperty("--kw-max", px + "px");
+  valEl.textContent = px + "px";
+
+  var truncated = 0, pushed = 0;
+  fixed.querySelectorAll(".article").forEach(function (art) {
+    var v = art.querySelector(".kw-v");
+    var kw = art.querySelector(".kw-inline");
+    var acts = art.querySelector(".article-actions");
+
+    // 잘렸나 — 실시간현황의 markTruncatedKeywords()와 같은 판정
+    var isTrunc = v.scrollWidth > v.clientWidth + 1;
+    if (isTrunc) {
+      truncated++;
+      kw.title = v.textContent;          // 잘린 행에만 값 툴팁
+    } else {
+      kw.title = "이 기사가 수집된 검색어입니다";
+    }
+
+    // 액션 묶음이 검색어와 다른 줄로 내려갔나 — 실제 렌더 좌표로 판정
+    var same = Math.abs(acts.getBoundingClientRect().top - kw.getBoundingClientRect().top) < 6;
+    if (!same) pushed++;
+    acts.style.outlineColor = same ? "#16A34A" : "#DC2626";
+  });
+
+  truncEl.textContent = truncated;
+  pushedEl.textContent = pushed;
+  pushedEl.parentElement.style.color = pushed ? "#DC2626" : "";
+}
+
+// 밀림이 0으로 유지되는 가장 큰 폭을 이분탐색으로 찾는다 — 글자수 추정이 아니라
+// 이 브라우저·이 폰트·이 카드 폭에서의 실제 렌더 결과 기준.
+function pushedCountAt(px) {
+  fixed.style.setProperty("--kw-max", px + "px");
+  var n = 0;
+  fixed.querySelectorAll(".article").forEach(function (art) {
+    var kw = art.querySelector(".kw-inline");
+    var acts = art.querySelector(".article-actions");
+    if (Math.abs(acts.getBoundingClientRect().top - kw.getBoundingClientRect().top) >= 6) n++;
+  });
+  return n;
+}
+document.getElementById("findmax").addEventListener("click", function () {
+  var lo = 60, hi = 600, best = lo;
+  while (lo <= hi) {
+    var mid = (lo + hi) >> 1;
+    if (pushedCountAt(mid) === 0) { best = mid; lo = mid + 1; } else { hi = mid - 1; }
+  }
+  slider.value = Math.min(best, slider.max);
+  measure();
+  var safe = Math.floor((best - 7) / 10) * 10;   // 게시시각 최대 폭만 빼고 10px 단위로 내림
+  var el = document.getElementById("found");
+  el.hidden = false;
+  el.innerHTML =
+    "이 카드 폭에서 액션 줄을 안 밀어내는 상한은 <b>" + best + "px</b>. " +
+    "이 줄에서 폭이 변하는 건 게시시각(<code>3분 전</code> ~ <code>23시간 전</code>, 약 7px) 하나뿐이다 — " +
+    "<code>📷 사진 추정</code>·<code>🤖 배정</code> 배지는 제목 줄(.title-row)에 붙어 이 계산과 무관하다. " +
+    "그 폭만 빼둔 <b>" + safe + "px</b>이 실제로 쓸 값이다.";
+});
+
+slider.addEventListener("input", measure);
+document.querySelectorAll(".preset").forEach(function (b) {
+  if (!b.dataset.v) return;   // "상한 찾기" 버튼은 자기 핸들러가 따로 있다
+  b.addEventListener("click", function () { slider.value = b.dataset.v; measure(); });
+});
+window.addEventListener("resize", measure);
+document.fonts && document.fonts.ready.then(measure);
+measure();
+
+// 위쪽(현재 동작) 구역의 밀림도 표시만 갱신
+(function markBroken() {
+  document.querySelectorAll("#broken .article").forEach(function (art) {
+    var kw = art.querySelector(".kw-inline");
+    var acts = art.querySelector(".article-actions");
+    var same = Math.abs(acts.getBoundingClientRect().top - kw.getBoundingClientRect().top) < 6;
+    acts.style.outlineColor = same ? "#16A34A" : "#DC2626";
+  });
+})();
+</script>
+</body>
+</html>

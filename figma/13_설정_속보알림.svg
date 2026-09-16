@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1106" viewBox="0 0 1440 1106">
+<rect width="100%" height="100%" fill="#F8FAFC"/>
+<g id="topbar">
+<rect x="0" y="0" width="1440" height="54.5" fill="#FFFFFF"/>
+<text x="490" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">홈</text>
+<text x="924.5" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">설정</text>
+</g>
+<g id="Page">
+<rect x="455" y="24" width="530" height="934.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+</g>
+<g id="form">
+<rect x="480" y="188.4" width="480" height="60" rx="6" fill="#FFFBEB" stroke="#FDE68A" stroke-width="1"/>
+<rect x="909" y="206.4" width="36" height="24" rx="4" fill="#2563EB"/>
+<rect x="480" y="266.4" width="480" height="1" fill="#E5E7EB"/>
+<rect x="480" y="340.9" width="16" height="16" fill="none"/>
+<rect x="480" y="372.4" width="16" height="16" fill="none"/>
+<rect x="480" y="403.9" width="16" height="16" fill="none"/>
+<rect x="480" y="435.4" width="16" height="16" fill="none"/>
+<rect x="480" y="463.2" width="480" height="1" fill="#E5E7EB"/>
+<rect x="480" y="535" width="110.5" height="24" fill="#FFFFFF" stroke="#767676" stroke-width="2"/>
+<text x="483" y="551.7" font-family="monospace" font-size="13.3" font-weight="400" fill="#000000" xml:space="preserve">09:00</text>
+<rect x="615" y="535" width="110.5" height="24" fill="#FFFFFF" stroke="#767676" stroke-width="2"/>
+<text x="618" y="551.7" font-family="monospace" font-size="13.3" font-weight="400" fill="#000000" xml:space="preserve">20:00</text>
+<rect x="798.2" y="530" width="69" height="34" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="807.2" y="552.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="400" fill="#1F2937" xml:space="preserve">5분</text>
+<rect x="480" y="572" width="480" height="38.5" rx="6" fill="#EFF6FF"/>
+<rect x="480" y="621.8" width="15" height="15" fill="none"/>
+<rect x="480" y="648" width="480" height="1" fill="#E5E7EB"/>
+<rect x="480" y="714.8" width="480" height="66" rx="6" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="828" y="733.8" width="119" height="28" rx="4" fill="#2563EB"/>
+<rect x="480" y="798.9" width="480" height="1" fill="#E5E7EB"/>
+<rect x="0" y="1021.5" width="1440" height="60.5" fill="#FFFFFF"/>
+<rect x="480" y="1034.5" width="480" height="35.5" rx="4" fill="#2563EB"/>
+<text x="495" y="214.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="700" fill="#92400E" xml:space="preserve">수시 감시 사용</text>
+<text x="495" y="231.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#A16207" xml:space="preserve">꺼도 정기 회차 검사는 계속됩니다 (아래 설명 참고)</text>
+<text x="919.3" y="221.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="10.9" font-weight="700" fill="#FFFFFF" xml:space="preserve">ON</text>
+<text x="480" y="295.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="700" fill="#1E3A5F" xml:space="preserve">감시 대상 검색어 그룹</text>
+<text x="480" y="316.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">고른 그룹의 검색 결과에서만 말머리를 찾습니다. 그룹이 많을수록 네이버 호출도 늘어납니다.</text>
+<text x="504" y="353.3" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="400" fill="#1F2937" xml:space="preserve">재정경제부 관련</text>
+<text x="603" y="352.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">키워드 6개</text>
+<text x="504" y="384.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="400" fill="#1F2937" xml:space="preserve">기타</text>
+<text x="536.9" y="384.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">키워드 2개</text>
+<text x="504" y="416.3" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="400" fill="#1F2937" xml:space="preserve">현안</text>
+<text x="536.9" y="415.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">키워드 5개</text>
+<text x="504" y="447.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="400" fill="#1F2937" xml:space="preserve">추가 검색어</text>
+<text x="578.1" y="447.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">키워드 6개</text>
+<text x="480" y="492.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="700" fill="#1E3A5F" xml:space="preserve">감시 시간대</text>
+<text x="480" y="513.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">이 시간에만 확인합니다. 이 밖에는 호출하지 않으므로 알림도 오지 않습니다.</text>
+<text x="598.5" y="551.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">~</text>
+<text x="739.5" y="551.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">확인 주기</text>
+<text x="492" y="594.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#1E3A5F" xml:space="preserve">감시할 그룹을 하나 이상 골라주세요.</text>
+<text x="502" y="633.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">감시 시간 밖에 나온 기사는 다음 감시 시작 때 몰아서 받기</text>
+<text x="480" y="677.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="700" fill="#1E3A5F" xml:space="preserve">받는 사람</text>
+<text x="480" y="698.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">말머리별로 누가 받을지는 수신 대상자 화면에서 사람마다 지정합니다.</text>
+<text x="493" y="740.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.8" font-weight="400" fill="#1F2937" xml:space="preserve">받는 사람이 없습니다 — 수신 대상자 화면에서 [단독]/[속보]</text>
+<text x="493" y="762.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.8" font-weight="400" fill="#1F2937" xml:space="preserve">열을 체크해주세요.</text>
+<text x="838" y="751.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="400" fill="#FFFFFF" xml:space="preserve">수신 대상자 관리 →</text>
+<text x="480" y="825.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="700" fill="#1E3A5F" xml:space="preserve">이 설정을 모두 꺼도</text>
+<text x="576.2" y="825.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">정기 회차가 기사를 모을 때 하는 말머리 검사는 그대로
+      동작합니다 — 네이버</text>
+<text x="480" y="846.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">추가 호출이 없는 검사라 항상 켜져 있습니다. 위 수시 감시는
+      그보다 빨리 알기 위한 기능입니다.</text>
+<text x="720" y="1057" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#FFFFFF" xml:space="preserve">저장</text>
+</g>
+<g id="h1">
+<text x="480" y="119.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="20.8" font-weight="700" fill="#1E3A5F" xml:space="preserve">🚨 [단독]·[속보] 기사 알림</text>
+</g>
+<g id="hint">
+<text x="480" y="152.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">정기 회차를 기다리지 않고, [단독]·[속보] 말머리가 붙은 기사가 올라오면 바로
+    텔레그램으</text>
+<text x="480" y="168.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">로 알려줍니다. 정기 모니터링 자동발송(</text>
+<text x="689.9" y="168.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#0000EE" xml:space="preserve">/auto-send</text>
+<text x="753.2" y="168.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">)과는
+    별개로 동작합니다.</text>
+</g>
+</svg>

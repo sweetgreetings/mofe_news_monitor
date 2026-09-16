@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>홈 쟁점 ∥ 추이 시안 — 여백 · 축 · 정량이냐 모양이냐</title>
+<style>
+  :root {
+    --bg: #F8FAFC; --card: #FFFFFF; --header: #1E3A5F; --accent: #2563EB;
+    --text: #1F2937; --muted: #6B7280; --border: #E5E7EB; --hover: #EFF6FF;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #E9EEF4; color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 28px 24px 60px; }
+  .wrap > h1 { font-size: 1.35rem; color: var(--header); margin: 0 0 6px; }
+  .lead { color: var(--muted); font-size: .9rem; margin: 0 0 22px; line-height: 1.65; }
+  .lead b { color: var(--text); }
+
+  .opt { margin: 0 0 30px; }
+  .opt-h { display: flex; align-items: baseline; gap: 10px; margin: 0 0 4px; }
+  .opt-h h2 { font-size: 1rem; color: var(--header); margin: 0; }
+  .opt-h .tag { font-size: .7rem; font-weight: 700; border-radius: 20px; padding: 2px 9px; }
+  .tag.now { background: #F1F3F5; color: var(--muted); }
+  .tag.rec { background: var(--accent); color: #fff; }
+  .opt-d { font-size: .82rem; color: var(--muted); margin: 0 0 10px; line-height: 1.6; }
+  .opt-d b { color: var(--text); }
+  .stage { overflow-x: auto; }
+  .frame { width: 960px; margin: 0 auto; background: var(--bg); border-radius: 12px; padding: 20px;
+    box-shadow: 0 1px 0 #D5DCE5, 0 8px 30px rgba(30,58,95,.10); }
+
+  /* ── 실제 홈 CSS(app/landing_renderer.py) 중 이 두 카드에 필요한 부분 ── */
+  .pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 13px; align-items: stretch; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 17px 20px; }
+  .card h2 { font-size: 0.78rem; font-weight: 700; color: var(--muted); margin: 0 0 13px;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card h2 .sub { font-weight: 500; opacity: 0.8; }
+  .trend-more { margin-left: auto; font-size: 0.76rem; color: var(--accent); font-weight: 700;
+    text-decoration: none; padding: 3px 8px; border-radius: 20px; }
+  .trend-card { display: flex; flex-direction: column; }
+  .tnote { font-size: 0.68rem; color: var(--muted); margin: 0; margin-top: auto; padding-top: 10px; line-height: 1.6; }
+  .trend-legend { display: flex; flex-wrap: wrap; gap: 5px 16px; margin-top: 9px; }
+  .trend-legend .li { display: inline-flex; align-items: center; gap: 6px; font-size: 0.81rem; }
+  .trend-legend .li .dot { width: 11px; height: 3px; border-radius: 2px; }
+  .trend-legend .li .n { color: var(--muted); font-size: 0.76rem; font-variant-numeric: tabular-nums; }
+  svg text { font-family: inherit; }
+
+  .irow { border-bottom: 1px solid var(--border); padding: 10px 0; }
+  .irow:last-of-type { border-bottom: none; }
+  .rowhead { display: flex; align-items: center; gap: 9px; }
+  .rank { width: 19px; height: 19px; border-radius: 50%; background: var(--hover); color: var(--accent);
+    font-size: 0.67rem; font-weight: 700; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .ibox { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 3px 8px; }
+  .iname { font-size: 0.9rem; font-weight: 600; color: var(--header); }
+  .gchip { font-size: 0.61rem; font-weight: 600; color: var(--muted); border: 1px solid var(--border);
+    border-radius: 20px; padding: 1px 7px; white-space: nowrap; }
+  .ibar { margin-left: auto; width: 64px; height: 5px; border-radius: 3px; background: var(--border); flex-shrink: 0; overflow: hidden; }
+  .ibar i { display: block; height: 100%; background: var(--accent); opacity: 0.55; border-radius: 3px; }
+
+  /* 여백 표시(시안 전용) — 카드 안에서 내용이 끝난 뒤 남는 빈 칸 */
+  .gapmark { flex: 1 1 0; min-height: 0; height: 0; overflow: hidden; margin-top: 6px; border-radius: 6px;
+    background: repeating-linear-gradient(135deg, rgba(220,38,38,.07) 0 6px, transparent 6px 12px);
+    border: 1px dashed rgba(220,38,38,.35); display: flex; align-items: center; justify-content: center;
+    font-size: .68rem; color: #DC2626; font-weight: 600; }
+  .issues-card { display: flex; flex-direction: column; }
+
+  /* ── B안: 단어별 줄 ── */
+  .sp { display: grid; grid-template-columns: 84px minmax(0, 1fr); column-gap: 10px; }
+  .sp .nm { display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+  .sp .nm b { font-size: 0.86rem; color: var(--header); font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .sp .nm b i { width: 10px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+  .sp .nm em { font-style: normal; font-size: 0.68rem; color: var(--muted); font-variant-numeric: tabular-nums; padding-left: 16px; }
+  .sp svg { display: block; width: 100%; height: auto; }
+
+  /* ── C안: 농도 칸 ── */
+  .hm { display: grid; grid-template-columns: 84px minmax(0, 1fr); column-gap: 10px; row-gap: 4px; align-items: center; }
+  .hm .nm b { font-size: 0.86rem; color: var(--header); font-weight: 600; }
+  .hm .cells { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+  .hm .cells span { height: 52px; border-radius: 4px; }
+  .hm .axis { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+  .hm .axis span { text-align: center; font-size: 0.62rem; color: #9CA3AF; }
+  .hm .axis span.we { color: #4B5563; font-weight: 600; }
+
+  .notes { margin: 8px auto 0; background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px 22px; font-size: .88rem; line-height: 1.75; }
+  .notes h2 { font-size: .95rem; color: var(--header); margin: 0 0 8px; }
+  .notes h3 { font-size: .88rem; color: var(--header); margin: 14px 0 4px; }
+  .notes p { margin: 0 0 6px; }
+  .notes ul { margin: 0 0 6px; padding-left: 20px; }
+  .notes code { background: #EEF2F7; padding: 1px 5px; border-radius: 4px; font-size: .85em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>홈 · 오늘의 쟁점 ∥ 정책 단어 추이</h1>
+  <p class="lead">숫자는 전부 <b>실제 데이터</b>(2026-09-11 14:00 기준 · 추이는 9/4~9/10)입니다.
+    폭은 실제 홈과 같은 960px. 빨간 빗금은 <b>내용이 끝난 뒤 남는 빈 칸</b>을 표시한 것(시안 전용).</p>
+
+  <section class="opt">
+    <div class="opt-h"><h2>지금</h2><span class="tag now">현재 화면</span></div>
+    <p class="opt-d">눈금 사다리가 <b>50 다음이 바로 100</b>이라 최댓값 54가 100 축에 올라가 위쪽 45%가 빈다.
+      두 카드를 같은 높이로 늘리는데(추이 쪽이 더 길다) 그 차이가 쟁점 밑에 빈 칸으로 남는다.</p>
+    <div class="stage"><div class="frame"><div class="pair" id="p-now"></div></div></div>
+  </section>
+
+  <section class="opt">
+    <div class="opt-h"><h2>A. 정량 그대로, 군더더기만 걷기</h2></div>
+    <p class="opt-d">축을 데이터에 맞춤(<b>0·20·40·60</b>) · 범례의 <b>7일 합계</b>와 각주를 뺌(단어 이름은 오른쪽 끝 라벨이 이미 말한다).
+      여백은 풀리지만 <b>종부세는 여전히 바닥에 붙어</b> 모양이 안 보인다 — 공유 축은 제일 큰 단어 기준이라서.</p>
+    <div class="stage"><div class="frame"><div class="pair" id="p-a"></div></div></div>
+  </section>
+
+  <section class="opt">
+    <div class="opt-h"><h2>A-1. A에서 숫자만 지우기</h2><span class="tag now">질문하신 안</span></div>
+    <p class="opt-d">한 축 그대로, y축 숫자와 끝값만 뺐다. <b>종부세·비거주가 바닥에 눌린 건 그대로</b>다 — 숫자를 지워도 축은 여전히 이형일 기준이라서.
+      오히려 “바닥에 붙은 게 0건인지 9건인지”를 알려주던 단서까지 사라진다.</p>
+    <div class="stage"><div class="frame"><div class="pair" id="p-a1"></div></div></div>
+  </section>
+
+  <section class="opt">
+    <div class="opt-h"><h2>A-2. 한 그래프 안에서 단어마다 자기 축</h2></div>
+    <p class="opt-d">B와 같은 계산(자기 축·바닥 10)을 한 그래프에 겹쳤다. 모양은 다 보이지만 <b>선끼리 위아래가 거짓말을 한다</b> —
+      9/10에 비거주(9건)가 이형일(14건)보다 <b>위</b>에 찍힌다. 한 판에 겹쳐 두면 눈은 높이를 비교하는데, 그 높이가 서로 다른 잣대라서.</p>
+    <div class="stage"><div class="frame"><div class="pair" id="p-a2"></div></div></div>
+  </section>
+
+  <section class="opt">
+    <div class="opt-h"><h2>B. 단어마다 한 줄 — 모양만</h2><span class="tag rec">추천</span></div>
+    <p class="opt-d">단어마다 <b>자기 축</b>으로 그린 작은 선 하나. y축 숫자가 없다. 쟁점 카드와 같은 “줄 목록” 모양이라 두 카드 높이가 저절로 맞는다.
+      자기 축의 함정(3건짜리 요동도 크게 보임)은 <b>축 바닥을 10건</b>으로 두고, 이름 밑 <b>7일 N건</b> 한 줄로 막는다.</p>
+    <div class="stage"><div class="frame"><div class="pair" id="p-b"></div></div></div>
+  </section>
+
+  <section class="opt">
+    <div class="opt-h"><h2>C. 농도 칸 — 더 정성적으로</h2></div>
+    <p class="opt-d">날짜별 칸의 진하기만(단어마다 자기 기준, 바닥 10건). 가장 조용하지만 <b>“오르는 중인가 내리는 중인가”는 선보다 한 박자 늦게 읽힌다</b>.
+      칸에 마우스를 올리면 건수.</p>
+    <div class="stage"><div class="frame"><div class="pair" id="p-c"></div></div></div>
+  </section>
+
+  <div class="notes">
+    <h2>의견</h2>
+    <h3>1. 쟁점 밑 여백 — 쟁점 카드 문제가 아니라 추이 카드가 길어서</h3>
+    <p>두 카드 밑선을 맞추는 규칙(<code>align-items: stretch</code>) 때문에 짧은 쪽이 늘어나며 빈 칸이 생긴다.
+      추이 카드에서 <b>같은 말을 두 번 하는 범례</b>(오른쪽 끝 라벨 “이형일 14”와 아래 “이형일 144건”)와
+      <b>각주</b>(“숨긴 기사 포함 · 옅은 띠는 주말”)를 걷으면 거의 맞는다. 각주는 “본업 화면은 자기를 해명하지 않는다”에도 걸리고, /trend에는 그대로 남기면 된다.</p>
+
+    <h3>2. 100 고정 — 버그에 가깝다</h3>
+    <p><code>app/trend_chart.py</code>의 눈금 사다리가 <code>10, 20, 50, 100, …</code>이라 51~100은 전부 100이 된다. 3칸 눈금이니
+      “한 칸 크기 × 3”으로 잡으면(1·2·5·10·20·25·50…) 54 → 60, 120 → 150처럼 딱 붙는다. /trend 화면에도 같이 좋아진다.
+      이건 어느 안을 고르든 고칠 것.</p>
+
+    <h3>3. 정량이 맞냐 — 홈에서는 아니라고 본다</h3>
+    <ul>
+      <li><b>홈이 답하는 질문은 “몇 건”이 아니라 “요즘 오르나 내리나”</b>다. 정확한 값이 필요한 사람은 /trend의 표·엑셀로 간다(그 화면은 정량 그대로 둔다).</li>
+      <li><b>공유 축은 작은 단어를 지운다.</b> 이형일(7일 144건)과 종부세(9건)를 한 축에 두면 종부세는 0~3을 오가는 모양이 통째로 안 보인다. 지켜보려고 고른 단어인데 안 보이면 고른 의미가 없다.</li>
+      <li><b>원건수는 그날 기사 총량을 따라간다.</b> 토 30건 · 일 50건 · 월 230건이라 주말 골짜기는 관심이 아니라 물량이다. (그날 전체 대비 비율로 바꾸면 이게 풀리지만, %는 모수를 설명해야 읽히는 값이라 홈엔 안 맞는다 — 쟁점 카드에서 %를 기각한 것과 같은 이유. 주말 띠로 충분하다고 봄.)</li>
+    </ul>
+    <p><b>그래서 B.</b> 숫자 축을 없애고 단어마다 모양만 보여준다. 남기는 숫자는 이름 밑 “7일 N건” 하나 — 이것마저 빼면 3건짜리 요동이 54건짜리 급등과 똑같은 크기로 보여서 오해를 만든다. 축 바닥 10건도 같은 이유.
+      단어가 1~2개뿐인 날은 줄 높이를 늘려 쟁점 카드와 높이를 맞춘다.</p>
+    <p>C는 더 조용하지만, 이 카드의 본업인 “방향”이 선보다 늦게 읽혀서 2순위.</p>
+  </div>
+</div>
+
+<script>
+// ── 실제 데이터 ──
+const DAYS = ['9/4(금)','9/5(토)','9/6(일)','9/7(월)','9/8(화)','9/9(수)','9/10(목)'];
+const WD = ['금','토','일','월','화','수','목'];
+const WEEKEND = [false,true,true,false,false,false,false];
+const SERIES = [
+  { word: '종부세', color: '#2a78d6', values: [3,0,2,2,0,1,1] },
+  { word: '비거주', color: '#eb6834', values: [2,2,2,4,3,0,9] },
+  { word: '이형일', color: '#1baf7a', values: [31,8,11,54,24,2,14] },
+];
+const ISSUES = [
+  [13,'정부 경기 회복 평가'], [5,'경제정책 인사 및 부동산 의혹'], [5,'9월 경제동향 평가'],
+  [4,'대정부질문 및 정책 격돌'], [4,'부동산 변칙 논란'],
+];
+const sum = a => a.reduce((x, y) => x + y, 0);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+function issuesCard(showGap) {
+  const top = ISSUES[0][0];
+  const rows = ISSUES.map(([n, name], i) =>
+    `<div class="irow"><div class="rowhead"><span class="rank">${i+1}</span>` +
+    `<span class="ibox"><span class="iname">${esc(name)}</span><span class="chips"><span class="gchip">재정경제부</span></span></span>` +
+    `<span class="ibar" title="${n}건"><i style="width:${Math.round(n*100/top)}%"></i></span></div></div>`).join('');
+  return `<div class="card issues-card"><h2>오늘의 쟁점</h2>${rows}${showGap ? '<div class="gapmark">빈 칸</div>' : ''}</div>`;
+}
+
+// app/trend_chart.py render_chart를 그대로 옮긴 것 — ymaxMode만 다르다.
+// opt.shape: y축 숫자·끝값 숨김 / opt.norm: 단어마다 자기 축(바닥 10)으로 겹쳐 그림
+function lineChart(ymaxMode, width = 412, height = 190, opt = {}) {
+  const n = DAYS.length, PL = opt.shape ? 14 : 34, PT = 12, PB = 26, PR = opt.shape ? 70 : 118;
+  const step = (width - PL - PR) / (n - 1);
+  const x = i => PL + i * step;
+  const mx = Math.max(1, ...SERIES.flatMap(s => s.values));
+  let ymax, tick;
+  if (ymaxMode === 'now') {
+    ymax = [10,20,50,100,150,200,300,400,500,750,1000].find(v => v >= mx);
+    tick = ymax / 3;
+  } else {
+    tick = [1,2,5,10,20,25,50,100,200,250,500].find(t => t * 3 >= mx);
+    ymax = tick * 3;
+  }
+  const yOf = sMax => v => PT + (1 - v / sMax) * (height - PT - PB);
+  const y = yOf(ymax);
+  let o = '';
+  WEEKEND.forEach((w, i) => { if (w) o += `<rect x="${x(i)-step/2}" y="${PT}" width="${step}" height="${height-PT-4}" fill="#EDF0F3"/>`; });
+  for (let g = 0; g < 4; g++) {
+    const v = tick * g, yy = y(v);
+    if (opt.shape && g > 0) continue;
+    o += `<line x1="${PL}" y1="${yy}" x2="${width-PR}" y2="${yy}" stroke="#EEF0F2"/>`;
+    if (!opt.shape) o += `<text x="${PL-7}" y="${yy+3.5}" text-anchor="end" font-size="9.5" fill="#9CA3AF">${Math.floor(v)}</text>`;
+  }
+  DAYS.forEach((d, i) => {
+    o += `<text x="${x(i)}" y="${height-9}" text-anchor="middle" font-size="9.5" fill="${WEEKEND[i]?'#4B5563':'#9CA3AF'}" font-weight="${WEEKEND[i]?600:400}">${d}</text>`;
+  });
+  const ends = [];
+  SERIES.forEach(s => {
+    const y = opt.norm ? yOf(Math.max(10, ...s.values)) : yOf(ymax);
+    o += `<polyline points="${s.values.map((v,i)=>`${x(i)},${y(v)}`).join(' ')}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    s.values.forEach((v, i) => o += `<circle cx="${x(i)}" cy="${y(v)}" r="2.8" fill="${s.color}" stroke="${s.color}" stroke-width="1.5"/>`);
+    ends.push({ word: s.word, v: s.values[n-1], y: y(s.values[n-1]) });
+  });
+  ends.sort((a, b) => a.y - b.y);
+  for (let k = 1; k < ends.length; k++) if (ends[k].y - ends[k-1].y < 13) ends[k].y = ends[k-1].y + 13;
+  const over = ends[ends.length-1].y - (height - PB - 2);
+  if (over > 0) ends.forEach(e => e.y -= over);
+  ends.forEach(e => o += `<text x="${width-PR+9}" y="${e.y+3.5}" font-size="10.5" fill="#1F2937">${e.word}${opt.shape ? '' : ` <tspan fill="#6B7280">${e.v}</tspan>`}</text>`);
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" style="display:block">${o}</svg>`;
+}
+
+function trendHead() {
+  return '<h2>정책 단어 추이 <span class="sub">최근 7일</span><a class="trend-more" href="#">더보기</a></h2>';
+}
+
+function trendNow() {
+  const legend = SERIES.map(s => `<span class="li"><span class="dot" style="background:${s.color}"></span>${s.word}<span class="n">${sum(s.values)}건</span></span>`).join('');
+  return `<div class="card trend-card">${trendHead()}${lineChart('now')}<div class="trend-legend">${legend}</div>` +
+    '<p class="tnote">* 기사 제목·요약 기준(숨긴 기사 포함) · 옅은 띠는 주말</p></div>';
+}
+
+function trendA1() {
+  return `<div class="card trend-card">${trendHead()}${lineChart('fit', 412, 206, { shape: true })}</div>`;
+}
+function trendA2() {
+  return `<div class="card trend-card">${trendHead()}${lineChart('fit', 412, 206, { shape: true, norm: true })}</div>`;
+}
+function trendA() {
+  return `<div class="card trend-card">${trendHead()}${lineChart('fit', 412, 206)}</div>`;
+}
+
+// B안: 단어별 스파크라인. 같은 viewBox 폭을 쓰는 축 줄과 x 위치를 공유한다.
+const SW = 318, PADX = 10;
+const sx = i => PADX + i * (SW - 2 * PADX) / (DAYS.length - 1);
+const sstep = (SW - 2 * PADX) / (DAYS.length - 1);
+const FLOOR = 10;
+
+function sparkRow(s, H) {
+  const top = 8, bot = 8;
+  const ymax = Math.max(FLOOR, ...s.values);
+  const y = v => top + (1 - v / ymax) * (H - top - bot);
+  let o = '';
+  WEEKEND.forEach((w, i) => { if (w) o += `<rect x="${sx(i)-sstep/2}" y="0" width="${sstep}" height="${H}" fill="#EDF0F3"/>`; });
+  o += `<line x1="0" y1="${H-0.5}" x2="${SW}" y2="${H-0.5}" stroke="#E5E7EB"/>`;
+  const pts = s.values.map((v, i) => `${sx(i)},${y(v)}`);
+  o += `<polygon points="${sx(0)},${H-bot} ${pts.join(' ')} ${sx(DAYS.length-1)},${H-bot}" fill="${s.color}" opacity=".09"/>`;
+  o += `<polyline points="${pts.join(' ')}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  const li = DAYS.length - 1;
+  o += `<circle cx="${sx(li)}" cy="${y(s.values[li])}" r="3.6" fill="${s.color}" stroke="#fff" stroke-width="1.5"/>`;
+  const tip = s.values.map((v, i) => `${DAYS[i]} ${v}건`).join('\n');
+  return `<svg viewBox="0 0 ${SW} ${H}"><title>${s.word}\n${tip}</title>${o}</svg>`;
+}
+
+function trendB() {
+  const H = 60;
+  let cells = '';
+  SERIES.slice().reverse().forEach(s => {
+    cells += `<div class="nm"><b><i style="background:${s.color}"></i>${s.word}</b><em>7일 ${sum(s.values)}건</em></div>${sparkRow(s, H)}`;
+  });
+  let ax = '';
+  WEEKEND.forEach((w, i) => { if (w) ax += `<rect x="${sx(i)-sstep/2}" y="0" width="${sstep}" height="18" fill="#EDF0F3"/>`; });
+  WD.forEach((d, i) => ax += `<text x="${sx(i)}" y="12.5" text-anchor="middle" font-size="9.5" fill="${WEEKEND[i]?'#4B5563':'#9CA3AF'}" font-weight="${WEEKEND[i]?600:400}">${d}</text>`);
+  cells += `<div></div><svg viewBox="0 0 ${SW} 18">${ax}</svg>`;
+  return `<div class="card trend-card">${trendHead()}<div class="sp">${cells}</div></div>`;
+}
+
+// C안: 농도 칸 — 한 색(accent)의 밝기만, 단어마다 자기 기준(바닥 10).
+function mix(a, b, t) {
+  const p = h => [1,3,5].map(k => parseInt(h.slice(k, k+2), 16));
+  const A = p(a), B = p(b);
+  return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join('');
+}
+function trendC() {
+  let body = '';
+  SERIES.slice().reverse().forEach(s => {
+    const ymax = Math.max(FLOOR, ...s.values);
+    const cells = s.values.map((v, i) => {
+      const t = Math.pow(v / ymax, 0.8);
+      return `<span title="${s.word} · ${DAYS[i]} ${v}건" style="background:${v === 0 ? '#F3F4F6' : mix('#E4ECFA', '#1E4FB8', t)}"></span>`;
+    }).join('');
+    body += `<div class="nm"><b>${s.word}</b></div><div class="cells">${cells}</div>`;
+  });
+  const axis = WD.map((d, i) => `<span class="${WEEKEND[i]?'we':''}">${d}</span>`).join('');
+  body += `<div></div><div class="axis">${axis}</div>`;
+  return `<div class="card trend-card">${trendHead()}<div class="hm">${body}</div></div>`;
+}
+
+document.getElementById('p-now').innerHTML = issuesCard(true) + trendNow();
+document.getElementById('p-a').innerHTML = issuesCard(true) + trendA();
+document.getElementById('p-a1').innerHTML = issuesCard(true) + trendA1();
+document.getElementById('p-a2').innerHTML = issuesCard(true) + trendA2();
+document.getElementById('p-b').innerHTML = issuesCard(true) + trendB();
+document.getElementById('p-c').innerHTML = issuesCard(true) + trendC();
+// 빈 칸이 거의 없으면(8px 미만) 표시를 지운다 — 표시가 카드 높이를 밀어올리지 않게.
+document.querySelectorAll('.gapmark').forEach(g => {
+  const h = g.getBoundingClientRect().height;
+  if (h < 8) g.remove(); else g.textContent = `빈 칸 ${Math.round(h)}px`;
+});
+</script>
+</body>
+</html>

@@ -2,6 +2,8 @@
 import html
 import logging
 import re
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
@@ -10,21 +12,131 @@ from urllib.parse import urlparse, urlunparse
 
 import requests
 
-from app.config import COLOR_ERROR, NAVER_CLIENT_ID, NAVER_CLIENT_SECRET
+from app.api_usage import record_api_call
+from app.config import COLOR_ERROR, SEARCH_LOOKBACK_MIN
+from app.credentials import naver_client_id, naver_client_secret, naver_is_configured
 
 logger = logging.getLogger(__name__)
 
 NAVER_NEWS_API_URL = "https://openapi.naver.com/v1/search/news.json"
+
+
+class NaverNotConfiguredError(requests.exceptions.RequestException):
+    """네이버 API 키가 없어 요청 자체를 시도하지 않았을 때 올린다.
+
+    [추가: 2026-08-20] app.credentials가 생기면서 키가 없는 상태로도 앱이 켜질 수
+    있게 됐다 — 그 상태에서 수집이 걸리면 이 예외로 즉시 실패시킨다. response에
+    status_code=401을 심어두는 이유는, 이미 있는 재시도 판단 로직(app.naver_api.
+    _retryable, app.scraper._is_retryable)이 둘 다 "response가 없으면(연결 실패 등)
+    재시도, 4xx면 포기"로 짜여 있어서다 — 키가 없는 건 5분 뒤에 다시 시도한다고
+    해결되는 일시적 오류가 아니라 사람이 등록해야 하는 상태이므로, 새 예외 종류를
+    추가하는 대신 기존 로직이 이미 "포기"로 분류하는 모양(401)을 그대로 빌린다."""
+
+    def __init__(self, message: str = "네이버 API 키가 등록돼 있지 않습니다."):
+        response = requests.Response()
+        response.status_code = 401
+        super().__init__(message, response=response)
+
+
+def test_naver_credentials(client_id: str, client_secret: str) -> tuple[bool, str]:
+    """설정 화면의 [연결 테스트] — 저장 전에 입력한 값이 실제로 되는지 확인한다.
+
+    저장된 값이 아니라 화면이 지금 넘겨준 값으로 직접 호출한다(아직 저장하지 않은
+    상태에서도 확인할 수 있어야 하므로 app.credentials를 거치지 않는다). "테스트"
+    키워드로 1건만 조회해 호출 자체를 최소화한다.
+    """
+    client_id = (client_id or "").strip()
+    client_secret = (client_secret or "").strip()
+    if not client_id or not client_secret:
+        return False, "Client ID와 Client Secret을 모두 입력해주세요."
+    headers = {"X-Naver-Client-Id": client_id, "X-Naver-Client-Secret": client_secret}
+    try:
+        response = requests.get(
+            NAVER_NEWS_API_URL, headers=headers, params={"query": "테스트", "display": 1}, timeout=10
+        )
+    except requests.exceptions.RequestException as error:
+        return False, f"네트워크 연결에 실패했습니다 — {error}"
+    if response.status_code == 200:
+        return True, '연결됐습니다 ("테스트" 1건 조회 성공)'
+    if response.status_code in (401, 403):
+        return False, "인증 실패 — Client ID/Secret을 다시 확인해주세요."
+    if response.status_code == 429:
+        return False, "요청 한도를 초과했습니다 (429) — 잠시 후 다시 시도해주세요."
+    return False, f"연결에 실패했습니다 (HTTP {response.status_code})"
 _MAX_DISPLAY = 100  # 네이버 API가 허용하는 1회 요청 최대 건수
 _MAX_START = 1000  # 네이버 API가 허용하는 최대 조회 시작 위치 (이 이상은 API 자체가 지원 안 함)
 # [추가: 2026-08-06] 키워드별 검색을 동시에 몇 개까지 허용할지 — 실시간 현황(live.html)이
 # 등록된 키워드를 하나씩 순서대로 물어봐 13개 기준 약 24초가 걸리던 것을 동시 처리로
-# 줄이기 위해 도입했다(사용자 실측: "정부" 6.97초, "재정경제부" 3.80초 등). 무제한 동시
-# 요청은 네이버 API의 초당 호출 제한에 걸릴 위험이 있어(순차일 때는 자연스럽게 벌어져
-# 있던 요청 간격이 사라짐), 5개 정도로 제한해 위험과 속도 개선 사이 절충했다 — 어차피
-# 가장 느린 키워드 하나(예: "정부" 7초)가 전체 시간의 하한이라, 5보다 더 늘려도 이 이상은
-# 빨라지지 않는다(계산상 13개 기준 약 24초 -> 약 7초로 줄어듦).
-_MAX_CONCURRENT_KEYWORD_SEARCHES = 5
+# 줄이기 위해 도입했다. 처음엔 5로 잡았다("가장 느린 키워드 하나의 시간까지만 기다리면
+# 된다"는 계산이었는데, 이건 키워드가 동시성 이하로 적을 때만 맞는 얘기였다).
+# [수정: 2026-08-13] 그룹/키워드 상한을 올리는 논의 중 실제로 재봤다(100키워드, 재시도
+# 없이 1회 시도 기준 — search_keywords 참고): 동시성 5는 429가 0%였지만 10은 5%,
+# 15는 20%, 20은 86%까지 치솟았다 — "느려지는 만큼 늘려도 괜찮다"는 예전 직관이
+# 틀렸다는 뜻이다(429는 선형이 아니라 어느 지점부터 급격히 나빠진다). 재시도 로직이
+# 흡수할 수 있는 여유만큼만 5→8로 올렸다. 8보다 더 올리고 싶으면 반드시 다시 실측할 것
+# (스크래치패드에 실측 스크립트 있음) — 감으로 올리지 말 것(CODING_CONVENTIONS §1).
+_MAX_CONCURRENT_KEYWORD_SEARCHES = 8
+
+# [추가: 2026-08-13] search_keywords가 호출마다 새로 만드는 ThreadPoolExecutor는 "자기
+# 안에서"만 동시성을 _MAX_CONCURRENT_KEYWORD_SEARCHES로 제한한다 — 서로 다른 호출자가
+# 동시에 검색을 돌리면(예: 정기 스케줄러 tick과 수시 카드 재수집이 같은 순간에 걸리는
+# 경우) 실제 네이버 호출은 합쳐서 8+8=16까지 오를 수 있고, 이건 위 실측(동시성 15에서
+# 429 20%)의 위험 구간이다. 겹칠 확률 자체는 낮다(정기 자동 호출은 스케줄러 tick 하나뿐,
+# 하루 4회×7초 — HISTORY.md "수시 모니터링" "API 동시 호출" 항목 참고) — 그래서 이건
+# 성능 최적화가 아니라 "만에 하나의 429 폭주 방지"용 안전장치다. 프로세스 전체에서
+# 하나뿐인 전역 세마포어로 모든 호출자를 묶는다. 키워드 단위(_search_one_keyword 함수
+# 전체)가 아니라 **HTTP 요청 하나하나**(페이지네이션의 각 페이지)에 걸어야 한다 —
+# 키워드 단위로 걸면 최대 10페이지짜리 검색 하나가 그 사이 다른 키워드의 슬롯까지
+# 계속 붙들고 있게 된다.
+_GLOBAL_REQUEST_SEM = threading.Semaphore(_MAX_CONCURRENT_KEYWORD_SEARCHES)
+
+# [추가: 2026-08-24] 제목이 "..."로 잘린 기사의 전체 제목을 다시 가져올 때(_fetch_full_title)
+# 동시에 몇 건까지 허용할지 — _GLOBAL_REQUEST_SEM과는 무관한 별도 상한이다. 네이버
+# API 하나가 아니라 서로 다른 언론사 사이트로 요청이 흩어지므로 한 서버에 몰릴 위험이
+# 낮고(429 대상이 아니다), 실측(2026-08-24, '정부' 검색 1페이지 100건)으로는 24건이
+# 잘려 있었다 — 순차로 처리하면 응답이 느린/안 뜨는 사이트가 하나만 섞여도 그때마다
+# 최대 3초(_fetch_full_title의 timeout)씩 그대로 블로킹됐다(실측 사례: 검색어 하나
+# 추가에 66초). 10은 24건 정도를 한두 배치로 끝낼 수 있는 여유이면서, 열어보는 언론사
+# 사이트 수(=서버 자원)가 한 번에 지나치게 몰리지 않는 값이다.
+_TITLE_REFETCH_CONCURRENCY = 10
+
+# [추가: 2026-08-13] 키워드 하나가 429(rate limit)·타임아웃 등으로 실패해도, 예전엔
+# 그 자리에서 바로 포기하고 빈 목록으로 조용히 대체했다 — 결과 0건("오늘 기사 없음")과
+# 구분이 안 돼 화면·회차 파일 어디에도 실패 흔적이 안 남았다(정기 스크랩·실시간현황
+# 둘 다). 재시도 없이 포기하기 전에 짧게 다시 시도하고, 그래도 안 되면 이번엔 "실패"라고
+# 위 계층(app.scraper/app.live_renderer)에 알린다 — 처리 방식은 호출부가 정한다
+# (정기 스크랩은 이미 있는 5분 간격 전체 재시도로 넘기고, 실시간현황은 캐시를 건드리지
+# 않고 화면에 경고를 띄운다).
+_KEYWORD_RETRY_ATTEMPTS = 3  # 최초 1회 + 재시도 2회
+
+
+def _retryable(error: requests.exceptions.RequestException) -> bool:
+    """일시적 오류(재시도할 가치가 있는 오류)인지 판단한다 — app.scraper._is_retryable와
+    같은 기준(연결 실패·타임아웃·5xx·429는 재시도, 그 외 4xx는 즉시 포기)이지만, 이
+    함수는 순환 임포트를 피하려고 이 모듈 안에 따로 둔다(app.scraper가 이 모듈을
+    임포트하므로 반대 방향 임포트는 불가능)."""
+    response = getattr(error, "response", None)
+    if response is None:
+        return True
+    if response.status_code == 429:
+        return True
+    return not (400 <= response.status_code < 500)
+
+
+def _retry_wait_seconds(error: requests.exceptions.RequestException, attempt: int) -> float:
+    """재시도 전 대기 시간. 429는 응답의 Retry-After 헤더를 최우선으로 따르고
+    (네이버가 언제 다시 받아줄지 스스로 알려주는 값이라 추측보다 정확하다), 없으면
+    시도 횟수에 비례해 늘어나는 backoff를 쓴다(연결 오류·5xx는 더 짧게)."""
+    response = getattr(error, "response", None)
+    if response is not None and response.status_code == 429:
+        retry_after = response.headers.get("Retry-After")
+        if retry_after:
+            try:
+                return float(retry_after)
+            except ValueError:
+                pass
+        return 3.0 * (attempt + 1)
+    return 1.0 * (attempt + 1)
 
 _TAG_PATTERN = re.compile(r"</?b>")
 
@@ -88,6 +200,9 @@ OUTLET_DOMAINS = {
     "hankyung.com": "한국경제",
     "heraldcorp.com": "헤럴드경제",
     "koreajoongangdaily.joins.com": "코리아중앙데일리",
+    # [추가: 2026-08-14] 코리아중앙데일리가 독립 도메인으로 옮겨간 것을 실측 표본에서
+    # 확인했다(7건 전부 koreajoongangdaily.com). 옛 도메인 항목도 과거 기사를 위해 남긴다.
+    "koreajoongangdaily.com": "코리아중앙데일리",
     "koreatimes.co.kr": "코리아타임스",
     "koreaherald.com": "코리아헤럴드",
     "etnews.com": "전자신문",
@@ -132,6 +247,10 @@ OUTLET_DOMAINS = {
     # 별도 항목 없이는 조선일보로 잘못 잡혔다(it.chosun.com 기사가 실제로 "(조선일보)"로
     # 표시된 것을 사용자가 확인해 요청).
     "it.chosun.com": "IT조선",
+    # [추가: 2026-08-21] 월간조선 — 마찬가지로 조선일보(chosun.com)의 하위 도메인이라
+    # 별도 항목 없이는 조선일보로 잘못 잡혔다(monthly.chosun.com 기사가 실제로 "조선일보"로
+    # 표시된 것을 사용자가 확인해 요청, 원문 URL idxno=71164).
+    "monthly.chosun.com": "월간조선",
     # [추가: 2026-08-03] 조세일보 — 사용자 요청으로 경제일간 카테고리 맨 끝에 추가.
     "joseilbo.com": "조세일보",
     # [추가: 2026-08-07] 사용자가 화면에서 직접 매핑 안 된 도메인(ichannela.com)을 발견해
@@ -140,6 +259,115 @@ OUTLET_DOMAINS = {
     "sisain.co.kr": "시사IN",
     "economist.co.kr": "이코노미스트",
     "kyeonggi.com": "경기일보",
+}
+
+# [추가: 2026-08-14] 네이버 언론사 코드(oid) → 언론사명.
+#
+# 네이버 뉴스 검색 API의 `link`가 네이버 미러 링크일 때 그 경로는
+# `n.news.naver.com/mnews/article/{oid}/{기사ID}` 형태이고, 이 {oid}가 네이버가 매체마다
+# 부여한 고유 번호다. 도메인 추정(OUTLET_DOMAINS)과 달리 한 회사가 도메인을 공유해도
+# 매체별로 번호가 갈리므로, 계열 매체를 정확히 구분할 수 있는 유일한 단서다.
+# (예: mk.co.kr을 매일경제 009 / 매경이코노미 024가 함께 쓴다.)
+#
+# 아래 표는 추측이 아니라 실측이다 — 실제 검색어로 모은 기사 9,174건에서 oid 88개를
+# 추려, 각 oid마다 네이버 기사 페이지를 열어 og:article:author(네이버가 표기하는 언론사명)로
+# 88개 전부 확인했다. 주석의 건수는 그 표본에서의 출현 횟수(빈도 감각용).
+# 새 언론사가 필요하면 같은 방법으로 확인해서 추가한다 — 번호를 짐작해서 넣지 않는다.
+NAVER_OID_OUTLETS = {
+    # 설정 화면 "언론사 선택" 목록에 등록된 매체 — 이름은 그 목록의 표기를 그대로 쓴다
+    # (화이트리스트 비교·우선순위 정렬이 이름 문자열로 이뤄지므로 달라지면 안 된다).
+    "003": "뉴시스",          # 313건
+    "421": "뉴스1",           # 281건
+    "001": "연합뉴스",        # 251건
+    "018": "이데일리",        # 167건
+    "008": "머니투데이",      # 128건
+    "277": "아시아경제",      # 116건
+    "009": "매일경제",        # 114건
+    "016": "헤럴드경제",      # 111건
+    "015": "한국경제",        # 105건
+    "014": "파이낸셜뉴스",    # 105건
+    "056": "KBS",             # 99건
+    "079": "노컷뉴스",        # 90건
+    "119": "데일리안",        # 89건
+    "011": "서울경제",        # 84건
+    "052": "YTN",             # 81건
+    "366": "조선비즈",        # 70건
+    "028": "한겨레",          # 63건
+    "629": "더팩트",          # 59건
+    "021": "문화일보",        # 58건
+    "025": "중앙일보",        # 58건
+    "023": "조선일보",        # 57건
+    "214": "MBC",             # 56건
+    "022": "세계일보",        # 51건
+    "032": "경향신문",        # 49건
+    "020": "동아일보",        # 47건
+    "469": "한국일보",        # 47건
+    "055": "SBS",             # 45건
+    "005": "국민일보",        # 45건
+    "448": "TV조선",          # 45건
+    "081": "서울신문",        # 44건
+    "123": "조세일보",        # 43건
+    "586": "시사저널",        # 43건
+    "088": "매일신문",        # 41건
+    "029": "디지털타임스",    # 40건
+    "437": "JTBC",            # 35건
+    "002": "프레시안",        # 34건
+    "057": "MBN",             # 33건
+    "243": "이코노미스트",    # 27건
+    "030": "전자신문",        # 26건
+    "666": "경기일보",        # 23건
+    "449": "채널A",           # 22건
+    "024": "매경이코노미",    # 18건 — 매일경제(009)와 mk.co.kr을 공유하던 바로 그 매체
+    "050": "한경비즈니스",    # 15건
+    "662": "농민신문",        # 11건
+    "053": "주간조선",        # 7건
+    "640": "코리아중앙데일리",  # 7건
+    "044": "코리아헤럴드",    # 2건
+    "308": "시사IN",          # 1건
+    # 설정 목록 밖의 매체 — 지금은 도메인 문자열("ohmynews.com")이 그대로 화면에 찍히는데,
+    # 사람이 읽을 수 있는 이름으로 바꿔주는 용도다. 이 표에 있다고 해서 "언론사 선택"
+    # 체크박스 목록(OUTLET_CATEGORIES)에 올라가는 건 아니다 — 그건 담당자가 고르는 목록이라
+    # 임의로 늘리지 않는다.
+    "374": "SBS Biz",         # 73건
+    "422": "연합뉴스TV",      # 56건
+    "031": "아이뉴스24",      # 53건
+    "047": "오마이뉴스",      # 42건
+    "417": "동행미디어 시대",  # 36건
+    "215": "한국경제TV",      # 35건
+    "082": "부산일보",        # 29건
+    "656": "대전일보",        # 29건
+    "138": "디지털데일리",    # 29건
+    "092": "지디넷코리아",    # 23건
+    "660": "kbc광주방송",     # 23건
+    "658": "국제신문",        # 20건
+    "654": "강원도민일보",    # 17건
+    "293": "블로터",          # 15건
+    "661": "JIBS",            # 12건
+    "117": "마이데일리",      # 11건
+    "648": "비즈워치",        # 11건
+    "655": "CJB청주방송",     # 9건
+    "087": "강원일보",        # 9건
+    "006": "미디어오늘",      # 8건
+    "382": "스포츠동아",      # 7건 — donga.com을 써서 동아일보로 잡히던 매체
+    "310": "여성신문",        # 6건
+    "468": "스포츠서울",      # 6건
+    "665": "더스쿠프",        # 5건
+    "657": "대구MBC",         # 4건
+    "262": "신동아",          # 3건 — 동아일보로 잡히던 매체
+    "077": "AP연합뉴스",      # 3건
+    "144": "스포츠경향",      # 2건 — 경향신문으로 잡히던 매체
+    "033": "주간경향",        # 2건 — 경향신문으로 잡히던 매체
+    "346": "헬스조선",        # 2건 — 조선일보로 잡히던 매체
+    "108": "스타뉴스",        # 2건
+    "076": "스포츠조선",      # 1건
+    "607": "뉴스타파",        # 1건
+    "584": "동아사이언스",    # 1건
+    "659": "전주MBC",         # 1건
+    "037": "주간동아",        # 1건 — 동아일보로 잡히던 매체
+    "127": "기자협회보",      # 1건
+    "356": "게임메카",        # 1건
+    "296": "코메디닷컴",      # 1건
+    "036": "한겨레21",        # 1건 — 한겨레로 잡히던 매체
 }
 
 # 설정 화면의 "언론사 선택" 카테고리별 목록 (PRD.md 기능1 규칙 16). 사용자가 준 순서를 그대로 따른다.
@@ -161,27 +389,39 @@ OUTLET_CATEGORIES = {
     "통신사 및 종합 일간지": ("연합뉴스", "뉴시스", "뉴스1", "노컷뉴스", "뉴스핌", "더팩트", "이코노미스트"),
     "전문일간": ("전자신문", "디지털타임스", "IT조선"),
     "기타 언론사": ("프레시안", "데일리안", "매일신문", "농민신문", "땅집고", "경기일보"),
-    # [추가: 2026-07-29] 신규 카테고리 — 주간지. 매경이코노미는 아직 도메인을 확인하지
-    # 못해 OUTLET_DOMAINS에는 등록하지 못했다(사용자 확인 필요) — 이름만 선택 목록에
-    # 올려두고, 도메인이 확정되면 OUTLET_DOMAINS에 추가하면 된다.
-    "주간지": ("한경비즈니스", "주간조선", "매경이코노미", "시사저널", "시사IN"),
+    # [추가: 2026-07-29] 신규 카테고리 — 주간지.
+    # [수정: 2026-08-14] 매경이코노미는 "도메인을 확인하지 못해" 이름만 올려둔 상태였는데,
+    # 애초에 전용 도메인이 없는 매체였다(매일경제와 mk.co.kr 공유). 네이버 oid 024로
+    # 판별되면서 이 항목이 실제로 동작하기 시작했다 — NAVER_OID_OUTLETS 참고.
+    # [추가: 2026-08-14] 신동아·주간동아(동아일보 계열), 주간경향(경향신문 계열),
+    # 한겨레21(한겨레 계열) — oid 판별이 도입되기 전엔 전부 모지(母紙) 이름으로 몰래
+    # 섞여 들어오고 있었다(사용자 요청으로 시사 주간지 카테고리 일관성에 맞춰 추가).
+    "주간지": (
+        "한경비즈니스", "주간조선", "월간조선", "매경이코노미", "시사저널", "시사IN",
+        "신동아", "주간동아", "주간경향", "한겨레21",
+    ),
 }
 
 ALL_OUTLET_NAMES = frozenset(name for names in OUTLET_CATEGORIES.values() for name in names)
 
-# [추가: 2026-07-29] mk.co.kr 도메인은 매일경제(일간지)·매경이코노미(주간지)가 같이 쓰는데,
-# 언론사 판별은 도메인만 보고 하다 보니(_extract_outlet) 둘을 구분할 방법이 없다 — 매경이코노미
-# 기사도 그냥 "매일경제"로 잡힌다. 화면에 "매일경제"로 보이는 기사가 실은 매경이코노미일 수
-# 있다는 걸 이용자가 한 번 더 확인하도록 화면 표시용 텍스트에만 표식을 붙인다. 아래에서
+# [추가: 2026-07-29] mk.co.kr 도메인은 매일경제(일간지)·매경이코노미(주간지)가 같이 쓴다.
+# [수정: 2026-08-14] 네이버 oid로 둘이 정확히 갈리면서(009/024) 이 표식의 조건이 좁아졌다 —
+# 예전엔 "매일경제"면 무조건 빨간 글자였지만, 이제 oid로 확정된 기사는 확실하므로 표식을
+# 붙이지 않는다. 남는 불확실 케이스는 네이버 미러 링크가 없어 도메인 폴백으로 "매일경제"가
+# 된 mk.co.kr 기사뿐이다(실측 표본 133건 중 1건). 그것만 빨갛게 남긴다 — 전부 빨갛게
+# 칠하면 경고가 배경 소음이 되어 정작 확인이 필요한 1건이 묻힌다.
 # 저장/비교에 쓰이는 outlet 원본 값(화이트리스트 비교, 우선순위 정렬 등)은 그대로 두고,
 # 복사/내보내기 텍스트에도 넣지 않는다 — 순전히 화면 확인용.
 _MK_AMBIGUOUS_OUTLET = "매일경제"
 
 
-def outlet_display_label(outlet: str) -> str:
-    """화면에 보여줄 언론사 이름 HTML 조각 — 매일경제만 매경이코노미와 섞였을 가능성을
-    알리기 위해 빨간 글자로 강조한다(mk.co.kr 도메인을 두 매체가 같이 써서 도메인만으론
-    구분이 안 됨, app.naver_api._extract_outlet 참고).
+def outlet_display_label(outlet: str, url: Optional[str] = None) -> str:
+    """화면에 보여줄 언론사 이름 HTML 조각 — 매경이코노미와 섞였을 *가능성이 남은*
+    매일경제 기사만 빨간 글자로 강조한다.
+
+    url에는 그 기사의 링크를 넘긴다. 그 링크가 네이버 미러 링크라 oid로 언론사가 확정된
+    경우엔 표식을 붙이지 않는다. url을 안 넘기면(옛 호출부) 확정 여부를 알 수 없으므로
+    안전하게 표식을 붙인다 — 모르는 걸 확실한 척하지 않는다.
 
     [수정: 2026-07-30] 처음엔 "매일경제**"처럼 문자만 덧붙였는데, 눈에 잘 안 띈다는
     피드백으로 빨간 글자 색으로 바꿨다. 이미 완성된(이스케이프된) HTML 조각을
@@ -189,9 +429,11 @@ def outlet_display_label(outlet: str) -> str:
     html.escape()하면 안 된다 — 그러면 <span> 태그가 그대로 글자로 보이게 된다.
     """
     escaped = html.escape(outlet)
-    if outlet == _MK_AMBIGUOUS_OUTLET:
-        return f'<span style="color:{COLOR_ERROR}">{escaped}</span>'
-    return escaped
+    if outlet != _MK_AMBIGUOUS_OUTLET:
+        return escaped
+    if url and outlet_from_naver_link(url):
+        return escaped  # oid로 확정된 기사 — 헷갈릴 여지가 없다
+    return f'<span style="color:{COLOR_ERROR}">{escaped}</span>'
 
 
 def _clean_text(raw: str) -> str:
@@ -329,6 +571,27 @@ def kst_today_at(hhmm: str) -> datetime:
     return datetime.now(_KST).replace(hour=hour, minute=minute, second=0, microsecond=0)
 
 
+def incremental_search_after(last_seen: datetime, earliest: datetime, now: Optional[datetime] = None) -> datetime:
+    """증분 검색(초안 app.preview_renderer / 실시간현황 app.live_renderer)의 하한을 정한다.
+
+    두 화면은 매번 처음부터 다시 검색하지 않고 "지금까지 본 가장 최신 pub_date"(last_seen)
+    이후만 추가로 검색한다. 그런데 네이버는 기사를 **발행시각 순서대로 색인하지 않는다** —
+    16:54 기사를 이미 받아온 뒤에 16:35 기사가 색인되는 일이 흔하다. last_seen을 그대로
+    하한으로 쓰면 그런 기사는 `after < pub_date` 조건에 영영 걸리지 않아, 그 화면에서
+    통째로 사라진다(초안에서는 "📂 소제목 미분류"로도 안 보이고, 회차 마감 수집에서야
+    처음 나타나 "마감 후 자동 배정" 배지가 붙는다 — 실측·배경은 HISTORY.md 참고).
+
+    그래서 last_seen과 "지금 − SEARCH_LOOKBACK_MIN(60분)" 중 **이른 쪽**을 하한으로 쓴다
+    — 최근 한 시간 구간은 매 새로고침마다 다시 훑는다는 뜻이다. 다시 받아온 기사는 두
+    호출부 모두 URL로 중복 제거하므로 화면·건수·matched_keywords는 달라지지 않는다.
+
+    earliest: 그보다 더 내려가면 안 되는 바닥(초안은 그 회차의 시작 시각, 실시간현황은
+    당일 0시) — 창 밖 기사를 캐시에 섞어 넣지 않기 위한 하한이다.
+    """
+    now = now or datetime.now(_KST)
+    return max(min(last_seen, now - timedelta(minutes=SEARCH_LOOKBACK_MIN)), earliest)
+
+
 # 도메인 문자열이 긴(구체적인) 것부터 검사해야 한다 — 예: "koreajoongangdaily.joins.com"
 # (코리아중앙데일리)이 그 자신의 상위 도메인 "joins.com"(중앙일보)으로 먼저 매칭되는
 # 오판정을 막는다. 모듈 로드 시 한 번만 정렬해 매 호출마다 다시 정렬하지 않는다.
@@ -336,7 +599,13 @@ _SORTED_OUTLET_DOMAINS = sorted(OUTLET_DOMAINS.items(), key=lambda kv: len(kv[0]
 
 
 def _extract_outlet(url: str) -> str:
-    """URL 도메인으로 언론사명을 추정한다. 목록에 없으면 도메인 자체를 그대로 쓴다."""
+    """URL 도메인으로 언론사명을 *추정*한다. 목록에 없으면 도메인 자체를 그대로 쓴다.
+
+    [수정: 2026-08-14] 이제 이건 폴백 경로다 — 우선 경로는 네이버 oid를 읽는
+    outlet_from_naver_link()이고, 판별 진입점은 resolve_outlet()이다. 도메인만으로는
+    한 회사가 도메인을 공유하는 계열 매체를 원리적으로 구분할 수 없다(매일경제/매경이코노미,
+    동아일보/스포츠동아·신동아·주간동아, 경향신문/스포츠경향·주간경향 등).
+    """
     domain = urlparse(url).netloc.removeprefix("www.")
     for known_domain, outlet_name in _SORTED_OUTLET_DOMAINS:
         # 서브도메인(biz.chosun.com)은 매칭하되, "notchosun.com"처럼 접미사만
@@ -344,6 +613,40 @@ def _extract_outlet(url: str) -> str:
         if domain == known_domain or domain.endswith("." + known_domain):
             return outlet_name
     return domain
+
+
+# 네이버 미러 링크의 경로에서 언론사 코드(oid)를 뽑는다. 실측상 경로는 전부
+# "/mnews/article/{oid}/{기사ID}" 형태였지만, 과거 링크 형식("/article/...")도 함께 받는다.
+_NAVER_ARTICLE_PATTERN = re.compile(r"^/(?:mnews/)?article/(\d+)/")
+
+
+def outlet_from_naver_link(url: str) -> Optional[str]:
+    """네이버 뉴스 미러 링크면 그 안의 언론사 코드(oid)로 언론사명을 확정한다.
+
+    네이버 링크가 아니거나(언론사 자체 도메인) 표에 없는 oid면 None — 호출하는 쪽이
+    도메인 추정으로 폴백한다. 도메인 추정과 달리 이건 "추정"이 아니라 네이버가 부여한
+    매체 고유 번호를 그대로 읽는 것이라 계열 매체도 정확히 갈린다(NAVER_OID_OUTLETS 참고).
+    """
+    parsed = urlparse(url)
+    if parsed.netloc.removeprefix("www.") != "n.news.naver.com":
+        return None
+    match = _NAVER_ARTICLE_PATTERN.match(parsed.path)
+    if not match:
+        return None
+    return NAVER_OID_OUTLETS.get(match.group(1))
+
+
+def resolve_outlet(naver_link: str, original_link: str) -> str:
+    """기사 하나의 언론사명을 정한다 — 네이버 oid 우선, 없으면 도메인 추정 폴백.
+
+    [추가: 2026-08-14] 기존엔 original_link의 도메인만 봤다. 실측 표본 3,947건 대조에서
+    도메인 방식이 36건(0.9%)을 다른 언론사 이름으로 잘못 붙이고 있었고(매경이코노미→매일경제
+    18건 등), 587건(14.9%)은 이름 대신 도메인 문자열이 그대로 찍히고 있었다. 두 문제 모두
+    oid 경로가 해결한다. 표본 기사의 43%가 네이버 미러 링크였고 나머지는 oid가 아예 없어
+    (네이버 뉴스 채널 미제휴 매체) 도메인 폴백이 계속 필요하다 — 그쪽은 도메인이 매체마다
+    갈려서 지금 방식으로 이미 맞는다(뉴스핌·아시아투데이·땅집고·IT조선·코리아타임스 확인).
+    """
+    return outlet_from_naver_link(naver_link) or _extract_outlet(original_link)
 
 
 def _strip_naver_query(url: str) -> str:
@@ -361,8 +664,11 @@ def _strip_naver_query(url: str) -> str:
 
 
 def _search_one_keyword(
-    keyword: str, after: Optional[datetime] = None, before: Optional[datetime] = None
-) -> list[dict]:
+    keyword: str,
+    after: Optional[datetime] = None,
+    before: Optional[datetime] = None,
+    include_unparsed_dates: bool = False,
+) -> tuple[list[dict], bool]:
     """
     한 키워드로 검색해 당일(KST) 게시된 기사만 모은다 (PRD.md 기능1 규칙 2).
 
@@ -374,32 +680,85 @@ def _search_one_keyword(
     한 건이라도 나오면 그 뒤로는 전부 더 오래된 기사다 — 그 지점에서 이 키워드의
     페이지네이션을 그만둔다(불필요한 API 호출을 줄인다). before보다 새 기사(보충 실행이라
     실제 시각이 창 끝을 지난 경우)는 이 창의 몫이 아니므로 건너뛰되, 그 뒤에 이 창에 속한
-    기사가 더 있을 수 있어 페이지네이션은 계속한다. pubDate를 못 읽는 낱개 기사는 그
-    기사만 건너뛴다(페이지네이션 중단 신호로 쓰지 않는다).
+    기사가 더 있을 수 있어 페이지네이션은 계속한다.
+
+    [추가: 2026-08-14] pubDate를 못 읽는 낱개 기사는 기본적으로 그 기사만 건너뛴다
+    (페이지네이션 중단 신호로도 쓰지 않는다) — 시각을 모르면 당일 창인지도, after/before
+    구간에 속하는지도 판단할 수 없어 회차별 시간창 수집(app.scraper.collect_run)에는
+    절대 넣으면 안 된다. include_unparsed_dates=True를 넘긴 호출부(app.live_renderer,
+    실시간현황 전용)만 이 기사를 `pub_date: None`으로 담아 결과에 포함한다 — "실시간은
+    필터 없이 날것 그대로"라는 이 화면의 원칙상, 시각을 못 읽었다는 기계적 사정으로
+    기사 자체를 조용히 버리면 안 된다는 사용자 결정에 따른 것이다(담당자가 원문을
+    직접 열어 발행일을 확인하도록 화면에 "발행시각 불명"으로 표시한다). 정기 스크랩·
+    수시 모니터링은 이 플래그를 안 쓰므로 기존 동작(건너뜀) 그대로다.
+
+    반환값은 (기사 목록, 조회 상한에 걸려 잘렸는지) — [수정: 2026-08-24] 예전엔 기사
+    목록만 돌려주고 "잘렸는지"는 로그로만 남겨, 이걸 다시 알아야 하는 호출부
+    (app.adhoc.collector의 §6.4b AND 상한 거부)가 `len(results) >= _MAX_START`로
+    직접 재추정했다. 그 추정은 이 함수가 시간창 밖 기사(continue)나 pubDate를 못 읽은
+    기사(건너뜀)를 스킵하면서도 `start`는 그대로 올리는 경우를 놓친다 — 그런 기사가
+    하나만 섞여도 `results`가 1,000건 밑으로 떨어져 실제로는 상한에 걸렸는데도
+    "안 걸렸다"고 오판했다(§6.4b가 막으려던 바로 그 상황이 새는 통로였다). 이 함수가
+    이미 정확히 알고 있는 `start > _MAX_START` 판정을 그대로 반환값에 실어, 다시
+    추정하지 않고 그대로 받아 쓰게 한다.
     """
+    # [추가: 2026-08-20] 요청 직전에 매번 다시 읽는다(app.credentials가 설정 화면
+    # 저장값을 즉시 반영하므로, 모듈 최상단에서 한 번만 읽어 캐싱하면 안 된다 — 이
+    # 프로젝트에서 이미 app.storage.ARTICLES_DIR이 같은 이유로 호출 시점 조회를
+    # 쓴다). 키가 아예 없으면 요청을 시도조차 하지 않고 바로 실패시킨다.
+    if not naver_is_configured():
+        raise NaverNotConfiguredError()
     headers = {
-        "X-Naver-Client-Id": NAVER_CLIENT_ID,
-        "X-Naver-Client-Secret": NAVER_CLIENT_SECRET,
+        "X-Naver-Client-Id": naver_client_id(),
+        "X-Naver-Client-Secret": naver_client_secret(),
     }
     results = []
     start = 1
+    # [추가: 2026-08-18] 조회 상한에 걸렸을 때 "어디까지 내려갔는지"를 로그에 남기기 위한 값.
+    # 최신순 정렬이라 뒤로 갈수록 오래된 기사이므로, 마지막으로 본 날짜가 곧 도달 지점이다.
+    deepest_pub_date: Optional[datetime] = None
     while start <= _MAX_START:
-        response = requests.get(
-            NAVER_NEWS_API_URL,
-            headers=headers,
-            params={"query": keyword, "display": _MAX_DISPLAY, "start": start, "sort": "date"},
-            timeout=10,
-        )
+        # _GLOBAL_REQUEST_SEM — 네이버 뉴스 검색 API 호출 전체(정기·수시 통틀어)를
+        # 하나의 상한으로 묶는다. _fetch_full_title/fetch_full_title_and_summary는
+        # 네이버가 아니라 개별 언론사 사이트를 호출하므로 여기 걸지 않는다 — 무관한
+        # 병목이 생긴다.
+        with _GLOBAL_REQUEST_SEM:
+            response = requests.get(
+                NAVER_NEWS_API_URL,
+                headers=headers,
+                params={"query": keyword, "display": _MAX_DISPLAY, "start": start, "sort": "date"},
+                timeout=10,
+            )
+        # [추가: 2026-08-20] 정기 스크랩·실시간현황·수시 모니터링·[단독]·[속보] 폴링
+        # 전부가 결국 여기 하나로 모이는 유일한 실제 요청 지점이다 — app.api_usage가
+        # 일일 호출 한도 소진을 실측으로 감시할 수 있는 것도 이 한 곳에서만 세기
+        # 때문이다. 429 등 실패 응답도 네이버에 도달한 호출이므로 raise_for_status
+        # 이전에 센다.
+        record_api_call()
         response.raise_for_status()
         items = response.json().get("items", [])
         if not items:
             break
 
         reached_older_article = False
+        # [수정: 2026-08-24] 제목이 "..."로 잘린 기사마다 그 자리에서 _fetch_full_title을
+        # 동기로(하나씩 순서대로) 불렀었다 — 언론사 사이트 응답이 느리거나 안 뜨면 호출당
+        # 최대 3초까지 그대로 블로킹됐다. 실측(2026-08-24, 키워드 '정부' 1페이지 100건):
+        # 24건이 제목이 잘려 있었다 — 이 페이지 하나만으로도 최악의 경우(전부 타임아웃)
+        # 72초가 걸릴 수 있는 구조였고, 실제로 수시 모니터링의 "꼭 포함할 검색어" 추가
+        # 하나가 66초 걸린 사례가 있었다(대부분의 시간이 이 순차 재요청이었다). 이 페이지
+        # 안에서 "포함할 기사"로 확정된 것들의 제목 재요청은 서로 아무 의존관계가 없으므로
+        # (다른 언론사 사이트로 흩어져 있어 네이버 API 호출 상한 `_GLOBAL_REQUEST_SEM`과도
+        # 무관하다), 이 창에 속하는지부터 먼저 순차로 가려낸 뒤(pending) 제목 재요청만
+        # 한꺼번에 동시로 보낸다.
+        pending: list[tuple[dict, Optional[datetime]]] = []
         for item in items:
             pub_date = _parse_pub_date(item.get("pubDate", ""))
             if pub_date is None:
-                continue  # 날짜를 못 읽으면 이 기사만 건너뛴다
+                if include_unparsed_dates:
+                    pending.append((item, None))
+                continue  # 날짜를 못 읽으면 이 기사만 건너뛴다 (페이지네이션 중단 신호로는 안 씀)
+            deepest_pub_date = pub_date
             if not _is_today_kst(pub_date):
                 reached_older_article = True
                 break  # 최신순 정렬이므로 여기서부터는 전부 더 오래된 기사
@@ -408,32 +767,78 @@ def _search_one_keyword(
                 break  # 이 창의 하한보다 오래된 기사 -> 여기서부터는 전부 이전 창(또는 그 이전)
             if before is not None and pub_date > before:
                 continue  # 이 창보다 나중(보충 실행 등) -> 건너뛰되 페이지네이션은 계속
+            pending.append((item, pub_date))
+
+        truncated_urls = list(
+            {
+                _strip_naver_query(item["link"])
+                for item, _ in pending
+                if _clean_text(item["title"]).endswith("...")
+            }
+        )
+        # [추가: 2026-07-27] 네이버 API가 제목을 "..."로 잘라 보내는 경우, 그 기사의
+        # 실제 페이지에서 온전한 제목을 다시 가져온다. 잘리지 않은 제목이 대다수라 이
+        # 추가 요청은 잘린 것에만 발생하고, 실패해도(다음 줄 or title) 원래 제목을 쓴다.
+        refetched_titles: dict[str, str] = {}
+        if truncated_urls:
+            with ThreadPoolExecutor(max_workers=min(len(truncated_urls), _TITLE_REFETCH_CONCURRENCY)) as executor:
+                for url, full_title in zip(truncated_urls, executor.map(_fetch_full_title, truncated_urls)):
+                    if full_title:
+                        refetched_titles[url] = full_title
+
+        for item, pub_date in pending:
             title = _clean_text(item["title"])
             url = _strip_naver_query(item["link"])
-            # [추가: 2026-07-27] 네이버 API가 제목을 "..."로 잘라 보내는 경우, 그 기사의
-            # 실제 페이지에서 온전한 제목을 다시 가져온다(_fetch_full_title). 잘리지 않은
-            # 제목이 대다수라 이 추가 요청은 잘린 것에만 발생하고, 실패해도 원래 제목을 쓴다.
             if title.endswith("..."):
-                title = _fetch_full_title(url) or title
+                title = refetched_titles.get(url) or title
             results.append(
                 {
-                    # 네이버가 기사를 자체 미러링하면 link가 n.news.naver.com이 되어
-                    # 도메인만으로는 언론사를 알 수 없다. 언론사 판별은 원본 링크로 한다.
-                    "outlet": _extract_outlet(item["originallink"]),
+                    # [수정: 2026-08-14] 예전엔 "네이버 미러 링크는 도메인이 전부
+                    # n.news.naver.com이라 언론사를 알 수 없다"고 보고 원본 링크의
+                    # 도메인만 썼는데, 미러 링크의 *경로*에는 언론사 코드(oid)가 박혀
+                    # 있다. 그쪽이 계열 매체까지 정확하므로 oid를 먼저 보고, 없을 때만
+                    # 원본 링크 도메인으로 폴백한다(resolve_outlet).
+                    "outlet": resolve_outlet(item["link"], item["originallink"]),
                     "title": title,
                     "url": url,
                     "summary": _clean_text(item["description"]),
                     # [추가: 2026-07-25] 화면에 게시일자를 직접 표시하진 않지만(PRD 규칙5),
                     # 실시간 기사 현황의 최신순 정렬과 "몇 분 전" 표시(화면 전용, 복사/내보내기
                     # 텍스트에는 안 들어감)에 쓰려고 파싱된 값을 그대로 실어 보낸다.
-                    "pub_date": pub_date.isoformat(),
+                    "pub_date": pub_date.isoformat() if pub_date else None,
                 }
             )
 
         if reached_older_article or len(items) < _MAX_DISPLAY:
             break
         start += _MAX_DISPLAY
-    return results
+
+    # [추가: 2026-08-18] start는 루프 맨 아래에서만 증가하므로, break로 빠져나왔다면
+    # 여전히 _MAX_START 이하다. _MAX_START를 넘겼다는 건 "창의 하한에 닿기 전에 네이버
+    # 조회 상한(최신 1000건)에 먼저 걸렸다"는 뜻 — 더 오래된 기사가 남아 있어도 API가
+    # 더 주지 않아 결과가 조용히 잘린다(실패로도 안 잡힌다).
+    #
+    # 화면 경고는(정기·실시간·breaking alert 쪽은) 아직 만들지 않았다 — 이 로그가
+    # 유일한 안내다. 실측(2026-08-18, 등록 키워드 9개)에서 상한에 닿는 건 '정부'
+    # 하나뿐이었고(약 284건/시간 · 하루 6,800건 환산), 나머지 8개는 1000번째 기사가
+    # 수 주~3개월 전이라 근처에도 못 갔다. 정기 회차는 창이 짧아 걸릴지 애매해(새벽 창은
+    # 낮 속도로 추정한 값이라 과대추정), 실제로 얼마나 자주 어느 키워드에서 일어나는지를
+    # 이 로그로 먼저 모은 뒤 화면 표시 여부를 정하기로 했다. 수시 모니터링만 예외 —
+    # 아래 반환값을 app.adhoc.collector가 §6.4b(AND 상한 거부) 판정에 그대로 쓴다.
+    # 배경·수치는 HISTORY.md "네이버 조회 상한(1000건) 잘림" 참고.
+    capped = start > _MAX_START
+    if capped:
+        logger.warning(
+            "네이버 조회 상한(최신 %d건)에 걸려 결과가 잘렸습니다 — 키워드=%r, 요청창=%s~%s, "
+            "%s까지만 수집됨(%d건). 더 오래된 기사는 API가 주지 않습니다.",
+            _MAX_START,
+            keyword,
+            after.strftime("%m-%d %H:%M") if after else "당일 0시",
+            before.strftime("%m-%d %H:%M") if before else "현재",
+            deepest_pub_date.strftime("%m-%d %H:%M") if deepest_pub_date else "?",
+            len(results),
+        )
+    return results, capped
 
 
 def _match_group(group_results: list[list[dict]], mode: str) -> list[dict]:
@@ -455,18 +860,139 @@ def _match_group(group_results: list[list[dict]], mode: str) -> list[dict]:
     return [article for results in group_results for article in results if article["url"] in common_urls]
 
 
+def search_keywords(
+    keywords: list[str],
+    after: Optional[datetime] = None,
+    before: Optional[datetime] = None,
+    include_unparsed_dates: bool = False,
+) -> tuple[dict[str, list[dict]], list[str], list[str]]:
+    """
+    키워드 목록 각각을 검색해 {키워드: 검색결과} 딕셔너리로 돌려준다. 그룹 OR/AND
+    매칭(app.naver_api.match_articles_to_groups)과 분리된 순수 검색 단계다 —
+    [추가: 2026-08-13] app.live_renderer가 키워드별로 다른 after(마지막으로 본 시각)를
+    쓰는 증분 캐시를 하려면 그룹 단위가 아니라 키워드 단위로 검색을 걸 수 있어야
+    해서 분리했다(search_articles_by_groups는 이 함수를 감싼 하위호환 래퍼).
+
+    after: datetime 하나면 모든 키워드에 동일하게 적용한다. {키워드: datetime|None}
+    딕셔너리면 키워드마다 다른 하한을 쓴다(없는 키워드나 값이 None이면 당일 0시부터,
+    즉 하한 없음) — 새로 등록된 키워드는 기존 키워드의 "마지막으로 본 시각"을 몰라서
+    처음부터(당일 0시) 검색해야 하는 경우에 쓴다.
+
+    [수정: 2026-08-06] 키워드를 하나씩 순서대로 검색하면 키워드 수만큼 대기 시간이
+    그대로 더해진다(13개 기준 약 24초 실측) — 동시에 최대 _MAX_CONCURRENT_KEYWORD_
+    SEARCHES개까지 병렬로 검색한다. [수정: 2026-08-13] 실측(100키워드, 재시도 없이
+    1회 시도 기준)으로 동시성별 429 발생률을 쟀다 — 5: 0%, 10: 5%, 15: 20%, 20: 86%.
+    15부터 사실상 못 쓰는 수준이라 "느린 만큼 늘려도 된다"는 예전 가정을 버리고 5→8로만
+    올렸다(재시도로 흡수 가능한 수준의 여유만 더 확보). 키워드 하나가 실패(타임아웃·
+    네트워크 오류·429)해도 나머지 결과는 그대로 살리고 빈 목록으로 대체한다 — 병렬화
+    전엔 한 키워드 실패가 곧 전체 검색 실패였는데, 여러 개를 동시에 돌리면서 그 실패가
+    상대적으로 더 자주 눈에 띌 수 있어 이 기회에 격리했다.
+    [수정: 2026-08-13] 격리는 유지하되, 포기하기 전에 스레드 안에서 짧게 재시도한다
+    (429는 Retry-After만큼, 그 외는 짧은 backoff) — 그래도 실패하면 빈 목록으로
+    대체하는 건 같지만, 이번엔 "실패했다"는 사실 자체를 failed_keywords로 같이 돌려줘
+    위 계층이 조용히 넘어가지 않게 한다(정상 검색됐지만 결과가 0건인 것과는 다르다).
+
+    include_unparsed_dates: _search_one_keyword로 그대로 전달한다 — 기본 False(정기
+    스크랩·수시 모니터링과 동일하게 pubDate 파싱 실패 기사를 건너뜀), app.live_renderer만
+    True로 호출해 그 기사를 `pub_date: None`으로 담아 온다.
+
+    반환값 세 번째 요소 capped_keywords: [추가: 2026-08-24] `_search_one_keyword`가
+    네이버 조회 상한(1,000건)에 걸려 결과가 잘린 것으로 판정한 키워드 이름 목록 —
+    실패(failed_keywords)와는 다른 축이다(검색 자체는 성공했지만 결과가 불완전하다는
+    뜻). app.adhoc.collector의 §6.4b AND 상한 거부가 이 값을 그대로 쓴다. 기존
+    호출부(app.breaking_alert_sender, app.live_renderer 등)는 이 값을 안 쓰고 버려도
+    되지만, 2-튜플 언패킹은 더 이상 안 맞으므로 호출부 전부를 3-튜플로 맞췄다.
+    """
+    def _after_for(keyword: str) -> Optional[datetime]:
+        if isinstance(after, dict):
+            return after.get(keyword)
+        return after
+
+    def _search_safely(keyword: str) -> tuple[list[dict], bool, bool]:
+        keyword_after = _after_for(keyword)
+        last_error: Optional[requests.exceptions.RequestException] = None
+        for attempt in range(_KEYWORD_RETRY_ATTEMPTS):
+            try:
+                results, capped = _search_one_keyword(
+                    keyword, after=keyword_after, before=before, include_unparsed_dates=include_unparsed_dates
+                )
+                return results, False, capped
+            except requests.exceptions.RequestException as error:
+                last_error = error
+                if attempt < _KEYWORD_RETRY_ATTEMPTS - 1 and _retryable(error):
+                    time.sleep(_retry_wait_seconds(error, attempt))
+                    continue
+                break
+        logger.warning("키워드 검색 실패(재시도 소진), 빈 결과로 대체합니다: %r", keyword, exc_info=last_error)
+        return [], True, False
+
+    with ThreadPoolExecutor(max_workers=_MAX_CONCURRENT_KEYWORD_SEARCHES) as executor:
+        raw_by_keyword = dict(zip(keywords, executor.map(_search_safely, keywords)))
+    results_by_keyword = {keyword: results for keyword, (results, _failed, _capped) in raw_by_keyword.items()}
+    failed_keywords = [keyword for keyword, (_results, failed, _capped) in raw_by_keyword.items() if failed]
+    capped_keywords = [keyword for keyword, (_results, _failed, capped) in raw_by_keyword.items() if capped]
+    return results_by_keyword, failed_keywords, capped_keywords
+
+
+def match_articles_to_groups(
+    groups: list[dict],
+    results_by_keyword: dict[str, list[dict]],
+    track_keyword_matches: bool = False,
+) -> list[dict]:
+    """
+    키워드별 원시 검색 결과(app.naver_api.search_keywords)에 그룹 OR/AND 규칙을 적용해
+    최종 기사 목록을 만든다(URL 기준 중복 제거 포함) — 검색과 매칭을 분리해뒀다.
+
+    groups: [{"keywords": [...], "mode": "OR"|"AND"}, ...] 형태. 그룹 "안"에서는 그 그룹의
+    mode(OR=하나라도 포함/AND=모두 포함)를 따르고, 그룹 "사이"는 항상 OR이다.
+
+    같은 기사가 여러 그룹에 걸려 중복 수집돼도 URL 기준으로 한 번만 남긴다(먼저 나온
+    그룹 순서 유지).
+
+    [추가: 2026-08-13] results_by_keyword를 검색 시점이 아니라 여기서 다시 넘겨받는
+    구조라, app.live_renderer처럼 키워드별 원시 결과를 캐시해뒀다가 그룹 구성(이름·
+    모드·소속)만 바뀌었을 땐 재검색 없이 이 함수만 다시 돌리면 새 구성이 정확히
+    반영된다(재분류가 재검색을 요구하지 않는다) — results_by_keyword.get(keyword, [])로
+    조회해, 그룹에 있지만 캐시에 없는 키워드(예: 이번에 막 추가돼 아직 결과가 없는
+    키워드)는 조용히 빈 결과로 취급한다.
+
+    track_keyword_matches: True면 각 기사 dict에 "matched_keywords"(그 기사가 실제로
+    걸린 모든 키워드 목록)를 덧붙인다 — app.live_renderer의 그룹 필터 칩용. 위 URL
+    중복 제거는 "어느 그룹에 배정할지"만 정할 뿐 실제로 여러 키워드에 걸린 사실
+    자체는 사라지지 않으므로, results_by_keyword를 다시 훑어 URL별로 어떤 키워드의
+    검색 결과에 있었는지 모은다(그룹 배정과 무관한, 사실 그대로의 매칭 정보).
+    """
+    seen_urls: set = set()
+    articles: list[dict] = []
+    for group in groups:
+        group_results = [results_by_keyword.get(keyword, []) for keyword in group["keywords"]]
+        for article in _match_group(group_results, group.get("mode", "OR")):
+            if article["url"] not in seen_urls:
+                seen_urls.add(article["url"])
+                articles.append(article)
+
+    if track_keyword_matches:
+        url_keywords: dict[str, list[str]] = {}
+        for keyword, results in results_by_keyword.items():
+            for a in results:
+                url_keywords.setdefault(a["url"], []).append(keyword)
+        for article in articles:
+            article["matched_keywords"] = url_keywords.get(article["url"], [])
+
+    return articles
+
+
 def search_articles_by_groups(
     groups: list[dict],
     after: Optional[datetime] = None,
     before: Optional[datetime] = None,
-) -> list[dict]:
+    track_keyword_matches: bool = False,
+) -> tuple[list[dict], list[str]]:
     """
     키워드 그룹 목록으로 기사를 검색해 모아 반환한다 (건수 제한 없음, PRD.md 기능1 규칙 2 갱신).
-
-    groups: [{"keywords": [...], "mode": "OR"|"AND"}, ...] 형태. 그룹 "안"에서는 그 그룹의
-    mode(OR=하나라도 포함/AND=모두 포함)를 따르고, 그룹 "사이"는 항상 OR이다 — 등록된
-    그룹 중 아무 그룹의 조건이나 만족하면 채택한다 ("기관 정보" 고정 그룹도 이 목록의
-    그룹 하나로 넘어온다).
+    app.naver_api.search_keywords + match_articles_to_groups를 그대로 이어붙인
+    하위호환 래퍼 — app.scraper.collect_run처럼 매번 통째로 새로 검색해도 되는
+    (캐시가 필요 없는) 호출부는 이 함수 하나로 충분하다.
 
     after/before: 회차별 시간창 수집의 하한(제외)·상한(포함) — app.scraper.collect_run이
     설정된 스케줄 창에서 계산해 넘겨준다. 둘 다 생략하면 당일 전체를 그대로 모은다.
@@ -475,9 +1001,11 @@ def search_articles_by_groups(
     한다 (그룹이 최대 6개(기관정보+5)·그룹당 최대 5개까지 늘어날 수 있어, 호출 낭비를
     줄이는 게 응답 지연에 직접 영향을 준다).
 
-    같은 기사가 여러 그룹에 걸려 중복 수집돼도 URL 기준으로 한 번만 남긴다(먼저 나온
-    그룹 순서 유지). 완전 동일 제목 중복 제거·[포토] 제외·언론사 우선순위 정렬은
-    이 함수 바깥(app.scraper.collect_run)에서 처리한다.
+    반환값은 (articles, failed_keywords) — failed_keywords는 재시도(_KEYWORD_RETRY_
+    ATTEMPTS회)를 다 써도 끝내 실패한 키워드 이름 목록이다(정상적으로 검색됐지만
+    결과가 0건인 것과는 다르다). 비어 있으면 전부 성공했다는 뜻. 실패를 어떻게 다룰지
+    (재시도할지, 경고만 띄울지)는 호출부의 몫이다 — 이 함수는 "무엇이 실패했는지"만
+    사실대로 보고한다.
     """
     unique_keywords: list[str] = []
     seen_keywords = set()
@@ -487,29 +1015,10 @@ def search_articles_by_groups(
                 seen_keywords.add(keyword)
                 unique_keywords.append(keyword)
 
-    # [수정: 2026-08-06] 키워드를 하나씩 순서대로 검색하면 키워드 수만큼 대기 시간이
-    # 그대로 더해진다(13개 기준 약 24초 실측) — 동시에 최대 _MAX_CONCURRENT_KEYWORD_
-    # SEARCHES개까지 병렬로 검색해, 가장 느린 키워드 하나의 시간(실측 약 7초)까지만
-    # 기다리면 되도록 줄였다. 키워드 하나가 실패(타임아웃·네트워크 오류)해도 나머지
-    # 결과는 그대로 살리고 빈 목록으로 대체한다 — 병렬화 전엔 한 키워드 실패가 곧
-    # 전체 검색 실패였는데, 여러 개를 동시에 돌리면서 그 실패가 상대적으로 더 자주
-    # 눈에 띌 수 있어 이 기회에 격리했다.
-    def _search_safely(keyword: str) -> list[dict]:
-        try:
-            return _search_one_keyword(keyword, after=after, before=before)
-        except requests.exceptions.RequestException:
-            logger.exception("키워드 검색 실패, 빈 결과로 대체합니다: %r", keyword)
-            return []
-
-    with ThreadPoolExecutor(max_workers=_MAX_CONCURRENT_KEYWORD_SEARCHES) as executor:
-        results_by_keyword = dict(zip(unique_keywords, executor.map(_search_safely, unique_keywords)))
-
-    seen_urls: set = set()
-    articles: list[dict] = []
-    for group in groups:
-        group_results = [results_by_keyword[keyword] for keyword in group["keywords"]]
-        for article in _match_group(group_results, group.get("mode", "OR")):
-            if article["url"] not in seen_urls:
-                seen_urls.add(article["url"])
-                articles.append(article)
-    return articles
+    # capped_keywords는 이 래퍼의 반환 계약(articles, failed_keywords)에 없던 값이라
+    # 여기선 버린다 — 정기 스크랩·랜딩 등 이 래퍼를 쓰는 호출부는 상한 판정을 아직
+    # 안 쓴다(위 search_keywords 반환값 3번째 요소 docstring 참고). 수시 모니터링은
+    # 이 래퍼가 아니라 search_keywords를 직접 불러(app.adhoc.collector) 값을 받는다.
+    results_by_keyword, failed_keywords, _capped_keywords = search_keywords(unique_keywords, after=after, before=before)
+    articles = match_articles_to_groups(groups, results_by_keyword, track_keyword_matches=track_keyword_matches)
+    return articles, failed_keywords

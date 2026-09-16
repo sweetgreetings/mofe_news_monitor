@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="573" viewBox="0 0 1440 573">
+<rect width="100%" height="100%" fill="#F8FAFC"/>
+<g id="topbar">
+<rect x="0" y="0" width="1440" height="54.5" fill="#FFFFFF"/>
+<text x="330" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">홈</text>
+<text x="665.2" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">수집 결과</text>
+<text x="1042.5" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">수시 보관함</text>
+</g>
+<g id="새 수집">
+<rect x="320" y="84" width="800" height="370.5" rx="12" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="433" y="166.5" width="156.5" height="35.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="445" y="189.3" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="400" fill="#1F2937" xml:space="preserve">+ 새 사안 만들기</text>
+<rect x="599.5" y="167.5" width="495.5" height="33.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="611.5" y="189.3" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="400" fill="#1F2937" xml:space="preserve">새 사안 이름 (예: 재경위)</text>
+<rect x="433" y="216" width="652" height="37.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="442" y="223" width="551.8" height="23.5" rx="8" fill="#FFFFFF"/>
+<text x="446" y="239.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="400" fill="#1F2937" xml:space="preserve">검색어 입력</text>
+<rect x="433" y="267.5" width="92" height="33.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="445" y="289.3" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="400" fill="#1F2937" xml:space="preserve">00:00</text>
+<rect x="553.5" y="267.5" width="92" height="33.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="565.5" y="289.3" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="400" fill="#1F2937" xml:space="preserve">19:10</text>
+<rect x="655.5" y="269.5" width="46.1" height="29.5" rx="8" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="1"/>
+<rect x="1016.6" y="268" width="78.4" height="32.5" rx="8" fill="#2563EB" stroke="#2563EB" stroke-width="1"/>
+<g transform="translate(1033.6,277.2) scale(0.5866,0.5866)" fill="none" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></g>
+<rect x="433" y="311" width="77.5" height="24.5" rx="12.3" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="516.5" y="311" width="74.9" height="24.5" rx="12.3" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="597.4" y="311" width="77.2" height="24.5" rx="12.3" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="343.5" width="750" height="1" fill="#E5E7EB"/>
+<rect x="349" y="386.5" width="13" height="13" fill="none"/>
+<rect x="729" y="386.5" width="13" height="13" fill="none"/>
+<rect x="349" y="415.5" width="13" height="13" fill="none"/>
+<text x="345" y="124.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="19.2" font-weight="700" fill="#1E3A5F" xml:space="preserve">새 수집</text>
+<text x="345" y="146.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">오늘 안에서 시간대를 정해 한 번에 모읍니다 · 검색어는 최대 5개</text>
+<text x="345" y="188.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.8" font-weight="600" fill="#6B7280" xml:space="preserve">사안</text>
+<text x="345" y="238.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.8" font-weight="600" fill="#6B7280" xml:space="preserve">검색어</text>
+<text x="1022.8" y="238.2" text-anchor="middle" font-family="Arial" font-size="13.1" font-weight="600" fill="#2563EB" xml:space="preserve">+ 추가</text>
+<text x="1051.8" y="238.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.2" font-weight="400" fill="#6B7280" xml:space="preserve">0 / 5</text>
+<text x="345" y="288.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.8" font-weight="600" fill="#6B7280" xml:space="preserve">수집시간</text>
+<text x="535" y="289.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">~</text>
+<text x="678.6" y="288.1" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="600" fill="#2563EB" xml:space="preserve">지금</text>
+<text x="1065.8" y="288.5" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#FFFFFF" xml:space="preserve">수집</text>
+<text x="471.7" y="327" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#4B5563" xml:space="preserve">0시 ~ 지금</text>
+<text x="553.9" y="327" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#4B5563" xml:space="preserve">최근 1시간</text>
+<text x="636" y="327" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#4B5563" xml:space="preserve">최근 3시간</text>
+<text x="345" y="369.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="700" fill="#6B7280" xml:space="preserve">이 회차에만 적용</text>
+<text x="373" y="397.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">등록 언론사만 보기</text>
+<text x="753" y="397.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">사진기사 제외</text>
+<text x="373" y="426.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">인사 발령 기사 제외</text>
+</g>
+</svg>

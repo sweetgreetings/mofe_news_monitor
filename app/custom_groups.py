@@ -7,7 +7,6 @@ from typing import Optional
 
 from app.atomic_write import atomic_write_text
 from app.config import CUSTOM_GROUPS_FILE
-from app.group_order import load_group_order, save_group_order
 
 
 def _today_str(now: Optional[datetime] = None) -> str:
@@ -57,11 +56,18 @@ def add_custom_group(name: str, now: Optional[datetime] = None) -> Optional[str]
     반환값은 없음(호출하는 쪽은 성공 여부를 신경 쓸 필요가 없다 — 이미 있어도 결과적으로
     "그 이름의 소제목이 존재한다"는 상태는 똑같이 보장되기 때문).
 
-    [추가: 2026-08-05] 새로 만든 소제목은 화면 맨 위에, 만든 순서대로 나오도록
-    `data/group_order.json`에도 같이 등록한다(`_place_at_top_of_order`) — 예전엔
-    맨 아래(자연 순서 맨 뒤)에 붙었는데, 소제목이 몇 개 쌓이면 스크롤해서 찾아야 해
-    불편하다는 피드백. 이건 "새로 만들 때의 기본 위치"일 뿐이라, 이후 ↑/↓나 소제목
-    미니 목차로 자유롭게 다시 옮기는 건 그대로 가능하다(다른 소제목 순서 조정과 동일).
+    **새로 만든 소제목은 목록 맨 아래에 온다** — 이 함수는 `group_order.json`을 아예
+    건드리지 않고, 순서는 전적으로 자연 순서에 맡긴다. 자연 순서에서 커스텀 소제목이
+    맨 뒤라는 건 두 자리가 함께 보장한다: 기사가 없으면 렌더러가 `empty_custom_groups`를
+    목록 끝에 붙이고(app.preview_renderer/app.renderer), 기사가 있으면
+    app.classifier._apply_forced_groups가 그 이름을 groups 끝에 끼워 넣는다.
+    (📂 소제목 미분류는 app.group_order.apply_group_order가 언제나 그보다 더 뒤로 민다.)
+
+    [수정: 2026-08-27] 2026-08-05에 넣었던 "새 소제목은 맨 위"(`_place_at_top_of_order`)를
+    걷어냈다 — 사용자 요청으로 기본 위치를 다시 아래로 되돌린 것이고, 동시에 회차마다
+    위치가 달라지던 문제도 같이 없앴다(만든 그 회차만 맨 위, 다음 회차부터는 group_order
+    버킷이 비어 자연 순서를 타 맨 아래였다). 이후 ▲▼나 소제목 미니 목차로 자유롭게 다시
+    옮기는 건 그대로 가능하다 — "기본 위치"만 바뀐다.
     """
     name = name.strip()
     if not name:
@@ -70,21 +76,7 @@ def add_custom_group(name: str, now: Optional[datetime] = None) -> Optional[str]
     if name not in names:
         names.append(name)
         _write(names, now)
-        _place_at_top_of_order(name, names)
     return name
-
-
-def _place_at_top_of_order(name: str, all_custom_names: list) -> None:
-    """방금 만든 소제목을, 기존에 순서가 등록돼 있던 다른 커스텀 소제목들 바로 다음
-    (만든 순서를 유지) — 그러면서도 커스텀이 아닌 소제목보다는 항상 앞서도록 끼워
-    넣는다. 아직 순서가 하나도 등록된 적 없으면(group_order.json이 비어 있으면)
-    맨 앞에 놓는다.
-    """
-    order = [n for n in load_group_order() if n != name]
-    earlier_customs_in_order = [n for n in all_custom_names if n != name and n in order]
-    insert_at = max((order.index(n) + 1 for n in earlier_customs_in_order), default=0)
-    order.insert(insert_at, name)
-    save_group_order(order)
 
 
 def remove_custom_group(name: str, now: Optional[datetime] = None) -> None:

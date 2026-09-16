@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>정기 — 숨긴 기사 쓰레기통 시안</title>
+<style>
+  :root {
+    --bg: #F8FAFC; --card: #FFFFFF; --header: #1E3A5F; --accent: #2563EB;
+    --text: #1F2937; --muted: #6B7280; --border: #E5E7EB; --hover: #EFF6FF;
+    --error: #DC2626; --on-fill: #FFFFFF; --divider-soft: #F1F3F5;
+    --send: #15803D; --ai-bg: #F0EAFB; --ai-text: #4A3F8F; --ai-border: #DCD0F2;
+    --row-hover: #F3F4F6; --warn-text: #92400E; --warn-bg: #FFFBEB; --warn-border: #FDE68A;
+    --accent-border: #BFDBFE; --sel-bg: #EFF6FF;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px; background: #EEF1F5; color: var(--text);
+    font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Malgun Gothic", sans-serif;
+  }
+  h1 { font-size: 1.05rem; color: var(--header); margin: 0 0 4px; }
+  .lede { font-size: 0.82rem; color: var(--muted); margin: 0 0 22px; line-height: 1.55; }
+  .grid { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; }
+  .case > .cap {
+    font-size: 0.78rem; font-weight: 700; color: var(--header); margin-bottom: 7px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .case > .cap .sub { font-weight: 500; color: var(--muted); }
+  .case > .note { font-size: 0.72rem; color: var(--muted); margin-top: 8px; max-width: 470px; line-height: 1.55; }
+  .case.wide > .note { max-width: 640px; }
+
+  /* ── 화면 프레임(부분): 실제 화면의 왼쪽 아래 모서리를 잘라낸 것 ── */
+  .screen {
+    position: relative; width: 470px; height: 520px; background: var(--bg);
+    border: 1px solid #D8DEE6; border-radius: 10px; overflow: hidden;
+    box-shadow: 0 6px 20px rgba(0,0,0,.08);
+  }
+  .screen.full { width: 640px; height: 620px; }
+  .topbar {
+    position: absolute; top: 0; left: 0; right: 0; height: 44px; z-index: 20;
+    background: var(--card); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  }
+  .topbar a { color: var(--accent); font-size: 0.8rem; font-weight: 600; text-decoration: none; }
+  .body { position: absolute; top: 44px; left: 0; right: 0; bottom: 40px; overflow: hidden; padding: 14px 16px; }
+  .screen.full .body { bottom: 0; padding: 16px 20px; }
+  .doc-head { font-size: 0.95rem; font-weight: 700; color: var(--header); margin-bottom: 3px; }
+  .doc-sub { font-size: 0.72rem; color: var(--muted); margin-bottom: 12px; }
+  .pending { font-size: 0.68rem; background: var(--warn-bg); color: var(--warn-text);
+    border: 1px solid var(--warn-border); border-radius: 10px; padding: 1px 7px; margin-left: 6px; }
+  h2.sub {
+    font-size: 0.84rem; color: var(--header); margin: 14px 0 8px; padding-bottom: 5px;
+    border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px;
+  }
+  .art { display: flex; gap: 8px; align-items: flex-start; padding: 7px 6px; border-radius: 6px; font-size: 0.8rem; }
+  .art:hover { background: var(--row-hover); }
+  .art .box { width: 12px; height: 12px; border: 1px solid #C7CDD6; border-radius: 3px; margin-top: 3px; flex: none; }
+  .art .t { flex: 1; line-height: 1.45; }
+  .art .t .o { color: var(--muted); }
+  .art .ic { color: #B6BDC7; font-size: 0.78rem; letter-spacing: 3px; flex: none; margin-top: 2px; }
+  .bottombar {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 40px; z-index: 20;
+    background: var(--card); border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
+    box-shadow: 0 -2px 8px rgba(0,0,0,.08);
+  }
+  .bottombar .lft { font-size: 0.72rem; color: var(--muted); }
+  .bottombar .ico { color: var(--muted); display: inline-flex; padding: 4px 8px; border-radius: 6px; }
+  .bottombar .ico.gone { position: relative; opacity: .3; }
+  .bottombar .ico.gone::after {
+    content: ""; position: absolute; left: 2px; right: 2px; top: 50%; height: 1.5px;
+    background: var(--error); transform: rotate(-16deg);
+  }
+  svg.i { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8;
+    stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ── FAB 스택 (수시 화면과 동일한 규격) ── */
+  .fab {
+    position: absolute; border-radius: 50%; background: var(--card); color: var(--muted);
+    border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,.12);
+    display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 200;
+  }
+  .fab.left { left: 20px; bottom: 20px; width: 56px; height: 56px; }
+  .fab.left.upper { bottom: 88px; width: 50px; height: 50px; }
+  .fab svg.i { width: 22px; height: 22px; }
+  .fab.left.upper svg.i { width: 20px; height: 20px; }
+  .fab .badge {
+    position: absolute; top: -3px; right: -3px; background: var(--error); color: var(--on-fill);
+    font-size: 0.66rem; font-weight: 700; border-radius: 9px; padding: 0 5px; line-height: 1.55;
+  }
+  .fab.right { right: 20px; bottom: 20px; width: 46px; height: 46px; }
+  .fab.right.send {
+    right: 20px; bottom: 80px; width: 56px; height: 56px; background: var(--send);
+    color: #fff; border: none; font-size: 0.9rem; font-weight: 700;
+    box-shadow: 0 4px 12px rgba(21,128,61,.4);
+  }
+
+  /* ── 팝오버(요약판) ── */
+  .fab-pop {
+    position: absolute; left: 20px; bottom: 88px; width: 336px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 11px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.16); padding: 12px 14px; z-index: 210;
+  }
+  .fab-pop h5 { margin: 0 0 3px; font-size: 0.85rem; color: var(--header); display: flex; align-items: center; gap: 6px; }
+  .fab-pop .hint { font-size: 0.72rem; color: var(--muted); margin: 0 0 4px; line-height: 1.45; }
+  .fab-pop .row {
+    display: flex; gap: 8px; align-items: center; padding: 8px 0;
+    border-top: 1px solid var(--divider-soft); font-size: 0.8rem;
+  }
+  .fab-pop .row .tx { flex: 1; color: var(--muted); line-height: 1.4; }
+  .fab-pop .row .gname { font-weight: 600; color: var(--header); }
+  .fab-pop .row .tm { color: #A6ADB8; font-size: 0.7rem; margin-left: 4px; }
+  .fab-pop .cnt {
+    flex: none; font-size: 0.7rem; font-weight: 700; color: var(--muted);
+    background: #F1F3F5; border-radius: 9px; padding: 1px 7px;
+  }
+  .fab-pop .more {
+    display: block; text-align: center; margin: 6px -14px -12px; padding: 9px 0 10px;
+    border-top: 1px solid var(--border); font-size: 0.76rem; font-weight: 600;
+    color: var(--accent); text-decoration: none; border-radius: 0 0 11px 11px;
+  }
+  .fab-pop .more:hover { background: var(--hover); }
+
+  .restore {
+    flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem;
+    color: var(--muted); background: transparent; border: 1px solid var(--border);
+    border-radius: 6px; padding: 3px 8px; cursor: pointer; font-family: inherit; white-space: nowrap;
+  }
+  .restore:hover { background: var(--hover); color: var(--accent); border-color: var(--accent); }
+  .restore svg.i { width: 13px; height: 13px; }
+
+  /* ── 풀사이즈 화면(/hidden) ── */
+  .full h1.ph { font-size: 1rem; color: var(--header); margin: 0 0 3px; display: flex; align-items: center; gap: 7px; }
+  .full .psub { font-size: 0.74rem; color: var(--muted); margin-bottom: 14px; }
+  .bulkbar {
+    display: flex; align-items: center; gap: 8px; background: var(--sel-bg);
+    border: 1px solid var(--accent-border); border-radius: 8px; padding: 8px 12px;
+    font-size: 0.78rem; color: var(--header); margin-bottom: 12px;
+  }
+  .bulkbar .n { font-weight: 700; }
+  .bulkbar .sp { flex: 1; }
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 5px; background: var(--accent); color: #fff;
+    border: none; border-radius: 6px; padding: 5px 11px; font-size: 0.76rem; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+  }
+  .btn-ghost {
+    background: transparent; color: var(--muted); border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 10px; font-size: 0.76rem; cursor: pointer; font-family: inherit;
+  }
+  .cb { width: 13px; height: 13px; border: 1px solid #C7CDD6; border-radius: 3px; flex: none; background: #fff; }
+  .cb.on { background: var(--accent); border-color: var(--accent); position: relative; }
+  .cb.on::after {
+    content: ""; position: absolute; left: 4px; top: 1px; width: 3px; height: 7px;
+    border: solid #fff; border-width: 0 1.6px 1.6px 0; transform: rotate(42deg);
+  }
+  .grp { border: 1px solid var(--border); border-radius: 9px; margin-bottom: 10px; background: var(--card); overflow: hidden; }
+  .grp > .gh {
+    display: flex; align-items: center; gap: 9px; padding: 10px 12px; font-size: 0.82rem;
+    background: #FAFBFC; border-bottom: 1px solid var(--border); cursor: pointer;
+  }
+  .grp > .gh .caret { color: #A6ADB8; font-size: 0.72rem; width: 9px; flex: none; }
+  .grp > .gh .gt { flex: 1; color: var(--text); }
+  .grp > .gh .gt .gname { font-weight: 700; color: var(--header); }
+  .grp > .gh .gt .when { color: #A6ADB8; font-size: 0.71rem; margin-left: 5px; }
+  .grp > .gh .cnt {
+    flex: none; font-size: 0.71rem; font-weight: 700; color: var(--muted);
+    background: #EDF0F4; border-radius: 9px; padding: 1px 8px;
+  }
+  .grp.closed > .gh { border-bottom: none; }
+  .hrow {
+    display: flex; align-items: center; gap: 9px; padding: 8px 12px; font-size: 0.8rem;
+    border-top: 1px solid var(--divider-soft);
+  }
+  .hrow:first-child { border-top: none; }
+  .hrow:hover { background: var(--row-hover); }
+  .hrow.sel { background: var(--sel-bg); }
+  .hrow .tx { flex: 1; color: var(--text); line-height: 1.4; }
+  .hrow .tx .o { color: var(--muted); }
+  .hrow .tm { color: #A6ADB8; font-size: 0.7rem; margin-left: 5px; }
+  .solo { background: var(--card); border: 1px solid var(--border); border-radius: 9px; }
+
+  .legend { margin-top: 26px; font-size: 0.78rem; color: var(--text); line-height: 1.7; max-width: 1000px; }
+  .legend h3 { font-size: 0.86rem; color: var(--header); margin: 18px 0 6px; }
+  .legend code { background: #EDF0F4; border-radius: 4px; padding: 1px 5px; font-size: 0.74rem; }
+  .legend ul { margin: 0; padding-left: 18px; }
+  .legend li { margin-bottom: 4px; }
+  .legend p { margin: 0 0 6px; }
+</style>
+</head>
+<body>
+
+<h1>정기 — 숨긴 기사 쓰레기통 (팝오버 요약 → 더보기로 풀사이즈)</h1>
+<p class="lede">
+  버튼 자리·규격·배지는 수시 수집 결과 화면과 동일. 팝오버는 <b>“지금 몇 건 빠져 있나 + 방금 것 되살리기”</b>까지만 맡고,
+  한 건씩 골라내는 일은 <b>더보기 → <code>/hidden</code> 풀사이즈</b>가 맡는다.
+</p>
+
+<div class="grid">
+
+  <!-- ───────────── ① 초안 ───────────── -->
+  <div class="case">
+    <div class="cap">① [초안] <span class="sub">— 팝오버(요약판), 숨긴 기사 15건</span></div>
+    <div class="screen">
+      <div class="topbar">
+        <a>← HOME</a>
+        <div><a style="margin-right:12px">실시간 현황</a><a>확정본</a></div>
+      </div>
+
+      <div class="body">
+        <div class="doc-head">[초안] 언론 모니터링 14:00 기준 <span class="pending">미분류 2건</span></div>
+        <div class="doc-sub">⏱️ 수집 종료시간까지 01:12:40 남음</div>
+
+        <h2 class="sub">&lt;내년도 예산안 편성&gt; <span style="font-size:.7rem;color:var(--ai-text);background:var(--ai-bg);border:1px solid var(--ai-border);border-radius:9px;padding:1px 6px">🤖</span></h2>
+        <div class="art"><span class="box"></span><span class="t"><span class="o">(연합뉴스)</span> 구윤철 부총리 “내년 예산, 재정 역할 확대”…확장 기조 재확인</span><span class="ic">⋯ ↑ ↓ 🗑</span></div>
+        <div class="art"><span class="box"></span><span class="t"><span class="o">(KBS)</span> 재정경제부, 2027년 예산안 당정협의 착수</span><span class="ic">⋯ ↑ ↓ 🗑</span></div>
+        <div class="art"><span class="box"></span><span class="t"><span class="o">(매일경제)</span> 세수 결손 우려에 “지출 구조조정 병행”</span><span class="ic">⋯ ↑ ↓ 🗑</span></div>
+
+        <h2 class="sub">&lt;부동산 세제 논의&gt;</h2>
+        <div class="art"><span class="box"></span><span class="t"><span class="o">(서울경제)</span> 이형일 부총리 후보자 “대규모 주택매입 시스템, 관계부처와 협의 중”</span><span class="ic">⋯ ↑ ↓ 🗑</span></div>
+      </div>
+
+      <div class="bottombar">
+        <span class="lft">🐰 오늘도 화이팅!</span>
+        <span>
+          <span class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M15 3.2 20.8 9l-8.2 8.2H6.8V11.4Z"/><path d="m11.4 6.8 5.8 5.8"/><path d="M3.5 21h17"/></svg></span>
+          <span class="ico gone" title="이 아이콘은 없앤다 — 좌하단 쓰레기통·더보기와 목적지가 같다"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></span>
+        </span>
+      </div>
+
+      <div class="fab-pop">
+        <h5><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg> 숨긴 기사 15건</h5>
+        <p class="hint">오늘 숨긴 기사예요. 자정이 지나면 목록이 비워져요.</p>
+        <div class="row">
+          <span class="tx"><span class="gname">&lt;부동산 세제 논의&gt;</span> 통째로 숨김<span class="tm">11:02</span></span>
+          <span class="cnt">12건</span>
+          <button class="restore"><svg class="i" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12H7"/></svg>모두</button>
+        </div>
+        <div class="row">
+          <span class="tx">골라서 숨김<span class="tm">10:57</span></span>
+          <span class="cnt">2건</span>
+          <button class="restore"><svg class="i" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12H7"/></svg>모두</button>
+        </div>
+        <div class="row">
+          <span class="tx">(뉴시스) [부고] 김○○ 재정경제부 국고국장 모친상<span class="tm">11:20</span></span>
+          <button class="restore"><svg class="i" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12H7"/></svg>복구</button>
+        </div>
+        <a class="more">쓰레기통 열어서 하나씩 고르기 →</a>
+      </div>
+
+      <button class="fab left upper" title="기사 숨기기 되돌리기">
+        <svg class="i" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12H7"/></svg>
+      </button>
+      <button class="fab left" title="숨긴 기사 15건">
+        <svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>
+        <span class="badge">15</span>
+      </button>
+      <button class="fab right" title="소제목 목차">
+        <svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+    </div>
+    <p class="note">팝오버는 <b>묶음 한 줄 + 낱개</b>까지만. 개별 펼치기(▾)는 없다 — 그건 더보기 너머 일. 하단바 🗑️는 뺀다(빗금): 더보기와 목적지가 같아 옆문이 된다.</p>
+  </div>
+
+  <!-- ───────────── ② 확정본 ───────────── -->
+  <div class="case">
+    <div class="cap">② [확정본] <span class="sub">— 닫힌 상태 (배지만, 숨긴 기사 1건)</span></div>
+    <div class="screen">
+      <div class="topbar">
+        <a>← HOME</a>
+        <div><a style="margin-right:12px">실시간 현황</a><a>다음 회차 초안</a></div>
+      </div>
+
+      <div class="body">
+        <div class="doc-head">언론 모니터링 14시 기준</div>
+        <div class="doc-sub">⏱️ 03:41 후 자동 발송</div>
+
+        <h2 class="sub">&lt;내년도 예산안 편성&gt;</h2>
+        <div class="art"><span class="box"></span><span class="t"><span class="o">(연합뉴스)</span> 구윤철 부총리 “내년 예산, 재정 역할 확대”…확장 기조 재확인</span><span class="ic">⋯ ↑ ↓ 🗑</span></div>
+        <div class="art"><span class="box"></span><span class="t"><span class="o">(KBS)</span> 재정경제부, 2027년 예산안 당정협의 착수</span><span class="ic">⋯ ↑ ↓ 🗑</span></div>
+
+        <h2 class="sub">&lt;부동산 세제 논의&gt;</h2>
+        <div class="art"><span class="box"></span><span class="t"><span class="o">(서울경제)</span> 이형일 부총리 후보자 “대규모 주택매입 시스템, 관계부처와 협의 중”</span><span class="ic">⋯ ↑ ↓ 🗑</span></div>
+        <div class="art"><span class="box"></span><span class="t"><span class="o">(문화일보)</span> 李 ‘지지율 붕괴’ 반등의 필요조건[오남석의 시론]</span><span class="ic">⋯ ↑ ↓ 🗑</span></div>
+        <div class="art"><span class="box"></span><span class="t"><span class="o">(데일리안)</span> 차기 수협은행장 6파전…신학기, 사상 첫 ‘연임 행장’ 도전장</span><span class="ic">⋯ ↑ ↓ 🗑</span></div>
+      </div>
+
+      <div class="bottombar">
+        <span class="lft">🐰 오늘도 화이팅!</span>
+        <span>
+          <span class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M15 3.2 20.8 9l-8.2 8.2H6.8V11.4Z"/><path d="m11.4 6.8 5.8 5.8"/><path d="M3.5 21h17"/></svg></span>
+          <span class="ico gone"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></span>
+        </span>
+      </div>
+
+      <button class="fab left upper" title="소제목 이름 변경 되돌리기">
+        <svg class="i" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12H7"/></svg>
+      </button>
+      <button class="fab left" title="숨긴 기사 1건">
+        <svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>
+        <span class="badge">1</span>
+      </button>
+      <button class="fab right send">(발송)</button>
+      <button class="fab right" title="소제목 목차">
+        <svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+    </div>
+    <p class="note">1건뿐이면 팝오버에 그 한 줄만 뜨고 더보기 줄은 안 그린다 — 갈 이유가 없는 링크를 매번 보여주지 않는다(0건이면 쓰레기통 자체를 안 그리는 것과 같은 결).</p>
+  </div>
+
+  <!-- ───────────── ③ 풀사이즈 ───────────── -->
+  <div class="case wide">
+    <div class="cap">③ 더보기 → 쓰레기통 풀사이즈 <span class="sub">— <code style="font-size:.72rem">/hidden</code>, 묶음 헤더 + 일괄 복구</span></div>
+    <div class="screen full">
+      <div class="topbar">
+        <a>← 초안으로</a>
+        <div><a style="margin-right:12px">← 확정본으로</a><a>실시간 현황</a></div>
+      </div>
+
+      <div class="body">
+        <h1 class="ph"><svg class="i" viewBox="0 0 24 24" style="width:19px;height:19px"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg> 숨긴 기사 15건</h1>
+        <div class="psub">오늘 숨긴 기사예요. 자정이 지나면 목록이 비워집니다.</div>
+
+        <div class="bulkbar">
+          <span class="n">3개 선택됨</span>
+          <span class="sp"></span>
+          <button class="btn-primary"><svg class="i" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12H7"/></svg> 선택한 기사 복구</button>
+          <button class="btn-ghost">선택 해제</button>
+        </div>
+
+        <!-- 묶음 ①: 소제목 통째 (펼침) -->
+        <div class="grp">
+          <div class="gh">
+            <span class="caret">▾</span>
+            <span class="cb on"></span>
+            <span class="gt"><span class="gname">&lt;부동산 세제 논의&gt;</span> 통째로 숨김<span class="when">11:02</span></span>
+            <span class="cnt">12건</span>
+            <button class="restore"><svg class="i" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12H7"/></svg>모두 복구</button>
+          </div>
+          <div class="hrow sel"><span class="cb on"></span><span class="tx"><span class="o">(뉴시스)</span> 국회 예결위, 종부세 개편안 심사 착수<span class="tm">10:41</span></span><button class="restore"><svg class="i" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12H7"/></svg>복구</button></div>
+          <div class="hrow sel"><span class="cb on"></span><span class="tx"><span class="o">(뉴스1)</span> 여당 “종부세 완화 속도조절” 기류<span class="tm">10:38</span></span><button class="restore"><svg class="i" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12H7"/></svg>복구</button></div>
+          <div class="hrow sel"><span class="cb on"></span><span class="tx"><span class="o">(파이낸셜뉴스)</span> 통신비 반값 기저효과에 물가 다시 3%대…개인서비스도 3.5%↑<span class="tm">10:33</span></span><button class="restore"><svg class="i" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12H7"/></svg>복구</button></div>
+          <div class="hrow"><span class="cb"></span><span class="tx"><span class="o">(서울경제)</span> 다주택자 중과 유예 연장 검토<span class="tm">10:29</span></span><button class="restore"><svg class="i" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12H7"/></svg>복구</button></div>
+          <div class="hrow" style="color:#A6ADB8;font-size:.75rem;justify-content:center">… 8건 더</div>
+        </div>
+
+        <!-- 묶음 ②: 체크박스 일괄 (접힘) -->
+        <div class="grp closed">
+          <div class="gh">
+            <span class="caret">▸</span>
+            <span class="cb"></span>
+            <span class="gt">골라서 숨김<span class="when">10:57</span></span>
+            <span class="cnt">2건</span>
+            <button class="restore"><svg class="i" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12H7"/></svg>모두 복구</button>
+          </div>
+        </div>
+
+        <!-- 낱개 -->
+        <div class="solo">
+          <div class="hrow"><span class="cb"></span><span class="tx"><span class="o">(뉴시스)</span> [부고] 김○○ 재정경제부 국고국장 모친상<span class="tm">11:20</span></span><button class="restore"><svg class="i" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12H7"/></svg>복구</button></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">묶음 헤더의 체크박스는 그 묶음 전체를 한 번에 고른다 — 확정본·초안의 소제목 <code>.group-select-all</code>과 같은 동작(한 방향: 개별 해제로 헤더가 풀리지는 않는다). 선택이 있을 때만 상단 바가 뜨는 것도 일괄이동 바와 같은 규칙.</p>
+  </div>
+
+</div>
+
+<div class="legend">
+
+  <h3>두 화면의 역할 분담</h3>
+  <ul>
+    <li><b>팝오버</b> — “지금 몇 건이 빠져 있나”와 “방금 날린 덩어리 되살리기”. 묶음은 한 줄, 낱개는 그대로 한 줄. 스크롤이 생기기 전에 끝난다.</li>
+    <li><b>풀사이즈(<code>/hidden</code>)</b> — 묶음을 펼쳐 그 안에서 한 건씩 고르기, 여러 묶음에 걸친 선택 복구. 40건짜리도 여기서 감당한다.</li>
+    <li>더보기는 <b>같은 탭</b>으로 간다 — 새 탭이면 거기서 복구했을 때 원래 탭이 옛 상태로 남아 화면이 거짓말을 한다. 돌아오는 링크(<code>preview_href</code>/<code>scrap_href</code>)는 이미 그 화면에 있다.</li>
+  </ul>
+
+  <h3>묶는 기준</h3>
+  <ul>
+    <li><b><code>hidden_at</code> 3초</b> — <code>app/undo.py</code>의 <code>coalesce_sec=3.0</code>과 같은 값. ↩가 “한 걸음”이라 부르는 단위와 쓰레기통이 “한 묶음”이라 부르는 단위가 같아야 두 장치가 따로 놀지 않는다.</li>
+    <li>묶음이 1건이면 묶지 않고 낱개 줄로 — 접을 게 없는데 접으면 클릭만 는다.</li>
+    <li><b>배지 숫자는 총 건수</b>(묶음 수가 아니라). 담당자의 질문은 “지금 화면에서 몇 건이 빠져 있나”다.</li>
+    <li>이름(<code>&lt;부동산 세제 논의&gt; 통째로 숨김</code>)을 붙이려면 <code>hide_article()</code>에 <code>group</code>을 하나 더 실어 <code>hidden_articles.json</code>에 적어야 한다 — <code>outlet</code>/<code>title</code>/<code>pub_date</code>를 이미 그렇게 넘기고 있어 방식은 그대로. 안 넘어온 기록(옛 데이터·체크박스 일괄)은 <code>골라서 숨김</code>으로 떨어진다.</li>
+  </ul>
+
+  <h3>수시와 똑같이 맞춘 것 / 정기라서 다른 것</h3>
+  <ul>
+    <li>같음 — 좌하단 스택(아래 쓰레기통 56px, 위 ↩ 50px), 빨간 배지, 0건이면 안 그림, 팝오버가 쓰레기통 바로 위에서 펼쳐짐.</li>
+    <li>다름 — 이름이 <b>「숨긴 기사」</b>다. 수시의 “목록 밖 기사”는 조건 밖 + 직접 숨김 두 종류를 담는 이름이었지만, 정기엔 조건 밖 개념이 없어 전부 복구 가능하다.</li>
+    <li>다름 — <b>더보기가 있다.</b> 수시는 카드 하나의 여집합이라 팝오버 안에서 끝나지만, 정기는 소제목 통째 숨기기 때문에 한 번에 수십 건이 들어온다.</li>
+    <li>다름 — 모수가 <b>하루 전역</b>이다. 초안·확정본·실시간 어디서 숨겼든 같은 목록. 그래서 두 화면의 배지가 같은 숫자일 수 있고 그게 정상이다.</li>
+    <li>다름 — 복구하면 <code>location.reload()</code>. 숨김 해제는 기사 목록과 소제목 구성이 같이 바뀌어서, 팝오버만 갱신하면 화면이 거짓말을 한다.</li>
+  </ul>
+
+  <h3>아직 안 정한 것</h3>
+  <ul>
+    <li>풀사이즈에 “어느 화면에서 숨겼나”(초안/확정본/실시간)를 표시할지 — 저장 필드가 하나 더 늘고, 전역 모수의 혼란을 줄여주긴 한다. 지금 목업엔 안 넣었다.</li>
+    <li>묶음 창을 3초 그대로 갈지, 소제목 통째 숨기기가 느릴 때를 대비해 넓힐지.</li>
+  </ul>
+</div>
+
+</body>
+</html>

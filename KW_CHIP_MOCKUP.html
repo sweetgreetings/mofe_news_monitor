@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>🔍 검색어 자르기 + 칩 목업</title>
+<style>
+  :root {
+    --bg: #F8FAFC; --card: #FFFFFF; --header: #1E3A5F; --accent: #2563EB;
+    --text: #1F2937; --muted: #6B7280; --border: #E5E7EB; --hover: #EFF6FF;
+    --text-soft: #4B5563; --text-faint: #9CA3AF; --error: #DC2626;
+    --warn-text: #92400E; --warn-chip-bg: #FEF3C7; --warn-border: #FDE68A;
+  }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .page { max-width: 900px; margin: 20px auto 70px; padding: 0 20px; }
+  h1 { font-size: 1.2rem; color: var(--header); margin: 0 0 6px; }
+  .lede { color: var(--muted); font-size: 0.85rem; margin: 0 0 16px; line-height: 1.65; }
+  code { background: #F1F5F9; border: 1px solid var(--border); border-radius: 4px;
+    padding: 1px 5px; font-size: 0.82em; color: #334155; }
+
+  .bar {
+    position: sticky; top: 0; z-index: 5; background: var(--card);
+    border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 8px;
+    padding: 12px 16px; margin: 0 0 6px; display: flex; align-items: center; gap: 8px;
+    flex-wrap: wrap; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  }
+  .bar b { font-size: 0.84rem; color: var(--header); margin-right: 2px; }
+  .bar button {
+    font-size: 0.79rem; padding: 5px 12px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--card); color: var(--text-soft);
+    font-family: inherit;
+  }
+  .bar button:hover { border-color: var(--accent); color: var(--accent); }
+  .bar button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .bar .sep { width: 1px; height: 22px; background: var(--border); margin: 0 5px; }
+  .bar .rec { font-size: 0.68rem; margin-left: 3px; opacity: .85; }
+
+  .vdesc {
+    font-size: 0.83rem; line-height: 1.7; color: var(--text-soft);
+    background: var(--card); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent); border-radius: 6px;
+    padding: 11px 15px; margin: 0 0 12px;
+  }
+  .vdesc b { color: var(--header); }
+  .bad { color: var(--error); font-weight: 700; }
+  .good { color: #166534; font-weight: 700; }
+
+  .measure {
+    margin: 0 0 12px; font-size: 0.83rem; color: var(--text-soft); line-height: 1.9;
+    background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px;
+  }
+  .measure b { color: var(--header); font-variant-numeric: tabular-nums; }
+
+  /* ── 확정본 카드 재현 (app/renderer.py 실제 값, content-box 800px) ── */
+  .container {
+    width: 800px; max-width: 100%; padding: 24px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 8px;
+  }
+  .container.w640 { width: 640px; }
+  .container.w360 { width: 360px; padding: 16px; }
+  .wrap-x { overflow-x: auto; }
+  .article { margin: 10px 0; line-height: 1.5; padding: 6px 8px; border-radius: 8px; }
+  .article:hover { background: #F3F4F6; }
+  .article summary { cursor: pointer; display: flex; flex-direction: column; gap: 4px; list-style: none; }
+  .article summary::-webkit-details-marker { display: none; }
+  .title-row { display: flex; align-items: baseline; justify-content: flex-start; gap: 8px; }
+  .title-line { min-width: 0; overflow-wrap: anywhere; color: var(--text); }
+  .title-outlet { color: var(--muted); font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  .article-select { margin-top: 3px; flex-shrink: 0; }
+  .action-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 4px; }
+  .article:has(.article-select) .action-row { padding-left: 28px; }
+  .article-actions {
+    margin-left: auto; display: flex; align-items: center; justify-content: flex-end;
+    gap: 4px; flex-shrink: 0; flex-wrap: wrap; row-gap: 4px;
+  }
+  .pub-time { flex-shrink: 0; color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+  .time-sep { color: var(--muted); font-size: 0.8rem; margin: 0 2px; }
+  .origin-link-text {
+    flex-shrink: 0; color: var(--accent); font-size: 0.8rem; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 2px; white-space: nowrap;
+  }
+  .origin-link-icon { width: 0.75em; height: 0.75em; }
+  .kw-inline { font-size: 0.8rem; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+  .kw-inline .kw-ic { width: 0.75em; height: 0.75em; color: var(--text-faint); flex-shrink: 0; }
+  .kw-inline .kw-v { color: var(--text-soft); }
+  .late-badge {
+    flex-shrink: 0; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 0.72rem;
+    color: var(--warn-text); background: var(--warn-chip-bg); border: 1px solid var(--warn-border); white-space: nowrap;
+  }
+  .group-move-select {
+    flex-shrink: 0; width: 100px; border: 1px solid var(--border); border-radius: 4px;
+    padding: 2px 4px; font-size: 0.78rem; color: var(--muted); background: var(--card);
+  }
+  .move-btn, .hide-btn, .copy-btn {
+    flex-shrink: 0; background: transparent; border: none; color: var(--muted);
+    font-size: 1rem; cursor: pointer; padding: 2px 6px; display: inline-flex; align-items: center;
+  }
+  .more-btn, .lab-btn {
+    background: transparent; border: none; color: var(--muted); font-size: 1.05rem;
+    line-height: 1; cursor: pointer; padding: 3px 7px; border-radius: 4px;
+    display: inline-flex; align-items: center; flex-shrink: 0;
+  }
+  .lab-btn { font-size: 1rem; padding: 3px 6px; }
+  .article-summary { margin: 6px 0 4px 20px; color: var(--text); font-size: 0.95rem; }
+
+  /* ── A안: 실시간현황처럼 고정 폭에서 자른다 (값은 JS가 "칩 없는 행이 안 밀리는 최대값"으로 잰다) ── */
+  .opt-a .kw-inline .kw-v {
+    display: inline-block; max-width: var(--kw-max, 200px); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; vertical-align: -3px;
+  }
+
+  /* ── B·C안: 남는 자리만큼 줄어든다 ──
+     줄바꿈을 끄고(줄이기 전에 줄바꿈부터 해버리므로), 검색어만 줄어들 수 있게 한다.
+     나머지(게시시각·원문보기·칩·버튼 묶음)는 전부 제 크기를 지킨다. */
+  .opt-b .action-row, .opt-c .action-row { flex-wrap: nowrap; }
+  .opt-b .action-row > *, .opt-c .action-row > * { flex-shrink: 0; }
+  .opt-b .action-row > .kw-inline, .opt-c .action-row > .kw-inline { flex: 0 1 auto; min-width: 0; }
+  .opt-b .kw-inline .kw-v, .opt-c .kw-inline .kw-v {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* 좁은 화면(실제로는 @media (max-width: 640px))에서는 지금처럼 버튼 묶음이 아랫줄로 —
+     폭 360px에 검색어까지 욱여넣으면 "재…"만 남아 쓸모가 없다. */
+  .is-mobile.opt-b .action-row, .is-mobile.opt-c .action-row { flex-wrap: wrap; }
+  .is-mobile.opt-b .action-row > .kw-inline, .is-mobile.opt-c .action-row > .kw-inline { flex-shrink: 1; }
+
+  /* 측정 표시 — 밀린 행 / 잘린 검색어 */
+  .show-marks .article.wrapped { box-shadow: inset 3px 0 0 var(--error); }
+  .show-marks .kw-inline.cut .kw-v { text-decoration: underline dotted var(--text-faint); text-underline-offset: 3px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>🔍 검색어 자르기 — <code>⏱ 늦게 들어온 기사</code> 칩이 붙은 행</h1>
+<p class="lede">
+  같은 기사 7건, <code>app/renderer.py</code>의 실제 CSS 값(카드 폭 800px, 들여쓰기 28px, 칩 0.72rem).
+  1·2행이 스크린샷 두 장의 그 행이다. 2·3·6행에 칩이 붙어 있다.
+  <b>빨간 왼쪽 선</b> = 버튼 묶음이 아랫줄로 밀린 행, 검색어 <b>점선 밑줄</b> = 잘린 행
+  (잘린 행에 마우스를 올리면 전체 검색어가 툴팁으로 뜬다).
+</p>
+
+<div class="bar">
+  <b>방식</b>
+  <button class="vbtn" data-v="now">지금</button>
+  <button class="vbtn" data-v="a">A · 고정 폭 자르기</button>
+  <button class="vbtn" data-v="b">B · 남는 자리만큼 · 칩 뒤</button>
+  <button class="vbtn on" data-v="c">C · 남는 자리만큼 · 칩 앞<span class="rec">추천</span></button>
+  <span class="sep"></span>
+  <b>카드 폭</b>
+  <button class="wbtn on" data-w="800">800 (데스크톱)</button>
+  <button class="wbtn" data-w="640">640</button>
+  <button class="wbtn" data-w="360">360 (모바일)</button>
+</div>
+
+<p class="vdesc" id="vdesc"></p>
+<div class="measure" id="m"></div>
+
+<div class="wrap-x"><div class="container show-marks opt-c" id="list"></div></div>
+
+</div>
+
+<script>
+var ROWS = [
+  { outlet: "이데일리", title: "“1300만명 코인 과세 유예” 5만명 돌파에도…이형일 “내년 과세”",
+    time: "11:16 · 2시간 전", kw: "재정경제부, 재경부, 이형일, 재경위, 재정경제기획위원회" },
+  { outlet: "아시아경제", title: "행시 69회 재경직 수석, 기획처 선택했다…5급 수습사무관 313명 오늘 첫 출근[관가 in]",
+    time: "11:00 · 2시간 전", kw: "재정경제부, 재경부, 기획재정부, 기재부, 재정경제기획위원회", late: true },
+  { outlet: "뉴시스", title: "기재부 1차관 \"하반기 내수 회복 흐름 이어갈 것\"",
+    time: "10:58 · 2시간 전", kw: "기재부", late: true },
+  { outlet: "KBS", title: "정부, 내년 예산안 728조 편성…12년 만의 최대 증가폭",
+    time: "12:41 · 38분 전", kw: "재정경제부, 구윤철" },
+  { outlet: "한국경제", title: "구윤철 \"재정경제기획위원회 출범 앞두고 조직 정비 마무리\"",
+    time: "12:05 · 1시간 전", kw: "재정경제부, 재경부, 기획재정부, 구윤철, 이형일, 재정경제기획위원회" },
+  { outlet: "연합뉴스", title: "[속보] 재경부, 9월 그린북 발표…\"경기 회복 조짐\"",
+    time: "10:59 · 2시간 전", kw: "재정경제부, 재경부", late: true },
+  { outlet: "매일경제", title: "국가재정전략회의 개최…\"지출 구조조정 없인 재정준칙 무의미\"",
+    time: "12:30 · 49분 전", kw: "재정경제부" },
+];
+
+var IC_SEARCH = '<svg class="kw-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
+var IC_EXT = '<svg class="origin-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 4h6v6"/><path d="M20 4l-8 8"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';
+var IC_COPY = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+var IC_TAG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 11V4a1 1 0 0 1 1-1h7l9 9-8 8z"/><circle cx="7.5" cy="7.5" r="1.3" fill="currentColor" stroke="none"/></svg>';
+var IC_TRASH = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16"/><path d="M9 6V4h6v2"/><path d="M6 6l1 14h10l1-14"/></svg>';
+var IC_UP = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg>';
+var IC_DOWN = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M18 13l-6 6-6-6"/></svg>';
+
+var ACTIONS =
+  '<span class="article-actions">' +
+    '<select class="group-move-select"><option>다른 소제목</option></select>' +
+    '<button class="copy-btn">' + IC_COPY + '</button>' +
+    '<button class="lab-btn">' + IC_TAG + '</button>' +
+    '<button class="more-btn">⋯</button>' +
+    '<button class="hide-btn">' + IC_TRASH + '</button>' +
+    '<button class="move-btn">' + IC_UP + '</button>' +
+    '<button class="move-btn">' + IC_DOWN + '</button>' +
+  '</span>';
+
+var TIP = "이 기사가 수집된 검색어입니다";
+function rowHtml(r, chipFirst) {
+  var kw = '<span class="time-sep">·</span>' +
+    '<span class="kw-inline" title="' + TIP + '">' + IC_SEARCH + '<span class="kw-v">' + r.kw + '</span></span>';
+  var chip = r.late
+    ? '<span class="late-badge" title="11시 회차 시간대 기사인데 그때 수집되지 않아 이번 회차에 담겼습니다">⏱ 늦게 들어온 기사</span>'
+    : '';
+  var meta = '<span class="pub-time">' + r.time + '</span>' +
+    '<span class="time-sep">·</span>' +
+    '<a class="origin-link-text" href="#" onclick="return false">' + IC_EXT + ' 원문보기</a>' +
+    (chipFirst ? chip + kw : kw + chip);
+  return '<div class="article' + (r.late ? ' has-chip' : '') + '"><details><summary>' +
+    '<div class="title-row"><input type="checkbox" class="article-select">' +
+      '<span class="title-line"><span class="title-outlet">' + r.outlet + '</span>' + r.title + '</span></div>' +
+    '<div class="action-row">' + meta + ACTIONS + '</div>' +
+    '</summary><p class="article-summary">(요약문)</p></details></div>';
+}
+
+var DESC = {
+  now: '<b>지금</b> — 검색어에 폭 제한이 없다. 검색어가 길면 버튼 묶음이 통째로 아랫줄로 내려간다.',
+  a: '<b>A · 고정 폭 자르기</b> — 실시간현황과 같은 방식. 폭은 <b>칩 없는 행이 하나도 안 밀리는 가장 큰 값</b>' +
+     '(<b id="kwmax"></b>)으로 JS가 잰다. <span class="bad">그래도 칩이 붙은 긴 행(2행)은 밀린다</span> — ' +
+     '칩 폭(약 110px)만큼 여유가 모자라서다. 칩까지 넣으려고 폭을 더 줄이면 칩 없는 행에서 괜히 자른다.',
+  b: '<b>B · 남는 자리만큼 줄이기, 칩은 검색어 뒤(지금 자리)</b> — ' +
+     '<span class="good">어느 행도 안 밀린다.</span> 칩이 있는 행만 검색어가 더 짧게 잘린다. ' +
+     '다만 칩이 <code>…</code> 바로 뒤에 붙어서, 2·3·6행에서 <b>칩의 가로 위치가 검색어 길이만큼 제각각</b>이다.',
+  c: '<b>C · 남는 자리만큼 줄이기, 칩은 원문보기 뒤·검색어 앞</b> — ' +
+     '<span class="good">어느 행도 안 밀리고, 칩이 늘 같은 자리에 선다.</span> ' +
+     '잘리는 검색어가 줄 맨 끝(버튼 바로 앞)이라 <code>…</code>도 제자리다. 원문보기는 칩보다 앞이라 안 움직인다. ' +
+     '360px(모바일)에서는 지금처럼 버튼 묶음이 아랫줄로 내려간다(실제로는 <code>@media</code>).',
+};
+
+var variant = "c", width = 800;
+var list = document.getElementById("list");
+
+function render() {
+  list.className = "container show-marks opt-" + variant +
+    (width === 640 ? " w640" : width === 360 ? " w360 is-mobile" : "");
+  list.innerHTML = ROWS.map(function (r) { return rowHtml(r, variant === "c"); }).join("");
+  document.querySelectorAll(".vbtn").forEach(function (b) { b.classList.toggle("on", b.dataset.v === variant); });
+  document.querySelectorAll(".wbtn").forEach(function (b) { b.classList.toggle("on", +b.dataset.w === width); });
+  if (variant === "a") findKwMax();
+  document.getElementById("vdesc").innerHTML = DESC[variant];
+  if (variant === "a") document.getElementById("kwmax").textContent = list.style.getPropertyValue("--kw-max");
+  measure();
+}
+
+function isWrapped(art) {
+  var t = art.querySelector(".pub-time").getBoundingClientRect().top;
+  var a = art.querySelector(".article-actions").getBoundingClientRect().top;
+  return Math.abs(a - t) > 6;
+}
+
+// A안: 칩 없는 행이 하나도 안 밀리는 가장 큰 max-width를 5px 단위로 찾는다.
+function findKwMax() {
+  var best = 60;
+  for (var w = 400; w >= 60; w -= 5) {
+    list.style.setProperty("--kw-max", w + "px");
+    var ok = true;
+    list.querySelectorAll(".article:not(.has-chip)").forEach(function (art) { if (isWrapped(art)) ok = false; });
+    if (ok) { best = w; break; }
+  }
+  list.style.setProperty("--kw-max", best + "px");
+}
+
+function measure() {
+  var wrapped = 0, cut = 0, chipXs = [];
+  list.querySelectorAll(".article").forEach(function (art) {
+    var w = isWrapped(art);
+    art.classList.toggle("wrapped", w);
+    if (w) wrapped++;
+    var kw = art.querySelector(".kw-inline"), v = kw.querySelector(".kw-v");
+    var c = v.scrollWidth > v.clientWidth + 1;
+    kw.classList.toggle("cut", c);
+    kw.title = c ? v.textContent : TIP;
+    if (c) cut++;
+    var chip = art.querySelector(".late-badge");
+    if (chip && !w) chipXs.push(Math.round(chip.getBoundingClientRect().left - art.getBoundingClientRect().left));
+  });
+  var spread = chipXs.length ? Math.max.apply(null, chipXs) - Math.min.apply(null, chipXs) : 0;
+  document.getElementById("m").innerHTML =
+    '버튼 묶음이 <b>아랫줄로 밀린 행</b> <b class="' + (wrapped ? "bad" : "good") + '">' + wrapped + '</b> / 7' +
+    ' &nbsp;·&nbsp; 검색어가 <b>잘린 행</b> <b>' + cut + '</b> / 7' +
+    ' &nbsp;·&nbsp; 칩 가로 위치 차이 <b class="' + (spread > 4 ? "bad" : "good") + '">' + spread + 'px</b>' +
+    ' <span style="color:var(--muted)">(한 줄에 선 칩끼리, 0이면 같은 자리)</span>';
+}
+
+document.querySelectorAll(".vbtn").forEach(function (b) {
+  b.addEventListener("click", function () { variant = b.dataset.v; render(); });
+});
+document.querySelectorAll(".wbtn").forEach(function (b) {
+  b.addEventListener("click", function () { width = +b.dataset.w; render(); });
+});
+window.addEventListener("resize", render);
+document.fonts && document.fonts.ready.then(render);
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>검색어 화면 촘촘하게 — 시안</title>
+<style>
+  :root {
+    --bg: #F8FAFC; --card: #FFFFFF; --header: #1E3A5F; --accent: #2563EB;
+    --text: #1F2937; --muted: #6B7280; --border: #E5E7EB; --hover: #EFF6FF;
+    --error: #DC2626; --error-bg: #FEF2F2; --error-border: #FECACA;
+    --chip-off-border: #CBD5E1; --toggle-off: #CBD5E1; --placeholder: #9CA3AF;
+    --accent-border: #BFDBFE;
+    --warn-bg: #FFFBEB; --warn-border: #FDE68A; --warn-text: #92400E; --warn-dot: #F59E0B;
+    --good: #15803D;
+  }
+  body { margin: 0; background: #EEF2F7; color: var(--text);
+    font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; }
+
+  /* ───────── 목업 바깥 틀 ───────── */
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 26px 20px 80px; }
+  .wrap h1.doc { font-size: 1.3rem; color: var(--header); margin: 0 0 6px; }
+  .doc-lead { color: var(--muted); font-size: .88rem; line-height: 1.6; margin: 0 0 16px; }
+  .changes { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 4px 16px; margin: 0 0 18px; }
+  .chg { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 4px 10px;
+    padding: 11px 0; border-bottom: 1px solid var(--border); font-size: .86rem; line-height: 1.6; }
+  .chg:last-child { border-bottom: 0; }
+  .chg .n { width: 22px; height: 22px; border-radius: 50%; background: var(--header); color: #fff;
+    font-size: .76rem; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+  .chg .n.side { background: var(--muted); }
+  .chg b { color: var(--header); }
+  .chg ul { margin: 3px 0 0; padding-left: 17px; color: var(--muted); }
+  .chg li b { color: var(--text); font-weight: 600; }
+  .chg code { background: #EEF2F7; border-radius: 4px; padding: 0 4px; font-size: .84em; }
+
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 0 0 10px; }
+  .seg-doc { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--card); }
+  .seg-doc button { border: 0; background: transparent; padding: 7px 14px; font: inherit; font-size: .85rem;
+    color: var(--muted); cursor: pointer; }
+  .seg-doc button + button { border-left: 1px solid var(--border); }
+  .seg-doc button.on { background: var(--accent); color: #fff; font-weight: 600; }
+  .stats { font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .stats b { color: var(--text); }
+  .stats .d { color: var(--good); font-weight: 700; }
+  .variant-note { font-size: .83rem; color: var(--muted); line-height: 1.6; margin: 0 0 12px; min-height: 1.6em; }
+  .variant-note b { color: var(--text); }
+
+  #stage { width: 100%; }
+  .scaler { transform-origin: 0 0; }
+  .frame { width: 800px; }
+  .park { position: absolute; left: -99999px; top: 0; visibility: hidden; }
+
+  /* 저장 바 모형 */
+  .bar-label { font-size: .75rem; color: var(--muted); margin: 12px 0 5px; }
+  .fake-savebar { background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 24px; width: 800px; }
+  .fake-savebar .save-msg { display: flex; align-items: flex-start; gap: 8px; font-size: .82rem; line-height: 1.5;
+    border-radius: 7px; padding: 9px 11px; margin-bottom: 10px;
+    background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text); }
+  .fake-savebar .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; background: var(--warn-dot); }
+  .fake-savebar .btn { background: var(--accent); color: #fff; border-radius: 4px; padding: 8px 16px;
+    text-align: center; font-size: 1rem; }
+
+  /* ───────── 앱 화면 공통(설정 서버 _BASE_STYLE 그대로 — content-box라 본문 폭이 800px) ───────── */
+  .screen { max-width: 800px; padding: 24px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 8px; }
+  .screen h1 { font-size: 1.3rem; color: var(--header); margin: 0 0 14px; display: flex; align-items: center; gap: 6px; }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+  .screen button { font-family: inherit; appearance: none; -webkit-appearance: none; }
+
+  /* ═════════ 현재 (app/settings_server.py _KEYWORD_GROUPS_TEMPLATE 값 그대로) ═════════ */
+  .cur .caption { color: var(--muted); font-size: .78rem; margin: 0 0 12px; }
+  .cur .scope-note { background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 14px; margin: 0 0 14px; display: flex; flex-direction: column; gap: 7px; }
+  .cur .scope-row { display: flex; align-items: baseline; gap: 9px; font-size: .86rem; line-height: 1.5; }
+  .cur .scope-row .u { font-size: .74rem; font-weight: 600; border-radius: 999px; padding: 2px 9px; white-space: nowrap; flex-shrink: 0; }
+  .cur .u.live { background: #FEF2F2; color: var(--error); }
+  .cur .u.scrap { background: var(--hover); color: var(--header); }
+  .cur .hint { color: var(--muted); font-size: .85rem; margin: 0 0 16px; }
+  .cur .groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
+  .cur .group-block { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; background: var(--card); }
+  .cur .group-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  /* 공용 input[type=text](회색 배경·테두리)가 .group-name-input(투명)을 명시도로 이긴 실제 모습 */
+  .cur .group-name-input { flex: 1; min-width: 0; font-weight: 600; font-family: inherit; font-size: 1rem;
+    background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; }
+  .cur .switch .pill { width: 46px; height: 26px; }
+  .cur .switch .pill::after { top: 3px; left: 3px; width: 20px; height: 20px; }
+  .cur .switch input:checked ~ .pill::after { transform: translateX(20px); }
+  .cur .group-trash { width: 32px; height: 32px; }
+  .cur .group-body { margin-top: 10px; }
+  .cur .chips { gap: 6px; }
+  .cur .chip { font-size: .9rem; }
+  .cur .chip-body { padding: 7px 3px 7px 12px; }
+  .cur .chip-x { font-size: 1rem; padding: 7px 10px 7px 6px; }
+  .cur .chip-add { padding: 5px 12px; }
+  .cur .chip-add input { font-size: .9rem; width: 92px; }
+  .cur .kw-meta { margin-top: 12px; font-size: .78rem; color: var(--muted); }
+  .cur .mode { margin: 12px 0 0; font-size: .85rem; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .cur .mode > span:first-child { color: var(--muted); font-size: .8rem; }
+  .cur .mode label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+  .cur .scrap-toggle { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--border); }
+  .cur .scrap-toggle label { font-size: .82rem; color: var(--muted); display: flex; align-items: flex-start; gap: 7px; line-height: 1.5; cursor: pointer; }
+  .cur .add-group-btn { margin-top: 14px; padding: 12px; font-size: .92rem; }
+
+  /* ───────── 두 화면이 같이 쓰는 부품 모양 ───────── */
+  .switch { position: relative; display: inline-flex; align-items: center; flex-shrink: 0; cursor: pointer; }
+  .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .pill { position: relative; border-radius: 999px; background: var(--toggle-off); transition: background .16s; flex-shrink: 0; }
+  .pill::after { content: ""; position: absolute; border-radius: 50%; background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .16s; }
+  .switch input:checked ~ .pill { background: var(--accent); }
+  .group-trash, .g-trash { background: transparent; border: 1px solid transparent; border-radius: 7px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; flex-shrink: 0; }
+  .group-trash:hover, .g-trash:hover { background: var(--error-bg); color: var(--error); border-color: var(--error-border); }
+  .chips { display: flex; flex-wrap: wrap; align-items: center; }
+  .chip { display: inline-flex; align-items: center; border-radius: 999px; line-height: 1; max-width: 100%; }
+  .chip-body { border: none; background: transparent; color: inherit; font: inherit; cursor: pointer;
+    border-radius: 999px 0 0 999px; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip-x { border: none; background: transparent; color: inherit; line-height: 1; cursor: pointer; opacity: .55;
+    border-radius: 0 999px 999px 0; }
+  .chip-x:hover { opacity: 1; color: var(--error); background: rgba(220,38,38,.08); }
+  .chip.on { background: var(--hover); border: 1px solid var(--accent); color: var(--header); font-weight: 600; }
+  .chip.off { background: var(--bg); border: 1px dashed var(--chip-off-border); color: var(--text); font-weight: 400; }
+  .chip-add { display: inline-flex; align-items: center; gap: 4px; border: 1px dashed var(--border);
+    background: var(--card); border-radius: 999px; color: var(--muted); }
+  .chip-add input { border: none; outline: none; background: transparent; font: inherit; color: var(--text); padding: 0; }
+  .chip-add input::placeholder { color: var(--placeholder); }
+  .chip-add .plus { color: var(--accent); font-weight: 700; }
+  .add-group-btn { width: 100%; background: var(--card); color: var(--accent); border: 1px dashed var(--accent);
+    border-radius: 8px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .add-group-btn:hover { background: var(--hover); }
+
+  /* ═════════ 시안 ═════════ */
+  .new .lead { color: var(--muted); font-size: .84rem; line-height: 1.7; margin: -4px 0 14px; }
+  .new .lead b { color: var(--text); font-weight: 600; }
+  /* 설명 문장 안에 카드의 실제 컨트롤 모양을 그대로 넣는다 — "이 표시 = 정기"가 이어 읽히게 */
+  .ref-cb { display: inline-flex; align-items: center; gap: 5px; color: var(--header); font-weight: 600;
+    font-size: .8rem; vertical-align: -1px; white-space: nowrap; margin: 0 1px; }
+  .ref-cb .box { width: 12px; height: 12px; border-radius: 3px; background: var(--accent); position: relative; }
+  .ref-cb .box::after { content: ""; position: absolute; left: 4px; top: 1.5px; width: 3px; height: 6px;
+    border: solid #fff; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+  .new .groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+  .g { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--card); }
+  .g-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .new .switch .pill { width: 38px; height: 22px; }
+  .new .switch .pill::after { top: 3px; left: 3px; width: 16px; height: 16px; }
+  .new .switch input:checked ~ .pill::after { transform: translateX(16px); }
+  /* 원래 의도대로 — 평소엔 제목처럼 투명, 올리면 테두리 */
+  .g-name { flex: 1; min-width: 0; font: inherit; font-size: .98rem; font-weight: 700; color: var(--header);
+    background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 3px 6px; }
+  .g-name:hover { border-color: var(--border); }
+  .g-name:focus { outline: none; border-color: var(--accent); background: var(--bg); }
+  .g-count { font-size: .76rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .g-count.full { color: var(--error); font-weight: 600; }
+  .g-trash { width: 28px; height: 28px; }
+  .new .chips { gap: 5px; }
+  .new .chip { font-size: .86rem; }
+  .new .chip-body { padding: 4px 2px 4px 10px; }
+  .new .chip-x { font-size: .95rem; padding: 4px 8px 4px 4px; }
+  .new .chip-add { padding: 3px 10px; }
+  .new .chip-add input { font-size: .86rem; width: 64px; }
+  .g-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+  .g-foot.flat { border-top: 0; padding-top: 0; }
+  /* 검색 방식 — 라디오 두 줄 대신 작은 세그먼트. "검색 방식" 글자는 툴팁으로 */
+  .mseg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .mseg button { border: 0; background: var(--card); color: var(--muted); font-size: .76rem; padding: 3px 9px; cursor: pointer; }
+  .mseg button + button { border-left: 1px solid var(--border); }
+  .mseg button.on { background: var(--hover); color: var(--header); font-weight: 600; }
+  /* 시안 A — 짧은 체크박스. 켜면 글자가 진해져서 카드를 훑기만 해도 정기 여부가 보인다 */
+  .scrap-a { display: inline-flex; align-items: center; gap: 5px; font-size: .8rem; color: var(--muted);
+    cursor: pointer; white-space: nowrap; }
+  .scrap-a input { margin: 0; accent-color: var(--accent); cursor: pointer; }
+  .scrap-a.on { color: var(--header); font-weight: 600; }
+  /* 시안 B — 머리줄 알약 */
+  .scrap-b { border-radius: 999px; font-size: .74rem; padding: 3px 9px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+  .scrap-b.on { background: var(--hover); border: 1px solid var(--accent-border); color: var(--header); font-weight: 600; }
+  .scrap-b.off { background: transparent; border: 1px dashed var(--chip-off-border); color: var(--muted); }
+  .ref-pill { display: inline-block; border-radius: 999px; font-size: .74rem; padding: 1px 8px; font-weight: 600;
+    background: var(--hover); border: 1px solid var(--accent-border); color: var(--header); vertical-align: 1px; }
+  .new .add-group-btn { margin-top: 12px; padding: 9px; font-size: .9rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="doc">검색어 화면 — 촘촘하게 · 설명 줄이기</h1>
+  <p class="doc-lead">등록된 그룹 6개(<code style="font-size:.85em">data/settings.json</code> 그대로)로 그렸어요. 폭은 실제와 같은 800px이고, 창이 좁으면 비율대로 줄어듭니다. 칩을 누르면 켜고 끄기, 정기 체크도 눌러볼 수 있어요.</p>
+
+  <div class="changes">
+    <div class="chg"><span class="n">1</span><div><b>칩·칸 위아래 여백</b>
+      <ul>
+        <li>키워드 칩 높이 <b>32 → 25px</b> (글자 .9 → .86rem, 위아래 여백 7 → 4px). 입력 칩도 같은 높이로.</li>
+        <li>그룹명 칸 <b>34 → 27px</b>, 카드 안쪽 여백 14·16 → 10·12px.</li>
+        <li>카드 아래 세 줄(키워드 수 / 검색 방식 / 정기 체크)을 <b>한 줄</b>로 — 키워드 수는 머리줄 오른쪽 <code>6/10</code>, 검색 방식은 작은 두 칸 버튼(「검색 방식」 글자는 툴팁).</li>
+      </ul></div></div>
+    <div class="chg"><span class="n">2</span><div><b>개요·설명 — 네 덩어리 → 두 줄</b>
+      <ul>
+        <li><b>빨간 「🔴 실시간 현황」 칩은 뺐어요.</b> 실시간은 "켜 둔 그룹 전부"라 따로 이름표를 붙일 대상이 아니에요. 대신 문장 안에 카드에 실제로 있는 <b>정기 체크 모양</b>을 그대로 넣어, 설명과 카드가 이어 읽히게 했어요.</li>
+        <li>「최대 8개·10개·최소 1개」 → 뺌. 카드마다 <code>6/10</code>이 있고, 8개가 차면 추가 버튼이 잠기고, 최소 조건은 저장 바가 막으면서 이유를 말해요. 「(그룹 간 OR)」도 용어라 뺌.</li>
+        <li>「저장하면 실시간엔 바로, 정기는 다음 회차부터」 → <b>저장 바 안내로 옮김</b>. 고친 게 있을 때만 보이고, 읽는 자리와 누르는 자리가 같아져요(맨 아래 저장 바 모형 참고).</li>
+      </ul></div></div>
+    <div class="chg"><span class="n">3</span><div><b>정기 스크랩 체크 — 70자 → 5자</b>
+      <ul>
+        <li>「정기 스크랩(예정된 회차)에도 포함 — 실시간 기사 현황에는 늘 나옵니다. 꺼두면 …」 → <b>「정기 스크랩」</b>. 나머지는 마우스를 올리면 툴팁으로.</li>
+        <li>켜면 글자가 진해져요 — 카드 여섯 장을 훑기만 해도 어느 그룹이 정기에 들어가는지 글자 무게로 보입니다.</li>
+      </ul></div></div>
+    <div class="chg"><span class="n side">+</span><div><b>덤 — 그룹명 칸이 회색 상자인 건 원래 의도가 아니에요</b>
+      <ul>
+        <li>코드는 「평소 투명, 올리면 테두리」로 적혀 있는데, 공용 <code>input[type=text]</code>(회색 배경) 규칙이 명시도가 더 높아서 이기고 있어요. 시안은 원래 의도대로 그렸어요 — 이름이 입력칸이 아니라 카드 제목처럼 읽힙니다.</li>
+      </ul></div></div>
+  </div>
+
+  <div class="controls">
+    <div class="seg-doc" id="viewSeg">
+      <button data-v="a" class="on">시안 A · 짧은 체크</button>
+      <button data-v="b">시안 B · 머리줄 알약</button>
+      <button data-v="cur">현재</button>
+    </div>
+    <span class="stats" id="stats"></span>
+  </div>
+  <p class="variant-note" id="variantNote"></p>
+
+  <div id="stage"><div class="scaler" id="scaler"></div></div>
+  <div class="park" id="park"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var GROUPS = [
+    { name: "재정경제부", kws: ["재정경제부", "재경부", "기획재정부", "기재부", "구윤철", "이형일"], mode: "OR", scrap: true },
+    { name: "재경위", kws: ["재경위", "재정경제기획위원회"], mode: "OR", scrap: true },
+    { name: "세제개편", kws: ["양도세", "종부세", "장특공제", "ISA", "보유세", "비거주"], mode: "OR", scrap: false },
+    { name: "추가 검색어", kws: ["IMF", "물가안정", "세제 개편"], mode: "OR", scrap: false },
+    { name: "예결위", kws: ["예결위", "예산결산특별위원회"], mode: "OR", scrap: false },
+    { name: "공공기관 통폐합", kws: ["공공기관", "감축"], mode: "AND", scrap: false }
+  ].map(function (g) {
+    return { name: g.name, mode: g.mode, scrap: g.scrap, kws: g.kws.map(function (w) { return { w: w, on: true }; }) };
+  });
+  var MAX_KW = 10;
+  var TRASH = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>';
+  var SEARCH = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>';
+  var SCRAP_TIP = "정기 스크랩(예정된 회차)에도 넣습니다.\n꺼두면 실시간 현황에만 나오고, 거기서 📌 담아두기로 직접 담을 수 있습니다.";
+  var view = "a";
+
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+  function chipsHtml(g, gi) {
+    var h = g.kws.map(function (k, ki) {
+      return '<span class="chip ' + (k.on ? "on" : "off") + '">' +
+        '<button type="button" class="chip-body" data-act="chip" data-g="' + gi + '" data-k="' + ki + '" title="' +
+        (k.on ? "누르면 검색에서 잠시 뺍니다" : "누르면 다시 검색에 넣습니다") + ' (두 번 누르면 글자 수정)">' + esc(k.w) + '</button>' +
+        '<button type="button" class="chip-x" title="이 키워드를 지웁니다">×</button></span>';
+    }).join("");
+    if (g.kws.length < MAX_KW) h += '<span class="chip-add"><span class="plus">+</span><input placeholder="키워드"></span>';
+    return '<div class="chips">' + h + '</div>';
+  }
+  function switchHtml() {
+    return '<label class="switch" title="이 그룹 전체를 검색에 쓸지 켜고 끕니다 (삭제 아님)"><input type="checkbox" checked><span class="pill"></span></label>';
+  }
+  function offCount(g) { return g.kws.filter(function (k) { return !k.on; }).length; }
+
+  // ── 현재 ──
+  var radioSeq = 0;  // 화면 밖 측정용 복사본과 라디오 이름이 겹치면 서로 체크를 지운다
+  function curCard(g, gi) {
+    var off = offCount(g);
+    var rn = "cm" + (radioSeq++);
+    return '<div class="group-block">' +
+      '<div class="group-head">' + switchHtml() +
+        '<input type="text" class="group-name-input" value="' + esc(g.name) + '">' +
+        '<button type="button" class="group-trash" title="이 그룹 지우기">' + TRASH + '</button></div>' +
+      '<div class="group-body">' + chipsHtml(g, gi) +
+        '<div class="kw-meta">키워드 ' + g.kws.length + ' / ' + MAX_KW + (off ? ' · ' + off + '개 잠시 뺌' : '') + '</div>' +
+        '<div class="mode"><span>검색 방식</span>' +
+          '<label><input type="radio" name="' + rn + '"' + (g.mode === "OR" ? " checked" : "") + ' data-act="mode" data-g="' + gi + '" data-m="OR"> 1개라도 포함</label>' +
+          '<label><input type="radio" name="' + rn + '"' + (g.mode === "AND" ? " checked" : "") + ' data-act="mode" data-g="' + gi + '" data-m="AND"> 모두 포함</label></div>' +
+      '</div>' +
+      '<div class="scrap-toggle"><label><input type="checkbox"' + (g.scrap ? " checked" : "") + ' data-act="scrap" data-g="' + gi + '"> ' +
+        '정기 스크랩(예정된 회차)에도 포함 — 실시간 기사 현황에는 늘 나옵니다. 꺼두면 정기 회차에만 안 들어가고, 실시간에서 "📌 담아두기"로 직접 담을 수 있습니다.</label></div>' +
+    '</div>';
+  }
+  function curScreen() {
+    return '<div class="screen cur">' +
+      '<h1>' + SEARCH + ' 검색어</h1>' +
+      '<p class="caption">* 저장하면 실시간 기사 현황에 바로 반영됩니다. (정기 스크랩은 다음 회차부터)</p>' +
+      '<div class="scope-note">' +
+        '<div class="scope-row"><span class="u live">🔴 실시간 현황</span><span><b>여기 등록한 그룹 전부</b>를 검색합니다 (그룹 간 OR)</span></div>' +
+        '<div class="scope-row"><span class="u scrap">💎 정기 스크랩</span><span>그중 <b>아래 "정기 스크랩에도 포함"을 켠 그룹만</b> (최소 1개 필요)</span></div>' +
+      '</div>' +
+      '<p class="hint">그룹은 최대 8개, 그룹당 키워드는 최대 10개까지 추가할 수 있고 최소 1개는 있어야 합니다. 키워드를 누르면 지우지 않고 검색에서만 잠시 뺄 수 있습니다(두 번 누르면 글자를 고칠 수 있습니다).</p>' +
+      '<div class="groups">' + GROUPS.map(curCard).join("") + '</div>' +
+      '<button type="button" class="add-group-btn">+ 키워드 그룹 추가</button>' +
+    '</div>';
+  }
+
+  // ── 시안 A / B ──
+  function msegHtml(g, gi) {
+    return '<div class="mseg" title="검색 방식 — 키워드 중 1개라도 들어간 기사 / 모두 들어간 기사">' +
+      '<button type="button" class="' + (g.mode === "OR" ? "on" : "") + '" data-act="mode" data-g="' + gi + '" data-m="OR">1개라도 포함</button>' +
+      '<button type="button" class="' + (g.mode === "AND" ? "on" : "") + '" data-act="mode" data-g="' + gi + '" data-m="AND">모두 포함</button></div>';
+  }
+  function countHtml(g) {
+    var off = offCount(g);
+    return '<span class="g-count' + (g.kws.length >= MAX_KW ? " full" : "") + '" title="키워드 수 (최대 ' + MAX_KW + '개)">' +
+      g.kws.length + '/' + MAX_KW + (off ? ' · ' + off + '개 뺌' : '') + '</span>';
+  }
+  function newCard(g, gi, v) {
+    var head = '<div class="g-head">' + switchHtml() +
+      '<input class="g-name" value="' + esc(g.name) + '" title="눌러서 이름 고치기">';
+    var foot;
+    if (v === "a") {
+      head += countHtml(g);
+      foot = '<div class="g-foot">' + msegHtml(g, gi) +
+        '<label class="scrap-a' + (g.scrap ? " on" : "") + '" title="' + esc(SCRAP_TIP) + '">' +
+        '<input type="checkbox"' + (g.scrap ? " checked" : "") + ' data-act="scrap" data-g="' + gi + '">정기 스크랩</label></div>';
+    } else {
+      head += '<button type="button" class="scrap-b ' + (g.scrap ? "on" : "off") + '" data-act="scrap" data-g="' + gi + '" title="' + esc(SCRAP_TIP) + '">' +
+        (g.scrap ? "✓ 정기" : "정기") + '</button>';
+      foot = '<div class="g-foot flat">' + msegHtml(g, gi) + countHtml(g) + '</div>';
+    }
+    head += '<button type="button" class="g-trash" title="이 그룹 지우기">' + TRASH + '</button></div>';
+    return '<div class="g">' + head + chipsHtml(g, gi) + foot + '</div>';
+  }
+  function newScreen(v) {
+    var ref = v === "a"
+      ? '<span class="ref-cb"><span class="box"></span>정기 스크랩</span>을 체크한'
+      : '<span class="ref-pill">✓ 정기</span>를 켠';
+    return '<div class="screen new">' +
+      '<h1>' + SEARCH + ' 검색어</h1>' +
+      '<p class="lead">켜 둔 그룹은 모두 <b>실시간 현황</b>에서 검색되고, 그중 ' + ref + ' 그룹만 <b>정기 스크랩</b>에도 들어갑니다.<br>' +
+        '키워드를 누르면 지우지 않고 잠시 빼고, 두 번 누르면 글자를 고칩니다.</p>' +
+      '<div class="groups">' + GROUPS.map(function (g, gi) { return newCard(g, gi, v); }).join("") + '</div>' +
+      '<button type="button" class="add-group-btn">+ 키워드 그룹 추가</button>' +
+    '</div>';
+  }
+
+  function saveBar(v) {
+    var msg = v === "cur"
+      ? '<b>아직 저장하지 않았습니다.</b> 아래 저장을 눌러야 실제로 반영됩니다.'
+      : '<b>아직 저장하지 않았습니다.</b> 저장하면 실시간 현황엔 바로, 정기 스크랩엔 다음 회차부터 반영됩니다.';
+    return '<div class="bar-label">↓ 고친 게 있을 때 화면 맨 아래 저장 바' + (v === "cur" ? "" : " — 맨 위 캡션이 여기로 왔어요") + '</div>' +
+      '<div class="fake-savebar"><div class="save-msg"><span class="dot"></span><span>' + msg + '</span></div><div class="btn">저장</div></div>';
+  }
+
+  function screenFor(v) { return v === "cur" ? curScreen() : newScreen(v); }
+
+  var NOTES = {
+    a: '<b>추천.</b> 옵션 둘(검색 방식·정기)이 카드 아래 한 줄에 모이고, 머리줄은 「켜기·이름·개수·지우기」만 남아요. 켜고 끄는 스위치가 머리줄에 하나뿐이라 헷갈릴 게 없어요.',
+    b: '머리줄만 훑어도 정기 여부가 보이는 게 장점. 다만 머리줄에 켜고 끄는 게 둘(그룹 스위치 · 정기 알약)이 돼, 「그룹을 끄는 것」과 「정기에서만 빼는 것」이 한눈에 비슷해 보일 수 있어요. (예전에 뺀 「카드마다 💎 정기 배지」와 달리 체크박스를 대신하는 것이라 같은 말을 두 번 하지는 않아요.)',
+    cur: '지금 화면 그대로(그룹명 칸 회색 상자 포함).'
+  };
+
+  function render() {
+    var scaler = document.getElementById("scaler");
+    scaler.innerHTML = '<div class="frame">' + screenFor(view) + saveBar(view) + '</div>';
+    // 세 화면 높이 비교용 — 화면 밖에 똑같이 그려 두고 잰다(저장 바 제외)
+    var park = document.getElementById("park");
+    park.innerHTML = ["cur", "a", "b"].map(function (v) { return '<div class="frame" data-v="' + v + '">' + screenFor(v) + '</div>'; }).join("");
+    var h = {};
+    park.querySelectorAll(".frame").forEach(function (f) { h[f.dataset.v] = f.querySelector(".screen").offsetHeight; });
+    var card = {};
+    park.querySelectorAll(".frame").forEach(function (f) {
+      var first = f.querySelector(".group-block, .g"); card[f.dataset.v] = first ? first.offsetHeight : 0;
+    });
+    function pct(a, b) { return Math.round((b - a) / a * 100); }
+    var s = '화면 높이 — 현재 <b>' + h.cur.toLocaleString() + 'px</b>';
+    if (view !== "cur") {
+      s += ' → 시안 ' + view.toUpperCase() + ' <b>' + h[view].toLocaleString() + 'px</b> <span class="d">(' + pct(h.cur, h[view]) + '%)</span>' +
+        ' · 「재정경제부」 카드 ' + card.cur + ' → ' + card[view] + 'px';
+    }
+    document.getElementById("stats").innerHTML = s;
+    document.getElementById("variantNote").innerHTML = NOTES[view];
+    fit();
+  }
+
+  function fit() {
+    var stage = document.getElementById("stage");
+    var scaler = document.getElementById("scaler");
+    var natural = 850; // 본문 800 + 좌우 여백 48 + 테두리 2
+    var sc = Math.min(1, stage.clientWidth / natural);
+    scaler.style.transform = sc < 1 ? "scale(" + sc + ")" : "";
+    stage.style.height = sc < 1 ? (scaler.offsetHeight * sc) + "px" : "";
+  }
+
+  document.getElementById("viewSeg").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    view = b.dataset.v;
+    this.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); });
+    render();
+  });
+
+  // 칩 켜고 끄기 · 검색 방식 · 정기 체크 — 세 화면이 같은 데이터를 본다
+  document.getElementById("stage").addEventListener("click", function (e) {
+    var t = e.target.closest("[data-act]"); if (!t) return;
+    var g = GROUPS[+t.dataset.g];
+    if (t.dataset.act === "chip") { var k = g.kws[+t.dataset.k]; k.on = !k.on; }
+    else if (t.dataset.act === "mode") { g.mode = t.dataset.m; }
+    else if (t.dataset.act === "scrap") { g.scrap = !g.scrap; }
+    else return;
+    render();
+  });
+
+  window.addEventListener("resize", fit);
+  render();
+})();
+</script>
+</body>
+</html>

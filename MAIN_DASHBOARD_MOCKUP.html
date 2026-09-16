@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>홈 미니 대시보드 시안</title>
+<style>
+  :root {
+    --bg:#F8FAFC; --card:#FFFFFF; --header:#1E3A5F; --accent:#2563EB;
+    --text:#1F2937; --muted:#6B7280; --border:#E5E7EB; --hover:#EFF6FF;
+    --error:#DC2626; --warn:#B45309; --warnbg:#FEF3C7; --warnbd:#FCD34D;
+    --ai:#7C6BB5; --aibg:#F3F0FA; --ghost:#E8EDF3;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font-family:"Pretendard","Noto Sans KR",-apple-system,sans-serif; }
+  .container { max-width:820px; margin:0 auto; padding:28px 24px 60px; }
+  h1 { font-size:1.3rem; font-weight:600; color:var(--header); margin:0 0 4px; text-align:center; }
+  .today { text-align:center; color:var(--muted); font-size:0.8rem; margin-bottom:22px; }
+
+  .card { background:var(--card); border:1px solid var(--border);
+    border-radius:10px; padding:18px 20px; margin-bottom:14px; }
+  .card h2 { font-size:0.8rem; font-weight:700; color:var(--muted);
+    margin:0 0 14px; letter-spacing:0.02em; display:flex; align-items:center; gap:8px; }
+  .card h2 .sub { font-weight:500; color:var(--muted); opacity:0.75; }
+
+  /* ── 상단 요약 ── */
+  .statrow { display:flex; align-items:baseline; gap:18px; flex-wrap:wrap; }
+  .bignum { font-size:2.1rem; font-weight:700; color:var(--header); line-height:1; }
+  .bigunit { font-size:0.95rem; color:var(--muted); margin-left:2px; }
+  .vs { font-size:0.82rem; color:var(--muted); }
+  .vs b { color:var(--error); font-weight:700; }
+  .hlset { margin-left:auto; display:flex; gap:8px; }
+  .hl { font-size:0.78rem; font-weight:700; padding:5px 11px; border-radius:20px;
+    border:1px solid var(--border); background:var(--card); cursor:pointer; }
+  .hl.scoop { color:#BE185D; border-color:#FBCFE8; }
+  .hl.flash { color:var(--error); border-color:#FECACA; }
+  .hl:hover { background:var(--hover); }
+
+  /* ── 시간대 막대 ── */
+  .chart { display:flex; gap:6px; align-items:flex-end; height:120px; }
+  .bslot { flex:1; display:flex; flex-direction:column; height:100%; }
+  .bwrap { flex:1; position:relative; display:flex; align-items:flex-end;
+    justify-content:center; gap:3px; }
+  .bar-y { width:12px; background:var(--ghost); border-radius:3px 3px 0 0; }
+  .bar-t { width:16px; background:var(--accent); border-radius:3px 3px 0 0; }
+  .bar-t.ongoing { background:repeating-linear-gradient(45deg,
+      var(--accent) 0 5px, #93B4F5 5px 10px); }
+  .bar-pending { width:16px; height:12px; border:1px dashed var(--border);
+    border-radius:3px; background:transparent; }
+  .blab { text-align:center; padding-top:6px; border-top:1px solid var(--border); margin-top:4px; }
+  .bv { display:block; font-size:0.76rem; font-weight:700; color:var(--text); }
+  .bv.pend { color:var(--border); }
+  .blab em { font-style:normal; font-size:0.66rem; color:var(--muted); }
+  .legend { display:flex; gap:14px; justify-content:flex-end; margin-top:10px;
+    font-size:0.68rem; color:var(--muted); }
+  .legend i { display:inline-block; width:9px; height:9px; border-radius:2px;
+    margin-right:4px; vertical-align:-1px; }
+
+  /* ── 쟁점 순위 ── */
+  .irow { border-bottom:1px solid var(--border); }
+  .irow:last-child { border-bottom:none; }
+  .rowhead { width:100%; display:flex; align-items:center; gap:10px; padding:11px 2px 3px;
+    background:none; border:none; font:inherit; color:inherit; text-align:left; cursor:pointer; }
+  .rowhead.nosum { cursor:default; }
+  .rowhead:not(.nosum):hover { background:#F3F4F6; }
+  .caret { width:11px; color:var(--muted); font-size:0.7rem; flex-shrink:0; }
+  .rank { width:19px; height:19px; border-radius:50%; background:var(--hover);
+    color:var(--accent); font-size:0.68rem; font-weight:700; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; }
+  .iname { font-size:0.92rem; font-weight:600; color:var(--header); }
+  .chips { display:flex; gap:4px; }
+  .gchip { font-size:0.62rem; font-weight:600; color:var(--muted);
+    border:1px solid var(--border); border-radius:20px; padding:1px 7px; white-space:nowrap; }
+  .icount { margin-left:auto; font-size:0.88rem; font-weight:700; color:var(--text); flex-shrink:0; }
+  .trendline { padding:0 2px 11px 40px; }
+  .badge { font-size:0.68rem; font-weight:600; padding:2px 8px; border-radius:4px; }
+  .badge.new { background:var(--warnbg); color:var(--warn); }
+  .badge.flow { background:var(--hover); color:var(--accent); }
+  .summ { display:none; padding:0 2px 14px 40px; }
+  .summ p { margin:0; font-size:0.83rem; line-height:1.65; color:var(--text);
+    background:var(--aibg); border-left:2px solid var(--ai);
+    padding:11px 13px; border-radius:0 6px 6px 0; }
+  .irow.open .summ { display:block; }
+  .irow.open .caret { transform:rotate(90deg); display:inline-block; }
+
+  /* ── 미분류 진단 ── */
+  .unc { display:flex; align-items:center; gap:10px; font-size:0.78rem;
+    background:var(--warnbg); border:1px solid var(--warnbd); color:var(--warn);
+    border-radius:8px; padding:10px 14px; margin-top:12px; }
+  .unc b { font-size:0.9rem; }
+  .unc .why { margin-left:auto; opacity:0.85; font-size:0.72rem; }
+
+  .note { font-size:0.72rem; color:var(--muted); margin-top:18px; line-height:1.7;
+    border-top:1px dashed var(--border); padding-top:14px; }
+  .note b { color:var(--header); }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>AI 기반 뉴스 모니터링</h1>
+  <p class="today">2026년 08월 25일 (화) · 17:00 회차까지 수집됨</p>
+
+  <div class="card">
+    <div class="statrow">
+      <div><span class="bignum">292</span><span class="bigunit">건</span></div>
+      <div class="vs">어제 같은 시각 359건 대비 <b>-19%</b> <span style="opacity:.6">(어제 하루 400건)</span></div>
+      <div class="hlset">
+        <span class="hl scoop">[단독] 3건</span>
+        <span class="hl flash">[속보] 5건</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>시간대별 유입 <span class="sub">3시간 단위</span></h2>
+    <div class="chart"><div class="bslot">
+      <div class="bwrap"><div class="bar-y" style="height:1.5%" title="어제 같은 시간 2건"></div><div class="bar-t" style="height:6.8%" title="오늘 9건"></div></div>
+      <div class="blab"><span class="bv">9</span><em>00</em></div>
+    </div><div class="bslot">
+      <div class="bwrap"><div class="bar-y" style="height:3.8%" title="어제 같은 시간 5건"></div><div class="bar-t" style="height:20.3%" title="오늘 27건"></div></div>
+      <div class="blab"><span class="bv">27</span><em>03</em></div>
+    </div><div class="bslot">
+      <div class="bwrap"><div class="bar-y" style="height:12.8%" title="어제 같은 시간 17건"></div><div class="bar-t" style="height:26.3%" title="오늘 35건"></div></div>
+      <div class="blab"><span class="bv">35</span><em>06</em></div>
+    </div><div class="bslot">
+      <div class="bwrap"><div class="bar-y" style="height:66.9%" title="어제 같은 시간 89건"></div><div class="bar-t" style="height:66.2%" title="오늘 88건"></div></div>
+      <div class="blab"><span class="bv">88</span><em>09</em></div>
+    </div><div class="bslot">
+      <div class="bwrap"><div class="bar-y" style="height:85.0%" title="어제 같은 시간 113건"></div><div class="bar-t" style="height:25.6%" title="오늘 34건"></div></div>
+      <div class="blab"><span class="bv">34</span><em>12</em></div>
+    </div><div class="bslot">
+      <div class="bwrap"><div class="bar-y" style="height:100.0%" title="어제 같은 시간 133건"></div><div class="bar-t ongoing" style="height:74.4%" title="오늘 99건"></div></div>
+      <div class="blab"><span class="bv">99</span><em>15</em></div>
+    </div><div class="bslot">
+      <div class="bwrap"><div class="bar-y" style="height:30.8%" title="어제 같은 시간 41건"></div><div class="bar-pending" title="아직 수집 전 — 0건이 아니라 모르는 구간"></div></div>
+      <div class="blab"><span class="bv pend">–</span><em>18</em></div>
+    </div><div class="bslot">
+      <div class="bwrap"><div class="bar-pending" title="아직 수집 전 — 0건이 아니라 모르는 구간"></div></div>
+      <div class="blab"><span class="bv pend">–</span><em>21</em></div>
+    </div></div>
+    <div class="legend">
+      <span><i style="background:#2563EB"></i>오늘</span>
+      <span><i style="background:#E8EDF3"></i>어제</span>
+      <span><i style="border:1px dashed #E5E7EB"></i>아직 수집 전</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>오늘의 쟁점 <span class="sub">분류된 100건 기준 · 줄을 누르면 AI 요약</span></h2>
+    <div class="irow">
+      <div class="rowhead nosum"><span class="caret"></span>
+        <span class="rank">1</span>
+        <span class="iname">국회 예산결산특별위원회 회의</span>
+        <span class="chips"><span class="gchip">예결위</span></span>
+        <span class="icount">21건</span>
+      </div>
+      <div class="trendline"><span class="badge new">🆕 14:00 회차에 등장</span></div>
+      
+    </div><div class="irow">
+      <button class="rowhead" onclick="tog(this)"><span class="caret">▸</span>
+        <span class="rank">2</span>
+        <span class="iname">2027년 예산안 당정협의</span>
+        <span class="chips"><span class="gchip">예결위</span></span>
+        <span class="icount">14건</span>
+      </button>
+      <div class="trendline"><span class="badge flow">↘ 4 → 9 → 1</span></div>
+      <div class="summ"><p>당정이 2027년 예산안에 대해 협의하고 반도체 특별회계 신설, 지방국립대 등록금 전액 지원, 3대 메가프로젝트 및 AI 산업 집중투자 등을 발표했다. 총 820조 규모의 슈퍼예산으로 미래산업 주도권 확보에 재정을 집중하기로 했다.</p></div>
+    </div><div class="irow">
+      <div class="rowhead nosum"><span class="caret"></span>
+        <span class="rank">3</span>
+        <span class="iname">비거주</span>
+        <span class="chips"><span class="gchip">재정경제부</span><span class="gchip">예결위</span></span>
+        <span class="icount">6건</span>
+      </div>
+      <div class="trendline"><span class="badge new">🆕 09:30 회차에 등장</span></div>
+      
+    </div><div class="irow">
+      <button class="rowhead" onclick="tog(this)"><span class="caret">▸</span>
+        <span class="rank">4</span>
+        <span class="iname">부동산 세제개편 재검토</span>
+        <span class="chips"><span class="gchip">재정경제부</span></span>
+        <span class="icount">5건</span>
+      </button>
+      <div class="trendline"><span class="badge new">🆕 06:00 회차에 등장</span></div>
+      <div class="summ"><p>정부가 8월 3일 발표한 비거주 1주택자 대상 종합부동산세·양도세 개편안에 대해 발표 3주 만에 전반적인 재검토에 들어갔다. 기본공제 인상, 비거주 사유 확대 인정 등이 검토되고 있으며, 다음달 1일 국무회의에 수정안을 올리고 3일 국회에 제출할 예정이다.</p></div>
+    </div><div class="irow">
+      <button class="rowhead" onclick="tog(this)"><span class="caret">▸</span>
+        <span class="rank">5</span>
+        <span class="iname">대법관 인선 권한 갈등</span>
+        <span class="chips"><span class="gchip">예결위</span></span>
+        <span class="icount">5건</span>
+      </button>
+      <div class="trendline"><span class="badge new">🆕 06:00 회차에 등장</span></div>
+      <div class="summ"><p>조희대 대법원장이 손준모 부장판사를 서면으로 제청한 것을 놓고 청와대와 대법원이 충돌하고 있다. 청와대는 대통령 임명권 침해로 보고 대법원장의 제청권 축소를 추진하는 한편, 대법원장은 권력의 자의적 행사 통제를 주장하고 있다.</p></div>
+    </div>
+    <div class="unc">
+      <span>📂 미분류 <b>192건</b> / 전체 292건</span>
+      <span class="why">마감 시 자동 배정 실패 112건 · AI 분류 실패(규칙 기반 대체) 26건</span>
+    </div>
+  </div>
+
+  <p class="note">
+    <b>이 화면의 모든 숫자는 2026-08-25 실제 저장 데이터입니다.</b> LLM 호출 0회 —
+    소제목·요약·검색어 매칭은 수집 시점에 이미 회차 파일에 저장된 값을 읽어 세고 정렬한 것뿐입니다.
+    (실측: 파일 읽기 2.1ms + 계산 0.1ms)<br>
+    아래에는 기존 홈의 4갈래 흐름도와 워드클라우드가 그대로 이어집니다 — 이 시안에서는 생략했습니다.
+  </p>
+</div>
+<script>
+function tog(b) { b.parentElement.classList.toggle('open'); }
+</script>
+</body>
+</html>

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>수집 원본 — 일괄이동 바를 하단에 고정하는 시안</title>
+<style>
+  :root {
+    --bg: #F8FAFC; --card: #FFFFFF; --border: #E5E7EB; --text: #1F2937;
+    --muted: #6B7280; --header: #1E3A5F; --accent: #2563EB; --accent-border: #BFDBFE;
+    --hover: #EFF6FF; --row-hover: #F3F4F6; --on-fill: #FFFFFF; --pill-bg: #F3F4F6;
+    --divider-soft: #F1F5F9; --text-faint: #9CA3AF; --error: #DC2626;
+    --warn-bg: #FFFBEB; --warn-border: #FDE68A; --warn-text: #92400E;
+    --ai-text: #6D28D9; --ai-border: #DDD6FE;
+    --adhoc-bg: #E3F1EE; --adhoc-text: #146B5E; --adhoc-border-soft: rgba(20, 107, 94, 0.24);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; background: #EEF2F6; color: var(--text);
+    font-family: 'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  .doc { max-width: 1180px; margin: 0 auto; }
+  .doc > h1 { font-size: 1.25rem; color: var(--header); margin: 0 0 6px; }
+  .doc > p.lead { color: var(--muted); font-size: 0.88rem; margin: 0 0 22px; line-height: 1.65; max-width: 920px; }
+  .doc > p.lead b { color: var(--header); }
+
+  .lane { margin-bottom: 34px; }
+  .lane > h2 { font-size: 1rem; color: var(--header); margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+  .tag { font-size: 0.72rem; font-weight: 700; border-radius: 20px; padding: 2px 9px;
+    background: var(--pill-bg); color: var(--muted); border: 1px solid var(--border); }
+  .tag.now { background: var(--warn-bg); color: var(--warn-text); border-color: var(--warn-border); }
+  .tag.pick { background: var(--hover); color: var(--accent); border-color: var(--accent-border); }
+  .lane > p.why { color: var(--muted); font-size: 0.83rem; margin: 0 0 12px; line-height: 1.7; max-width: 920px; }
+  .lane > p.why b { color: var(--header); }
+
+  /* 브라우저 창 하나를 흉내내는 틀 — 안쪽(.scroll)만 스크롤되고, 바·fab은 틀에 붙는다
+     (실제 화면의 position: fixed와 같은 모양). */
+  .screen { position: relative; height: 500px; background: var(--bg); overflow: hidden;
+    border: 1px solid #CBD5E1; border-radius: 10px; box-shadow: 0 6px 18px rgba(15,23,42,.08); }
+  .scroll { position: absolute; inset: 0; overflow-y: auto; scrollbar-gutter: stable; }
+  .topbar { position: sticky; top: 0; z-index: 20; background: var(--card);
+    border-bottom: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .topbar-inner { max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: space-between; align-items: center; }
+  .topbar a { color: var(--accent); text-decoration: none; font-size: 0.92rem; font-weight: 600; padding: 6px 10px; border-radius: 6px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 18px 24px 80px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 22px 24px; }
+  .head { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+  .head h1 { font-size: 1.2rem; color: var(--header); margin: 0; }
+  .kind { font-size: 0.72rem; font-weight: 700; border-radius: 20px; padding: 2px 9px;
+    background: var(--adhoc-bg); color: var(--adhoc-text); border: 1px solid var(--adhoc-border-soft); }
+  .meta { display: flex; gap: 6px; flex-wrap: wrap; font-size: 0.76rem; color: var(--muted); }
+  .meta span { background: var(--pill-bg); border-radius: 12px; padding: 2px 9px; }
+
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 11px 0;
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin: 16px 0; }
+  .btn { font: inherit; font-size: 0.8rem; padding: 5px 11px; border-radius: 8px; cursor: pointer; border: 1px solid var(--accent);
+    background: var(--accent); color: var(--on-fill); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .btn.ghost { background: var(--card); color: var(--accent); border-color: var(--accent-border); }
+  .btn.mute { background: var(--card); color: var(--muted); border-color: var(--border); }
+  .btn.ai { background: transparent; color: var(--ai-text); border-color: var(--ai-border); }
+  .tb-input { font: inherit; width: 120px; padding: 5px 9px; font-size: 0.8rem; border: 1px solid var(--border); border-radius: 7px; }
+  .sent-filter { font-size: 0.8rem; color: var(--muted); display: inline-flex; gap: 4px; align-items: center; }
+  .sel-sm { font: inherit; font-size: 0.78rem; padding: 3px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--card); color: var(--muted); }
+  .sel-sm.to-bundle { border-color: var(--adhoc-border-soft); color: var(--adhoc-text); }
+
+  h2.sub { color: var(--header); font-size: 1rem; margin: 20px 0 6px; display: flex; align-items: center; gap: 6px; }
+  h2.sub .cnt { font-size: 0.76rem; color: var(--muted); font-weight: 400; }
+  .article { padding: 6px 8px; border-radius: 8px; margin: 10px 0; line-height: 1.5; }
+  .article:hover { background: var(--row-hover); }
+  .article:has(.bulk-chk:checked) { background: var(--hover); }
+  .a-top { display: flex; gap: 10px; align-items: flex-start; }
+  .bulk-chk { margin-top: 4px; flex: none; }
+  .a-title { font-size: 1rem; }
+  .a-title .outlet { color: var(--muted); font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  .a-bot { display: flex; align-items: center; gap: 8px; margin: 4px 0 0 28px; font-size: 0.8rem; color: var(--muted); }
+  .a-bot a { color: var(--muted); text-decoration: none; }
+  .a-acts { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+  .ib { color: var(--muted); padding: 2px 5px; }
+
+  /* ── 지금: 툴바 바로 아래, 흐름 안에 있는 파란 상자 ─────────────────── */
+  .bulk-now { display: none; align-items: center; gap: 8px; background: var(--hover); border: 1px solid var(--accent-border);
+    border-radius: 8px; padding: 8px 12px; margin: -8px 0 16px; font-size: 0.85rem; color: var(--accent); font-weight: 600; flex-wrap: wrap; }
+  .bulk-now.on { display: flex; }
+
+  /* ── A안: 정기 확정본의 .bottombar와 같은 모양 (선택했을 때만 올라온다) ── */
+  .bbar-a { position: absolute; left: 0; right: 0; bottom: 0; z-index: 20;
+    background: var(--card); border-top: 1px solid var(--border); box-shadow: 0 -2px 8px rgba(0,0,0,.08);
+    transform: translateY(100%); transition: transform .16s ease-out; }
+  .bbar-a.on { transform: none; }
+  .bbar-a .inner { max-width: 800px; margin: 0 auto; padding: 10px 24px;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.85rem; }
+  .bbar-a .count { font-weight: 600; color: var(--header); white-space: nowrap; margin-right: 4px; }
+  .bbar-a .div { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+  .bbar-a .clear { margin-left: auto; background: transparent; border: none; color: var(--muted); }
+  .bbar-a .clear:hover { background: var(--hover); }
+
+  /* ── B안: 떠 있는 파란 상자 (지금 모양 그대로 아래로) ───────────────── */
+  .bbar-b { position: absolute; left: 50%; bottom: 18px; z-index: 20; width: min(752px, calc(100% - 180px));
+    transform: translate(-50%, 16px); opacity: 0; pointer-events: none; transition: all .16s ease-out;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--hover); border: 1px solid var(--accent-border);
+    border-radius: 10px; padding: 9px 14px; font-size: 0.85rem; color: var(--accent); font-weight: 600;
+    box-shadow: 0 8px 24px rgba(15,23,42,.16); }
+  .bbar-b.on { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+  .bbar-b .clear { margin-left: auto; }
+
+  /* 좌하단 fab — 실제 값 그대로(쓰레기통 left 20/bottom 20/56px, ↩ bottom 88/50px) */
+  .fab { position: absolute; z-index: 25; border-radius: 50%; background: var(--card); color: var(--muted);
+    border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,.12); display: flex; align-items: center; justify-content: center; }
+  .fab.trash { left: 20px; bottom: 20px; width: 56px; height: 56px; font-size: 1.2rem; }
+  .fab.undo { left: 20px; bottom: 88px; width: 50px; height: 50px; font-size: 1.2rem; }
+  .fab .badge { position: absolute; top: -3px; right: -3px; background: var(--error); color: #fff; font-size: 0.66rem;
+    font-weight: 700; border-radius: 9px; padding: 0 5px; line-height: 1.55; }
+
+  .pointer { position: absolute; z-index: 30; right: 36px; font-size: 0.78rem; font-weight: 700;
+    background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border);
+    border-radius: 8px; padding: 6px 10px; box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+  .pointer.top { top: 62px; }
+
+  .notes { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px;
+    font-size: 0.85rem; line-height: 1.75; color: var(--text); }
+  .notes h3 { margin: 0 0 6px; font-size: 0.95rem; color: var(--header); }
+  .notes ul { margin: 0; padding-left: 18px; }
+  .notes b { color: var(--header); }
+</style>
+</head>
+<body>
+<div class="doc">
+  <h1>수집 원본 — 체크하면 뜨는 일괄이동 바를 화면 아래에 붙이기</h1>
+  <p class="lead">
+    지금은 이 바가 <b>툴바 바로 아래(목록 맨 위)</b>에만 나타나서, 스크롤을 내려 기사를 체크하면
+    바가 화면 밖에 있어 <b>다시 맨 위까지 올라가야</b> 옮기거나 보낼 수 있습니다.
+    세 틀 모두 실제로 체크해 볼 수 있어요 — 틀 안에서 스크롤해 보세요.
+  </p>
+
+  <!-- ─────────────── 지금 ─────────────── -->
+  <section class="lane" data-lane="now">
+    <h2>지금 <span class="tag now">현재 동작</span></h2>
+    <p class="why">
+      아래쪽 기사 두 건을 체크해 둔 상태입니다. <b>바는 이미 떠 있지만 저 위 툴바 밑이라 안 보입니다.</b>
+      체크한 게 있다는 신호가 행 배경색뿐이라, 무엇을 할 수 있는지는 올라가 봐야 압니다.
+    </p>
+    <div class="screen">
+      <div class="scroll"><!--BODY--></div>
+      <div class="pointer top">↑ 바는 저 위에 있어요</div>
+      <div class="fab undo">↩</div>
+      <div class="fab trash">🗑<span class="badge">3</span></div>
+    </div>
+  </section>
+
+  <!-- ─────────────── A안 ─────────────── -->
+  <section class="lane" data-lane="a">
+    <h2>A안 — 정기 확정본 하단바와 같은 흰 띠 <span class="tag pick">추천</span></h2>
+    <p class="why">
+      정기 확정본·초안의 일괄이동 바가 이미 이 자리(<b>화면 맨 아래 흰 띠, 폭 800px 안쪽</b>)에 있습니다.
+      같은 일을 하는 바가 두 흐름에서 같은 자리에 있어야 오갈 때 안 헷갈립니다(좌하단 쓰레기통·↩를 정기와 맞춘 것과 같은 규칙).
+      다른 점 하나 — 정기는 🖍 형광펜 때문에 띠가 늘 떠 있지만, 수시엔 띠에 올릴 게 이것뿐이라
+      <b>체크했을 때만 아래에서 올라오고</b> 전부 풀면 내려갑니다. 두 동작(소제목 옮기기 / 확정본으로 보내기)은
+      얇은 세로선으로 가르고, 「선택 해제」는 정기처럼 오른쪽 끝 글자 버튼입니다.
+    </p>
+    <div class="screen">
+      <div class="scroll"><!--BODY--></div>
+      <div class="fab undo">↩</div>
+      <div class="fab trash">🗑<span class="badge">3</span></div>
+      <div class="bbar-a">
+        <div class="inner">
+          <span class="count" data-count>2개 선택됨</span>
+          <select class="sel-sm"><option>이동할 소제목 선택</option><option>종부세 개편 방향</option><option>여야 반응</option><option>시장 반응</option></select>
+          <button class="btn">옮기기</button>
+          <span class="div"></span>
+          <select class="sel-sm to-bundle"><option>수집 확정본으로 보내기</option><option>9/15 종부세 보고</option><option>+ 새 모음 만들기</option></select>
+          <button class="btn">보내기</button>
+          <button class="btn clear">선택 해제</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────── B안 ─────────────── -->
+  <section class="lane" data-lane="b">
+    <h2>B안 — 지금의 파란 상자를 그대로 아래에 띄우기</h2>
+    <p class="why">
+      모양은 지금 그대로(연파랑 = 체크한 행과 같은 색)이고 자리만 아래로 내려 공중에 띄웁니다.
+      선택 상태라는 게 색으로 바로 이어져 읽히는 장점이 있지만, <b>정기 확정본의 하단바와 모양이 갈립니다</b> —
+      같은 버튼들이 화면마다 다른 옷을 입게 됩니다. 좌하단 쓰레기통과 겹치지 않게 폭을 줄여야 해서
+      창이 좁으면 두 줄로 먼저 접힙니다.
+    </p>
+    <div class="screen">
+      <div class="scroll"><!--BODY--></div>
+      <div class="fab undo">↩</div>
+      <div class="fab trash">🗑<span class="badge">3</span></div>
+      <div class="bbar-b">
+        <span data-count>2개 선택됨</span>
+        <select class="sel-sm"><option>이동할 소제목 선택</option><option>종부세 개편 방향</option><option>여야 반응</option><option>시장 반응</option></select>
+        <button class="btn">옮기기</button>
+        <select class="sel-sm to-bundle"><option>수집 확정본으로 보내기</option><option>9/15 종부세 보고</option><option>+ 새 모음 만들기</option></select>
+        <button class="btn">보내기</button>
+        <button class="btn mute clear">선택 해제</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="notes">
+    <h3>A안으로 갈 때 같이 정해지는 것들</h3>
+    <ul>
+      <li><b>수집 확정본 화면에도 똑같이 적용됩니다.</b> 같은 코드(<code>#bulk-bar</code>)를 두 화면이 쓰고, 확정본에서는 「보내기」 칸만 빠집니다.</li>
+      <li><b>마지막 기사가 띠에 가려지지 않습니다.</b> 이 화면은 이미 아래 여백이 80px라(띠 높이 약 50px) 스크롤을 끝까지 내리면 마지막 기사가 띠 위로 올라옵니다.</li>
+      <li><b>좌하단 🗑·↩는 그 자리 그대로</b>입니다 — 정기 화면에서도 두 버튼이 하단 띠 위에 떠 있는 같은 배치이고, 넓은 창에선 띠 안쪽(800px) 바깥이라 버튼끼리 부딪히지 않습니다.</li>
+      <li><b>좁은 창(휴대폰 폭)에서는 띠가 두 줄로 접힙니다</b>(가로 스크롤 없음).</li>
+      <li>기능은 그대로입니다 — 버튼·드롭다운·동작은 한 글자도 안 바뀌고 <b>자리만</b> 옮깁니다. 정기 바에 있는 ↑↓·🗑 일괄 숨기기는 수집 원본엔 원래 없고(원본은 시간순이라 ↑↓가 없다), 이번에도 안 넣습니다.</li>
+    </ul>
+  </div>
+</div>
+
+<template id="body-tpl">
+  <div class="topbar"><div class="topbar-inner">
+    <a href="#">🏠 홈</a>
+    <span><a href="#">새 수집</a><a href="#">수집 확정본</a><a href="#">수시 보관함</a></span>
+  </div></div>
+  <div class="container"><div class="card">
+    <div class="head"><h1>수시 모니터링 14시 20분 기준(종부세)</h1><span class="kind">원본</span></div>
+    <div class="meta"><span>🔍 종부세 32 · 종합부동산세 11</span><span>🕐 09:00 ~ 14:20</span><span>📥 14:20 43건</span></div>
+    <div class="toolbar">
+      <button class="btn ai">🤖 소제목 배정</button>
+      <input class="tb-input" placeholder="새 소제목 이름">
+      <button class="btn mute">+ 소제목 추가</button>
+      <label class="sent-filter"><input type="checkbox"> 아직 안 보낸 기사만 (5건 보냄)</label>
+      <span style="flex:1"></span>
+      <button class="btn ghost">복사</button>
+      <button class="btn ghost">txt로 저장</button>
+    </div>
+    <div class="bulk-now">
+      <span data-count>2개 선택됨</span>
+      <select class="sel-sm"><option>이동할 소제목 선택</option></select>
+      <button class="btn">옮기기</button>
+      <select class="sel-sm to-bundle"><option>수집 확정본으로 보내기</option></select>
+      <button class="btn">보내기</button>
+      <button class="btn mute">선택 해제</button>
+    </div>
+    <!--GROUPS-->
+  </div></div>
+</template>
+
+<script>
+  var GROUPS = [
+    ["종부세 개편 방향", [
+      ["연합뉴스", "정부, 종부세 공정시장가액비율 60% 유지 가닥…세율 조정은 보류", "14:12"],
+      ["한국경제", "종부세 기본공제 12억→15억 상향 검토…1주택자 부담 완화", "13:58"],
+      ["매일경제", "[단독] 기재부, 종부세 과세표준 구간 5단계로 단순화 추진", "13:41"],
+      ["서울경제", "종부세 개편안 이달 말 세법개정안에 담긴다", "12:20"],
+      ["이데일리", "종합부동산세 다주택 중과 폐지 여부, 막판 쟁점으로", "11:05"],
+    ]],
+    ["여야 반응", [
+      ["조선일보", "야당 \"종부세 완화는 부자 감세\"…국회 심사 험로 예고", "13:30"],
+      ["중앙일보", "여당 \"1주택 실수요자 보호가 우선\"…종부세 완화 힘 싣기", "12:48"],
+      ["뉴시스", "국회 기재위, 종부세 개편 공청회 일정 합의 불발", "10:52"],
+      ["한국일보", "종부세 놓고 여야 원내대표 회동…접점 못 찾아", "10:10"],
+    ]],
+    ["시장 반응", [
+      ["머니투데이", "종부세 완화 기대감에 강남 매수 문의 늘어", "14:05"],
+      ["동아일보", "\"세 부담 줄면 매물 잠김 심해질 것\"…전문가 우려", "13:12"],
+      ["뉴스1", "종부세 개편 소식에 재건축 단지 호가 들썩", "11:48"],
+      ["KBS", "종부세 대상자 올해 40만 명 안팎…작년보다 소폭 감소", "09:40"],
+    ]],
+  ];
+  function rowHtml(a, checked) {
+    return '<div class="article"><div class="a-top">' +
+      '<input type="checkbox" class="bulk-chk"' + (checked ? ' checked' : '') + '>' +
+      '<div class="a-title"><span class="outlet">' + a[0] + '</span>' + a[1] + '</div></div>' +
+      '<div class="a-bot"><span>' + a[2] + ' 게시</span><span>·</span><a href="#">원문보기 ↗</a>' +
+      '<span>🔍 종부세</span><span class="a-acts">' +
+      '<select class="sel-sm to-bundle"><option>수집 확정본으로</option></select>' +
+      '<span class="ib">⧉</span><span class="ib">🗑</span><span class="ib">⋯</span></span></div></div>';
+  }
+  // 체크해 둘 기사: 「시장 반응」의 둘째·셋째 — 목록 아래쪽이라 지금 방식이면 바가 안 보인다.
+  var PRECHECK = {"시장 반응|1": true, "시장 반응|2": true};
+  var groupsHtml = GROUPS.map(function (g) {
+    return '<h2 class="sub">' + g[0] + ' <span class="cnt">' + g[1].length + '건</span></h2>' +
+      g[1].map(function (a, i) { return rowHtml(a, PRECHECK[g[0] + '|' + i]); }).join('');
+  }).join('');
+  var tpl = document.getElementById('body-tpl').innerHTML.replace('<!--GROUPS-->', groupsHtml);
+
+  document.querySelectorAll('.lane').forEach(function (lane) {
+    var scroll = lane.querySelector('.scroll');
+    scroll.innerHTML = tpl;
+    var bar = lane.dataset.lane === 'now' ? lane.querySelector('.bulk-now')
+            : lane.dataset.lane === 'a' ? lane.querySelector('.bbar-a') : lane.querySelector('.bbar-b');
+    function update() {
+      var n = lane.querySelectorAll('.bulk-chk:checked').length;
+      bar.classList.toggle('on', n > 0);
+      lane.querySelectorAll('[data-count]').forEach(function (el) { el.textContent = n + '개 선택됨'; });
+      var ptr = lane.querySelector('.pointer');
+      if (ptr) ptr.style.display = n > 0 ? '' : 'none';
+    }
+    lane.addEventListener('change', function (e) { if (e.target.classList.contains('bulk-chk')) update(); });
+    lane.querySelectorAll('.clear').forEach(function (b) {
+      b.addEventListener('click', function () {
+        lane.querySelectorAll('.bulk-chk:checked').forEach(function (c) { c.checked = false; });
+        update();
+      });
+    });
+    var nowClear = lane.querySelector('.bulk-now .btn.mute');
+    if (nowClear) nowClear.addEventListener('click', function () {
+      lane.querySelectorAll('.bulk-chk:checked').forEach(function (c) { c.checked = false; });
+      update();
+    });
+    update();
+    // 체크해 둔 기사가 보이도록 아래로 내려둔 상태에서 시작한다.
+    var target = lane.querySelectorAll('.bulk-chk:checked')[0];
+    if (target) scroll.scrollTop = target.closest('.article').offsetTop - 200;
+  });
+</script>
+</body>
+</html>

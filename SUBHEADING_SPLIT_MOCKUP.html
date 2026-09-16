@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI 기사 나누기 — 소제목 전체 체크 → 하단바 연보라 버튼 시안</title>
+<style>
+  /* 값은 전부 app/config.py 실제 팔레트 그대로다. */
+  :root {
+    --bg: #F8FAFC; --card: #FFFFFF; --border: #E5E7EB; --text: #1F2937;
+    --muted: #6B7280; --header: #1E3A5F; --accent: #2563EB; --accent-border: #BFDBFE;
+    --hover: #EFF6FF; --row-hover: #F3F4F6; --on-fill: #FFFFFF; --pill-bg: #F3F4F6;
+    --ai-bg: #F0EAFB; --ai-bg-hover: #E7DBFA; --ai-text: #4A3F8F; --ai-text-strong: #372C6E;
+    --ai-border: #DCD0F2; --ai-mark: #A78BFA;
+    --warn-bg: #FFFBEB; --warn-border: #FDE68A; --warn-text: #92400E; --warn-chip: #FEF3C7;
+    --error: #DC2626;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; background: #EEF2F6; color: var(--text);
+    font-family: 'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.125em; flex-shrink: 0; }
+  .doc { max-width: 1180px; margin: 0 auto; }
+  .doc > h1 { font-size: 1.25rem; color: var(--header); margin: 0 0 6px; }
+  .doc > p.lead { color: var(--muted); font-size: 0.88rem; margin: 0 0 22px; line-height: 1.7; max-width: 940px; }
+  .doc > p.lead b { color: var(--header); }
+
+  .lane { margin-bottom: 38px; }
+  .lane > h2 { font-size: 1rem; color: var(--header); margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+  .lane > p.why { color: var(--muted); font-size: 0.83rem; margin: 0 0 12px; line-height: 1.7; max-width: 940px; }
+  .lane > p.why b { color: var(--header); }
+  .num { display: inline-flex; width: 22px; height: 22px; border-radius: 50%; background: var(--header);
+    color: #fff; font-size: 0.75rem; align-items: center; justify-content: center; }
+
+  /* ── 브라우저 창 틀 ── 안쪽만 스크롤되고, 하단바·fab은 틀에 붙는다(실제 position: fixed와 같은 모양) */
+  .screen { position: relative; height: 560px; max-width: 860px; background: var(--bg); overflow: hidden;
+    border: 1px solid #CBD5E1; border-radius: 10px; box-shadow: 0 6px 18px rgba(15,23,42,.08); }
+  .scroll { position: absolute; inset: 0; overflow-y: auto; scrollbar-gutter: stable; }
+  .topbar { position: sticky; top: 0; z-index: 20; background: var(--card);
+    border-bottom: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .topbar-inner { max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: space-between; align-items: center; }
+  .topbar a { color: var(--accent); text-decoration: none; font-size: 0.86rem; font-weight: 600; }
+  .topbar .live { color: var(--error); }
+  .container { max-width: 800px; margin: 0 auto; padding: 18px 24px 90px; }
+  .page-h { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; flex-wrap: wrap; }
+  .page-h h1 { font-size: 1.15rem; color: var(--header); margin: 0; }
+  .pill { font-size: 0.72rem; font-weight: 700; color: var(--muted); background: var(--pill-bg); border-radius: 999px; padding: 2px 9px; }
+  .pill.warn { color: var(--warn-text); background: var(--warn-chip); }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0 0 8px; }
+  .tb { font: inherit; font-size: 0.8rem; font-weight: 600; padding: 6px 11px; border-radius: 8px; border: 1px solid transparent;
+    background: var(--hover); color: var(--accent); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .tb.ghost { background: transparent; border-color: var(--accent-border); font-weight: 400; border-radius: 6px; }
+  .tb.ai { background: var(--ai-bg); color: var(--ai-text); border-color: var(--ai-border); }
+  .tb-div { width: 1px; height: 24px; background: var(--border); }
+  .view { margin-left: auto; font-size: 0.8rem; border: 1px solid var(--accent); border-radius: 6px; padding: 5px 9px; background: #fff; color: var(--text); }
+
+  /* ── 소제목 ── */
+  .sub { margin-top: 22px; }
+  .sub h2 { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    font-size: 1rem; color: var(--header); border-bottom: 1px solid var(--border); margin: 0 0 4px; padding-bottom: 6px; }
+  .sub-title { display: flex; align-items: center; gap: 5px; min-width: 0; }
+  .sub-title .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ai-badge { color: var(--muted); font-size: 0.85rem; opacity: .75; }
+  .cnt { font-size: 0.72rem; font-weight: 700; color: var(--muted); background: var(--pill-bg); border-radius: 999px; padding: 1px 8px; }
+  .icons { display: flex; gap: 8px; color: var(--muted); font-size: 0.85rem; flex-shrink: 0; }
+  .icons .off { opacity: .35; }
+  .unclassified .nm { color: var(--muted); font-weight: 600; }
+  .unc-cnt { font-size: 0.75rem; font-weight: 700; color: var(--warn-text); background: var(--warn-chip); border-radius: 999px; padding: 1px 8px; }
+  .assign-btn { font: inherit; font-size: 0.76rem; font-weight: 600; padding: 3px 9px; border-radius: 6px;
+    background: var(--ai-bg); color: var(--ai-text); border: 1px solid var(--ai-border); display: inline-flex; align-items: center; gap: 4px; }
+
+  /* ── 기사 행 ── */
+  .art { margin: 7px 0; padding: 6px 8px; border-radius: 8px; line-height: 1.5; }
+  .art.checked { background: var(--hover); }
+  .art.ai { background: var(--ai-bg); }
+  .r1 { display: flex; align-items: flex-start; gap: 8px; font-size: 0.9rem; }
+  .r1 input { margin-top: 4px; }
+  .outlet { color: var(--muted); font-size: 0.86em; font-weight: 500; margin-right: .4em; }
+  .r2 { display: flex; align-items: center; gap: 6px; padding-left: 21px; font-size: 0.74rem; color: var(--muted); }
+  .r2 a { color: var(--accent); text-decoration: none; }
+  .r2 .kw { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 3em; flex: 1 1 0; max-width: max-content; }
+  .acts { margin-left: auto; display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+  .acts .sel { font-size: 0.72rem; border: 1px solid var(--border); border-radius: 4px; padding: 1px 4px; color: var(--muted); background: #fff; width: 78px; }
+  .more-rows { font-size: 0.76rem; color: var(--muted); padding: 2px 8px 4px 29px; }
+
+  /* ── 하단바(일괄이동 바) ── */
+  .bottombar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--card);
+    border-top: 1px solid var(--border); box-shadow: 0 -2px 8px rgba(0,0,0,.08); }
+  .bottombar-inner { max-width: 800px; margin: 0 auto; padding: 10px 24px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .bulk { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.82rem; }
+  .bulk .count { font-weight: 600; color: var(--header); white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+  .bulk select { border: 1px solid var(--accent); border-radius: 4px; padding: 5px 6px; font-size: 0.8rem; background: #fff; color: var(--text); width: 140px; }
+  .bb { font: inherit; font-size: 0.8rem; padding: 5px 11px; border-radius: 4px; border: none;
+    background: var(--accent); color: #fff; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .bb.sq { padding: 5px 9px; }
+  .bb.off { opacity: .35; }
+  .bb.clear { background: transparent; color: var(--muted); }
+  .bar-div { width: 1px; height: 24px; background: var(--border); margin: 0 2px; }
+  /* 새 버튼: 툴바의 「AI 모든 기사 재분류」·미분류 칸의 「AI 기사 배정」과 같은 채운 연보라 */
+  .bb.split { background: var(--ai-bg); color: var(--ai-text); border: 1px solid var(--ai-border); font-weight: 600; border-radius: 6px; }
+  .bb.split:hover { background: var(--ai-bg-hover); }
+  .bb.split.locked { opacity: .45; cursor: not-allowed; }
+  .bb.split.busy { opacity: .7; cursor: progress; }
+  .bb.split.busy .ic { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hl-btn { color: var(--muted); font-size: 1rem; padding: 4px 8px; }
+
+  /* 목업용 말풍선(실제로는 title 툴팁) */
+  .bubble-wrap { position: relative; display: inline-flex; }
+  .bubble { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+    background: var(--header); color: #fff; font-size: 0.74rem; line-height: 1.5; padding: 7px 10px; border-radius: 6px;
+    width: 250px; box-shadow: 0 4px 12px rgba(0,0,0,.2); z-index: 40; }
+  .bubble::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -6px;
+    border: 6px solid transparent; border-top-color: var(--header); }
+
+  .fab { position: absolute; left: 20px; width: 50px; height: 50px; border-radius: 50%; background: var(--card);
+    border: 1px solid var(--border); color: var(--muted); display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,.12); z-index: 30; font-size: 1.2rem; }
+  .fab.undo { bottom: 88px; }
+  .fab.trash { bottom: 20px; width: 56px; height: 56px; }
+  .fab .badge { position: absolute; top: -4px; right: -4px; background: var(--error); color: #fff; font-size: 0.64rem;
+    font-weight: 700; border-radius: 999px; padding: 1px 5px; }
+  .fab-tip { position: absolute; left: 80px; bottom: 98px; background: var(--header); color: #fff; font-size: 0.74rem;
+    padding: 6px 10px; border-radius: 6px; z-index: 40; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+  .fab-tip::before { content: ""; position: absolute; right: 100%; top: 50%; margin-top: -6px;
+    border: 6px solid transparent; border-right-color: var(--header); }
+  .toc { position: absolute; right: 20px; bottom: 20px; width: 46px; height: 46px; border-radius: 50%;
+    background: var(--card); border: 1px solid var(--border); color: var(--muted); display: flex; align-items: center; justify-content: center; z-index: 30; }
+
+  /* ── ② 버튼 상태 표 ── */
+  .states { display: grid; gap: 10px; max-width: 1000px; }
+  .st { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 14px; align-items: center;
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+  .st .cap { font-size: 0.8rem; line-height: 1.55; }
+  .st .cap b { color: var(--header); display: block; font-size: 0.84rem; }
+  .st .cap span { color: var(--muted); }
+  .st .strip { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; background: var(--card);
+    box-shadow: 0 -2px 8px rgba(0,0,0,.05); overflow-x: auto; }
+  .st .why-tip { margin-top: 6px; font-size: 0.74rem; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+  .st .why-tip code { background: var(--pill-bg); border-radius: 4px; padding: 1px 6px; color: var(--header); font-family: inherit; }
+  .tag { font-size: 0.68rem; font-weight: 700; border-radius: 20px; padding: 1px 8px; margin-left: 4px; vertical-align: 1px; }
+  .tag.on, .tag.busy { background: var(--ai-bg); color: var(--ai-text); border: 1px solid var(--ai-border); }
+  .tag.lock { background: var(--pill-bg); color: var(--muted); border: 1px solid var(--border); }
+  .tag.none { background: #fff; color: var(--muted); border: 1px dashed var(--border); }
+
+  /* ── ③ 결과 옆 설명 ── */
+  .pair { display: grid; grid-template-columns: minmax(0, 860px) minmax(0, 1fr); gap: 20px; align-items: start; }
+  .notes { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; font-size: 0.8rem; line-height: 1.65; }
+  .notes h3 { margin: 0 0 6px; font-size: 0.86rem; color: var(--header); }
+  .notes ul { margin: 0; padding-left: 18px; }
+  .notes li { margin-bottom: 6px; }
+  .notes b { color: var(--header); }
+  .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; border: 1px solid var(--ai-border); background: var(--ai-bg); }
+
+  /* ── ④ 대화상자 흉내 ── */
+  .dialogs { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; max-width: 1000px; }
+  .dlg { background: var(--card); border-radius: 12px; box-shadow: 0 10px 30px rgba(15,23,42,.18); border: 1px solid #D6DCE4; padding: 18px 18px 14px; }
+  .dlg .from { font-size: 0.72rem; color: var(--muted); margin-bottom: 8px; }
+  .dlg pre { white-space: pre-wrap; font-family: inherit; font-size: 0.84rem; line-height: 1.6; margin: 0 0 14px; color: var(--text); }
+  .dlg .btns { display: flex; justify-content: flex-end; gap: 8px; }
+  .dlg .btns span { font-size: 0.8rem; padding: 5px 16px; border-radius: 6px; border: 1px solid var(--border); }
+  .dlg .btns .ok { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .dlg-cap { font-size: 0.8rem; color: var(--muted); margin: 8px 2px 0; line-height: 1.6; }
+  .dlg-cap b { color: var(--header); }
+
+  .decide { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; max-width: 1000px; }
+  .decide h2 { font-size: 1rem; color: var(--header); margin: 0 0 10px; }
+  .decide ol { margin: 0; padding-left: 20px; font-size: 0.84rem; line-height: 1.7; }
+  .decide li { margin-bottom: 8px; }
+  .decide .rec { color: var(--ai-text); font-weight: 700; }
+
+  @media (max-width: 1100px) { .pair { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 720px) { .st { grid-template-columns: minmax(0, 1fr); } body { padding: 16px; } }
+</style>
+</head>
+<body>
+<div class="doc">
+  <h1>AI 기사 나누기 — 소제목 전체를 체크하면 하단바에 연보라 버튼</h1>
+  <p class="lead">
+    기사는 <b>오늘 14시 초안(13시 35분 기준)의 실제 기사</b>예요. 전체 75건 중 62건이 <b>&lt;이형일 경제부총리 인사청문회&gt;</b> 한 칸에
+    몰려 있고, 그 안에 비거주 1주택 논란·경제정책 구상·<b>김승원 후보자(다른 청문회)</b>·대미투자까지 섞여 있어요.
+    약속은 한 줄이에요. <b>고른 기사만 AI가 새 소제목으로 나누고, 다른 소제목은 한 글자도 안 건드려요.</b>
+    그래서 버튼 이름에 「재분류」를 안 쓰고, 색은 다른 AI 버튼 둘과 같은 채운 연보라예요.
+  </p>
+
+  <!-- ① -->
+  <section class="lane">
+    <h2><span class="num">1</span> 소제목 헤더 체크박스를 누르면 → 하단바에 「AI 기사 나누기」</h2>
+    <p class="why">
+      지금 하단바(옮기기 · ↑↓ · 🗑)에 <b>세로선을 하나 두고</b> 그 뒤에 붙였어요. 왼쪽은 내가 직접 하는 일, 오른쪽은 AI에게 맡기는 일이에요.
+      하단바는 체크했을 때만 올라오니 버튼도 그때만 보여요. 마우스를 올리면 뜨는 툴팁(아래 말풍선)이 <b>「다른 소제목은 그대로」</b>를 약속해요.
+      그 한마디가 「AI 모든 기사 재분류」와 가르는 선이에요.
+    </p>
+    <div class="screen">
+      <div class="scroll">
+        <div class="topbar"><div class="topbar-inner"><a href="#">홈</a><a href="#" class="live">● 실시간</a><a href="#">확정본</a></div></div>
+        <div class="container">
+          <div class="page-h"><h1>초안 (14시 예정 · 지금 13시 35분 기준)</h1><span class="pill">전체 75건</span><span class="pill warn">미분류 5건</span></div>
+          <div class="toolbar">
+            <span class="tb">복사</span><span class="tb">txt</span><span class="tb ghost">+ 새 소제목</span><span class="tb ghost">+ 키워드 직접 작성</span>
+            <span class="tb-div"></span>
+            <span class="tb ai" data-ic="refresh">AI 모든 기사 재분류</span>
+            <select class="view"><option>소제목별</option></select>
+          </div>
+          <div id="lane1-body"></div>
+        </div>
+      </div>
+      <div class="fab undo" data-ic="undo"></div>
+      <div class="fab trash" data-ic="trash"><span class="badge">157</span></div>
+      <div class="toc" data-ic="menu"></div>
+      <div class="bottombar"><div class="bottombar-inner">
+        <div class="bulk" id="lane1-bar"></div>
+        <span class="hl-btn" data-ic="marker"></span>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ② -->
+  <section class="lane">
+    <h2><span class="num">2</span> 버튼이 언제 켜지고 언제 잠기나</h2>
+    <p class="why">
+      잠길 때는 <b>버튼을 숨기지 않고 흐리게 둔 채, 이유를 툴팁에 적어요</b>. 기존 하단바 ↑↓가 여러 소제목에 걸치면 잠기는 것과 같은 규칙이에요.
+      숨겨버리면 「왜 오늘은 버튼이 없지?」가 돼요. 예외는 📂 미분류 하나예요. 그 칸에는 이미 「AI 기사 배정」이 있어서, 여기서는 아예 안 그려요.
+    </p>
+    <div class="states" id="states"></div>
+  </section>
+
+  <!-- ③ -->
+  <section class="lane">
+    <h2><span class="num">3</span> 누른 뒤 — 원래 자리에 소제목 여러 개가 들어온다</h2>
+    <p class="why">
+      62건이 6개 소제목으로 나뉘어 <b>원래 소제목이 있던 자리(맨 위)</b>에 차례로 들어가요. AI가 어디에도 안 맞는다고 본 2건은 원래 있던 &lt;기타&gt;로 합쳐져 맨 뒤에 남아요.
+      방금 AI가 옮긴 기사는 <b>「AI 기사 배정」 뒤와 같은 연보라 행</b>으로 한 번 칠해져요(보라 = 내가 시켜서 AI가 옮긴 것). 새 소제목에는 🤖 배지가 붙어요.
+      <b>안내 배너는 따로 안 띄워요.</b> 화면이 바뀐 것 자체가 결과이고, 되돌리는 길은 ↩ 한 번이에요.
+    </p>
+    <div class="pair">
+      <div class="screen">
+        <div class="scroll">
+          <div class="topbar"><div class="topbar-inner"><a href="#">홈</a><a href="#" class="live">● 실시간</a><a href="#">확정본</a></div></div>
+          <div class="container">
+            <div class="page-h"><h1>초안 (14시 예정 · 지금 13시 36분 기준)</h1><span class="pill">전체 75건</span><span class="pill warn">미분류 5건</span></div>
+            <div class="toolbar">
+              <span class="tb">복사</span><span class="tb">txt</span><span class="tb ghost">+ 새 소제목</span><span class="tb ghost">+ 키워드 직접 작성</span>
+              <span class="tb-div"></span>
+              <span class="tb ai" data-ic="refresh">AI 모든 기사 재분류</span>
+              <select class="view"><option>소제목별</option></select>
+            </div>
+            <div id="lane3-body"></div>
+          </div>
+        </div>
+        <div class="fab undo" data-ic="undo"></div>
+        <div class="fab-tip">되돌리기: AI 기사 나누기</div>
+        <div class="fab trash" data-ic="trash"><span class="badge">157</span></div>
+        <div class="toc" data-ic="menu"></div>
+        <div class="bottombar"><div class="bottombar-inner"><div></div><span class="hl-btn" data-ic="marker"></span></div></div>
+      </div>
+      <div class="notes">
+        <h3>이 결과를 만들려면 코드에서 지켜야 할 것</h3>
+        <ul>
+          <li><b>자리:</b> 새 소제목들은 목록 끝이 아니라 원래 소제목 자리에 끼워요(<code>group_order</code> 갱신). 지금 「기타」 재정리는 결과를 끝에 붙이는데, 기타는 원래 맨 뒤라 괜찮았던 거예요.</li>
+          <li><b>마감 후 확정본:</b> 나눈 결과를 초안 분류 캐시에 써 넣어야 해요. 안 그러면 확정본이 원래 「인사청문회」 하나로 돌아가요.</li>
+          <li><b>옛 이름 되살아남:</b> 이 칸으로 「다른 소제목」을 써서 옮겨둔 기사가 있으면, 그 배정 기록이 옛 이름을 다시 만들어요. 나눌 때 같이 정리해요.</li>
+          <li><b>순서:</b> 각 새 소제목 안의 기사 순서는 나누기 전 순서(내가 ↑↓로 맞춘 것)를 그대로 따라요.</li>
+          <li><b>칸 수:</b> 남은 칸(15 − 지금 소제목 수 + 1)만큼만 만들어요. 오늘은 넉넉해요.</li>
+          <li><span class="sw"></span> 연보라 행은 다음 새로고침에 사라져요(배정 결과와 같은 1회성).</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ④ -->
+  <section class="lane">
+    <h2><span class="num">4</span> 대화상자는 두 경우에만</h2>
+    <p class="why">
+      기본은 <b>확인창 없이 바로 나눠요</b>. 이 칸 안에서 잃을 게 없고(🤖 이름·AI 순서뿐), ↩ 한 번이면 원래대로 돌아오니까요.
+      확인창은 <b>담당자가 직접 해 둔 일이 사라질 때만</b> 한 번 물어요. 그런 일이 0건이면 그 문장은 아예 안 나와요.
+    </p>
+    <div class="dialogs">
+      <div>
+        <div class="dlg">
+          <div class="from">127.0.0.1:8765 내용:</div>
+          <pre>「청문회 쟁점 정리」는 직접 고친 이름이에요. 나누면 이 이름은 없어지고 AI가 새 이름을 붙여요.
+「다른 소제목」으로 이 칸에 옮겨둔 기사 3건도 새 소제목으로 흩어질 수 있어요.
+(다른 소제목과 숨긴 기사, 담아둔 기사는 영향을 받지 않습니다.)
+
+고른 62건을 AI로 나눌까요?</pre>
+          <div class="btns"><span>취소</span><span class="ok">확인</span></div>
+        </div>
+        <p class="dlg-cap"><b>잃을 게 있을 때만 뜨는 확인창.</b> 기존 재분류 확인창과 같은 순서예요(상황 → 안심 문장 → 빈 줄 → 질문). 안심 문장도 같은 상수(<code>RECLASSIFY_SAFE_NOTE</code>)를 쓰는데, 앞머리만 「다른 소제목과」로 바꿔요.</p>
+      </div>
+      <div>
+        <div class="dlg">
+          <div class="from">127.0.0.1:8765 내용:</div>
+          <pre>더 나눌 쟁점을 찾지 못했어요.
+「이형일 경제부총리 인사청문회」는 그대로 뒀어요.</pre>
+          <div class="btns"><span class="ok">확인</span></div>
+        </div>
+        <p class="dlg-cap"><b>AI가 한 덩어리로 돌려줬을 때.</b> 화면이 전혀 안 바뀌니 알려야 해요. 이름만 슬쩍 바뀌는 게 최악이라 이때는 이름까지 원래대로 둬요. 호출이 실패했을 때도 같은 문장으로 알리고 아무것도 안 바꿔요.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="decide">
+    <h2>정해주셔야 할 것 (제 추천 포함)</h2>
+    <ol>
+      <li><b>일부만 골라도 켤까?</b> (②의 두 번째 줄) — <span class="rec">추천: 켠다.</span> 규칙이 「고른 것만 나눈다, 안 고른 건 원래 칸에 남는다」 하나로 정리되고, 소제목 전체를 고른 건 그중 「남는 게 0건」인 경우일 뿐이에요. 62건 중 비거주 논란 24건만 체크해 따로 떼는 식으로도 쓸 수 있어요.</li>
+      <li><b>연보라를 기사 행 전체에 칠할까?</b> — 62줄이 한꺼번에 보라가 돼요. <span class="rec">추천: 칠한다.</span> 「AI 기사 배정」 뒤와 같은 규칙이고, 어디까지 바뀌었는지가 곧 그 범위예요. 다음 새로고침에 사라져요.</li>
+      <li><b>확정본에도 둘까?</b> — <span class="rec">추천: 둘 다.</span> 「AI 모든 기사 재분류」가 두 화면에 같은 모양으로 있는 것과 같은 규칙이에요. 먼저 초안에만 만들고 써 본 뒤 확정본에 옮겨도 돼요.</li>
+      <li><b>「기타」 칸 전체를 골라 누르면?</b> — 오늘 11시 확정본은 83건 중 51건이 기타였어요. 기타도 똑같이 켜 두면 자동 「기타」 재정리를 손으로 부르는 버튼이 돼요. <span class="rec">추천: 막지 않는다.</span></li>
+    </ol>
+  </div>
+</div>
+
+<script>
+// 아이콘 — app/icons.py 값 그대로(split만 이 기능용 새 아이콘)
+var IC = {
+  trash: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/>',
+  pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/>',
+  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/>',
+  up: '<path d="M12 19V5"/><path d="m5 12 7-7 7 7"/>',
+  down: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
+  tri_up: '<path d="m6 15 6-6 6 6"/>', tri_down: '<path d="m6 9 6 6 6-6"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  dots: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
+  tag: '<path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.3"/>',
+  copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
+  ext: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14 21 3"/>',
+  marker: '<path d="M15 3.2 20.8 9l-8.2 8.2H6.8V11.4Z"/><path d="m11.4 6.8 5.8 5.8"/><path d="M3.5 21h17"/>',
+  bot: '<circle cx="12" cy="5.4" r="1.4"/><path d="M12 6.8v2.3"/><rect x="4.5" y="9.1" width="15" height="10.9" rx="4"/><circle cx="9" cy="14.3" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="14.3" r="1" fill="currentColor" stroke="none"/><path d="M9 17.3h6"/><path d="M4.5 13.2h-2M19.5 13.2h2"/>',
+  folder: '<path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.6h8.8A1.5 1.5 0 0 1 21 9.1v9.4a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5Z"/>',
+  check: '<path d="m20 6-11 11-5-5"/>',
+  // 새 아이콘 — 한 줄기가 셋으로 갈라진다(= 하나를 여러 개로)
+  split: '<path d="M12 21v-7"/><path d="M12 14 5 6"/><path d="M12 14 19 6"/><path d="M12 14V4"/><circle cx="5" cy="5" r="1.6"/><circle cx="19" cy="5" r="1.6"/><circle cx="12" cy="3" r="1.6"/>'
+};
+function ic(n) { return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + IC[n] + '</svg>'; }
+document.querySelectorAll('[data-ic]').forEach(function (el) { el.insertAdjacentHTML('afterbegin', ic(el.dataset.ic)); });
+
+function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+// 기사 행 하나 — 실제 render_article의 모양을 줄여 옮김
+function row(a, cls) {
+  return '<div class="art ' + (cls || '') + '">' +
+    '<div class="r1"><input type="checkbox"' + (cls === 'checked' ? ' checked' : '') + '>' +
+    '<span><span class="outlet">' + esc(a[0]) + '</span>' + esc(a[1]) + '</span></div>' +
+    '<div class="r2"><span>' + a[2] + ' · ' + (a[3] || '1시간 전') + '</span> · <a href="#">원문보기</a> · ' +
+    '<span class="kw">' + ic('search') + ' ' + esc(a[4] || '이형일') + '</span>' +
+    '<span class="acts"><select class="sel"><option>다른 소제목</option></select>' + ic('copy') + ic('tag') + ic('dots') + ic('trash') + ic('up') + ic('down') + '</span></div></div>';
+}
+function head(name, count, opts) {
+  opts = opts || {};
+  var title = opts.unclassified
+    ? '<span class="sub-title unclassified"><input type="checkbox">' + ic('folder') + '<span class="nm">소제목 미분류</span><span class="unc-cnt">' + count + '건</span></span>'
+    : '<span class="sub-title"><input type="checkbox"' + (opts.checked ? ' checked' : '') + '><span class="nm">&lt;' + esc(name) + '&gt;</span>' +
+      (opts.ai ? '<span class="ai-badge">' + ic('bot') + '</span>' : '') + '<span class="cnt">' + count + '</span></span>';
+  var icons = opts.unclassified
+    ? '<span class="assign-btn">' + ic('bot') + ' AI 기사 배정</span>'
+    : '<span class="icons">' + ic('copy') + ic('pencil') + ic('trash') +
+      (opts.locked ? '' : '<span class="' + (opts.first ? 'off' : '') + '">' + ic('tri_up') + '</span>' + ic('tri_down')) + '</span>';
+  return '<h2>' + title + icons + '</h2>';
+}
+function section(name, count, arts, cls, opts, moreText) {
+  return '<div class="sub">' + head(name, count, opts) + arts.map(function (a) { return row(a, cls); }).join('') +
+    (moreText ? '<div class="more-rows">' + moreText + '</div>' : '') + '</div>';
+}
+
+// ── ① 체크한 화면 ──
+var BIG = [
+  ['KBS', '이형일·이소영 청문회…‘ETF·갭투자’ 공방', '12:06', '1시간 전', '이형일'],
+  ['KBS', '이형일 경제부총리 후보자 인사청문회…‘갭투자’·ETF 수익 ‘여야 설전’', '11:45', '1시간 전', '재정경제부, 이형일'],
+  ['KBS', '17년 보유·실거주 4개월 과천 아파트에 “집은 거주하는 곳이라면서요?” [지금뉴스]', '11:18', '2시간 전', '재정경제부, 이형일, 재정경제기획위원회'],
+  ['SBS', '이형일 "과천 집 비거주 논란 송구…거주 목적으로 산 것"', '11:35', '2시간 전', '재정경제부, 기획재정부, 이형일'],
+  ['MBC', '이형일 "경기회복 온기 고르게"‥물가안정 첫 과제로', '12:04', '1시간 전', '재정경제부, 이형일'],
+  ['MBC', '"아내가 아들에 부탁" 김승원 눈물의 해명‥청문회 전반전 고성전', '12:03', '1시간 전', '이형일']
+];
+document.getElementById('lane1-body').innerHTML =
+  section('이형일 경제부총리 인사청문회', 62, BIG, 'checked', { ai: true, checked: true, first: true }, '… 체크된 기사 56건 더') +
+  section('청문회 사진', 1, [['노컷뉴스', '관계자와 대화하는 이형일 후보자', '12:40', '55분 전']], '', { ai: true }) +
+  section('재경관 화상회의', 5, [['노컷뉴스', '재경부, 주요국 하반기 경제이슈 점검…AI·통상·이상기후 주목', '10:12', '3시간 전', '재정경제부']], '', { ai: true }, '… 4건 더');
+
+function bar(n, state, withBubble) {
+  var split;
+  if (state === 'on') split = '<span class="bb split">' + ic('split') + ' AI 기사 나누기</span>';
+  else if (state === 'busy') split = '<span class="bb split busy">' + ic('split') + ' 나누는 중…</span>';
+  else if (state === 'locked') split = '<span class="bb split locked">' + ic('split') + ' AI 기사 나누기</span>';
+  else split = '';
+  if (withBubble) split = '<span class="bubble-wrap"><span class="bubble">고른 ' + n + '건만 AI가 쟁점별로 새 소제목으로 나눠요. 다른 소제목은 그대로예요.</span>' + split + '</span>';
+  return '<span class="count">' + ic('check') + ' ' + n + '개 선택됨</span>' +
+    '<select><option>이동할 소제목</option></select><span class="bb">옮기기</span>' +
+    '<span class="bb sq ' + (state === 'multi' || state === 'lockedMulti' ? '' : 'off') + '">' + ic('up') + '</span>' +
+    '<span class="bb sq off">' + ic('down') + '</span>' +
+    '<span class="bb sq">' + ic('trash') + '</span>' +
+    (split ? '<span class="bar-div"></span>' + split : '') +
+    '<span class="bb clear">선택 해제</span>';
+}
+document.getElementById('lane1-bar').innerHTML = bar(62, 'on', true);
+
+// ── ② 상태표 ──
+var STATES = [
+  ['on', '한 소제목 전체 (62건)', '이번 요청 그대로의 경우', 'on', ''],
+  ['on', '한 소제목 안에서 일부 (24건)', '고른 24건만 나뉘고, 안 고른 38건은 원래 소제목에 그 이름 그대로 남아요', 'on', ''],
+  ['busy', '누른 직후', '몇 초~십몇 초. 두 번 눌리지 않게 잠그고 글자만 바꿔요(재분류 버튼과 같은 방식)', 'busy', ''],
+  ['locked', '여러 소제목에 걸쳐 고름', '하단바 ↑↓가 잠기는 것과 같은 조건', 'lock', '한 소제목 안의 기사만 나눌 수 있어요'],
+  ['locked', '3건 이하', '2건씩 두 묶음도 안 나오는 크기', 'lock', '4건 이상 골라야 나눌 수 있어요'],
+  ['locked', '소제목이 15개로 꽉 참', '나눌 칸이 없어요', 'lock', '소제목이 15개로 꽉 차 있어요. 빈 소제목을 지우거나 합친 뒤 다시 눌러 주세요'],
+  ['none', '📂 미분류 칸 기사를 고름', '그 칸 헤더에 「AI 기사 배정」이 이미 있어요', 'none', '']
+];
+var counts = [62, 24, 62, 9, 3, 30, 5];
+document.getElementById('states').innerHTML = STATES.map(function (s, i) {
+  var tagTxt = { on: '켜짐', busy: '진행 중', lock: '잠김', none: '안 그림' }[s[3]];
+  return '<div class="st"><div class="cap"><b>' + s[1] + '<span class="tag ' + s[3] + '">' + tagTxt + '</span></b><span>' + s[2] + '</span></div>' +
+    '<div><div class="strip"><div class="bulk">' + bar(counts[i], s[0]) + '</div></div>' +
+    (s[4] ? '<div class="why-tip">마우스를 올리면 → <code>' + s[4] + '</code></div>' : '') + '</div></div>';
+}).join('');
+
+// ── ③ 나눈 뒤 ──
+var G = [
+  ['이형일 과천 아파트 비거주 논란', 24, [
+    ['KBS', '17년 보유·실거주 4개월 과천 아파트에 “집은 거주하는 곳이라면서요?” [지금뉴스]', '11:18', '2시간 전', '재정경제부, 이형일, 재정경제기획위원회'],
+    ['SBS', '이형일 "과천 집 비거주 논란 송구…거주 목적으로 산 것"', '11:35', '2시간 전', '재정경제부, 기획재정부, 이형일'],
+    ['동아일보', '이형일, 과천 아파트 비거주 논란에 “국민 눈높이에 미흡, 송구”', '11:31', '2시간 전']]],
+  ['이형일 경제정책 구상(성장·물가·재정)', 15, [
+    ['MBC', '이형일 "경기회복 온기 고르게"‥물가안정 첫 과제로', '12:04', '1시간 전', '재정경제부, 이형일'],
+    ['중앙일보', '이형일 “3% 성장·국민소득 4만 달러 예상…성장 온기 확산할 것”', '11:52', '1시간 전'],
+    ['머니투데이', '이형일 "한은 통화긴축 공감…재정으로 취약층 지원해야"', '11:40', '1시간 전']]],
+  ['김승원 후보자 청문회 공방', 6, [
+    ['MBC', '"아내가 아들에 부탁" 김승원 눈물의 해명‥청문회 전반전 고성전', '12:03', '1시간 전'],
+    ['문화일보', '적반하장 청문회… 김승원 “한동훈 폭로 출처 밝힐 것”', '11:58', '1시간 전']]],
+  ['대미투자·가족 ETF 질의', 6, [
+    ['파이낸셜뉴스', '이형일 "대미투자, 연 200억달러·총 2000억달러 범위 내 협의"', '11:26', '2시간 전'],
+    ['아시아경제', '이형일 "가족 보유 ETF는 지수 추종 상품…이해충돌 문제 없어"', '11:21', '2시간 전']]],
+  ['경제 컨트롤타워 역할 주문', 5, [
+    ['머니투데이', '정성호 "부총리가 중심 놓치면 중구난방"…이형일에 \'경제원톱\' 주문', '12:10', '1시간 전'],
+    ['연합뉴스', '이형일 "부총리 취임하면 경제팀 수장으로서 조율하고 책임"(종합)', '12:01', '1시간 전']]],
+  ['다주택 과세 소신 공방', 4, [
+    ['머니투데이', '강민국 "다주택 과세 180도 번복"…이형일 "민간임대 소신 그대로"', '11:49', '1시간 전'],
+    ['뉴시스', '이형일 "\'다주택 징벌적 과세\' 발언, 민간 임대 필요하다는 취지"', '11:44', '1시간 전']]]
+];
+var html = G.map(function (g, i) {
+  var more = g[1] - g[2].length;
+  return section(g[0], g[1], g[2], 'ai', { ai: true, first: i === 0 }, more > 0 ? '… 연보라 ' + more + '건 더' : '');
+}).join('');
+html += section('청문회 사진', 1, [['노컷뉴스', '관계자와 대화하는 이형일 후보자', '12:40', '55분 전']], '', { ai: true });
+html += section('재경관 화상회의', 5, [['노컷뉴스', '재경부, 주요국 하반기 경제이슈 점검…AI·통상·이상기후 주목', '10:12', '3시간 전', '재정경제부']], '', { ai: true }, '… 4건 더');
+html += '<div class="sub">' + head('기타', 4, { locked: true }) +
+  row(['문화일보', '회사채 만기 돌아오는데… 국내기업 자금조달 ‘경고등’', '09:12', '4시간 전', '재정경제부']) +
+  row(['헤럴드경제', '韓·투르크, 에너지·자원 협력 강화', '08:40', '5시간 전', '재정경제부']) +
+  row(['헤럴드경제', '[헤럴드pic] 당당·초조·여유…누가 통과할까', '12:20', '1시간 전'], 'ai') +
+  row(['아시아경제', '[사설]경제부총리 청문회, 과거보다 성장을 물어라', '06:30', '7시간 전'], 'ai') + '</div>';
+html += '<div class="sub">' + head('', 5, { unclassified: true }) +
+  row(['JTBC', '이형일 "비거주 1주택 논란 송구…실거주 목적으로 산 것"', '13:22', '13분 전']) + '<div class="more-rows">… 4건 더</div></div>';
+document.getElementById('lane3-body').innerHTML = html;
+</script>
+</body>
+</html>

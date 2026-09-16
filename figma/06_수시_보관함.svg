@@ -1,0 +1,343 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1360" viewBox="0 0 1440 1360">
+<rect width="100%" height="100%" fill="#F8FAFC"/>
+<g id="topbar">
+<rect x="0" y="0" width="1440" height="54.5" fill="#FFFFFF"/>
+<text x="330" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">홈</text>
+</g>
+<g id="수시 보관함">
+<rect x="320" y="84" width="800" height="1157.5" rx="12" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="166.5" width="750" height="150.5" rx="10" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="412" y="177.5" width="459.2" height="30.5" rx="7" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="423" y="197.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.8" font-weight="400" fill="#1F2937" xml:space="preserve">사안 이름 일부만 넣어도 됩니다 (예: 세수)</text>
+<rect x="881.2" y="179" width="48.1" height="27.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="358" y="217" width="724" height="1" fill="#E5E7EB"/>
+<rect x="412" y="227" width="208.9" height="30" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="413" y="228" width="47" height="28" fill="#FFFFFF"/>
+<rect x="460" y="228" width="48.8" height="28" fill="#FFFFFF"/>
+<rect x="508.8" y="228" width="58.4" height="28" fill="#FFFFFF"/>
+<rect x="567.2" y="228" width="52.7" height="28" fill="#2563EB"/>
+<rect x="358" y="266" width="724" height="1" fill="#E5E7EB"/>
+<rect x="412" y="276" width="125.6" height="30" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="572.1" y="276" width="125.6" height="30" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="707.7" y="276" width="52.7" height="30" rx="6" fill="#2563EB" stroke="#2563EB" stroke-width="1"/>
+<rect x="941.6" y="331" width="50.1" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.8" y="331" width="43.1" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1042.9" y="331" width="50.1" height="29.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="368.5" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="379.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="379.5" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="379.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="416" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="427" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="427" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="427" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="469.5" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="480.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="480.5" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="480.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="517" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="528" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="528" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="528" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="523" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="534" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="534" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="534" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="570.5" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="581.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="581.5" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="581.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="576.5" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="587.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="587.5" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="587.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="624" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="635" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="635" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="635" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="630" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="641" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="641" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="641" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="677.5" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="688.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="688.5" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="688.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="683.5" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="694.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="694.5" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="694.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="731" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="742" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="742" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="742" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="737" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="748" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="748" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="748" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="784.5" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="795.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="795.5" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="795.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="790.5" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="801.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="801.5" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="801.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="838" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="849" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="849" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="849" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="844" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="855" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="855" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="855" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="891.5" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="902.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="902.5" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="902.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="897.5" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="908.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="908.5" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="908.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="945" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="956" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="956" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="956" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="951" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="962" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="962" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="962" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="998.5" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="1009.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="1009.5" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="1009.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="1004.5" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="1015.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="1015.5" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="1015.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="1052" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="1063" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="1063" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="1063" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="1058" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="1069" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="1069" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="1069" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="1105.5" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="1116.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="1116.5" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="1116.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="1111.5" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="1122.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="1122.5" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="1122.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="1159" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="1170" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="1170" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="1170" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="1165" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="1176" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="1176" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="1176" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="1212.5" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="1223.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="1223.5" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="1223.5" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="345" y="1260" width="750" height="46.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="946.3" y="1271" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="995.1" y="1271" width="38.1" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="1037.2" y="1271" width="44.8" height="24.5" rx="6" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="345" y="124.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="19.2" font-weight="700" fill="#1E3A5F" xml:space="preserve">수시 보관함</text>
+<text x="345" y="146.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">사안별로 쌓인 수시 모니터링 · 1년간 보관됩니다</text>
+<text x="358" y="196.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="600" fill="#6B7280" xml:space="preserve">사안명</text>
+<text x="905.3" y="196.6" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">검색</text>
+<text x="939.3" y="196.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">비워두면 이 기간의 모든 사안</text>
+<text x="358" y="245.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="600" fill="#6B7280" xml:space="preserve">기간</text>
+<text x="436" y="245.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">1일</text>
+<text x="483.9" y="245.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">7일</text>
+<text x="537.5" y="245.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">1개월</text>
+<text x="593.6" y="245.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="600" fill="#FFFFFF" xml:space="preserve">전체</text>
+<text x="549.6" y="295.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="600" fill="#6B7280" xml:space="preserve">~</text>
+<text x="734.1" y="294.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="600" fill="#FFFFFF" xml:space="preserve">조회</text>
+<text x="770.4" y="294.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">시작일 ~ 종료일을 직접 넣고 조회</text>
+<text x="347" y="349.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">전체 기간 · 사안</text>
+<text x="437.4" y="349.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="700" fill="#1E3A5F" xml:space="preserve">15개</text>
+<text x="468.4" y="349.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">· 회차</text>
+<text x="506.5" y="349.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="700" fill="#1E3A5F" xml:space="preserve">17건</text>
+<text x="537.6" y="349.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">· 기사</text>
+<text x="575.7" y="349.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="700" fill="#1E3A5F" xml:space="preserve">1041건</text>
+<text x="966.7" y="349.6" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1017.3" y="349.6" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1067.9" y="349.6" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="376" y="396" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">테스트2 8/19</text>
+<text x="460.2" y="395.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">햄버거 · 치즈버거 · 버거킹 · 롯데리아</text>
+<text x="748" y="395.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">날짜 1 · 회차 1 · 8건</text>
+<text x="968.7" y="395.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="395.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="395.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="376" y="443.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">8월 19일 (수)</text>
+<text x="482" y="443" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">회차 1 · 8건</text>
+<text x="968.7" y="442.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="442.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="442.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="497" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">테스트 8/19</text>
+<text x="451.3" y="496.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">치킨 · 양념치킨 · 후라이드치킨 · 비비큐 · bcc</text>
+<text x="758.5" y="496.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">날짜 1 · 회차 1 · 187건</text>
+<text x="968.7" y="496.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="496.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="496.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="544.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">8월 19일 (수)</text>
+<text x="480.6" y="544" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">회차 1 · 187건</text>
+<text x="968.7" y="543.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="543.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="543.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="550.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">세마포어실서버검증</text>
+<text x="494.2" y="550.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">-</text>
+<text x="670.9" y="550" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">날짜 1 · 회차 1 · 68건</text>
+<text x="968.7" y="549.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="549.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="549.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="598" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">8월 13일 (목)</text>
+<text x="480.6" y="597.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">회차 1 · 68건</text>
+<text x="968.7" y="597.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="597.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="597.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="604" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">삭제버튼실서버검증</text>
+<text x="494.2" y="603.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">-</text>
+<text x="674.1" y="603.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">날짜 1 · 회차 1 · 0건</text>
+<text x="968.7" y="603.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="603.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="603.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="651.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">8월 13일 (목)</text>
+<text x="480.6" y="651" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">회차 1 · 0건</text>
+<text x="968.7" y="650.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="650.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="650.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="657.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">삭제분기검증</text>
+<text x="457.7" y="657.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">-</text>
+<text x="657.5" y="657" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">날짜 1 · 회차 1 · 1건</text>
+<text x="968.7" y="656.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="656.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="656.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="705" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">8월 13일 (목)</text>
+<text x="480.6" y="704.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">회차 1 · 1건</text>
+<text x="968.7" y="704.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="704.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="704.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="711" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">순서삭제검증</text>
+<text x="457.7" y="710.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">-</text>
+<text x="656.3" y="710.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">날짜 1 · 회차 1 · 6건</text>
+<text x="968.7" y="710.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="710.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="710.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="758.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">8월 13일 (목)</text>
+<text x="480.6" y="758" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">회차 1 · 6건</text>
+<text x="968.7" y="757.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="757.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="757.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="764.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">되돌리기다단계검증</text>
+<text x="494.2" y="764.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">-</text>
+<text x="674.1" y="764" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">날짜 1 · 회차 1 · 0건</text>
+<text x="968.7" y="763.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="763.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="763.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="812" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">8월 13일 (목)</text>
+<text x="480.6" y="811.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">회차 1 · 0건</text>
+<text x="968.7" y="811.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="811.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="811.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="818" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">coalesce검증</text>
+<text x="459.8" y="817.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">-</text>
+<text x="656.9" y="817.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">날짜 1 · 회차 1 · 0건</text>
+<text x="968.7" y="817.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="817.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="817.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="865.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">8월 13일 (목)</text>
+<text x="480.6" y="865" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">회차 1 · 0건</text>
+<text x="968.7" y="864.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="864.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="864.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="871.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">되돌리기검증</text>
+<text x="457.7" y="871.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">-</text>
+<text x="656.4" y="871" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">날짜 1 · 회차 1 · 3건</text>
+<text x="968.7" y="870.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="870.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="870.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="919" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">8월 13일 (목)</text>
+<text x="480.6" y="918.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">회차 1 · 3건</text>
+<text x="968.7" y="918.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="918.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="918.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="925" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">순서일괄이동검증</text>
+<text x="482.1" y="924.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">-</text>
+<text x="668.8" y="924.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">날짜 1 · 회차 1 · 7건</text>
+<text x="968.7" y="924.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="924.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="924.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="972.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">8월 13일 (목)</text>
+<text x="480.6" y="972" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">회차 1 · 7건</text>
+<text x="968.7" y="971.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="971.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="971.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="978.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">폼제출검증</text>
+<text x="445.5" y="978.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">-</text>
+<text x="649.7" y="978" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">날짜 1 · 회차 1 · 0건</text>
+<text x="968.7" y="977.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="977.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="977.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="1026" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">8월 13일 (목)</text>
+<text x="480.6" y="1025.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">회차 1 · 0건</text>
+<text x="968.7" y="1025.3" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="1025.3" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="1025.3" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="1032" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">커스텀분류연동검증</text>
+<text x="494.2" y="1031.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">-</text>
+<text x="672.4" y="1031.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">날짜 1 · 회차 1 · 12건</text>
+<text x="968.7" y="1031.3" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="1031.3" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="1031.3" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="1079.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">8월 13일 (목)</text>
+<text x="480.6" y="1079" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">회차 1 · 12건</text>
+<text x="968.7" y="1078.8" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="1078.8" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="1078.8" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="1085.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">커스텀소제목검증</text>
+<text x="482.1" y="1085.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">-</text>
+<text x="668" y="1085" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">날짜 1 · 회차 1 · 0건</text>
+<text x="968.7" y="1084.8" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="1084.8" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="1084.8" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="1133" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">8월 13일 (목)</text>
+<text x="480.6" y="1132.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">회차 1 · 0건</text>
+<text x="968.7" y="1132.3" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="1132.3" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="1132.3" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="1139" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">LLM분류검증</text>
+<text x="459.2" y="1138.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">-</text>
+<text x="655.2" y="1138.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">날짜 1 · 회차 1 · 17건</text>
+<text x="968.7" y="1138.3" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="1138.3" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="1138.3" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="1186.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">8월 13일 (목)</text>
+<text x="480.6" y="1186" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">회차 1 · 17건</text>
+<text x="968.7" y="1185.8" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="1185.8" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="1185.8" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="1192.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">테스트-collector</text>
+<text x="478.7" y="1192.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">-</text>
+<text x="658.4" y="1192" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">날짜 2 · 회차 2 · 732건</text>
+<text x="968.7" y="1191.8" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="1191.8" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="1191.8" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="1240" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">8월 13일 (목)</text>
+<text x="480.6" y="1239.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">회차 1 · 0건</text>
+<text x="968.7" y="1239.3" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="1239.3" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="1239.3" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+<text x="374.6" y="1287.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="600" fill="#1E3A5F" xml:space="preserve">1월 1일 (수)</text>
+<text x="480.6" y="1287" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">회차 1 · 732건</text>
+<text x="968.7" y="1286.8" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">복사</text>
+<text x="1014.2" y="1286.8" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">txt</text>
+<text x="1059.6" y="1286.8" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12" font-weight="400" fill="#6B7280" xml:space="preserve">엑셀</text>
+</g>
+</svg>

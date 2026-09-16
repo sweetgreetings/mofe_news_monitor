@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>수시 기사 행을 정기에 맞추기 — 목업</title>
+<style>
+  :root{
+    --bg:#F8FAFC; --card:#FFFFFF; --header:#1E3A5F; --accent:#2563EB;
+    --text:#1F2937; --muted:#6B7280; --border:#E5E7EB; --hover:#EFF6FF;
+    --error:#DC2626; --row-hover:#F3F4F6; --text-soft:#4B5563; --text-faint:#9CA3AF;
+    --photo-t:#6B7280; --photo-bg:#F3F4F6; --photo-b:#E5E7EB;
+    --label-t:#8A5A14; --label-bg:#FBF0DA; --label-b:rgba(138,90,20,.28);
+    --scoop:#B91C1C; --scoop-bg:#FEF2F2; --scoop-bar:#DC2626;
+    --adhoc-bg:#E3F1EE; --adhoc-t:#146B5E;
+    --divider-soft:#F1F5F9; --sep-faint:#9CA3AF;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","맑은 고딕",sans-serif;}
+  .wrap{max-width:960px;margin:0 auto;padding:28px 24px 80px}
+  h1{font-size:1.25rem;color:var(--header);margin:0 0 6px}
+  .sub{font-size:.86rem;color:var(--muted);margin:0 0 26px;line-height:1.7}
+  h2{font-size:1rem;color:var(--header);margin:34px 0 4px;display:flex;align-items:center;gap:8px}
+  h2 .badge{font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .b-ref{background:var(--hover);color:var(--accent);border:1px solid #BFDBFE}
+  .b-now{background:var(--photo-bg);color:var(--photo-t);border:1px solid var(--photo-b)}
+  .b-new{background:var(--adhoc-bg);color:var(--adhoc-t);border:1px solid var(--adhoc-t)}
+  .note{font-size:.8rem;color:var(--muted);margin:0 0 10px;line-height:1.65}
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 18px}
+
+  /* ── 아이콘 공통 (app/icons.py와 동일) ───────────────────── */
+  .ic{width:1em;height:1em;stroke:currentColor;fill:none;stroke-width:1.9;
+      stroke-linecap:round;stroke-linejoin:round;vertical-align:-.15em;flex-shrink:0}
+
+  /* ══ A. 정기 확정본 (기준) — app/renderer.py render_article ══ */
+  .r .article{margin:10px 0;line-height:1.5;padding:6px 8px;border-radius:8px}
+  .r .article:hover{background:var(--row-hover)}
+  .r .article.art-scoop{background:var(--scoop-bg);border-left:3px solid var(--scoop-bar);padding-left:9px}
+  .r .article.is-photo{opacity:.55}
+  .r .article.is-photo:hover{opacity:1}
+  .r summary{cursor:pointer;display:flex;flex-direction:column;gap:4px;list-style:none}
+  .r summary::-webkit-details-marker{display:none}
+  .r .title-row{display:flex;align-items:baseline;gap:8px}
+  .r .title-line{min-width:0;overflow-wrap:anywhere;color:var(--text)}
+  .r .title-line .outlet{color:var(--muted)}
+  .r .action-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;row-gap:4px}
+  .r .article:has(.article-select) .action-row{padding-left:28px}
+  .r .pub-time{flex-shrink:0;color:var(--muted);font-size:.8rem;white-space:nowrap}
+  .r .time-sep{color:var(--muted);font-size:.8rem;margin:0 2px}
+  .r .origin-link-text{flex-shrink:0;color:var(--accent);font-size:.8rem;text-decoration:none;
+      display:inline-flex;align-items:center;gap:2px;white-space:nowrap}
+  .r .origin-link-text .ic{width:.75em;height:.75em}
+  .r .kw-inline{font-size:.8rem;color:var(--muted);display:inline-flex;align-items:center;gap:4px}
+  .r .kw-inline .ic{width:.75em;height:.75em;color:var(--text-faint)}
+  .r .kw-inline .kw-v{color:var(--text-soft)}
+  .r .article-actions{margin-left:auto;display:flex;align-items:center;justify-content:flex-end;
+      gap:4px;flex-shrink:0;flex-wrap:wrap;row-gap:4px}
+  .r .move-btn,.r .hide-btn,.r .copy-btn{flex-shrink:0;background:transparent;border:none;
+      color:var(--muted);font-size:1rem;cursor:pointer;padding:2px 6px}
+  .r .copy-btn{display:inline-flex;align-items:center}
+  .r .hide-btn:hover{color:var(--error)}
+  .r .move-btn:disabled{color:var(--border);cursor:not-allowed}
+  .r .more-btn,.r .lab-btn{background:transparent;border:none;color:var(--muted);font-size:1.05rem;
+      line-height:1;cursor:pointer;padding:3px 7px;border-radius:4px;display:inline-flex;align-items:center}
+  .r .more-btn:hover,.r .lab-btn:hover{background:var(--hover);color:var(--accent)}
+  .r .more-wrap{position:relative;display:inline-flex;flex-shrink:0}
+  .r .more-menu{position:absolute;right:0;top:100%;margin-top:4px;z-index:60;min-width:172px;
+      background:var(--card);border:1px solid var(--border);border-radius:8px;padding:4px;
+      box-shadow:0 4px 16px rgba(0,0,0,.13);display:none}
+  .r .more-wrap.is-open .more-menu{display:block}
+  .r .more-wrap.is-open .more-btn{background:var(--hover);color:var(--accent)}
+  .r .more-menu button{display:block;width:100%;text-align:left;background:transparent;border:none;
+      padding:8px 10px;border-radius:5px;font-size:.85rem;color:var(--text);cursor:pointer;white-space:nowrap}
+  .r .more-menu button:hover{background:var(--hover)}
+  .r .lab-btn.on{color:var(--label-t);background:var(--label-bg)}
+  .r .lab-btn .lab-count{font-size:.62rem;font-weight:700;margin-left:2px}
+  .r select.grp{font:inherit;font-size:.78rem;padding:2px 6px;border:1px solid var(--border);
+      border-radius:6px;background:var(--card);color:var(--muted);max-width:150px}
+  .r .photo-badge{flex-shrink:0;padding:1px 7px;border-radius:999px;font-size:.72rem;
+      color:var(--photo-t);background:var(--photo-bg);border:1px solid var(--photo-b);
+      white-space:nowrap;position:relative;top:-.15em}
+  .r .t-scoop{color:var(--scoop);font-weight:800}
+  .r .lab-row{display:flex;align-items:center;gap:4px;margin-top:3px;padding-left:28px}
+  .r .lab-row .tagmark{color:var(--label-t);font-size:.72rem;display:inline-flex}
+  .r .lab-chip{display:inline-flex;align-items:center;gap:4px;font-size:.64rem;font-weight:700;
+      color:var(--label-t);background:var(--label-bg);border:1px solid var(--label-b);
+      border-radius:20px;padding:2px 8px;white-space:nowrap}
+  .r .article-summary{margin:6px 0 4px 20px;color:var(--text);font-size:.95rem}
+
+  /* ══ B. 수시 현재 — app/adhoc/renderer.py _render_article_row ══ */
+  .n .article{padding:8px 9px;border-radius:8px;margin:2px 0;border-bottom:1px solid var(--divider-soft)}
+  .n summary{cursor:pointer;list-style:none}
+  .n summary::-webkit-details-marker{display:none}
+  .n .a-top{display:flex;align-items:flex-start;gap:8px}
+  .n .a-title{font-size:.93rem}
+  .n .a-title .outlet{color:var(--muted)}
+  .n .a-bot{display:flex;align-items:center;gap:6px;margin:5px 0 0 25px}
+  .n .a-time{font-size:.78rem;color:var(--muted)}
+  .n .a-time-sep{color:var(--sep-faint);font-size:.78rem}
+  .n .origin-link{color:var(--accent);font-size:.78rem;text-decoration:none;
+      display:inline-flex;align-items:center;gap:2px}
+  .n .origin-link .ic{width:.78em;height:.78em}
+  .n .a-acts{display:flex;gap:4px;align-items:center;margin-left:auto}
+  .n .icon-btn{border:none;background:none;color:var(--muted);border-radius:6px;padding:4px 6px;
+      cursor:pointer;display:inline-flex;align-items:center;font-size:1rem}
+  .n .icon-btn:hover{background:var(--border);color:var(--text)}
+  .n .icon-btn.lab-btn.on{color:var(--label-t);background:var(--label-bg)}
+  .n .lab-count{font-size:.62rem;font-weight:700;margin-left:2px}
+  .n .sel-sm{font:inherit;font-size:.78rem;padding:3px 8px;border:1px solid var(--border);
+      border-radius:7px;background:var(--card);color:var(--muted)}
+  .n .a-summary{font-size:.87rem;color:var(--text);margin:6px 0 0 25px;padding:8px 11px;
+      background:var(--bg);border-left:2px solid var(--border);border-radius:0 6px 6px 0}
+  .n .lab-row{display:flex;align-items:center;gap:4px;margin:4px 0 0 25px}
+  .n .lab-row .tagmark{color:var(--label-t);font-size:.72rem;display:inline-flex}
+  .n .lab-chip{display:inline-flex;align-items:center;gap:4px;font-size:.64rem;font-weight:700;
+      color:var(--label-t);background:var(--label-bg);border:1px solid var(--label-b);
+      border-radius:20px;padding:2px 8px}
+  /* 없어진 것들(스크린샷 재현용) */
+  .n .pin-btn{border:none;background:none;color:#9CA3AF;border-radius:6px;padding:4px 6px;
+      cursor:not-allowed;position:relative;font-size:1rem;display:inline-flex;align-items:center}
+  .n .pin-btn::after{content:"";position:absolute;left:3px;right:3px;top:50%;height:1.5px;
+      background:#9CA3AF;transform:rotate(-20deg)}
+  .n .hidden-tag{display:inline-flex;align-items:center;gap:3px;font-size:.68rem;
+      color:var(--photo-t);background:var(--photo-bg);border:1px solid var(--photo-b);
+      border-radius:999px;padding:1px 7px;white-space:nowrap}
+  .gone{position:relative}
+  .gone-mark{position:absolute;right:-6px;top:-10px;font-size:.62rem;font-weight:700;color:#fff;
+      background:var(--error);border-radius:4px;padding:1px 5px;white-space:nowrap;z-index:2}
+
+  /* 차이 표 */
+  table{border-collapse:collapse;width:100%;font-size:.82rem;margin-top:12px}
+  th,td{border:1px solid var(--border);padding:7px 9px;text-align:left;vertical-align:top}
+  th{background:var(--bg);color:var(--header);font-size:.76rem;white-space:nowrap}
+  td.k{white-space:nowrap;color:var(--text-soft)}
+  .yes{color:var(--adhoc-t);font-weight:700}
+  .no{color:var(--error);font-weight:700}
+  .warn-box{background:#FFFBEB;border:1px solid #FCD34D;border-radius:10px;padding:12px 15px;
+      font-size:.83rem;line-height:1.75;color:#78350F;margin-top:14px}
+  .warn-box b{color:#92400E}
+  code{background:var(--photo-bg);border:1px solid var(--photo-b);border-radius:4px;
+      padding:1px 5px;font-size:.94em}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>수시 기사 행 → 정기와 같은 규격으로</h1>
+<p class="sub">
+  기준은 <code>app/renderer.py</code> <code>render_article()</code>(정기 확정본·초안).<br>
+  A(기준) → B(수시 지금) → C(수시 제안). C의 첫 행은 ⋯ 메뉴를 펼친 상태로 그렸다. 색·아이콘·수치는 전부 실제 코드값 그대로 옮겼다.
+</p>
+
+<!-- ───────── A ───────── -->
+<h2>A. 정기 확정본 <span class="badge b-ref">기준</span></h2>
+<p class="note">제목 1rem / 메타 0.8rem / 들여쓰기 28px / 카드 여백 6px 8px · 위아래 10px</p>
+<div class="panel r">
+  <div class="article">
+    <details><summary>
+      <div class="title-row">
+        <input type="checkbox" class="article-select">
+        <span class="title-line"><span class="outlet">(조선일보)</span> 이형일 부총리 후보자 “상속세만으로 ‘주가 누르기’ 해소 가능한지 고민 있어”</span>
+      </div>
+      <div class="action-row">
+        <span class="pub-time">14:08 · 1시간 전</span>
+        <span class="time-sep">·</span>
+        <a class="origin-link-text" href="#" onclick="return false">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+        <span class="time-sep">·</span>
+        <span class="kw-inline"><svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 이형일</span></span>
+        <span class="article-actions">
+          <select class="grp"><option>다른 소제목</option></select>
+          <button class="copy-btn" title="복사하기"><svg class="ic" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+          <button class="lab-btn" title="라벨"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button>
+          <button class="more-btn" title="더보기"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+          <button class="hide-btn" title="숨기기"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+          <button class="move-btn" disabled><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+          <button class="move-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+        </span>
+      </div>
+    </summary>
+    <p class="article-summary">이형일 부총리 겸 재정경제부 장관 후보자는 …(저장된 요약)</p>
+    </details>
+  </div>
+</div>
+
+<!-- ───────── B ───────── -->
+<h2>B. 수시 수집 확정본 <span class="badge b-now">지금 (화면에 보이는 그대로)</span></h2>
+<p class="note">
+  빨간 표시 둘은 <b>이미 코드에서 지운 것</b>이다 — 지금 화면에 보인다면 옛 서버가 그대로 떠 있는 것.<br>
+  제목 0.93rem / 메타 0.78rem / 들여쓰기 25px / 카드 여백 8px 9px · 위아래 2px + 아래 실선
+</p>
+<div class="panel n">
+  <div class="article">
+    <details><summary>
+      <div class="a-top">
+        <input type="checkbox">
+        <div class="a-title"><span class="outlet">(KBS)</span> 이형일 후보자 “물가가 경제팀 성적표…비거주 차등, 없어지진 않을 것”
+          <span class="gone"><span class="gone-mark">삭제됨</span><span class="hidden-tag">🗑 정기 확정본에서 숨김</span></span>
+        </div>
+      </div>
+      <div class="a-bot">
+        <span class="a-time">11:41</span>
+        <span class="a-time-sep">·</span>
+        <a class="origin-link" href="#" onclick="return false">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+        <span class="a-acts">
+          <select class="sel-sm"><option>다른 소제목</option></select>
+          <span class="gone"><span class="gone-mark">삭제됨</span><button class="pin-btn" title="담아두기">📌</button></span>
+          <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+          <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button>
+          <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+          <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+          <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+        </span>
+      </div>
+    </summary>
+    <p class="a-summary">이형일 후보자는 인사청문회에서 …(저장된 요약)</p>
+    </details>
+  </div>
+</div>
+
+<!-- ───────── C ───────── -->
+<h2>C. 수시 수집 확정본 <span class="badge b-new">제안 — 정기와 동일 규격</span></h2>
+<p class="note">
+  A의 CSS·마크업을 그대로 쓴다(<code>.title-row</code>/<code>.action-row</code>/<code>.pub-time</code>/
+  <code>.article-actions</code>). 위 3줄 = 평소 · 4번째 = 사진 추정 · 5번째 = [단독].
+</p>
+<div class="panel r">
+
+  <!-- 기본 -->
+  <div class="article">
+    <details><summary>
+      <div class="title-row">
+        <input type="checkbox" class="article-select">
+        <span class="title-line"><span class="outlet">(KBS)</span> 이형일 후보자 “물가가 경제팀 성적표…비거주 차등, 없어지진 않을 것”</span>
+      </div>
+      <div class="action-row">
+        <span class="pub-time">11:41 · 3시간 전</span>
+        <span class="time-sep">·</span>
+        <a class="origin-link-text" href="#" onclick="return false">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+        <span class="time-sep">·</span>
+        <span class="kw-inline"><svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">이형일, 부총리</span></span>
+        <span class="article-actions">
+          <select class="grp"><option>다른 소제목</option></select>
+          <button class="copy-btn" title="복사하기"><svg class="ic" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+          <button class="lab-btn on" title="라벨"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg><span class="lab-count">1</span></button>
+          <span class="more-wrap is-open"><button class="more-btn" title="더보기"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <span class="more-menu">
+              <button type="button">원문 다시 불러오기</button>
+              <button type="button">기사제목 직접 수정</button>
+            </span>
+          </span>
+          <button class="hide-btn" title="숨기기"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+          <button class="move-btn" disabled><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+          <button class="move-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+        </span>
+      </div>
+      <div class="lab-row"><span class="tagmark"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></span><span class="lab-chip">인사청문회 ×</span></div>
+    </summary>
+    <p class="article-summary">이형일 후보자는 인사청문회에서 …(저장된 요약)</p>
+    </details>
+  </div>
+
+  <!-- 라벨 없음 -->
+  <div class="article">
+    <details><summary>
+      <div class="title-row">
+        <input type="checkbox" class="article-select">
+        <span class="title-line"><span class="outlet">(연합뉴스)</span> 재정경제부, 내년 예산안 국회 제출…총지출 증가율 4%대</span>
+      </div>
+      <div class="action-row">
+        <span class="pub-time">10:02 · 5시간 전</span>
+        <span class="time-sep">·</span>
+        <a class="origin-link-text" href="#" onclick="return false">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+        <span class="time-sep">·</span>
+        <span class="kw-inline"><svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">예산안</span></span>
+        <span class="article-actions">
+          <select class="grp"><option>다른 소제목</option></select>
+          <button class="copy-btn"><svg class="ic" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+          <button class="lab-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button>
+          <button class="more-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+          <button class="hide-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+          <button class="move-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+          <button class="move-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+        </span>
+      </div>
+    </summary>
+    <p class="article-summary">정부가 내년도 예산안을 국회에 제출했다 …(저장된 요약)</p>
+    </details>
+  </div>
+
+  <!-- 사진 추정 -->
+  <div class="article is-photo">
+    <details><summary>
+      <div class="title-row">
+        <input type="checkbox" class="article-select">
+        <span class="title-line"><span class="outlet">(뉴시스)</span> 인사청문회 출석한 이형일 후보자</span>
+        <span class="photo-badge"><svg class="ic" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="3.6"/></svg> 사진 추정</span>
+      </div>
+      <div class="action-row">
+        <span class="pub-time">09:31 · 6시간 전</span>
+        <span class="time-sep">·</span>
+        <a class="origin-link-text" href="#" onclick="return false">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+        <span class="time-sep">·</span>
+        <span class="kw-inline"><svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">이형일</span></span>
+        <span class="article-actions">
+          <select class="grp"><option>다른 소제목</option></select>
+          <button class="copy-btn"><svg class="ic" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+          <button class="lab-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button>
+          <button class="more-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+          <button class="hide-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+          <button class="move-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+          <button class="move-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+        </span>
+      </div>
+    </summary>
+    <p class="article-summary">이형일 부총리 후보자가 …(저장된 요약)</p>
+    </details>
+  </div>
+
+  <!-- [단독] -->
+  <div class="article art-scoop">
+    <details><summary>
+      <div class="title-row">
+        <input type="checkbox" class="article-select">
+        <span class="title-line"><span class="outlet">(한국경제)</span> <span class="t-scoop">[단독]</span> 재정경제부, 상속세 개편안 이달 말 발표 검토</span>
+      </div>
+      <div class="action-row">
+        <span class="pub-time">08:15 · 7시간 전</span>
+        <span class="time-sep">·</span>
+        <a class="origin-link-text" href="#" onclick="return false">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+        <span class="time-sep">·</span>
+        <span class="kw-inline"><svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">상속세, 재정경제부</span></span>
+        <span class="article-actions">
+          <select class="grp"><option>다른 소제목</option></select>
+          <button class="copy-btn"><svg class="ic" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+          <button class="lab-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button>
+          <button class="more-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+          <button class="hide-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+          <button class="move-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+          <button class="move-btn" disabled><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+        </span>
+      </div>
+    </summary>
+    <p class="article-summary">재정경제부가 상속세 개편안을 …(저장된 요약)</p>
+    </details>
+  </div>
+</div>
+
+<!-- ───────── 차이 표 ───────── -->
+<h2>무엇이 달랐나 / 무엇을 맞추나</h2>
+<table>
+  <tr><th>항목</th><th>정기</th><th>수시 (지금)</th><th>C안</th><th>비고</th></tr>
+  <tr><td class="k">제목 글자</td><td>1rem</td><td>0.93rem</td><td class="yes">1rem</td><td>정기 쪽으로</td></tr>
+  <tr><td class="k">메타 줄 글자</td><td>0.8rem</td><td>0.78rem</td><td class="yes">0.8rem</td><td></td></tr>
+  <tr><td class="k">메타 줄 들여쓰기</td><td>28px</td><td>25px</td><td class="yes">28px</td><td>체크박스 실측값</td></tr>
+  <tr><td class="k">카드 여백</td><td>6px 8px · 위아래 10px</td><td>8px 9px · 위아래 2px + 실선</td><td class="yes">정기와 동일</td><td>실선 제거</td></tr>
+  <tr><td class="k">“N분 전”</td><td class="yes">있음</td><td class="no">없음</td><td class="yes">추가</td><td>pub_date로 계산, 데이터 이미 있음</td></tr>
+  <tr><td class="k">🔍 검색어</td><td class="yes">있음</td><td class="no">없음</td><td class="yes">추가</td><td><code>matched_keywords</code> 카드에 이미 저장 중</td></tr>
+  <tr><td class="k">📷 사진 추정</td><td class="yes">있음</td><td class="no">없음</td><td class="yes">추가</td><td><code>looks_like_photo_caption</code> 그대로 재사용</td></tr>
+  <tr><td class="k">[단독]/[속보] 강조</td><td class="yes">있음</td><td class="no">없음</td><td class="yes">추가</td><td><code>app.filters.headline_kind</code> 재사용</td></tr>
+  <tr><td class="k">복사 ✓ 피드백</td><td class="yes">아이콘 1초 ✓</td><td class="no">글자 치환</td><td class="yes">아이콘 ✓</td><td><code>copyArticleIcon</code>과 동일</td></tr>
+  <tr><td class="k">⋯ 더보기</td><td class="yes">있음</td><td class="no">없음</td><td class="yes">추가</td><td>단, <code>apply_summary_overrides</code>도 같이 걸어야 함 — 아래</td></tr>
+  <tr><td class="k">요약 박스</td><td>여백만</td><td>배경+좌측바</td><td class="yes">정기와 동일</td><td>수시 쪽이 예쁘지만 “같게”가 우선</td></tr>
+  <tr><td class="k">📌 담아두기</td><td>—</td><td class="no">화면에 보임</td><td class="yes">없음</td><td>코드엔 이미 없다 = 옛 서버</td></tr>
+  <tr><td class="k">🗑 정기 확정본에서 숨김</td><td>—</td><td class="no">화면에 보임</td><td class="yes">없음</td><td>위와 같음</td></tr>
+</table>
+
+<div class="warn-box">
+  <b>⋯ 더보기 — 넣는 게 맞다. 다만 한 줄을 같이 고쳐야 한다.</b><br><br>
+  두 항목 다 <code>data/summary_overrides.json</code>에 <b>URL을 키로 전역 저장</b>한다.
+  그런데 이 파일은 원래부터 <b>정기·수시가 함께 쓰라고</b> <code>app/</code> 최상위에 둔
+  공유 저장소다(<code>labels.json</code>과 같은 성격 — CLAUDE.md 라벨 절에 그렇게 적혀 있다).
+  담는 값도 “이 URL의 진짜 제목·요약이 무엇인가”라는 <b>사실 하나</b>라, 같은 기사면 어느
+  화면에서 보든 같아야 맞다. 📌가 옮기던 <b>담당자의 판단</b>(이 기사를 정기 보고서에 넣겠다)과는
+  성격이 다르다.<br><br>
+  <b>진짜 문제는 따로 있다 —</b> <code>apply_summary_overrides()</code>가 지금 정기 4곳
+  (확정본·초안·실시간·정기 보관함)에만 걸려 있고 <b>수시엔 아예 안 걸려 있다.</b>
+  이 상태로 ⋯만 붙이면 <b>수시에서 고쳤는데 그 화면은 그대로고 정기만 바뀌는</b> 최악이 된다.<br><br>
+  <b>같이 고칠 한 줄:</b> <code>app/adhoc/renderer.py</code> <code>_article_groups()</code>의
+  <code>articles_in_condition(card)</code> → <code>apply_summary_overrides(articles_in_condition(card))</code>.
+  이 함수가 <b>화면·복사·txt·엑셀이 모두 지나는 길목</b>이라 여기 한 곳이면 전부 덮인다.
+</div></div>
+
+</div>
+</body>
+</html>

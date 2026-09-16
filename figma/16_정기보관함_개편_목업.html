@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>[목업] 정기 보관함 — 수시 보관함 형식으로</title>
+<style>
+  /* 색·폰트·간격은 전부 app/config.py PALETTE + app/adhoc/renderer.py 실제 값 그대로.
+     이 파일은 화면 시안일 뿐이라 링크·버튼은 동작하지 않는다. */
+  body { margin: 0; background: #F8FAFC; color: #1F2937;
+    font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .container { max-width: 800px; margin: 0 auto; padding: 84px 24px 80px; }
+  .card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px;
+    padding: 22px 24px; margin-bottom: 14px; }
+  .topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    background: #FFFFFF; border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .topbar-inner { max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: space-between; align-items: center; }
+  .topbar a { color: #2563EB; text-decoration: none; font-size: 0.92rem; font-weight: 600;
+    padding: 6px 10px; border-radius: 6px; }
+  .topbar a:hover { background: #EFF6FF; }
+  h1.page-title { color: #1E3A5F; font-size: 1.2rem; margin: 0 0 4px; }
+  .page-sub { color: #6B7280; font-size: 0.82rem; margin: 0 0 16px; }
+
+  /* ── 기간 조회 바 (수시 .period-bar 그대로) ───────────────────────── */
+  .period-bar { border: 1px solid #E5E7EB; border-radius: 10px; padding: 10px 12px;
+    background: #F8FAFC; margin: 14px 0; }
+  .period-bar form { margin: 0; }
+  .prow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .prow + .prow, .period-bar form + form { margin-top: 9px; padding-top: 9px; border-top: 1px solid #E5E7EB; }
+  .prow .jlab { color: #6B7280; font-size: 0.8rem; font-weight: 600; width: 44px; flex: none; }
+  .prow input[type=date] { font: inherit; font-size: 0.85rem; border: 1px solid #E5E7EB;
+    border-radius: 6px; background: #FFFFFF; color: #1F2937; padding: 5px 8px;
+    font-variant-numeric: tabular-nums; }
+  .prow .tilde { color: #6B7280; margin: 0 2px; font-weight: 600; }
+  .prow .go { border: 1px solid #2563EB; background: #2563EB; color: #FFFFFF; border-radius: 6px;
+    padding: 6px 14px; font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .jhint { font-size: 0.78rem; color: #6B7280; }
+  .seg { display: inline-flex; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; background: #FFFFFF; }
+  .seg-btn { border: none; background: #FFFFFF; color: #6B7280; font: inherit; font-size: 0.82rem;
+    padding: 6px 15px; cursor: pointer; border-right: 1px solid #E5E7EB; }
+  .seg-btn:last-child { border-right: none; }
+  .seg-btn.on { background: #2563EB; color: #FFFFFF; font-weight: 600; }
+
+  /* ── 결과 요약 줄 + 내보내기 ─────────────────────────────────────── */
+  .result-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 2px 8px; }
+  .result-line { font-size: 0.82rem; color: #6B7280; display: flex; align-items: center; gap: 8px;
+    flex-wrap: wrap; flex: 1; min-width: 0; margin: 0; }
+  .result-line b { color: #1E3A5F; }
+  .exp { display: inline-flex; gap: 4px; flex: none; margin-left: auto; }
+  .exp button { border: 1px solid #E5E7EB; background: #FFFFFF; color: #6B7280; border-radius: 6px;
+    padding: 4px 11px; font-size: 0.75rem; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .exp button:hover { background: #EFF6FF; color: #2563EB; border-color: #BFDBFE; }
+  .exp button.xls:hover { background: #F0FDF4; color: #15803D; border-color: #BBF7D0; }
+  .exp.lg button { font-size: 0.8rem; padding: 6px 13px; }
+
+  /* ── 날짜 블록 (1단) ─────────────────────────────────────────────── */
+  details.day-block { border-top: 1px solid #F1F5F9; background: #FCFDFE; }
+  details.day-block > summary { list-style: none; cursor: pointer; display: flex; align-items: center;
+    gap: 10px; padding: 10px 12px 10px 14px; font-size: 0.9rem; }
+  details.day-block > summary::-webkit-details-marker { display: none; }
+  details.day-block > summary::before { content: "▸"; color: #6B7280; font-size: 0.72rem; }
+  details.day-block[open] > summary::before { content: "▾"; }
+  details.day-block > summary:hover { background: #F3F4F6; }
+  .day-block .d { font-weight: 600; color: #1E3A5F; min-width: 116px; font-variant-numeric: tabular-nums; }
+  .today-chip { font-size: 0.72rem; background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE;
+    border-radius: 10px; padding: 1px 8px; font-weight: 600; }
+
+  /* ── 회차(시간대) 블록 (2단) — 최신 시간이 위 ─────────────────────── */
+  details.slot-block { margin: 0; }
+  details.slot-block > summary { list-style: none; cursor: pointer; display: flex; align-items: center;
+    gap: 10px; padding: 7px 12px 7px 42px; font-size: 0.84rem; border-top: 1px solid #F1F5F9; }
+  details.slot-block > summary::-webkit-details-marker { display: none; }
+  details.slot-block > summary::before { content: "▸"; color: #6B7280; font-size: 0.7rem; }
+  details.slot-block[open] > summary::before { content: "▾"; }
+  details.slot-block > summary:hover { background: #F3F4F6; }
+  .slot-block .win { color: #1E3A5F; font-weight: 600; min-width: 104px;
+    font-variant-numeric: tabular-nums; }
+  /* 상태 칩 — 근거는 전부 이미 저장된 값이다(sent_by, 숨김 제외 기사 수).
+     칩이 없으면 "이 앱을 통해 나간 기록이 없음" — "안 했다"고 단정하지 않는다. */
+  .st { font-size: 0.72rem; border-radius: 10px; padding: 1px 9px; border: 1px solid; flex: none; }
+  .st.sent   { background: #F8FAFC; color: #6B7280; border-color: #E5E7EB; }   /* 발송 완료 — 담당자가 (발송)을 누름 */
+  .st.auto   { background: #F8FAFC; color: #6B7280; border-color: #E5E7EB; }   /* 자동 발송 — 확정본과 같은 muted */
+
+  /* ── 회차를 펼쳤을 때: 지금 화면과 똑같은 소제목 + 기사 목록 ───────── */
+  .slot-body { padding: 4px 12px 14px 42px; }
+  .history-group { margin-top: 12px; }
+  .history-group h3 { font-size: 0.95rem; color: #1E3A5F; border-bottom: 1px solid #E5E7EB;
+    padding-bottom: 4px; margin: 0 0 6px; }
+  .article { margin: 8px 0; line-height: 1.5; padding: 4px 6px; border-radius: 8px; }
+  .article:hover { background: #F3F4F6; }
+  .title-row { display: flex; align-items: baseline; gap: 8px; }
+  .title-line { color: #1F2937; font-size: 0.92rem; }
+  .action-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .pub-time { color: #6B7280; font-size: 0.8rem; white-space: nowrap; }
+  .origin-link-text { color: #2563EB; font-size: 0.8rem; text-decoration: none; }
+
+  /* ── 목업 주석(실제 화면에는 없음) ───────────────────────────────── */
+  .memo { border: 1px dashed #BFDBFE; background: #EFF6FF; border-radius: 10px;
+    padding: 12px 14px; margin: 0 0 18px; font-size: 0.82rem; color: #1F2937; line-height: 1.65; }
+  .memo b { color: #1E3A5F; }
+  .memo ul { margin: 6px 0 0; padding-left: 18px; }
+  .memo .tag { display: inline-block; background: #FFFFFF; border: 1px solid #BFDBFE;
+    color: #2563EB; border-radius: 10px; padding: 1px 8px; font-size: 0.72rem; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="topbar"><div class="topbar-inner">
+  <a href="#">홈</a>
+  <span><a href="#">확정본</a><a href="#">실시간현황</a><a href="#">수시 보관함</a><a href="#">설정</a></span>
+</div></div>
+
+<div class="container">
+
+  <div class="memo">
+    <span class="tag">목업 메모</span> 실제 화면에는 이 상자가 없다.
+    <ul>
+      <li><b>1단 = 날짜, 2단 = 회차(시간대)</b> · 시간대는 <b>나중 시간이 위</b>(16:30 → 09:00). 회차 번호("1. 16:30")는 뺐다 — 1번이 최신이라 헷갈린다.</li>
+      <li><b>회차 수·기사 건수를 상시 표시하지 않는다</b> — 하루 4회 고정이라 "4"는 정보가 아니고, 건수는 찾는 기준이 아니다. 펼치면 기사 목록이 곧 답이고, 0건이면 💤이 나온다.</li>
+      <li>발송 <b>실패</b> 칩은 없다 — 지금 구조가 전송 결과를 어디에도 저장하지 않는다(record_send가 전송 <i>전</i>에 불리고 성공/실패 반환값은 버려짐). 만들려면 전송 결과 기록부터 따로 해야 한다.</li>
+    <li>상태 칩: <b>발송 완료</b> · <b>자동 발송</b> 둘뿐(회색). 날짜 층에는 <b>오늘</b>(파랑) 하나. "빈 회차" 칩은 뺐다 — 저장된 회차 54개 중 기사 0건 회차가 0개라 뜰 일이 없다(실측). 칩이 없는 줄 = "이 앱을 통해 나간 기록 없음". 담당자가 복사해 앱 밖에서 처리했을 수 있으므로 "미발송" 같은 단정은 하지 않는다 — 부정형 대신 긍정형만 쓴다. 근거는 이미 저장된 <code>sent_by</code>("manual"/"auto") 하나라 발송 로직은 건드리지 않는다. 자동 발송이 회색인 이유 — 확정본 화면이 이미 "수동이든 자동이든 둘 다 끝난 일"이라 같은 muted를 쓴다. 연보라는 "누르면 비용이 드는 AI 동작"에 예약된 색이라 여기 쓰지 않는다.</li>
+      <li>복사·txt·엑셀을 <b>결과 전체 / 날짜 / 회차</b> 세 층에 같은 모양으로 — 지금은 회차 층에만 있다.</li>
+      <li>기사 행에 <b>검색어</b>는 안 보여준다 — 확정본·초안 전용이다(<code>show_matched_keywords</code> 기본 꺼짐). 보관함은 "그날 뭐 있었지"를 훑는 화면이라 왜 걸렸는지는 필요 없다.</li>
+      <li>수시의 <b>사안명 검색</b> 칸은 정기에 대응물이 없어 뺐다(정기의 축은 날짜뿐).</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h1 class="page-title">정기 보관함</h1>
+    <p class="page-sub">날짜별로 쌓인 정기 스크랩 · 최근 1년 보관됩니다</p>
+
+    <div class="period-bar">
+      <form>
+        <div class="prow">
+          <b class="jlab">기간</b>
+          <div class="seg">
+            <button type="button" class="seg-btn">1일</button>
+            <button type="button" class="seg-btn">7일</button>
+            <button type="button" class="seg-btn on">1개월</button>
+            <button type="button" class="seg-btn">전체</button>
+          </div>
+          <span class="jhint">날짜 기준으로 조회합니다</span>
+        </div>
+      </form>
+      <form class="prow prow-range">
+        <b class="jlab"></b>
+        <input type="date" value="2026-08-01">
+        <span class="tilde">~</span>
+        <input type="date" value="2026-08-21">
+        <button type="button" class="go">조회</button>
+        <span class="jhint">시작일 ~ 종료일을 직접 넣고 조회</span>
+      </form>
+    </div>
+
+    <div class="result-bar">
+      <p class="result-line">2026-08-01 ~ 08-21 · <b>15일</b></p>
+      <span class="exp lg"><button type="button">복사</button><button type="button">txt</button><button type="button" class="xls">엑셀</button></span>
+    </div>
+
+    <!-- ── 오늘 ─────────────────────────────────────────────── -->
+    <details class="day-block" open>
+      <summary>
+        <span class="d">8월 21일 (금)</span>
+        <span class="today-chip">오늘</span>
+        <span class="exp"><button type="button">복사</button><button type="button">txt</button><button type="button" class="xls">엑셀</button></span>
+      </summary>
+
+      <details class="slot-block" open>
+        <summary>
+          <span class="win">16:30 기준</span>
+          <span class="exp"><button type="button">복사</button><button type="button">txt</button><button type="button" class="xls">엑셀</button></span>
+        </summary>
+        <div class="slot-body">
+          <div class="history-group">
+            <h3>&lt;세수 결손 대응&gt;</h3>
+            <div class="article">
+              <div class="title-row"><span class="title-line">ㅇ (한국경제) 세수 재추계 앞두고 기재부 "추경 논의는 아직"</span></div>
+              <div class="action-row"><span class="pub-time">16:12 게시</span><a class="origin-link-text" href="#">원문보기</a></div>
+            </div>
+            <div class="article">
+              <div class="title-row"><span class="title-line">ㅇ (연합뉴스) 국세수입 7월까지 전년 대비 4.2조 감소</span></div>
+              <div class="action-row"><span class="pub-time">15:47 게시</span><a class="origin-link-text" href="#">원문보기</a></div>
+            </div>
+          </div>
+          <div class="history-group">
+            <h3>&lt;가계부채·금융&gt;</h3>
+            <div class="article">
+              <div class="title-row"><span class="title-line">ㅇ (KBS) 가계대출 증가폭 두 달째 둔화… 당국 "추가 조치 검토"</span></div>
+              <div class="action-row"><span class="pub-time">16:03 게시</span><a class="origin-link-text" href="#">원문보기</a></div>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="slot-block">
+        <summary>
+          <span class="win">13:30 기준</span>
+          <span class="st sent">발송 완료</span>
+          <span class="exp"><button type="button">복사</button><button type="button">txt</button><button type="button" class="xls">엑셀</button></span>
+        </summary>
+        <div class="slot-body"><p class="jhint">(펼치면 그 회차의 소제목·기사 목록)</p></div>
+      </details>
+
+      <details class="slot-block">
+        <summary>
+          <span class="win">10:30 기준</span>
+          <span class="st auto">자동 발송</span>
+          <span class="exp"><button type="button">복사</button><button type="button">txt</button><button type="button" class="xls">엑셀</button></span>
+        </summary>
+        <div class="slot-body"><p class="jhint">(펼치면 그 회차의 소제목·기사 목록)</p></div>
+      </details>
+
+      <details class="slot-block">
+        <summary>
+          <span class="win">09:00 기준</span>
+          <span class="st auto">자동 발송</span>
+          <span class="exp"><button type="button">복사</button><button type="button">txt</button><button type="button" class="xls">엑셀</button></span>
+        </summary>
+        <div class="slot-body"><p class="jhint">(펼치면 그 회차의 소제목·기사 목록)</p></div>
+      </details>
+    </details>
+
+    <!-- ── 어제 ─────────────────────────────────────────────── -->
+    <details class="day-block">
+      <summary>
+        <span class="d">8월 20일 (목)</span>
+        <span class="exp"><button type="button">복사</button><button type="button">txt</button><button type="button" class="xls">엑셀</button></span>
+      </summary>
+      <details class="slot-block"><summary><span class="win">16:30 기준</span><span class="st sent">발송 완료</span></summary></details>
+      <details class="slot-block"><summary><span class="win">13:30 기준</span></summary></details>
+      <details class="slot-block"><summary><span class="win">10:30 기준</span><span class="st auto">자동 발송</span></summary></details>
+      <details class="slot-block"><summary><span class="win">09:00 기준</span><span class="st auto">자동 발송</span></summary></details>
+    </details>
+
+    <details class="day-block">
+      <summary>
+        <span class="d">8월 19일 (수)</span>
+        <span class="exp"><button type="button">복사</button><button type="button">txt</button><button type="button" class="xls">엑셀</button></span>
+      </summary>
+      <p class="jhint" style="padding:8px 12px 12px 42px; margin:0;">펼치면 불러옵니다…</p>
+    </details>
+
+    <details class="day-block">
+      <summary>
+        <span class="d">8월 18일 (화)</span>
+        <span class="exp"><button type="button">복사</button><button type="button">txt</button><button type="button" class="xls">엑셀</button></span>
+      </summary>
+      <p class="jhint" style="padding:8px 12px 12px 42px; margin:0;">펼치면 불러옵니다…</p>
+    </details>
+
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,1992 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>초안</title>
+<style>
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .container {
+    max-width: 800px; margin: 24px auto; padding: 24px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: 8px; padding-top: 60px; padding-bottom: 56px;
+  }
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    background: #FFFFFF; border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .topbar-inner {
+    max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .topbar a { color: #2563EB; text-decoration: none; font-size: 0.92rem; font-weight: 600; padding: 6px 10px; border-radius: 6px; }
+  .topbar a:hover { background: #EFF6FF; }
+  /* [추가: 2026-08-18] 회차 종료(카운트다운 0) 안내 띠 — round-countdown이 0에 닿아도
+     예전엔 화면이 아무 말도 안 해서, 담당자가 마감된 초안인 줄 모르고 계속 고치다
+     그 작업이 어디에도 반영 안 되는 사고가 있었다(HISTORY.md 2026-08-18). topbar처럼
+     position:fixed로 맨 위에 붙이고, JS(showRoundOverBanner)가 topbar를 그만큼
+     아래로 밀어낸다 — 사용자가 목업 3안 중 "상단 고정 띠"를 골랐다: 스크롤 위치와
+     무관하게 항상 보여야 놓치지 않는다는 이유. */
+  .round-over-banner {
+    display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 21;
+    background: #FFFBEB; border-bottom: 1px solid #FDE68A;
+  }
+  .round-over-banner.is-visible { display: block; }
+  .round-over-banner-inner {
+    max-width: 800px; margin: 0 auto; padding: 11px 24px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .round-over-banner .msg { flex: 1; min-width: 200px; font-size: 0.86rem; color: #92400E; }
+  .round-over-banner .msg b { color: #92400E; }
+  .round-over-banner .go {
+    background: #1E3A5F; color: #FFFFFF; border: none; border-radius: 6px;
+    padding: 8px 14px; font-size: 0.84rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+    text-decoration: none; display: inline-block;
+  }
+  .round-over-banner .go:hover { background: #16304D; }
+  .round-over-banner .dismiss {
+    background: transparent; border: none; color: #92400E; font-size: 0.82rem;
+    cursor: pointer; text-decoration: underline; padding: 4px;
+  }
+  /* [추가: 2026-08-20] AI 소제목 분류가 규칙 기반(단어 빈도)으로 떨어졌을 때의 경고.
+     이 폴백은 여태 화면에 아무 흔적을 안 남겨서, 담당자가 <부총리>처럼 뭉개진 소제목을
+     눈으로 발견할 때까지 아무도 몰랐다(2026-08-20 09:30 회차). 회차 마감 띠와 달리
+     화면 위에 고정하지 않고 기사 목록 맨 위에 흐르는 박스로 둔다 — 마감은 "지금 하던
+     일이 헛수고가 된다"는 즉시성이 있지만 이건 "지금 보이는 소제목을 믿지 마라"라서
+     목록과 함께 스크롤되는 편이 맞다.
+     [수정: 2026-08-20] 배너 안에 붉은 실행 버튼을 따로 두지 않는다 — 툴바에 이미
+     같은 라벨의 "전체 기사 재분류" 버튼이 있고(스크롤 없이 90~120px 위, 실측), 같은
+     라벨의 버튼이 화면에 둘이면 "다른 건가?"라는 새 의문만 늘어난다. 대신 문구가
+     .btn-ref로 툴바 버튼을 가리킨다. */
+  .classify-degraded {
+    background: #FEF2F2; border: 1px solid #FECACA; border-left: 4px solid #DC2626;
+    border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;
+  }
+  .classify-degraded .msg { font-size: 0.86rem; color: #DC2626; line-height: 1.6; }
+  .classify-degraded .msg b { color: #DC2626; }
+  /* [추가: 2026-08-20] 문구 안에서 툴바 버튼을 가리키는 인라인 칩 — 실제 그 버튼과
+     같은 색·같은 아이콘(app/icons.py "bot")을 써서 "이게 그 버튼이다"가 바로
+     읽히게 한다(app.preview_renderer._actions_html의 .reclassify-btn과 배색 통일). */
+  .classify-degraded .btn-ref {
+    display: inline-flex; align-items: center; gap: 4px; background: #F0EAFB;
+    border: 1px solid #DCD0F2; border-radius: 5px; padding: 1px 8px 1px 6px;
+    font-weight: 700; color: #4A3F8F; white-space: nowrap;
+  }
+  .classify-degraded .btn-ref .ic { width: 0.95em; height: 0.95em; }
+  /* [추가: 2026-08-20] 연속 재분류 실패 이력 — "재분류마저 실패" 문구에서만 붙는다. */
+  .classify-degraded .retry-log {
+    display: block; margin-top: 8px; padding-top: 7px; border-top: 1px dashed #FECACA;
+    color: #6B7280; font-size: 0.78rem; font-variant-numeric: tabular-nums;
+  }
+  /* 배너가 뜨면 그만큼 topbar를 아래로 밀어 겹치지 않게 한다(높이는 JS가 실측).
+     [수정: 2026-08-20] topbar만 밀고 .container는 그대로 뒀더니, .container의
+     고정 margin-top(24px)이 밀려난 topbar보다 위에 있어 본문(제목 줄 포함)이
+     topbar 밑에 가려졌다(확정본에 같은 표시를 새로 넣으며 발견 — HISTORY.md
+     "마감 후 자동 배정" 참고). .container도 같은 높이만큼 같이 밀어야 한다. */
+  body.round-over .topbar { top: var(--round-banner-h, 0px); }
+  body.round-over .container { margin-top: calc(24px + var(--round-banner-h, 0px)); }
+  .bottombar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    background: #FFFFFF; border-top: 1px solid #E5E7EB; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  }
+  .bottombar-inner {
+    max-width: 800px; margin: 0 auto; padding: 10px 24px;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  }
+  .bottombar a { color: #2563EB; text-decoration: none; font-size: 1.1rem; padding: 6px 10px; border-radius: 6px; }
+  .bottombar a:hover { background: #EFF6FF; }
+  /* [추가: 2026-08-03] app.renderer와 동일한 이유 — 하단바 🖍️ 형광펜 편집 팝오버. */
+  .highlight-wrap { position: relative; }
+  .highlight-toggle {
+    background: transparent; border: none; color: #6B7280; font-size: 1.1rem; cursor: pointer;
+    padding: 6px 10px; border-radius: 6px;
+  }
+  .highlight-toggle:hover { background: #EFF6FF; }
+  .highlight-popover {
+    display: none; position: absolute; bottom: 100%; right: 0; margin-bottom: 8px;
+    background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); padding: 12px; width: 220px; z-index: 30;
+  }
+  .highlight-popover.is-open { display: block; }
+  .highlight-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .highlight-chip {
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 14px;
+    font-size: 0.82rem; color: #1F2937; cursor: pointer;
+  }
+  .highlight-chip button {
+    background: transparent; border: none; padding: 0; font-size: 0.8rem; cursor: pointer;
+    color: inherit; line-height: 1;
+  }
+  .highlight-empty { color: #6B7280; font-size: 0.8rem; margin: 0 0 8px; }
+  .highlight-add-form { display: flex; gap: 6px; }
+  .highlight-add-form input { flex: 1; font-size: 0.85rem; padding: 5px 8px; min-width: 0; }
+  .highlight-add-form button { font-size: 0.82rem; padding: 5px 10px; white-space: nowrap; }
+  /* [추가: 2026-08-05] app.renderer와 동일한 소제목 미니 목차(펼침형). */
+  /* [수정: 2026-08-10] app.renderer와 동일한 이유 — (확정)/(전송) 버튼과 색이 겹치지
+     않도록 중립색으로 톤다운. */
+  /* [추가: 2026-08-11] ↩ 되돌리기 — 오른쪽 플로팅 버튼들(발송·목차)과 성격이
+     반대인 "취소" 계열이라 사용자 요청대로 화면 왼쪽 아래에 따로 뒀다. 되돌릴 게 있을
+     때만 렌더링한다(항상 떠 있으면 "뭘 되돌리는지" 알 수 없어 오히려 불안하다). */
+  .undo-fab {
+    position: fixed; left: 20px; bottom: 20px; width: 56px; height: 56px; border-radius: 50%;
+    background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; font-size: 1.4rem;
+    cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .undo-fab:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .undo-fab:disabled { opacity: 0.5; cursor: progress; }
+  .toc-toggle-btn {
+    position: fixed; right: 20px; bottom: 20px; width: 46px; height: 46px; border-radius: 50%;
+    background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; font-size: 1.2rem; cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .toc-toggle-btn:hover { background: #EFF6FF; }
+  /* [추가: 2026-08-11] 확정본의 (발송) 카운트다운(빨강, 경고성)과 다른 맥락 — "이번 회차가
+     언제 끝나는지" 참고용 정보라 회색으로 톤을 낮췄다. ☰ 버튼 바로 위에 둔다. */
+  /* [수정: 2026-08-13] 시:분 → 시:분:초. 숫자가 매초 바뀌므로 tabular-nums로 자릿수 폭을
+     고정한다 — 안 그러면 문구 전체가 초마다 미세하게 흔들려 시선을 뺏는다. */
+  .round-countdown {
+    position: fixed; right: 20px; bottom: 74px; text-align: right;
+    font-size: 0.78rem; font-weight: 700; color: #6B7280; z-index: 199; white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  /* [추가: 2026-08-13] 회차 종료 10분 이내 — 초는 늘 보이되 "지금 급한가"는 색이 말한다
+     (9시간짜리 회차도 있어, 초가 흐른다는 것만으로는 임박 여부를 알 수 없다). 확정본
+     발송 카운트다운과 같은 빨강(#DC2626)을 쓴다 — 같은 "마감 임박"이라는 뜻이므로. */
+  .round-countdown.urgent { color: #DC2626; }
+  /* [수정: 2026-08-18] app.renderer와 동일 — 하단 (취소)/(적용) 바가 스크롤을 따라
+     밀려나지 않도록 스크롤 영역(.toc-scroll)을 바깥 상자에서 분리했다. */
+  .toc-popover {
+    display: none; position: fixed; right: 20px; bottom: 74px; width: 200px;
+    background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15); z-index: 200;
+  }
+  .toc-popover.is-open { display: block; }
+  .toc-scroll { max-height: 320px; overflow-y: auto; padding: 8px; }
+  /* [추가: 2026-08-05] app.renderer와 동일 — 목차 안에서 소제목 순서까지 바꿀 수 있게
+     항목마다 작은 ▲▼를 붙였다(이름 클릭=이동, 화살표 클릭=순서 변경으로 분리). */
+  .toc-row { display: flex; align-items: center; justify-content: space-between; border-radius: 4px; }
+  .toc-row a {
+    flex: 1; min-width: 0; padding: 6px 8px; font-size: 0.85rem; color: #1F2937;
+    text-decoration: none; border-radius: 4px; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .toc-row a:hover { background: #EFF6FF; }
+  .toc-row-btns { display: flex; gap: 1px; flex-shrink: 0; padding-right: 4px; }
+  .toc-order-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 0.72rem; cursor: pointer;
+    padding: 2px 4px; border-radius: 4px;
+  }
+  .toc-order-btn:hover { background: #EFF6FF; }
+  .toc-order-btn:disabled { opacity: 0.3; cursor: default; }
+  /* [수정: 2026-08-18] ▲▼가 더는 새로고침을 일으키지 않으므로, 이 표시는 (적용)을
+     누를 때까지 남아 "이번에 뭘 옮겼는지"를 누적해서 보여준다. */
+  .toc-row.toc-row-moved { background: #E7EFE8; }
+  .toc-empty { color: #6B7280; font-size: 0.82rem; padding: 6px 8px; }
+  /* [추가: 2026-08-18] app.renderer와 동일한 팝오버 하단 확정 바 — 담당자가 "(적용)을
+     누르기 전까지는 아무것도 바뀌지 않았다"고 믿을 수 있어야 하므로 서버로 나가는 길은
+     (적용) 하나뿐이다. 구조는 .edit-summary-form을 따랐다(취소 왼쪽·커밋 오른쪽).
+     바꾼 게 없으면 아예 나타나지 않는다. */
+  .toc-foot {
+    display: none; flex-direction: column; gap: 6px;
+    padding: 8px; border-top: 1px solid #E5E7EB;
+    background: #FFFFFF; border-radius: 0 0 8px 8px;
+  }
+  .toc-foot.is-dirty { display: flex; }
+  .toc-dirty-count { font-size: 0.76rem; color: #6B7280; }
+  .toc-foot-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .toc-foot-actions button { font-size: 0.78rem; padding: 5px 12px; border-radius: 5px; cursor: pointer; }
+  .toc-cancel-btn { background: transparent; color: #6B7280; border: 1px solid #E5E7EB; }
+  .toc-cancel-btn:hover { background: #EFF6FF; }
+  .toc-apply-btn { background: #2563EB; color: #FFFFFF; border: none; font-weight: 700; }
+  .toc-apply-btn:hover { background: #1D4ED8; }
+  .toc-foot-actions button:disabled { opacity: 0.6; cursor: progress; }
+  @keyframes toc-nudge { 0%, 100% { background: #FFFFFF; } 25%, 75% { background: #EFF6FF; } }
+  .toc-foot.nudge { animation: toc-nudge 0.5s ease-in-out; }
+  /* [추가: 2026-07-30] 체크박스로 기사를 선택했을 때만 나타나는 "일괄 이동" 바 —
+     장바구니처럼 화면 하단에 붙어있다가, 선택이 하나도 없으면 숨어서 원래 있던
+     🗑️(숨긴 기사 관리)만 오른쪽에 그대로 남는다. */
+  .bulk-move-bar { display: none; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.85rem; }
+  .bulk-move-bar.is-active { display: flex; }
+  .bulk-move-bar .bulk-move-count { font-weight: 600; color: #1E3A5F; white-space: nowrap; }
+  #bulk-move-select {
+    border: 1px solid #2563EB; border-radius: 4px; padding: 5px 8px; font-size: 0.85rem;
+    color: #1F2937; background: #FFFFFF;
+  }
+  .bulk-move-bar button { padding: 5px 12px; font-size: 0.85rem; }
+  /* [추가: 2026-08-04] app.renderer와 동일 — 일괄 위/아래 이동 버튼. */
+  #bulk-move-up, #bulk-move-down { padding: 5px 10px; }
+  #bulk-move-up:disabled, #bulk-move-down:disabled { opacity: 0.35; cursor: not-allowed; }
+  .bulk-move-bar .clear-btn { background: transparent; color: #6B7280; }
+  .bulk-move-bar .clear-btn:hover { background: #EFF6FF; }
+  .actions .create-group-btn {
+    background: transparent; color: #2563EB; border: 1px solid #BFDBFE;
+    border-radius: 6px; font-weight: 400;
+  }
+  .actions .create-group-btn:hover { background: #EFF6FF; border-color: #A9C6F5; }
+  /* [수정: 2026-08-12] 초안 툴바에 있던 "🤖 미분류 배정"을 📂 소제목 미분류 칸의
+     헤더로 옮겼다 — 미분류를 발견하는 그 자리에서 바로 누르도록(스크롤 불필요),
+     그리고 미분류가 0건이면 그 칸 자체가 안 뜨니 버튼도 자동으로 사라진다(disabled
+     처리가 따로 필요 없다). 대신 툴바엔 "🤖 전체 기사 재분류"가 새로 생겼다(아래).
+     색은 여전히 연보라(#F0EAFB) — "파랑=담당자가 하는 일 / 연보라=AI가 하는 일"이라는
+     색 언어를 따른 것(CLAUDE.md "Design direction"). 채운 배경으로 둔다 — 이 버튼은
+     안전하고(기존 소제목을 안 건드림) 자주 눌러도 되는 쪽이라 눈에 잘 띄어야 한다. */
+  .assign-unclassified-btn {
+    background: #F0EAFB; color: #4A3F8F; border: 1px solid #DCD0F2; border-radius: 6px;
+    font-size: 0.82rem; font-weight: 600; padding: 4px 10px; cursor: pointer;
+  }
+  .assign-unclassified-btn:hover { background: #E7DBFA; border-color: #CBB8ED; }
+  .assign-unclassified-btn:disabled { opacity: 0.5; cursor: progress; }
+  .actions-divider { width: 1px; height: 26px; background: #E5E7EB; margin: 0 2px; }
+  /* [추가: 2026-08-12] "🤖 전체 기사 재분류" — 기존 소제목 이름·구성을 전부 새로 짓는
+     파괴적 동작이라, 안전한 "미분류 배정"과 달리 **테두리만**(고스트) 둬 한 발 물러나
+     보이게 한다. 같은 연보라 계열이라 "AI가 하는 일"이라는 건 알 수 있으면서도, 채워
+     칠하지 않아 상시 노출된 위험한 버튼처럼 부각되지 않는다. */
+  .actions .reclassify-btn {
+    background: transparent; color: #4A3F8F; border: 1px solid #DCD0F2;
+  }
+  .actions .reclassify-btn:hover { background: #F0EAFB; border-color: #CBB8ED; }
+  .actions .reclassify-btn:disabled { opacity: 0.5; cursor: progress; }
+  .regen-badge {
+    display: inline-block; margin-left: 6px; min-width: 17px; padding: 0 5px;
+    background: #DC2626; color: #FFFFFF; border-radius: 999px;
+    font-size: 0.72rem; font-weight: 700; line-height: 17px; text-align: center;
+  }
+  /* "📂 소제목 미분류" 묶음 — 임시 상태라는 게 보이게 점선 테두리로 구분한다. */
+  .subheading.subheading-unclassified { border: 2px dashed #DC2626; }
+  /* [추가: 2026-08-11] AI가 만든 소제목 표식. 화면 전용이며, 소제목 이름 문자열과
+     완전히 분리된 별도 span이라 복사/다운로드/발송 텍스트에는 절대 따라가지 않는다. */
+  .ai-badge { margin-left: 6px; font-size: 0.8rem; opacity: 0.75; vertical-align: middle; }
+  /* [추가: 2026-08-20] 소제목별 기사 건수 칩 — app.renderer._render_groups와 동일. */
+  .subheading-count {
+    margin-left: 6px; font-size: 0.75rem; font-weight: 700; color: #6B7280;
+    background: #F3F4F6; border-radius: 999px; padding: 1px 8px;
+  }
+  .total-count-badge {
+    margin-left: 8px; font-size: 0.78rem; font-weight: 700; color: #6B7280;
+    background: #F3F4F6; border-radius: 999px; padding: 2px 10px; vertical-align: middle;
+  }
+  /* 임시 보관함(아직 분류 안 된 기사) 제목 — 소제목이 아니라 대기실이라는 게 읽히도록
+     꺾쇠 없이 회색 기울임꼴로, 확정된 소제목들과 시각적으로 확실히 구분한다. */
+  .unclassified-title { color: #6B7280; font-style: italic; font-weight: 600; }
+  .unclassified-count {
+    margin-left: 4px; font-style: normal; font-weight: 700; font-size: 0.8rem;
+    color: #DC2626; background: #EFF6FF; border-radius: 999px; padding: 1px 8px;
+  }
+  .article-select { margin-top: 3px; flex-shrink: 0; }
+  .group-move-select {
+    flex-shrink: 0; width: 100px; border: 1px solid #E5E7EB; border-radius: 4px;
+    padding: 2px 4px; font-size: 0.78rem; color: #6B7280; background: #FFFFFF;
+  }
+  /* [추가: 2026-08-04] app.renderer와 동일 — 소제목별/시간순/언론사순 보기 전환 select. */
+  .view-mode-select {
+    border: 1px solid #2563EB; border-radius: 6px; padding: 6px 10px; font-size: 0.85rem;
+    color: #1F2937; background: #FFFFFF;
+  }
+  /* [수정: 2026-08-04] app.renderer와 동일 — 사용자가 직접 만든 소제목은 기사가
+     차 있어도 점선 테두리를 유지해 자동 분류 소제목과 구분되게 한다. */
+  .subheading-custom { border: 2px dashed #7DD3FC; border-radius: 8px; padding: 8px 16px; }
+  .empty-group-hint { color: #6B7280; font-size: 0.85rem; margin: 6px 0 0; }
+  header h1 { font-size: 1.3rem; margin-bottom: 6px; color: #1E3A5F; }
+  .preview-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  /* [추가: 2026-08-12] app.renderer(확정본)와 동일 위치·스타일 — "지난 기사"는 이 화면의
+     액션(복사/다운로드 등)이 아니라 다른 화면으로 넘어가는 링크라 툴바가 아닌 제목 옆에
+     둔다. 초안 담당자도 회차 진행 중 "이전엔 어떻게 묶었더라"를 참고할 일이 있어 확정본과
+     같은 자리에 추가했다(사용자 요청 — 위치를 확정본과 일치시켜달라는 명시적 요구). */
+  .history-link { color: #6B7280; font-size: 0.85rem; text-decoration: none; white-space: nowrap; }
+  .history-link:hover { color: #2563EB; }
+  .preview-hint {
+    font-size: 0.85rem; color: #6B7280; background: #EFF6FF; border-radius: 8px;
+    padding: 10px 14px; margin-bottom: 20px; line-height: 1.6;
+  }
+  /* [추가: 2026-08-11] hint가 빈 문자열이면(위 round-countdown 중복 안내문 삭제) 박스
+     자체를 완전히 접어 빈 여백이 남지 않게 한다. */
+  .preview-hint:empty { display: none; }
+  .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+  /* [추가: 2026-08-12] 툴바 버튼 높이를 고정값으로 못박는다 — 🤖 이모지가 들어간
+     버튼만 브라우저에 따라 색이모지 글꼴의 내부 line-height가 라틴/한글 텍스트보다
+     커서 박스 자체가 다른 버튼보다 눈에 띄게 부풀어 보이는 문제가 실제로 있었다
+     (padding·font-size는 다른 버튼과 똑같은데도 발생). height를 고정하면 내용이
+     이모지든 텍스트든 상관없이 박스 크기가 항상 같다. */
+  .actions button, .actions a.btn { height: 32px; box-sizing: border-box; }
+  /* [추가: 2026-08-10] app.renderer와 동일 — 정렬 보기 방식은 액션이 아니라 표시
+     옵션이라 툴바 맨 오른쪽으로 분리했다(사용자 선택). */
+  .actions .view-mode-select { margin-left: auto; }
+  /* [수정: 2026-08-03] app.renderer와 동일한 이유 — button은 a와 달리 font-family를
+     상속받지 않고, appearance:auto(네이티브 OS 버튼 껍데기)까지 남아있어 폰트만 맞춰선
+     완전히 똑같이 안 보인다. 크롬이 button 텍스트만 내부적으로 수직 중앙 정렬해주는
+     것까지 발견해 align-items: center를 직접 지정했다. */
+  button, a.btn {
+    background: #2563EB; color: #FFFFFF; border: none; border-radius: 4px;
+    padding: 6px 14px; font-size: 0.9rem; font-family: inherit; cursor: pointer; text-decoration: none;
+    appearance: none; -webkit-appearance: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    user-select: none; -webkit-user-select: none;
+  }
+  button:hover, a.btn:hover { background: #1E3A5F; }
+  /* [수정: 2026-08-03] app.renderer와 동일한 이유로 액션 툴바만 소프트 필로(시안 B) */
+  .actions button, .actions a.btn {
+    background: #EFF6FF; color: #2563EB; font-weight: 600; border-radius: 8px;
+  }
+  .actions button:hover, .actions a.btn:hover { background: #EFF6FF; }
+  .subheading { margin-top: 28px; }
+  /* [수정: 2026-08-05] app.renderer와 동일 — h2 기본 margin 제거 + 아이콘 오른쪽 정렬. */
+  .subheading h2 {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    font-size: 1.1rem; color: #1E3A5F; border-bottom: 1px solid #E5E7EB;
+    margin: 0 0 6px; padding-bottom: 6px;
+  }
+  .subheading-title { display: flex; align-items: center; gap: 4px; min-width: 0; }
+  .subheading-icons { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+  .rename-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 0.9rem; cursor: pointer;
+    vertical-align: middle; user-select: none; -webkit-user-select: none;
+  }
+  /* [추가: 2026-08-13] app.renderer와 동일 — 소제목 🗑️만 hover 빨강, ✏️는 무채색 유지. */
+  .rename-btn.group-hide-btn:hover { color: #DC2626; }
+  /* [추가: 2026-08-03] app.renderer와 동일한 이유 — 소제목 순서 조정 버튼. */
+  /* [수정: 2026-08-05] app.renderer와 동일 — 기사 ↑/↓(.move-btn)과 가로폭 통일. */
+  /* [수정: 2026-08-13] app.renderer와 동일 — 소제목은 ▲▼(목차 팝오버와 같은 기호),
+     기사는 ↑↓로 대상을 형태로 구분한다. 두 화면이 갈리면 안 되므로 같이 바꾼다. */
+  .order-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 0.78rem; cursor: pointer;
+    vertical-align: middle; padding: 2px 6px; user-select: none; -webkit-user-select: none;
+  }
+  .order-btn:disabled { opacity: 0.35; cursor: default; }
+  .article { margin: 10px 0; line-height: 1.5; padding: 6px 8px; border-radius: 8px; }
+  /* [추가: 2026-08-20] app.renderer와 동일 — [단독] 카드 강조 + 말머리 글자색.
+     우선순위 원칙도 동일(다른 상태 배경보다 먼저 선언해 가장 낮은 우선순위). */
+  .article.art-scoop { background: #FEF2F2; border-left: 3px solid #DC2626; padding-left: 9px; }
+  .t-scoop { color: #B91C1C; font-weight: 800; }
+  .t-flash { color: #B91C1C; font-weight: 600; }
+  /* [추가: 2026-08-05] app.renderer와 동일 — 마우스 오버 시 연한 회색 표시. */
+  .article:hover { background: #F3F4F6; }
+  /* [추가: 2026-08-21] app.renderer와 동일 — 사진 추정 기사는 지우지 않고 행을
+     흐리게만 표시한다. 여태 이 화면엔 .photo-badge CSS 자체가 없었다(사진기사 제외
+     설정이 항상 켜져 있던 전제라 이 배지가 뜰 일이 실질적으로 없었음) — 설정 기본값을
+     끔으로 바꾸며 처음으로 실제 렌더링 대상이 됐다. */
+  .article.is-photo { opacity: 0.55; }
+  .article.is-photo:hover, .article.is-photo:has(.article-select:checked) { opacity: 1; }
+  /* [추가: 2026-08-03] app.renderer와 동일한 이유 — 체크된 기사만 연한 배경으로
+     표시한다 (디자인 시안 A). */
+  .article:has(.article-select:checked) { background: #EFF6FF; }
+  /* [추가: 2026-08-05] app.renderer와 동일 — 승격 직후 그 기사를 한 번 표시한다. */
+  .article.just-promoted { background: #FFF9C4; }
+  /* [수정: 2026-08-05] app.renderer와 동일 — 순서 이동은 노란색(승격·새 기사 도착과 겹침)
+     대신 연두색을 쓴다. */
+  .article.just-moved { background: #E7EFE8; }
+  /* [수정: 2026-08-13] app.renderer와 동일 — summary를 1행에서 2행(.title-row/
+     .action-row)으로 나눴다. 제목이 게시시각·액션 묶음과 폭을 다투다 대부분 2~3줄로
+     꺾이던 문제 때문. */
+  .article summary {
+    cursor: pointer; display: flex; flex-direction: column; gap: 4px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .article summary::marker { color: #6B7280; }
+  /* [수정: 2026-07-30, 유지: 2026-08-13] 🗑️를 제목 바로 옆(2행)에 둔다 — 예전 footer
+     위치는 요약을 펼치면 제목에서 멀어져 헷갈렸다. */
+  .title-row { display: flex; align-items: baseline; justify-content: flex-start; gap: 8px; }
+  /* [수정: 2026-08-13] app.renderer와 동일 — 좁은 화면에서 액션 묶음이 옆으로 넘치던
+     문제(실측) 때문에 wrap을 허용한다. */
+  .action-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 4px; }
+  /* [추가: 2026-08-07] app.renderer와 동일 — 모바일 사파리 탭 하이라이트 잔상 방지. */
+  .title-line { min-width: 0; overflow-wrap: anywhere; color: #1F2937; -webkit-tap-highlight-color: transparent; }
+  /* [수정: 2026-08-05, 2026-08-13] app.renderer와 동일 — 액션 묶음만 margin-left: auto로
+     2행 오른쪽 끝에 붙이고, 그래도 안 들어가면 wrap한다. */
+  .article-actions {
+    margin-left: auto; display: flex; align-items: center; justify-content: flex-end;
+    gap: 4px; flex-shrink: 0; flex-wrap: wrap; row-gap: 4px;
+  }
+  /* [추가: 2026-08-21] app.renderer와 동일 — 사진 추정 배지(아이콘+문구 칩). */
+  .photo-badge {
+    flex-shrink: 0; padding: 1px 7px; border-radius: 999px; font-size: 0.72rem;
+    color: #6B7280; background: #F3F4F6; border: 1px solid #E5E7EB; white-space: nowrap;
+  }
+  .article-summary { margin: 6px 0 4px 20px; color: #1F2937; font-size: 0.95rem; }
+  /* [수정: 2026-08-13] app.renderer와 동일 — URL 밑줄 텍스트를 없애며(.url 폐기,
+     "원문보기" 아이콘으로 대체) footer엔 extra_buttons_html만 남는다. */
+  .article-footer { display: flex; align-items: center; gap: 8px; }
+  /* [수정: 2026-07-30] "이미 확인함"을 영구 기억(localStorage)하지 않고 "지금 펼쳐서
+     보고 있는 기사"에만 실시간 적용 — app.renderer와 같은 이유·같은 방식(:has()). */
+  /* [수정: 2026-08-21] 색(남색) 대신 opacity로 — 화면에 남는 파랑이 전부 "누를 수
+     있는 것"이 되도록, 상태 표시는 색이 아닌 밝기로만 준다. */
+  .article:has(details[open]) .title-line { opacity: 0.62; }
+  /* [추가: 2026-07-29] 지난번 이 화면을 봤을 때는 없다가 이번에 새로 들어온 기사 —
+     초안은 새로고침할 때마다 다시 검색하므로 뭐가 새로 섞였는지 표시해준다
+     (app.preview_renderer._compute_preview_articles가 매번 새로 검색·병합한 결과). */
+  .article.is-new-arrival { background: #FFF9C4; border-radius: 6px; padding: 8px 10px; }
+  /* [추가: 2026-08-12] "🤖 미분류 기사 분류"가 방금 자리를 정해준 기사 — 어디에 배정됐는지
+     담당자가 바로 찾을 수 있게 한 번만 표시하고 다음 새로고침에 사라진다(.just-moved와 같은 방식).
+     색은 🤖 버튼과 같은 연보라 — "저 버튼을 눌렀더니 이것들이 생겼다"가 그대로 이어진다.
+     .is-new-arrival(노랑)보다 **뒤에** 선언해 겹칠 때 연보라가 이긴다: 노랑은 "기사가 왔다"는
+     이미 아는 정보고, 연보라는 "내가 시켜서 방금 배정됐다"는 지금 확인해야 할 정보다. */
+  .article.just-classified { background: #F0EAFB; }
+  /* [수정: 2026-08-03] app.renderer와 동일한 이유 — 화면에서 직접 드래그해 복사할 때
+     게시 시각이 같이 딸려오지 않도록 이 부분만 선택 자체를 막는다. */
+  .pub-time {
+    flex-shrink: 0; color: #6B7280; font-size: 0.8rem; white-space: nowrap;
+    user-select: none; -webkit-user-select: none;
+  }
+  .move-btn, .hide-btn, .copy-btn {
+    flex-shrink: 0; background: transparent; border: none; color: #6B7280; font-size: 1rem;
+    cursor: pointer; padding: 2px 6px; user-select: none; -webkit-user-select: none;
+  }
+  .move-btn:disabled { color: #E5E7EB; cursor: not-allowed; }
+  .hide-btn:hover { color: #DC2626; }
+  /* [수정: 2026-08-14] app.renderer와 동일 — 원문보기가 아이콘에서 게시시각 옆 텍스트
+     링크로 바뀌었다(복사 아이콘과 실루엣이 겹쳐 구분이 안 된다는 지적). */
+  .time-sep { color: #6B7280; font-size: 0.8rem; margin: 0 2px; user-select: none; -webkit-user-select: none; }
+  .origin-link-text {
+    flex-shrink: 0; color: #2563EB; font-size: 0.8rem; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 2px; white-space: nowrap;
+  }
+  .origin-link-text:hover { text-decoration: underline; }
+  .origin-link-icon { width: 0.75em; height: 0.75em; }
+  /* [추가: 2026-08-21] app.renderer와 동일 — "검색어 기재부, 정부"(이 기사가 어떤
+     검색어로 걸렸는지). 두 화면이 같은 뜻으로 읽히도록 색·크기를 그대로 맞춘다. */
+  .kw-inline {
+    font-size: 0.8rem; color: #6B7280;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  /* 돋보기는 값보다 한 톤 흐리게 — 먼저 읽혀야 하는 건 검색어 자체다. 크기는 바로 옆
+     원문보기 아이콘(.origin-link-icon)과 같은 0.75em이라 액션 줄에서 높이가 안 튄다. */
+  .kw-inline .kw-ic { width: 0.75em; height: 0.75em; color: #9CA3AF; flex-shrink: 0; }
+  .kw-inline .kw-v { color: #4B5563; }
+  /* [추가: 2026-08-14] app.renderer와 동일 — title-line 렌더 좌표 실측(28px)만큼
+     action-row를 들여써 게시시각·원문보기가 제목 글자 시작점과 같은 줄에서 시작하게 한다. */
+  .article:has(.article-select) .action-row { padding-left: 28px; }
+  .copy-btn { display: inline-flex; align-items: center; }
+  .copy-btn .icon-done { display: none; }
+  .copy-btn.is-copied .icon-default { display: none; }
+  .copy-btn.is-copied .icon-done { display: inline-flex; }
+  /* [추가: 2026-08-05] app.renderer와 동일 — 원문 다시 가져오기 버튼, 평소 숨김. */
+  .refetch-btn {
+    flex-shrink: 0; background: transparent; border: none; color: #6B7280; font-size: 1rem;
+    cursor: pointer; padding: 2px 6px; user-select: none; -webkit-user-select: none;
+    opacity: 0; transition: opacity 0.15s;
+  }
+  .article:hover .refetch-btn { opacity: 1; }
+  .refetch-btn:disabled { opacity: 0.35 !important; cursor: not-allowed; }
+  /* [추가: 2026-08-11] "⋯ 더보기" 메뉴 — 원문 다시 불러오기 / 기사제목 직접 수정.
+     예전엔 이 둘과 복사하기까지 셋이 제목 줄에 아이콘으로 직접 붙어 있었고
+     .refetch-btn의 opacity:0으로 숨겼다가 카드 호버 시에만 나타났는데, (1) 호버할
+     때마다 아이콘이 4→8개로 늘어 목록을 훑을 때 산만했고 (2) **모바일엔 호버가 없어
+     아예 누를 수 없었다.** 그래서 ⋯ 버튼은 호버와 무관하게 항상 보이고, 메뉴 안은
+     아이콘 대신 글자로 이름을 보여준다. [수정: 2026-08-13] app.renderer와 동일 —
+     복사하기는 다시 메뉴에서 빠져나가 상시 노출 아이콘(.copy-btn)이 됐다. */
+  .more-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+  .more-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 1.05rem; line-height: 1;
+    cursor: pointer; padding: 3px 7px; border-radius: 4px;
+    user-select: none; -webkit-user-select: none;
+  }
+  .more-btn:hover { background: #EFF6FF; color: #2563EB; }
+  .more-menu {
+    display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 60;
+    min-width: 172px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px;
+    padding: 4px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.13);
+  }
+  .more-wrap.is-open .more-menu { display: block; }
+  .more-menu button {
+    display: block; width: 100%; text-align: left; background: transparent; border: none;
+    padding: 8px 10px; border-radius: 5px; font-size: 0.85rem; color: #1F2937;
+    cursor: pointer; white-space: nowrap;
+  }
+  .more-menu button:hover { background: #EFF6FF; }
+  .more-menu button:disabled { opacity: 0.5; cursor: progress; }
+  /* [추가: 2026-08-18] 🏷 라벨 — PRD.md 기능10, 2026-08-18 목업 대화. 앰버 계열은
+     기존 COLOR_* 팔레트(파랑=담당자 액션/보라=AI 액션)와 겹치지 않는 세 번째 축으로
+     확정했다(MAIN_FLOW_MOCKUP.html의 --label-bg/--label-text 그대로). */
+  .lab-pop-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+  .lab-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 1rem; line-height: 1;
+    cursor: pointer; padding: 3px 6px; border-radius: 4px; display: inline-flex; align-items: center;
+    user-select: none; -webkit-user-select: none;
+  }
+  .lab-btn:hover { background: #EFF6FF; color: #2563EB; }
+  .lab-btn.on { color: #8A5A14; background: #FBF0DA; }
+  .lab-btn .lab-count { font-size: 0.62rem; font-weight: 700; margin-left: 2px; }
+  .lab-pop {
+    position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 60; width: 260px;
+    text-align: left; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px;
+    padding: 11px 12px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.13);
+  }
+  .lab-pop.hidden { display: none; }
+  .lab-pop h4 { margin: 0 0 6px; font-size: 0.66rem; color: #6B7280; font-weight: 700; }
+  .lab-pop .attached { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; min-height: 20px; }
+  .lab-pop .attached .none { font-size: 0.66rem; color: #6B7280; }
+  .lab-pop .known { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+  .lab-pop .known .none { font-size: 0.66rem; color: #6B7280; }
+  .lab-chip {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 0.64rem; font-weight: 700;
+    color: #8A5A14; background: #FBF0DA; border: 1px solid rgba(138, 90, 20, 0.28);
+    border-radius: 20px; padding: 2px 8px; white-space: nowrap;
+  }
+  .lab-chip .x { color: #8A5A14; opacity: 0.55; cursor: pointer; font-weight: 700; }
+  .lab-chip .x:hover { opacity: 1; }
+  .known-chip {
+    font-size: 0.64rem; font-weight: 600; color: #6B7280; cursor: pointer;
+    background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 20px; padding: 2px 8px;
+  }
+  .known-chip:hover { background: #FBF0DA; color: #8A5A14; border-color: rgba(138, 90, 20, 0.28); }
+  .known-chip.used { background: #FBF0DA; color: #8A5A14; border-color: rgba(138, 90, 20, 0.28); font-weight: 700; }
+  .known-chip .n { opacity: 0.6; font-weight: 500; margin-left: 3px; }
+  .lab-pop .addbox { display: flex; gap: 5px; }
+  .lab-pop .addbox input {
+    flex: 1; font-size: 0.72rem; padding: 5px 7px; border: 1px solid #E5E7EB; border-radius: 5px;
+  }
+  .lab-pop .addbox button {
+    font-size: 0.7rem; font-weight: 700; padding: 5px 10px; border-radius: 5px; cursor: pointer;
+    background: #FBF0DA; color: #8A5A14; border: 1px solid rgba(138, 90, 20, 0.28);
+  }
+  .lab-pop .sim-warn {
+    margin-top: 8px; font-size: 0.64rem; line-height: 1.7; color: #8A5A14; background: #FBF0DA;
+    border: 1px dashed rgba(138, 90, 20, 0.28); border-radius: 6px; padding: 6px 8px;
+  }
+  .lab-pop .sim-warn.hidden { display: none; }
+  .lab-pop .sim-warn button {
+    font-size: 0.62rem; font-weight: 700; padding: 3px 8px; border-radius: 20px; cursor: pointer;
+    margin-left: 3px; border: none;
+  }
+  .lab-pop .sim-warn .use { background: #8A5A14; color: #FFFFFF; }
+  .lab-pop .sim-warn .keep { background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; }
+  .lab-pop .hint { font-size: 0.62rem; color: #6B7280; margin: 8px 0 0; line-height: 1.7; }
+  .lab-row {
+    display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 6px;
+    padding-top: 6px; border-top: 1px dashed #E5E7EB;
+  }
+  .lab-row .tagmark { color: #8A5A14; opacity: 0.75; }
+  /* [추가: 2026-08-05] app.renderer와 동일 — ✏️ 직접 수정 인라인 편집 칸. */
+  .edit-summary-form {
+    margin: 8px 0 4px 20px; padding: 10px 12px; border: 1px solid #2563EB; border-radius: 8px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .edit-summary-form input, .edit-summary-form textarea {
+    width: 100%; box-sizing: border-box; padding: 6px 10px; border: 1px solid #E5E7EB; border-radius: 6px;
+    font-size: 0.88rem; color: #1F2937; background: #FFFFFF; font-family: inherit;
+  }
+  .edit-summary-form .edit-summary-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .edit-summary-form button { font-size: 0.82rem; padding: 5px 12px; }
+  .empty { text-align: center; margin-top: 60px; font-size: 1.1rem; color: #6B7280; }
+  .bottom { margin-top: 40px; background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: 8px; padding: 16px 18px; }
+  .bottom h3 { margin: 0 0 8px; font-size: 1rem; color: #1E3A5F; }
+  .bottom-keywords { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 18px; }
+  .ai-keyword-chip {
+    font-size: 0.82rem; color: #1F2937; background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: 14px; padding: 3px 12px; cursor: pointer; font-family: inherit;
+  }
+  .ai-keyword-chip:hover { border-color: #2563EB; color: #2563EB; }
+  .ai-keyword-chip:disabled { cursor: default; color: #6B7280; border-color: #E5E7EB; background: #F8FAFC; }
+  /* [수정: 2026-08-13] app.renderer와 동일 — 추가된 상태를 글자를 지우지 않고 표시한다. */
+  .ai-keyword-chip.added { border-color: #2563EB; background: #2563EB; color: #FFFFFF; }
+  .ai-keyword-chip.added::before { content: "✓ "; }
+  .bottom-summary { border-top: 1px solid #E5E7EB; padding-top: 14px; }
+  .bottom-header-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .bottom-header-row h3 { margin: 0; }
+  .bottom-summary-copy {
+    font-size: 0.78rem; color: #2563EB; background: transparent; border: 1px solid #E5E7EB;
+    border-radius: 6px; padding: 3px 10px; cursor: pointer; font-family: inherit;
+  }
+  .bottom-summary-item { padding: 8px 0; border-bottom: 1px solid #E5E7EB; }
+  .bottom-summary-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .bottom-summary-item strong { display: block; color: #1E3A5F; margin-bottom: 3px; }
+  .bottom-summary-item p { margin: 0; }
+  .manual-divider {
+    display: flex; align-items: center; gap: 10px; margin: 32px 0 4px;
+    color: #6B7280; font-size: 0.75rem;
+  }
+  .manual-divider::before, .manual-divider::after { content: ""; flex: 1; border-top: 1px dashed #E5E7EB; }
+  .manual-zone { border: 1px dashed #E5E7EB; border-radius: 8px; padding: 14px 18px; margin-top: 10px; }
+  .manual-zone-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .manual-zone-title { font-weight: 600; color: #1F2937; font-size: 0.95rem; }
+  .manual-zone-hint { font-size: 0.75rem; color: #6B7280; }
+  .manual-zone .article:first-child { margin-top: 10px; }
+  /* [추가: 2026-08-05] app.renderer와 동일 — 직접 키워드 작성 메모 칸. */
+  /* [수정: 2026-08-07] app.renderer와 동일 — 스크롤 중에도 계속 보이도록 sticky 고정. */
+  .keyword-note-zone {
+    display: none; align-items: center; gap: 8px; border: 1px dashed #E5E7EB; border-radius: 8px;
+    padding: 10px 14px; margin: 10px 0 4px; flex-wrap: wrap;
+    position: sticky; top: 60px; z-index: 15; background: #FFFFFF;
+  }
+  .keyword-note-zone.is-open { display: flex; }
+  .keyword-note-zone input {
+    flex: 1; min-width: 220px; padding: 6px 10px; border: 1px solid #E5E7EB; border-radius: 6px;
+    font-size: 0.88rem; color: #1F2937; background: #FFFFFF;
+  }
+  /* [추가: 2026-08-10] app.renderer와 동일 — 저장된 메모는 (수정)을 눌러야 편집 가능. */
+  .keyword-note-zone input:disabled { background: #F8FAFC; color: #6B7280; }
+  .keyword-note-zone button { font-size: 0.82rem; padding: 5px 10px; white-space: nowrap; }
+  /* [추가: 2026-08-13] app.renderer와 동일 — 단색 SVG 아이콘(app.icons) 공통 크기·색. */
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<div class="round-over-banner" id="round-over-banner">
+  <div class="round-over-banner-inner">
+    <span class="msg" id="round-over-msg"></span>
+    <a class="go" href="http://127.0.0.1:8765/index.html">확정본 열기 →</a>
+    <button type="button" class="dismiss" onclick="dismissRoundOverBanner()">나중에</button>
+  </div>
+</div>
+<div class="topbar"><div class="topbar-inner">
+  <a href="http://127.0.0.1:8765/home.html">홈</a>
+  <a href="http://127.0.0.1:8765/live.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color:#DC2626"><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><path d="M6.4 6.4a8 8 0 0 0 0 11.2M17.6 17.6a8 8 0 0 0 0-11.2"/></svg> 실시간</a>
+  <a href="http://127.0.0.1:8765/index.html">확정본</a>
+</div></div>
+<div class="container">
+  <header class="preview-head">
+    <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h6"/><path d="M14 2v6h6v3"/><path d="M20.5 13.5a1.6 1.6 0 0 1 2.2 2.2L18 20.5l-3 .8.8-3Z"/></svg> 초안 (10시 30분 예정 · 지금 16시 40분 기준)<span class="total-count-badge">전체 6건</span></h1>
+    <a class="history-link" href="history.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg> 정기 보관함</a>
+  </header>
+  <div class="actions" id="preview-actions"><button onclick="copyPlainText()">복사</button><form method="POST" action="/download-text" style="display:contents" onsubmit="if (CLASSIFY_DEGRADED && !confirm(classifyDegradedConfirmMsg('내려받을까요'))) return false; this.text.value=PLAIN_TEXT;"><input type="hidden" name="filename" value="스크랩초안_10-30_16-40.txt"><input type="hidden" name="text" value=""><button type="submit" class="btn">다운로드</button></form><button class="create-group-btn" type="button" onclick="createCustomGroup()">+ 새 소제목</button><button class="create-group-btn" type="button" onclick="toggleKeywordNote(this)">+ 키워드 직접 작성</button><span class="actions-divider"></span><button class="create-group-btn reclassify-btn" type="button" data-manual-edits="0" data-degraded="0" onclick="regenerateSubheadings(this)" title="전체 기사를 처음부터 다시 분류합니다"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5.4" r="1.4"/><path d="M12 6.8v2.3"/><rect x="4.5" y="9.1" width="15" height="10.9" rx="4"/><circle cx="9" cy="14.3" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="14.3" r="1" fill="currentColor" stroke="none"/><path d="M9 17.3h6"/><path d="M4.5 13.2h-2M19.5 13.2h2"/></svg> 전체 기사 재분류</button><select class="view-mode-select" onchange="applyViewMode(this.value)" title="소제목 구성은 그대로 두고 화면에 나열하는 순서만 바꿉니다"><option value="subheading" selected>소제목별</option><option value="group-time">소제목 내 시간순</option><option value="time">시간순</option><option value="outlet">언론사순</option></select></div>
+  <div class="keyword-note-zone" id="keyword-note-zone">
+    <input type="text" id="keyword-note-input" value="" placeholder="키워드 a, 키워드 b, 키워드 c..." onkeydown="keywordNoteKey(event)">
+    <button type="button" onclick="toggleKeywordEditMode(this)">저장</button>
+    <button class="clear-btn" type="button" onclick="cancelKeywordNote()">취소</button>
+  </div>
+  <div class="preview-hint" id="preview-hint"></div>
+  <div id="preview-body"><section class="subheading" id="subheading-0" data-toc-name="&lt;조세지출 결산 및 세제개편&gt;"><h2><span class="subheading-title"><input type="checkbox" class="group-select-all" onclick="event.stopPropagation();" onchange="toggleGroupSelectAll(this);" title="이 소제목 기사 전체 선택"> &lt;조세지출 결산 및 세제개편&gt;<span class="ai-badge" title="AI가 자동으로 묶은 소제목입니다"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5.4" r="1.4"/><path d="M12 6.8v2.3"/><rect x="4.5" y="9.1" width="15" height="10.9" rx="4"/><circle cx="9" cy="14.3" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="14.3" r="1" fill="currentColor" stroke="none"/><path d="M9 17.3h6"/><path d="M4.5 13.2h-2M19.5 13.2h2"/></svg></span><span class="subheading-count">1</span></span><span class="subheading-icons"><button class="rename-btn" type="button" data-name="조세지출 결산 및 세제개편" data-current="조세지출 결산 및 세제개편" onclick="renameGroup(this)" title="소제목 이름 바꾸기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button> <button class="rename-btn group-hide-btn" type="button" onclick="hideGroup(this)" title="이 소제목 통째로 숨기기(기사 각각 숨긴 것과 동일 — 되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="order-btn" type="button" data-name="조세지출 결산 및 세제개편" onclick="moveGroupOrder(this, 'up');" disabled title="소제목 위로 이동"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></button><button class="order-btn" type="button" data-name="조세지출 결산 및 세제개편" onclick="moveGroupOrder(this, 'down');" title="소제목 아래로 이동"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></span></h2><div class="article" data-url="https://n.news.naver.com/mnews/article/055/0001382364" data-outlet-rank="0"><details><summary><div class="title-row"><input type="checkbox" class="article-select" data-url="https://n.news.naver.com/mnews/article/055/0001382364" onclick="event.stopPropagation();" onchange="updateBulkMoveBar();"><span class="title-line">(SBS) 소득 상위 10%에 보험료·교육비 공제 혜택 절반 이상</span></div><div class="action-row"><span class="pub-time">11:12 · <span class="pub-time-relative" data-pub-date="2026-08-21T11:12:00+09:00"></span></span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/055/0001382364" target="_blank" rel="noopener noreferrer" title="https://n.news.naver.com/mnews/article/055/0001382364">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 재경부</span></span><span class="article-actions"><select class="group-move-select" onclick="event.stopPropagation();" onchange="event.stopPropagation(); moveArticleToGroup(this);"><option value="" selected disabled>다른 소제목</option><option value="취약차주 금리부담 지원방안">취약차주 금리부담 지원방안</option><option value="미래기금 신설 및 교육교부금 개편">미래기금 신설 및 교육교부금 개편</option><option value="태국산 동관 덤핑 관세">태국산 동관 덤핑 관세</option></select><button class="copy-btn" type="button" data-copy-text="ㅇ (SBS) 소득 상위 10%에 보험료·교육비 공제 혜택 절반 이상
+https://n.news.naver.com/mnews/article/055/0001382364" onclick="event.stopPropagation(); copyArticleIcon(this);" title="복사하기" aria-label="복사하기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button><span class="lab-pop-wrap"><button class="iconbtn lab-btn" type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382364" data-outlet="SBS" data-title="소득 상위 10%에 보험료·교육비 공제 혜택 절반 이상" data-pub-date="2026-08-21T11:12:00+09:00" data-group="조세지출 결산 및 세제개편" data-scrap-date="2026-08-21" data-scrap-end="10:30" onclick="event.stopPropagation(); toggleLabelPopover(this);" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="lab-pop hidden" onclick="event.stopPropagation();"><h4>이 기사에 붙은 라벨</h4><div class="attached"><span class="none">아직 없음</span></div><h4>이미 쓴 라벨 (눌러서 붙이기)</h4><div class="known"><span class="none">아직 쓴 라벨이 없습니다</span></div><div class="addbox"><input type="text" placeholder="새 라벨 입력" class="lab-input" onkeydown="event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);"><button type="button" onclick="event.stopPropagation(); addLabelFromInput(this.previousElementSibling);">추가</button></div><div class="sim-warn hidden"></div><p class="hint">라벨은 보고서 텍스트(복사·txt·발송)에 나가지 않습니다. 화면과 엑셀 내보내기에만 표시됩니다.</p></span></span><span class="more-wrap"><button class="more-btn" type="button" onclick="event.stopPropagation(); toggleArticleMenu(this);" title="더보기" aria-label="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button><span class="more-menu"><button type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382364" onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382364" data-title="소득 상위 10%에 보험료·교육비 공제 혜택 절반 이상" data-summary="재정경제부는 조세특례제한법 개정에 따라 올해 처음으로 조세지출 결산서를 지난 18일 국회에 제출했다고 오늘(21일) 밝혔습니다. 재경부에 따르면 지난해 국세 감면액은 76조 1천억 원이며 연구인력개발비... " onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button></span></span><button class="hide-btn" type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382364" data-outlet="SBS" data-title="소득 상위 10%에 보험료·교육비 공제 혜택 절반 이상" data-pub-date="2026-08-21T11:12:00+09:00" onclick="event.stopPropagation(); hideArticle(this);" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382364" data-direction="up" onclick="event.stopPropagation(); previewMoveArticle(this);" disabled title="소제목 안에서 위로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382364" data-direction="down" onclick="event.stopPropagation(); previewMoveArticle(this);" disabled title="소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><p class="article-summary"><span class="hl-word" data-word="재정경제부" style="background-color:#93CDF5;color:#1F2937">재정경제부</span>는 조세특례제한법 개정에 따라 올해 처음으로 조세지출 결산서를 지난 18일 국회에 제출했다고 오늘(21일) 밝혔습니다. <span class="hl-word" data-word="재경부" style="background-color:#93CDF5;color:#1F2937">재경부</span>에 따르면 지난해 국세 감면액은 76조 1천억 원이며 연구인력개발비... </p></details><div class="article-footer"></div></div></section>
+<section class="subheading" id="subheading-1" data-toc-name="&lt;취약차주 금리부담 지원방안&gt;"><h2><span class="subheading-title"><input type="checkbox" class="group-select-all" onclick="event.stopPropagation();" onchange="toggleGroupSelectAll(this);" title="이 소제목 기사 전체 선택"> &lt;취약차주 금리부담 지원방안&gt;<span class="ai-badge" title="AI가 자동으로 묶은 소제목입니다"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5.4" r="1.4"/><path d="M12 6.8v2.3"/><rect x="4.5" y="9.1" width="15" height="10.9" rx="4"/><circle cx="9" cy="14.3" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="14.3" r="1" fill="currentColor" stroke="none"/><path d="M9 17.3h6"/><path d="M4.5 13.2h-2M19.5 13.2h2"/></svg></span><span class="subheading-count">2</span></span><span class="subheading-icons"><button class="rename-btn" type="button" data-name="취약차주 금리부담 지원방안" data-current="취약차주 금리부담 지원방안" onclick="renameGroup(this)" title="소제목 이름 바꾸기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button> <button class="rename-btn group-hide-btn" type="button" onclick="hideGroup(this)" title="이 소제목 통째로 숨기기(기사 각각 숨긴 것과 동일 — 되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="order-btn" type="button" data-name="취약차주 금리부담 지원방안" onclick="moveGroupOrder(this, 'up');" title="소제목 위로 이동"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></button><button class="order-btn" type="button" data-name="취약차주 금리부담 지원방안" onclick="moveGroupOrder(this, 'down');" title="소제목 아래로 이동"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></span></h2><div class="article" data-url="https://n.news.naver.com/mnews/article/055/0001382360" data-outlet-rank="1"><details><summary><div class="title-row"><input type="checkbox" class="article-select" data-url="https://n.news.naver.com/mnews/article/055/0001382360" onclick="event.stopPropagation();" onchange="updateBulkMoveBar();"><span class="title-line">(SBS) <span class="hl-word" data-word="구윤철" style="background-color:#93CDF5;color:#1F2937">구윤철</span> &quot;금리 상승 부담 줄이도록 취약차주 지원책 조속히 마련&quot;</span></div><div class="action-row"><span class="pub-time">11:04 · <span class="pub-time-relative" data-pub-date="2026-08-21T11:04:00+09:00"></span></span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/055/0001382360" target="_blank" rel="noopener noreferrer" title="https://n.news.naver.com/mnews/article/055/0001382360">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 구윤철</span></span><span class="article-actions"><select class="group-move-select" onclick="event.stopPropagation();" onchange="event.stopPropagation(); moveArticleToGroup(this);"><option value="" selected disabled>다른 소제목</option><option value="조세지출 결산 및 세제개편">조세지출 결산 및 세제개편</option><option value="미래기금 신설 및 교육교부금 개편">미래기금 신설 및 교육교부금 개편</option><option value="태국산 동관 덤핑 관세">태국산 동관 덤핑 관세</option></select><button class="copy-btn" type="button" data-copy-text="ㅇ (SBS) 구윤철 &quot;금리 상승 부담 줄이도록 취약차주 지원책 조속히 마련&quot;
+https://n.news.naver.com/mnews/article/055/0001382360" onclick="event.stopPropagation(); copyArticleIcon(this);" title="복사하기" aria-label="복사하기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button><span class="lab-pop-wrap"><button class="iconbtn lab-btn" type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382360" data-outlet="SBS" data-title="구윤철 &quot;금리 상승 부담 줄이도록 취약차주 지원책 조속히 마련&quot;" data-pub-date="2026-08-21T11:04:00+09:00" data-group="취약차주 금리부담 지원방안" data-scrap-date="2026-08-21" data-scrap-end="10:30" onclick="event.stopPropagation(); toggleLabelPopover(this);" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="lab-pop hidden" onclick="event.stopPropagation();"><h4>이 기사에 붙은 라벨</h4><div class="attached"><span class="none">아직 없음</span></div><h4>이미 쓴 라벨 (눌러서 붙이기)</h4><div class="known"><span class="none">아직 쓴 라벨이 없습니다</span></div><div class="addbox"><input type="text" placeholder="새 라벨 입력" class="lab-input" onkeydown="event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);"><button type="button" onclick="event.stopPropagation(); addLabelFromInput(this.previousElementSibling);">추가</button></div><div class="sim-warn hidden"></div><p class="hint">라벨은 보고서 텍스트(복사·txt·발송)에 나가지 않습니다. 화면과 엑셀 내보내기에만 표시됩니다.</p></span></span><span class="more-wrap"><button class="more-btn" type="button" onclick="event.stopPropagation(); toggleArticleMenu(this);" title="더보기" aria-label="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button><span class="more-menu"><button type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382360" onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382360" data-title="구윤철 &quot;금리 상승 부담 줄이도록 취약차주 지원책 조속히 마련&quot;" data-summary="▲ 구윤철 부총리 겸 재정경제부 장관이 21일 서울 중구 은행회관에서 열린 시장상황점검회의에서 발언하고 있다. 구윤철 부총리 겸 재정경제부 장관은 &quot;소상공인 채무부담과 서민·취약 차주의 금융 부담을 덜어드리기... " onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button></span></span><button class="hide-btn" type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382360" data-outlet="SBS" data-title="구윤철 &quot;금리 상승 부담 줄이도록 취약차주 지원책 조속히 마련&quot;" data-pub-date="2026-08-21T11:04:00+09:00" onclick="event.stopPropagation(); hideArticle(this);" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382360" data-direction="up" onclick="event.stopPropagation(); previewMoveArticle(this);" disabled title="소제목 안에서 위로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382360" data-direction="down" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><p class="article-summary">▲ <span class="hl-word" data-word="구윤철" style="background-color:#93CDF5;color:#1F2937">구윤철</span> 부총리 겸 <span class="hl-word" data-word="재정경제부" style="background-color:#93CDF5;color:#1F2937">재정경제부</span> 장관이 21일 서울 중구 은행회관에서 열린 시장상황점검회의에서 발언하고 있다. <span class="hl-word" data-word="구윤철" style="background-color:#93CDF5;color:#1F2937">구윤철</span> 부총리 겸 <span class="hl-word" data-word="재정경제부" style="background-color:#93CDF5;color:#1F2937">재정경제부</span> 장관은 &quot;소상공인 채무부담과 서민·취약 차주의 금융 부담을 덜어드리기... </p></details><div class="article-footer"></div></div>
+<div class="article" data-url="https://n.news.naver.com/mnews/article/214/0001519268" data-outlet-rank="4"><details><summary><div class="title-row"><input type="checkbox" class="article-select" data-url="https://n.news.naver.com/mnews/article/214/0001519268" onclick="event.stopPropagation();" onchange="updateBulkMoveBar();"><span class="title-line">(MBC) <span class="hl-word" data-word="구윤철" style="background-color:#93CDF5;color:#1F2937">구윤철</span> &quot;금리상승 부담 줄이도록 취약차주 지원책 조속히 마련&quot;</span></div><div class="action-row"><span class="pub-time">13:32 · <span class="pub-time-relative" data-pub-date="2026-08-21T13:32:00+09:00"></span></span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/214/0001519268" target="_blank" rel="noopener noreferrer" title="https://n.news.naver.com/mnews/article/214/0001519268">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 구윤철</span></span><span class="article-actions"><select class="group-move-select" onclick="event.stopPropagation();" onchange="event.stopPropagation(); moveArticleToGroup(this);"><option value="" selected disabled>다른 소제목</option><option value="조세지출 결산 및 세제개편">조세지출 결산 및 세제개편</option><option value="미래기금 신설 및 교육교부금 개편">미래기금 신설 및 교육교부금 개편</option><option value="태국산 동관 덤핑 관세">태국산 동관 덤핑 관세</option></select><button class="copy-btn" type="button" data-copy-text="ㅇ (MBC) 구윤철 &quot;금리상승 부담 줄이도록 취약차주 지원책 조속히 마련&quot;
+https://n.news.naver.com/mnews/article/214/0001519268" onclick="event.stopPropagation(); copyArticleIcon(this);" title="복사하기" aria-label="복사하기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button><span class="lab-pop-wrap"><button class="iconbtn lab-btn" type="button" data-url="https://n.news.naver.com/mnews/article/214/0001519268" data-outlet="MBC" data-title="구윤철 &quot;금리상승 부담 줄이도록 취약차주 지원책 조속히 마련&quot;" data-pub-date="2026-08-21T13:32:00+09:00" data-group="취약차주 금리부담 지원방안" data-scrap-date="2026-08-21" data-scrap-end="10:30" onclick="event.stopPropagation(); toggleLabelPopover(this);" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="lab-pop hidden" onclick="event.stopPropagation();"><h4>이 기사에 붙은 라벨</h4><div class="attached"><span class="none">아직 없음</span></div><h4>이미 쓴 라벨 (눌러서 붙이기)</h4><div class="known"><span class="none">아직 쓴 라벨이 없습니다</span></div><div class="addbox"><input type="text" placeholder="새 라벨 입력" class="lab-input" onkeydown="event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);"><button type="button" onclick="event.stopPropagation(); addLabelFromInput(this.previousElementSibling);">추가</button></div><div class="sim-warn hidden"></div><p class="hint">라벨은 보고서 텍스트(복사·txt·발송)에 나가지 않습니다. 화면과 엑셀 내보내기에만 표시됩니다.</p></span></span><span class="more-wrap"><button class="more-btn" type="button" onclick="event.stopPropagation(); toggleArticleMenu(this);" title="더보기" aria-label="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button><span class="more-menu"><button type="button" data-url="https://n.news.naver.com/mnews/article/214/0001519268" onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/214/0001519268" data-title="구윤철 &quot;금리상승 부담 줄이도록 취약차주 지원책 조속히 마련&quot;" data-summary="구윤철 부총리 겸 재정경제부 장관이 &quot;소상공인 채무부담과 서민의 금융 부담을 덜기 위한 지원방안을 마련해 조속히 발표하겠다고 밝혔습니다. 구 부총리는 오늘 시장상황점검회의에서 주요국 장기국채 금리가 수십 년... " onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button></span></span><button class="hide-btn" type="button" data-url="https://n.news.naver.com/mnews/article/214/0001519268" data-outlet="MBC" data-title="구윤철 &quot;금리상승 부담 줄이도록 취약차주 지원책 조속히 마련&quot;" data-pub-date="2026-08-21T13:32:00+09:00" onclick="event.stopPropagation(); hideArticle(this);" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/214/0001519268" data-direction="up" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 위로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/214/0001519268" data-direction="down" onclick="event.stopPropagation(); previewMoveArticle(this);" disabled title="소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><p class="article-summary"><span class="hl-word" data-word="구윤철" style="background-color:#93CDF5;color:#1F2937">구윤철</span> 부총리 겸 <span class="hl-word" data-word="재정경제부" style="background-color:#93CDF5;color:#1F2937">재정경제부</span> 장관이 &quot;소상공인 채무부담과 서민의 금융 부담을 덜기 위한 지원방안을 마련해 조속히 발표하겠다고 밝혔습니다. 구 부총리는 오늘 시장상황점검회의에서 주요국 장기국채 금리가 수십 년... </p></details><div class="article-footer"></div></div></section>
+<section class="subheading" id="subheading-2" data-toc-name="&lt;미래기금 신설 및 교육교부금 개편&gt;"><h2><span class="subheading-title"><input type="checkbox" class="group-select-all" onclick="event.stopPropagation();" onchange="toggleGroupSelectAll(this);" title="이 소제목 기사 전체 선택"> &lt;미래기금 신설 및 교육교부금 개편&gt;<span class="ai-badge" title="AI가 자동으로 묶은 소제목입니다"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5.4" r="1.4"/><path d="M12 6.8v2.3"/><rect x="4.5" y="9.1" width="15" height="10.9" rx="4"/><circle cx="9" cy="14.3" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="14.3" r="1" fill="currentColor" stroke="none"/><path d="M9 17.3h6"/><path d="M4.5 13.2h-2M19.5 13.2h2"/></svg></span><span class="subheading-count">2</span></span><span class="subheading-icons"><button class="rename-btn" type="button" data-name="미래기금 신설 및 교육교부금 개편" data-current="미래기금 신설 및 교육교부금 개편" onclick="renameGroup(this)" title="소제목 이름 바꾸기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button> <button class="rename-btn group-hide-btn" type="button" onclick="hideGroup(this)" title="이 소제목 통째로 숨기기(기사 각각 숨긴 것과 동일 — 되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="order-btn" type="button" data-name="미래기금 신설 및 교육교부금 개편" onclick="moveGroupOrder(this, 'up');" title="소제목 위로 이동"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></button><button class="order-btn" type="button" data-name="미래기금 신설 및 교육교부금 개편" onclick="moveGroupOrder(this, 'down');" title="소제목 아래로 이동"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></span></h2><div class="article" data-url="https://n.news.naver.com/mnews/article/055/0001382388" data-outlet-rank="3"><details><summary><div class="title-row"><input type="checkbox" class="article-select" data-url="https://n.news.naver.com/mnews/article/055/0001382388" onclick="event.stopPropagation();" onchange="updateBulkMoveBar();"><span class="title-line">(SBS) 속도전 앞세운 &#x27;재정저수지&#x27; 미래기금…&#x27;국회 밖 곳간&#x27; 우려도</span></div><div class="action-row"><span class="pub-time">13:18 · <span class="pub-time-relative" data-pub-date="2026-08-21T13:18:00+09:00"></span></span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/055/0001382388" target="_blank" rel="noopener noreferrer" title="https://n.news.naver.com/mnews/article/055/0001382388">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">정부</span></span><span class="article-actions"><select class="group-move-select" onclick="event.stopPropagation();" onchange="event.stopPropagation(); moveArticleToGroup(this);"><option value="" selected disabled>다른 소제목</option><option value="조세지출 결산 및 세제개편">조세지출 결산 및 세제개편</option><option value="취약차주 금리부담 지원방안">취약차주 금리부담 지원방안</option><option value="태국산 동관 덤핑 관세">태국산 동관 덤핑 관세</option></select><button class="copy-btn" type="button" data-copy-text="ㅇ (SBS) 속도전 앞세운 &#x27;재정저수지&#x27; 미래기금…&#x27;국회 밖 곳간&#x27; 우려도
+https://n.news.naver.com/mnews/article/055/0001382388" onclick="event.stopPropagation(); copyArticleIcon(this);" title="복사하기" aria-label="복사하기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button><span class="lab-pop-wrap"><button class="iconbtn lab-btn" type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382388" data-outlet="SBS" data-title="속도전 앞세운 &#x27;재정저수지&#x27; 미래기금…&#x27;국회 밖 곳간&#x27; 우려도" data-pub-date="2026-08-21T13:18:00+09:00" data-group="미래기금 신설 및 교육교부금 개편" data-scrap-date="2026-08-21" data-scrap-end="10:30" onclick="event.stopPropagation(); toggleLabelPopover(this);" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="lab-pop hidden" onclick="event.stopPropagation();"><h4>이 기사에 붙은 라벨</h4><div class="attached"><span class="none">아직 없음</span></div><h4>이미 쓴 라벨 (눌러서 붙이기)</h4><div class="known"><span class="none">아직 쓴 라벨이 없습니다</span></div><div class="addbox"><input type="text" placeholder="새 라벨 입력" class="lab-input" onkeydown="event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);"><button type="button" onclick="event.stopPropagation(); addLabelFromInput(this.previousElementSibling);">추가</button></div><div class="sim-warn hidden"></div><p class="hint">라벨은 보고서 텍스트(복사·txt·발송)에 나가지 않습니다. 화면과 엑셀 내보내기에만 표시됩니다.</p></span></span><span class="more-wrap"><button class="more-btn" type="button" onclick="event.stopPropagation(); toggleArticleMenu(this);" title="더보기" aria-label="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button><span class="more-menu"><button type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382388" onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382388" data-title="속도전 앞세운 &#x27;재정저수지&#x27; 미래기금…&#x27;국회 밖 곳간&#x27; 우려도" data-summary="우리 경제의 성장판을 열어야 한다는 판단입니다. 기획처 관계자는 &quot;이번 추가세수를 단기 경기 부양을 위한 일시적 소비성 지출로 소진하거나 재정 건전성 관리에만 치중하면 대변혁의 분수령을 놓칠 우려가 있다&quot;고... " onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button></span></span><button class="hide-btn" type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382388" data-outlet="SBS" data-title="속도전 앞세운 &#x27;재정저수지&#x27; 미래기금…&#x27;국회 밖 곳간&#x27; 우려도" data-pub-date="2026-08-21T13:18:00+09:00" onclick="event.stopPropagation(); hideArticle(this);" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382388" data-direction="up" onclick="event.stopPropagation(); previewMoveArticle(this);" disabled title="소제목 안에서 위로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382388" data-direction="down" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><p class="article-summary">우리 경제의 성장판을 열어야 한다는 판단입니다. 기획처 관계자는 &quot;이번 추가세수를 단기 경기 부양을 위한 일시적 소비성 지출로 소진하거나 재정 건전성 관리에만 치중하면 대변혁의 분수령을 놓칠 우려가 있다&quot;고... </p></details><div class="article-footer"></div></div>
+<div class="article" data-url="https://n.news.naver.com/mnews/article/448/0000634846" data-outlet-rank="5"><details><summary><div class="title-row"><input type="checkbox" class="article-select" data-url="https://n.news.naver.com/mnews/article/448/0000634846" onclick="event.stopPropagation();" onchange="updateBulkMoveBar();"><span class="title-line">(TV조선) 교육교부금 연동 55년만에 폐지…100조 넘보는 미래기금 신설</span></div><div class="action-row"><span class="pub-time">11:17 · <span class="pub-time-relative" data-pub-date="2026-08-21T11:17:00+09:00"></span></span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/448/0000634846" target="_blank" rel="noopener noreferrer" title="https://n.news.naver.com/mnews/article/448/0000634846">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 정부</span></span><span class="article-actions"><select class="group-move-select" onclick="event.stopPropagation();" onchange="event.stopPropagation(); moveArticleToGroup(this);"><option value="" selected disabled>다른 소제목</option><option value="조세지출 결산 및 세제개편">조세지출 결산 및 세제개편</option><option value="취약차주 금리부담 지원방안">취약차주 금리부담 지원방안</option><option value="태국산 동관 덤핑 관세">태국산 동관 덤핑 관세</option></select><button class="copy-btn" type="button" data-copy-text="ㅇ (TV조선) 교육교부금 연동 55년만에 폐지…100조 넘보는 미래기금 신설
+https://n.news.naver.com/mnews/article/448/0000634846" onclick="event.stopPropagation(); copyArticleIcon(this);" title="복사하기" aria-label="복사하기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button><span class="lab-pop-wrap"><button class="iconbtn lab-btn" type="button" data-url="https://n.news.naver.com/mnews/article/448/0000634846" data-outlet="TV조선" data-title="교육교부금 연동 55년만에 폐지…100조 넘보는 미래기금 신설" data-pub-date="2026-08-21T11:17:00+09:00" data-group="미래기금 신설 및 교육교부금 개편" data-scrap-date="2026-08-21" data-scrap-end="10:30" onclick="event.stopPropagation(); toggleLabelPopover(this);" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="lab-pop hidden" onclick="event.stopPropagation();"><h4>이 기사에 붙은 라벨</h4><div class="attached"><span class="none">아직 없음</span></div><h4>이미 쓴 라벨 (눌러서 붙이기)</h4><div class="known"><span class="none">아직 쓴 라벨이 없습니다</span></div><div class="addbox"><input type="text" placeholder="새 라벨 입력" class="lab-input" onkeydown="event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);"><button type="button" onclick="event.stopPropagation(); addLabelFromInput(this.previousElementSibling);">추가</button></div><div class="sim-warn hidden"></div><p class="hint">라벨은 보고서 텍스트(복사·txt·발송)에 나가지 않습니다. 화면과 엑셀 내보내기에만 표시됩니다.</p></span></span><span class="more-wrap"><button class="more-btn" type="button" onclick="event.stopPropagation(); toggleArticleMenu(this);" title="더보기" aria-label="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button><span class="more-menu"><button type="button" data-url="https://n.news.naver.com/mnews/article/448/0000634846" onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/448/0000634846" data-title="교육교부금 연동 55년만에 폐지…100조 넘보는 미래기금 신설" data-summary="기금의 구체적인 규모는 재정경제부가 산출하는 국세수입 전망 등을 반영해 다음 달 초 내년도 예산안 및 국가재정운용계획을 발표할 때 공개한다. 정부가 설명한 조성 방식과 개요를 토대로 계산하면 2027년 추세치는... " onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button></span></span><button class="hide-btn" type="button" data-url="https://n.news.naver.com/mnews/article/448/0000634846" data-outlet="TV조선" data-title="교육교부금 연동 55년만에 폐지…100조 넘보는 미래기금 신설" data-pub-date="2026-08-21T11:17:00+09:00" onclick="event.stopPropagation(); hideArticle(this);" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/448/0000634846" data-direction="up" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 위로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/448/0000634846" data-direction="down" onclick="event.stopPropagation(); previewMoveArticle(this);" disabled title="소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><p class="article-summary">기금의 구체적인 규모는 <span class="hl-word" data-word="재정경제부" style="background-color:#93CDF5;color:#1F2937">재정경제부</span>가 산출하는 국세수입 전망 등을 반영해 다음 달 초 내년도 예산안 및 국가재정운용계획을 발표할 때 공개한다. <span class="hl-word" data-word="정부" style="background-color:#C9A3EE;color:#1F2937">정부</span>가 설명한 조성 방식과 개요를 토대로 계산하면 2027년 추세치는... </p></details><div class="article-footer"></div></div></section>
+<section class="subheading" id="subheading-3" data-toc-name="&lt;태국산 동관 덤핑 관세&gt;"><h2><span class="subheading-title"><input type="checkbox" class="group-select-all" onclick="event.stopPropagation();" onchange="toggleGroupSelectAll(this);" title="이 소제목 기사 전체 선택"> &lt;태국산 동관 덤핑 관세&gt;<span class="ai-badge" title="AI가 자동으로 묶은 소제목입니다"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5.4" r="1.4"/><path d="M12 6.8v2.3"/><rect x="4.5" y="9.1" width="15" height="10.9" rx="4"/><circle cx="9" cy="14.3" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="14.3" r="1" fill="currentColor" stroke="none"/><path d="M9 17.3h6"/><path d="M4.5 13.2h-2M19.5 13.2h2"/></svg></span><span class="subheading-count">1</span></span><span class="subheading-icons"><button class="rename-btn" type="button" data-name="태국산 동관 덤핑 관세" data-current="태국산 동관 덤핑 관세" onclick="renameGroup(this)" title="소제목 이름 바꾸기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button> <button class="rename-btn group-hide-btn" type="button" onclick="hideGroup(this)" title="이 소제목 통째로 숨기기(기사 각각 숨긴 것과 동일 — 되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="order-btn" type="button" data-name="태국산 동관 덤핑 관세" onclick="moveGroupOrder(this, 'up');" title="소제목 위로 이동"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></button><button class="order-btn" type="button" data-name="태국산 동관 덤핑 관세" onclick="moveGroupOrder(this, 'down');" disabled title="소제목 아래로 이동"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></span></h2><div class="article" data-url="https://n.news.naver.com/mnews/article/055/0001382358" data-outlet-rank="2"><details><summary><div class="title-row"><input type="checkbox" class="article-select" data-url="https://n.news.naver.com/mnews/article/055/0001382358" onclick="event.stopPropagation();" onchange="updateBulkMoveBar();"><span class="title-line">(SBS) 태국산 이음매 없는 동관에 덤핑 관세 부과…5년간 최고 8.41%</span></div><div class="action-row"><span class="pub-time">11:03 · <span class="pub-time-relative" data-pub-date="2026-08-21T11:03:00+09:00"></span></span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/055/0001382358" target="_blank" rel="noopener noreferrer" title="https://n.news.naver.com/mnews/article/055/0001382358">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><span class="article-actions"><select class="group-move-select" onclick="event.stopPropagation();" onchange="event.stopPropagation(); moveArticleToGroup(this);"><option value="" selected disabled>다른 소제목</option><option value="조세지출 결산 및 세제개편">조세지출 결산 및 세제개편</option><option value="취약차주 금리부담 지원방안">취약차주 금리부담 지원방안</option><option value="미래기금 신설 및 교육교부금 개편">미래기금 신설 및 교육교부금 개편</option></select><button class="copy-btn" type="button" data-copy-text="ㅇ (SBS) 태국산 이음매 없는 동관에 덤핑 관세 부과…5년간 최고 8.41%
+https://n.news.naver.com/mnews/article/055/0001382358" onclick="event.stopPropagation(); copyArticleIcon(this);" title="복사하기" aria-label="복사하기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button><span class="lab-pop-wrap"><button class="iconbtn lab-btn" type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382358" data-outlet="SBS" data-title="태국산 이음매 없는 동관에 덤핑 관세 부과…5년간 최고 8.41%" data-pub-date="2026-08-21T11:03:00+09:00" data-group="태국산 동관 덤핑 관세" data-scrap-date="2026-08-21" data-scrap-end="10:30" onclick="event.stopPropagation(); toggleLabelPopover(this);" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="lab-pop hidden" onclick="event.stopPropagation();"><h4>이 기사에 붙은 라벨</h4><div class="attached"><span class="none">아직 없음</span></div><h4>이미 쓴 라벨 (눌러서 붙이기)</h4><div class="known"><span class="none">아직 쓴 라벨이 없습니다</span></div><div class="addbox"><input type="text" placeholder="새 라벨 입력" class="lab-input" onkeydown="event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);"><button type="button" onclick="event.stopPropagation(); addLabelFromInput(this.previousElementSibling);">추가</button></div><div class="sim-warn hidden"></div><p class="hint">라벨은 보고서 텍스트(복사·txt·발송)에 나가지 않습니다. 화면과 엑셀 내보내기에만 표시됩니다.</p></span></span><span class="more-wrap"><button class="more-btn" type="button" onclick="event.stopPropagation(); toggleArticleMenu(this);" title="더보기" aria-label="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button><span class="more-menu"><button type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382358" onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382358" data-title="태국산 이음매 없는 동관에 덤핑 관세 부과…5년간 최고 8.41%" data-summary="▲ 재정경제부 재정경제부는 태국에서 국내로 수입되는 이음매 없는 동관에 덤핑 방지 관세를 부과하기로 했다고 오늘(21일) 밝혔습니다. 이번 결정은 산업통상부 무역위원회가 능원금속공업㈜과 LS메탈㈜의 반덤핑... " onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button></span></span><button class="hide-btn" type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382358" data-outlet="SBS" data-title="태국산 이음매 없는 동관에 덤핑 관세 부과…5년간 최고 8.41%" data-pub-date="2026-08-21T11:03:00+09:00" onclick="event.stopPropagation(); hideArticle(this);" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382358" data-direction="up" onclick="event.stopPropagation(); previewMoveArticle(this);" disabled title="소제목 안에서 위로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/055/0001382358" data-direction="down" onclick="event.stopPropagation(); previewMoveArticle(this);" disabled title="소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><p class="article-summary">▲ <span class="hl-word" data-word="재정경제부" style="background-color:#93CDF5;color:#1F2937">재정경제부</span> <span class="hl-word" data-word="재정경제부" style="background-color:#93CDF5;color:#1F2937">재정경제부</span>는 태국에서 국내로 수입되는 이음매 없는 동관에 덤핑 방지 관세를 부과하기로 했다고 오늘(21일) 밝혔습니다. 이번 결정은 산업통상부 무역위원회가 능원금속공업㈜과 LS메탈㈜의 반덤핑... </p></details><div class="article-footer"></div></div></section><div class="bottom"><h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5.4" r="1.4"/><path d="M12 6.8v2.3"/><rect x="4.5" y="9.1" width="15" height="10.9" rx="4"/><circle cx="9" cy="14.3" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="14.3" r="1" fill="currentColor" stroke="none"/><path d="M9 17.3h6"/><path d="M4.5 13.2h-2M19.5 13.2h2"/></svg> AI가 추출한 주요 키워드</h3><div class="bottom-keywords"><button type="button" class="ai-keyword-chip" onclick="addAiKeyword(this)" data-keyword="마련">마련</button><button type="button" class="ai-keyword-chip" onclick="addAiKeyword(this)" data-keyword="부담">부담</button><button type="button" class="ai-keyword-chip" onclick="addAiKeyword(this)" data-keyword="조속히">조속히</button><button type="button" class="ai-keyword-chip" onclick="addAiKeyword(this)" data-keyword="줄이도록">줄이도록</button><button type="button" class="ai-keyword-chip" onclick="addAiKeyword(this)" data-keyword="지원책">지원책</button></div><div class="bottom-summary"><div class="bottom-header-row"><h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.6a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 20.5l1.6-4.5A8.4 8.4 0 0 1 12 3.2a8.4 8.4 0 0 1 9 8.4Z"/></svg> AI가 읽은 소제목별 주요 요약</h3><button type="button" class="bottom-summary-copy" onclick="copyAiSummary(this)" data-copy-text="&lt;조세지출 결산 및 세제개편&gt;
+기획재정부가 조세특례제한법 개정에 따라 처음으로 조세지출 결산서를 국회에 제출했다. 지난해 국세 감면액은 76조 1천억 원이며, 소득 상위 10%가 보험료·교육비 공제 혜택의 절반 이상을 받는 것으로 나타났다.
+
+&lt;취약차주 금리부담 지원방안&gt;
+구윤철 부총리 겸 재정경제부 장관은 금리 상승에 따른 소상공인과 서민, 취약차주의 금융 부담을 덜기 위한 지원책을 조속히 마련하겠다고 밝혔다. 주요국 장기국채 금리 인상이 국내 경제에 미치는 부담을 줄이기 위한 대책을 추진 중이다.
+
+&lt;미래기금 신설 및 교육교부금 개편&gt;
+정부가 추가세수를 활용해 100조 원대의 미래기금 신설을 추진하고 있다. 55년 만에 교육교부금 연동 제도를 폐지하고, 새로운 기금 규모는 내년도 예산안 발표 시 공개될 예정이다.
+
+&lt;태국산 동관 덤핑 관세&gt;
+기획재정부는 태국에서 수입되는 이음매 없는 동관에 덤핑 방지 관세를 부과하기로 결정했다. 산업통상부 무역위원회의 결정에 따라 최고 8. 41% 수준의 관세가 5년간 부과될 예정이다.">복사</button></div><div class="bottom-summary-item"><strong>&lt;조세지출 결산 및 세제개편&gt;</strong><p><span class="hl-word" data-word="기획재정부" style="background-color:#C9A3EE;color:#1F2937">기획재정부</span>가 조세특례제한법 개정에 따라 처음으로 조세지출 결산서를 국회에 제출했다. 지난해 국세 감면액은 76조 1천억 원이며, 소득 상위 10%가 보험료·교육비 공제 혜택의 절반 이상을 받는 것으로 나타났다.</p></div><div class="bottom-summary-item"><strong>&lt;취약차주 금리부담 지원방안&gt;</strong><p><span class="hl-word" data-word="구윤철" style="background-color:#93CDF5;color:#1F2937">구윤철</span> 부총리 겸 <span class="hl-word" data-word="재정경제부" style="background-color:#93CDF5;color:#1F2937">재정경제부</span> 장관은 금리 상승에 따른 소상공인과 서민, 취약차주의 금융 부담을 덜기 위한 지원책을 조속히 마련하겠다고 밝혔다. 주요국 장기국채 금리 인상이 국내 경제에 미치는 부담을 줄이기 위한 대책을 추진 중이다.</p></div><div class="bottom-summary-item"><strong>&lt;미래기금 신설 및 교육교부금 개편&gt;</strong><p><span class="hl-word" data-word="정부" style="background-color:#C9A3EE;color:#1F2937">정부</span>가 추가세수를 활용해 100조 원대의 미래기금 신설을 추진하고 있다. 55년 만에 교육교부금 연동 제도를 폐지하고, 새로운 기금 규모는 내년도 예산안 발표 시 공개될 예정이다.</p></div><div class="bottom-summary-item"><strong>&lt;태국산 동관 덤핑 관세&gt;</strong><p><span class="hl-word" data-word="기획재정부" style="background-color:#C9A3EE;color:#1F2937">기획재정부</span>는 태국에서 수입되는 이음매 없는 동관에 덤핑 방지 관세를 부과하기로 결정했다. 산업통상부 무역위원회의 결정에 따라 최고 8. 41% 수준의 관세가 5년간 부과될 예정이다.</p></div></div></div></div>
+</div>
+<button type="button" class="undo-fab" onclick="undoLastAction(this)" title="기사 숨기기 되돌리기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg></button>
+<span class="round-countdown" id="round-countdown"></span>
+<button type="button" class="toc-toggle-btn" onclick="toggleTocPopover()" title="소제목 목차"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+<div class="toc-popover" id="toc-popover"></div>
+<div class="bottombar"><div class="bottombar-inner">
+  <div class="bulk-move-bar" id="bulk-move-bar">
+    <span class="bulk-move-count" id="bulk-move-count"></span>
+    <select id="bulk-move-select"></select>
+    <button type="button" onclick="bulkMoveSelected()">옮기기</button>
+    <button type="button" id="bulk-move-up" onclick="bulkMoveOrder('up')" title="선택한 기사들을 통째로 위로 이동(같은 소제목 안에서만)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+    <button type="button" id="bulk-move-down" onclick="bulkMoveOrder('down')" title="선택한 기사들을 통째로 아래로 이동(같은 소제목 안에서만)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+    <button type="button" onclick="bulkHideSelected()" title="선택한 기사 전부 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+    <button class="clear-btn" type="button" onclick="clearSelection()">선택 해제</button>
+  </div>
+  <div class="highlight-wrap">
+    <button type="button" class="highlight-toggle" onclick="toggleHighlightPopover()" title="형광펜 단어 편집"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3.2 20.8 9l-8.2 8.2H6.8V11.4Z"/><path d="m11.4 6.8 5.8 5.8"/><path d="M3.5 21h17"/></svg></button>
+    <div class="highlight-popover" id="highlight-popover">
+      <div class="highlight-chips" id="highlight-chips"></div>
+      <form class="highlight-add-form" onsubmit="return addHighlightWord(event);">
+        <input type="text" id="highlight-new-word" placeholder="단어 추가" maxlength="20">
+        <button type="submit">추가</button>
+      </form>
+    </div>
+  </div>
+  <a href="http://127.0.0.1:8765/hidden" title="숨긴 기사 관리"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></a>
+</div></div>
+<script>
+// [수정: 2026-07-30] previewMoveArticle이 reload 없이 이 값을 새로 대입하므로 const가 아닌 let.
+let PLAIN_TEXT = "[초안] 언론 모니터링 10시 30분 기준\n\n<조세지출 결산 및 세제개편>\nㅇ (SBS) 소득 상위 10%에 보험료·교육비 공제 혜택 절반 이상\nhttps://n.news.naver.com/mnews/article/055/0001382364\n\n<취약차주 금리부담 지원방안>\nㅇ (SBS) 구윤철 \"금리 상승 부담 줄이도록 취약차주 지원책 조속히 마련\"\nhttps://n.news.naver.com/mnews/article/055/0001382360\n\nㅇ (MBC) 구윤철 \"금리상승 부담 줄이도록 취약차주 지원책 조속히 마련\"\nhttps://n.news.naver.com/mnews/article/214/0001519268\n\n<미래기금 신설 및 교육교부금 개편>\nㅇ (SBS) 속도전 앞세운 '재정저수지' 미래기금…'국회 밖 곳간' 우려도\nhttps://n.news.naver.com/mnews/article/055/0001382388\n\nㅇ (TV조선) 교육교부금 연동 55년만에 폐지…100조 넘보는 미래기금 신설\nhttps://n.news.naver.com/mnews/article/448/0000634846\n\n<태국산 동관 덤핑 관세>\nㅇ (SBS) 태국산 이음매 없는 동관에 덤핑 관세 부과…5년간 최고 8.41%\nhttps://n.news.naver.com/mnews/article/055/0001382358\n";
+// [추가: 2026-08-20] AI 소제목 분류가 규칙 기반 폴백 상태인지 + 지금 나갈 소제목 이름들.
+// previewMoveArticle이 ↑/↓ 이동 뒤 이 값도 새로 대입한다(분류가 다시 계산되므로).
+let CLASSIFY_DEGRADED = false;
+let CLASSIFY_DEGRADED_NAMES = [];
+// [추가: 2026-08-20] 복사·다운로드 직전, 폴백 상태면 한 번 더 묻는다 — 배너를 놓치고
+// 스크롤을 내려 바로 복사/다운로드만 누르는 경우를 잡는 마지막 방어선이다. verb에 따라
+// 마지막 줄만 갈린다("복사할까요?"/"내려받을까요?") — 실제로 나갈 텍스트가 다르지
+// 않으므로 그 외 문구는 동일하다.
+function classifyDegradedConfirmMsg(verb) {
+  // CLASSIFY_DEGRADED_NAMES는 이미 담당자의 "소제목 형식" 템플릿(기본 "<{section}>")이
+  // 적용된 표시 이름이다 — 여기서 또 꺾쇠로 감싸면 이중으로 붙는다.
+  return "AI가 소제목을 묶지 못했어요. 지금 소제목은 AI가 지은 이름이 아니라, 단어 빈도수에 따라 기계적으로 뽑은 단어입니다.\n\n"
+      + CLASSIFY_DEGRADED_NAMES.join(", ")
+      + "\n\n그대로 " + verb + "?";
+}
+function copyPlainText() {
+  if (CLASSIFY_DEGRADED && !confirm(classifyDegradedConfirmMsg("복사할까요"))) { return; }
+  navigator.clipboard.writeText(PLAIN_TEXT)
+    .then(() => alert("클립보드에 복사했습니다."))
+    .catch(() => alert("복사에 실패했습니다."));
+}
+// [추가: 2026-08-10] app.renderer와 동일 — 기사 한 건만 복사.
+// [추가: 2026-08-11] 기사 행의 "⋯ 더보기" 메뉴 — 형광펜 팝오버와 같은 패턴
+// (다시 누르면 닫힘 + 바깥 클릭 시 닫힘). 한 번에 하나만 열리게 해서, 다른 기사의 ⋯를
+// 누르면 이전 것이 자동으로 닫힌다.
+function closeArticleMenus() {
+  var open = document.querySelectorAll(".more-wrap.is-open");
+  for (var i = 0; i < open.length; i++) { open[i].classList.remove("is-open"); }
+}
+function toggleArticleMenu(btn) {
+  var wrap = btn.closest(".more-wrap");
+  var wasOpen = wrap.classList.contains("is-open");
+  closeArticleMenus();
+  if (!wasOpen) { wrap.classList.add("is-open"); }
+}
+document.addEventListener("click", function(e) {
+  if (!e.target.closest(".more-wrap")) { closeArticleMenus(); }
+});
+// [수정: 2026-08-13] app.renderer와 동일 — 복사하기가 상시 노출 아이콘이 되며
+// 글자 치환 대신 아이콘을 1초간 check로 바꾼다.
+function copyArticleIcon(btn) {
+  navigator.clipboard.writeText(btn.dataset.copyText).then(function() {
+    btn.classList.add("is-copied");
+    clearTimeout(btn._copyTimer);
+    btn._copyTimer = setTimeout(function() { btn.classList.remove("is-copied"); }, 1000);
+  }).catch(function() {
+    alert("복사에 실패했습니다.");
+  });
+}
+// [추가: 2026-08-18] 🏷 라벨 — 형광펜 팝오버(toggleHighlightPopover)와 같은 패턴(한
+// 번에 하나만 열림 + 바깥 클릭 시 닫힘). 서버가 붙이기/떼기 응답으로 그 기사의
+// "지금 라벨 전체 목록"을 돌려주면, 그 목록 하나로 팝오버·카드 줄·배지 셋을 한 번에
+// 다시 그린다(추측으로 DOM을 짜맞추면 서버 상태와 어긋날 수 있어, 항상 서버가 돌려준
+// 최종 목록을 그대로 믿는다).
+var LAB_TAG_ICON_SVG = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg>';
+function closeLabelPopovers() {
+  document.querySelectorAll(".lab-pop").forEach(function(p) { p.classList.add("hidden"); });
+}
+function toggleLabelPopover(btn) {
+  var pop = btn.parentNode.querySelector(".lab-pop");
+  var wasOpen = !pop.classList.contains("hidden");
+  closeLabelPopovers();
+  if (wasOpen) { return; }
+  pop.classList.remove("hidden");
+  var attached = Array.prototype.map.call(pop.querySelectorAll(".attached .lab-chip"), function(c) { return c.dataset.label; });
+  pop.querySelectorAll(".known-chip").forEach(function(k) {
+    k.classList.toggle("used", attached.indexOf(k.dataset.label) !== -1);
+  });
+}
+document.addEventListener("click", function(e) {
+  if (!e.target.closest(".lab-pop-wrap")) { closeLabelPopovers(); }
+});
+function escapeLabelHtml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function applyLabelState(btn, labelsList) {
+  var article = btn.closest(".article");
+  var pop = btn.parentNode.querySelector(".lab-pop");
+  var chipsHtml = labelsList.length
+    ? labelsList.map(function(n) {
+        return '<span class="lab-chip" data-label="' + escapeLabelHtml(n) + '">' + escapeLabelHtml(n) +
+          ' <span class="x" onclick="event.stopPropagation(); detachLabelChip(this);">×</span></span>';
+      }).join("")
+    : '<span class="none">아직 없음</span>';
+  pop.querySelector(".attached").innerHTML = chipsHtml;
+  var row = article.querySelector(".lab-row");
+  if (labelsList.length) {
+    var rowHtml = '<span class="tagmark">' + LAB_TAG_ICON_SVG + "</span>" + chipsHtml;
+    if (row) { row.innerHTML = rowHtml; }
+    else {
+      row = document.createElement("div");
+      row.className = "lab-row";
+      row.innerHTML = rowHtml;
+      btn.closest("summary").appendChild(row);
+    }
+  } else if (row) { row.remove(); }
+  btn.classList.toggle("on", labelsList.length > 0);
+  var countEl = btn.querySelector(".lab-count");
+  if (labelsList.length) {
+    if (!countEl) { countEl = document.createElement("span"); countEl.className = "lab-count"; btn.appendChild(countEl); }
+    countEl.textContent = labelsList.length;
+  } else if (countEl) { countEl.remove(); }
+  pop.querySelectorAll(".known-chip").forEach(function(k) {
+    k.classList.toggle("used", labelsList.indexOf(k.dataset.label) !== -1);
+  });
+}
+function attachLabel(btn, label) {
+  label = (label || "").trim();
+  if (!label) { return; }
+  fetch("http://127.0.0.1:8765/add-label", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({
+      url: btn.dataset.url, outlet: btn.dataset.outlet, title: btn.dataset.title,
+      pubDate: btn.dataset.pubDate, group: btn.dataset.group,
+      scrapDate: btn.dataset.scrapDate, scrapEnd: btn.dataset.scrapEnd, label: label
+    })
+  }).then(function(res) {
+    if (!res.ok) { throw new Error(); }
+    return res.json();
+  }).then(function(data) { applyLabelState(btn, data.labels); })
+  .catch(function() { alert("라벨을 붙이지 못했습니다 — 앱이 실행 중인지 확인해주세요."); });
+}
+function detachLabel(btn, label) {
+  fetch("http://127.0.0.1:8765/remove-label", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({url: btn.dataset.url, label: label})
+  }).then(function(res) {
+    if (!res.ok) { throw new Error(); }
+    return res.json();
+  }).then(function(data) { applyLabelState(btn, data.labels); })
+  .catch(function() { alert("라벨을 떼지 못했습니다 — 앱이 실행 중인지 확인해주세요."); });
+}
+function detachLabelChip(el) {
+  var chip = el.closest(".lab-chip");
+  var btn = el.closest(".article").querySelector(".lab-btn");
+  detachLabel(btn, chip.dataset.label);
+}
+function knownChipClick(el) {
+  var btn = el.closest(".article").querySelector(".lab-btn");
+  if (el.classList.contains("used")) { detachLabel(btn, el.dataset.label); }
+  else { attachLabel(btn, el.dataset.label); }
+}
+function addLabelFromInput(input) {
+  var btn = input.closest(".article").querySelector(".lab-btn");
+  attachLabel(btn, input.value);
+  input.value = "";
+  var warn = input.closest(".lab-pop").querySelector(".sim-warn");
+  warn.classList.add("hidden");
+}
+// [추가: 2026-08-18] 새 라벨 입력 시 비슷한 이름 경고(목업 ③-3) — 병합보다 값싼
+// 예방책이라는 판단(2026-08-18 대화). 편집거리 1 이하 또는 접두 일치(세제개편/세제
+// 같은 경우)를 "비슷함"으로 본다. 막지는 않는다 — 진짜 다른 라벨일 수 있어서다.
+function labelEditDistance1(a, b) {
+  if (a === b) { return true; }
+  var la = a.length, lb = b.length;
+  if (Math.abs(la - lb) > 1) { return false; }
+  var i = 0, j = 0, edits = 0;
+  while (i < la && j < lb) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    edits++;
+    if (edits > 1) { return false; }
+    if (la === lb) { i++; j++; }
+    else if (la > lb) { i++; }
+    else { j++; }
+  }
+  return true;
+}
+function checkSimilarLabel(input) {
+  var pop = input.closest(".lab-pop");
+  var warn = pop.querySelector(".sim-warn");
+  var typed = input.value.trim();
+  if (!typed) { warn.classList.add("hidden"); return; }
+  var known = Array.prototype.map.call(pop.querySelectorAll(".known-chip"), function(k) { return k.dataset.label; });
+  var match = known.find(function(name) {
+    if (name === typed) { return false; }
+    return labelEditDistance1(name, typed) || name.indexOf(typed) === 0 || typed.indexOf(name) === 0;
+  });
+  if (!match) { warn.classList.add("hidden"); return; }
+  warn.classList.remove("hidden");
+  warn.innerHTML = "비슷한 라벨 <b>\"" + escapeLabelHtml(match) + "\"</b>가 있어요."
+    + '<button type="button" class="use" onclick="event.stopPropagation(); useSimilarLabel(this);" data-label="' + escapeLabelHtml(match) + '">' + escapeLabelHtml(match) + '로 붙이기</button>'
+    + '<button type="button" class="keep" onclick="event.stopPropagation(); this.closest(\'.sim-warn\').classList.add(\'hidden\');">그대로 쓰기</button>';
+}
+function useSimilarLabel(btn) {
+  var input = btn.closest(".lab-pop").querySelector(".lab-input");
+  input.value = btn.dataset.label;
+  addLabelFromInput(input);
+}
+// [추가: 2026-08-13] app.renderer와 동일 — 하단 "AI가 추출한 주요 키워드" 칩 클릭 시
+// "(AI 추출)" 그룹에 바로 등록한다. 이 화면엔 showToast가 없어 alert로 결과를 알린다.
+// [수정: 2026-08-13] app.renderer와 동일 — 추가된 칩을 다시 누르면 되돌린다.
+function addAiKeyword(btn) {
+  var keyword = btn.dataset.keyword;
+  var isRemoving = btn.classList.contains("added");
+  btn.disabled = true;
+  fetch("http://127.0.0.1:8765/" + (isRemoving ? "remove-ai-keyword" : "add-ai-keyword"), {
+    method: "POST",
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({keyword: keyword})
+  }).then(function(res) {
+    return res.json().then(function(data) { return {ok: res.ok, data: data}; });
+  }).then(function(result) {
+    btn.disabled = false;
+    if (result.ok) {
+      if (isRemoving) {
+        btn.classList.remove("added");
+        alert("'" + keyword + "' 키워드 추가를 취소했습니다.");
+      } else {
+        btn.classList.add("added");
+        alert("'" + keyword + "' 키워드가 '" + result.data.group_name + "' 그룹에 추가됐습니다.");
+      }
+    } else {
+      alert(result.data.error || "요청을 처리하지 못했습니다.");
+    }
+  }).catch(function() {
+    btn.disabled = false;
+    alert("요청을 처리하지 못했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+// [추가: 2026-08-13] app.renderer와 동일 — 요약 복사는 위쪽 기사 목록 복사(PLAIN_TEXT)와
+// 별도 텍스트라 한 번 더 확인창을 거친다.
+function copyAiSummary(btn) {
+  if (!confirm("AI 요약을 복사할까요? (위 기사 목록 복사와는 별도로 복사됩니다)")) return;
+  navigator.clipboard.writeText(btn.dataset.copyText).then(function() {
+    alert("복사했습니다.");
+  }).catch(function() {
+    alert("복사에 실패했습니다.");
+  });
+}
+// [추가: 2026-08-11] 이번 회차 종료(=정식 수집으로 넘어가는 시각)까지 남은 시간 —
+// 참고용 표시일 뿐 실제 전환은 app.scheduler의 tick이 한다(이 탭이 닫혀 있어도
+// 그대로 일어남).
+// [수정: 2026-08-13] 시:분 → hh:mm:ss. 원래도 1초마다 다시 그리고 있었는데 분 단위만
+// 표시해 59초 동안 화면이 멈춘 것처럼 보였다(사용자 지적) — 초를 넣으면 계산 비용 없이
+// "이 화면 살아있음"이 드러난다. 확정본 발송 카운트다운(MM:SS)과도 표기 체계가 맞는다.
+// [수정: 2026-08-18] "0에 닿아도 완료 문구를 안 둔다"던 예전 판단(회차가 끝나는 순간
+// 화면 자체가 확정본으로 넘어가므로 보여줄 사람이 없다)이 틀렸다 — 실제로는 이 탭이
+// 계속 옛 초안을 보여준 채 멈춰 있고(정식 전환은 app.scheduler tick이 다음에 화면을
+// 다시 그릴 때만 일어남), 담당자가 그걸 모르고 마감된 초안을 계속 고치다 그 작업이
+// 확정본에 전혀 반영 안 되는 사고가 났다(HISTORY.md 2026-08-18). round-countdown이
+// 0에 닿으면 showRoundOverBanner()로 상단에 노란 띠를 띄운다(목업 3안 중 "상단 고정
+// 띠" — 스크롤 위치와 무관하게 항상 보여야 놓치지 않는다는 이유로 선택됨).
+const ROUND_DEADLINE_MS = 1787275800000;
+function formatRoundEndTimeKr(ms) {
+  var d = new Date(ms);
+  var hour = d.getHours();
+  var minute = d.getMinutes();
+  return minute === 0 ? (hour + "시") : (hour + "시 " + minute + "분");
+}
+function showRoundOverBanner() {
+  var banner = document.getElementById("round-over-banner");
+  if (!banner || banner.classList.contains("is-visible")) return;
+  // [추가: 2026-08-18] "나중에"로 닫으면 이 회차(=이 마감 시각)가 끝나 있는 동안은
+  // 다시 안 뜬다 — 탭을 새로고침할 때마다 방금 닫은 배너가 또 뜨면 "나중에"가
+  // 의미 없어진다. sessionStorage라 이 탭을 닫으면(=세션 종료) 자연히 초기화된다.
+  if (sessionStorage.getItem("roundOverDismissed:" + ROUND_DEADLINE_MS)) return;
+  document.getElementById("round-over-msg").innerHTML =
+    "<b>" + formatRoundEndTimeKr(ROUND_DEADLINE_MS) + " 회차가 마감됐어요.</b> 지금 보고 있는 건 마감 시점의 초안이에요. 여기서 더 고쳐도 확정본에는 반영되지 않아요.";
+  banner.classList.add("is-visible");
+  document.body.classList.add("round-over");
+  document.documentElement.style.setProperty("--round-banner-h", banner.offsetHeight + "px");
+  // [추가: 2026-08-20] 페이지를 열자마자(=이미 마감된 회차를 바로 여는 경우)
+  // updateRoundCountdown이 곧바로 이 함수를 부르는데, 그 시점엔 레이아웃이 아직
+  // 자리잡기 전이라 배너 높이가 잘못 잡힐 수 있다 — 다음 페인트 프레임에 한 번 더
+  // 재보정한다(app.renderer의 finalize-banner와 같은 이유·같은 방식).
+  if (window.requestAnimationFrame) {
+    requestAnimationFrame(function () {
+      document.documentElement.style.setProperty("--round-banner-h", banner.offsetHeight + "px");
+    });
+  }
+}
+function dismissRoundOverBanner() {
+  sessionStorage.setItem("roundOverDismissed:" + ROUND_DEADLINE_MS, "1");
+  document.getElementById("round-over-banner").classList.remove("is-visible");
+  document.body.classList.remove("round-over");
+}
+function updateRoundCountdown() {
+  var el = document.getElementById("round-countdown");
+  if (!el) return;
+  var remain = Math.max(0, Math.floor((ROUND_DEADLINE_MS - Date.now()) / 1000));
+  var hh = String(Math.floor(remain / 3600)).padStart(2, "0");
+  var mm = String(Math.floor(remain / 60) % 60).padStart(2, "0");
+  var ss = String(remain % 60).padStart(2, "0");
+  el.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.3l3.2 1.9"/></svg> 수집 종료시간까지 ' + hh + ":" + mm + ":" + ss + " 남음";
+  el.classList.toggle("urgent", remain <= 600);
+  if (remain <= 0) { showRoundOverBanner(); }
+}
+if (ROUND_DEADLINE_MS) {
+  updateRoundCountdown();
+  setInterval(updateRoundCountdown, 1000);
+}
+// [수정: 2026-08-10] 초안의 개별 Telegram/Email 버튼을 없앴다 — 이제 초안은 (확정)만
+// 하고, 전송은 확정된 뒤 완성본에서 한 번에 처리한다(app.confirm_send).
+// [추가: 2026-08-03] app.renderer와 동일한 이유·동작 — 하단바 🖍️ 형광펜 팝오버.
+const HIGHLIGHT_WORDS = [{"word": "기획재정부", "color_hex": "#C9A3EE"}, {"word": "기재부", "color_hex": "#C9A3EE"}, {"word": "재정경제부", "color_hex": "#93CDF5"}, {"word": "재경부", "color_hex": "#93CDF5"}, {"word": "구윤철", "color_hex": "#93CDF5"}, {"word": "보유세", "color_hex": "#FFA8A8"}, {"word": "1주택", "color_hex": "#FFA8A8"}, {"word": "비거주", "color_hex": "#FFA8A8"}, {"word": "실거주", "color_hex": "#FFA8A8"}, {"word": "정부", "color_hex": "#C9A3EE"}, {"word": "재정경제기획위원회", "color_hex": "#FFE066"}];
+function renderHighlightChips() {
+  var wrap = document.getElementById("highlight-chips");
+  if (!HIGHLIGHT_WORDS.length) {
+    wrap.innerHTML = '<p class="highlight-empty">등록된 형광펜 단어가 없어요.</p>';
+    return;
+  }
+  wrap.innerHTML = HIGHLIGHT_WORDS.map(function(item) {
+    var word = item.word.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    var attr = item.word.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    // [수정: 2026-08-05] app.renderer와 동일 — 칩 클릭으로 색 순환.
+    return '<span class="highlight-chip" data-word="' + attr + '" style="background:' + item.color_hex +
+      '" onclick="cycleChipColor(this)" title="클릭하면 색이 바뀝니다">' + word +
+      '<button type="button" data-word="' + attr + '" onclick="event.stopPropagation(); removeHighlightWord(this)" title="제거">×</button></span>';
+  }).join("");
+}
+function toggleHighlightPopover() {
+  var pop = document.getElementById("highlight-popover");
+  var opening = !pop.classList.contains("is-open");
+  pop.classList.toggle("is-open");
+  if (opening) { renderHighlightChips(); }
+}
+// [추가: 2026-08-05] app.renderer와 동일 — 팝오버 바깥 클릭 시 닫힘.
+document.addEventListener("click", function(e) {
+  var pop = document.getElementById("highlight-popover");
+  if (pop.classList.contains("is-open") && !e.target.closest(".highlight-wrap")) {
+    pop.classList.remove("is-open");
+  }
+});
+// [추가: 2026-08-05] app.renderer와 동일한 소제목 미니 목차(펼침형) — #preview-body가
+// previewMoveArticle 등으로 통째로 갈아끼워질 수 있어서, 목록을 미리 만들어두지 않고
+// 열 때마다 그 시점의 .subheading[data-toc-name]을 다시 읽어 항상 최신 상태로 그린다.
+// [수정: 2026-08-18] app.renderer와 동일 — 팝오버 안 ▲▼는 이제 누를 때마다 저장하지
+// 않는다. 팝오버가 들고 있는 순서만 바꾸고, (적용)을 눌렀을 때 /save-group-order +
+// 새로고침을 딱 한 번 한다.
+// 설계 전제: **담당자는 (적용)을 누르기 전까지 아무것도 안 바뀌었다고 믿는다.** 그래서
+// 자동으로 저장되는 경로를 하나도 두지 않았다 — 바깥 클릭도, 이름 클릭도, 팝오버 닫기도
+// 저장하지 않는다. 나가는 길은 (적용)과 (취소) 둘뿐이다.
+// 헤더 <h2>의 ▲▼(moveGroupOrder)는 눈앞의 한 칸을 조정하는 용도라 지금처럼 즉시 저장이다.
+var _tocItems = [];    // 팝오버가 들고 있는 (아직 저장 안 한) 순서
+var _tocBase = [];     // 팝오버를 열었을 때의 순서 = 지금 저장돼 있는 순서
+var _tocMoved = {};   // 이번에 옮긴 소제목 이름 (초록 표시용)
+var _tocBusy = false;  // (적용) 요청 진행 중
+function _tocReadSections() {
+  return Array.prototype.map.call(document.querySelectorAll(".subheading[data-toc-name]"), function(sec) {
+    var renameBtn = sec.querySelector(".rename-btn[data-current]");
+    return {
+      raw: renameBtn ? renameBtn.dataset.name : "",
+      label: sec.dataset.tocName,
+      id: sec.id,
+      // [추가: 2026-08-05] app.renderer와 동일 — 사용자가 직접 만든 소제목은 목차에서도 볼드로.
+      custom: sec.classList.contains("subheading-custom")
+    };
+  });
+}
+function _tocDirtyCount() {
+  var n = 0;
+  for (var i = 0; i < _tocItems.length; i++) {
+    if (_tocItems[i].raw !== _tocBase[i]) { n++; }
+  }
+  return n;
+}
+// 📂 소제목 미분류처럼 이름 바꾸기 버튼이 없는 칸은 raw가 빈 문자열이고, 순서 대상이
+// 아니다 — 예전 moveTocOrder도 .rename-btn[data-current] 목록만 보고 순서를 계산해서
+// 이 칸을 건너뛰었다. 목차에는 그대로 보여주되 ▲▼만 잠그고, 이웃도 건너뛴다.
+// (초안은 미분류 칸이 실제로 자주 뜨는 화면이라 확정본보다 더 자주 걸리는 경로다.)
+function _tocReorderNeighbor(idx, step) {
+  if (!_tocItems[idx] || !_tocItems[idx].raw) { return -1; }
+  for (var k = idx + step; k >= 0 && k < _tocItems.length; k += step) {
+    if (_tocItems[k].raw) { return k; }
+  }
+  return -1;
+}
+function buildTocPopover() {
+  _tocItems = _tocReadSections();
+  _tocBase = _tocItems.map(function(item) { return item.raw; });
+  _tocMoved = {};
+  _tocBusy = false;
+  var justMoved = sessionStorage.getItem("tocJustMovedNames");
+  if (justMoved) {
+    sessionStorage.removeItem("tocJustMovedNames");
+    try {
+      JSON.parse(justMoved).forEach(function(name) { _tocMoved[name] = true; });
+    } catch (err) { /* 저장된 값이 깨졌으면 표시만 생략한다 */ }
+  }
+  _tocRender();
+}
+function _tocRender() {
+  var pop = document.getElementById("toc-popover");
+  pop.innerHTML = "";
+  if (!_tocItems.length) {
+    pop.innerHTML = '<p class="toc-empty">소제목이 없어요.</p>';
+    return;
+  }
+  var scroll = document.createElement("div");
+  scroll.className = "toc-scroll";
+  _tocItems.forEach(function(item, idx) {
+    var row = document.createElement("div");
+    row.className = "toc-row" + (_tocMoved[item.raw] ? " toc-row-moved" : "");
+    var a = document.createElement("a");
+    a.href = "#";
+    a.textContent = item.label;
+    if (item.custom) { a.style.fontWeight = "700"; }
+    a.onclick = function(e) { e.preventDefault(); scrollToSubheading(item.id); };
+    var btns = document.createElement("span");
+    btns.className = "toc-row-btns";
+    var up = document.createElement("button");
+    up.type = "button"; up.className = "toc-order-btn"; up.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>'; up.title = "위로";
+    var prevIdx = _tocReorderNeighbor(idx, -1);
+    var nextIdx = _tocReorderNeighbor(idx, 1);
+    up.disabled = prevIdx < 0 || _tocBusy;
+    up.onclick = function() { _tocSwap(idx, prevIdx); };
+    var down = document.createElement("button");
+    down.type = "button"; down.className = "toc-order-btn"; down.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>'; down.title = "아래로";
+    down.disabled = nextIdx < 0 || _tocBusy;
+    down.onclick = function() { _tocSwap(idx, nextIdx); };
+    btns.appendChild(up);
+    btns.appendChild(down);
+    row.appendChild(a);
+    row.appendChild(btns);
+    scroll.appendChild(row);
+  });
+  pop.appendChild(scroll);
+  pop.appendChild(_tocBuildFoot());
+}
+function _tocBuildFoot() {
+  var dirty = _tocDirtyCount();
+  var foot = document.createElement("div");
+  foot.id = "toc-foot";
+  foot.className = "toc-foot" + (dirty ? " is-dirty" : "");
+  var count = document.createElement("span");
+  count.className = "toc-dirty-count";
+  count.textContent = _tocBusy ? "반영하는 중…" : (dirty + "개 위치 바뀜");
+  var actions = document.createElement("div");
+  actions.className = "toc-foot-actions";
+  var cancel = document.createElement("button");
+  cancel.type = "button"; cancel.className = "toc-cancel-btn"; cancel.textContent = "취소";
+  cancel.disabled = _tocBusy;
+  cancel.onclick = _tocCancel;
+  var apply = document.createElement("button");
+  apply.type = "button"; apply.className = "toc-apply-btn"; apply.textContent = "적용";
+  apply.disabled = _tocBusy;
+  apply.onclick = _tocApply;
+  actions.appendChild(cancel);
+  actions.appendChild(apply);
+  foot.appendChild(count);
+  foot.appendChild(actions);
+  return foot;
+}
+function _tocSwap(i, j) {
+  if (_tocBusy || j < 0 || j >= _tocItems.length) { return; }
+  if (!_tocItems[i].raw || !_tocItems[j].raw) { return; }  // 순서 대상이 아닌 칸은 안 건드린다
+  var moving = _tocItems[i].raw;
+  var tmp = _tocItems[i]; _tocItems[i] = _tocItems[j]; _tocItems[j] = tmp;
+  _tocMoved[moving] = true;
+  // 제자리로 돌아온 소제목은 초록 표시도 거둔다 — 바뀐 게 0이면 표시도 0이어야 한다.
+  _tocItems.forEach(function(item, k) {
+    if (item.raw === _tocBase[k]) { delete _tocMoved[item.raw]; }
+  });
+  _tocRender();
+}
+function _tocApply() {
+  if (_tocBusy || !_tocDirtyCount()) { return; }
+  _tocBusy = true;
+  _tocRender();  // ▲▼·취소·적용 전부 잠근다 — 연타로 순서가 엇갈리지 않도록
+  // 순서 대상이 아닌 칸(raw === "")은 빼고 보낸다 — 예전 moveTocOrder가 보내던 목록과 같다.
+  var order = _tocItems.filter(function(item) { return item.raw; }).map(function(item) { return item.raw; });
+  var moved = Object.keys(_tocMoved);
+  fetch("http://127.0.0.1:8765/save-group-order", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({order: JSON.stringify(order)})
+  }).then(function(res) {
+    if (res.ok) {
+      sessionStorage.setItem("tocJustMovedNames", JSON.stringify(moved));
+      sessionStorage.setItem("tocPopoverReopen", "1");
+      location.reload();
+    } else {
+      _tocBusy = false; _tocRender();
+      alert("순서 변경에 실패했습니다. 다시 시도해주세요.");
+    }
+  }).catch(function() {
+    // 실패해도 옮겨둔 순서는 그대로 두고 잠금만 푼다 — 다시 (적용)을 누르면 된다.
+    _tocBusy = false; _tocRender();
+    alert("순서 변경에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+function _tocCancel() {
+  if (_tocBusy) { return; }
+  // 서버를 부르지 않는다 — 팝오버가 들고 있던 순서만 원래대로 되돌리고 닫는다
+  // (editSummary의 "취소"가 form.remove()만 하는 것과 같은 성격).
+  var byName = {};
+  _tocItems.forEach(function(item) { byName[item.raw] = item; });
+  _tocItems = _tocBase.map(function(name) { return byName[name]; });
+  _tocMoved = {};
+  _tocRender();
+  document.getElementById("toc-popover").classList.remove("is-open");
+}
+// 미확정 상태에서 닫으려 했을 때 — 닫지 않고 하단 바만 한 번 깜빡여 어디서 결정해야
+// 하는지 가리킨다. 아무 반응이 없으면 "고장났나?"로 읽히기 때문에 무반응은 피한다.
+function _tocNudge() {
+  var foot = document.getElementById("toc-foot");
+  if (!foot) { return; }
+  foot.classList.remove("nudge");
+  void foot.offsetWidth;  // 같은 애니메이션을 연속으로 다시 재생시키기 위한 리플로우
+  foot.classList.add("nudge");
+  setTimeout(function() { foot.classList.remove("nudge"); }, 520);
+}
+function _tocTryClose() {
+  if (_tocBusy) { return; }
+  if (_tocDirtyCount()) { _tocNudge(); return; }
+  document.getElementById("toc-popover").classList.remove("is-open");
+}
+// [추가: 2026-08-10] 회차 종료 10분 전부터 뜨는 "지금 마감하기"(=확정) 버튼 — 지금
+function toggleTocPopover() {
+  var pop = document.getElementById("toc-popover");
+  if (pop.classList.contains("is-open")) { _tocTryClose(); return; }
+  pop.classList.add("is-open");
+  buildTocPopover();
+}
+function scrollToSubheading(id) {
+  // 이동은 팝오버를 닫는 동작이라 닫기와 같은 규칙을 탄다.
+  if (_tocBusy) { return; }
+  if (_tocDirtyCount()) { _tocNudge(); return; }
+  var el = document.getElementById(id);
+  if (el) { el.scrollIntoView({behavior: "smooth", block: "start"}); }
+  document.getElementById("toc-popover").classList.remove("is-open");
+}
+// [수정: 2026-08-18] app.renderer와 동일 — 미확정 상태에서는 팝오버 바깥 클릭을 **캡처
+// 단계에서 막는다**. 닫기만 막으면 그 클릭이 뒤로 통과해서 헤더 ▲▼(즉시 저장)가 눌리고,
+// 팝오버가 들고 있던 순서와 다른 순서가 저장돼 버린다. 초안은 여기에 더해 #preview-body를
+// 통째로 갈아끼우는 동작(기사 숨김·이동 등)까지 같은 클릭으로 튈 수 있어 더 필요하다.
+document.addEventListener("click", function(e) {
+  var pop = document.getElementById("toc-popover");
+  if (!pop.classList.contains("is-open")) { return; }
+  if (e.target.closest(".toc-popover")) { return; }
+  if (e.target.closest(".toc-toggle-btn")) { return; }  // toggleTocPopover가 처리한다
+  if (_tocBusy || _tocDirtyCount()) {
+    e.preventDefault();
+    e.stopPropagation();
+    _tocNudge();
+    return;
+  }
+  pop.classList.remove("is-open");
+}, true);
+function _postToggleHighlight(word) {
+  return fetch("http://127.0.0.1:8765/keywords/toggle-highlight", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({word: word})
+  });
+}
+function removeHighlightWord(btn) {
+  _postToggleHighlight(btn.dataset.word).then(function(res) {
+    if (res.ok) { location.reload(); }
+    else { alert("삭제에 실패했습니다. 다시 시도해주세요."); }
+  }).catch(function() {
+    alert("삭제에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+function addHighlightWord(evt) {
+  evt.preventDefault();
+  var input = document.getElementById("highlight-new-word");
+  var word = input.value.trim();
+  if (!word) { return false; }
+  _postToggleHighlight(word).then(function(res) {
+    if (res.ok) { location.reload(); }
+    else { alert("추가에 실패했습니다 — 형광펜 단어는 최대 개수까지 등록돼 있을 수 있어요."); }
+  }).catch(function() {
+    alert("추가에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+  return false;
+}
+// [추가: 2026-08-04] app.renderer와 동일 — 형광펜 단어 클릭 시 다음 색으로 순환.
+// [수정: 2026-08-05] app.renderer와 동일 — 팝오버 칩 클릭으로 색 순환(본문 클릭 방식은 삭제).
+function cycleChipColor(chip) {
+  var word = chip.dataset.word;
+  fetch("http://127.0.0.1:8765/keywords/cycle-highlight-color", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({word: word})
+  }).then(function(res) {
+    if (!res.ok) { alert("색 변경에 실패했습니다. 다시 시도해주세요."); return null; }
+    return res.json();
+  }).then(function(data) {
+    if (!data) return;
+    chip.style.background = data.color_hex;
+    document.querySelectorAll('.hl-word[data-word="' + CSS.escape(word) + '"]').forEach(function(span) {
+      span.style.backgroundColor = data.color_hex;
+    });
+  }).catch(function() {
+    alert("색 변경에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+// [추가: 2026-08-20] 숨김 요청 본문을 한 곳에서 만든다. 예전엔 단건 🗑️만 언론사·제목·
+// 발행시각을 함께 보내고, 일괄 숨기기(bulkHideSelected)와 소제목 통째 숨기기(hideGroup)는
+// url 하나만 보냈다 — 그래서 그 두 경로로 숨긴 기사는 hidden_articles.json에 언론사·제목이
+// null로 남았고, "네이버가 같은 기사를 새 기사 ID로 재게재하면 옛 URL 숨김이 안 먹는다"는
+// 2026-08-13 사고 때 넣어둔 (언론사, 제목) 대조 보호(app.curation.filter_hidden)를 통째로
+// 못 받았다. 실제로 2026-08-20 09:30 회차에서 일괄로 숨긴 뉴스1 기사가 같은 제목·같은
+// 언론사로 기사 ID만 바뀌어 다시 들어왔다. 세 경로가 같은 본문을 쓰게 해서 원천 차단한다.
+// (dataset 값이 없으면 "undefined" 문자열이 그대로 실려 가짜 언론사명이 저장되므로 || "".)
+function hideArticleBody(btn) {
+  return new URLSearchParams({
+    url: btn.dataset.url,
+    outlet: btn.dataset.outlet || "",
+    title: btn.dataset.title || "",
+    pubDate: btn.dataset.pubDate || ""
+  });
+}
+function hideArticle(btn) {
+  var article = btn.closest(".article");
+  fetch("http://127.0.0.1:8765/hide-article", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: hideArticleBody(btn)
+  }).then(function(res) {
+    if (res.ok) { article.remove(); }
+    else { alert("숨기기에 실패했습니다. 다시 시도해주세요."); }
+  }).catch(function() {
+    alert("숨기기에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+// [추가: 2026-08-05] app.renderer와 동일 — 원문에서 다시 가져오기.
+function refetchSummary(btn) {
+  var url = btn.dataset.url;
+  btn.disabled = true;
+  fetch("http://127.0.0.1:8765/refetch-summary", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({url: url})
+  }).then(function(res) {
+    if (res.ok) { location.reload(); }
+    else if (res.status === 404) { alert("원문에서 더 나은 제목·요약을 찾지 못했어요."); btn.disabled = false; }
+    else { alert("다시 가져오기에 실패했습니다. 다시 시도해주세요."); btn.disabled = false; }
+  }).catch(function() {
+    alert("다시 가져오기에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+    btn.disabled = false;
+  });
+}
+// [추가: 2026-08-05] app.renderer와 동일 — ✏️ 직접 수정.
+function editSummary(btn) {
+  var article = btn.closest(".article");
+  if (article.querySelector(".edit-summary-form")) { return; }
+  var url = btn.dataset.url;
+  var form = document.createElement("div");
+  form.className = "edit-summary-form";
+  var titleInput = document.createElement("input");
+  titleInput.type = "text";
+  titleInput.value = btn.dataset.title;
+  var summaryInput = document.createElement("textarea");
+  summaryInput.rows = 2;
+  summaryInput.value = btn.dataset.summary;
+  var actions = document.createElement("div");
+  actions.className = "edit-summary-actions";
+  var cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "clear-btn";
+  cancelBtn.textContent = "취소";
+  cancelBtn.onclick = function(e) { e.stopPropagation(); form.remove(); };
+  var saveBtn = document.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.textContent = "저장";
+  saveBtn.onclick = function(e) {
+    e.stopPropagation();
+    fetch("http://127.0.0.1:8765/edit-summary", {
+      method: "POST", keepalive: true,
+      headers: {"Content-Type": "application/x-www-form-urlencoded"},
+      body: new URLSearchParams({url: url, title: titleInput.value, summary: summaryInput.value})
+    }).then(function(res) {
+      if (res.ok) { location.reload(); }
+      else { alert("저장하지 못했습니다. 다시 시도해주세요."); }
+    }).catch(function() {
+      alert("저장하지 못했습니다 — 앱이 실행 중인지 확인해주세요.");
+    });
+  };
+  actions.appendChild(cancelBtn);
+  actions.appendChild(saveBtn);
+  form.appendChild(titleInput);
+  form.appendChild(summaryInput);
+  form.appendChild(actions);
+  var details = article.querySelector("details");
+  details.open = true;
+  article.querySelector(".article-summary").insertAdjacentElement("afterend", form);
+}
+// [추가: 2026-08-04] app.renderer와 동일 — 소제목별/시간순/언론사순 보기 전환. 실제
+// 소제목 구성은 그대로 두고, 화면에 기사를 나열하는 순서만 바꾼다(카드 DOM 노드를 옮겼다
+// 되돌리는 방식 — 이유는 app.renderer.hideArticle 주변 주석 참고). previewMoveArticle이
+// #preview-body를 통째로 갈아끼우는 화면이라, 그때마다 _FLAT_VIEW_HOMES를 비워 다시
+// 캡처하게 한다(위 previewMoveArticle 참고).
+var _FLAT_VIEW_HOMES = null;
+function _restoreSubheadingView() {
+  if (_FLAT_VIEW_HOMES) {
+    // app.renderer._restoreSubheadingView와 동일한 이유 — 뒤에서부터 복원해야
+    // insertBefore의 참조 노드(next)가 항상 이미 제자리로 돌아와 있다.
+    _FLAT_VIEW_HOMES.slice().reverse().forEach(function(home) {
+      if (!document.body.contains(home.el)) { return; }
+      if (home.next && home.next.parentNode === home.parent) {
+        home.parent.insertBefore(home.el, home.next);
+      } else {
+        home.parent.appendChild(home.el);
+      }
+    });
+  }
+  document.querySelectorAll(".subheading").forEach(function(s) { s.style.display = ""; });
+  var flat = document.getElementById("flat-view");
+  if (flat) { flat.remove(); }
+}
+function applyViewMode(mode) {
+  _restoreSubheadingView();
+  if (mode === "subheading") { return; }
+  var firstSub = document.querySelector(".subheading");
+  if (!firstSub) { return; }
+  if (!_FLAT_VIEW_HOMES) {
+    _FLAT_VIEW_HOMES = Array.prototype.map.call(document.querySelectorAll(".subheading .article"), function(el) {
+      return { el: el, parent: el.parentElement, next: el.nextElementSibling };
+    });
+  }
+  // [추가: 2026-08-04] app.renderer와 동일 — 소제목 경계는 유지한 채 그 안 카드만 시간순.
+  if (mode === "group-time") {
+    document.querySelectorAll(".subheading").forEach(function(section) {
+      var inGroup = Array.prototype.filter.call(section.children, function(el) {
+        return el.classList.contains("article");
+      });
+      inGroup.sort(function(a, b) {
+        var ad = (a.querySelector(".hide-btn").dataset.pubDate || "");
+        var bd = (b.querySelector(".hide-btn").dataset.pubDate || "");
+        return ad < bd ? 1 : ad > bd ? -1 : 0;
+      });
+      inGroup.forEach(function(el) { section.appendChild(el); });
+    });
+    return;
+  }
+  var articles = Array.prototype.filter.call(document.querySelectorAll(".subheading .article"), function(el) {
+    return document.body.contains(el);
+  });
+  if (mode === "time") {
+    articles.sort(function(a, b) {
+      var ad = (a.querySelector(".hide-btn").dataset.pubDate || "");
+      var bd = (b.querySelector(".hide-btn").dataset.pubDate || "");
+      return ad < bd ? 1 : ad > bd ? -1 : 0;
+    });
+  } else if (mode === "outlet") {
+    articles.sort(function(a, b) {
+      return (Number(a.dataset.outletRank) || 0) - (Number(b.dataset.outletRank) || 0);
+    });
+  }
+  document.querySelectorAll(".subheading").forEach(function(s) { s.style.display = "none"; });
+  var flat = document.createElement("section");
+  flat.id = "flat-view";
+  flat.className = "subheading";
+  firstSub.parentNode.insertBefore(flat, firstSub);
+  articles.forEach(function(el) { flat.appendChild(el); });
+}
+// [추가: 2026-07-30] 자동분류가 완벽하지 않아 여러 기사를 한꺼번에 바로잡아야 할 때 쓰는
+// 체크박스 다중 선택 + 하단 "장바구니" 바. 소제목 이름은 서버가 다시 내려주는 게 아니라
+// 지금 화면에 그려진 <h2> 제목들을 그대로 읽어서 쓴다 — reload 없이 이동한 직후에도
+// (previewMoveArticle이 #preview-body를 갈아끼운 뒤) 항상 최신 소제목 목록과 맞는다.
+// [수정: 2026-07-30] 소제목 이름표(rename)가 붙어 있으면 화면엔 그 이름표가 보이지만,
+// 서버(set_group_override)는 원래 분류 단어(원본 이름) 기준으로 소제목을 찾는다 —
+// <h2> 텍스트(이름표)를 그대로 값으로 쓰면 이름표 붙은 소제목으로는 이동 자체가
+// 조용히 실패한다. 이미 화면에 원본 이름을 갖고 있는 ✏️ 버튼의 data-name을 대신
+// 읽어서, 값(value)엔 원본 이름을, 화면엔 이름표(data-current)를 쓴다.
+function getAllGroups() {
+  return Array.prototype.map.call(document.querySelectorAll(".subheading h2 .rename-btn[data-current]"), function(btn) {
+    // [추가: 2026-08-07] app.renderer와 동일 — 사용자가 만든 소제목 여부도 같이 읽는다.
+    var custom = btn.closest(".subheading").classList.contains("subheading-custom");
+    return {value: btn.dataset.name, label: btn.dataset.current, custom: custom};
+  });
+}
+// [추가: 2026-08-03] app.renderer와 동일한 이유·동작 — 소제목 화면 순서를 바꾼다.
+function moveGroupOrder(btn, direction) {
+  var names = Array.prototype.map.call(document.querySelectorAll(".subheading h2 .rename-btn[data-current]"), function(b) { return b.dataset.name; });
+  var i = names.indexOf(btn.dataset.name);
+  var j = direction === "up" ? i - 1 : i + 1;
+  if (i < 0 || j < 0 || j >= names.length) { return; }
+  var tmp = names[i]; names[i] = names[j]; names[j] = tmp;
+  fetch("http://127.0.0.1:8765/save-group-order", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({order: JSON.stringify(names)})
+  }).then(function(res) {
+    if (res.ok) { location.reload(); }
+    else { alert("순서 변경에 실패했습니다. 다시 시도해주세요."); }
+  }).catch(function() {
+    alert("순서 변경에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+// [추가: 2026-08-04] app.renderer와 동일 — 소제목 헤더 체크박스로 그 소제목 안 기사
+// 체크박스를 한 번에 맞춘다.
+function toggleGroupSelectAll(checkbox) {
+  var section = checkbox.closest(".subheading");
+  if (!section) { return; }
+  section.querySelectorAll(".article-select").forEach(function(cb) { cb.checked = checkbox.checked; });
+  updateBulkMoveBar();
+}
+function updateBulkMoveBar() {
+  var checked = document.querySelectorAll(".article-select:checked");
+  var bar = document.getElementById("bulk-move-bar");
+  if (checked.length === 0) { bar.classList.remove("is-active"); return; }
+  bar.classList.add("is-active");
+  document.getElementById("bulk-move-count").textContent = "☑️ " + checked.length + "개 선택됨";
+  var select = document.getElementById("bulk-move-select");
+  var options = '<option value="" selected disabled>이동할 소제목</option>';
+  getAllGroups().forEach(function(g) {
+    var opt = document.createElement("option");
+    opt.value = g.value;
+    opt.textContent = g.label;
+    if (g.custom) { opt.style.fontWeight = "700"; }
+    options += opt.outerHTML;
+  });
+  select.innerHTML = options;
+  // [추가: 2026-08-04] app.renderer와 동일 — 일괄 위/아래 이동 버튼 활성화 여부.
+  var upBtn = document.getElementById("bulk-move-up");
+  var downBtn = document.getElementById("bulk-move-down");
+  var checkedArticles = Array.prototype.map.call(checked, function(cb) { return cb.closest(".article"); });
+  var sections = checkedArticles.map(function(el) { return el.closest(".subheading"); });
+  var sameSection = sections.every(function(s) { return s === sections[0]; });
+  if (sameSection) {
+    var siblings = Array.prototype.filter.call(sections[0].children, function(el) { return el.classList.contains("article"); });
+    var positions = checkedArticles.map(function(el) { return siblings.indexOf(el); }).sort(function(a, b) { return a - b; });
+    upBtn.disabled = positions[0] === 0;
+    downBtn.disabled = positions[positions.length - 1] === siblings.length - 1;
+  } else {
+    upBtn.disabled = true;
+    downBtn.disabled = true;
+  }
+}
+function bulkMoveOrder(direction) {
+  var urls = Array.prototype.map.call(document.querySelectorAll(".article-select:checked"), function(cb) { return cb.dataset.url; });
+  if (!urls.length) { return; }
+  var body = new URLSearchParams();
+  urls.forEach(function(u) { body.append("urls", u); });
+  body.append("direction", direction);
+  fetch("http://127.0.0.1:8765/preview-bulk-move-order", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: body
+  }).then(function(res) {
+    if (res.ok) { sessionStorage.setItem("bulkMoveCheckedUrls", JSON.stringify(urls)); location.reload(); }
+    else { alert("순서 변경에 실패했습니다. 다시 시도해주세요."); }
+  }).catch(function() {
+    alert("순서 변경에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+// [추가: 2026-08-05] app.renderer와 동일 — 선택한 기사 여러 개를 한꺼번에 숨긴다.
+function bulkHideSelected() {
+  // [수정: 2026-08-20] 체크박스(url만 있음)가 아니라 그 행의 🗑️ 버튼을 모은다 —
+  // 언론사·제목·발행시각까지 함께 보내려면 그 값들을 들고 있는 쪽이 필요하다(hideArticleBody).
+  var btns = Array.prototype.map.call(document.querySelectorAll(".article-select:checked"), function(cb) {
+    var article = cb.closest(".article");
+    return article ? article.querySelector(".hide-btn[data-url]") : null;
+  }).filter(function(btn) { return btn; });
+  if (!btns.length) { return; }
+  if (!confirm(btns.length + "개 기사를 숨길까요? (숨긴 기사 관리에서 하나씩 되돌릴 수 있어요)")) return;
+  Promise.all(btns.map(function(btn) {
+    return fetch("http://127.0.0.1:8765/hide-article", {
+      method: "POST", keepalive: true,
+      headers: {"Content-Type": "application/x-www-form-urlencoded"},
+      body: hideArticleBody(btn)
+    });
+  })).then(function(responses) {
+    if (responses.every(function(res) { return res.ok; })) { location.reload(); }
+    else { alert("일부 기사를 숨기지 못했습니다. 다시 시도해주세요."); }
+  }).catch(function() {
+    alert("숨기기에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+// [추가: 2026-08-21] app.renderer의 같은 함수와 동일 — "📷 사진 추정 전체 선택"이
+// .is-photo 행을 전부 체크해 하단 바를 띄운다. 숨기는 건 담당자가 오탐 체크를 해제한
+// 뒤 직접 🗑️를 눌러야 한다(bulkHideSelected가 그대로 확인창을 거친다).
+function selectAllPhotoSuspects() {
+  document.querySelectorAll(".article.is-photo .article-select").forEach(function(cb) { cb.checked = true; });
+  updateBulkMoveBar();
+}
+function clearSelection() {
+  document.querySelectorAll(".article-select:checked").forEach(function(cb) { cb.checked = false; });
+  updateBulkMoveBar();
+}
+function _postGroupMove(urls, target) {
+  var body = new URLSearchParams();
+  urls.forEach(function(u) { body.append("urls", u); });
+  body.append("target", target);
+  return fetch("http://127.0.0.1:8765/bulk-move-article", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: body
+  });
+}
+function bulkMoveSelected() {
+  var urls = Array.prototype.map.call(document.querySelectorAll(".article-select:checked"), function(cb) { return cb.dataset.url; });
+  var target = document.getElementById("bulk-move-select").value;
+  if (!urls.length || !target) { return; }
+  _postGroupMove(urls, target).then(function(res) {
+    if (res.ok) { sessionStorage.setItem("justMovedUrls", JSON.stringify(urls)); location.reload(); }
+    else { alert("이동에 실패했습니다. 다시 시도해주세요."); }
+  }).catch(function() {
+    alert("이동에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+function moveArticleToGroup(select) {
+  var url = select.closest(".article").dataset.url;
+  var target = select.value;
+  if (!target) { return; }
+  _postGroupMove([url], target).then(function(res) {
+    if (res.ok) { sessionStorage.setItem("justMovedUrls", JSON.stringify([url])); location.reload(); }
+    else { alert("소제목 이동에 실패했습니다. 다시 시도해주세요."); }
+  }).catch(function() {
+    alert("소제목 이동에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+// [추가: 2026-08-11] 📂 소제목 미분류에 있는 기사만 기존 소제목에 배정한다 — 기존
+// 소제목의 이름·구성은 절대 건드리지 않으므로 잃을 게 없다(확인 팝업 없음).
+// [수정: 2026-08-12] 이름을 assignUnclassified로 바꾸고(이제 "재분류"가 아니라
+// "배정"), 툴바가 아니라 📂 칸 헤더의 버튼이 이걸 부른다.
+function assignUnclassified(btn) {
+  btn.disabled = true;
+  var label = btn.innerHTML;
+  btn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9Z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8Z"/></svg> 분류하는 중…';
+  fetch("http://127.0.0.1:8765/assign-unclassified", {
+    method: "POST", keepalive: true
+  }).then(function(res) {
+    if (res.ok) {
+      res.json().then(function(data) {
+        sessionStorage.setItem("justClassifiedUrls", JSON.stringify((data && data.assigned) || []));
+        location.reload();
+      }).catch(function() { location.reload(); });
+    }
+    else {
+      btn.disabled = false; btn.innerHTML = label;
+      alert("미분류 기사를 분류하지 못했습니다. 잠시 후 다시 시도해주세요.");
+    }
+  }).catch(function() {
+    btn.disabled = false; btn.innerHTML = label;
+    alert("미분류 기사를 분류하지 못했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+// [추가: 2026-08-12] "🤖 전체 기사 재분류" — 기존 소제목을 전부 새로 짓는 파괴적 동작이라
+// app.renderer의 같은 이름 함수와 동일한 확인창을 쓴다(문구도 동일 — 잃는 게 같으므로).
+// [수정: 2026-08-12] 옮겨둔 기사(edits)가 0건이어도 항상 확인한다 — 이 버튼은 옮긴
+// 기사가 없어도 소제목 이름·순서는 항상 새로 짓는다. "옮겨둔 기사 N건" 문장만
+// 있을 때만 넣는다(app.renderer의 같은 함수와 동일한 이유).
+// [수정: 2026-08-20] data-degraded="1"(지금 소제목이 규칙 기반 폴백 상태)이면 다른
+// 확인창을 쓴다 — 평소 문구("이름·순서가 초기화됩니다")는 폴백 상태에서 거짓에
+// 가깝다. 이름은 이미 단어 빈도로 뭉개졌고, 옮겨둔 배치(group_overrides)도 그
+// 이름을 못 찾아 이미 무효이기 때문이다. 없어진 걸 잃는다고 겁주면 정작 눌러야
+// 할 순간에 담당자가 망설이게 된다.
+function regenerateSubheadings(btn) {
+  var msg;
+  if (btn.dataset.degraded === "1") {
+    msg = "지금 소제목은 AI가 지은 이름이 아니라, 단어 빈도수에 따라 기계적으로 뽑은 단어입니다.\nAI로 다시 묶을까요?\n\n"
+        + "(숨긴 기사와 담아둔 기사는 그대로 유지됩니다)";
+  } else {
+    var edits = parseInt(btn.dataset.manualEdits || "0", 10);
+    var editsLine = edits > 0 ? "직접 옮겨둔 기사 " + edits + "건, 소제목 이름과 순서가 초기화됩니다.\n" : "소제목 이름과 순서가 초기화됩니다.\n";
+    msg = "전체 기사를 다시 분류합니다.\n" + editsLine
+        + "(숨긴 기사와 담아둔 기사는 그대로 유지됩니다)\n\n계속할까요?";
+  }
+  if (!confirm(msg)) {
+    return;
+  }
+  btn.disabled = true;
+  var label = btn.innerHTML;
+  btn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9Z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8Z"/></svg> 분류하는 중…';
+  fetch("http://127.0.0.1:8765/regenerate-subheadings-draft", {
+    method: "POST", keepalive: true
+  }).then(function(res) {
+    if (res.ok) { location.reload(); }
+    else {
+      btn.disabled = false; btn.innerHTML = label;
+      alert("소제목을 다시 만들지 못했습니다. 잠시 후 다시 시도해주세요.");
+    }
+  }).catch(function() {
+    btn.disabled = false; btn.innerHTML = label;
+    alert("소제목을 다시 만들지 못했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+
+// [추가: 2026-08-11] ↩ 되돌리기 — 숨기기·소제목 이동·이름 변경·AI 재분류를 모두
+// 같은 경로로 한 단계 되돌린다(app/undo.py가 상태를 통째로 스냅샷해둔다).
+function undoLastAction(btn) {
+  btn.disabled = true;
+  fetch("http://127.0.0.1:8765/undo", { method: "POST", keepalive: true })
+    .then(function(res) {
+      if (res.ok) { location.reload(); }
+      else if (res.status === 409) { btn.disabled = false; alert("되돌릴 작업이 없습니다."); }
+      else { btn.disabled = false; alert("되돌리기에 실패했습니다. 다시 시도해주세요."); }
+    }).catch(function() {
+      btn.disabled = false;
+      alert("되돌리기에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+    });
+}
+function createCustomGroup() {
+  var name = prompt("새 소제목 이름을 입력하세요");
+  if (name === null) return;
+  name = name.trim();
+  if (!name) { alert("소제목 이름은 비워둘 수 없습니다."); return; }
+  // [수정: 2026-08-04] app.renderer와 동일 — 지금 화면에 떠 있는 소제목만 중복 검사.
+  var body = new URLSearchParams({name: name});
+  getAllGroups().forEach(function(g) { body.append("active_names", g.value); });
+  fetch("http://127.0.0.1:8765/add-custom-group", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: body
+  }).then(function(res) {
+    if (res.ok) { location.reload(); }
+    else if (res.status === 409) { alert("이미 '" + name + "'라는 이름의 소제목이 있습니다."); }
+    else { alert("소제목 만들기에 실패했습니다. 다시 시도해주세요."); }
+  }).catch(function() {
+    alert("소제목 만들기에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+// [수정: 2026-08-10] app.renderer와 동일 — 메모 없을 때만 렌더링되는 버튼이라 클릭은
+// 항상 "열기"다. 패널을 열면서 클릭한 버튼 자신도 바로 숨긴다.
+function toggleKeywordNote(btn) {
+  document.getElementById("keyword-note-zone").classList.add("is-open");
+  btn.style.display = "none";
+}
+// [추가: 2026-08-10] app.renderer와 동일 — 저장/수정 버튼 통합.
+function toggleKeywordEditMode(btn) {
+  var input = document.getElementById("keyword-note-input");
+  if (input.disabled) {
+    input.disabled = false;
+    input.focus();
+    btn.textContent = "저장";
+  } else {
+    saveKeywordNote();
+  }
+}
+function saveKeywordNote() {
+  var text = document.getElementById("keyword-note-input").value;
+  fetch("http://127.0.0.1:8765/save-manual-keyword-note", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({text: text})
+  }).then(function(res) {
+    if (res.ok) { location.reload(); }
+    else { alert("저장하지 못했습니다. 다시 시도해주세요."); }
+  }).catch(function() {
+    alert("저장하지 못했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+// [추가: 2026-08-21] 사용자 요청 — 메모 칸에서 엔터만 쳐도 "저장"/"수정" 버튼을 누른
+// 것과 똑같이 저장된다. 한글은 조합 중 엔터로 글자를 확정하므로 그 엔터
+// (isComposing / keyCode 229)는 무시한다 — 안 그러면 마지막 글자를 확정하려던 엔터가
+// 그대로 저장으로 새어 나가 조합이 끊긴다.
+function keywordNoteKey(ev) {
+  if (ev.key !== "Enter") return;
+  if (ev.isComposing || ev.keyCode === 229) return;
+  ev.preventDefault();
+  saveKeywordNote();
+}
+function clearKeywordNote() {
+  document.getElementById("keyword-note-input").value = "";
+  saveKeywordNote();
+}
+// [추가: 2026-08-10] app.renderer와 동일 — 저장된 메모가 없는 채로 처음 여는 중이면
+// "삭제"가 아니라 "취소"다.
+function cancelKeywordNote() {
+  location.reload();
+}
+function removeCustomGroup(btn) {
+  var name = btn.dataset.name;
+  // [수정: 2026-08-11] 확인창에는 화면에 보이는 이름(data-current)을 쓴다 — 예전엔
+  // data-name(자동 생성된 원래 단어)을 그대로 보여줘서, ✏️로 이름을 바꿔둔 소제목을
+  // 지우려 하면 "내가 본 적 없는 이름"이 뜨는 버그가 있었다(사용자 제보). 서버로
+  // 보내는 건 여전히 원래 단어 name이다 — 저장 키가 그것이기 때문.
+  if (!confirm('"' + (btn.dataset.current || name) + '" 소제목을 삭제할까요?')) return;
+  fetch("http://127.0.0.1:8765/remove-custom-group", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({name: name})
+  }).then(function(res) {
+    if (res.ok) { location.reload(); }
+    else { alert("삭제에 실패했습니다. 다시 시도해주세요."); }
+  }).catch(function() {
+    alert("삭제에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+// [수정: 2026-07-30] 예전엔 성공하면 location.reload()로 페이지 전체를 새로 불러왔는데,
+// 그 reload가 서버에서 전체 그룹 재검색을 한 번 더 유발해 클릭 한 번에 네이버 검색이
+// 2번(이동 계산 1번 + reload로 다시 그리기 1번) 돌았다. 이제 서버가 이동 계산에 쓴
+// 결과를 그대로 화면 조각(JSON)으로 돌려주고, 여기서 DOM만 갈아끼운다 — 검색은
+// 이동 계산 1번으로 끝난다(그마저도 app.preview_cache 덕에 증분 검색이라 가볍다).
+function previewMoveArticle(btn) {
+  var url = btn.dataset.url;
+  var direction = btn.dataset.direction;
+  fetch("http://127.0.0.1:8765/preview-move-article", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({url: url, direction: direction})
+  }).then(function(res) {
+    if (!res.ok) { alert("소제목 이동에 실패했습니다. 다시 시도해주세요."); return null; }
+    if (res.status === 204) { return null; }  // 더 옮길 곳이 없거나 검색 실패 — 조용히 무시
+    return res.json();
+  }).then(function(data) {
+    if (!data) return;
+    document.getElementById("preview-body").innerHTML = data.body;
+    document.getElementById("preview-actions").innerHTML = data.actions_html;
+    document.getElementById("preview-hint").innerHTML = data.hint;
+    PLAIN_TEXT = data.plain_text;
+    // [추가: 2026-08-20] 이동 한 번마다 분류가 다시 계산되므로(app.preview_renderer.
+    // _compute_preview_content), 복사·다운로드 확인창이 이동 직후에도 최신 폴백 상태를
+    // 보도록 같이 갱신한다. actions_html도 새로 갈아끼워졌으니 재분류 버튼의
+    // data-degraded도 이미 최신이다.
+    CLASSIFY_DEGRADED = data.classify_degraded;
+    CLASSIFY_DEGRADED_NAMES = data.classify_degraded_names;
+    // [추가: 2026-08-04] #preview-body를 통째로 갈아끼웠으니 시간순/언론사순 보기가
+    // 기억해둔 기사 노드 위치(_FLAT_VIEW_HOMES)는 전부 무효 — 다시 캡처하게 비운다.
+    _FLAT_VIEW_HOMES = null;
+    renderRelativeTimes();
+    // [추가: 2026-08-05] 이 함수는 새로고침 없이 DOM만 바로 갈아끼우므로, 다른 이동
+    // 함수처럼 sessionStorage를 거칠 필요 없이 방금 옮긴 기사를 바로 표시할 수 있다.
+    var movedEl = document.querySelector('.article[data-url="' + CSS.escape(url) + '"]');
+    if (movedEl) { movedEl.classList.add("just-moved"); }
+  }).catch(function() {
+    alert("소제목 이동에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+// [수정: 2026-08-11] app.renderer와 동일 — 담아둔 기사의 승격 조작이 이모지 버튼
+// 두 개에서 화면별 소제목 드롭다운 하나로 바뀌었다(이유는 app.renderer
+// ._manual_promote_control_html 참고). el은 <select>일 수도 소제목이 없는 화면의
+// 📥 <button>일 수도 있는데, 둘 다 value가 있어(버튼은 기본 "") 같은 코드로 읽힌다.
+function _promoteManual(el, endpoint, failMsg) {
+  var url = el.dataset.url;
+  var group = el.value || "";
+  el.disabled = true;
+  fetch("http://127.0.0.1:8765/" + endpoint, {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({url: url, group: group})
+  }).then(function(res) {
+    if (res.ok) { sessionStorage.setItem("justPromotedUrl", url); location.reload(); }
+    else { el.disabled = false; el.selectedIndex = 0; alert(failMsg + " 다시 시도해주세요."); }
+  }).catch(function() {
+    el.disabled = false; el.selectedIndex = 0;
+    alert(failMsg + " — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+function promoteManualArticle(el) {
+  _promoteManual(el, "promote-manual-article", "확정본에 넣지 못했습니다.");
+}
+function promoteManualArticleToDraft(el) {
+  _promoteManual(el, "promote-manual-article-to-draft", "초안에 넣지 못했습니다.");
+}
+function renameGroup(btn) {
+  var name = btn.dataset.name;
+  var current = btn.dataset.current;
+  var newLabel = prompt("소제목 이름을 입력하세요", current);
+  if (newLabel === null) return;
+  newLabel = newLabel.trim();
+  if (!newLabel) { alert("소제목 이름은 비워둘 수 없습니다."); return; }
+  // [수정: 2026-08-04] app.renderer와 동일 — 지금 화면에 떠 있는 소제목만 중복 검사.
+  var body = new URLSearchParams({name: name, label: newLabel});
+  getAllGroups().forEach(function(g) { body.append("active_names", g.value); });
+  fetch("http://127.0.0.1:8765/rename-group", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: body
+  }).then(function(res) {
+    if (res.ok) { location.reload(); }
+    else if (res.status === 409) { alert("이미 '" + newLabel + "'라는 이름의 소제목이 있습니다."); }
+    else { alert("이름 변경에 실패했습니다. 다시 시도해주세요."); }
+  }).catch(function() {
+    alert("이름 변경에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+function hideGroup(btn) {
+  var section = btn.closest(".subheading");
+  if (!confirm("이 소제목의 기사를 전부 숨길까요? (숨긴 기사 관리에서 하나씩 되돌릴 수 있어요)")) return;
+  // [수정: 2026-08-20] url만 뽑아 보내던 것을, 버튼 자체를 넘겨 언론사·제목·발행시각까지
+  // 함께 보내도록 바꿨다(hideArticleBody 주석 참고).
+  var btns = Array.prototype.slice.call(section.querySelectorAll(".hide-btn[data-url]"));
+  Promise.all(btns.map(function (btn) {
+    return fetch("http://127.0.0.1:8765/hide-article", {
+      method: "POST", keepalive: true,
+      headers: {"Content-Type": "application/x-www-form-urlencoded"},
+      body: hideArticleBody(btn)
+    });
+  })).then(function (responses) {
+    if (responses.every(function (res) { return res.ok; })) { location.reload(); }
+    else { alert("일부 기사를 숨기지 못했습니다. 다시 시도해주세요."); }
+  }).catch(function () {
+    alert("숨기기에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
+  });
+}
+function renderRelativeTimes() {
+  var now = Date.now();
+  document.querySelectorAll(".pub-time-relative[data-pub-date]").forEach(function (el) {
+    var pub = new Date(el.dataset.pubDate).getTime();
+    if (isNaN(pub)) return;
+    var minutes = Math.floor((now - pub) / 60000);
+    var text;
+    if (minutes < 1) text = "방금 전";
+    else if (minutes < 60) text = minutes + "분 전";
+    else if (minutes < 1440) text = Math.floor(minutes / 60) + "시간 전";
+    else text = Math.floor(minutes / 1440) + "일 전";
+    el.textContent = text;
+  });
+}
+renderRelativeTimes();
+// [추가: 2026-07-29] 지난번 이 화면을 봤을 때 있던 기사 URL 목록을 저장해뒀다가, 이번
+// 로드에서 그 목록에 없는 것만 "새로 들어온 기사"로 표시한다(is-seen과는 다른 개념 —
+// "내가 클릭해봤나"가 아니라 "지난 로드 이후 새로 생겼나"). 기준선이 아예 없으면
+// (이 회차를 처음 여는 것) 비교 대상이 없으므로 아무것도 표시하지 않고 이번 목록을
+// 기준선으로만 저장한다.
+// [수정: 2026-08-13] 기준선을 회차별로 나눈다(예전엔 "previewKnownUrls" 하나로 전역).
+// 회차가 바뀌면 검색 구간 자체가 달라져 기사가 통째로 갈리는데, 전역 기준선이면 그
+// 순간 화면 전체가 노랗게 물들어 "새로 들어온 것"이라는 정보가 무의미해진다. 회차
+// 종료 시각(ROUND_DEADLINE_MS)은 (날짜, 회차)마다 유일하므로 그대로 식별자로 쓴다 —
+// 회차가 바뀌면 기준선이 없는 상태가 되어 위 규칙대로 아무것도 표시하지 않는다.
+(function () {
+  var storageKey = "previewKnownUrls:" + ROUND_DEADLINE_MS;
+  var currentUrls = Array.prototype.map.call(
+    document.querySelectorAll(".article[data-url]"),
+    function (el) { return el.dataset.url; }
+  );
+  var known = null;
+  try {
+    var raw = localStorage.getItem(storageKey);
+    known = raw === null ? null : JSON.parse(raw);
+  } catch (e) { known = null; }
+  if (known !== null) {
+    document.querySelectorAll(".article[data-url]").forEach(function (el) {
+      if (known.indexOf(el.dataset.url) === -1) { el.classList.add("is-new-arrival"); }
+    });
+  }
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(currentUrls));
+  } catch (e) { /* 저장 실패(용량 초과 등)는 표시가 한 번 빠지는 것뿐이라 무시한다 */ }
+  // 지난 회차·지난 날짜의 기준선은 다시 쓸 일이 없으므로 여기서 정리한다 — 그냥 두면
+  // 회차마다 키가 하나씩 쌓여 localStorage에 계속 남는다.
+  for (var i = localStorage.length - 1; i >= 0; i--) {
+    var key = localStorage.key(i);
+    if (key && key.indexOf("previewKnownUrls:") === 0 && key !== storageKey) {
+      localStorage.removeItem(key);
+    }
+  }
+  localStorage.removeItem("previewKnownUrls");  // 전역 방식이던 시절의 잔재 정리
+})();
+// [추가: 2026-08-05] app.renderer와 동일 — 방금 승격한 기사를 한 번 표시하고 지운다.
+(function() {
+  var justPromotedUrl = sessionStorage.getItem("justPromotedUrl");
+  if (!justPromotedUrl) { return; }
+  sessionStorage.removeItem("justPromotedUrl");
+  var el = document.querySelector('.article[data-url="' + CSS.escape(justPromotedUrl) + '"]');
+  if (el) { el.classList.add("just-promoted"); }
+})();
+// [추가: 2026-08-05] app.renderer와 동일 — 일괄 위/아래 이동 직전 체크했던 URL들을 다시 체크.
+(function() {
+  var raw = sessionStorage.getItem("bulkMoveCheckedUrls");
+  if (!raw) { return; }
+  sessionStorage.removeItem("bulkMoveCheckedUrls");
+  var urls = JSON.parse(raw);
+  urls.forEach(function(u) {
+    var cb = document.querySelector('.article-select[data-url="' + CSS.escape(u) + '"]');
+    if (cb) { cb.checked = true; }
+    var el = document.querySelector('.article[data-url="' + CSS.escape(u) + '"]');
+    if (el) { el.classList.add("just-moved"); }
+  });
+  updateBulkMoveBar();
+})();
+// [추가: 2026-08-05] app.renderer와 동일 — moveArticleToGroup/bulkMoveSelected가 남겨둔
+// "방금 옮긴 기사들"을 한 번 표시한다.
+(function() {
+  var raw = sessionStorage.getItem("justMovedUrls");
+  if (!raw) { return; }
+  sessionStorage.removeItem("justMovedUrls");
+  JSON.parse(raw).forEach(function(u) {
+    var el = document.querySelector('.article[data-url="' + CSS.escape(u) + '"]');
+    if (el) { el.classList.add("just-moved"); }
+  });
+})();
+// [추가: 2026-08-12] "🤖 미분류 기사 분류"가 방금 배정한 기사들을 한 번 표시한다.
+(function() {
+  var raw = sessionStorage.getItem("justClassifiedUrls");
+  if (!raw) { return; }
+  sessionStorage.removeItem("justClassifiedUrls");
+  JSON.parse(raw).forEach(function(u) {
+    var el = document.querySelector('.article[data-url="' + CSS.escape(u) + '"]');
+    if (el) { el.classList.add("just-classified"); }
+  });
+})();
+// [추가: 2026-08-05] app.renderer와 동일 — 남겨둔 신호가 있으면 목차 팝오버를 다시
+// 열어둔다.
+// [수정: 2026-08-18] 이제 신호를 남기는 쪽은 _tocApply뿐이라, 여기서 다시 열리는 팝오버는
+// "방금 적용한 결과"를 보여주는 자리다(옮긴 소제목이 초록으로 한 번 표시된다).
+(function() {
+  if (!sessionStorage.getItem("tocPopoverReopen")) { return; }
+  sessionStorage.removeItem("tocPopoverReopen");
+  document.getElementById("toc-popover").classList.add("is-open");
+  buildTocPopover();
+})();
+</script>
+</body>
+</html>

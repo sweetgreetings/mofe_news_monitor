@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="281" viewBox="0 0 1440 281">
+<rect width="100%" height="100%" fill="#F8FAFC"/>
+<g id="topbar">
+<rect x="0" y="0" width="1440" height="54.5" fill="#FFFFFF"/>
+<text x="490" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">홈</text>
+<text x="924.5" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">설정</text>
+</g>
+<g id="Page">
+<rect x="315" y="24" width="810" height="232.5" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+</g>
+<g id="라벨 관리">
+<rect x="340" y="134.5" width="760" height="1" fill="#E5E7EB"/>
+<g transform="translate(340,94.5) scale(0.6999,0.6999)" fill="none" stroke="#1E3A5F" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"></circle><path d="M19.1 14.4a1.5 1.5 0 0 0 .3 1.7l.1.1a1.9 1.9 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-1.7-.3 1.5 1.5 0 0 0-.9 1.4v.2a1.9 1.9 0 1 1-3.8 0v-.1a1.5 1.5 0 0 0-1-1.4 1.5 1.5 0 0 0-1.7.3l-.1.1a1.9 1.9 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0 .3-1.7 1.5 1.5 0 0 0-1.4-.9h-.2a1.9 1.9 0 1 1 0-3.8h.1a1.5 1.5 0 0 0 1.4-1 1.5 1.5 0 0 0-.3-1.7l-.1-.1a1.9 1.9 0 1 1 2.6-2.6l.1.1a1.5 1.5 0 0 0 1.7.3h.1a1.5 1.5 0 0 0 .9-1.4v-.2a1.9 1.9 0 1 1 3.8 0v.1a1.5 1.5 0 0 0 .9 1.4 1.5 1.5 0 0 0 1.7-.3l.1-.1a1.9 1.9 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0-.3 1.7v.1a1.5 1.5 0 0 0 1.4.9h.2a1.9 1.9 0 1 1 0 3.8h-.1a1.5 1.5 0 0 0-1.4.9Z"></path></g>
+<rect x="977.1" y="85" width="122.9" height="37.5" rx="4" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<text x="356.8" y="108.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16.8" font-weight="700" fill="#1E3A5F" xml:space="preserve">라벨 관리</text>
+<text x="994.1" y="108.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">← 라벨 보관함</text>
+</g>
+<g id="hint">
+<text x="340" y="163.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">라벨을 붙이는 곳은 기사 행이고, 라벨 자체를 손보는 곳은 여기 하나입니다.
+    이름 변경 · 합치기 · 삭제를 각각 따로 둡니다 — 이름 변경이 몰래 병</text>
+<text x="340" y="179.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">합까지 하지 않습니다.</text>
+</g>
+<g id="hint 2">
+<text x="340" y="211.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">아직 라벨이 없습니다.</text>
+</g>
+</svg>

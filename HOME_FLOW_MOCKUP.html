@@ -1,0 +1,278 @@
+<!-- 홈 화면 흐름도(메뉴) 정리 시안 — 지금 / A: 화살표 글자만 뺌 / B: 섹션 제목 줄까지 뺌 -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>홈 흐름도 메뉴 시안</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F8FAFC; color: #1F2937;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  .wrap { max-width: 1010px; margin: 0 auto; padding: 28px 20px 60px; }
+  h1 { font-size: 1.15rem; color: #1E3A5F; margin: 0 0 6px; }
+  .lead { font-size: 0.85rem; color: #6B7280; margin: 0 0 26px; line-height: 1.7; }
+  .col { margin-bottom: 30px; }
+  .col h3 { font-size: 0.92rem; margin: 0 0 4px; color: #1E3A5F; display: flex; align-items: center; gap: 8px; }
+  .col .why { font-size: 0.78rem; color: #6B7280; margin: 0 0 10px; line-height: 1.65; }
+  .col .why b { color: #1F2937; }
+  .pick { font-size: 0.66rem; font-weight: 700; color: #fff; background: #2563EB; border-radius: 20px; padding: 2px 8px; }
+  .now { font-size: 0.66rem; font-weight: 700; color: #6B7280; border: 1px solid #E5E7EB; border-radius: 20px; padding: 2px 8px; }
+  .alt { font-size: 0.66rem; font-weight: 700; color: #6B7280; background: #F1F3F5; border-radius: 20px; padding: 2px 8px; }
+  .h { font-size: 0.7rem; font-weight: 600; color: #6B7280; margin-left: auto; }
+  .frame { background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 12px; padding: 14px; overflow-x: auto; }
+  .frame .card { max-width: 960px; margin: 0 auto; }
+
+  /* ── 아래는 app/landing_renderer.py 의 실제 값 그대로 ── */
+  .card { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 17px 20px; }
+  .flowsec { margin-bottom: 12px; }
+  .flowsec:last-of-type { margin-bottom: 0; }
+  .flowlab { font-size: 0.66rem; color: #6B7280; font-weight: 700; margin: 0 0 6px 2px; }
+  .flow { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; }
+  .flow a { text-decoration: none; display: flex; flex-direction: column; gap: 2px;
+    padding: 9px 14px; border-radius: 9px; min-width: 118px; flex: 1; }
+  .flow .lbl { font-size: 0.81rem; font-weight: 700; }
+  .flow .st { font-size: 0.7rem; font-weight: 600; color: #6B7280; }
+  .flow .arr { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 5px; }
+  .flow .arr span { color: #E5E7EB; font-size: 1.1rem; }
+  .flow .arr em { font-style: normal; font-size: 0.55rem; color: #6B7280; }
+  a.live { background: #FEF2F2; } a.live .lbl { color: #DC2626; }
+  a.draft { background: #EFF6FF; } a.draft .lbl { color: #2563EB; }
+  a.done { background: #EFF6FF; } a.done .lbl { color: #1E3A5F; }
+  a.arch { background: #F1F3F5; } a.arch .lbl { color: #6B7280; }
+  a.adhoc { background: #E3F1EE; } a.adhoc .lbl { color: #146B5E; }
+  a.archad { background: #F0F7F5; } a.archad .lbl { color: #146B5E; }
+  .solo a { background: #FBF0DA; flex-direction: row; align-items: center; gap: 9px; }
+  .solo .lbl { color: #8A5A14; }
+  .tagset { margin-left: auto; display: flex; gap: 4px; flex-wrap: wrap; }
+  .tag-chip { font-size: 0.6rem; font-weight: 700; color: #8A5A14; background: rgba(255,255,255,0.8);
+    border: 1px solid rgba(138,90,20,0.22); border-radius: 20px; padding: 2px 7px; }
+  .flowhead { display: flex; align-items: center; justify-content: space-between; margin: 0 0 6px 2px; }
+  .flowhead .flowlab { margin: 0; }
+  .gearlink { font-size: 0.73rem; color: #6B7280; text-decoration: none; border: 1px solid #E5E7EB;
+    border-radius: 20px; padding: 4px 11px; display: inline-flex; align-items: center; gap: 4px;
+    background: #fff; white-space: nowrap; }
+  .gearlink:hover { background: #EFF6FF; }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+
+  /* ── 시안에서 바뀌는 것 ── */
+  /* A·B 공통: 화살표 글자를 빼고, 화살표만 한 단계 진하게(테두리색 #E5E7EB → #CBD5E1) */
+  .v2 .flow .arr { padding: 0 7px; }
+  .v2 .flow .arr span { color: #CBD5E1; }
+  /* A·B 공통: 박스에 마우스를 올리면 살짝 떠 보이게 — 어디가 눌리는지 알려주는 정도만 */
+  .v2 .flow a { transition: box-shadow .12s; }
+  .v2 .flow a:hover { box-shadow: 0 0 0 1px rgba(30,58,95,0.14) inset; }
+  /* B안: 섹션 제목 줄이 없으니 줄 간격만 남긴다 */
+  .v3 .flowsec { margin-bottom: 8px; }
+  .v3 .flowsec:last-of-type { margin-bottom: 0; }
+  .liverow { display: flex; align-items: center; gap: 10px; }
+  .liverow .flow { flex: 1; }
+
+  /* 툴팁 문구 표 */
+  .tips { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 14px 18px; }
+  .tips h3 { font-size: 0.9rem; color: #1E3A5F; margin: 0 0 4px; }
+  .tips p { font-size: 0.78rem; color: #6B7280; margin: 0 0 10px; line-height: 1.6; }
+  .tips table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .tips td { padding: 7px 8px; border-top: 1px solid #E5E7EB; vertical-align: top; }
+  .tips td:first-child { white-space: nowrap; font-weight: 700; color: #1E3A5F; width: 130px; }
+</style>
+
+<div class="wrap">
+  <h1>홈 화면 · 흐름도 메뉴 정리</h1>
+  <p class="lead">
+    구조(4갈래 · 화살표 · 색)는 그대로 두고 <b>글자만 걷어내는</b> 방향입니다.
+    화살표 안 글자(회차 마감 · 다음 회차 · 골라 보내기 · 자정)는 7~8px이라 거의 안 읽히고, 그중 둘은
+    지금 동작과도 어긋나 있습니다(확정본은 이미 정기 보관함에 들어가 있고, 수시 보관함도 자정을 기다리지 않습니다).
+    A·B안은 대신 박스마다 <b>브라우저 기본 툴팁 한 줄</b>을 답니다 — <b>박스에 마우스를 1초쯤 올려보세요.</b>
+    폭은 실제 홈과 같은 960px입니다.
+  </p>
+
+  <!-- ─────────── 지금 ─────────── -->
+  <div class="col">
+    <h3><span class="now">지금</span> 섹션 제목 + 화살표 글자 <span class="h" data-h="now"></span></h3>
+    <p class="why">
+      같은 말이 두 번 나오는 자리(<b>실시간</b> 제목 아래 🔴 실시간 박스)와, 보관함 안의 폴더 구조를 설명하는 제목
+      (<b>일자 › 시간대</b>, <b>사안 › 일자</b>), 화살표 밑의 작은 글자가 한 카드에 겹쳐 있습니다.
+    </p>
+    <div class="frame">
+      <div class="card">
+        <div class="flowsec">
+          <div class="flowhead">
+            <p class="flowlab">실시간</p>
+            <a class="gearlink" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M19.1 14.4a1.5 1.5 0 0 0 .3 1.7l.1.1a1.9 1.9 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-1.7-.3 1.5 1.5 0 0 0-.9 1.4v.2a1.9 1.9 0 1 1-3.8 0v-.1a1.5 1.5 0 0 0-1-1.4 1.5 1.5 0 0 0-1.7.3l-.1.1a1.9 1.9 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0 .3-1.7 1.5 1.5 0 0 0-1.4-.9h-.2a1.9 1.9 0 1 1 0-3.8h.1a1.5 1.5 0 0 0 1.4-1 1.5 1.5 0 0 0-.3-1.7l-.1-.1a1.9 1.9 0 1 1 2.6-2.6l.1.1a1.5 1.5 0 0 0 1.7.3h.1a1.5 1.5 0 0 0 .9-1.4v-.2a1.9 1.9 0 1 1 3.8 0v.1a1.5 1.5 0 0 0 .9 1.4 1.5 1.5 0 0 0 1.7-.3l.1-.1a1.9 1.9 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0-.3 1.7v.1a1.5 1.5 0 0 0 1.4.9h.2a1.9 1.9 0 1 1 0 3.8h-.1a1.5 1.5 0 0 0-1.4.9Z"/></svg> 설정</a>
+          </div>
+          <div class="flow">
+            <a class="live" href="#"><span class="lbl">🔴 실시간</span><span class="st">1578건</span></a>
+          </div>
+        </div>
+        <div class="flowsec">
+          <p class="flowlab">모니터링 · 일자 › 시간대</p>
+          <div class="flow">
+            <a class="draft" href="#"><span class="lbl">⛏️ 초안</span><span class="st">65건</span></a>
+            <span class="arr"><span>→</span><em>회차 마감</em></span>
+            <a class="done" href="#"><span class="lbl">💎 확정본</span><span class="st">14:00 · 20건</span></a>
+            <span class="arr"><span>→</span><em>다음 회차</em></span>
+            <a class="arch" href="#"><span class="lbl">🗄️ 정기 보관함</span><span class="st">오늘 4회차</span></a>
+          </div>
+        </div>
+        <div class="flowsec">
+          <p class="flowlab">수시 모니터링 · 사안 › 일자</p>
+          <div class="flow">
+            <a class="adhoc" href="#"><span class="lbl">🔎 수집 원본</span><span class="st">오늘 2건</span></a>
+            <span class="arr"><span>→</span><em>골라 보내기</em></span>
+            <a class="adhoc" href="#"><span class="lbl">🗂️ 수집 확정본</span><span class="st">오늘 0건</span></a>
+            <span class="arr"><span>→</span><em>자정</em></span>
+            <a class="archad" href="#"><span class="lbl">📚 수시 보관함</span><span class="st">&nbsp;</span></a>
+          </div>
+        </div>
+        <div class="flowsec solo">
+          <p class="flowlab">라벨 · 회차와 사안을 가로질러</p>
+          <div class="flow">
+            <a href="#"><span style="font-size:0.95rem">🏷️</span><span class="lbl">라벨 보관함</span>
+              <span class="tagset"><span class="tag-chip">사진 아님 2</span><span class="tag-chip">비상경제본부회의 1</span><span class="tag-chip">테스트 1</span></span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────── A안 ─────────── -->
+  <div class="col">
+    <h3><span class="alt">A안</span> 화살표 글자만 뺌 <span class="h" data-h="a"></span></h3>
+    <p class="why">
+      가장 작은 변화 — 섹션 제목·설정 자리는 그대로이고, <b>화살표만 남기고 글자를 뺀 뒤</b> 화살표를 한 단계 진하게 했습니다
+      (지금은 테두리색이라 거의 안 보입니다). 화살표가 설명하던 내용은 박스 툴팁으로 옮깁니다.
+      제목 줄의 해명투(일자 › 시간대 등)는 남습니다.
+    </p>
+    <div class="frame">
+      <div class="card v2">
+        <div class="flowsec">
+          <div class="flowhead">
+            <p class="flowlab">실시간</p>
+            <a class="gearlink" href="#" title="검색어·수집 시간·언론사·발송 등 설정"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M19.1 14.4a1.5 1.5 0 0 0 .3 1.7l.1.1a1.9 1.9 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-1.7-.3 1.5 1.5 0 0 0-.9 1.4v.2a1.9 1.9 0 1 1-3.8 0v-.1a1.5 1.5 0 0 0-1-1.4 1.5 1.5 0 0 0-1.7.3l-.1.1a1.9 1.9 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0 .3-1.7 1.5 1.5 0 0 0-1.4-.9h-.2a1.9 1.9 0 1 1 0-3.8h.1a1.5 1.5 0 0 0 1.4-1 1.5 1.5 0 0 0-.3-1.7l-.1-.1a1.9 1.9 0 1 1 2.6-2.6l.1.1a1.5 1.5 0 0 0 1.7.3h.1a1.5 1.5 0 0 0 .9-1.4v-.2a1.9 1.9 0 1 1 3.8 0v.1a1.5 1.5 0 0 0 .9 1.4 1.5 1.5 0 0 0 1.7-.3l.1-.1a1.9 1.9 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0-.3 1.7v.1a1.5 1.5 0 0 0 1.4.9h.2a1.9 1.9 0 1 1 0 3.8h-.1a1.5 1.5 0 0 0-1.4.9Z"/></svg> 설정</a>
+          </div>
+          <div class="flow">
+            <a class="live" href="#" data-tip="live"><span class="lbl">🔴 실시간</span><span class="st">1578건</span></a>
+          </div>
+        </div>
+        <div class="flowsec">
+          <p class="flowlab">모니터링 · 일자 › 시간대</p>
+          <div class="flow">
+            <a class="draft" href="#" data-tip="draft"><span class="lbl">⛏️ 초안</span><span class="st">65건</span></a>
+            <span class="arr" aria-hidden="true"><span>→</span></span>
+            <a class="done" href="#" data-tip="done"><span class="lbl">💎 확정본</span><span class="st">14:00 · 20건</span></a>
+            <span class="arr" aria-hidden="true"><span>→</span></span>
+            <a class="arch" href="#" data-tip="arch"><span class="lbl">🗄️ 정기 보관함</span><span class="st">오늘 4회차</span></a>
+          </div>
+        </div>
+        <div class="flowsec">
+          <p class="flowlab">수시 모니터링 · 사안 › 일자</p>
+          <div class="flow">
+            <a class="adhoc" href="#" data-tip="adhoc"><span class="lbl">🔎 수집 원본</span><span class="st">오늘 2건</span></a>
+            <span class="arr" aria-hidden="true"><span>→</span></span>
+            <a class="adhoc" href="#" data-tip="bundle"><span class="lbl">🗂️ 수집 확정본</span><span class="st">오늘 0건</span></a>
+            <span class="arr" aria-hidden="true"><span>→</span></span>
+            <a class="archad" href="#" data-tip="archad"><span class="lbl">📚 수시 보관함</span><span class="st">&nbsp;</span></a>
+          </div>
+        </div>
+        <div class="flowsec solo">
+          <p class="flowlab">라벨 · 회차와 사안을 가로질러</p>
+          <div class="flow">
+            <a href="#" data-tip="label"><span style="font-size:0.95rem">🏷️</span><span class="lbl">라벨 보관함</span>
+              <span class="tagset"><span class="tag-chip">사진 아님 2</span><span class="tag-chip">비상경제본부회의 1</span><span class="tag-chip">테스트 1</span></span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────── B안 ─────────── -->
+  <div class="col">
+    <h3><span class="pick">B안 · 추천</span> 섹션 제목 줄까지 뺌 <span class="h" data-h="b"></span></h3>
+    <p class="why">
+      박스 이름(초안 · 확정본 · 정기 보관함 / 수집 원본 · 수집 확정본 · 수시 보관함)과 <b>줄마다 다른 색</b>이 이미
+      무슨 흐름인지 말하고 있어서 제목 줄을 통째로 뺐습니다. 설정은 갈 곳이 없어진 제목 줄 대신
+      <b>🔴 실시간 박스와 같은 줄 오른쪽</b>에 둡니다 — 카드 오른쪽 위라는 자리는 그대로입니다.
+    </p>
+    <div class="frame">
+      <div class="card v2 v3">
+        <div class="flowsec">
+          <div class="liverow">
+            <div class="flow">
+              <a class="live" href="#" data-tip="live"><span class="lbl">🔴 실시간</span><span class="st">1578건</span></a>
+            </div>
+            <a class="gearlink" href="#" title="검색어·수집 시간·언론사·발송 등 설정"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M19.1 14.4a1.5 1.5 0 0 0 .3 1.7l.1.1a1.9 1.9 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-1.7-.3 1.5 1.5 0 0 0-.9 1.4v.2a1.9 1.9 0 1 1-3.8 0v-.1a1.5 1.5 0 0 0-1-1.4 1.5 1.5 0 0 0-1.7.3l-.1.1a1.9 1.9 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0 .3-1.7 1.5 1.5 0 0 0-1.4-.9h-.2a1.9 1.9 0 1 1 0-3.8h.1a1.5 1.5 0 0 0 1.4-1 1.5 1.5 0 0 0-.3-1.7l-.1-.1a1.9 1.9 0 1 1 2.6-2.6l.1.1a1.5 1.5 0 0 0 1.7.3h.1a1.5 1.5 0 0 0 .9-1.4v-.2a1.9 1.9 0 1 1 3.8 0v.1a1.5 1.5 0 0 0 .9 1.4 1.5 1.5 0 0 0 1.7-.3l.1-.1a1.9 1.9 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0-.3 1.7v.1a1.5 1.5 0 0 0 1.4.9h.2a1.9 1.9 0 1 1 0 3.8h-.1a1.5 1.5 0 0 0-1.4.9Z"/></svg> 설정</a>
+          </div>
+        </div>
+        <div class="flowsec">
+          <div class="flow">
+            <a class="draft" href="#" data-tip="draft"><span class="lbl">⛏️ 초안</span><span class="st">65건</span></a>
+            <span class="arr" aria-hidden="true"><span>→</span></span>
+            <a class="done" href="#" data-tip="done"><span class="lbl">💎 확정본</span><span class="st">14:00 · 20건</span></a>
+            <span class="arr" aria-hidden="true"><span>→</span></span>
+            <a class="arch" href="#" data-tip="arch"><span class="lbl">🗄️ 정기 보관함</span><span class="st">오늘 4회차</span></a>
+          </div>
+        </div>
+        <div class="flowsec">
+          <div class="flow">
+            <a class="adhoc" href="#" data-tip="adhoc"><span class="lbl">🔎 수집 원본</span><span class="st">오늘 2건</span></a>
+            <span class="arr" aria-hidden="true"><span>→</span></span>
+            <a class="adhoc" href="#" data-tip="bundle"><span class="lbl">🗂️ 수집 확정본</span><span class="st">오늘 0건</span></a>
+            <span class="arr" aria-hidden="true"><span>→</span></span>
+            <a class="archad" href="#" data-tip="archad"><span class="lbl">📚 수시 보관함</span><span class="st">&nbsp;</span></a>
+          </div>
+        </div>
+        <div class="flowsec solo">
+          <div class="flow">
+            <a href="#" data-tip="label"><span style="font-size:0.95rem">🏷️</span><span class="lbl">라벨 보관함</span>
+              <span class="tagset"><span class="tag-chip">사진 아님 2</span><span class="tag-chip">비상경제본부회의 1</span><span class="tag-chip">테스트 1</span></span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────── 툴팁 문구 ─────────── -->
+  <div class="tips">
+    <h3>툴팁 문구 (A·B 공통)</h3>
+    <p>
+      브라우저 기본 <code>title</code> 툴팁이라 새 팝업·JS가 없고, 박스를 누르는 데 방해되지 않습니다.
+      매일 쓰는 담당자에겐 안 보이는 것과 같고, 처음 쓰는 사람만 올려보면 됩니다.
+      화살표가 하던 설명("회차 마감", "골라 보내기")은 <b>받는 쪽 박스</b>의 문구로 옮겼습니다.
+    </p>
+    <table id="tip-table"></table>
+  </div>
+</div>
+
+<script>
+  // 툴팁 문구 한 곳 — 박스의 title과 아래 표가 같은 값을 쓴다.
+  var TIPS = {
+    live:   ['🔴 실시간',     '등록한 모든 검색어의 오늘 기사를 거르지 않고 그대로 보여줍니다'],
+    draft:  ['⛏️ 초안',       '지금 진행 중인 회차 — 마감 전까지 여기서 정리합니다'],
+    done:   ['💎 확정본',     '회차가 마감되면 초안이 여기로 넘어옵니다 · 여기서 발송합니다'],
+    arch:   ['🗄️ 정기 보관함', '확정된 회차를 날짜별로 모아 둡니다'],
+    adhoc:  ['🔎 수집 원본',   '사안·검색어·시간을 정해 따로 모은 기사입니다'],
+    bundle: ['🗂️ 수집 확정본', '수집 원본에서 골라 보낸 기사를 한 곳에 모읍니다'],
+    archad: ['📚 수시 보관함', '수시로 모은 것을 사안별·날짜별로 모아 둡니다'],
+    label:  ['🏷️ 라벨 보관함', '라벨을 붙인 기사를 정기·수시 가리지 않고 모아 봅니다']
+  };
+  document.querySelectorAll('[data-tip]').forEach(function (a) {
+    a.title = TIPS[a.dataset.tip][1];
+  });
+  var rows = Object.keys(TIPS).map(function (k) {
+    return '<tr><td>' + TIPS[k][0] + '</td><td>' + TIPS[k][1] + '</td></tr>';
+  });
+  document.getElementById('tip-table').innerHTML = rows.join('');
+  // 시안 링크는 어디로도 가지 않는다
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('a[href="#"]')) e.preventDefault();
+  });
+  // 카드 높이를 제목 옆에 적어 세 안을 숫자로도 비교한다
+  function showHeights() {
+    var cards = document.querySelectorAll('.frame .card');
+    ['now', 'a', 'b'].forEach(function (k, i) {
+      document.querySelector('[data-h="' + k + '"]').textContent =
+        '카드 높이 ' + Math.round(cards[i].getBoundingClientRect().height) + 'px';
+    });
+  }
+  window.addEventListener('load', showHeights);
+  window.addEventListener('resize', showHeights);
+</script>

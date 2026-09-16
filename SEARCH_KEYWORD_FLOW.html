@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>검색어 기능 흐름 — 현재 동작</title><style>
+  body { margin: 0; background: #F8FAFC; color: #1F2937;
+    font-family: 'Pretendard', 'Noto Sans KR', -apple-system, sans-serif; }
+  .page { max-width: 1080px; margin: 0 auto; padding: 30px 26px 70px; }
+  h1 { font-size: 1.35rem; color: #1E3A5F; margin: 0 0 6px; }
+  .sub { color: #6B7280; font-size: 0.86rem; margin: 0 0 28px; line-height: 1.6; }
+  .sub b { color: #1E3A5F; }
+
+  .flow { display: flex; align-items: flex-start; }
+  .src { flex: 0 0 306px; position: relative; margin-right: 36px; }
+  .src::after { content: ""; position: absolute; right: -36px; top: 168px;
+    width: 36px; height: 2px; background: #D3DBE5; }
+
+  .box { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 15px 16px; }
+  .box > h2 { font-size: 0.95rem; color: #1E3A5F; margin: 0 0 3px;
+    display: flex; align-items: baseline; gap: 7px; }
+  .box > h2 .path { font-weight: 400; font-size: 0.73rem; color: #93A0B0;
+    font-family: ui-monospace, Menlo, monospace; }
+  .box > .cap { color: #6B7280; font-size: 0.77rem; margin: 0 0 12px; line-height: 1.55; }
+
+  .grp { border: 1px solid #DCE4EE; border-radius: 8px; padding: 9px 11px; margin-top: 8px; background: #FCFDFF; }
+  .grp .gname { font-size: 0.84rem; font-weight: 700; color: #1E3A5F;
+    display: flex; align-items: center; gap: 6px; }
+  .grp .mode { font-size: 0.68rem; font-weight: 700; color: #2563EB;
+    background: #EFF6FF; border: 1px solid #BFD3F5; border-radius: 999px; padding: 1px 7px; }
+  .grp .kw { margin: 7px 0 0; display: flex; flex-wrap: wrap; gap: 4px; }
+  .grp .kw span { font-size: 0.73rem; background: #F1F5F9; border: 1px solid #E2E8F0;
+    border-radius: 5px; padding: 2px 6px; color: #334155; }
+  .grp .kw span.off { color: #B6BEC8; text-decoration: line-through; background: #FAFBFC; }
+  .grp .sw { margin-top: 8px; display: flex; flex-direction: column; gap: 3px;
+    font-size: 0.74rem; color: #4B5563; }
+  .grp .sw i { font-style: normal; font-weight: 700; }
+  .grp .sw .on { color: #15803D; }
+  .grp .sw .no { color: #9CA3AF; }
+  .grp.dim { background: #F7F8FA; border-style: dashed; }
+  .grp.dim .gname { color: #9CA3AF; }
+
+  .side { margin-top: 14px; background: #FFFFFF; border: 1px dashed #DDE3EB;
+    border-radius: 10px; padding: 13px 15px; }
+  .side h3 { font-size: 0.8rem; color: #6B7280; margin: 0 0 8px; font-weight: 700; }
+  .side p { margin: 0 0 7px; font-size: 0.78rem; line-height: 1.6; color: #4B5563; }
+  .side p:last-child { margin-bottom: 0; }
+  .side b { color: #1E3A5F; }
+
+  .branches { flex: 1; position: relative; padding-left: 46px; min-width: 0; }
+  .branches::before { content: ""; position: absolute; left: 0; top: 30px; bottom: 32px;
+    width: 2px; background: #D3DBE5; }
+  .branch { position: relative; border-radius: 12px; padding: 14px 16px 16px; margin-bottom: 16px; }
+  .branch:last-child { margin-bottom: 0; }
+  .branch::before { content: ""; position: absolute; left: -46px; top: 28px;
+    width: 38px; height: 2px; background: #D3DBE5; }
+  .branch::after { content: ""; position: absolute; left: -10px; top: 23px;
+    border: 6px solid transparent; border-left-color: #C3CDDB; }
+
+  .branch > .head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .pill { border-radius: 999px; padding: 3px 12px; font-size: 0.79rem; font-weight: 700; color: #FFFFFF; }
+  .scope { font-size: 0.78rem; font-weight: 700; }
+  .branch > .why { margin: 0 0 12px; font-size: 0.78rem; color: #6B7280; line-height: 1.6; }
+
+  .chain { display: flex; align-items: stretch; flex-wrap: wrap; gap: 8px; }
+  .step { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 9px;
+    padding: 10px 12px; min-width: 104px; flex: 1 1 0; }
+  .step .t { font-size: 0.85rem; font-weight: 700; color: #1E3A5F; }
+  .step .d { font-size: 0.74rem; color: #6B7280; margin-top: 4px; line-height: 1.55; }
+  .step.ghost { background: transparent; border-style: dashed; }
+  .arw { align-self: center; color: #B7C1CE; font-size: 0.95rem; flex: 0 0 auto; }
+  .arw small { display: block; font-size: 0.66rem; color: #9CA3AF; text-align: center; margin-top: -2px; }
+
+  .b-live { background: #FEF4F4; border: 1px solid #F6D9D9; }
+  .b-live .pill { background: #DC2626; }
+  .b-live .scope { color: #B02222; }
+  .b-reg { background: #F2F7FE; border: 1px solid #D8E5F8; }
+  .b-reg .pill { background: #2563EB; }
+  .b-reg .scope { color: #1E4FB0; }
+  .b-alert { background: #FFFBEB; border: 1px solid #FDE68A; }
+  .b-alert .pill { background: #B45309; }
+  .b-alert .scope { color: #92400E; }
+  .b-adhoc { background: #F0F8F6; border: 1px solid #CFE6E0; }
+  .b-adhoc .pill { background: #146B5E; }
+  .b-adhoc .scope { color: #146B5E; }
+
+  .kwline { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 10px; }
+  .kwline span { font-size: 0.73rem; border-radius: 5px; padding: 2px 7px;
+    background: #FFFFFF; border: 1px solid #E5E7EB; color: #374151; }
+  .kwline span.must { background: #E3F1EE; border-color: #BFDCD5; color: #146B5E; font-weight: 700; }
+
+  .foot { margin-top: 30px; background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-left: 3px solid #2563EB; border-radius: 8px; padding: 15px 17px; }
+  .foot h3 { margin: 0 0 9px; font-size: 0.88rem; color: #1E3A5F; }
+  .foot ul { margin: 0; padding-left: 19px; }
+  .foot li { font-size: 0.81rem; line-height: 1.85; color: #374151; }
+  .foot b { color: #1E3A5F; }
+  .foot code { font-family: ui-monospace, Menlo, monospace; font-size: 0.76rem;
+    background: #F1F5F9; border-radius: 4px; padding: 1px 5px; color: #334155; }
+
+  @media (max-width: 860px) {
+    .flow { display: block; }
+    .src { margin: 0 0 20px; }
+    .src::after { display: none; }
+    .branches { padding-left: 0; }
+    .branches::before, .branch::before, .branch::after { display: none; }
+  }
+</style></head><body>
+<div class="page">
+  <h1>검색어가 지금 어떻게 쓰이는가</h1>
+  <p class="sub">검색어 목록은 <b>「검색어 그룹」 하나</b>뿐이다. 갈래마다 다른 건 “그 목록의 <b>어디까지</b> 쓰느냐”뿐이고,
+    상시/대기 같은 상태값은 없다. 사안 수집만 이 목록을 아예 안 쓰고 카드마다 직접 입력한다.</p>
+
+  <div class="flow">
+    <!-- ── 출발점 ── -->
+    <div class="src">
+      <div class="box">
+        <h2>🔑 검색어 그룹 <span class="path">/keywords</span></h2>
+        <p class="cap">최대 8그룹 × 그룹당 10개 · 그룹끼리는 <b>항상 OR</b><br />
+          그룹마다 스위치 2개 + 키워드별 체크</p>
+
+        <div class="grp">
+          <div class="gname">기관 정보 (기본) <span class="mode">OR</span></div>
+          <div class="kw"><span>재정경제부</span><span>구윤철</span><span class="off">기재부</span></div>
+          <div class="sw">
+            <div><i class="on">✓ 켜짐</i> — 어디서든 쓰임</div>
+            <div><i class="on">✓ 정기 스크랩에도 포함</i></div>
+          </div>
+        </div>
+
+        <div class="grp">
+          <div class="gname">세제 개편 <span class="mode">AND</span></div>
+          <div class="kw"><span>세제</span><span>개편안</span></div>
+          <div class="sw">
+            <div><i class="on">✓ 켜짐</i></div>
+            <div><i class="no">✗ 정기 스크랩 포함 안 함</i> — 실시간에만</div>
+          </div>
+        </div>
+
+        <div class="grp dim">
+          <div class="gname">환율 감시 <span class="mode">OR</span></div>
+          <div class="kw"><span class="off">환율</span><span class="off">외환시장</span></div>
+          <div class="sw"><div><i class="no">✗ 꺼짐</i> — 네 갈래 전부에서 빠짐</div></div>
+        </div>
+      </div>
+
+      <div class="side">
+        <h3>검색과 무관한 별도 목록 (같은 화면에 있지만 검색엔 안 쓰임)</h3>
+        <p><b>🖍️ 형광펜 단어</b> (최대 20) — 요약문에 색칠만. 기사를 더 가져오거나 덜 가져오지 않는다.</p>
+        <p><b>📈 정책 단어 추이</b> (최대 8, <code>/trend</code>) — 등록 검색어에서 골라 담을 수 있지만 저장은 따로. <b>이미 저장된</b> 회차 기사의 제목+요약을 문자열로 세기만 한다.</p>
+      </div>
+    </div>
+
+    <!-- ── 네 갈래 ── -->
+    <div class="branches">
+
+      <div class="branch b-live">
+        <div class="head"><span class="pill">🔴 실시간 기사 현황</span>
+          <span class="scope">켜진 그룹 전부 — 정기 포함 여부 무시</span></div>
+        <p class="why">화면을 열 때마다 새로 검색 · 저장 없음 · <b>필터 없음</b>(같은 제목·사진 기사·언론사 화이트리스트 전부 미적용, 숨긴 기사도 표시만 하고 남긴다)</p>
+        <div class="chain">
+          <div class="step"><div class="t">켜진 그룹 전부</div><div class="d">그룹 안에서만 각자의 OR/AND, 그룹끼리는 OR</div></div>
+          <div class="arw">→<small>검색</small></div>
+          <div class="step"><div class="t">당일 0시 ~ 현재</div><div class="d">키워드별 증분 캐시 — 두 번째부터는 “마지막 본 시각 −60분”부터만</div></div>
+          <div class="arw">→</div>
+          <div class="step"><div class="t">시간순 목록</div><div class="d">검색어를 켜고 끄면 재검색 없이 즉시 반영(새 키워드만 실제로 검색)</div></div>
+        </div>
+      </div>
+
+      <div class="branch b-reg">
+        <div class="head"><span class="pill">💎 정기 스크랩</span>
+          <span class="scope">“정기 스크랩에도 포함” ✓ 그룹만</span></div>
+        <p class="why">회차 시각(기본 4회)에 자동 실행 · 그 회차의 <b>시간창(start~end)에 발행된 기사만</b> 수집</p>
+        <div class="chain">
+          <div class="step"><div class="t">✓ 표시한 그룹</div><div class="d">실시간이 쓰는 목록의 부분집합</div></div>
+          <div class="arw">→</div>
+          <div class="step"><div class="t">⛏️ 초안</div><div class="d">회차 진행 중 자동 생성 · 같은 그룹으로 계속 검색 · AI 소제목 분류</div></div>
+          <div class="arw">→<small>마감</small></div>
+          <div class="step"><div class="t">💎 확정본</div><div class="d">회차 파일로 저장 — 기사마다 <b>걸린 검색어</b>도 그때 기준으로 함께 박제</div></div>
+          <div class="arw">→<small>5분 뒤</small></div>
+          <div class="step"><div class="t">📤 발송</div><div class="d">텔레그램 · 이메일 (자동 발송 ON일 때)</div></div>
+        </div>
+      </div>
+
+      <div class="branch b-alert">
+        <div class="head"><span class="pill">🚨 [단독]·[속보] 알림</span>
+          <span class="scope">감시 대상으로 따로 고른 그룹만</span></div>
+        <p class="why"><code>/breaking-alert</code>에서 그룹을 골라 체크 · 고른 그룹의 키워드를 <b>평평하게 모아</b> 넓게 훑는다(그룹의 OR/AND는 재현하지 않음)</p>
+        <div class="chain">
+          <div class="step"><div class="t">고른 그룹의 키워드</div><div class="d">정기 포함 여부와 무관 — 이 축은 완전히 별개</div></div>
+          <div class="arw">→<small>3~30분</small></div>
+          <div class="step"><div class="t">폴링 검색</div><div class="d">정해둔 감시 시간대에만 · 하루 호출이 한도 80%를 넘으면 이 폴링만 멈춤</div></div>
+          <div class="arw">→</div>
+          <div class="step"><div class="t">텔레그램 알림</div><div class="d">받는 사람은 정기 수신자와 따로 지정</div></div>
+        </div>
+        <div class="chain" style="margin-top:8px">
+          <div class="step ghost"><div class="t">＋ 정기 회차가 저장되기 직전에도 한 번 검사</div>
+            <div class="d">이 경로는 감시 설정을 전부 꺼도 항상 동작하고, 이미 검색해둔 결과를 보므로 추가 호출 0회</div></div>
+        </div>
+      </div>
+
+      <div class="branch b-adhoc">
+        <div class="head"><span class="pill">🗂️ 사안 수집</span>
+          <span class="scope">검색어 그룹을 안 쓴다 — 카드마다 직접 입력</span></div>
+        <p class="why">담당자가 사안·검색어·시간창을 직접 정해 한 번에 수집 · 자동 실행 없음 · 발송 없음 · 오늘 안에서만</p>
+        <div class="kwline"><span>부동산 대책</span><span>공급 계획</span><span class="must">＋ 꼭 포함: 국토부</span></div>
+        <div class="chain">
+          <div class="step"><div class="t">새 수집 카드</div><div class="d">검색어 최대 5개(OR) + 꼭 포함할 검색어 최대 3개(AND) · 시간창 직접 지정</div></div>
+          <div class="arw">→</div>
+          <div class="step"><div class="t">수집 결과</div><div class="d">카드 안에서 검색어를 고쳐 다시 불러오기 가능 — 조건을 되돌리면 배정·순서까지 그대로 돌아옴</div></div>
+          <div class="arw">→</div>
+          <div class="step"><div class="t">📌 담아두기</div><div class="d">여기서만 정기와 만난다 — 그날 확정본의 “담아둔 기사” 칸으로</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="foot">
+    <h3>이 그림에서 가장 헷갈리기 쉬운 네 가지</h3>
+    <ul>
+      <li><b>실시간 ⊇ 정기</b> — 실시간은 켜진 그룹 <b>전부</b>, 정기는 그중 “정기 스크랩에도 포함”을 켠 그룹만. 실시간이 비공식·미완이 아니라 <b>더 넓은</b> 쪽이다.</li>
+      <li><b>스위치는 두 개다</b> — <code>켜짐</code>을 끄면 네 갈래 어디에도 안 나오고, <code>정기 스크랩에도 포함</code>만 끄면 실시간·알림엔 남고 정기 회차에서만 빠진다.</li>
+      <li><b>알림 감시 그룹은 제3의 축</b> — 정기 포함 여부와 아무 관계 없이 <code>/breaking-alert</code>에서 따로 고른다.</li>
+      <li><b>검색어를 바꾸면 앞으로만 바뀐다</b> — 실시간·초안은 즉시 반영되지만, 이미 저장된 확정본에 박힌 “걸린 검색어”는 <b>그 회차 수집 당시 기준</b>으로 남는다(그 회차가 왜 이렇게 모였는지의 기록).</li>
+    </ul>
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>아이콘 후보 — 확정에 넣기 / 정기로 보내기</title>
+<style>
+  :root {
+    --bg:#F8FAFC; --card:#FFF; --header:#1E3A5F; --accent:#2563EB; --text:#1F2937;
+    --muted:#6B7280; --border:#E5E7EB; --hover:#EFF6FF;
+    --adhoc-bg:#E3F1EE; --adhoc-text:#146B5E;
+    --pin-gray:#6B7280; --on-fill:#FFF;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font-family:'Pretendard','Noto Sans KR',sans-serif; }
+  /* 앱과 동일한 아이콘 규격 (app/icons.py의 .ic) */
+  .ic { width:1em; height:1em; stroke:currentColor; fill:none; stroke-width:1.9;
+    stroke-linecap:round; stroke-linejoin:round; vertical-align:-0.15em; flex-shrink:0; }
+  .container { max-width:900px; margin:0 auto; padding:28px 24px 80px; }
+  h1 { color:var(--header); font-size:1.25rem; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:0.85rem; margin:0 0 22px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:20px 22px; margin-bottom:16px; }
+  h2 { font-size:1rem; color:var(--header); margin:0 0 4px; }
+  .h2sub { color:var(--muted); font-size:0.8rem; margin:0 0 16px; }
+
+  /* --- 1. 확대 보기 --- */
+  .big-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:14px; }
+  .big-cell { border:1px solid var(--border); border-radius:10px; padding:14px 8px; text-align:center; }
+  .big-cell .glyph { font-size:44px; color:var(--text); line-height:1; }
+  .big-cell .nm { font-size:0.76rem; color:var(--muted); margin-top:9px; font-family:ui-monospace,monospace; }
+  .big-cell .desc { font-size:0.72rem; color:var(--muted); margin-top:3px; line-height:1.4; }
+  .big-cell.isnew { border-color:var(--adhoc-text); background:var(--adhoc-bg); }
+  .big-cell.isnew .nm { color:var(--adhoc-text); font-weight:700; }
+  .big-cell.cur { border-color:#FCA5A5; background:#FEF2F2; }
+
+  /* --- 2. 실제 행 --- */
+  .row { display:flex; align-items:flex-start; gap:8px; padding:9px 6px;
+    border-bottom:1px solid var(--border); }
+  .row:last-child { border-bottom:none; }
+  .row:hover { background:var(--hover); }
+  .row-body { flex:1; min-width:0; }
+  .row-title { font-size:0.92rem; line-height:1.5; }
+  .row-title .outlet { color:var(--muted); font-weight:600; }
+  .row-meta { margin-top:3px; font-size:0.76rem; color:var(--muted); }
+  .acts { display:flex; align-items:flex-start; gap:4px; flex-shrink:0; }
+  .acts > div { display:flex; flex-direction:column; align-items:center; min-width:62px; }
+  /* 앱과 동일 (.icon-btn) */
+  .icon-btn { border:none; background:none; color:var(--muted); border-radius:6px;
+    padding:4px 6px; cursor:pointer; display:inline-flex; align-items:center; font-size:1rem; }
+  .icon-btn:hover { background:var(--hover); color:var(--accent); }
+  .icon-btn.on { color:var(--on-fill); background:var(--adhoc-text); }
+  .icon-btn.pin-on { color:var(--on-fill); background:var(--pin-gray); }
+  .lbl-under { display:block; text-align:center; font-size:0.64rem; color:var(--adhoc-text);
+    font-weight:700; margin-top:3px; white-space:nowrap; }
+  .combo-name { font-size:0.78rem; color:var(--adhoc-text); font-weight:700; margin:16px 0 2px;
+    padding-top:14px; border-top:1px dashed var(--border); }
+  .combo-name:first-of-type { border-top:none; padding-top:0; margin-top:0; }
+  .combo-why { font-size:0.75rem; color:var(--muted); margin:0 0 8px; }
+
+  /* --- 표 --- */
+  table { width:100%; border-collapse:collapse; font-size:0.82rem; margin-top:6px; }
+  th,td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:0.76rem; }
+  td .g { font-size:1.15rem; }
+  .verdict-ok { color:var(--adhoc-text); font-weight:700; }
+  .verdict-no { color:#B91C1C; }
+  .note { background:#FFFBEB; border:1px solid #FCD34D; border-radius:8px;
+    padding:12px 14px; font-size:0.82rem; color:#92400E; line-height:1.7; }
+  .note b { display:block; margin-bottom:4px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>아이콘 후보 비교</h1>
+<p class="sub">전부 앱의 실제 규격(<code>viewBox 0 0 24 24</code>, <code>stroke-width 1.9</code>, <code>1em</code>, 단색)으로 그린 것 — 이모지 아님</p>
+
+<!-- ================= 1. 확대 ================= -->
+<div class="card">
+  <h2>1. 확대해서 모양 보기 <span style="font-weight:400;color:#6B7280;font-size:0.85rem">(44px)</span></h2>
+  <p class="h2sub">🟩 = 새로 만들어야 하는 것 · 🟥 = 지금 쓰는 것</p>
+  <div class="big-grid">
+
+    <div class="big-cell cur">
+      <div class="glyph"><svg class="ic" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg></div>
+      <div class="nm">pin</div><div class="desc">지금 쓰는 📌<br>(담아두기)</div>
+    </div>
+
+    <div class="big-cell">
+      <div class="glyph"><svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg></div>
+      <div class="nm">in</div><div class="desc"><b>이미 있음</b><br>트레이에 넣기</div>
+    </div>
+
+    <div class="big-cell isnew">
+      <div class="glyph"><svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 8l5-5 5 5"/><path d="M12 3v12"/></svg></div>
+      <div class="nm">out</div><div class="desc">in의 화살표만<br>뒤집은 것</div>
+    </div>
+
+    <div class="big-cell">
+      <div class="glyph"><svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></div>
+      <div class="nm">external_link</div><div class="desc"><b>이미 있음</b><br>원문보기에 쓰는 중</div>
+    </div>
+
+    <div class="big-cell">
+      <div class="glyph"><svg class="ic" viewBox="0 0 24 24"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg></div>
+      <div class="nm">send</div><div class="desc"><b>이미 있음</b><br>아직 아무데도 안 씀</div>
+    </div>
+
+    <div class="big-cell">
+      <div class="glyph"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.6h8.8A1.5 1.5 0 0 1 21 9.1v9.4a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5Z"/></svg></div>
+      <div class="nm">folder</div><div class="desc"><b>이미 있음</b><br>내가 말한 🗂️</div>
+    </div>
+
+    <div class="big-cell isnew">
+      <div class="glyph"><svg class="ic" viewBox="0 0 24 24"><path d="M4 12h12"/><path d="m11 7 5 5-5 5"/><path d="M20 4v16"/></svg></div>
+      <div class="nm">to_wall</div><div class="desc">벽(=정기) 쪽으로<br>밀어 넣기</div>
+    </div>
+
+    <div class="big-cell">
+      <div class="glyph"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.3 2.6 2.6 5-5"/></svg></div>
+      <div class="nm">check_circle</div><div class="desc"><b>이미 있음</b><br>"확정됨" 느낌</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ================= 2. 실제 행 ================= -->
+<div class="card">
+  <h2>2. 실제 버튼 크기로, 한 행에 나란히</h2>
+  <p class="h2sub">여기가 진짜 판단 기준 — 두 버튼이 옆에 붙었을 때 <b>서로 구분되는지</b>가 전부야.<br>
+    (수집 확정 화면의 기사 행 · 확정에 넣은 상태 = 채운 청록, 정기로 보낸 상태 = 채운 회색)</p>
+
+  <div class="combo-name">조합 A ─ in / out  ·  <span style="color:#6B7280;font-weight:400">추천</span></div>
+  <p class="combo-why">같은 트레이에 화살표만 반대. 안으로 넣기 ↔ 밖으로 내보내기가 모양만으로 갈림.</p>
+  <div class="row">
+    <div class="row-body">
+      <div class="row-title"><span class="outlet">(KBS)</span> 정부, 부동산 세제개편안 발표…다주택자 종부세 완화</div>
+      <div class="row-meta">11:42 게시 · 원문보기</div>
+    </div>
+    <div class="acts">
+      <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+      <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+      <div><button class="icon-btn on"><svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg></button><span class="lbl-under">확정에 넣음</span></div>
+      <div><button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 8l5-5 5 5"/><path d="M12 3v12"/></svg></button><span class="lbl-under">정기로</span></div>
+      <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+    </div>
+  </div>
+
+  <div class="combo-name">조합 B ─ in / external_link</div>
+  <p class="combo-why">"밖으로 나간다"는 이미 원문보기에서 쓰던 뜻 — 근데 그래서 같은 행에 두 번 나와.</p>
+  <div class="row">
+    <div class="row-body">
+      <div class="row-title"><span class="outlet">(KBS)</span> 정부, 부동산 세제개편안 발표…다주택자 종부세 완화</div>
+      <div class="row-meta">11:42 게시 · 원문보기 <svg class="ic" viewBox="0 0 24 24" style="font-size:0.75rem"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg> ← 여기 이미 있음</div>
+    </div>
+    <div class="acts">
+      <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+      <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+      <div><button class="icon-btn on"><svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg></button><span class="lbl-under">확정에 넣음</span></div>
+      <div><button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></button><span class="lbl-under">정기로</span></div>
+      <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+    </div>
+  </div>
+
+  <div class="combo-name">조합 C ─ in / send</div>
+  <p class="combo-why">종이비행기. 근데 이 앱에서 "보내기"는 <b>텔레그램·이메일 발송</b>이라 뜻이 겹칠 위험.</p>
+  <div class="row">
+    <div class="row-body">
+      <div class="row-title"><span class="outlet">(KBS)</span> 정부, 부동산 세제개편안 발표…다주택자 종부세 완화</div>
+      <div class="row-meta">11:42 게시 · 원문보기</div>
+    </div>
+    <div class="acts">
+      <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+      <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+      <div><button class="icon-btn on"><svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg></button><span class="lbl-under">확정에 넣음</span></div>
+      <div><button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg></button><span class="lbl-under">정기로</span></div>
+      <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+    </div>
+  </div>
+
+  <div class="combo-name">조합 D ─ folder / out</div>
+  <p class="combo-why">내가 처음 말한 🗂️. 근데 폴더는 <b>"보관"</b>으로 읽혀서 "넣는 동작"이 약해.</p>
+  <div class="row">
+    <div class="row-body">
+      <div class="row-title"><span class="outlet">(KBS)</span> 정부, 부동산 세제개편안 발표…다주택자 종부세 완화</div>
+      <div class="row-meta">11:42 게시 · 원문보기</div>
+    </div>
+    <div class="acts">
+      <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+      <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+      <div><button class="icon-btn on"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.6h8.8A1.5 1.5 0 0 1 21 9.1v9.4a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5Z"/></svg></button><span class="lbl-under">확정에 넣음</span></div>
+      <div><button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 8l5-5 5 5"/><path d="M12 3v12"/></svg></button><span class="lbl-under">정기로</span></div>
+      <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+    </div>
+  </div>
+
+  <div class="combo-name">조합 E ─ 지금 상태 (비교용) ─ in / pin</div>
+  <p class="combo-why">📌를 그대로 두면? 핀과 트레이는 모양이 꽤 다르긴 해. 문제는 <b>모양보다 말</b>이었을 수도.</p>
+  <div class="row">
+    <div class="row-body">
+      <div class="row-title"><span class="outlet">(KBS)</span> 정부, 부동산 세제개편안 발표…다주택자 종부세 완화</div>
+      <div class="row-meta">11:42 게시 · 원문보기</div>
+    </div>
+    <div class="acts">
+      <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+      <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+      <div><button class="icon-btn on"><svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg></button><span class="lbl-under">확정에 넣음</span></div>
+      <div><button class="icon-btn pin-on"><svg class="ic" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg></button><span class="lbl-under">담아둠</span></div>
+      <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 3. 정리 ================= -->
+<div class="card">
+  <h2>3. 정리</h2>
+  <table>
+    <tr><th style="width:70px">후보</th><th>좋은 점</th><th>걸리는 점</th><th style="width:80px">판정</th></tr>
+    <tr>
+      <td><span class="g"><svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 8l5-5 5 5"/><path d="M12 3v12"/></svg></span> out</td>
+      <td>이미 있는 <code>in</code>과 <b>정확히 한 쌍</b>. 트레이는 그대로, 화살표만 반대라 안/밖이 즉시 읽힘. 새 어휘를 안 배워도 됨</td>
+      <td>새로 하나 만들어야 함(그래봐야 3줄)</td>
+      <td class="verdict-ok">추천</td>
+    </tr>
+    <tr>
+      <td><span class="g"><svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></span> external_link</td>
+      <td>"밖으로"가 직관적, 이미 있음</td>
+      <td><b>같은 행에 이미 쓰이고 있음</b>(원문보기). 한 행에 같은 아이콘이 두 번 나오는데 뜻이 다름 — 제일 위험</td>
+      <td class="verdict-no">탈락</td>
+    </tr>
+    <tr>
+      <td><span class="g"><svg class="ic" viewBox="0 0 24 24"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg></span> send</td>
+      <td>이미 있고 아무데도 안 씀</td>
+      <td>이 앱에서 "보내기"는 <b>텔레그램·이메일 발송</b>(되돌릴 수 없는 동작, 초록색)이라 뜻이 겹침. 담아두기는 되돌릴 수 있는 건데 발송처럼 보이면 안 됨</td>
+      <td class="verdict-no">탈락</td>
+    </tr>
+    <tr>
+      <td><span class="g"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.6h8.8A1.5 1.5 0 0 1 21 9.1v9.4a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5Z"/></svg></span> folder</td>
+      <td>홈 흐름도의 🗂️와 짝이 맞음</td>
+      <td>폴더는 "보관"이라 <b>동작이 아니라 장소</b>로 읽힘. 넣는 건지 여는 건지 모호</td>
+      <td>보류</td>
+    </tr>
+    <tr>
+      <td><span class="g"><svg class="ic" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg></span> pin</td>
+      <td>세 화면에서 이미 쓰는 확립된 어휘, 도착지 구획 이름도 「📌 담아둔 기사」</td>
+      <td>「확정에 넣기」와 나란히 서면 둘 다 "어딘가로 보낸다"로 읽힘</td>
+      <td>가능</td>
+    </tr>
+  </table>
+</div>
+
+<div class="note">
+  <b>⚠️ 결정 전에 알아둘 것 — 이걸 바꾸면 실시간현황도 같이 바꿔야 해</b>
+  📌 「담아두기」는 <b>실시간현황에도 똑같이 있는 버튼</b>이야(같은 저장소 <code>manual_articles.json</code>, 같은 동작).
+  수시에서만 바꾸면 같은 동작이 두 화면에서 다른 아이콘이 돼. 그리고 도착지 구획 이름은
+  「📌 담아둔 기사」인데, 버튼만 바꾸면 <b>버튼 아이콘 ≠ 도착지 아이콘</b>이 되는 작은 흠이 남아.
+  (우체통에 넣으면 게시판에 붙는 셈이라 크게 어색하진 않지만, 알고는 정하자.)
+</div>
+
+</div>
+</body>
+</html>

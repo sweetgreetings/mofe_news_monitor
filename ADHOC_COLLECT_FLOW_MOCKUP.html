@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>수시 모니터링 — 새 수집(시간순) ▸ 수집 결과(언론사순) 목업</title>
+<style>
+  /* 색은 전부 app/config.py PALETTE 값 그대로 (CLAUDE.md "Design direction").
+     accent #2563EB / 수시 청록 #146B5E / AI 연보라 #4A3F8F / 발송 초록 #15803D */
+  body { margin: 0; background: #F8FAFC; color: #1F2937;
+         font-family: 'Pretendard', 'Noto Sans KR', -apple-system, sans-serif; }
+  .container { max-width: 860px; margin: 0 auto; padding: 20px 24px 140px; }
+  .card { background: #FFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 20px 22px; margin-bottom: 14px; }
+
+  /* ── 목업 전용 화면 전환 바 (실제 앱엔 없음) ───────────────── */
+  .mock-switch { position: sticky; top: 0; z-index: 40; flex-wrap: wrap; background: #1E3A5F; color: #FFF;
+    display: flex; gap: 6px; align-items: center; padding: 7px 16px; font-size: 0.8rem; }
+  .mock-switch b { font-weight: 700; opacity: 0.75; margin-right: 8px; }
+  .mock-switch button { font: inherit; font-size: 0.8rem; border: 1px solid rgba(255,255,255,0.35); background: transparent;
+    color: #FFF; border-radius: 6px; padding: 4px 12px; cursor: pointer; }
+  .mock-switch button.on { background: #FFF; color: #1E3A5F; font-weight: 700; border-color: #FFF; }
+  .mock-note { margin-left: auto; opacity: 0.7; font-size: 0.74rem; }
+
+  /* ── 상단바 (정기 .topbar와 같은 모양) ───────────────────── */
+  .topbar { position: sticky; top: 34px; z-index: 20; background: #FFF;
+    border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .topbar-inner { max-width: 860px; margin: 0 auto; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; }
+  .topbar a { color: #2563EB; text-decoration: none; font-size: 0.92rem; font-weight: 600; padding: 6px 10px; border-radius: 6px; }
+  .topbar a:hover { background: #EFF6FF; }
+  .topbar .cur { color: #146B5E; font-weight: 700; font-size: 0.92rem; }
+
+  h1.page-title { color: #1E3A5F; font-size: 1.2rem; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .page-sub { color: #6B7280; font-size: 0.82rem; margin: 0 0 16px; }
+  .adhoc-mark { background: #E3F1EE; color: #146B5E; border-radius: 12px; padding: 2px 10px; font-size: 0.74rem; font-weight: 700; }
+
+  /* ── 폼 ─────────────────────────────────────────────── */
+  .field { display: flex; align-items: center; gap: 10px; margin: 13px 0; flex-wrap: wrap; }
+  .field > label { width: 82px; flex: none; font-size: 0.86rem; color: #6B7280; font-weight: 600; }
+  input[type=text], input[type=time], select { font: inherit; font-size: 0.88rem; padding: 6px 10px;
+    border: 1px solid #E5E7EB; border-radius: 8px; background: #FFF; color: #1F2937; }
+  input[type=text] { flex: 1; min-width: 120px; }
+  input.hm { width: 66px; text-align: center; font-variant-numeric: tabular-nums; flex: none; }
+  .kw-box { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; border: 1px solid #E5E7EB;
+    border-radius: 8px; padding: 6px 8px; background: #FFF; min-width: 220px; }
+  .kw-chip { background: #EFF6FF; color: #2563EB; border: 1px solid #E5E7EB; border-radius: 14px;
+    padding: 3px 10px; font-size: 0.82rem; display: inline-flex; gap: 6px; align-items: center; }
+  .kw-chip.must { background: #E3F1EE; color: #146B5E; border-color: #146B5E; }
+  .kw-chip button { border: none; background: none; color: #6B7280; cursor: pointer; line-height: 1; padding: 0; }
+  .kw-add { border: none; background: none; color: #2563EB; cursor: pointer; font-size: 0.82rem; font-weight: 600; padding: 3px 6px; }
+  .adv { margin-top: 10px; border-top: 1px dashed #E5E7EB; padding-top: 12px; font-size: 0.83rem; color: #6B7280; }
+  .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+
+  /* ── 버튼 ───────────────────────────────────────────── */
+  .btn { font: inherit; font-size: 0.88rem; padding: 7px 16px; border-radius: 8px; cursor: pointer;
+    border: 1px solid #2563EB; background: #2563EB; color: #FFF; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+  .btn:hover { filter: brightness(1.07); }
+  .btn.ghost { background: #FFF; color: #2563EB; }
+  .btn.mute { background: #FFF; color: #6B7280; border-color: #E5E7EB; }
+  .btn.ai { background: #F0EAFB; color: #4A3F8F; border-color: #DCD0F2; }
+  .btn.ai.on { background: #4A3F8F; color: #FFF; border-color: #4A3F8F; }
+  .btn.send { background: #15803D; border-color: #15803D; }
+  .btn.sm { font-size: 0.8rem; padding: 5px 11px; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* ── 결과 헤더 / 필터 줄 ─────────────────────────────── */
+  .res-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 18px 2px 8px; }
+  .res-head .cnt { color: #1E3A5F; font-weight: 700; font-size: 0.95rem; }
+  .res-head .sub { color: #6B7280; font-size: 0.8rem; }
+  .sortmark { display: inline-flex; align-items: center; gap: 5px; background: #F3F4F6; color: #4B5563;
+    border-radius: 12px; padding: 3px 11px; font-size: 0.76rem; font-weight: 600; }
+  .filterbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border: 1px solid #E5E7EB;
+    background: #F8FAFC; border-radius: 10px; padding: 9px 11px; margin-bottom: 10px; }
+  .filterbar input[type=search] { font: inherit; font-size: 0.84rem; border: 1px solid #E5E7EB; border-radius: 7px;
+    padding: 5px 10px; flex: 1; min-width: 150px; background: #FFF; }
+  .chip { font-size: 0.78rem; padding: 4px 11px; border-radius: 20px; border: 1px solid #E5E7EB;
+    background: #FFF; color: #4B5563; cursor: pointer; font-family: inherit; }
+  .chip.on { background: #EFF6FF; border-color: #2563EB; color: #2563EB; font-weight: 600; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 2px 12px; }
+  .toolbar .spacer { margin-left: auto; }
+  .exp button { border: 1px solid #E5E7EB; background: #FFF; color: #6B7280; border-radius: 6px;
+    padding: 5px 11px; font-size: 0.78rem; cursor: pointer; font-family: inherit; }
+  .exp button:hover { background: #EFF6FF; color: #2563EB; border-color: #BFDBFE; }
+
+  /* ── 기사 행 ─────────────────────────────────────────── */
+  .article { border-bottom: 1px solid #F1F5F9; padding: 9px 10px; display: flex; gap: 10px; align-items: flex-start; }
+  .article:hover { background: #F3F4F6; }
+  .article:last-child { border-bottom: none; }
+  .article.sent { background: #F8FAFC; }
+  .article.sent .a-title { color: #9CA3AF; }
+  .a-time { color: #6B7280; font-size: 0.79rem; font-variant-numeric: tabular-nums; flex: none; width: 44px; padding-top: 2px; }
+  .a-body { flex: 1; min-width: 0; }
+  .a-title { font-size: 0.9rem; line-height: 1.45; }
+  .outlet { color: #6B7280; font-size: 0.82rem; }
+  .a-meta { margin-top: 3px; font-size: 0.76rem; color: #9CA3AF; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .a-meta a { color: #2563EB; text-decoration: none; }
+  .kwmark { color: #6B7280; }
+  .a-acts { display: flex; gap: 4px; align-items: center; flex: none; }
+  .icon-btn { border: 1px solid #E5E7EB; background: #FFF; color: #6B7280; border-radius: 6px;
+    padding: 3px 9px; font-size: 0.76rem; cursor: pointer; font-family: inherit; }
+  .icon-btn:hover { background: #EFF6FF; color: #2563EB; border-color: #BFDBFE; }
+  .icon-btn.go { border-color: #146B5E; color: #146B5E; font-weight: 600; }
+  .icon-btn.go:hover { background: #E3F1EE; color: #146B5E; border-color: #146B5E; }
+  .sent-tag { font-size: 0.75rem; color: #146B5E; background: #E3F1EE; border-radius: 11px; padding: 3px 10px; font-weight: 600; }
+  .rank { font-size: 0.72rem; color: #9CA3AF; background: #F3F4F6; border-radius: 9px; padding: 1px 7px; }
+
+  /* ── 소제목 ─────────────────────────────────────────── */
+  h2.sub { font-size: 0.95rem; color: #1E3A5F; margin: 22px 0 4px; padding: 7px 10px;
+    border-left: 3px solid #2563EB; background: #F8FAFC; display: flex; align-items: center; gap: 8px; }
+  h2.sub .ai-badge { font-size: 0.72rem; background: #F0EAFB; color: #4A3F8F; border-radius: 10px; padding: 2px 8px; }
+  h2.sub .gcnt { font-size: 0.76rem; color: #6B7280; font-weight: 400; margin-left: auto; }
+  h2.sub .ord { border: 1px solid #E5E7EB; background: #FFF; color: #6B7280; border-radius: 5px;
+    font-size: 0.7rem; padding: 1px 6px; cursor: pointer; }
+
+  /* ── 하단 고정 액션 바 (새 수집) ───────────────────────── */
+  .stickybar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: #FFF;
+    border-top: 1px solid #E5E7EB; box-shadow: 0 -2px 10px rgba(0,0,0,0.07); }
+  .stickybar-inner { max-width: 860px; margin: 0 auto; padding: 11px 24px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .stickybar .selcnt { font-size: 0.86rem; color: #1E3A5F; font-weight: 700; }
+  .stickybar .hint { font-size: 0.77rem; color: #9CA3AF; }
+  .stickybar .right { margin-left: auto; display: flex; gap: 8px; }
+
+  /* ── 배너 / 토스트 / 팝오버 ───────────────────────────── */
+  .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 84px; z-index: 50;
+    background: #146B5E; color: #FFF; border-radius: 10px; padding: 11px 18px; font-size: 0.86rem;
+    display: none; align-items: center; gap: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.18); }
+  .toast a { color: #FFF; text-decoration: underline; font-weight: 700; }
+  .banner-warn { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; border-radius: 9px;
+    padding: 10px 13px; font-size: 0.83rem; margin: 10px 0; }
+  .banner-ai { background: #F4EFFC; border: 1px solid #DCD0F2; color: #4A3F8F; border-radius: 9px;
+    padding: 10px 13px; font-size: 0.83rem; margin: 10px 0; display: flex; align-items: center; gap: 10px; }
+  .banner-ai .x { margin-left: auto; border: none; background: none; color: #7C6FA8; cursor: pointer; font-size: 1rem; }
+  .sendwrap { position: relative; display: inline-block; }
+  .sendpop { position: absolute; right: 0; bottom: 42px; width: 300px; background: #FFF; border: 1px solid #E5E7EB;
+    border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.14); padding: 13px 15px; display: none; z-index: 35; text-align: left; }
+  .sendpop h4 { margin: 0 0 8px; font-size: 0.82rem; color: #1E3A5F; }
+  .sendpop ul { margin: 0 0 10px; padding-left: 17px; font-size: 0.81rem; color: #4B5563; line-height: 1.7; }
+  .sendpop .ch { font-size: 0.74rem; color: #6B7280; }
+  .sendpop .row { display: flex; gap: 6px; justify-content: flex-end; }
+  .sent-done { font-size: 0.82rem; color: #6B7280; background: #F3F4F6; border-radius: 12px; padding: 5px 12px; }
+  .undo-fab { position: fixed; left: 20px; bottom: 90px; z-index: 25; width: 42px; height: 42px; border-radius: 50%;
+    border: 1px solid #E5E7EB; background: #FFF; color: #6B7280; font-size: 1.1rem; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+  /* 목업 주석 말풍선 */
+  .anno { border-left: 3px solid #146B5E; background: #E3F1EE; color: #146B5E; font-size: 0.79rem;
+    padding: 8px 12px; border-radius: 0 8px 8px 0; margin: 12px 0; line-height: 1.6; }
+  .anno b { color: #0F5147; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="mock-switch">
+  <b>목업</b>
+  <button id="tabA" class="on" onclick="showScreen('A')">① 새 수집 (시간순)</button>
+  <button id="tabB" onclick="showScreen('B')">② 수집 결과 (언론사순)</button>
+  <span class="mock-note">실제 화면 아님 · 버튼 눌러보면 상태가 바뀝니다</span>
+</div>
+
+<!-- ══════════════ ① 새 수집 ══════════════ -->
+<div id="screenA">
+  <div class="topbar"><div class="topbar-inner">
+    <span class="cur">🔎 새 수집</span>
+    <span><a href="#">홈</a><a href="#" onclick="showScreen('B');return false;">수집 결과</a><a href="#">수시 보관함</a></span>
+  </div></div>
+
+  <div class="container">
+    <h1 class="page-title">새 수집 <span class="adhoc-mark">수시 모니터링</span></h1>
+    <p class="page-sub">사안·검색어·시간대를 정해 한 번에 불러옵니다. 여기서 고른 기사만 수집 결과로 넘어갑니다.</p>
+
+    <div class="card">
+      <div class="field"><label>사안명</label><input type="text" value="예결위 결산 심사"></div>
+      <div class="field"><label>검색어</label>
+        <div class="kw-box">
+          <span class="kw-chip">예결위 <button>×</button></span>
+          <span class="kw-chip">결산 심사 <button>×</button></span>
+          <span class="kw-chip">추경 <button>×</button></span>
+          <button class="kw-add">+ 추가</button>
+          <span style="margin-left:auto;font-size:0.76rem;color:#6B7280;">3 / 5</span>
+        </div>
+      </div>
+      <div class="field"><label>수집 시간</label>
+        <input class="hm" type="text" value="00:00"> <span style="color:#6B7280">~</span>
+        <input class="hm" type="text" value="14:30">
+        <button class="chip">0시~지금</button><button class="chip">최근 1시간</button><button class="chip">최근 3시간</button>
+      </div>
+      <div class="adv">고급 설정 ▸ <label style="margin-left:8px"><input type="checkbox"> 선택 언론사만</label>
+        <label style="margin-left:12px"><input type="checkbox"> 사진기사 제외</label>
+        <label style="margin-left:12px"><input type="checkbox"> 인사 기사 제외</label></div>
+      <div class="form-actions"><button class="btn ghost">초기화</button><button class="btn">🔎 불러오기</button></div>
+    </div>
+
+    <div class="anno"><b>바뀌는 점</b> — 새 수집이 “카드를 만들고 끝”이 아니라, <b>불러온 결과를 그 자리에서 시간순으로 훑는 화면</b>이 됩니다.
+      실시간 현황과 같은 읽는 방식(최신순·필터 없음에 가까움)이고, 여기서 고른 것만 아래 버튼으로 수집 결과에 넘깁니다.</div>
+
+    <div class="res-head">
+      <span class="cnt">48건</span>
+      <span class="sortmark">🕘 최신순 (발행시각)</span>
+      <span class="sub">00:00 ~ 14:30 · 검색어 3개</span>
+    </div>
+
+    <div class="filterbar">
+      <input type="search" placeholder="제목 검색">
+      <button class="chip on">예결위 <span style="opacity:.7">21</span></button>
+      <button class="chip">결산 심사 <span style="opacity:.7">17</span></button>
+      <button class="chip">추경 <span style="opacity:.7">10</span></button>
+      <button class="chip">안 보낸 기사만</button>
+    </div>
+
+    <div class="card" style="padding:6px 8px" id="listA">
+      <div class="article" data-t="14:22">
+        <div class="a-time">14:22</div>
+        <div class="a-body">
+          <div class="a-title"><span class="outlet">(연합뉴스)</span> 예결위, 2026년도 결산 심사 이틀째…부처별 집행률 도마</div>
+          <div class="a-meta"><a href="#">원문보기 ↗</a><span class="kwmark">🔍 예결위, 결산 심사</span></div>
+        </div>
+        <div class="a-acts"><input type="checkbox" class="chkA" onchange="updateBarA()">
+          <button class="icon-btn go" onclick="sendOne(this)">→ 담기</button></div>
+      </div>
+      <div class="article" data-t="14:08">
+        <div class="a-time">14:08</div>
+        <div class="a-body">
+          <div class="a-title"><span class="outlet">(한국경제)</span> 구윤철 부총리 “결산 지적사항, 내년 예산에 즉시 반영”</div>
+          <div class="a-meta"><a href="#">원문보기 ↗</a><span class="kwmark">🔍 예결위</span></div>
+        </div>
+        <div class="a-acts"><input type="checkbox" class="chkA" onchange="updateBarA()">
+          <button class="icon-btn go" onclick="sendOne(this)">→ 담기</button></div>
+      </div>
+      <div class="article sent" data-t="13:51">
+        <div class="a-time">13:51</div>
+        <div class="a-body">
+          <div class="a-title"><span class="outlet">(KBS)</span> 예결위 결산소위, 불용액 급증 놓고 공방</div>
+          <div class="a-meta"><a href="#">원문보기 ↗</a><span class="kwmark">🔍 예결위, 결산 심사</span></div>
+        </div>
+        <div class="a-acts"><span class="sent-tag">✔ 담김</span></div>
+      </div>
+      <div class="article" data-t="13:30">
+        <div class="a-time">13:30</div>
+        <div class="a-body">
+          <div class="a-title"><span class="outlet">(뉴시스)</span> 야당 “재정 운용 부실” vs 정부 “경기 대응 불가피”</div>
+          <div class="a-meta"><a href="#">원문보기 ↗</a><span class="kwmark">🔍 결산 심사</span></div>
+        </div>
+        <div class="a-acts"><input type="checkbox" class="chkA" onchange="updateBarA()">
+          <button class="icon-btn go" onclick="sendOne(this)">→ 담기</button></div>
+      </div>
+      <div class="article" data-t="12:47">
+        <div class="a-time">12:47</div>
+        <div class="a-body">
+          <div class="a-title"><span class="outlet">(매일경제)</span> 추경 논의 물밑 개시…재정경제부 “현재로선 검토 없다”</div>
+          <div class="a-meta"><a href="#">원문보기 ↗</a><span class="kwmark">🔍 추경</span></div>
+        </div>
+        <div class="a-acts"><input type="checkbox" class="chkA" onchange="updateBarA()">
+          <button class="icon-btn go" onclick="sendOne(this)">→ 담기</button></div>
+      </div>
+      <div class="article" data-t="11:19">
+        <div class="a-time">11:19</div>
+        <div class="a-body">
+          <div class="a-title"><span class="outlet">(이데일리)</span> 국고채 발행 계획 수정 가능성…시장 “추경 여부가 변수”</div>
+          <div class="a-meta"><a href="#">원문보기 ↗</a><span class="kwmark">🔍 추경</span></div>
+        </div>
+        <div class="a-acts"><input type="checkbox" class="chkA" onchange="updateBarA()">
+          <button class="icon-btn go" onclick="sendOne(this)">→ 담기</button></div>
+      </div>
+      <div class="article" data-t="09:58">
+        <div class="a-time">09:58</div>
+        <div class="a-body">
+          <div class="a-title"><span class="outlet">(서울경제)</span> 결산 심사 앞두고 부처별 이월·불용 자료 제출</div>
+          <div class="a-meta"><a href="#">원문보기 ↗</a><span class="kwmark">🔍 결산 심사</span></div>
+        </div>
+        <div class="a-acts"><input type="checkbox" class="chkA" onchange="updateBarA()">
+          <button class="icon-btn go" onclick="sendOne(this)">→ 담기</button></div>
+      </div>
+    </div>
+
+    <p style="text-align:center;color:#9CA3AF;font-size:0.8rem;margin:14px 0 0">… 아래로 41건 더</p>
+  </div>
+
+  <div class="stickybar"><div class="stickybar-inner">
+    <span class="selcnt" id="selcntA">0건 선택됨</span>
+    <span class="hint">담은 기사는 [수집 결과]에서 언론사 순서로 다시 정렬됩니다.</span>
+    <span class="right">
+      <button class="btn mute sm" onclick="checkAll()">전체 선택</button>
+      <button class="btn" id="sendSelA" disabled onclick="sendSelected()">→ 수집 결과로 보내기</button>
+    </span>
+  </div></div>
+
+  <div class="toast" id="toastA"><span id="toastMsg"></span><a href="#" onclick="showScreen('B');return false;">수집 결과 열기 →</a></div>
+</div>
+
+<!-- ══════════════ ② 수집 결과 ══════════════ -->
+<div id="screenB" class="hidden">
+  <div class="topbar"><div class="topbar-inner">
+    <span class="cur">🗂️ 수집 결과</span>
+    <span><a href="#">홈</a><a href="#" onclick="showScreen('A');return false;">새 수집</a><a href="#">수시 보관함</a></span>
+  </div></div>
+
+  <div class="container">
+    <h1 class="page-title">예결위 결산 심사 <span class="adhoc-mark">수시 모니터링</span></h1>
+    <p class="page-sub">수시 모니터링 14시 30분 기준 · 2026-09-01</p>
+
+    <div class="card" style="padding:12px 14px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:0.8rem;color:#6B7280">
+        <span class="kw-chip">🔍 예결위</span><span class="kw-chip">결산 심사</span><span class="kw-chip">추경</span>
+        <span class="kw-chip must">꼭 포함: 재정경제부</span>
+        <span>🕘 00:00~14:30</span><span>📥 14:31 +26건</span>
+        <button class="btn ghost sm" style="margin-left:auto">편집</button>
+      </div>
+    </div>
+
+    <div class="anno"><b>바뀌는 점 3가지</b> — ① 목록 순서는 <b>언론사 우선순위</b>가 기본(정기 확정본과 같은 규칙). ②
+      소제목 분류는 <b>담당자가 버튼을 눌렀을 때만</b> 돕니다(자동 호출 없음 = 비용 0). ③ 이 화면에 <b>발송</b>이 생깁니다.</div>
+
+    <div class="toolbar">
+      <label style="font-size:0.82rem;color:#6B7280">정렬</label>
+      <select id="sortB" onchange="applySort()">
+        <option value="outlet">언론사순 (기본)</option>
+        <option value="time">시간순</option>
+      </select>
+      <button class="btn ai" id="aiBtn" onclick="toggleAI()">🤖 AI 소제목 분류</button>
+      <button class="btn mute sm hidden" id="aiOffBtn" onclick="toggleAI()">소제목 없이 보기</button>
+      <span class="spacer"></span>
+      <span class="exp"><button>📋 복사</button><button>⬇ txt</button><button>⬇ 엑셀</button></span>
+      <span class="sendwrap">
+        <button class="btn send" id="sendBtnB" onclick="toggleSendPop()">📨 발송</button>
+        <span class="sent-done hidden" id="sentDoneB">✔️ 14시 41분 발송 완료</span>
+        <div class="sendpop" id="sendPopB">
+          <h4>이 수집 결과를 발송합니다</h4>
+          <ul>
+            <li>텔레그램 · 3명 <span class="ch">(김주무관, 이사무관, 나)</span></li>
+            <li>이메일 · 2명 <span class="ch">(과장님, 팀 메일)</span></li>
+          </ul>
+          <p style="font-size:0.78rem;color:#92400E;background:#FFFBEB;border:1px solid #FDE68A;border-radius:7px;padding:7px 9px;margin:0 0 10px">
+            지금 화면에 보이는 26건이 그대로 나갑니다. 자동 발송은 없습니다 — 누를 때만 나갑니다.</p>
+          <div class="row"><button class="btn mute sm" onclick="toggleSendPop()">취소</button>
+            <button class="btn send sm" onclick="doSend()">보내기</button></div>
+        </div>
+      </span>
+    </div>
+
+    <div class="banner-ai hidden" id="aiBanner">🤖 26건을 소제목 5개로 묶었어요. 이름·순서는 직접 고칠 수 있고, 다시 누르면 새로 묶습니다.
+      <button class="x" onclick="this.parentNode.classList.add('hidden')">×</button></div>
+
+    <div class="res-head">
+      <span class="cnt">26건</span>
+      <span class="sortmark" id="sortMarkB">🏢 언론사순</span>
+      <span class="sub">새 수집에서 담은 기사</span>
+    </div>
+
+    <!-- 소제목 없는 평면 목록 -->
+    <div class="card" style="padding:6px 8px" id="flatB">
+      <div class="article" data-t="13:51" data-r="1">
+        <div class="a-time">13:51</div>
+        <div class="a-body"><div class="a-title"><span class="outlet">(KBS)</span> 예결위 결산소위, 불용액 급증 놓고 공방</div>
+          <div class="a-meta"><span class="rank">방송 1순위</span><a href="#">원문보기 ↗</a></div></div>
+        <div class="a-acts"><select class="icon-btn"><option>다른 소제목</option></select>
+          <button class="icon-btn">📌</button><button class="icon-btn">🏷</button><button class="icon-btn">🗑</button>
+          <button class="icon-btn">↑</button><button class="icon-btn">↓</button></div>
+      </div>
+      <div class="article" data-t="10:12" data-r="2">
+        <div class="a-time">10:12</div>
+        <div class="a-body"><div class="a-title"><span class="outlet">(MBC)</span> “이월·불용 30조” 결산 심사 쟁점 부상</div>
+          <div class="a-meta"><span class="rank">방송 2순위</span><a href="#">원문보기 ↗</a></div></div>
+        <div class="a-acts"><select class="icon-btn"><option>다른 소제목</option></select>
+          <button class="icon-btn">📌</button><button class="icon-btn">🏷</button><button class="icon-btn">🗑</button>
+          <button class="icon-btn">↑</button><button class="icon-btn">↓</button></div>
+      </div>
+      <div class="article" data-t="08:40" data-r="3">
+        <div class="a-time">08:40</div>
+        <div class="a-body"><div class="a-title"><span class="outlet">(조선일보)</span> 재정경제부, 결산 지적 반영 위한 내부 점검 착수</div>
+          <div class="a-meta"><span class="rank">주요 3순위</span><a href="#">원문보기 ↗</a></div></div>
+        <div class="a-acts"><select class="icon-btn"><option>다른 소제목</option></select>
+          <button class="icon-btn">📌</button><button class="icon-btn">🏷</button><button class="icon-btn">🗑</button>
+          <button class="icon-btn">↑</button><button class="icon-btn">↓</button></div>
+      </div>
+      <div class="article" data-t="14:08" data-r="4">
+        <div class="a-time">14:08</div>
+        <div class="a-body"><div class="a-title"><span class="outlet">(한국경제)</span> 구윤철 부총리 “결산 지적사항, 내년 예산에 즉시 반영”</div>
+          <div class="a-meta"><span class="rank">주요 4순위</span><a href="#">원문보기 ↗</a></div></div>
+        <div class="a-acts"><select class="icon-btn"><option>다른 소제목</option></select>
+          <button class="icon-btn">📌</button><button class="icon-btn">🏷</button><button class="icon-btn">🗑</button>
+          <button class="icon-btn">↑</button><button class="icon-btn">↓</button></div>
+      </div>
+      <div class="article" data-t="12:47" data-r="5">
+        <div class="a-time">12:47</div>
+        <div class="a-body"><div class="a-title"><span class="outlet">(매일경제)</span> 추경 논의 물밑 개시…재정경제부 “현재로선 검토 없다”</div>
+          <div class="a-meta"><span class="rank">주요 5순위</span><a href="#">원문보기 ↗</a></div></div>
+        <div class="a-acts"><select class="icon-btn"><option>다른 소제목</option></select>
+          <button class="icon-btn">📌</button><button class="icon-btn">🏷</button><button class="icon-btn">🗑</button>
+          <button class="icon-btn">↑</button><button class="icon-btn">↓</button></div>
+      </div>
+      <div class="article" data-t="11:19" data-r="6">
+        <div class="a-time">11:19</div>
+        <div class="a-body"><div class="a-title"><span class="outlet">(이데일리)</span> 국고채 발행 계획 수정 가능성…시장 “추경 여부가 변수”</div>
+          <div class="a-meta"><span class="rank">주요 6순위</span><a href="#">원문보기 ↗</a></div></div>
+        <div class="a-acts"><select class="icon-btn"><option>다른 소제목</option></select>
+          <button class="icon-btn">📌</button><button class="icon-btn">🏷</button><button class="icon-btn">🗑</button>
+          <button class="icon-btn">↑</button><button class="icon-btn">↓</button></div>
+      </div>
+      <div class="article" data-t="14:22" data-r="7">
+        <div class="a-time">14:22</div>
+        <div class="a-body"><div class="a-title"><span class="outlet">(연합뉴스)</span> 예결위, 2026년도 결산 심사 이틀째…부처별 집행률 도마</div>
+          <div class="a-meta"><span class="rank">주요 7순위</span><a href="#">원문보기 ↗</a></div></div>
+        <div class="a-acts"><select class="icon-btn"><option>다른 소제목</option></select>
+          <button class="icon-btn">📌</button><button class="icon-btn">🏷</button><button class="icon-btn">🗑</button>
+          <button class="icon-btn">↑</button><button class="icon-btn">↓</button></div>
+      </div>
+      <div class="article" data-t="13:30" data-r="8">
+        <div class="a-time">13:30</div>
+        <div class="a-body"><div class="a-title"><span class="outlet">(뉴시스)</span> 야당 “재정 운용 부실” vs 정부 “경기 대응 불가피”</div>
+          <div class="a-meta"><span class="rank">주요 8순위</span><a href="#">원문보기 ↗</a></div></div>
+        <div class="a-acts"><select class="icon-btn"><option>다른 소제목</option></select>
+          <button class="icon-btn">📌</button><button class="icon-btn">🏷</button><button class="icon-btn">🗑</button>
+          <button class="icon-btn">↑</button><button class="icon-btn">↓</button></div>
+      </div>
+    </div>
+
+    <!-- 소제목 분류된 목록 -->
+    <div id="groupedB" class="hidden">
+      <h2 class="sub">&lt;결산 심사 쟁점&gt; <span class="ai-badge">🤖 AI</span>
+        <span class="gcnt">3건</span><button class="ord">▲</button><button class="ord">▼</button></h2>
+      <div class="card" style="padding:6px 8px">
+        <div class="article"><div class="a-time">13:51</div><div class="a-body">
+          <div class="a-title"><span class="outlet">(KBS)</span> 예결위 결산소위, 불용액 급증 놓고 공방</div>
+          <div class="a-meta"><a href="#">원문보기 ↗</a></div></div>
+          <div class="a-acts"><button class="icon-btn">📌</button><button class="icon-btn">🏷</button><button class="icon-btn">🗑</button></div></div>
+        <div class="article"><div class="a-time">10:12</div><div class="a-body">
+          <div class="a-title"><span class="outlet">(MBC)</span> “이월·불용 30조” 결산 심사 쟁점 부상</div>
+          <div class="a-meta"><a href="#">원문보기 ↗</a></div></div>
+          <div class="a-acts"><button class="icon-btn">📌</button><button class="icon-btn">🏷</button><button class="icon-btn">🗑</button></div></div>
+        <div class="article"><div class="a-time">14:22</div><div class="a-body">
+          <div class="a-title"><span class="outlet">(연합뉴스)</span> 예결위, 2026년도 결산 심사 이틀째…부처별 집행률 도마</div>
+          <div class="a-meta"><a href="#">원문보기 ↗</a></div></div>
+          <div class="a-acts"><button class="icon-btn">📌</button><button class="icon-btn">🏷</button><button class="icon-btn">🗑</button></div></div>
+      </div>
+
+      <h2 class="sub">&lt;정부 대응&gt; <span class="ai-badge">🤖 AI</span>
+        <span class="gcnt">2건</span><button class="ord">▲</button><button class="ord">▼</button></h2>
+      <div class="card" style="padding:6px 8px">
+        <div class="article"><div class="a-time">08:40</div><div class="a-body">
+          <div class="a-title"><span class="outlet">(조선일보)</span> 재정경제부, 결산 지적 반영 위한 내부 점검 착수</div>
+          <div class="a-meta"><a href="#">원문보기 ↗</a></div></div>
+          <div class="a-acts"><button class="icon-btn">📌</button><button class="icon-btn">🏷</button><button class="icon-btn">🗑</button></div></div>
+        <div class="article"><div class="a-time">14:08</div><div class="a-body">
+          <div class="a-title"><span class="outlet">(한국경제)</span> 구윤철 부총리 “결산 지적사항, 내년 예산에 즉시 반영”</div>
+          <div class="a-meta"><a href="#">원문보기 ↗</a></div></div>
+          <div class="a-acts"><button class="icon-btn">📌</button><button class="icon-btn">🏷</button><button class="icon-btn">🗑</button></div></div>
+      </div>
+
+      <h2 class="sub">&lt;추경 논의&gt; <span class="ai-badge">🤖 AI</span>
+        <span class="gcnt">2건</span><button class="ord">▲</button><button class="ord">▼</button></h2>
+      <div class="card" style="padding:6px 8px">
+        <div class="article"><div class="a-time">12:47</div><div class="a-body">
+          <div class="a-title"><span class="outlet">(매일경제)</span> 추경 논의 물밑 개시…재정경제부 “현재로선 검토 없다”</div>
+          <div class="a-meta"><a href="#">원문보기 ↗</a></div></div>
+          <div class="a-acts"><button class="icon-btn">📌</button><button class="icon-btn">🏷</button><button class="icon-btn">🗑</button></div></div>
+        <div class="article"><div class="a-time">11:19</div><div class="a-body">
+          <div class="a-title"><span class="outlet">(이데일리)</span> 국고채 발행 계획 수정 가능성…시장 “추경 여부가 변수”</div>
+          <div class="a-meta"><a href="#">원문보기 ↗</a></div></div>
+          <div class="a-acts"><button class="icon-btn">📌</button><button class="icon-btn">🏷</button><button class="icon-btn">🗑</button></div></div>
+      </div>
+
+      <h2 class="sub">&lt;야당 비판&gt; <span class="ai-badge">🤖 AI</span>
+        <span class="gcnt">1건</span><button class="ord">▲</button><button class="ord">▼</button></h2>
+      <div class="card" style="padding:6px 8px">
+        <div class="article"><div class="a-time">13:30</div><div class="a-body">
+          <div class="a-title"><span class="outlet">(뉴시스)</span> 야당 “재정 운용 부실” vs 정부 “경기 대응 불가피”</div>
+          <div class="a-meta"><a href="#">원문보기 ↗</a></div></div>
+          <div class="a-acts"><button class="icon-btn">📌</button><button class="icon-btn">🏷</button><button class="icon-btn">🗑</button></div></div>
+      </div>
+
+      <div class="anno" style="margin-top:18px">소제목을 켜면 정렬 선택은 <b>소제목 안에서만</b> 적용됩니다 —
+        소제목 순서 자체는 ▲▼로 담당자가 정합니다(정기 화면과 같은 규칙).</div>
+    </div>
+  </div>
+
+  <button class="undo-fab" title="되돌리기">↩</button>
+  <div class="toast" id="toastB"><span id="toastMsgB"></span></div>
+</div>
+
+<script>
+function showScreen(s) {
+  document.getElementById('screenA').classList.toggle('hidden', s !== 'A');
+  document.getElementById('screenB').classList.toggle('hidden', s !== 'B');
+  document.getElementById('tabA').classList.toggle('on', s === 'A');
+  document.getElementById('tabB').classList.toggle('on', s === 'B');
+  window.scrollTo(0, 0);
+}
+
+/* ── 새 수집: 선택 → 수집 결과로 보내기 ── */
+function updateBarA() {
+  var n = document.querySelectorAll('#listA .chkA:checked').length;
+  document.getElementById('selcntA').textContent = n ? n + '건 선택됨' : '0건 선택됨';
+  document.getElementById('sendSelA').disabled = n === 0;
+}
+function checkAll() {
+  document.querySelectorAll('#listA .chkA').forEach(function (c) { c.checked = true; });
+  updateBarA();
+}
+function markSent(row) {
+  row.classList.add('sent');
+  row.querySelector('.a-acts').innerHTML = '<span class="sent-tag">✔ 담김</span>';
+}
+function toast(msg) {
+  var t = document.getElementById('toastA');
+  document.getElementById('toastMsg').textContent = msg;
+  t.style.display = 'flex';
+  setTimeout(function () { t.style.display = 'none'; }, 4000);
+}
+function sendOne(btn) { markSent(btn.closest('.article')); updateBarA(); toast('1건을 수집 결과로 보냈어요.'); }
+function sendSelected() {
+  var rows = document.querySelectorAll('#listA .chkA:checked');
+  rows.forEach(function (c) { markSent(c.closest('.article')); });
+  updateBarA();
+  toast(rows.length + '건을 수집 결과로 보냈어요.');
+}
+
+/* ── 수집 결과: 정렬 / AI 소제목 / 발송 ── */
+function applySort() {
+  var mode = document.getElementById('sortB').value;
+  var list = document.getElementById('flatB');
+  var rows = Array.prototype.slice.call(list.querySelectorAll('.article'));
+  rows.sort(function (a, b) {
+    if (mode === 'time') { return b.dataset.t.localeCompare(a.dataset.t); }
+    return parseInt(a.dataset.r) - parseInt(b.dataset.r);
+  });
+  rows.forEach(function (r) { list.appendChild(r); });
+  document.getElementById('sortMarkB').textContent = mode === 'time' ? '🕘 시간순 (최신)' : '🏢 언론사순';
+}
+function toggleAI() {
+  var on = document.getElementById('groupedB').classList.contains('hidden');
+  document.getElementById('groupedB').classList.toggle('hidden', !on);
+  document.getElementById('flatB').classList.toggle('hidden', on);
+  document.getElementById('aiBanner').classList.toggle('hidden', !on);
+  document.getElementById('aiOffBtn').classList.toggle('hidden', !on);
+  document.getElementById('aiBtn').textContent = on ? '🔄 AI 다시 묶기' : '🤖 AI 소제목 분류';
+  document.getElementById('aiBtn').classList.toggle('on', on);
+}
+function toggleSendPop() {
+  var p = document.getElementById('sendPopB');
+  p.style.display = p.style.display === 'block' ? 'none' : 'block';
+}
+function doSend() {
+  toggleSendPop();
+  document.getElementById('sendBtnB').classList.add('hidden');
+  document.getElementById('sentDoneB').classList.remove('hidden');
+  var t = document.getElementById('toastB');
+  document.getElementById('toastMsgB').textContent = '텔레그램 3명 · 이메일 2명에게 보냈어요.';
+  t.style.display = 'flex';
+  setTimeout(function () { t.style.display = 'none'; }, 4000);
+}
+</script>
+</body>
+</html>

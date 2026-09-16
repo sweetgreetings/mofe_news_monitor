@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>홈 개편 목업</title>
+<style>
+  /* 색은 전부 app/config.py PALETTE 실제 값 그대로 (CLAUDE.md "Design direction" 규칙1) */
+  :root {
+    --bg:#F8FAFC; --card:#FFFFFF; --header:#1E3A5F; --accent:#2563EB;
+    --text:#1F2937; --muted:#6B7280; --border:#E5E7EB; --hover:#EFF6FF;
+    --error:#DC2626; --live-bg:#FEF2F2; --accent-tonal:#EFF6FF;
+    --adhoc-bg:#E3F1EE; --adhoc-text:#146B5E; --arch-adhoc-bg:#F0F7F5;
+    --arch-reg-bg:#EDF1F6; --arch-reg-text:#46586F;
+    --label-bg:#FBF0DA; --label-text:#8A5A14;
+    --send:#15803D;
+  }
+  body {
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'Pretendard','Noto Sans KR',sans-serif;
+    min-height:100vh; box-sizing:border-box; padding:18px;
+    display:flex; flex-direction:column; align-items:center; gap:14px;
+  }
+  .mock-chrome { width:100%; max-width:600px; display:flex; flex-direction:column; gap:10px; }
+  .container {
+    position:relative;               /* [변경 ①] 설정 버튼 앵커 */
+    max-width:600px; margin:24px auto; padding:26px 24px 30px; text-align:center;
+    background:var(--card); border:1px solid var(--border); border-radius:8px;
+  }
+
+  /* ───── [변경 ①] 설정: 하단 우측 → 카드 우측 상단 ───── */
+  .head-row {
+    display:flex; align-items:center; justify-content:space-between;
+    gap:12px; margin-bottom:14px; text-align:left;
+  }
+  .brand { display:flex; align-items:center; gap:11px; min-width:0; }
+  .settings-top {
+    display:flex; align-items:center; gap:5px; flex-shrink:0;
+    font-size:0.85rem; color:var(--muted); text-decoration:none;
+    padding:5px 9px; border-radius:6px;
+  }
+  .settings-top:hover { color:var(--accent); background:var(--hover); }
+
+  .logo { width:46px; height:46px; flex-shrink:0; border-radius:50%; background:var(--bg); }
+  h1 { font-size:1.15rem; font-weight:600; margin:0; line-height:1.35; color:var(--header); }
+
+  /* ───── [변경 ②] 오늘 상태 한 줄 (신규) ───── */
+  .status-line {
+    display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:center;
+    font-size:0.78rem; color:var(--muted);
+    background:var(--bg); border:1px solid var(--border); border-radius:20px;
+    padding:6px 14px; margin:0 auto 20px;
+  }
+  .status-line .strong { color:var(--header); font-weight:700; }
+  .status-line .sent { color:var(--send); font-weight:600; }
+  .status-line .dot { color:var(--border); }
+  .status-line .next { color:var(--muted); }
+
+  .flow-a { display:flex; align-items:center; justify-content:center; gap:0; margin:0 auto 18px; flex-wrap:wrap; }
+  .flow-a a, .flow-a .box {
+    text-decoration:none; display:flex; flex-direction:column; align-items:center; gap:4px;
+    padding:11px 18px; border-radius:10px; min-width:108px;
+  }
+  .flow-a .icon { font-size:1.05rem; line-height:1; }
+  .flow-a .label { font-size:0.86rem; font-weight:700; }
+  .flow-a .sub { font-size:0.68rem; color:var(--muted); }
+  .flow-a a.live { background:var(--live-bg); }
+  .flow-a a.live .label { color:var(--error); }
+  .flow-a a.draft { background:var(--hover); }
+  .flow-a a.draft .label { color:var(--accent); }
+  .flow-a a.done { background:var(--accent-tonal); }
+  .flow-a a.done .label { color:var(--header); }
+  .flow-a .arrow { color:var(--border); font-size:1.3rem; padding:0 4px; }
+  .flow-a .arrow-wrap { display:flex; flex-direction:column; align-items:center; padding:0 3px; }
+  .flow-a .arrow-note { font-size:0.58rem; color:var(--muted); margin-top:2px; white-space:nowrap; }
+  /* [변경 ⑦] 액션(+ 새 수집)은 상태 흐름이 아니므로 흐름 칸이 아니라 섹션 줄의 버튼으로.
+     단, 카드 우측 가장자리에 붙이면 상단 '설정'과 세로 축이 하나 생겨 위계가 섞여 읽힌다
+     (사용자 지적). 그래서 섹션 라벨 **바로 옆에** 붙여 한 덩어리로 가운데 정렬한다 —
+     붙어 있는 것은 한 몸으로 읽히므로 "이 섹션 소관"이 즉시 전달되고, 우측 축도 안 생긴다. */
+  .flow-head { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:7px; flex-wrap:wrap; }
+  .flow-head .flow-section-label { margin-bottom:0; }
+  /* [수정] 처음엔 테두리 없는 tonal 칩이었는데 "눌리는 버튼 같지 않다"는 지적(정확함).
+     이 앱에서 테두리 없는 tonal 배경 + 작은 글씨는 칩(.chip/.custom-tag = 정보 표시)
+     관례고, 누르는 것은 전부 .btn — 예외 없이 테두리가 있다. 그중에서도 .btn.ai
+     ("누르는 건 맞지만 API 비용이 드니 과하게 눌러야 할 것처럼 보이면 안 되는" 자리)
+     패턴을 수시 색으로 가져왔다 — 새 수집도 누르면 네이버 검색이 나가는 같은 성격.
+     테두리 색은 adhoc 전용 border 토큰이 없어 COLOR_ADHOC_TEXT를 그대로 쓴다
+     (config.py의 COLOR_MUST_BORDER = COLOR_ADHOC_TEXT와 같은 선례). */
+  .row-action {
+    text-decoration:none; white-space:nowrap; display:inline-flex; align-items:center; gap:5px;
+    font-size:0.8rem; font-weight:600; color:var(--adhoc-text);
+    background:var(--card); border:1px solid var(--adhoc-text); border-radius:8px;
+    padding:5px 11px;
+  }
+  .row-action:hover { background:var(--adhoc-bg); }
+  .flow-section-label { font-size:0.7rem; color:var(--muted); font-weight:600; margin-bottom:7px; letter-spacing:0.02em; }
+  .flow-divider { border-top:1px dashed var(--border); margin:0 0 15px; }
+  .flow-a a.adhoc { background:var(--adhoc-bg); }
+  .flow-a a.adhoc .label { color:var(--adhoc-text); }
+  .flow-a a.arch-reg { background:var(--arch-reg-bg); }
+  .flow-a a.arch-reg .label { color:var(--arch-reg-text); }
+  .flow-a a.arch-adhoc { background:var(--arch-adhoc-bg); }
+  .flow-a a.arch-adhoc .label { color:var(--adhoc-text); }
+
+  /* ───── [변경 ④] 오늘 진행 중인 사안이 없을 때: 링크가 아니라 비활성 칸 ───── */
+  .flow-a .box.empty-card {
+    background:var(--bg); border:1px dashed var(--border); cursor:default;
+  }
+  .flow-a .box.empty-card .icon { opacity:0.4; }
+  .flow-a .box.empty-card .label { color:var(--muted); }
+  .flow-a .box.empty-card .sub { color:var(--muted); opacity:0.85; }
+
+  .solo-wide { display:flex; justify-content:center; margin:0 auto 18px; }
+  .solo-wide a {
+    text-decoration:none; display:flex; align-items:center; gap:11px;
+    padding:11px 20px; border-radius:10px; background:var(--label-bg);
+    width:100%; max-width:460px; box-sizing:border-box;
+  }
+  .solo-wide .txt { display:flex; flex-direction:column; align-items:flex-start; gap:2px; }
+  .solo-wide .label { font-size:0.9rem; font-weight:700; color:var(--label-text); }
+  .solo-wide .sub { font-size:0.68rem; color:var(--muted); }
+  .solo-wide .tagset { display:flex; gap:4px; margin-left:auto; flex-wrap:wrap; justify-content:flex-end; }
+  .solo-wide .tag-chip {
+    font-size:0.6rem; font-weight:700; color:var(--label-text);
+    background:rgba(255,255,255,0.75); border:1px solid rgba(138,90,20,0.22);
+    border-radius:20px; padding:2px 7px; white-space:nowrap;
+  }
+
+  .wordcloud { display:flex; flex-wrap:wrap; justify-content:center; align-items:baseline; gap:2px 7px; margin:0 auto; max-width:100%; }
+  .wc-word { white-space:nowrap; line-height:1.3; display:inline-block; }
+  .wc-caption { color:var(--muted); font-size:0.7rem; margin:5px 0 16px; }
+  .contact { color:var(--muted); font-size:0.85rem; margin:0; }
+  .contact a { color:var(--accent); }
+  .ic { width:1em; height:1em; stroke:currentColor; fill:none; stroke-width:1.9;
+    stroke-linecap:round; stroke-linejoin:round; vertical-align:-0.15em; flex-shrink:0; }
+
+  /* ───── 목업 전용: 변경점 주석 (실제 화면에는 없음) ───── */
+  .anno {
+    position:absolute; z-index:5; width:19px; height:19px; border-radius:50%;
+    background:var(--error); color:#fff; font-size:0.66rem; font-weight:700;
+    display:none; align-items:center; justify-content:center;
+    box-shadow:0 0 0 2px #fff; cursor:default;
+  }
+  body.show-anno .anno { display:flex; }
+  .anno-target { position:relative; }
+  body.show-anno .renamed { box-shadow:inset 0 -0.5em 0 rgba(220,38,38,0.14); border-radius:2px; }
+  .flow-a .state-none { display:none; }
+  body.state-empty .flow-a .state-has { display:none; }
+  body.state-empty .flow-a .state-none { display:flex; }
+  body.show-anno .anno-target { outline:2px dashed rgba(220,38,38,0.5); outline-offset:3px; border-radius:8px; }
+  .anno-bar {
+    display:flex; align-items:center; gap:10px;
+    background:#fff; border:1px solid var(--border); border-radius:8px; padding:8px 12px;
+    font-size:0.78rem; color:var(--muted); box-shadow:0 2px 8px rgba(0,0,0,0.06);
+  }
+  .anno-bar button {
+    font-family:inherit; font-size:0.76rem; font-weight:600; cursor:pointer;
+    color:var(--accent); background:#fff; border:1px solid var(--border);
+    border-radius:6px; padding:4px 10px;
+  }
+  .anno-bar button:hover { background:var(--hover); }
+  .anno-legend {
+    display:none;
+    background:#fff; border:1px solid var(--border); border-radius:8px; padding:12px 14px;
+    font-size:0.72rem; color:var(--text); line-height:1.55; box-shadow:0 2px 8px rgba(0,0,0,0.06);
+    text-align:left;
+  }
+  body.show-anno .anno-legend { display:block; }
+  .anno-legend li { margin-bottom:7px; }
+  .anno-legend ol { margin:0; padding-left:19px; }
+  .anno-legend b { color:var(--header); }
+  .mock-h { font-size:0.7rem; font-weight:700; color:var(--muted); margin:0 0 8px; letter-spacing:0.03em; }
+</style>
+</head>
+<body class="show-anno">
+
+<div class="mock-chrome">
+<div class="anno-bar">
+  <span>홈 개편 목업</span>
+  <button onclick="document.body.classList.toggle('show-anno')">변경점 표시 켜기/끄기</button>
+  <button onclick="document.body.classList.toggle('state-empty')">오늘 사안: 있음 / 없음</button>
+</div>
+
+<div class="anno-legend">
+  <p class="mock-h">변경점</p>
+  <ol>
+    <li><b>설정</b> — 하단 우측 → 카드 우측 상단. 스크롤 없이 항상 보임</li>
+    <li><b>오늘 상태 한 줄</b> (신규) — 회차·건수·발송·다음 회차. 확정본 안 들어가도 앎</li>
+    <li><b>워드클라우드 정리</b> — <code>00</code>, <code>10</code>, <code>▲10</code>, <code>▲14</code>, <code>◇장관</code> 제거 / <code>종합정책질</code> → <code>종합정책질의</code></li>
+    <li><b>오늘 사안</b> — 없을 땐 링크 대신 비활성 칸. 옆 칸과 목적지가 겹치지 않음 (위 버튼으로 두 상태 전환)</li>
+    <li><b>상단 헤더 한 줄화 + 여백 축소</b> — 카드 높이 약 1,100px → 약 800px. 설정·상태·실시간·정기까지 접힘선 위로</li>
+    <li><b>이름 정리</b> (<span style="box-shadow:inset 0 -0.5em 0 rgba(220,38,38,0.14)">밑줄 친 곳</span>) — <code>수집 결과</code>→<code>오늘 사안</code>(완료형→진행형), <code>새 수집</code>→<code>+ 새 수집</code>(만들기 액션 표시), <code>라벨 보관함</code>→<code>라벨 모아보기</code>(보관함 계열에서 분리). 섹션 라벨이 칸 이름과 겹치던 두 줄도 정리</li>
+    <li><b>+ 새 수집을 흐름 밖으로</b> — 상태가 아니라 액션이라서 칸이 아닌 섹션 줄 버튼으로. 모양은 <code>.btn.ai</code>와 같은 <b>테두리 있는 버튼</b>(흰 배경 + 청록 테두리) — 테두리 없는 tonal은 이 앱에서 칩(정보 표시) 관례라 눌리는 것으로 안 읽힌다. 수시 행은 상태 2단(오늘 사안 → 수시 보관함)만 남음. 버튼은 카드 우측 끝이 아니라 <b>섹션 라벨 바로 옆</b>에 붙여, 상단 <code>설정</code>과 우측 세로 축이 겹치지 않게 함. 화살표에 남아 있던 <code>수집</code> 중복도 사라짐</li>
+  </ol>
+  <p style="color:#6B7280;margin:10px 0 0">* 워드클라우드는 오늘 실제 데이터에서 쓰레기 토큰만 걷어낸 것</p>
+</div>
+</div>
+
+<div class="container">
+
+  <div class="head-row">
+    <div class="brand">
+      <img class="logo" src="../logo.svg" alt="로고" width="46" height="46">
+      <h1>AI 기반 뉴스 모니터링</h1>
+    </div>
+    <a class="settings-top anno-target" href="#">
+      <span class="anno" style="top:-9px; left:-9px;">1</span>
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M19.1 14.4a1.5 1.5 0 0 0 .3 1.7l.1.1a1.9 1.9 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-1.7-.3 1.5 1.5 0 0 0-.9 1.4v.2a1.9 1.9 0 1 1-3.8 0v-.1a1.5 1.5 0 0 0-1-1.4 1.5 1.5 0 0 0-1.7.3l-.1.1a1.9 1.9 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0 .3-1.7 1.5 1.5 0 0 0-1.4-.9h-.2a1.9 1.9 0 1 1 0-3.8h.1a1.5 1.5 0 0 0 1.4-1 1.5 1.5 0 0 0-.3-1.7l-.1-.1a1.9 1.9 0 1 1 2.6-2.6l.1.1a1.5 1.5 0 0 0 1.7.3h.1a1.5 1.5 0 0 0 .9-1.4v-.2a1.9 1.9 0 1 1 3.8 0v.1a1.5 1.5 0 0 0 .9 1.4 1.5 1.5 0 0 0 1.7-.3l.1-.1a1.9 1.9 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0-.3 1.7v.1a1.5 1.5 0 0 0 1.4.9h.2a1.9 1.9 0 1 1 0 3.8h-.1a1.5 1.5 0 0 0-1.4.9Z"/></svg> 설정
+    </a>
+  </div>
+
+  <div class="status-line anno-target">
+    <span class="anno" style="top:-9px; left:-9px;">2</span>
+    <span class="strong">10:30 회차</span>
+    <span class="dot">·</span>
+    <span>42건</span>
+    <span class="dot">·</span>
+    <span class="sent">✔️ 10시 34분 발송 완료</span>
+    <span class="dot">·</span>
+    <span class="next">다음 회차 13:30</span>
+  </div>
+
+  <div class="flow-section-label"><span class="renamed">거르지 않고 그대로</span></div>
+  <div class="flow-a">
+    <a class="live" href="#">
+      <span class="icon">🔴</span><span class="label">실시간</span><span class="sub">지금 들어오는 기사 · 검색어에 걸린 그대로</span>
+    </a>
+  </div>
+  <div class="flow-divider"></div>
+
+  <div class="flow-section-label">정기 모니터링 · 일자 › 시간대</div>
+  <div class="flow-a">
+    <a class="draft" href="#">
+      <span class="icon">⛏️</span><span class="label">초안</span><span class="sub">회차 마감 전 다듬기</span>
+    </a>
+    <span class="arrow-wrap"><span class="arrow">→</span><span class="arrow-note">회차 마감</span></span>
+    <a class="done" href="#">
+      <span class="icon">💎</span><span class="label">확정본</span><span class="sub">이번 회차 · 발송</span>
+    </a>
+    <span class="arrow-wrap"><span class="arrow">→</span><span class="arrow-note">다음 회차</span></span>
+    <a class="arch-reg" href="#">
+      <span class="icon">🗄️</span><span class="label">정기 보관함</span><span class="sub">지난 회차</span>
+    </a>
+  </div>
+  <div class="flow-divider"></div>
+
+  <div class="flow-head">
+    <div class="flow-section-label">수시 모니터링 · 사안 › 일자</div>
+    <a class="row-action anno-target" href="#">
+      <span class="anno" style="top:-9px; right:-9px;">7</span>+ 새 수집
+    </a>
+  </div>
+  <div class="flow-a">
+    <a class="adhoc state-has anno-target" href="#">
+      <span class="anno" style="top:-9px; right:-9px;">4</span>
+      <span class="icon">🗂️</span><span class="label"><span class="renamed">오늘 사안</span></span><span class="sub"><span class="renamed">검색어·소제목 다듬기</span></span>
+    </a>
+    <span class="box empty-card state-none anno-target">
+      <span class="anno" style="top:-9px; right:-9px;">4</span>
+      <span class="icon">🗂️</span><span class="label"><span class="renamed">오늘 사안</span></span><span class="sub">진행 중인 사안 없음</span>
+    </span>
+    <span class="arrow-wrap"><span class="arrow">→</span><span class="arrow-note">자정</span></span>
+    <a class="arch-adhoc" href="#">
+      <span class="icon">📚</span><span class="label">수시 보관함</span><span class="sub">사안별 아카이브</span>
+    </a>
+  </div>
+  <div class="flow-divider"></div>
+
+  <div class="flow-section-label"><span class="renamed">정기 · 수시 전체를 가로질러</span></div>
+  <div class="solo-wide">
+    <a href="#">
+      <span style="font-size:1.05rem">🏷️</span>
+      <span class="txt">
+        <span class="label"><span class="renamed">라벨 모아보기</span></span>
+        <span class="sub"><span class="renamed">내가 표시해둔 기사</span></span>
+      </span>
+      <span class="tagset"><span class="tag-chip">세제개편 12</span><span class="tag-chip">예산 8</span><span class="tag-chip">부총리 5</span></span>
+    </a>
+  </div>
+
+  <div class="wordcloud anno-target">
+    <span class="anno" style="top:-13px; left:-9px;">3</span>
+    <span class="wc-word" style="font-size:1.90rem; color:#6B7280; font-weight:500;" title="17회 언급 · 등록 검색어">예산결산특별위원회</span>
+    <span class="wc-word" style="font-size:1.90rem; color:#1E3A5F; font-weight:700;" title="15회 언급">전체회의</span>
+    <span class="wc-word" style="font-size:1.90rem; color:#1E3A5F; font-weight:700;" title="15회 언급">국무회의</span>
+    <span class="wc-word" style="font-size:1.55rem; color:#6B7280; font-weight:500;" title="14회 언급 · 등록 검색어">예결위</span>
+    <span class="wc-word" style="font-size:1.55rem; color:#2563EB; font-weight:500;" title="14회 언급">종합정책질의</span>
+    <span class="wc-word" style="font-size:1.55rem; color:#2563EB; font-weight:500;" title="11회 언급">비거주</span>
+    <span class="wc-word" style="font-size:1.25rem; color:#3B7DDB; font-weight:500;" title="11회 언급">서울</span>
+    <span class="wc-word" style="font-size:1.25rem; color:#3B7DDB; font-weight:500;" title="9회 언급">청와대</span>
+    <span class="wc-word" style="font-size:1.25rem; color:#3B7DDB; font-weight:500;" title="6회 언급">거주</span>
+    <span class="wc-word" style="font-size:1.00rem; color:#7AA5E8; font-weight:500;" title="6회 언급">의원</span>
+    <span class="wc-word" style="font-size:1.00rem; color:#7AA5E8; font-weight:500;" title="6회 언급">대통령</span>
+    <span class="wc-word" style="font-size:1.00rem; color:#7AA5E8; font-weight:500;" title="6회 언급">홍익표</span>
+    <span class="wc-word" style="font-size:0.82rem; color:#A9C3EF; font-weight:500;" title="6회 언급">1주택자</span>
+    <span class="wc-word" style="font-size:0.82rem; color:#A9C3EF; font-weight:500;" title="5회 언급">경제부총리</span>
+    <span class="wc-word" style="font-size:0.82rem; color:#A9C3EF; font-weight:500;" title="5회 언급">기존</span>
+  </div>
+  <p class="wc-caption">*0시 이후 현재까지 주요 언급어</p>
+
+  <p class="contact">문의 <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4.5" width="20" height="15" rx="2"/><path d="m2.5 6.5 9.5 6 9.5-6"/></svg> <a href="mailto:sweetgreetings@naver.com">sweetgreetings@naver.com</a></p>
+</div>
+
+</body>
+</html>

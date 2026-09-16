@@ -1,0 +1,174 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1631" viewBox="0 0 1440 1631">
+<rect width="100%" height="100%" fill="#F8FAFC"/>
+<g id="topbar">
+<rect x="0" y="0" width="1440" height="54.5" fill="#FFFFFF"/>
+<text x="490" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">홈</text>
+<text x="924.5" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">설정</text>
+</g>
+<g id="Page">
+<rect x="455" y="24" width="530" height="1458.8" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="0" y="1546.5" width="1440" height="60.5" fill="#FFFFFF"/>
+<rect x="480" y="1559.5" width="480" height="35.5" rx="4" fill="#CBD5E1"/>
+<text x="720" y="1582" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#64748B" xml:space="preserve">저장</text>
+</g>
+<g id="h1">
+<g transform="translate(480,99.8) scale(0.8665,0.8665)" fill="none" stroke="#1E3A5F" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></g>
+<text x="500.8" y="117.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="20.8" font-weight="700" fill="#1E3A5F" xml:space="preserve">검색어</text>
+</g>
+<g id="div">
+<rect x="480" y="261.5" width="480" height="264.3" rx="10" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="497" y="280.2" width="46" height="26" rx="13" fill="#2563EB"/>
+<rect x="553" y="276.5" width="348" height="33.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="564" y="298.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="600" fill="#1F2937" xml:space="preserve">재정경제부 관련</text>
+<g transform="translate(919,285.2) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path>&lt;\/svg&gt;</g>
+<rect x="497" y="320" width="104.3" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="607.3" y="320" width="79.4" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="692.7" y="320" width="104.3" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="803" y="320" width="79.4" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="497" y="358" width="66.9" height="32" rx="16" fill="#F8FAFC" stroke="#94A3B8" stroke-width="1"/>
+<rect x="569.9" y="358" width="79.4" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="655.4" y="358" width="79.4" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="740.8" y="358.2" width="133.8" height="31.5" rx="15.8" fill="#FFFFFF" stroke="#A9B6CA" stroke-width="1"/>
+<rect x="765.6" y="364.2" width="96" height="19.5" fill="none"/>
+<text x="767.6" y="379" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="400" fill="#1F2937" xml:space="preserve">키워드</text>
+<rect x="563.7" y="431.5" width="13" height="13" fill="none"/>
+<rect x="670.9" y="431.5" width="13" height="13" fill="none"/>
+<rect x="497" y="458.5" width="446" height="1" fill="#E5E7EB"/>
+<rect x="501" y="474.5" width="13" height="13" fill="none"/>
+<rect x="480" y="539.8" width="480" height="226.3" rx="10" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="497" y="558.5" width="46" height="26" rx="13" fill="#2563EB"/>
+<rect x="553" y="554.8" width="348" height="33.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="564" y="577.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="600" fill="#1F2937" xml:space="preserve">기타</text>
+<g transform="translate(919,563.5) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path>&lt;\/svg&gt;</g>
+<rect x="497" y="598.3" width="79.4" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="582.4" y="598.3" width="154.1" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="742.5" y="598.5" width="133.8" height="31.5" rx="15.8" fill="#FFFFFF" stroke="#A9B6CA" stroke-width="1"/>
+<rect x="767.4" y="604.5" width="96" height="19.5" fill="none"/>
+<text x="769.4" y="619.3" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="400" fill="#1F2937" xml:space="preserve">키워드</text>
+<rect x="563.7" y="671.8" width="13" height="13" fill="none"/>
+<rect x="670.9" y="671.8" width="13" height="13" fill="none"/>
+<rect x="497" y="698.8" width="446" height="1" fill="#E5E7EB"/>
+<rect x="501" y="714.8" width="13" height="13" fill="none"/>
+<rect x="480" y="780.1" width="480" height="263.8" rx="10" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="497" y="798.9" width="46" height="26" rx="13" fill="#2563EB"/>
+<rect x="553" y="795.1" width="348" height="33.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="564" y="817.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="600" fill="#1F2937" xml:space="preserve">현안</text>
+<g transform="translate(919,803.9) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path>&lt;\/svg&gt;</g>
+<rect x="497" y="838.6" width="79.4" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="582.4" y="838.6" width="79.4" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="667.8" y="838.6" width="91.9" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="765.7" y="838.6" width="62.2" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="833.9" y="838.6" width="79.4" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="497" y="876.6" width="133.8" height="31.5" rx="15.8" fill="#FFFFFF" stroke="#A9B6CA" stroke-width="1"/>
+<rect x="521.8" y="882.6" width="96" height="19.5" fill="none"/>
+<text x="523.8" y="897.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="400" fill="#1F2937" xml:space="preserve">키워드</text>
+<rect x="563.7" y="949.6" width="13" height="13" fill="none"/>
+<rect x="670.9" y="949.6" width="13" height="13" fill="none"/>
+<rect x="497" y="976.6" width="446" height="1" fill="#E5E7EB"/>
+<rect x="501" y="992.6" width="13" height="13" fill="none"/>
+<rect x="480" y="1058" width="480" height="264.3" rx="10" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="497" y="1076.7" width="46" height="26" rx="13" fill="#2563EB"/>
+<rect x="553" y="1073" width="348" height="33.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="564" y="1095.3" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="600" fill="#1F2937" xml:space="preserve">추가 검색어</text>
+<g transform="translate(919,1081.7) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"></path>&lt;\/svg&gt;</g>
+<rect x="497" y="1116.5" width="65.3" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="568.3" y="1116.5" width="91.9" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="666.1" y="1116.5" width="91.9" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="764" y="1116.5" width="79.4" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="497" y="1154.5" width="104.3" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="607.3" y="1154.5" width="95.6" height="32" rx="16" fill="#E7F0FF" stroke="#2563EB" stroke-width="1"/>
+<rect x="709" y="1154.7" width="133.8" height="31.5" rx="15.8" fill="#FFFFFF" stroke="#A9B6CA" stroke-width="1"/>
+<rect x="733.8" y="1160.7" width="96" height="19.5" fill="none"/>
+<text x="735.8" y="1175.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="400" fill="#1F2937" xml:space="preserve">키워드</text>
+<rect x="563.7" y="1228" width="13" height="13" fill="none"/>
+<rect x="670.9" y="1228" width="13" height="13" fill="none"/>
+<rect x="497" y="1255" width="446" height="1" fill="#E5E7EB"/>
+<rect x="501" y="1271" width="13" height="13" fill="none"/>
+<text x="510" y="339.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">재정경제부</text>
+<text x="585.8" y="340.5" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="620.3" y="339.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">재경부</text>
+<text x="671.2" y="340.5" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="705.7" y="339.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">기획재정부</text>
+<text x="781.5" y="340.5" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="816" y="339.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">기재부</text>
+<text x="866.9" y="340.5" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="510" y="377.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="400" fill="#1F2937" xml:space="preserve">정부</text>
+<text x="548.4" y="378.5" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">×</text>
+<text x="582.9" y="377.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">구윤철</text>
+<text x="633.8" y="378.5" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="668.4" y="377.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">이형일</text>
+<text x="719.2" y="378.5" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="753.8" y="378.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="700" fill="#2563EB" xml:space="preserve">+</text>
+<text x="497" y="412.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">키워드 7 / 10 · 1개 잠시 뺌</text>
+<text x="497" y="440.3" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">검색 방식</text>
+<text x="584.7" y="440.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">1개라도 포함</text>
+<text x="691.9" y="440.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">모두 포함</text>
+<text x="524" y="484.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">정기 스크랩(예정된 회차)에도 포함 — 꺼두면 실시간 기사 현황에만 나오고, &quot;→ 스</text>
+<text x="524" y="504.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">크랩&quot;으로 직접 옮겨야 정식 반영됩니다.</text>
+<text x="510" y="618.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">재경위</text>
+<text x="560.9" y="618.8" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="595.4" y="618.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">재정경제기획위원회</text>
+<text x="721" y="618.8" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="755.5" y="618.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="700" fill="#2563EB" xml:space="preserve">+</text>
+<text x="497" y="653.3" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">키워드 2 / 10</text>
+<text x="497" y="680.6" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">검색 방식</text>
+<text x="584.7" y="680.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">1개라도 포함</text>
+<text x="691.9" y="680.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">모두 포함</text>
+<text x="524" y="725.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">정기 스크랩(예정된 회차)에도 포함 — 꺼두면 실시간 기사 현황에만 나오고, &quot;→ 스</text>
+<text x="524" y="744.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">크랩&quot;으로 직접 옮겨야 정식 반영됩니다.</text>
+<text x="510" y="858.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">양도세</text>
+<text x="560.9" y="859.2" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="595.4" y="858.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">종부세</text>
+<text x="646.3" y="859.2" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="680.8" y="858.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">장특공제</text>
+<text x="744.2" y="859.2" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="778.7" y="858.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">ISA</text>
+<text x="812.4" y="859.2" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="846.9" y="858.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">보유세</text>
+<text x="897.8" y="859.2" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="510" y="897" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="700" fill="#2563EB" xml:space="preserve">+</text>
+<text x="497" y="931.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">키워드 5 / 10</text>
+<text x="497" y="958.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">검색 방식</text>
+<text x="584.7" y="958.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">1개라도 포함</text>
+<text x="691.9" y="958.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">모두 포함</text>
+<text x="524" y="1003.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">정기 스크랩(예정된 회차)에도 포함 — 꺼두면 실시간 기사 현황에만 나오고, &quot;→ 스</text>
+<text x="524" y="1022.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">크랩&quot;으로 직접 옮겨야 정식 반영됩니다.</text>
+<text x="510" y="1136.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">IMF</text>
+<text x="546.8" y="1137" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="581.3" y="1136.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">물가안정</text>
+<text x="644.6" y="1137" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="679.1" y="1136.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">초과세수</text>
+<text x="742.5" y="1137" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="777" y="1136.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">코스피</text>
+<text x="827.9" y="1137" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="510" y="1174.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">인플레이션</text>
+<text x="585.8" y="1175" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="620.3" y="1174.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.4" font-weight="600" fill="#1E3A5F" xml:space="preserve">세제 개편</text>
+<text x="687.4" y="1175" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1E3A5F" xml:space="preserve">×</text>
+<text x="722" y="1175" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="700" fill="#2563EB" xml:space="preserve">+</text>
+<text x="497" y="1209.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">키워드 6 / 10</text>
+<text x="497" y="1236.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">검색 방식</text>
+<text x="584.7" y="1237.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">1개라도 포함</text>
+<text x="691.9" y="1237.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">모두 포함</text>
+<text x="524" y="1281.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">정기 스크랩(예정된 회차)에도 포함 — 꺼두면 실시간 기사 현황에만 나오고, &quot;→ 스</text>
+<text x="524" y="1301.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.1" font-weight="400" fill="#6B7280" xml:space="preserve">크랩&quot;으로 직접 옮겨야 정식 반영됩니다.</text>
+</g>
+<g id="add-group-btn">
+<rect x="480" y="1342.3" width="480" height="43.5" rx="8" fill="#FFFFFF" stroke="#2563EB" stroke-width="1"/>
+<text x="720" y="1368.5" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">+ 키워드 그룹 추가</text>
+</g>
+<g id="caption">
+<text x="480" y="148.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">* 저장 후 다음 스크랩 회차부터 적용됩니다. (실시간 현황은 즉시 반영)</text>
+</g>
+<g id="hint">
+<text x="480" y="177.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">키워드 그룹은 최대 8개, 그룹당 키워드는 최대 10개까지
+    추가할 수 있습니다. 그룹 중 하나</text>
+<text x="480" y="193.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">라도 조건을 만족하면 실시간 기사 현황에 나옵니다
+    (그룹 간 OR). 그룹은 최소 1개는 있어</text>
+<text x="480" y="209.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">야 하고, &quot;정기 스크랩에도 포함&quot;으로 켠 그룹만
+    예정된 회차에 자동으로 수집됩니다(최소 1</text>
+<text x="480" y="225.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">개 필요). 키워드를 누르면 지우지 않고
+    검색에서만 잠시 뺄 수 있습니다(두 번 누르면 글자</text>
+<text x="480" y="241.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">를 고칠 수 있습니다).</text>
+</g>
+</svg>

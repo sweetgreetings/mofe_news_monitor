@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1024" viewBox="0 0 1440 1024">
+<rect width="100%" height="100%" fill="#F8FAFC"/>
+<g id="topbar">
+<rect x="0" y="0" width="1440" height="54.5" fill="#FFFFFF"/>
+<text x="490" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">홈</text>
+<text x="924.5" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">설정</text>
+</g>
+<g id="Page">
+<rect x="455" y="24" width="530" height="693.1" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+</g>
+<g id="status">
+<rect x="480" y="206.4" width="480" height="36.5" rx="6" fill="#EFF6FF"/>
+<g transform="translate(494,216.9) scale(0.5866,0.5866)" fill="none" stroke="#2563EB" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m20 6-11 11-5-5"></path></g>
+<text x="508.1" y="228.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.1" font-weight="400" fill="#2563EB" xml:space="preserve">.env에 봇 토큰이 설정돼 있습니다.</text>
+</g>
+<g id="help-box">
+<rect x="480" y="262.9" width="480" height="134" rx="6" fill="#EFF6FF"/>
+<rect x="512" y="329.9" width="432.6" height="33" rx="4" fill="#FFFFFF"/>
+<rect x="727.5" y="345.9" width="65.3" height="17" rx="4" fill="#FFFFFF"/>
+<text x="494" y="284.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="600" fill="#1F2937" xml:space="preserve">받는 사람의 chat id 확인하는 법</text>
+<text x="512" y="306.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">받을 사람이 텔레그램에서 이 봇을 찾아 대화를 시작합니다(아무 메시지나 1개 이상</text>
+<text x="512" y="322.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">전송).</text>
+<text x="512" y="342.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">브라우저에서</text>
+<text x="591.2" y="342.3" font-family="monospace" font-size="13.1" font-weight="400" fill="#1F2937" xml:space="preserve">https://api.telegram.org/bot&lt;.env의 봇 토큰&gt;/ge</text>
+<text x="512" y="358.3" font-family="monospace" font-size="13.1" font-weight="400" fill="#1F2937" xml:space="preserve">tUpdates</text>
+<text x="580.2" y="358.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">를 열어 방금 보낸 메시지의</text>
+<text x="732.5" y="358.3" font-family="monospace" font-size="13.1" font-weight="400" fill="#1F2937" xml:space="preserve">chat.id</text>
+<text x="792.8" y="358.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">값을 확인합니다.</text>
+<text x="512" y="378.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">확인한 숫자를 아래 &quot;받는 사람&quot;에 등록합니다.</text>
+</g>
+<g id="form">
+<rect x="480" y="460.9" width="480" height="1" fill="#E5E7EB"/>
+<rect x="480" y="474.1" width="36" height="24" rx="4" fill="#2563EB"/>
+<rect x="524" y="469.9" width="152" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="535" y="491.7" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">홍정희</text>
+<rect x="684" y="469.9" width="152" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="695" y="491.7" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">8427535869</text>
+<rect x="844" y="478.6" width="15" height="15" fill="none"/>
+<rect x="867" y="478.6" width="15" height="15" fill="none"/>
+<rect x="896" y="473.4" width="38.3" height="25.5" rx="4" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="480" y="510.4" width="138.4" height="37.5" rx="4" fill="#FFFFFF" stroke="#2563EB" stroke-width="1"/>
+<rect x="480" y="561.9" width="480" height="62.2" fill="#F8FAFC"/>
+<rect x="0" y="939.5" width="1440" height="60.5" fill="#FFFFFF"/>
+<rect x="480" y="952.5" width="480" height="35.5" rx="4" fill="#2563EB"/>
+<text x="480" y="427.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" xml:space="preserve">받는 사람 (최대 15명) — 체크를 풀면 지우지 않고도 잠깐 대상에서 뺄 수 있습니다.</text>
+<text x="480" y="453.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11.2" font-weight="700" fill="#6B7280" xml:space="preserve">정기</text>
+<text x="524" y="453.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11.2" font-weight="700" fill="#6B7280" xml:space="preserve">이름</text>
+<text x="662" y="453.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11.2" font-weight="700" fill="#6B7280" xml:space="preserve">chat id</text>
+<text x="859" y="453.5" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11.2" font-weight="700" fill="#6B7280" xml:space="preserve">단독</text>
+<text x="901" y="453.5" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11.2" font-weight="700" fill="#6B7280" xml:space="preserve">속보</text>
+<text x="490.3" y="489.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="10.9" font-weight="700" fill="#FFFFFF" xml:space="preserve">ON</text>
+<text x="915.1" y="489.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">del</text>
+<text x="549.2" y="533.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#2563EB" xml:space="preserve">+ 받는 사람 추가</text>
+<text x="495" y="585.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">&quot;나&quot;처럼 정기(확정본)는 끄고 [단독]·[속보] 알림만 받을 수 있습니다 — 두 발송은
+      서로 독</text>
+<text x="495" y="607.1" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#1F2937" xml:space="preserve">립적입니다(정기는 회차 확정 후 전체 목록, 알림은 해당 기사 1~3건만 즉시).</text>
+<text x="720" y="975" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#FFFFFF" xml:space="preserve">저장</text>
+</g>
+<g id="h1">
+<text x="480" y="119.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="20.8" font-weight="700" fill="#1E3A5F" xml:space="preserve">📤 텔레그램 수신 대상자 지정</text>
+</g>
+<g id="hint">
+<text x="480" y="153.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">받는 사람을 한 번만 등록해 두고, 무엇을 받을지(정기 확정본 / 🚨 [단독]·[속보] 즉시
+    알림)</text>
+<text x="480" y="170.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">는 사람마다 체크합니다. 정기 확정본이 언제 나가는지(직접 (발송) 누를 때 /
+    자동발송)는</text>
+<text x="947.8" y="170.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#0000EE" xml:space="preserve">자</text>
+<text x="480" y="186.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#0000EE" xml:space="preserve">동발송 설정</text>
+<text x="542.4" y="186.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">, 알림 조건(감시 시간대·그룹)은</text>
+<text x="713.7" y="186.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#0000EE" xml:space="preserve">[단독]·[속보] 기사 알림</text>
+<text x="837.6" y="186.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">에서 정합니다.</text>
+</g>
+</svg>

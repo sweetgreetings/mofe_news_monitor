@@ -1,0 +1,375 @@
+<title>사진 추정 모아 보기 목업</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg:#F8FAFC; --card:#FFFFFF; --header:#1E3A5F; --accent:#2563EB; --text:#1F2937;
+    --muted:#6B7280; --soft:#4B5563; --faint:#9CA3AF; --border:#E5E7EB; --hover:#EFF6FF;
+    --accent-border:#BFDBFE; --row-hover:#F3F4F6; --error:#DC2626;
+    --warn-text:#92400E; --warn-bg:#FFFBEB; --warn-border:#FDE68A; --warn-chip:#FEF3C7;
+    --scoop-bg:#FEF2F2; --scoop-bar:#DC2626;
+    --adhoc:#0F766E; --adhoc-bg:#F0FDFA; --adhoc-border:#99F6E4;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; font-size:14px; }
+  .ic { width:1em; height:1em; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; vertical-align:-0.13em; }
+  button { font:inherit; }
+
+  /* ── 목업 조작판 (실제 화면엔 없음) ── */
+  .mk-panel { position:sticky; top:0; z-index:30; background:#111827; color:#F9FAFB; padding:10px 16px; }
+  .mk-inner { max-width:800px; margin:0 auto; display:flex; flex-direction:column; gap:7px; }
+  .mk-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .mk-lab { font-size:.75rem; color:#9CA3AF; width:34px; flex-shrink:0; }
+  .mk-seg { display:inline-flex; border:1px solid #374151; border-radius:8px; overflow:hidden; flex-wrap:wrap; }
+  .mk-seg button { background:transparent; color:#D1D5DB; border:0; padding:5px 11px; font-size:.8rem; cursor:pointer; }
+  .mk-seg button + button { border-left:1px solid #374151; }
+  .mk-seg button.on { background:#F9FAFB; color:#111827; font-weight:700; }
+  .mk-rec { font-size:.68rem; background:#FDE68A; color:#78350F; border-radius:999px; padding:0 6px; margin-left:4px; font-weight:700; }
+  .mk-hint { font-size:.78rem; color:#D1D5DB; line-height:1.5; }
+  .mk-hint b { color:#fff; }
+
+  /* ── 앱 화면 ── */
+  .topbar { background:var(--card); border-bottom:1px solid var(--border); }
+  .topbar-inner { max-width:800px; margin:0 auto; padding:12px 24px; display:flex; justify-content:space-between; align-items:center; }
+  .topbar a { color:var(--accent); text-decoration:none; font-size:.85rem; margin-left:14px; }
+  .brand { font-weight:700; color:var(--header); }
+  .container { max-width:800px; margin:18px auto 120px; background:var(--card); border:1px solid var(--border);
+    border-radius:12px; padding:22px 24px 28px; }
+  h1 { font-size:1.35rem; color:var(--header); margin:0 0 6px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .kind-chip { font-size:.72rem; font-weight:700; color:var(--adhoc); background:var(--adhoc-bg); border:1px solid var(--adhoc-border); border-radius:999px; padding:1px 8px; }
+  .meta-chips { display:flex; gap:6px; flex-wrap:wrap; margin:4px 0 12px; }
+  .mchip { font-size:.76rem; color:var(--soft); background:var(--bg); border:1px solid var(--border); border-radius:999px; padding:2px 9px; }
+  .toolbar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:10px 0 12px; border-bottom:1px solid var(--border); }
+  .btn { display:inline-flex; align-items:center; gap:5px; height:32px; padding:0 12px; border-radius:8px; font-size:.82rem;
+    border:1px solid var(--accent-border); background:var(--card); color:var(--accent); cursor:pointer; white-space:nowrap; text-decoration:none; }
+  .btn:hover { background:var(--hover); }
+  .btn.ai { background:#F5F3FF; border-color:#DDD6FE; color:#6D28D9; }
+  .btn.mute { border-color:var(--border); color:var(--soft); }
+  .btn.mute:hover { background:var(--row-hover); }
+  .btn.on, .btn.on:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .btn.sm { height:28px; padding:0 10px; font-size:.78rem; }
+  .sel { height:32px; border:1px solid var(--border); border-radius:8px; padding:0 8px; font-size:.8rem; color:var(--soft); background:#fff; }
+  .spacer { flex:1; }
+  .sel-row { display:flex; gap:8px; align-items:center; padding:10px 0 0; }
+
+  .subheading { margin-top:24px; }
+  .subheading h2 { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:1.1rem;
+    color:var(--header); border-bottom:1px solid var(--border); margin:0 0 6px; padding-bottom:6px; }
+  .sh-title { display:flex; align-items:center; gap:6px; min-width:0; }
+  .sh-title input { margin:0; }
+  .sh-icons { display:flex; gap:2px; color:var(--muted); font-size:.85rem; flex-shrink:0; }
+  .sh-icons span { padding:2px 5px; }
+  .cnt { font-size:.78rem; color:var(--muted); font-weight:500; }
+  .unc-title { color:var(--muted); font-style:italic; font-weight:600; }
+  .unc-count { font-size:.8rem; font-weight:700; color:var(--warn-text); background:var(--warn-chip); border-radius:999px; padding:1px 8px; }
+
+  .article { margin:8px 0; line-height:1.5; padding:6px 8px; border-radius:8px; }
+  .article.art-scoop { background:var(--scoop-bg); border-left:3px solid var(--scoop-bar); padding-left:9px; }
+  .article:hover { background:var(--row-hover); }
+  .article:has(.article-select:checked) { background:var(--hover); }
+  .article.is-photo { opacity:.55; }
+  .article.is-photo:hover, .article.is-photo:has(.article-select:checked) { opacity:1; }
+  .sum { display:flex; align-items:flex-start; gap:8px; }
+  .sum input { margin-top:5px; flex-shrink:0; }
+  .title-line { flex:0 1 auto; min-width:0; font-size:1rem; }
+  .title-outlet { color:var(--muted); font-size:.86em; font-weight:500; margin-right:.5em; }
+  .t-flash { color:var(--error); font-weight:600; }
+  .photo-badge { flex-shrink:0; padding:1px 7px; border-radius:999px; font-size:.72rem; color:var(--muted);
+    background:var(--bg); border:1px solid var(--border); white-space:nowrap; margin-top:3px; }
+  .acts { margin-left:auto; display:flex; gap:0; flex-shrink:0; color:var(--muted); }
+  .acts button { background:transparent; border:0; color:var(--muted); padding:2px 6px; cursor:pointer; font-size:1rem; }
+  .acts button:disabled { color:var(--border); }
+  .acts .del:hover { color:var(--error); }
+  .meta { margin-left:28px; font-size:.8rem; color:var(--muted); display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .meta a { color:var(--muted); }
+  .from-tag { color:var(--soft); background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:0 6px; font-size:.74rem; }
+
+  /* A안: 소제목 안에 남는 안내 줄 */
+  .moved-note { margin:6px 0 2px 8px; font-size:.8rem; color:var(--muted); display:flex; gap:6px; align-items:center; }
+  .moved-note .warn { color:var(--warn-text); background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:6px; padding:0 6px; }
+  .empty-sub { margin:8px 0 2px 8px; font-size:.82rem; color:var(--faint); font-style:italic; }
+  /* A안: 맨 아래 사진 칸 */
+  .photo-zone { margin-top:30px; border:1px dashed var(--border); border-radius:10px; padding:10px 12px 6px; background:#FCFCFD; }
+  .photo-zone h2 { border-bottom-style:dashed; }
+  .photo-zone .zone-title { color:var(--soft); }
+  .fold { background:transparent; border:1px solid var(--border); color:var(--muted); border-radius:6px; font-size:.75rem; padding:1px 8px; cursor:pointer; }
+
+  /* B안: 모아 보는 중 띠 */
+  .gather-strip { position:sticky; top:106px; z-index:15; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    background:var(--hover); border:1px solid var(--accent-border); border-radius:10px; padding:9px 12px; margin:14px 0 6px; }
+  .gather-strip label { display:flex; align-items:center; gap:5px; font-size:.84rem; color:var(--text); cursor:pointer; }
+  .gather-strip .msg { font-size:.86rem; color:var(--header); }
+  .gathered .article.is-photo { opacity:1; }
+  .gathered .photo-badge { display:none; }
+  .zone-list .article.is-photo { opacity:1; }
+  .zone-list .photo-badge { display:none; }
+  .done-msg { text-align:center; color:var(--muted); padding:28px 0 16px; font-size:.9rem; }
+
+  /* 선택 바 · 쓰레기통 · 되돌리기 · 토스트 */
+  .bulk-bar { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); z-index:25; display:none; align-items:center; gap:10px;
+    background:#fff; border:1px solid var(--border); border-radius:12px; padding:8px 12px; box-shadow:0 6px 20px rgba(15,23,42,.12); }
+  .bulk-bar.on { display:flex; }
+  .bulk-bar .n { font-size:.85rem; color:var(--text); font-weight:600; }
+  .btn.danger { border-color:#FECACA; color:var(--error); }
+  .btn.danger:hover { background:#FEF2F2; }
+  .fab { position:fixed; left:20px; width:56px; height:56px; border-radius:50%; background:#fff; border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center; color:var(--soft); font-size:1.3rem; box-shadow:0 2px 6px rgba(15,23,42,.1); cursor:pointer; z-index:20; }
+  .fab[hidden] { display:none; }
+  .fab.trash { bottom:20px; }
+  .fab.undo { bottom:88px; width:50px; height:50px; left:23px; font-size:1.15rem; }
+  .fab .badge { position:absolute; top:-3px; right:-3px; background:var(--error); color:#fff; font-size:.7rem; font-weight:700; border-radius:999px; padding:1px 6px; }
+  .toast { position:fixed; left:50%; top:130px; transform:translateX(-50%); background:#111827; color:#fff; font-size:.84rem; padding:8px 14px; border-radius:8px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:40; }
+  .toast.on { opacity:1; }
+
+  /* 설명 카드 */
+  .notes { max-width:800px; margin:0 auto 140px; background:#fff; border:1px solid var(--border); border-radius:12px; padding:20px 24px; line-height:1.65; }
+  .notes h3 { font-size:1rem; color:var(--header); margin:0 0 8px; }
+  .notes h3 + * { margin-top:0; }
+  .cmp-wrap { overflow-x:auto; }
+  .cmp { border-collapse:collapse; width:100%; min-width:560px; font-size:.84rem; }
+  .cmp th, .cmp td { border:1px solid var(--border); padding:7px 9px; vertical-align:top; text-align:left; }
+  .cmp th { background:var(--bg); color:var(--soft); font-weight:600; }
+  .cmp td.good { color:#166534; } .cmp td.bad { color:var(--warn-text); }
+  .notes ul { padding-left:20px; margin:6px 0; }
+  .notes li { margin:3px 0; }
+  .mock-tag { font-size:.78rem; color:var(--muted); }
+  @media (max-width:640px) {
+    .container { margin:12px 12px 120px; padding:16px; }
+    .notes { margin:0 12px 140px; padding:16px; }
+    .gather-strip { top:150px; }
+  }
+</style>
+
+<div class="mk-panel">
+  <div class="mk-inner">
+    <div class="mk-row"><span class="mk-lab">화면</span>
+      <span class="mk-seg" id="mk-screen">
+        <button data-v="reg" class="on">정기 확정본 · 9/1 11:00</button>
+        <button data-v="adh">수시 수집 원본 · 인사청문회</button>
+      </span>
+    </div>
+    <div class="mk-row"><span class="mk-lab">안</span>
+      <span class="mk-seg" id="mk-plan">
+        <button data-v="B" class="on">B 모아 보기<span class="mk-rec">추천</span></button>
+        <button data-v="A">A 맨 아래 한 칸</button>
+        <button data-v="now">지금 화면</button>
+      </span>
+    </div>
+    <div class="mk-hint" id="mk-hint"></div>
+  </div>
+</div>
+
+<div class="topbar"><div class="topbar-inner"><span class="brand" id="brand">언론 모니터링</span><span id="nav"></span></div></div>
+<div class="container" id="screen"></div>
+
+<div class="bulk-bar" id="bulk">
+  <span class="n" id="bulk-n">0개 선택됨</span>
+  <select class="sel" disabled id="bulk-move"><option>다른 소제목 ▾</option></select>
+  <button class="btn danger sm" onclick="hideChecked()"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg> 숨기기</button>
+  <button class="btn mute sm" onclick="clearChecks()">선택 해제</button>
+</div>
+<div class="fab undo" id="undo" hidden onclick="undoLast()" title="방금 숨긴 기사 되돌리기"><svg class="ic" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg></div>
+<div class="fab trash" id="trash" hidden title="숨긴 기사"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg><span class="badge" id="trash-n">0</span></div>
+<div class="toast" id="toast"></div>
+
+<div class="notes">
+  <h3>무엇을 비교하나</h3>
+  <p>지금은 사진 추정 기사가 <b>제자리(소제목 안)에서 흐리게</b>만 보여서, 골라 숨기려면 목록 전체를 훑어야 해요.
+     정기 9/1 11:00 회차는 57건 중 12건이 소제목 3곳에 흩어져 있고, 수시 「인사청문회」 원본은 117건 중 62건이 사진 추정이에요.
+     두 안 모두 그 기사들을 <b>한 곳에 모아</b> 보여줍니다. 차이는 <b>늘 따로 두느냐, 필요할 때만 모으느냐</b>예요.</p>
+
+  <div class="cmp-wrap"><table class="cmp">
+    <tr><th></th><th>B 모아 보기 (추천)</th><th>A 맨 아래 한 칸</th></tr>
+    <tr><th>평소 화면</th><td>지금과 같아요 — 제자리에서 흐리게</td><td>사진 추정은 소제목에서 빠져 맨 아래 한 칸에 늘 모여 있어요</td></tr>
+    <tr><th>보고서(복사·txt·발송)와 화면</th><td class="good">늘 같아요 — 모아 보기는 「보기 순서」처럼 화면만 바꿔요</td>
+        <td class="bad">어긋나요 — 숨기기 전까진 보고서엔 원래 소제목으로 나가는데 화면엔 거기 없어요.
+        「인사 인사」는 2건이 전부 사진이라 화면엔 빈 소제목, 보고서엔 2건이 나가요. 소제목 📋 복사도 화면에 없는 기사를 복사해요</td></tr>
+    <tr><th>오탐(진짜 기사)</th><td>체크를 풀어 두면 「원래 화면으로」 누를 때 제자리에 그대로 있어요</td><td>칸에서 꺼낼 길이 따로 필요해요(「제자리로」 버튼 + 그걸 기억할 저장소)</td></tr>
+    <tr><th>새로 필요한 것</th><td>버튼 하나 + 화면 전환(서버 변경 없음)</td><td>화면·보고서 규칙을 새로 정해야 해요</td></tr>
+  </table></div>
+
+  <h3 style="margin-top:18px">B안에서 정해 둔 것</h3>
+  <ul>
+    <li><b>이름은 두 흐름 모두 「📷 사진 추정 모아 보기 (N)」</b> — 지금 「사진 추정 전체 선택」 자리를 대신해요. 전체 선택은 모아 보는 중 띠의 체크박스가 맡아요. 0건이면 버튼을 안 그려요(지금과 같아요).</li>
+    <li><b>모아 보는 중엔 흐림과 📷 칩을 뗐어요</b> — 전부 사진 추정이라 행마다 같은 값이면 장식이에요. 대신 행마다 <b>원래 소제목 이름표</b>를 달아요(보고서에 나갈 자리). 수시 원본처럼 전부 미분류면 이름표도 안 달아요.</li>
+    <li><b>순서는 화면 순서 그대로</b> — 정기는 소제목 순, 수시 원본은 시간순이라 같은 행사 사진이 붙어 나와요.</li>
+    <li><b>띠가 스크롤을 따라와요</b> — 60건을 훑으며 체크를 풀어도 「전체 선택」·「원래 화면으로」가 안 사라져요.</li>
+    <li><b>숨기면 그 자리에서 빠지고, 다 치우면 「남은 사진 추정이 없어요」</b>. 숨긴 기사는 지금처럼 좌하단 🗑(정기)·「목록 밖 기사」(수시)로 가고, ↩ 한 번이면 통째로 돌아와요.</li>
+    <li><b>숨기고 새로고침돼도 모아 보기가 풀리지 않아요</b> — 정기 초안·확정본은 숨길 때 화면을 다시 불러오고, 수시는 폼 제출이라 페이지가 새로 떠요. 회차(수시는 카드)별로 탭 안에만 기억해요.</li>
+    <li><b>수시엔 선택 바 「🗑 숨기기」가 먼저 있어야 해요</b> — 앞 목업(ADHOC_SELECT_PHOTO_MOCKUP.html)의 ③이에요. 이 기능은 그 위에 얹혀요.</li>
+  </ul>
+  <p class="mock-tag">실제 기사로 그렸어요(정기 2026-09-01 11:00 회차, 수시 2026-09-15 「인사청문회」 원본). 숨기기는 목업 안에서만 흉내 내요.</p>
+</div>
+
+<script>
+var DATA = {"regular": {"slot": "11:00", "date": "2026-09-01", "groups": [{"name": "김용범 정책실장 사퇴", "arts": [{"o": "KBS", "t": "김용범 정책실장 어제 사의…이 대통령 사표 수리", "u": "https://n.news.naver.com/mnews/article/056/0012248408", "tm": "10:17", "k": "구윤철", "p": 0, "h": ""}, {"o": "SBS", "t": "김용범 청와대 정책실장 사퇴…'여론 악화' 때문인 듯", "u": "https://n.news.naver.com/mnews/article/055/0001384910", "tm": "10:25", "k": "재정경제부", "p": 0, "h": ""}, {"o": "중앙일보", "t": "김용범 靑정책실장 사퇴…레버리지ETF·부동산 논란 책임론", "u": "https://n.news.naver.com/mnews/article/025/0003548184", "tm": "10:15", "k": "재정경제부", "p": 0, "h": ""}, {"o": "헤럴드경제", "t": "김용범 靑 정책실장 퇴진…경제·국토 이어 경제라인 ‘물갈이’", "u": "https://n.news.naver.com/mnews/article/016/0002690983", "tm": "09:57", "k": "재정경제부, 재경부, 기획재정부, 이형일, 재정경제기획위원회", "p": 0, "h": ""}, {"o": "이데일리", "t": "개각서 살아남은 김용범, 하루 만에 퇴장…레버리지·부동산에 발목", "u": "https://n.news.naver.com/mnews/article/018/0006361405", "tm": "09:52", "k": "재정경제부, 이형일, 재정경제기획위원회", "p": 0, "h": ""}, {"o": "한경비즈니스", "t": "김용범 정책실장 전격 사퇴…이재명 정부 ‘경제 컨트롤타워’ 쇄신", "u": "https://magazine.hankyung.com/money/article/202609015943c", "tm": "10:38", "k": "재정경제부", "p": 0, "h": ""}, {"o": "노컷뉴스", "t": "국힘, 김용범 사퇴에 \"개각 여론 악화 달래기용 '꼬리 자르기'\"", "u": "https://n.news.naver.com/mnews/article/079/0004184485", "tm": "10:31", "k": "재정경제기획위원회", "p": 0, "h": ""}, {"o": "뉴시스", "t": "개각·참모진 개편 이틀 만에 사퇴한 김용범…레버리지ETF·부동산 민심 악화에 책임론", "u": "https://n.news.naver.com/mnews/article/003/0014160691", "tm": "10:50", "k": "재정경제부", "p": 0, "h": ""}]}, {"name": "중국산 아크릴산 부틸 덤핑관세", "arts": [{"o": "머니투데이", "t": "정부, 중국산 아크릴산 부틸에 최고 19.17% 덤핑방지관세 부과", "u": "https://n.news.naver.com/mnews/article/008/0005407544", "tm": "10:00", "k": "재정경제부, 재경부", "p": 0, "h": ""}, {"o": "헤럴드경제", "t": "중국산 아크릴산 부틸에 덤핑관세 부과… 5년간 최대 19.17%", "u": "https://n.news.naver.com/mnews/article/016/0002691010", "tm": "10:21", "k": "재정경제부", "p": 0, "h": ""}, {"o": "이데일리", "t": "중국산 아크릴산 부틸에 5년간 덤핑방지관세 부과… 최대 19.17%", "u": "https://n.news.naver.com/mnews/article/018/0006361418", "tm": "10:02", "k": "재정경제부", "p": 0, "h": ""}]}, {"name": "중소기업 AI 전환 지원", "arts": [{"o": "조선비즈", "t": "“中企, 업종간 뭉치고 현장 데이터 모아…AI 생태계 구축 동참해야”", "u": "https://n.news.naver.com/mnews/article/366/0001189543", "tm": "10:01", "k": "재정경제부", "p": 0, "h": ""}, {"o": "연합뉴스", "t": "재경차관 \"정부 AI지원→스타트업 개발→중기 활용 생태계 조성\"", "u": "https://n.news.naver.com/mnews/article/001/0016281703", "tm": "10:00", "k": "재정경제부", "p": 0, "h": ""}, {"o": "뉴시스", "t": "재경2차관 \"중기 AI 전환 총력…GPU·제조 파운데이션 모델 지원\"", "u": "https://n.news.naver.com/mnews/article/003/0014160413", "tm": "10:00", "k": "재정경제부, 재경부", "p": 0, "h": ""}, {"o": "머니투데이", "t": "\"AI대전환으로 중소기업 성장...현장에서 혁신 생태계 조성 필요\"", "u": "https://n.news.naver.com/mnews/article/008/0005407597", "tm": "10:56", "k": "재정경제부", "p": 0, "h": ""}, {"o": "파이낸셜뉴스", "t": "김기문 회장 \"중소기업 AI 전환 수준 맞춰 정책 지원해야\"", "u": "https://n.news.naver.com/mnews/article/014/0005569170", "tm": "10:55", "k": "재정경제부", "p": 0, "h": ""}, {"o": "뉴시스", "t": "전략경제와 중소기업 AI 전환 세미나", "u": "https://n.news.naver.com/mnews/article/003/0014160721", "tm": "10:51", "k": "재정경제부", "p": 0, "h": ""}, {"o": "뉴시스", "t": "입장하는 김기문 중기중앙회장-박영선 전략경제자문단 위원장", "u": "https://n.news.naver.com/mnews/article/003/0014160725", "tm": "10:51", "k": "재정경제부", "p": 1, "h": ""}, {"o": "뉴시스", "t": "강연하는 박영선 전략경제자문단 위원장", "u": "https://n.news.naver.com/mnews/article/003/0014160677", "tm": "10:49", "k": "재정경제부", "p": 1, "h": ""}, {"o": "뉴스1", "t": "'전략경제와 중소기업 AI전환 세미나' 축사하는 허장 차관", "u": "https://n.news.naver.com/mnews/article/421/0009143424", "tm": "10:58", "k": "재정경제부", "p": 1, "h": ""}, {"o": "뉴스1", "t": "허장 차관, 전략경제와 중소기업 AI전환 세미나 축사", "u": "https://n.news.naver.com/mnews/article/421/0009143427", "tm": "10:58", "k": "재정경제부", "p": 1, "h": ""}, {"o": "뉴스1", "t": "축사하는 허장 차관", "u": "https://n.news.naver.com/mnews/article/421/0009143425", "tm": "10:58", "k": "재정경제부", "p": 1, "h": ""}]}, {"name": "추석 민생안정대책", "arts": [{"o": "아시아경제", "t": "사과·소고기 등 성수품 18.3만톤 푼다… 최대 50% 할인 위해 1000억 투입", "u": "https://n.news.naver.com/mnews/article/277/0005810122", "tm": "10:49", "k": "재정경제부", "p": 0, "h": ""}, {"o": "조선비즈", "t": "추석 농축산물 최대 40%·수산물 최대 50% 할인", "u": "https://n.news.naver.com/mnews/article/366/0001189569", "tm": "10:50", "k": "재정경제부", "p": 0, "h": ""}, {"o": "노컷뉴스", "t": "성수품 18.3만톤·할인지원 1030억…소상공인에 43.4조 명절자금", "u": "https://n.news.naver.com/mnews/article/079/0004184529", "tm": "10:57", "k": "재정경제부", "p": 0, "h": ""}, {"o": "뉴스핌", "t": "추석 민생에 1030억 할인 지원…소상공인 43조 자금 공급", "u": "https://www.newspim.com/news/view/20260901000280", "tm": "10:52", "k": "재정경제부", "p": 0, "h": ""}]}, {"name": "인사 인사", "arts": [{"o": "뉴스1", "t": "이형일 차관과 대화하는 이재명 대통령", "u": "https://n.news.naver.com/mnews/article/421/0009143426", "tm": "10:58", "k": "재정경제부", "p": 1, "h": ""}, {"o": "뉴스1", "t": "발언하는 이형일 차관", "u": "https://n.news.naver.com/mnews/article/421/0009143428", "tm": "10:58", "k": "재정경제부", "p": 1, "h": ""}]}, {"name": "기타", "arts": [{"o": "국민일보", "t": "[단독] 전세대출도 부익부? 소득 상위 30%가 대출 67% 쓸어갔다", "u": "https://n.news.naver.com/mnews/article/005/0001870156", "tm": "10:14", "k": "재정경제기획위원회", "p": 0, "h": "단독"}, {"o": "연합뉴스", "t": "日, CPTPP 사무국 유치 추진…주도권 확대 의도", "u": "https://n.news.naver.com/mnews/article/001/0016281638", "tm": "09:44", "k": "재정경제부, 구윤철", "p": 0, "h": ""}, {"o": "매일경제", "t": "200조 국민성장펀드도 이제 시작인데…쏟아지는 ‘닮은꼴’ 정책펀드 [기자24시]", "u": "https://n.news.naver.com/mnews/article/009/0005728470", "tm": "09:50", "k": "재정경제부", "p": 0, "h": ""}, {"o": "조선비즈", "t": "법무법인 광장, ‘2026년 조세 포럼’ 개최… 세제개편·세무조사 대응 논의", "u": "https://n.news.naver.com/mnews/article/366/0001189546", "tm": "10:03", "k": "재정경제부", "p": 0, "h": ""}, {"o": "SBS", "t": "[정치쇼] 최민희 \"용혜인 겸직 논란? 청문회 후 판단해도 늦지 않아…비례 두 번, 그만큼 실력 있단 뜻\"", "u": "https://n.news.naver.com/mnews/article/055/0001384900", "tm": "09:41", "k": "기재부", "p": 0, "h": ""}, {"o": "TV조선", "t": "김용범 靑 정책실장 사의 표명…李대통령 수리", "u": "https://n.news.naver.com/mnews/article/448/0000636746", "tm": "10:02", "k": "재정경제부, 구윤철", "p": 0, "h": ""}, {"o": "서울신문", "t": "[인사] 재정경제부", "u": "https://n.news.naver.com/mnews/article/081/0003675375", "tm": "10:03", "k": "재정경제부", "p": 0, "h": ""}, {"o": "머니투데이", "t": "수은, 첫 직접 투자 펀드 1.2조 만든다...PE·VC 동시 조성", "u": "https://n.news.naver.com/mnews/article/008/0005407578", "tm": "10:42", "k": "재정경제부", "p": 0, "h": ""}, {"o": "머니투데이", "t": "[인사]재정경제부", "u": "https://n.news.naver.com/mnews/article/008/0005407534", "tm": "09:51", "k": "재정경제부", "p": 0, "h": ""}, {"o": "머니투데이", "t": "박선원 \"용혜인, 다음 순번 선관위 등록…당연히 비례대표직 사퇴해야\"", "u": "https://n.news.naver.com/mnews/article/008/0005407532", "tm": "09:45", "k": "재경부", "p": 0, "h": ""}, {"o": "세계일보", "t": "안규백 1년여 만에 교체…강신철 앞에 놓인 ‘국방 난제’ [박수찬의 軍]", "u": "https://n.news.naver.com/mnews/article/022/0004155314", "tm": "09:32", "k": "재정경제부", "p": 0, "h": ""}, {"o": "세계일보", "t": "“공공기관 데이터 한곳에 연결”…AI 시대 ‘데이터 고속도로’ 구축 경쟁", "u": "https://n.news.naver.com/mnews/article/022/0004155313", "tm": "09:31", "k": "기획재정부", "p": 0, "h": ""}, {"o": "연합뉴스", "t": "중국산 아크릴산 부틸에 덤핑관세…5년간 최고 19.17%", "u": "https://n.news.naver.com/mnews/article/001/0016281806", "tm": "10:21", "k": "재정경제부", "p": 0, "h": ""}, {"o": "연합뉴스", "t": "출근하는 이형일 경제부총리 후보자", "u": "https://n.news.naver.com/mnews/article/001/0016281760", "tm": "10:12", "k": "재정경제부, 이형일", "p": 1, "h": ""}, {"o": "연합뉴스", "t": "조현 장관과 이형일 차관", "u": "https://n.news.naver.com/mnews/article/001/0016281754", "tm": "10:10", "k": "재정경제부, 이형일", "p": 1, "h": ""}, {"o": "연합뉴스", "t": "수은, AI·첨단전략 중점투자 펀드 조성…3천억원 출자", "u": "https://n.news.naver.com/mnews/article/001/0016281664", "tm": "09:50", "k": "재정경제부", "p": 0, "h": ""}, {"o": "뉴시스", "t": "축사하는 허장 재경부 2차관", "u": "https://n.news.naver.com/mnews/article/003/0014160685", "tm": "10:49", "k": "재정경제부, 재경부", "p": 1, "h": ""}, {"o": "뉴시스", "t": "조국혁신당 \"韓, '북미 정상회담' 美 설득하고 北 접점 만들어야\"", "u": "https://n.news.naver.com/mnews/article/003/0014160585", "tm": "10:35", "k": "재정경제부", "p": 0, "h": ""}, {"o": "뉴시스", "t": "조현 장관과 인사하는 이형일 부총리 후보자", "u": "https://n.news.naver.com/mnews/article/003/0014160434", "tm": "10:03", "k": "재정경제부, 이형일", "p": 1, "h": ""}, {"o": "뉴시스", "t": "정부, 中산 아크릴산 부틸에 최대 19.17% 덤핑방지관세", "u": "https://n.news.naver.com/mnews/article/003/0014160411", "tm": "10:00", "k": "재정경제부, 재경부", "p": 0, "h": ""}, {"o": "뉴스1", "t": "조현 외교장관과 인사하는 이형일 재경부 1차관", "u": "https://n.news.naver.com/mnews/article/421/0009143203", "tm": "10:03", "k": "재정경제부, 재경부, 이형일", "p": 1, "h": ""}, {"o": "뉴스1", "t": "중국산 아크릴산 부틸에 8.32~19.17% 덤핑방지관세…5년간 부과", "u": "https://n.news.naver.com/mnews/article/421/0009143173", "tm": "10:00", "k": "재정경제부, 재경부", "p": 0, "h": ""}, {"o": "뉴스1", "t": "재경차관 \"중소기업 AI 전환 총력 지원…GPU 인프라·제조모델 개발\"", "u": "https://n.news.naver.com/mnews/article/421/0009143176", "tm": "10:00", "k": "재정경제부, 재경부", "p": 0, "h": ""}, {"o": "뉴스1", "t": "AI 전환 해법 모색 나선 중소기업계…\"대기업 AI 경쟁력 산업 전반으로\"", "u": "https://n.news.naver.com/mnews/article/421/0009143180", "tm": "10:00", "k": "재정경제부", "p": 0, "h": ""}, {"o": "뉴스1", "t": "'與도 교체 요구' 김용범, 李정부 개각 이틀만에 사퇴…정책기조 바뀌나", "u": "https://n.news.naver.com/mnews/article/421/0009143152", "tm": "09:54", "k": "재정경제부", "p": 0, "h": ""}, {"o": "노컷뉴스", "t": "중국산 아크릴산 부틸에 5년간 최고 19.17% 덤핑관세 부과", "u": "https://n.news.naver.com/mnews/article/079/0004184468", "tm": "10:12", "k": "재정경제부", "p": 0, "h": ""}, {"o": "한경비즈니스", "t": "[속보]“결국 김용범까지” 대통령정책실장 사퇴", "u": "https://n.news.naver.com/mnews/article/050/0000110329", "tm": "10:35", "k": "재정경제부", "p": 0, "h": "속보"}, {"o": "뉴스핌", "t": "재경부, 중국산 아크릴산 부틸에 최대 19.17% 덤핑방지관세 부과", "u": "https://www.newspim.com/news/view/20260901000271", "tm": "10:00", "k": "재정경제부, 재경부", "p": 0, "h": ""}, {"o": "뉴스핌", "t": "김용범 정책실장, 1년 3개월 만에 사퇴…李대통령, 사표 수리", "u": "https://www.newspim.com/news/view/20260901000197", "tm": "09:32", "k": "기획재정부", "p": 0, "h": ""}]}]}, "adhoc": {"title": "인사청문회", "kw": ["이형일", "재정경제부"], "win": {"start": "11:00", "end": "13:05"}, "groups": [{"name": "📂 소제목 미분류", "arts": [{"o": "뉴시스", "t": "이형일 \"'다주택 징벌적 과세' 발언, 민간 임대 필요하다는 취지\"", "u": "https://n.news.naver.com/mnews/article/003/0014191191", "tm": "12:55", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "전자신문", "t": "[포토] 여당 질의 답변하는 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/030/0003466887", "tm": "12:54", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "전자신문", "t": "[포토] 이형일 '갸웃'", "u": "https://n.news.naver.com/mnews/article/030/0003466889", "tm": "12:54", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "전자신문", "t": "[포토] 야당 질의 답변하는 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/030/0003466891", "tm": "12:54", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "머니투데이", "t": "강민국 \"다주택 과세 180도 번복\"…이형일 \"민간임대 소신 그대로\"", "u": "https://n.news.naver.com/mnews/article/008/0005413917", "tm": "12:53", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "머니투데이", "t": "정태호 \"관료 제 역할 못한 '부동산 세제 논의' 실망\"…이형일 \"송구\"", "u": "https://n.news.naver.com/mnews/article/008/0005413913", "tm": "12:46", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "머니투데이", "t": "정성호 \"부총리가 중심 놓치면 중구난방\"…이형일에 '경제원톱' 주문", "u": "https://n.news.naver.com/mnews/article/008/0005413911", "tm": "12:45", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "뉴스1", "t": "이형일 \"전세사기·시장 불안에 개인 다주택자 공급 고수 어려워\"", "u": "https://n.news.naver.com/mnews/article/421/0009170964", "tm": "12:31", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "이데일리", "t": "이형일 부총리 후보 “경상수지 흑자 2900억달러 넘을 것”", "u": "https://n.news.naver.com/mnews/article/018/0006369647", "tm": "12:28", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "뉴스1", "t": "생각에 잠긴 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/421/0009170942", "tm": "12:28", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스1", "t": "선서하는 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/421/0009170943", "tm": "12:28", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스1", "t": "모두 발언하는 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/421/0009170945", "tm": "12:28", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스1", "t": "모두발언하는 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/421/0009170946", "tm": "12:28", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스1", "t": "인사청문회 질의에 답변하는 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/421/0009170948", "tm": "12:28", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스1", "t": "질의에 답하는 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/421/0009170949", "tm": "12:28", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스1", "t": "답변하는 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/421/0009170950", "tm": "12:28", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "연합뉴스", "t": "인사청문회에서 인사말 하는 이형일 부총리 겸 재정경제부 장관 후보자", "u": "https://n.news.naver.com/mnews/article/001/0016311494", "tm": "12:23", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "연합뉴스", "t": "이형일 부총리 겸 재정경제부 장관 후보자 선서", "u": "https://n.news.naver.com/mnews/article/001/0016311495", "tm": "12:23", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스1", "t": "이형일 \"500조 규모 퇴직연금, 수익률 저조…법안 준비 중\"", "u": "https://n.news.naver.com/mnews/article/421/0009170917", "tm": "12:23", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "연합뉴스", "t": "이형일 후보자 인사청문회에서 답변", "u": "https://n.news.naver.com/mnews/article/001/0016311465", "tm": "12:21", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "연합뉴스", "t": "질문에 답하는 이형일 부총리 겸 재정경제부 장관 후보자", "u": "https://n.news.naver.com/mnews/article/001/0016311476", "tm": "12:21", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "연합뉴스", "t": "주택 문제 관련 질의에 답하는 이형일 부총리 겸 재정경제부 장관 후보자", "u": "https://n.news.naver.com/mnews/article/001/0016311452", "tm": "12:20", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "연합뉴스", "t": "인사청문회에서 답변하는 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/001/0016311457", "tm": "12:20", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "연합뉴스", "t": "이형일 부총리 겸 재정경제부 자관 인사청문회", "u": "https://n.news.naver.com/mnews/article/001/0016311459", "tm": "12:20", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "연합뉴스", "t": "청문회에서 답변하는 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/001/0016311461", "tm": "12:20", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "연합뉴스", "t": "청문회장 입장하는 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/001/0016311446", "tm": "12:19", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "연합뉴스", "t": "안내 받는 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/001/0016311447", "tm": "12:19", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "연합뉴스", "t": "청문회에서 인사하는 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/001/0016311448", "tm": "12:19", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴시스", "t": "슈퍼 청문위크 개막, 인사청문회 출석한 이형일-김승원-이소영 후보자", "u": "https://n.news.naver.com/mnews/article/003/0014191150", "tm": "12:19", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스1", "t": "이형일 \"비거주 예외사유, 저는 해당 안 돼…절대 신청 안 하겠다\"", "u": "https://n.news.naver.com/mnews/article/421/0009170907", "tm": "12:18", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "연합뉴스", "t": "여야, 이형일 '비거주 1주택' 공방…\"투기 세력\"·\"갭투자 아냐\"", "u": "https://n.news.naver.com/mnews/article/001/0016311441", "tm": "12:17", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "뉴시스", "t": "정성호, 경제부총리 후보자에 \"부동산 논란은 소통 부족 탓…野 적극 소통해야\"", "u": "https://n.news.naver.com/mnews/article/003/0014191144", "tm": "12:17", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "문화일보", "t": "적반하장 청문회… 김승원 “한동훈 폭로 출처 밝힐 것”", "u": "https://n.news.naver.com/mnews/article/021/0002818911", "tm": "12:16", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "문화일보", "t": "野, 후보자 ‘비거주 주택’ 집중추궁… 이형일 “4개월 거주는 확실”", "u": "https://n.news.naver.com/mnews/article/021/0002818907", "tm": "12:15", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "YTN", "t": "김승원 청문회 여야 격돌...'가족 특혜' 해명하며 울컥", "u": "https://n.news.naver.com/mnews/article/052/0002407231", "tm": "12:11", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "이데일리", "t": "[포토]조승래 위원장에게 선서문 전달하는 이형일 부총리 겸 재정경제부 장관 후보자", "u": "https://n.news.naver.com/mnews/article/018/0006369640", "tm": "12:11", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "이데일리", "t": "[포토]질의에 답하는 이형일 부총리 겸 재정경제부 장관 후보자", "u": "https://n.news.naver.com/mnews/article/018/0006369641", "tm": "12:11", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "이데일리", "t": "[포토]선서하는 이형일 부총리 겸 재정경제부 장관 후보자", "u": "https://n.news.naver.com/mnews/article/018/0006369638", "tm": "12:09", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "연합뉴스", "t": "이형일 \"부총리 취임하면 경제팀 수장으로서 조율하고 책임\"(종합)", "u": "https://n.news.naver.com/mnews/article/001/0016311404", "tm": "12:08", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "디지털타임스", "t": "이형일 “과천 집, 거주 목적 구매”", "u": "https://n.news.naver.com/mnews/article/029/0003048069", "tm": "12:06", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "뉴시스", "t": "이형일 청문회서 '비거주 1주택' 공방…與 \"갭투자 아냐\" 野 \"실거주 했나\"", "u": "https://n.news.naver.com/mnews/article/003/0014191103", "tm": "12:05", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "MBC", "t": "이형일 \"경기회복 온기 고르게\"‥물가안정 첫 과제로", "u": "https://n.news.naver.com/mnews/article/214/0001524019", "tm": "12:04", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "조선비즈", "t": "이형일, 과천 아파트 갭투자 의혹에 “국민 눈높이 미흡한 부분 송구”", "u": "https://n.news.naver.com/mnews/article/366/0001192448", "tm": "12:03", "k": "이형일, 재정경제부, 재정경제부", "p": 0, "h": ""}, {"o": "뉴스핌", "t": "이형일 \"대미투자 연 200억·총 2000억달러 한도 내 협의\"", "u": "https://www.newspim.com/news/view/20260915000682", "tm": "12:00", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "뉴스핌", "t": "이형일, '레버리지 ETF·국민연금 주식비중' 소신 묻자 \"회의 내용 비공개\"", "u": "https://www.newspim.com/news/view/20260915000642", "tm": "11:59", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "뉴시스", "t": "'경제 컨트롤타워는 부총리' 조언에…이형일 \"공감한다\"", "u": "https://n.news.naver.com/mnews/article/003/0014191033", "tm": "11:56", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "뉴스1", "t": "野, 이형일 '비거주 1주택' 공세…與에서도 \"좀 민망한 일\"", "u": "https://n.news.naver.com/mnews/article/421/0009170829", "tm": "11:55", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "경향신문", "t": "이형일 “과천 아파트 실거주 목적…근무지 이동 탓에 거주 못해”", "u": "https://n.news.naver.com/mnews/article/032/0003470469", "tm": "11:50", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "중앙일보", "t": "이형일 “3% 성장·국민소득 4만 달러 예상…성장 온기 확산할 것”", "u": "https://n.news.naver.com/mnews/article/025/0003551458", "tm": "11:48", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "서울경제", "t": "이형일 과천 아파트 비거주 논란 송구…“거주 목적으로 산 것”", "u": "https://n.news.naver.com/mnews/article/011/0004661973", "tm": "11:47", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "파이낸셜뉴스", "t": "이형일 \"한은 긴축 기조 공감…통화·재정 폴리시믹스 필요\"", "u": "https://n.news.naver.com/mnews/article/014/0005575974", "tm": "11:46", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "KBS", "t": "이형일 경제부총리 후보자 인사청문회…‘갭투자’·ETF 수익 ‘여야 설전’", "u": "https://n.news.naver.com/mnews/article/056/0012257520", "tm": "11:45", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "헤럴드경제", "t": "‘김승원 청문회’ 與野 공방…“의혹 제기 사과해야” “증인없는 맹탕”", "u": "https://n.news.naver.com/mnews/article/016/0002697506", "tm": "11:42", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "MBC", "t": "이형일 \"경기 회복 온기 고르게 퍼지도록 최선 다할 것\"", "u": "https://n.news.naver.com/mnews/article/214/0001524015", "tm": "11:41", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "머니투데이", "t": "이형일 \"한은 통화긴축 공감…재정으로 취약층 지원해야\"", "u": "https://n.news.naver.com/mnews/article/008/0005413890", "tm": "11:41", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "서울경제", "t": "이형일, 과천 아파트 비거주 논란에 “국민 눈높이에 미흡”", "u": "https://n.news.naver.com/mnews/article/011/0004661971", "tm": "11:41", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "헤럴드경제", "t": "[헤럴드pic] 당당·초조·여유…누가 통과할까", "u": "https://n.news.naver.com/mnews/article/016/0002697505", "tm": "11:41", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "노컷뉴스", "t": "모두발언하는 이형일 경제부총리 겸 재정경제부 장관 후보자", "u": "https://n.news.naver.com/mnews/article/079/0004189436", "tm": "11:41", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "노컷뉴스", "t": "이형일 경제부총리 겸 재정경제부 장관 후보자 인사청문회", "u": "https://n.news.naver.com/mnews/article/079/0004189437", "tm": "11:41", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "노컷뉴스", "t": "관계자와 대화하는 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/079/0004189438", "tm": "11:41", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "노컷뉴스", "t": "의원 질의에 답변하는 이형일 경제부총리 겸 재정경제부 장관 후보자", "u": "https://n.news.naver.com/mnews/article/079/0004189439", "tm": "11:41", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "노컷뉴스", "t": "인사청문회 질의에 답변하는 이형일 부총리 후보자", "u": "https://n.news.naver.com/mnews/article/079/0004189440", "tm": "11:41", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "노컷뉴스", "t": "답변하는 이형일 경제부총리 겸 재정경제부 장관 후보자", "u": "https://n.news.naver.com/mnews/article/079/0004189441", "tm": "11:41", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "노컷뉴스", "t": "답변하는 이형일 경제부총리 후보자", "u": "https://n.news.naver.com/mnews/article/079/0004189442", "tm": "11:41", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "노컷뉴스", "t": "선서하는 이형일 경제부총리 겸 재정경제부 장관 후보자", "u": "https://n.news.naver.com/mnews/article/079/0004189444", "tm": "11:41", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "노컷뉴스", "t": "인사청문회 선서하는 이형일 경제부총리 후보자", "u": "https://n.news.naver.com/mnews/article/079/0004189445", "tm": "11:41", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "노컷뉴스", "t": "인사하는 이형일 경제부총리 후보자", "u": "https://n.news.naver.com/mnews/article/079/0004189446", "tm": "11:41", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "노컷뉴스", "t": "생각에 잠긴 이형일 경제부총리 후보자", "u": "https://n.news.naver.com/mnews/article/079/0004189447", "tm": "11:41", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스1", "t": "답변하는 이형일 부총리 겸 재정경제부 장관 후보자", "u": "https://n.news.naver.com/mnews/article/421/0009170803", "tm": "11:39", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "아시아투데이", "t": "[포토] 선서하는 이형일 부총리 겸 재정경제부 장관 후보자", "u": "https://www.asiatoday.co.kr/kn/view.php?key=20260915010005589", "tm": "11:38", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "아시아투데이", "t": "[포토] 고개 숙여 인사하는 이형일 부총리 겸 재정경제부 장관 후보자", "u": "https://www.asiatoday.co.kr/kn/view.php?key=20260915010005590", "tm": "11:38", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스1", "t": "정성호 \"부동산 논란은 소통 부족 탓…경제부총리 野와 소통해야\"", "u": "https://n.news.naver.com/mnews/article/421/0009170796", "tm": "11:36", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "아시아투데이", "t": "[포토] 이형일 후보자 ‘17년 보유, 4개월 거주 아파트에...심려 끼쳐 송구’ - 아시아투데이", "u": "https://www.asiatoday.co.kr/kn/view.php?key=20260915010005588", "tm": "11:36", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "SBS", "t": "이형일 \"과천 집 비거주 논란 송구…거주 목적으로 산 것\"", "u": "https://n.news.naver.com/mnews/article/055/0001388373", "tm": "11:35", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "프레시안", "t": "막 오른 김승원 청문회…국힘 \"임명 강행 땐 '지지율 20%', '데드덕'\"", "u": "https://n.news.naver.com/mnews/article/002/0002456666", "tm": "11:34", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "동아일보", "t": "이형일, 과천 아파트 비거주 논란에 “국민 눈높이에 미흡, 송구”", "u": "https://n.news.naver.com/mnews/article/020/0003748221", "tm": "11:33", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "뉴스핌", "t": "메모하는 이형일 부총리 후보자", "u": "https://www.newspim.com/news/view/20260915000624", "tm": "11:32", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스핌", "t": "인사청문회 모두발언하는 이형일 부총리 후보자", "u": "https://www.newspim.com/news/view/20260915000625", "tm": "11:32", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스핌", "t": "선서문 제출하는 이형일 부총리 후보자", "u": "https://www.newspim.com/news/view/20260915000626", "tm": "11:32", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스핌", "t": "이형일, 과천 아파트 비거주 논란 \"국민 눈높이 미흡한 부분 송구\"", "u": "https://www.newspim.com/news/view/20260915000627", "tm": "11:32", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스핌", "t": "의원 질의에 답하는 이형일 부총리 겸 재정경제부 장관 후보자", "u": "https://www.newspim.com/news/view/20260915000630", "tm": "11:32", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스핌", "t": "질의에 답변하는 이형일 부총리 후보자", "u": "https://www.newspim.com/news/view/20260915000632", "tm": "11:32", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스핌", "t": "이형일 부총리 겸 재정경제부 장관 후보자 인사청문회", "u": "https://www.newspim.com/news/view/20260915000634", "tm": "11:32", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "데일리안", "t": "인사청문회 질의 답변하는 이형일 경제부총리 후보자", "u": "https://n.news.naver.com/mnews/article/119/0003132816", "tm": "11:32", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "데일리안", "t": "답변하는 이형일 재정경제부 장관 후보자", "u": "https://n.news.naver.com/mnews/article/119/0003132814", "tm": "11:31", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "한겨레", "t": "‘17년 보유, 4개월 거주’ 아파트에…이형일 “심려 끼쳐 송구”", "u": "https://n.news.naver.com/mnews/article/028/0002823137", "tm": "11:30", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "뉴시스", "t": "이형일 \"'지속가능한 성장' 가장 중요…취약계층 보듬어야 가능\"", "u": "https://n.news.naver.com/mnews/article/003/0014190866", "tm": "11:30", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "파이낸셜뉴스", "t": "이형일 \"대미투자, 연 200억달러·총 2000억달러 범위 내 협의\"", "u": "https://n.news.naver.com/mnews/article/014/0005575965", "tm": "11:29", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "헤럴드경제", "t": "이형일 “올해 국민소득 4만달러대 예상…7-SEED로 새 성장기회 만들 것”", "u": "https://n.news.naver.com/mnews/article/016/0002697484", "tm": "11:29", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "데일리안", "t": "질의 답변하는 이형일 경제부총리 후보자", "u": "https://n.news.naver.com/mnews/article/119/0003132812", "tm": "11:29", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "이데일리", "t": "이형일 \"통화긴축 공감…재정으로 취약층 돕는 '정책 조합' 펴야\"", "u": "https://n.news.naver.com/mnews/article/018/0006369595", "tm": "11:28", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "헤럴드경제", "t": "이형일 “과천집 비거주 논란 송구…평생 1주택자로 장기 보유”", "u": "https://n.news.naver.com/mnews/article/016/0002697475", "tm": "11:26", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "뉴스1", "t": "이형일 \"통화 긴축 기조 공감…재정으로 취약계층 보완\"", "u": "https://n.news.naver.com/mnews/article/421/0009170728", "tm": "11:26", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "이데일리", "t": "이형일 부총리 후보 \"대미투자 연 200억달러 한도 준수\"", "u": "https://n.news.naver.com/mnews/article/018/0006369581", "tm": "11:19", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "노컷뉴스", "t": "이형일 \"경기회복 온기 민생으로…'대체불가 대한민국' 만들 것\"", "u": "https://n.news.naver.com/mnews/article/079/0004189409", "tm": "11:19", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "KBS", "t": "17년 보유·실거주 4개월 과천 아파트에 “집은 거주하는 곳이라면서요?” [지금뉴스]", "u": "https://n.news.naver.com/mnews/article/056/0012257502", "tm": "11:18", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "아시아경제", "t": "[포토] 증인선서하는 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/277/0005816505", "tm": "11:16", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "아시아경제", "t": "[포토] 보고 받는 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/277/0005816509", "tm": "11:16", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴시스", "t": "이형일 \"가족 ETF 투자, 개별 주식 아니라 이해 상충 문제 없어\"", "u": "https://n.news.naver.com/mnews/article/003/0014190746", "tm": "11:16", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "아시아경제", "t": "[포토] 답변하는 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/277/0005816504", "tm": "11:15", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "아시아경제", "t": "[포토] 자리로 돌아가는 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/277/0005816506", "tm": "11:15", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "아시아경제", "t": "[포토] 고개숙인 이형일 후보자", "u": "https://n.news.naver.com/mnews/article/277/0005816507", "tm": "11:15", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "아시아경제", "t": "[포토] 이형일 후보자 인사청문회", "u": "https://n.news.naver.com/mnews/article/277/0005816503", "tm": "11:14", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "서울신문", "t": "이형일, 과천 아파트 비거주 논란에 “국민 눈높이 미흡 송구”", "u": "https://n.news.naver.com/mnews/article/081/0003680336", "tm": "11:10", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "데일리안", "t": "선서문 제출하는 이형일 경제부총리 후보자", "u": "https://n.news.naver.com/mnews/article/119/0003132795", "tm": "11:10", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "머니투데이", "t": "與 \"갭투자 아냐\" vs 野 \"실거주 4개월\"…이형일 '과천 주택' 공방", "u": "https://n.news.naver.com/mnews/article/008/0005413847", "tm": "11:09", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "뉴스핌", "t": "이형일, 지명 통보 경로 함구…\"김현지·김용범에게 연락 안 받아\"", "u": "https://www.newspim.com/news/view/20260915000550", "tm": "11:09", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "데일리안", "t": "안경 고쳐쓰는 이형일 경제부총리 후보자", "u": "https://n.news.naver.com/mnews/article/119/0003132794", "tm": "11:09", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "파이낸셜뉴스", "t": "이형일, 과천 아파트 비거주 논란 \"국민 눈높이 미흡 송구\"", "u": "https://n.news.naver.com/mnews/article/014/0005575945", "tm": "11:06", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "뉴스핌", "t": "조승래 위원장과 악수하는 이형일 부총리 후보자", "u": "https://www.newspim.com/news/view/20260915000568", "tm": "11:06", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스핌", "t": "모두발언하는 이형일 부총리 후보자", "u": "https://www.newspim.com/news/view/20260915000569", "tm": "11:06", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스핌", "t": "모두발언하는 이형일 부총리 겸 재정경제부 장관 후보자", "u": "https://www.newspim.com/news/view/20260915000570", "tm": "11:06", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스핌", "t": "의원 질의에 답하는 이형일 부총리 후보자", "u": "https://www.newspim.com/news/view/20260915000571", "tm": "11:06", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스핌", "t": "인사청문회 질의에 답하는 이형일 부총리 후보자", "u": "https://www.newspim.com/news/view/20260915000572", "tm": "11:06", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "뉴스핌", "t": "선서문 전달하는 이형일 부총리 후보자", "u": "https://www.newspim.com/news/view/20260915000567", "tm": "11:05", "k": "이형일, 재정경제부", "p": 1, "h": ""}, {"o": "헤럴드경제", "t": "김승원 청문회 시작부터 난타전…“맹탕 청문회 계획” vs “역량 검증 자리”", "u": "https://n.news.naver.com/mnews/article/016/0002697403", "tm": "11:03", "k": "이형일, 재정경제부", "p": 0, "h": ""}, {"o": "노컷뉴스", "t": "한병도 \"국힘, 김승원 모욕 몰두…진짜 표적은 형사사법 개혁\"", "u": "https://n.news.naver.com/mnews/article/079/0004189386", "tm": "11:01", "k": "이형일, 재정경제부", "p": 0, "h": ""}]}]}};
+var IC = {
+  camera:'<svg class="ic" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="3.6"/></svg>',
+  trash:'<svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>', copy:'<svg class="ic" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+  file:'<svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>',
+  refresh:'<svg class="ic" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>',
+  search:'<svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>'
+};
+var S = { screen:'reg', plan:'B', gathering:false, zoneOpen:true, hidden:{}, batches:[] };
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function isUnc(n){ return n==='📂 소제목 미분류'; }
+function groups(){ return DATA[S.screen==='reg'?'regular':'adhoc'].groups; }
+function live(a){ return !S.hidden[a.u]; }
+function allPhotos(){ var out=[]; groups().forEach(function(g){ g.arts.forEach(function(a){ if(a.p&&live(a)) out.push({a:a,g:g.name}); }); }); return out; }
+
+function row(a, opts){
+  opts = opts||{};
+  var reg = S.screen==='reg';
+  var cls = 'article' + (a.p?' is-photo':'') + (a.h==='단독'?' art-scoop':'');
+  var title = a.h==='속보' ? '<span class="t-flash">'+esc(a.t)+'</span>' : esc(a.t);
+  var badge = a.p ? '<span class="photo-badge">'+IC.camera+' 사진 추정</span>' : '';
+  var acts = ((reg && !opts.from)?'<button title="위로">↑</button><button title="아래로">↓</button>':'')
+    + '<button title="복사">'+IC.copy+'</button><button title="더보기">⋯</button>'
+    + '<button class="del" title="숨기기" onclick="hideOne(\''+esc(a.u)+'\')">'+IC.trash+'</button>';
+  var from = (opts.from && !isUnc(opts.from)) ? '<span class="from-tag" title="보고서엔 이 소제목으로 나가요">'+esc(opts.from)+'</span>' : '';
+  var kw = a.k ? '<span>'+IC.search+' '+esc(a.k)+'</span>' : '';
+  return '<div class="'+cls+'" data-u="'+esc(a.u)+'"><div class="sum">'
+    + '<input type="checkbox" class="article-select" onchange="syncBulk()">'
+    + '<span class="title-line"><span class="title-outlet">'+esc(a.o)+'</span>'+title+'</span>'+badge
+    + '<span class="acts">'+acts+'</span></div>'
+    + '<div class="meta">'+from+'<span>'+esc(a.tm)+' 게시</span><span>·</span><a href="#" onclick="return false">원문보기</a>'+kw+'</div></div>';
+}
+
+function subhead(name, n, opts){
+  opts=opts||{};
+  var reg = S.screen==='reg';
+  var t = isUnc(name) ? '<span class="unc-title">📂 소제목 미분류</span><span class="unc-count">'+n+'건</span>'
+                      : esc(reg?'<'+name+'>':name) + (reg?'':' <span class="cnt">'+n+'건</span>');
+  var icons = isUnc(name) ? '' : '<span>'+IC.copy+'</span>'+(reg?'<span>✏️</span>':'')+'<span>'+IC.trash+'</span><span>▲▼</span>';
+  return '<h2><span class="sh-title"><input type="checkbox" title="이 소제목 기사 전체 선택" onchange="checkGroup(this)">'+t+'</span><span class="sh-icons">'+icons+'</span></h2>';
+}
+
+function header(){
+  var reg = S.screen==='reg', photos = allPhotos().length, h='';
+  if (reg){
+    document.getElementById('brand').textContent='언론 모니터링';
+    document.getElementById('nav').innerHTML='<a href="#">홈</a><a href="#">초안</a><a href="#">실시간현황</a>';
+    h += '<h1>언론 모니터링 11:00 기준</h1>';
+    var pbtn = '';
+    if (photos){
+      if (S.plan==='B') pbtn = '<button class="btn mute'+(S.gathering?' on':'')+'" onclick="toggleGather()">'+IC.camera+' 사진 추정 모아 보기 ('+photos+')</button>';
+      else if (S.plan==='A') pbtn = '<button class="btn mute" onclick="jumpZone()">'+IC.camera+' 사진 추정 칸으로 ('+photos+')</button>';
+      else pbtn = '<button class="btn mute" onclick="checkAllPhotos()">'+IC.camera+' 사진 추정 전체 선택 ('+photos+')</button>';
+    }
+    h += '<div class="toolbar"><button class="btn">'+IC.copy+' 복사</button><button class="btn">'+IC.file+' txt</button><button class="btn">⬇ xlsx</button>'
+      + '<select class="sel"><option>소제목별</option></select><span class="spacer"></span>'
+      + '<button class="btn ai">'+IC.refresh+' AI 모든 기사 재분류</button><button class="btn mute">+ 새 소제목</button>'+pbtn+'</div>';
+  } else {
+    var d = DATA.adhoc;
+    document.getElementById('brand').textContent='수시 모니터링';
+    document.getElementById('nav').innerHTML='<a href="#">홈</a><a href="#">수집 확정본</a><a href="#">수시 보관함</a>';
+    h += '<h1>수시 모니터링 13시 05분 기준('+esc(d.title)+') <span class="kind-chip">수집 원본</span></h1>';
+    h += '<div class="meta-chips"><span class="mchip">'+IC.search+' '+esc(d.kw.join(' · '))+'</span><span class="mchip">🕐 '+esc(d.win.start)+' ~ '+esc(d.win.end)+'</span><span class="mchip">📥 13:05 '+totalLive()+'건</span></div>';
+    h += '<div class="toolbar"><button class="btn ai sm">소제목 배정</button><button class="btn mute sm">+ 소제목 추가</button><span class="spacer"></span>'
+      + '<button class="btn sm">'+IC.copy+' 복사</button><button class="btn sm">'+IC.file+' txt로 저장</button><button class="btn sm">⬇ xlsx</button></div>';
+    if (photos){
+      var b = S.plan==='B' ? '<button class="btn mute sm'+(S.gathering?' on':'')+'" onclick="toggleGather()">'+IC.camera+' 사진 추정 모아 보기 ('+photos+')</button>'
+            : S.plan==='A' ? '<button class="btn mute sm" onclick="jumpZone()">'+IC.camera+' 사진 추정 칸으로 ('+photos+')</button>'
+            : '<button class="btn mute sm" onclick="checkAllPhotos()">'+IC.camera+' 사진 추정 전체 선택 ('+photos+')</button>';
+      h += '<div class="sel-row">'+b+'</div>';
+    }
+  }
+  return h;
+}
+function totalLive(){ var n=0; groups().forEach(function(g){ g.arts.forEach(function(a){ if(live(a)) n++; }); }); return n; }
+
+function render(){
+  var h = header();
+  var gs = groups();
+  if (S.plan==='B' && S.gathering){
+    var ps = allPhotos();
+    h += '<div class="gather-strip"><label><input type="checkbox" id="gather-all" onchange="checkAllPhotos(this.checked)"'+(ps.length?'':' disabled')+'> 전체 선택</label>'
+      + '<span class="msg">'+(ps.length?'<b>'+IC.camera+' 사진 추정 '+ps.length+'건</b>만 모아 보고 있어요':'남은 사진 추정이 없어요')+'</span>'
+      + '<span class="spacer"></span><button class="btn sm" onclick="toggleGather()">원래 화면으로</button></div>';
+    h += '<div class="gathered">';
+    if (!ps.length) h += '<div class="done-msg">다 치웠어요. 숨긴 기사는 왼쪽 아래 🗑에서 되살릴 수 있어요.</div>';
+    ps.forEach(function(x){ h += row(x.a,{from:x.g}); });
+    h += '</div>';
+  } else {
+    gs.forEach(function(g){
+      var arts = g.arts.filter(live);
+      var moved = S.plan==='A' ? arts.filter(function(a){return a.p;}).length : 0;
+      var shown = S.plan==='A' ? arts.filter(function(a){return !a.p;}) : arts;
+      if (!arts.length) return;
+      h += '<div class="subheading">'+subhead(g.name, shown.length);
+      if (!shown.length) h += '<div class="empty-sub">화면엔 기사가 없어요</div>';
+      shown.forEach(function(a){ h += row(a); });
+      if (moved) h += '<div class="moved-note">'+IC.camera+' 사진 추정 '+moved+'건은 맨 아래 칸으로 모았어요 <span class="warn">보고서엔 이 소제목으로 나가요</span></div>';
+      h += '</div>';
+    });
+    if (S.plan==='A'){
+      var ps2 = allPhotos();
+      if (ps2.length){
+        h += '<div class="photo-zone" id="photo-zone"><h2><span class="sh-title"><input type="checkbox" title="사진 추정 전체 선택" onchange="checkGroup(this)">'
+          + '<span class="zone-title">'+IC.camera+' 사진 추정</span><span class="cnt">'+ps2.length+'건</span></span>'
+          + '<button class="fold" onclick="S.zoneOpen=!S.zoneOpen;render()">'+(S.zoneOpen?'접기':'펼치기')+'</button></h2>';
+        if (S.zoneOpen){ h += '<div class="zone-list">'; ps2.forEach(function(x){ h += row(x.a,{from:x.g}); }); h += '</div>'; }
+        h += '</div>';
+      }
+    }
+  }
+  document.getElementById('screen').innerHTML = h;
+  var st=document.querySelector('.gather-strip'); if(st) st.style.top=(document.querySelector('.mk-panel').offsetHeight+8)+'px';
+  hint(); syncBulk(); syncFabs();
+}
+
+function hint(){
+  var reg=S.screen==='reg', n=allPhotos().length, t='';
+  if (S.plan==='B') t = S.gathering ? '<b>모아 보는 중</b> — 몇 개 체크를 풀고 아래 선택 바의 🗑 숨기기 → 다 치우면 「원래 화면으로」.'
+                                    : '<b>B</b> — 평소엔 지금 화면 그대로. '+(reg?'툴바':'목록 위')+'의 「📷 사진 추정 모아 보기 ('+n+')」를 눌러 보세요.';
+  else if (S.plan==='A') t = '<b>A</b> — 사진 추정이 늘 맨 아래 한 칸에 따로 있어요. 소제목 안에 남는 안내 줄과 빈 소제목을 보세요.';
+  else t = '<b>지금 화면</b> — 비교용. 사진 추정이 제자리에서 흐리게 섞여 있어요.';
+  document.getElementById('mk-hint').innerHTML = t;
+}
+function toggleGather(){ S.gathering=!S.gathering; render(); window.scrollTo({top:0}); }
+function jumpZone(){ var z=document.getElementById('photo-zone'); if(z) z.scrollIntoView({behavior:'smooth',block:'start'}); }
+function checkedBoxes(){ return Array.prototype.slice.call(document.querySelectorAll('#screen .article-select:checked')); }
+function syncBulk(){
+  var n = checkedBoxes().length;
+  document.getElementById('bulk').classList.toggle('on', n>0);
+  document.getElementById('bulk-n').textContent = n+'개 선택됨';
+}
+function checkGroup(cb){
+  var box = cb.closest('.subheading, .photo-zone');
+  if (cb.checked) box.querySelectorAll('.article-select').forEach(function(x){ x.checked=true; });
+  syncBulk();
+}
+function checkAllPhotos(on){
+  if (on===undefined) on=true;
+  document.querySelectorAll('#screen .article.is-photo .article-select').forEach(function(x){ x.checked=on; });
+  syncBulk();
+}
+function clearChecks(){ document.querySelectorAll('#screen .article-select').forEach(function(x){ x.checked=false; }); var g=document.getElementById('gather-all'); if(g) g.checked=false; syncBulk(); }
+function doHide(urls){
+  if (!urls.length) return;
+  urls.forEach(function(u){ S.hidden[u]=1; }); S.batches.push(urls);
+  render(); toast(urls.length+'건 숨겼어요');
+}
+function hideOne(u){ doHide([u]); }
+function hideChecked(){
+  var urls = checkedBoxes().map(function(cb){ return cb.closest('.article').getAttribute('data-u'); });
+  if (!confirm('선택한 '+urls.length+'건을 숨길까요?\n(목업 — 실제 기사는 안 바뀌어요)')) return;
+  doHide(urls);
+}
+function undoLast(){ var b=S.batches.pop(); if(!b) return; b.forEach(function(u){ delete S.hidden[u]; }); render(); toast(b.length+'건 되돌렸어요'); }
+function syncFabs(){
+  var n = Object.keys(S.hidden).length;
+  document.getElementById('trash').hidden = !n; document.getElementById('trash-n').textContent = n;
+  document.getElementById('undo').hidden = !S.batches.length;
+}
+var tt; function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(tt); tt=setTimeout(function(){ t.classList.remove('on'); },1400); }
+function seg(id, key){
+  document.querySelectorAll('#'+id+' button').forEach(function(b){
+    b.onclick=function(){ document.querySelectorAll('#'+id+' button').forEach(function(x){x.classList.remove('on');}); b.classList.add('on');
+      S[key]=b.getAttribute('data-v'); S.gathering=false; S.batches=[]; S.hidden={}; render(); };
+  });
+}
+seg('mk-screen','screen'); seg('mk-plan','plan');
+render();
+</script>

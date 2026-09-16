@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>수집 확정본 머리줄 시각 — 시안</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #EEF1F5; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; font-size: 14px; }
+  button { font: inherit; cursor: pointer; }
+  .mk { max-width: 860px; margin: 0 auto; padding: 24px 16px 100px; }
+  h1.t { font-size: 1.2rem; color: #1E3A5F; margin: 0 0 6px; }
+  .lead { font-size: 0.84rem; color: #6B7280; margin: 0 0 14px; line-height: 1.75; }
+  .lead b { color: #1F2937; }
+
+  .scen { position: sticky; top: 0; z-index: 10; background: #EEF1F5; padding: 8px 0 10px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .scen .cap { font-size: 0.78rem; color: #6B7280; font-weight: 700; margin-right: 4px; }
+  .scen button { border: 1px solid #CBD5E1; background: #fff; color: #334155; border-radius: 20px; padding: 6px 13px; font-size: 0.82rem; font-weight: 600; }
+  .scen button.on { background: #146B5E; border-color: #146B5E; color: #fff; }
+  .scen-desc { font-size: 0.8rem; color: #57534E; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 10px;
+    padding: 9px 13px; margin-bottom: 18px; line-height: 1.7; }
+  .scen-desc b { color: #1F2937; }
+
+  .ref { background: #fff; border: 1px dashed #CBD5E1; border-radius: 10px; padding: 10px 14px; margin-bottom: 22px; font-size: 0.8rem; color: #6B7280; }
+  .ref code { font-family: inherit; color: #1F2937; font-weight: 600; }
+
+  .opt { margin-bottom: 26px; }
+  .opt h2 { font-size: 1rem; color: #1E3A5F; margin: 0 0 3px; display: flex; align-items: center; gap: 8px; }
+  .opt .why { font-size: 0.8rem; color: #6B7280; margin: 0 0 10px; line-height: 1.7; }
+  .opt .why b { color: #1F2937; }
+  .rec { font-size: 0.7rem; font-weight: 700; color: #fff; background: #2563EB; border-radius: 6px; padding: 2px 8px; }
+  .same { font-size: 0.72rem; font-weight: 600; color: #6B7280; background: #F3F4F6; border-radius: 6px; padding: 2px 8px; }
+
+  .pair { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 10px; }
+  @media (max-width: 700px) { .pair { grid-template-columns: minmax(0, 1fr); } }
+  .screen { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 14px 16px; }
+  .lbl { font-size: 0.68rem; font-weight: 700; color: #9CA3AF; letter-spacing: .03em; margin-bottom: 8px; }
+  .hd { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 9px; }
+  .hd .h { font-size: 1.1rem; font-weight: 700; color: #1E3A5F; }
+  .hd .nm { border-bottom: 1px dashed #93C5FD; padding: 0 3px; }
+  .kind { font-size: 0.7rem; font-weight: 700; color: #146B5E; background: #E3F1EE; border-radius: 8px; padding: 2px 8px; }
+  .meta { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 0.74rem; color: #146B5E; background: #E3F1EE;
+    border: 1px solid rgba(20,107,94,.24); border-radius: 20px; padding: 3px 10px; font-weight: 600; white-space: nowrap; }
+  .chip .tm { color: #0F5247; font-weight: 700; }
+  .copy { background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: 12px; padding: 14px 16px; }
+  .copy pre { margin: 0; font-family: inherit; font-size: 0.8rem; line-height: 1.6; color: #374151; white-space: pre-wrap; word-break: keep-all; }
+  .copy pre .first { background: #FEF9C3; border-radius: 3px; padding: 1px 3px; font-weight: 600; color: #1F2937; }
+  .copy pre .dim { color: #9CA3AF; }
+
+  .rules { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 14px 18px; margin-top: 30px; font-size: 0.82rem; line-height: 1.8; color: #4B5563; }
+  .rules h2 { font-size: 0.95rem; color: #1E3A5F; margin: 0 0 6px; }
+  .rules b { color: #1F2937; }
+  .rules ul { margin: 0; padding-left: 18px; }
+</style>
+</head>
+<body>
+<div class="mk">
+  <h1 class="t">수집 확정본 머리줄에 원본 시각 붙이기 — 시안</h1>
+  <p class="lead">화면 머리줄은 <b>복사·txt 첫 줄과 같은 글자</b>예요. 그래서 시각을 붙이면 받는 사람이 보는 보고서 첫 줄도 같이 바뀌어요.
+    왼쪽이 화면, 오른쪽이 복사하면 나가는 텍스트예요(노란 줄이 달라지는 곳).
+    <b>원본이 하나일 때, 둘일 때, 원본을 더 불러왔지만 새로 안 보냈을 때</b>를 위 버튼으로 바꿔 보세요.</p>
+
+  <div class="scen" id="scen">
+    <span class="cap">상황</span>
+    <button data-s="one" class="on">① 원본 하나</button>
+    <button data-s="two">② 원본 둘에서 모음</button>
+    <button data-s="later">③ 원본을 더 불러왔지만 새로 안 보냄</button>
+  </div>
+  <div class="scen-desc" id="scen-desc"></div>
+
+  <div class="ref" id="ref"></div>
+
+  <div id="opts"></div>
+
+  <div class="rules">
+    <h2>「원본 시각」은 정확히 무엇인가 (B·C·D 공통)</h2>
+    <ul>
+      <li><b>보내는 순간의 원본 기준 시각</b>(원본 머리줄의 「13시 05분 기준」)이에요. 보낼 때 기사마다 적어 두고, 확정본은 그중 <b>가장 늦은 것</b>(C는 원본마다 가장 늦은 것)을 써요.</li>
+      <li>원본의 <b>지금</b> 시각을 그대로 따라가지 않아요 — 원본을 14:10까지 다시 불러와도 새로 보낸 게 없으면 확정본 기사는 그대로라, 머리줄만 14시로 바뀌면 거짓말이 돼요(③ 상황).</li>
+      <li>확정본에서 기사를 숨기면 그 기사 몫의 시각도 빠져요 — 14:10에 보낸 2건을 다 숨기면 도로 13시 05분이 돼요.</li>
+      <li>이 기능 전에 보낸 기사엔 시각이 안 적혀 있어요. 그런 기사만 있는 확정본은 <b>지금처럼 시각 없이</b> 나가요(없는 값을 지어내지 않아요).</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+var SCEN = {
+  one: {
+    desc: '<b>인사청문회</b> 원본(11:00~<b>13:05</b>)에서 12건을 골라 보낸 뒤예요. 앞으로 가장 흔할 모양이에요 — 원본에서 처음 보낼 때 같은 이름의 확정본이 저절로 생기니까요.',
+    ref: '비교: 원본을 복사하면 첫 줄 → <code>수시 모니터링 13시 05분 기준(인사청문회)</code>',
+    srcs: [['인사청문회', '13:05', 12]],
+    title: '인사청문회'
+  },
+  two: {
+    desc: '인사청문회 확정본에 <b>인사청문회</b> 원본(11:00~<b>13:05</b>)에서 12건, <b>대정부질문</b> 원본(09:00~<b>12:30</b>)에서 3건을 모았어요. 원본의 ▾에서 다른 확정본을 골라 보낸 경우예요.',
+    ref: '비교: 두 원본의 첫 줄 → <code>…13시 05분 기준(인사청문회)</code> · <code>…12시 30분 기준(대정부질문)</code>',
+    srcs: [['인사청문회', '13:05', 12], ['대정부질문', '12:30', 3]],
+    title: '인사청문회'
+  },
+  later: {
+    desc: '①에서 이어서 원본을 「지금까지 불러오기」로 <b>14:10</b>까지 다시 불러왔지만, <b>확정본으로 새로 보낸 기사는 없어요</b>. 확정본 안의 기사는 여전히 13:05 기준 원본에서 고른 12건이에요.',
+    ref: '비교: 지금 원본을 복사하면 첫 줄 → <code>수시 모니터링 14시 10분 기준(인사청문회)</code>',
+    srcs: [['인사청문회', '13:05', 12]],
+    title: '인사청문회'
+  }
+};
+
+function kr(hhmm) { var p = hhmm.split(':'); return (+p[0]) + '시 ' + p[1] + '분'; }
+function latest(srcs) { return srcs.map(function (s) { return s[1]; }).sort().slice(-1)[0]; }
+
+var BODY = '\n\n<span class="dim">&lt;다주택 과세 발언 공방&gt;\nㅇ (머니투데이) 강민국 "다주택 과세 180도 번복"…\nhttps://n.news.naver.com/…\n…</span>';
+
+var OPTS = [
+  { key: 'A', name: 'A. 지금대로 — 시각 없음',
+    why: '확정본은 시간창이 없는 카드라 「N시 기준」이 가리킬 게 없다는 지금 규칙 그대로예요. 대신 <b>받는 사람은 이 보고서가 언제 기준인지 알 수 없어요</b>.',
+    head: function (s) { return '수시 모니터링 (' + s.title + ')'; },
+    screen: function (s) { return '수시 모니터링 (<span class="nm">' + s.title + '</span>)'; },
+    chips: function (s) { return s.srcs.map(function (x) { return '📥 ' + x[0] + ' ' + x[2] + '건 ↗'; }); } },
+  { key: 'B', name: 'B. 머리줄에 가장 늦은 원본 시각', rec: true,
+    why: '<b>원본·정기와 똑같은 모양</b>이라 받는 사람이 보기엔 그냥 「13시 05분 기준 보고서」예요. 원본이 여럿이면 <b>가장 늦은 시각 하나</b>만 — 「이 시각까지 본 것」이라는 뜻이라 대개 맞지만, ②처럼 12:30까지만 모은 원본이 섞이면 그쪽은 살짝 부풀려 말해요.',
+    head: function (s) { return '수시 모니터링 ' + kr(latest(s.srcs)) + ' 기준(' + s.title + ')'; },
+    screen: function (s) { return '수시 모니터링 ' + kr(latest(s.srcs)) + ' 기준(<span class="nm">' + s.title + '</span>)'; },
+    chips: function (s) { return s.srcs.map(function (x) { return '📥 ' + x[0] + ' ' + x[2] + '건 ↗'; }); } },
+  { key: 'C', name: 'C. 머리줄에 원본 시각을 모두',
+    why: '원본이 여럿이면 시각을 전부 적어요 — <b>가장 정확하지만</b> ②에서 첫 줄이 길어지고, 받는 사람은 시각이 왜 둘인지 몰라요(원본이라는 개념을 모르니까요).',
+    head: function (s) { return '수시 모니터링 ' + s.srcs.map(function (x) { return x[1]; }).sort().map(kr).join('·') + ' 기준(' + s.title + ')'; },
+    screen: function (s) { return '수시 모니터링 ' + s.srcs.map(function (x) { return x[1]; }).sort().map(kr).join('·') + ' 기준(<span class="nm">' + s.title + '</span>)'; },
+    chips: function (s) { return s.srcs.map(function (x) { return '📥 ' + x[0] + ' ' + x[2] + '건 ↗'; }); } },
+  { key: 'D', name: 'D. 화면 칩에만 — 복사 텍스트는 지금대로',
+    why: '담당자는 📥 칩에서 원본마다 시각을 보고, <b>보고서 첫 줄은 지금 그대로</b> 시각 없이 나가요. 화면만 바뀌니 가장 조심스러운 안인데, 「언제 기준인가」가 정작 필요한 쪽은 받는 사람이라 효과가 적어요.',
+    head: function (s) { return '수시 모니터링 (' + s.title + ')'; },
+    screen: function (s) { return '수시 모니터링 (<span class="nm">' + s.title + '</span>)'; },
+    chips: function (s) { return s.srcs.map(function (x) { return '📥 ' + x[0] + ' <span class="tm">' + x[1] + ' 기준</span> · ' + x[2] + '건 ↗'; }); } }
+];
+
+function render(key) {
+  var s = SCEN[key];
+  document.getElementById('scen-desc').innerHTML = s.desc;
+  document.getElementById('ref').innerHTML = s.ref;
+  var out = '';
+  OPTS.forEach(function (o) {
+    var same = (key !== 'two' && o.key === 'C') ? '<span class="same">원본이 하나일 땐 B와 같아요</span>' : '';
+    out += '<section class="opt"><h2>' + o.name + (o.rec ? ' <span class="rec">추천</span>' : '') + ' ' + same + '</h2>' +
+      '<p class="why">' + o.why + '</p>' +
+      '<div class="pair"><div class="screen"><div class="lbl">화면</div>' +
+        '<div class="hd"><span class="h">' + o.screen(s) + '</span><span class="kind">확정본</span></div>' +
+        '<div class="meta">' + o.chips(s).map(function (c) { return '<span class="chip">' + c + '</span>'; }).join('') + '</div></div>' +
+      '<div class="copy"><div class="lbl">복사·txt</div><pre><span class="first">' + o.head(s) + '</span>' + BODY + '</pre></div></div></section>';
+  });
+  document.getElementById('opts').innerHTML = out;
+  document.querySelectorAll('#scen button').forEach(function (b) { b.classList.toggle('on', b.dataset.s === key); });
+}
+document.querySelectorAll('#scen button').forEach(function (b) { b.onclick = function () { render(b.dataset.s); }; });
+render('one');
+</script>
+</body>
+</html>

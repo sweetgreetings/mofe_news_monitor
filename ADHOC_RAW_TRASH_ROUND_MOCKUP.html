@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>수집 원본 🗑 · 전부 보내기 · 확정본 나누기 — 시안</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #EEF1F5; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; font-size: 14px; }
+  button { font: inherit; cursor: pointer; }
+  .mk { max-width: 1200px; margin: 0 auto; padding: 24px 16px 100px; }
+  h1.t { font-size: 1.2rem; color: #1E3A5F; margin: 0 0 6px; }
+  .lead { font-size: 0.84rem; color: #6B7280; margin: 0 0 12px; line-height: 1.75; }
+  .lead b { color: #1F2937; }
+  .lead ol { margin: 4px 0 0; padding-left: 20px; }
+
+  /* 위쪽 고정 — 비교할 선택지 */
+  .scen { position: sticky; top: 0; z-index: 20; background: #EEF1F5; padding: 8px 0 10px; display: flex; flex-direction: column; gap: 6px; }
+  .scen .line { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .scen .cap { font-size: 0.78rem; color: #6B7280; font-weight: 700; margin-right: 4px; min-width: 11.5em; }
+  .scen button { border: 1px solid #CBD5E1; background: #fff; color: #334155; border-radius: 20px; padding: 5px 12px; font-size: 0.8rem; font-weight: 600; }
+  .scen button.on { background: #146B5E; border-color: #146B5E; color: #fff; }
+  .scen button .rec { font-size: 0.66rem; background: #2563EB; color: #fff; border-radius: 5px; padding: 0 5px; margin-left: 4px; }
+  .scen button.on .rec { background: #fff; color: #146B5E; }
+  .scen .reset { margin-left: auto; background: transparent; border-style: dashed; color: #6B7280; }
+  .scen-desc { font-size: 0.8rem; color: #57534E; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 10px;
+    padding: 9px 13px; margin-bottom: 16px; line-height: 1.7; }
+  .scen-desc b { color: #1F2937; }
+  .scen-desc .bad { color: #B91C1C; font-weight: 700; }
+
+  .stage { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+  @media (max-width: 920px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+  .col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .screen { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  .lbl { font-size: 0.68rem; font-weight: 700; color: #9CA3AF; letter-spacing: .03em; margin-bottom: 8px; display: flex; gap: 6px; align-items: center; }
+  .lbl .new { color: #146B5E; background: #E3F1EE; border-radius: 5px; padding: 0 6px; }
+
+  /* ── 수집 원본 (실제 화면 값 그대로) ── */
+  .report-head { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; font-size: 1.1rem; font-weight: 700; color: #1E3A5F; }
+  .report-head .nm { border-bottom: 1px dashed #93C5FD; padding: 0 3px; }
+  .now-btn { margin-left: auto; font-size: 0.8rem; padding: 5px 12px; border-radius: 14px; border: 1px solid #2563EB;
+    background: #2563EB; color: #fff; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
+  .now-btn:hover { background: #1D4ED8; }
+  .now-btn:disabled { opacity: .45; cursor: not-allowed; }
+  .meta { display: flex; gap: 6px; flex-wrap: wrap; margin: 9px 0 10px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 0.74rem; color: #475569; background: #F8FAFC;
+    border: 1px solid #E5E7EB; border-radius: 20px; padding: 3px 10px; white-space: nowrap; }
+  .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 0 10px; border-top: 1px solid #F1F5F9; }
+  .sent-filter { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: #6B7280; cursor: pointer; }
+  .sent-filter small { color: #9CA3AF; }
+  .send-all { font-size: 0.78rem; font-weight: 700; color: #146B5E; background: #fff; border: 1px solid rgba(20,107,94,.4);
+    border-radius: 7px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px; }
+  .send-all:hover { background: #E3F1EE; }
+  .send-all.flash { animation: fl .9s ease; }
+  .btn-ghost { font-size: 0.78rem; color: #475569; background: #fff; border: 1px solid #E5E7EB; border-radius: 7px; padding: 4px 10px; }
+  .pair-link { display: inline-flex; align-items: center; gap: 5px; font-size: 0.8rem; font-weight: 700; color: #146B5E; background: #E3F1EE;
+    border: 1px solid rgba(20,107,94,.24); border-radius: 16px; padding: 5px 12px; white-space: nowrap; cursor: pointer; }
+  .pair-link.none { background: #fff; color: #9CA3AF; border-style: dashed; font-weight: 500; cursor: default; }
+  .raw-head { display: flex; align-items: baseline; gap: 8px; margin: 4px 0 4px; }
+  .raw-head .cnt { font-size: 0.86rem; color: #1E3A5F; font-weight: 700; }
+  .raw-head .ord { font-size: 0.76rem; color: #6B7280; }
+
+  .article { padding: 10px 8px; border-radius: 8px; position: relative; }
+  .article:hover { background: #F3F4F6; }
+  .article.is-new-arrival { background: #FFF9C4; }
+  .article.is-photo .a-title, .article.is-photo .a-bot .a-time, .article.is-photo .a-bot .kw { opacity: .55; }
+  .article.is-sent { box-shadow: inset 3px 0 0 #146B5E; }
+  .article.is-sent .a-title, .article.is-sent .a-bot .a-time, .article.is-sent .a-bot .kw, .article.is-sent .a-bot .org { opacity: .55; }
+  /* 🗑 숨김 — 실시간현황 .live-row.is-hidden과 같은 값(opacity .5 + 취소선) */
+  .article.is-hid .a-title { opacity: .5; text-decoration: line-through; }
+  .article.is-hid .a-bot .a-time, .article.is-hid .a-bot .kw, .article.is-hid .a-bot .org { opacity: .5; }
+  body.unproc-only .article.is-sent, body.unproc-only .article.is-hid { display: none; }
+  .a-title { font-size: 1rem; line-height: 1.5; }
+  .a-title .outlet { color: #6B7280; font-size: .86em; font-weight: 500; margin-right: .5em; }
+  .t-flash { color: #DC2626; font-weight: 600; }
+  .photo-badge { font-size: .72rem; color: #6B7280; background: #F3F4F6; border: 1px solid #E5E7EB; border-radius: 999px; padding: 1px 7px; margin-left: 6px; white-space: nowrap; }
+  .a-bot { display: flex; align-items: center; gap: 8px; margin: 4px 0 0 4px; flex-wrap: wrap; row-gap: 4px; font-size: .8rem; color: #6B7280; }
+  .a-bot .org { color: #6B7280; text-decoration: none; }
+  .a-bot .kw b { font-weight: 400; color: #4B5563; }
+  .a-acts { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; }
+  .send-split { display: inline-flex; border: 1px solid rgba(20,107,94,.24); border-radius: 7px; }
+  .send-split button { border: none; background: #E3F1EE; color: #146B5E; font-size: .76rem; font-weight: 700; }
+  .send-split .go { padding: 3px 9px; border-radius: 6px 0 0 6px; min-width: 74px; }
+  .send-split .more { padding: 3px 6px; border-left: 1px solid rgba(20,107,94,.24); border-radius: 0 6px 6px 0; font-size: .68rem; cursor: default; }
+  .send-split .go:hover { filter: brightness(.96); }
+  .state-btn { border: 1px solid #E5E7EB; background: #fff; color: #9CA3AF; font-size: .76rem; font-weight: 600; border-radius: 7px;
+    padding: 3px 9px; min-width: 99px; display: inline-flex; align-items: center; justify-content: center; gap: 3px; }
+  .state-btn:disabled { cursor: default; }
+  .state-btn.undo { color: #6B7280; }
+  .state-btn.undo:hover { border-color: #CBD5E1; color: #1F2937; }
+  .icon-btn { border: none; background: none; color: #9CA3AF; padding: 3px 4px; border-radius: 6px; display: inline-flex; }
+  .icon-btn:hover { color: #1F2937; }
+  .icon-btn.trash:hover { color: #DC2626; }
+  .icon-btn.ghost { visibility: hidden; }
+  .icon-btn.more-ic:hover { background: #EFF6FF; }
+  .ic { width: 15px; height: 15px; }
+  .new-tip { position: absolute; top: -9px; right: 10px; font-size: .66rem; font-weight: 700; color: #fff; background: #2563EB; border-radius: 5px; padding: 0 5px; }
+  @keyframes fl { 0% { box-shadow: 0 0 0 3px rgba(20,107,94,.35); } 100% { box-shadow: none; } }
+
+  /* ── 수집 확정본 ── */
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .tab { font-size: .78rem; border: 1px solid #E5E7EB; background: #fff; color: #475569; border-radius: 8px; padding: 4px 10px; font-weight: 600; }
+  .tab .n { color: #9CA3AF; font-weight: 500; margin-left: 4px; }
+  .tab.on { border-color: #146B5E; background: #E3F1EE; color: #146B5E; }
+  .tab.flash { animation: fl .9s ease; }
+  .tabs .hint { font-size: .74rem; color: #9CA3AF; align-self: center; }
+  .b-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 1.02rem; font-weight: 700; color: #1E3A5F; margin-bottom: 4px; }
+  .kind { font-size: .7rem; font-weight: 700; color: #146B5E; background: #E3F1EE; border-radius: 8px; padding: 2px 8px; }
+  .b-sub { font-size: .76rem; color: #9CA3AF; margin-bottom: 8px; }
+  .b-row { display: flex; align-items: flex-start; gap: 6px; padding: 7px 6px; border-radius: 7px; font-size: .9rem; line-height: 1.5; }
+  .b-row:hover { background: #F3F4F6; }
+  .b-row .tt { flex: 1; min-width: 0; }
+  .b-row .tt .outlet { color: #6B7280; font-size: .86em; margin-right: .5em; }
+  .b-row.just { background: #E7EFE8; }
+  .b-empty { color: #9CA3AF; font-size: .84rem; padding: 18px 4px; text-align: center; line-height: 1.7; }
+  .b-hidden { margin-top: 8px; border-top: 1px dashed #E5E7EB; padding-top: 6px; }
+  .b-hidden .h { font-size: .74rem; color: #9CA3AF; font-weight: 700; margin-bottom: 2px; }
+  .b-hidden .b-row { color: #9CA3AF; font-size: .84rem; }
+  .b-hidden .b-row .tt { text-decoration: line-through; }
+  .restore { font-size: .72rem; border: 1px solid #E5E7EB; background: #fff; color: #475569; border-radius: 6px; padding: 1px 7px; flex: none; }
+
+  /* ── 수시 보관함 ── */
+  .arch .iss { font-weight: 700; color: #1E3A5F; font-size: .92rem; }
+  .arch .day { margin: 4px 0 0 14px; font-size: .84rem; color: #1F2937; display: flex; gap: 6px; align-items: center; }
+  .arch .today { font-size: .68rem; color: #2563EB; background: #EFF6FF; border-radius: 6px; padding: 0 6px; font-weight: 700; }
+  .arch .slot { margin: 3px 0 0 30px; font-size: .84rem; color: #374151; display: flex; gap: 8px; }
+  .arch .slot .n { color: #9CA3AF; }
+  .arch .none { color: #9CA3AF; font-size: .82rem; margin-left: 14px; }
+
+  .rules { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 14px 18px; margin-top: 26px; font-size: 0.82rem; line-height: 1.8; color: #4B5563; }
+  .rules h2 { font-size: 0.95rem; color: #1E3A5F; margin: 14px 0 6px; }
+  .rules h2:first-child { margin-top: 0; }
+  .rules b { color: #1F2937; }
+  .rules ul { margin: 0; padding-left: 18px; }
+  .tbl-wrap { overflow-x: auto; }
+  table.cmp { border-collapse: collapse; width: 100%; min-width: 560px; font-size: .8rem; }
+  table.cmp th, table.cmp td { border-bottom: 1px solid #F1F5F9; padding: 7px 8px; text-align: left; vertical-align: top; }
+  table.cmp th { color: #6B7280; font-weight: 700; background: #F8FAFC; }
+  table.cmp td:first-child { color: #6B7280; font-weight: 700; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="mk">
+  <h1 class="t">수집 원본 🗑 · 전부 보내기 · 확정본 나누기 — 시안</h1>
+  <div class="lead">왼쪽이 <b>수집 원본</b>, 오른쪽이 보낸 기사가 쌓이는 <b>수집 확정본</b>과 <b>수시 보관함</b>이에요. 전부 실제로 눌러져요.
+    <ol>
+      <li>사진 기사 두 건을 <b>🗑</b>로 치워 보세요 — 실시간현황과 같은 동작이에요.</li>
+      <li>툴바의 <b>「처리 안 한 N건 전부 확정본으로」</b>를 눌러 보세요.</li>
+      <li><b>「지금까지 불러오기」</b>로 시간을 넘기고(노란 줄 = 새 기사) 다시 보내 보세요. 위쪽 첫 줄을 바꾸면 확정본이 어떻게 갈리는지 비교돼요.</li>
+    </ol>
+  </div>
+
+  <div class="scen">
+    <div class="line" id="mode1">
+      <span class="cap">확정본 나누기</span>
+      <button data-v="one">하나로 계속 (지금)</button>
+      <button data-v="send">보낼 때마다</button>
+      <button data-v="load">불러올 때마다<span class="rec">추천</span></button>
+    </div>
+    <div class="line" id="mode2">
+      <span class="cap">확정본에서 🗑 하면 원본에선</span>
+      <button data-v="hide">🗑 숨김으로<span class="rec">추천</span></button>
+      <button data-v="back">처리 안 함으로 (지금)</button>
+      <button class="reset" id="reset">처음부터</button>
+    </div>
+  </div>
+  <div class="scen-desc" id="desc"></div>
+
+  <div class="stage">
+    <div class="screen" id="raw"></div>
+    <div class="col">
+      <div class="screen" id="bundle"></div>
+      <div class="screen arch" id="arch"></div>
+    </div>
+  </div>
+
+  <div class="rules">
+    <h2>정기와 나란히 놓으면</h2>
+    <div class="tbl-wrap"><table class="cmp">
+      <tr><th></th><th>정기</th><th>수시 (이 시안, 추천안)</th></tr>
+      <tr><td>날것</td><td>실시간 — 행마다 🗑(숨김 표시만), 「아직 처리 안 한 기사만」</td><td>수집 원본 — <b>같은 🗑, 같은 필터 이름</b></td></tr>
+      <tr><td>보고서로 가는 길</td><td>초안이 저절로 참 → 필요 없는 걸 🗑</td><td>하나씩 보내기, 또는 <b>전부 보내고 확정본에서 🗑</b> (둘 다 됨)</td></tr>
+      <tr><td>경계</td><td>회차 마감 — 시계가 정함</td><td><b>지금까지 불러오기</b> — 담당자가 정함</td></tr>
+      <tr><td>보고서</td><td>회차마다 확정본 「14시 기준」, 그 회차 기사만</td><td>불러올 때마다 확정본 「16시 10분 기준」, 그때 보낸 기사만</td></tr>
+      <tr><td>보관</td><td>정기 보관함 날짜 ▸ 회차</td><td>수시 보관함 사안 ▸ 날짜 ▸ 회차 — <b>지금 구조 그대로</b></td></tr>
+    </table></div>
+
+    <h2>① 원본의 🗑 — 실시간과 똑같이</h2>
+    <ul>
+      <li>누르면 목록에서 <b>빼지 않고</b> 흐리게 + 취소선, 보내기 버튼 자리가 <b>「🗑 숨김」</b>이 돼요. 다시 누르면 되돌아가요(실시간 <code>unhideFromLive</code>와 같은 모양).</li>
+      <li>필터 이름 <b>「아직 안 보낸 기사만」 → 「아직 처리 안 한 기사만」</b> — 보냄·숨김을 둘 다 가려요. 실시간과 같은 이름이고, 옆 작은 글자로 몇 건씩인지 알려줘요.</li>
+      <li>이 카드 안에만 남는 표시예요. 정기 쪽 숨긴 기사 저장소(<code>hidden_articles.json</code>)는 안 건드려요 — 수시와 정기 사이 통로 0개 규칙 그대로.</li>
+      <li>보낸 기사엔 🗑가 없어요. 빼려면 확정본에서 뺀다 — 한 기사를 두 곳에서 따로 빼면 어느 쪽이 이기는지 설명해야 해서예요.</li>
+    </ul>
+
+    <h2>② 「처리 안 한 N건 전부 확정본으로」</h2>
+    <ul>
+      <li>자리는 필터 바로 옆 — 필터를 켜면 보이는 목록이 곧 이 버튼이 보낼 목록이라 짝으로 둬요.</li>
+      <li>0건이면 버튼을 안 그려요. 누르면 건수와 받는 확정본 이름을 적은 확인창이 한 번 떠요.</li>
+      <li>이 버튼이 있어야 <b>정기 초안처럼 "다 받아놓고 지우기"</b>가 돼요: 원본에서 명백한 잡음만 🗑 → 전부 보내기 → 확정본에서 마저 🗑.</li>
+    </ul>
+
+    <h2>③ 확정본 나누기 — 「보낼 때마다」가 아니라 「불러올 때마다」</h2>
+    <ul>
+      <li>보내기는 기사 한 건씩 누르는 동작이라, <b>누를 때마다 새 확정본</b>이면 12건 보내면 확정본 12개가 생겨요(위에서 「보낼 때마다」로 눌러 보세요).</li>
+      <li>그래서 경계를 <b>「지금까지 불러오기」</b>에 둬요. 같은 원본 시각에서 보낸 건 몇 번에 나눠 눌러도 한 확정본이고, 다시 불러온 뒤 보내면 새 확정본이 생겨요. 새 확정본은 그때 보낸 기사만 담아요(정기 회차처럼).</li>
+      <li><b>사안명에 번호를 안 붙여요.</b> 확정본 머리줄의 「16시 10분 기준」이 이미 그 확정본의 이름이에요. 사안명은 보고서 첫 줄로 나가는 글자라, 기계가 붙인 「인사청문회 2」가 섞이면 안 돼요(「기타2」를 안 만든 것과 같은 이유).</li>
+      <li>덤 — 머리줄 시각(B안)의 "알고 감수한 흠"이 사라져요. 한 확정본의 기사가 전부 같은 원본 시각에서 왔으니 「N시 N분 기준」이 늘 정확해요.</li>
+      <li>불러오기만 하고 안 보내면 새 확정본은 안 생겨요(지금처럼 처음 보낼 때 생김). 다른 확정본에 합치고 싶으면 ▾ 메뉴(지금 있는 길)로 골라 보내요.</li>
+      <li>오늘 누적본이 필요할 땐 수시 보관함의 날짜 줄 복사(이미 있음)가 확정본들을 이어 붙여 줘요 — 정기 보관함 날짜 줄과 같아요.</li>
+    </ul>
+
+    <h2>④ 확정본에서 🗑 한 기사가 원본에서 어떻게 보이나</h2>
+    <ul>
+      <li><b>추천: 「🗑 숨김」으로.</b> 정기에서도 초안·확정본에서 숨긴 기사가 실시간에 「🗑 숨김」으로 보여요 — "이 기사 안 쓴다"는 한 가지 뜻.</li>
+      <li>지금처럼 「처리 안 함」으로 돌아가면, 다음에 「전부 보내기」를 누를 때 <b>방금 뺀 기사가 다음 확정본으로 도로 끌려가요</b>(오른쪽 위 두 번째 줄을 바꿔서 해보세요).</li>
+      <li>실수로 보낸 걸 되돌리는 길: 확정본 🗑 → 원본의 「🗑 숨김」을 한 번 더 누르면 「처리 안 함」.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const IC = {
+  trash: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>',
+  copy: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>',
+  dots: '<svg class="ic" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
+  check: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>',
+  folder: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  refresh: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>',
+  ext: '<svg class="ic" style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/></svg>',
+};
+
+// 가상의 기사 — 실제 인물·기사가 아니다.
+const BATCHES = [
+  { at: '15:05', arts: [
+    ['연합뉴스', '14:58', '경제부총리 후보자 청문회, 부동산 보유 논란 공방', '인사청문회'],
+    ['뉴시스', '14:51', '[속보] 청문회 정회…여야 자료 제출 놓고 충돌', '청문회'],
+    ['한국경제', '14:40', '후보자 "재정 건전성 원칙 지키겠다"…확장재정 질의엔 말 아껴', '인사청문회'],
+    ['뉴스1', '14:33', '답변하는 경제부총리 후보자', '인사청문회', 'photo'],
+    ['머니투데이', '14:20', '여당 "정책 검증 집중" vs 야당 "도덕성 먼저"', '청문회'],
+    ['서울경제', '13:55', '청문회 앞둔 세제 개편안, 후보자 입장은', '인사청문회'],
+    ['이데일리', '13:30', '후보자 배우자 주식 보유 논란…"직무 관련성 없다"', '인사청문회'],
+    ['매일경제', '12:48', '청문회 일정 확정…오늘 오전 10시부터', '청문회'],
+    ['뉴시스', '11:40', '[포토] 청문회장 들어서는 후보자', '청문회', 'photo'],
+  ]},
+  { at: '16:10', arts: [
+    ['연합뉴스', '16:02', '청문회 속개…세수 결손 대책 집중 질의', '청문회'],
+    ['KBS', '15:48', '후보자 "추경 편성, 필요하면 검토"', '인사청문회'],
+    ['뉴스1', '15:30', '질의 경청하는 후보자', '인사청문회', 'photo'],
+    ['한국일보', '15:12', '야당, 청문보고서 채택 거부 시사', '인사청문회'],
+  ]},
+  { at: '17:15', arts: [
+    ['중앙일보', '17:05', '청문회 종료…보고서 채택 여부 내일 결정', '청문회'],
+    ['뉴시스', '16:50', '[속보] 여야, 청문보고서 채택 합의 불발', '청문회'],
+    ['이데일리', '16:31', '후보자 마무리 발언 "국민 눈높이 맞추겠다"', '인사청문회'],
+  ]},
+];
+const ALL = [];
+BATCHES.forEach((b, bi) => b.arts.forEach((a, i) => ALL.push({
+  u: 'u' + bi + '-' + i, o: a[0], p: a[1], t: a[2], kw: a[3], photo: a[4] === 'photo', batch: bi,
+})));
+const OUTLET_RANK = ['KBS', 'MBC', '조선일보', '중앙일보', '동아일보', '한국경제', '매일경제', '서울경제', '한국일보', '머니투데이', '이데일리', '연합뉴스', '뉴시스', '뉴스1'];
+const rank = o => { const i = OUTLET_RANK.indexOf(o); return i < 0 ? 99 : i; };
+const byU = u => ALL.find(a => a.u === u);
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const toMin = hm => { const [h, m] = hm.split(':').map(Number); return h * 60 + m; };
+const fmt = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+const kr = hm => { const [h, m] = hm.split(':').map(Number); return h + '시 ' + String(m).padStart(2, '0') + '분'; };
+
+let MODE1 = 'load', MODE2 = 'hide', S;
+function reset() {
+  S = { loaded: 1, winEnd: '15:05', clock: toMin('15:05') + 2, newUrls: new Set(), rawHidden: new Set(),
+        cards: [], active: null, unproc: false, log: [['15:05', 9]], flashTab: null, justRows: new Set() };
+}
+
+// ── 상태 계산 (저장하지 않고 매번 다시 — sent_index와 같은 원칙) ──
+function sentCard(u) { return S.cards.find(c => c.entries.some(e => e.u === u && !e.hidden)); }
+function hiddenInBundle(u) { return S.cards.some(c => c.entries.some(e => e.u === u && e.hidden && !e.released)); }
+function status(u) {
+  if (S.rawHidden.has(u)) return 'hid-raw';
+  if (sentCard(u)) return 'sent';
+  if (MODE2 === 'hide' && hiddenInBundle(u)) return 'hid-bundle';
+  return 'none';
+}
+function cardLabel(c) {
+  if (MODE1 === 'one') {
+    const vis = c.entries.filter(e => !e.hidden);
+    const t = vis.length ? vis.map(e => e.basis).sort().slice(-1)[0] : c.key;
+    return t;
+  }
+  return c.key;
+}
+function currentKey() {
+  if (MODE1 === 'one') return 'one';
+  if (MODE1 === 'send') return fmt(S.clock);
+  return S.winEnd;
+}
+function send(urls) {
+  if (!urls.length) return;
+  S.clock += 2;  // 보내는 데 시간이 조금 흐른다
+  const key = currentKey();
+  let c = S.cards.find(x => x.key === key);
+  if (!c) { c = { key, entries: [] }; S.cards.push(c); S.flashTab = key; }
+  urls.forEach(u => {
+    const e = c.entries.find(x => x.u === u);
+    if (e) { e.hidden = false; e.released = false; e.basis = S.winEnd; }
+    else c.entries.push({ u, hidden: false, released: false, basis: S.winEnd });
+  });
+  // 확정본은 언론사순으로 끼워 넣는다(실제 send_to_bundle과 같은 규칙).
+  c.entries.sort((a, b) => rank(byU(a.u).o) - rank(byU(b.u).o) || toMin(byU(b.u).p) - toMin(byU(a.u).p));
+  S.active = key;
+  S.justRows = new Set(urls);
+  render();
+}
+function reload() {
+  if (S.loaded >= BATCHES.length) return;
+  const b = BATCHES[S.loaded];
+  S.loaded += 1;
+  S.winEnd = b.at;
+  S.clock = toMin(b.at) + 2;
+  S.newUrls = new Set(ALL.filter(a => a.batch === S.loaded - 1).map(a => a.u));
+  S.log.push([b.at, b.arts.length]);
+  S.justRows = new Set();
+  render();
+}
+
+// ── 원본 ──
+function rawRow(a) {
+  const st = status(a.u);
+  const cls = ['article'];
+  if (S.newUrls.has(a.u) && st === 'none') cls.push('is-new-arrival');
+  if (a.photo) cls.push('is-photo');
+  if (st === 'sent') cls.push('is-sent');
+  if (st.startsWith('hid')) cls.push('is-hid');
+  let title = esc(a.t);
+  if (/^\[속보\]/.test(a.t)) title = '<span class="t-flash">' + title + '</span>';
+  const badge = a.photo ? '<span class="photo-badge">📷 사진 추정</span>' : '';
+  let stateHtml, trash;
+  if (st === 'sent') {
+    const c = sentCard(a.u);
+    stateHtml = `<button class="state-btn" disabled title="「${kr(cardLabel(c))} 기준」 수집 확정본으로 보낸 기사예요 — 빼려면 그 확정본에서 🗑">${IC.check} 보냄</button>`;
+    trash = `<button class="icon-btn ghost">${IC.trash}</button>`;
+  } else if (st.startsWith('hid')) {
+    const why = st === 'hid-raw' ? '숨긴 기사예요 — 눌러서 되돌려요' : '수집 확정본에서 뺀 기사예요 — 눌러서 「처리 안 함」으로 되돌려요';
+    stateHtml = `<button class="state-btn undo" data-act="unhide" data-u="${a.u}" title="${why}">${IC.trash} 숨김</button>`;
+    trash = `<button class="icon-btn ghost">${IC.trash}</button>`;
+  } else {
+    stateHtml = `<span class="send-split"><button class="go" data-act="send" data-u="${a.u}" title="「${kr(currentKey() === 'one' ? S.winEnd : currentKey())} 기준」 수집 확정본으로 보내요">확정본으로</button><button class="more" title="다른 수집 확정본으로 (시안에선 안 열려요)">▾</button></span>`;
+    trash = `<button class="icon-btn trash" data-act="hide" data-u="${a.u}" title="숨기기 — 목록에 남기고 흐리게만 해요">${IC.trash}</button>`;
+  }
+  return `<div class="${cls.join(' ')}">
+    <div class="a-title"><span class="outlet">${esc(a.o)}</span>${title}${badge}</div>
+    <div class="a-bot"><span class="a-time">${a.p} 게시</span>·<a class="org" href="#" onclick="return false">원문보기 ${IC.ext}</a>·<span class="kw">🔍 <b>${esc(a.kw)}</b></span>
+      <span class="a-acts">${stateHtml}<button class="icon-btn" title="복사">${IC.copy}</button><button class="icon-btn more-ic" title="더보기">${IC.dots}</button>${trash}</span>
+    </div></div>`;
+}
+function renderRaw() {
+  const arts = ALL.filter(a => a.batch < S.loaded).sort((x, y) => toMin(y.p) - toMin(x.p));
+  const counts = { sent: 0, hid: 0, none: 0 };
+  arts.forEach(a => { const s = status(a.u); counts[s === 'sent' ? 'sent' : s === 'none' ? 'none' : 'hid']++; });
+  const done = counts.sent + counts.hid;
+  const filter = done
+    ? `<label class="sent-filter"><input type="checkbox" id="unproc" ${S.unproc ? 'checked' : ''}> 아직 처리 안 한 기사만 <small>(보냄 ${counts.sent} · 숨김 ${counts.hid})</small></label>`
+    : '';
+  const tgt = currentKey() === 'one' ? null : currentKey();
+  const sendAll = counts.none
+    ? `<button class="send-all" data-act="sendall" data-n="${counts.none}">처리 안 한 ${counts.none}건 전부 확정본으로</button>`
+    : '';
+  const cur = S.cards.find(c => c.key === currentKey());
+  let pair;
+  if (cur) {
+    const n = cur.entries.filter(e => !e.hidden).length;
+    pair = `<span class="pair-link" data-act="gotab" data-k="${cur.key}">${IC.folder} ${MODE1 === 'one' ? '' : cardLabel(cur) + ' '}확정본 ${n}건 →</span>`;
+  } else {
+    pair = `<span class="pair-link none" title="보내면 이 확정본이 생겨요">${IC.folder} ${tgt && MODE1 === 'load' ? tgt + ' ' : ''}확정본 · 보내면 생겨요</span>`;
+  }
+  const logTxt = S.log.map((l, i) => i === 0 ? `${l[0]} ${l[1]}건` : `${l[0]} +${l[1]}건`).join(' · ');
+  const more = S.loaded < BATCHES.length;
+  document.getElementById('raw').innerHTML = `
+    <div class="lbl">수집 원본 <span class="new">🗑 · 전부 보내기 · 필터 이름</span></div>
+    <div class="report-head">수시 모니터링 ${kr(S.winEnd)} 기준(<span class="nm">인사청문회</span>)
+      <button class="now-btn" data-act="reload" ${more ? '' : 'disabled title="시안에 준비된 기사는 여기까지예요"'}>${IC.refresh} 지금까지 불러오기</button></div>
+    <div class="meta"><span class="chip">🔍 인사청문회 · 청문회</span><span class="chip">🕐 11:00~${S.winEnd}</span><span class="chip">📥 ${logTxt}</span></div>
+    <div class="toolbar">${filter}${sendAll}<span style="flex:1"></span><button class="btn-ghost">⬇ xlsx</button>${pair}</div>
+    <div class="raw-head"><span class="cnt">${arts.length}건</span><span class="ord">· 최신순</span></div>
+    ${arts.map(rawRow).join('')}`;
+  document.body.classList.toggle('unproc-only', S.unproc);
+}
+
+// ── 확정본 ──
+function renderBundle() {
+  const el = document.getElementById('bundle');
+  const lbl = `<div class="lbl">수집 확정본 <span class="new">${MODE1 === 'one' ? '지금과 같음' : MODE1 === 'send' ? '보낼 때마다 새로' : '불러올 때마다 새로'}</span></div>`;
+  if (!S.cards.length) {
+    el.innerHTML = lbl + '<div class="b-empty">아직 보낸 기사가 없어요.<br>원본에서 보내면 여기 생겨요.</div>';
+    return;
+  }
+  if (!S.cards.find(c => c.key === S.active)) S.active = S.cards[S.cards.length - 1].key;
+  const tabs = S.cards.map(c => {
+    const n = c.entries.filter(e => !e.hidden).length;
+    const name = MODE1 === 'one' ? '인사청문회' : '인사청문회 ' + cardLabel(c);
+    return `<button class="tab ${c.key === S.active ? 'on' : ''} ${S.flashTab === c.key ? 'flash' : ''}" data-act="tab" data-k="${c.key}">${name}<span class="n">${n}</span></button>`;
+  }).join('');
+  const many = S.cards.length >= 4 ? `<span class="hint">← ${S.cards.length}개</span>` : '';
+  const c = S.cards.find(x => x.key === S.active);
+  const vis = c.entries.filter(e => !e.hidden);
+  const hid = c.entries.filter(e => e.hidden);
+  const bases = [...new Set(vis.map(e => e.basis))];
+  let sub = '';
+  if (MODE1 === 'one' && bases.length > 1) sub = `원본 ${bases.sort().join(' · ')} 에서 보낸 기사가 섞여 있어요 — 머리줄은 가장 늦은 시각`;
+  if (MODE1 === 'send') sub = `탭 이름은 보낸 시각(${c.key}), 머리줄은 원본 시각(${cardLabel2(c)}) — 둘이 달라요`;
+  const rows = vis.length
+    ? vis.map(e => { const a = byU(e.u); return `<div class="b-row ${S.justRows.has(e.u) ? 'just' : ''}"><span class="tt"><span class="outlet">${esc(a.o)}</span>${esc(a.t)}</span><button class="icon-btn trash" data-act="bhide" data-k="${c.key}" data-u="${e.u}" title="이 확정본에서 빼기">${IC.trash}</button></div>`; }).join('')
+    : '<div class="b-empty">남은 기사가 없어요</div>';
+  const hidHtml = hid.length
+    ? `<div class="b-hidden"><div class="h">🗑 숨긴 기사 ${hid.length}</div>${hid.map(e => { const a = byU(e.u); return `<div class="b-row"><span class="tt"><span class="outlet">${esc(a.o)}</span>${esc(a.t)}</span><button class="restore" data-act="brestore" data-k="${c.key}" data-u="${e.u}">복구</button></div>`; }).join('')}</div>`
+    : '';
+  el.innerHTML = `${lbl}<div class="tabs">${tabs}${many}</div>
+    <div class="b-head">수시 모니터링 ${kr(MODE1 === 'send' ? cardLabel2(c) : cardLabel(c))} 기준(인사청문회)<span class="kind">확정본</span></div>
+    <div class="b-sub">${sub || '&nbsp;'}</div>${rows}${hidHtml}`;
+}
+function cardLabel2(c) {  // 보낼 때마다 모드의 머리줄 — B안 그대로(가장 늦은 원본 시각)
+  const vis = c.entries.filter(e => !e.hidden);
+  return vis.length ? vis.map(e => e.basis).sort().slice(-1)[0] : c.key;
+}
+
+// ── 보관함 ──
+function renderArch() {
+  const el = document.getElementById('arch');
+  const lbl = '<div class="lbl">수시 보관함 <span class="new">사안 ▸ 날짜 ▸ 회차 — 구조는 지금 그대로</span></div>';
+  if (!S.cards.length) { el.innerHTML = lbl + '<div class="none">아직 쌓인 확정본이 없어요</div>'; return; }
+  const slots = S.cards.slice().reverse().map(c => {
+    const n = c.entries.filter(e => !e.hidden).length;
+    const t = MODE1 === 'send' ? c.key : cardLabel(c);
+    return `<div class="slot"><span>${t} 기준</span><span class="n">· ${n}건</span></div>`;
+  }).join('');
+  el.innerHTML = `${lbl}<div class="iss">인사청문회</div><div class="day">9월 15일 (화) <span class="today">오늘</span></div>${slots}`;
+}
+
+function renderDesc() {
+  const n = S.cards.length;
+  const m1 = {
+    one: `<b>지금 동작.</b> 보낸 기사는 전부 한 확정본에 계속 쌓이고, 머리줄은 가장 늦게 보낸 원본 시각이에요. 15시에 한 번 복사해 보고했다면 16시 복사본엔 15시 것이 <b>다시</b> 들어가요.`,
+    send: `누를 때마다 새 확정본이 생겨요. 기사 한 건씩 누르면 <span class="bad">한 건짜리 확정본이 줄줄이</span> 생기고(지금 ${n}개), 탭 이름(보낸 시각)과 머리줄(원본 시각)이 서로 달라요. 한 확정본으로 모으려면 늘 체크하거나 「전부 보내기」로만 보내야 해요.`,
+    load: `<b>「지금까지 불러오기」가 경계예요.</b> 같은 원본 시각에서 보낸 건 몇 번에 나눠 눌러도 한 확정본으로 모이고, 다시 불러온 뒤 보내면 새 확정본이 생겨요. 머리줄 「N시 N분 기준」이 곧 그 확정본의 이름이라 사안명엔 아무것도 안 붙여요. 정기 회차와 같은 모양이에요.`,
+  }[MODE1];
+  const m2 = MODE2 === 'hide'
+    ? ' · 확정본에서 뺀 기사는 원본에서 <b>「🗑 숨김」</b>으로 보여요.'
+    : ' · 확정본에서 뺀 기사는 원본에서 <b>「처리 안 함」</b>으로 돌아가요 — 다음 「전부 보내기」에 <span class="bad">도로 끌려가요</span>.';
+  document.getElementById('desc').innerHTML = m1 + m2;
+}
+
+function render() {
+  document.querySelectorAll('#mode1 button').forEach(b => b.classList.toggle('on', b.dataset.v === MODE1));
+  document.querySelectorAll('#mode2 button[data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === MODE2));
+  renderRaw(); renderBundle(); renderArch(); renderDesc();
+  S.flashTab = null;
+}
+
+document.addEventListener('click', ev => {
+  const m1 = ev.target.closest('#mode1 button[data-v]');
+  if (m1) { MODE1 = m1.dataset.v; reset(); render(); return; }
+  const m2 = ev.target.closest('#mode2 button[data-v]');
+  if (m2) { MODE2 = m2.dataset.v; render(); return; }
+  if (ev.target.closest('#reset')) { reset(); render(); return; }
+  const b = ev.target.closest('[data-act]');
+  if (!b) return;
+  const u = b.dataset.u, k = b.dataset.k;
+  const card = k ? S.cards.find(c => c.key === k) : null;
+  switch (b.dataset.act) {
+    case 'send': send([u]); break;
+    case 'hide': S.rawHidden.add(u); S.justRows = new Set(); render(); break;
+    case 'unhide':
+      S.rawHidden.delete(u);
+      S.cards.forEach(c => c.entries.forEach(e => { if (e.u === u && e.hidden) e.released = true; }));
+      render(); break;
+    case 'sendall': {
+      const urls = ALL.filter(a => a.batch < S.loaded && status(a.u) === 'none').map(a => a.u);
+      const key = currentKey();
+      const name = key === 'one' ? '인사청문회' : `${kr(MODE1 === 'send' ? fmt(S.clock + 2) : key)} 기준`;
+      if (confirm(`처리 안 한 ${urls.length}건을 「${name}」 수집 확정본으로 보낼까요?\n원본에는 그대로 남아요. 빼려면 확정본에서 🗑를 누르면 돼요.`)) send(urls);
+      break;
+    }
+    case 'reload': reload(); break;
+    case 'tab': case 'gotab': S.active = k; S.justRows = new Set(); render(); break;
+    case 'bhide': card.entries.find(e => e.u === u).hidden = true; S.justRows = new Set(); render(); break;
+    case 'brestore': { const e = card.entries.find(x => x.u === u); e.hidden = false; e.released = false; S.rawHidden.delete(u); render(); break; }
+  }
+});
+document.addEventListener('change', ev => {
+  if (ev.target.id === 'unproc') { S.unproc = ev.target.checked; render(); }
+});
+reset(); render();
+</script>
+</body>
+</html>

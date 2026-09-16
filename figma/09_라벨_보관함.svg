@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="350" viewBox="0 0 1440 350">
+<rect width="100%" height="100%" fill="#F8FAFC"/>
+<g id="topbar">
+<rect x="0" y="0" width="1440" height="54.5" fill="#FFFFFF"/>
+<text x="490" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">홈</text>
+<text x="924.5" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">설정</text>
+</g>
+<g id="Page">
+<rect x="315" y="24" width="810" height="301.1" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+</g>
+<g id="라벨 보관함">
+<rect x="340" y="134.5" width="760" height="1" fill="#E5E7EB"/>
+<g transform="translate(340,94.5) scale(0.6999,0.6999)" fill="none" stroke="#1E3A5F" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"></path><circle cx="7.5" cy="7.5" r="1.4" fill="#1E3A5F" stroke="none"></circle></g>
+<rect x="990.4" y="85" width="109.6" height="37.5" rx="4" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<g transform="translate(1007.4,95.8) scale(0.6667,0.6667)" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"></circle><path d="M19.1 14.4a1.5 1.5 0 0 0 .3 1.7l.1.1a1.9 1.9 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-1.7-.3 1.5 1.5 0 0 0-.9 1.4v.2a1.9 1.9 0 1 1-3.8 0v-.1a1.5 1.5 0 0 0-1-1.4 1.5 1.5 0 0 0-1.7.3l-.1.1a1.9 1.9 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0 .3-1.7 1.5 1.5 0 0 0-1.4-.9h-.2a1.9 1.9 0 1 1 0-3.8h.1a1.5 1.5 0 0 0 1.4-1 1.5 1.5 0 0 0-.3-1.7l-.1-.1a1.9 1.9 0 1 1 2.6-2.6l.1.1a1.5 1.5 0 0 0 1.7.3h.1a1.5 1.5 0 0 0 .9-1.4v-.2a1.9 1.9 0 1 1 3.8 0v.1a1.5 1.5 0 0 0 .9 1.4 1.5 1.5 0 0 0 1.7-.3l.1-.1a1.9 1.9 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0-.3 1.7v.1a1.5 1.5 0 0 0 1.4.9h.2a1.9 1.9 0 1 1 0 3.8h-.1a1.5 1.5 0 0 0-1.4.9Z"></path></g>
+<text x="356.8" y="108.8" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16.8" font-weight="700" fill="#1E3A5F" xml:space="preserve">라벨 보관함</text>
+<text x="1023.4" y="108.5" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">라벨 관리</text>
+</g>
+<g id="empty">
+<text x="720" y="207.6" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">💤</text>
+<text x="720" y="239.7" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">아직 라벨을 붙인 기사가 없습니다. 확정본·초안·수집 결과 화면에서 기사의 🏷 버튼으로 붙일 수 있어요.</text>
+</g>
+</svg>

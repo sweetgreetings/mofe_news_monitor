@@ -1,0 +1,150 @@
+window.__mkSvg = function (opts) {
+  opts = opts || {};
+  const W = opts.w || 1440, MAXH = opts.maxH || 100000;
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const rgba = c => { const m = /rgba?\(([^)]+)\)/.exec(c); if(!m) return null;
+    const p = m[1].split(',').map(Number); const a = p.length>3?p[3]:1;
+    if(!a) return null; return {hex:'#'+p.slice(0,3).map(n=>('0'+Math.round(n).toString(16)).slice(-2)).join('').toUpperCase(), a:a}; };
+  const num = v => parseFloat(v) || 0;
+  window.scrollTo(0,0);
+  const out = [];  // {g, xml, top}
+  let H = 0;
+
+  // 그룹 루트: 상단바 + 컨테이너 직계 자식
+  const roots = [...document.querySelectorAll('.topbar, .container > *')];
+  const seen = new Map();
+  const label = n => {
+    const h = n.querySelector && n.querySelector('h1,h2,h3');
+    let t = h && h.textContent ? h.textContent.replace(/[\s\u200b]+/g,' ').trim() : '';
+    t = t.replace(/[\u25b2\u25bc\u2191\u2193\u22ef]|[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu,'').trim().slice(0,40);
+    t = t.replace(/\s*\d+$/,'').trim();
+    if (!t) t = (n.className && typeof n.className==='string' ? n.className.split(' ')[0] : n.tagName.toLowerCase());
+    return t || n.tagName.toLowerCase();
+  };
+  const groupOf = el => { let n = el; while (n && n !== document.body) { if (roots.indexOf(n)>=0) {
+      if (!seen.has(n)) { let b = label(n), nm = b, i = 2; const used = new Set([...seen.values()]);
+        while (used.has(nm)) nm = b + ' ' + (i++); seen.set(n, nm); }
+      return seen.get(n); } n = n.parentElement; } return 'Page'; };
+
+  const push = (el, xml, top) => out.push({g: groupOf(el), xml, top});
+  const hidDet = el => { let n = el; while (n && n !== document.body) {
+    if (n.tagName === 'SUMMARY') return false;
+    if (n.tagName === 'DETAILS') return !n.hasAttribute('open');
+    n = n.parentElement; } return false; };
+
+  // 1) 박스(배경/테두리)
+  document.querySelectorAll('body *').forEach(el => {
+    const cs = getComputedStyle(el);
+    if (cs.display==='none' || cs.visibility==='hidden' || +cs.opacity===0) return;
+    if (el.ownerSVGElement || hidDet(el)) return;
+    const r = el.getBoundingClientRect();
+    if (r.width < 0.5 || r.height < 0.5) return;
+    const y = r.top + (cs.position==='fixed' ? 0 : window.scrollY);
+    if (y > MAXH) return;
+    H = Math.max(H, Math.min(y + r.height, MAXH));
+    if (el.tagName === 'svg') {
+      const sc = rgba(cs.stroke), fc = rgba(cs.fill);
+      const vb = (el.getAttribute('viewBox') || ('0 0 ' + r.width + ' ' + r.height)).split(/[\s,]+/).map(Number);
+      const sx = r.width / (vb[2] || r.width), sy = r.height / (vb[3] || r.height);
+      const hex = sc ? sc.hex : (fc ? fc.hex : '#000000');
+      const inner = el.innerHTML.replace(/currentColor/g, hex);
+      push(el, '<g transform="translate(' + (+(r.left - vb[0]*sx).toFixed(1)) + ',' + (+(y - vb[1]*sy).toFixed(1)) + ') scale(' + (+sx.toFixed(4)) + ',' + (+sy.toFixed(4)) + ')" fill="' + (fc ? fc.hex : 'none') + '" stroke="' + (sc ? sc.hex : 'none') + '" stroke-width="' + num(cs.strokeWidth) + '" stroke-linecap="' + cs.strokeLinecap + '" stroke-linejoin="' + cs.strokeLinejoin + '">' + inner + '</g>', y);
+      return;
+    }
+    // <img> — 미리 받아둔 자산(opts.assets)을 SVG 안에 심는다
+    if (el.tagName === 'IMG') {
+      const a = (opts.assets || {})[el.currentSrc || el.src];
+      const P = 'x="' + (+r.left.toFixed(1)) + '" y="' + (+y.toFixed(1)) + '" width="' + (+r.width.toFixed(1)) + '" height="' + (+r.height.toFixed(1)) + '"';
+      if (a && a.svg) push(el, '<svg ' + P + (a.vb ? ' viewBox="' + a.vb + '"' : '') + ' preserveAspectRatio="xMidYMid meet" overflow="visible">' + a.svg + '</svg>', y);
+      else if (a && a.uri) push(el, '<image ' + P + ' preserveAspectRatio="xMidYMid meet" href="' + a.uri + '"/>', y);
+      return;
+    }
+    // 폼 컨트롤(select/input)은 표시 텍스트가 DOM 텍스트 노드가 아니라 따로 그린다
+    if (el.tagName === 'SELECT' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+      const fbg = rgba(cs.backgroundColor), fbw = num(cs.borderTopWidth), fbc = rgba(cs.borderTopColor);
+      const frad = Math.min(num(cs.borderTopLeftRadius), r.width/2, r.height/2);
+      let fr = '<rect x="' + (+r.left.toFixed(1)) + '" y="' + (+y.toFixed(1)) + '" width="' + (+r.width.toFixed(1)) + '" height="' + (+r.height.toFixed(1)) + '"' + (frad ? ' rx="' + (+frad.toFixed(1)) + '"' : '') + ' fill="' + (fbg ? fbg.hex : 'none') + '"';
+      if (fbw > 0 && fbc) fr += ' stroke="' + fbc.hex + '" stroke-width="' + fbw + '"';
+      push(el, fr + '/>', y);
+      let t = '';
+      if (el.tagName === 'SELECT') { const o = el.selectedOptions && el.selectedOptions[0]; t = o ? (o.textContent || '').trim() : ''; }
+      else if (/^(text|search|email|number|url|tel|date|time|month)$/.test(el.type || 'text'))
+        t = (el.value || el.getAttribute('placeholder') || '').trim();
+      const fcol = rgba(cs.color);
+      if (t && fcol) {
+        const ffs = num(cs.fontSize);
+        const px = num(cs.paddingLeft) + fbw;
+        push(el, '<text x="' + (+(r.left + px).toFixed(1)) + '" y="' + (+(y + r.height/2 + ffs*0.35).toFixed(1)) + '" font-family="' + esc(cs.fontFamily.replace(/"/g, "'")) + '" font-size="' + (+ffs.toFixed(1)) + '" font-weight="' + cs.fontWeight + '" fill="' + fcol.hex + '" xml:space="preserve">' + esc(t) + '</text>', y);
+      }
+      return;
+    }
+    const bg = rgba(cs.backgroundColor);
+    const bw = ['Top','Right','Bottom','Left'].map(s=>num(cs['border'+s+'Width']));
+    const bc = ['Top','Right','Bottom','Left'].map(s=>rgba(cs['border'+s+'Color']));
+    const uni = bw.every(v=>v===bw[0]) && bw[0]>0 && bc.every(c=>c&&bc[0]&&c.hex===bc[0].hex);
+    const rad = Math.min(num(cs.borderTopLeftRadius), r.width/2, r.height/2);
+    const A = v => `x="${+r.left.toFixed(1)}" y="${+y.toFixed(1)}" width="${+r.width.toFixed(1)}" height="${+r.height.toFixed(1)}"${rad?` rx="${+rad.toFixed(1)}"`:''}`;
+    if (bg || uni) {
+      let s = `<rect ${A()} fill="${bg?bg.hex:'none'}"`;
+      if (bg && bg.a < 1) s += ` fill-opacity="${+bg.a.toFixed(2)}"`;
+      if (uni) s += ` stroke="${bc[0].hex}" stroke-width="${bw[0]}"`;
+      push(el, s + '/>', y);
+    } else {
+      // 변이 서로 다른 테두리 → 변별로 선 하나씩
+      const sides = [[0,r.left,y,r.width,bw[0]],[2,r.left,y+r.height-bw[2],r.width,bw[2]],[3,r.left,y,bw[3],r.height],[1,r.left+r.width-bw[1],y,bw[1],r.height]];
+      sides.forEach(([i,x,yy,w,h]) => { if (bw[i]>0 && bc[i]) push(el, `<rect x="${+x.toFixed(1)}" y="${+yy.toFixed(1)}" width="${+w.toFixed(1)}" height="${+h.toFixed(1)}" fill="${bc[i].hex}"/>`, yy); });
+    }
+  });
+
+  // 2) 텍스트 (줄 단위로 분해 → 피그마에서 편집 가능한 텍스트 레이어)
+  const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let tn;
+  while ((tn = tw.nextNode())) {
+    const raw = tn.nodeValue; if (!raw || !raw.trim()) continue;
+    const el = tn.parentElement; if (!el) continue;
+    if (el.ownerSVGElement || el.tagName === 'svg' || hidDet(el)) continue;
+    const cs = getComputedStyle(el);
+    if (cs.display==='none' || cs.visibility==='hidden' || +cs.opacity===0) continue;
+    const col = rgba(cs.color); if (!col) continue;
+    const fs = num(cs.fontSize), off = cs.position==='fixed' ? 0 : window.scrollY;
+    const rg = document.createRange(); rg.selectNodeContents(tn);
+    const rects = [...rg.getClientRects()].filter(r=>r.width>0.5&&r.height>0.5);
+    if (!rects.length) continue;
+    // 줄별로 문자 묶기
+    let lines;
+    if (rects.length === 1) { lines = [{t: raw.trim(), r: rects[0]}]; }
+    else {
+      lines = []; let cur = null;
+      for (let i=0;i<raw.length;i++){
+        const r2 = document.createRange(); r2.setStart(tn,i); r2.setEnd(tn,i+1);
+        const cr = r2.getBoundingClientRect(); if (!cr.height) continue;
+        const key = Math.round(cr.top);
+        if (!cur || cur.key !== key) { cur = {key, t:'', r:cr, left:cr.left, right:cr.right}; lines.push(cur); }
+        cur.t += raw[i]; cur.left = Math.min(cur.left, cr.left); cur.right = Math.max(cur.right, cr.right);
+      }
+      lines = lines.map(l => ({t: l.t.trim(), r: {left:l.left, right:l.right, top:l.r.top, height:l.r.height, width:l.right-l.left}})).filter(l=>l.t);
+    }
+    const ta = cs.textAlign;
+    lines.forEach(l => {
+      const y = l.r.top + off; if (y > MAXH) return;
+      H = Math.max(H, Math.min(y + l.r.height, MAXH));
+      let x = l.r.left, anc = '';
+      if (ta==='center') { x = (l.r.left + l.r.right)/2; anc = ' text-anchor="middle"'; }
+      else if (ta==='right'||ta==='end') { x = l.r.right; anc = ' text-anchor="end"'; }
+      const by = y + (l.r.height - fs)/2 + fs*0.8;
+      const ls = num(cs.letterSpacing);
+      push(el, `<text x="${+x.toFixed(1)}" y="${+by.toFixed(1)}"${anc} font-family="${esc(cs.fontFamily.replace(/"/g,"'"))}" font-size="${+fs.toFixed(1)}" font-weight="${cs.fontWeight}" fill="${col.hex}"${col.a<1?` fill-opacity="${+col.a.toFixed(2)}"`:''}${ls?` letter-spacing="${+ls.toFixed(2)}"`:''} xml:space="preserve">${esc(l.t)}</text>`, y);
+    });
+  }
+
+  // 3) 그룹별로 묶어 SVG 조립
+  H = Math.ceil(Math.min(H + 24, MAXH));
+  const order = []; const byG = new Map();
+  out.forEach(o => { if (!byG.has(o.g)) { byG.set(o.g, []); order.push(o.g); } byG.get(o.g).push(o.xml); });
+  const bodyBg = rgba(getComputedStyle(document.body).backgroundColor);
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">\n`;
+  svg += `<rect width="100%" height="100%" fill="${bodyBg?bodyBg.hex:'#FFFFFF'}"/>\n`;
+  order.forEach((g,i) => { svg += `<g id="${esc(g).slice(0,60)}">\n` + byG.get(g).join('\n') + `\n</g>\n`; });
+  svg += '</svg>\n';
+  return {svg, w: W, h: H, nodes: out.length, groups: order.length};
+};

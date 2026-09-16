@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>기사 제목 줄 — 언론사 표시 시안</title>
+<style>
+/* ───────── 실제 확정본 CSS(index.html) 그대로 ───────── */
+
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .container {
+    max-width: 800px; margin: 24px auto; padding: 24px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: 8px;
+  }
+  /* [수정: 2026-07-27] 상단 고정 바 — HOME + 다른 두 화면(초안/실시간)으로 바로 이동.
+     🗑️(숨긴 기사 관리)는 하단 고정 바로 옮겼다 — 상단이 3개 내비게이션으로 꽉 차서
+     자리를 따로 뺐다. 이 화면은 file://로 직접 열릴 수도 있어 절대경로(설정 서버
+     주소)를 쓰는 링크가 섞여 있다 — home.html은 같은 폴더의 정적 파일이라 상대경로로도
+     항상 동작한다. */
+  .container { padding-top: 60px; padding-bottom: 56px; }
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    background: #FFFFFF; border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .topbar-inner {
+    max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .topbar a { color: #2563EB; text-decoration: none; font-size: 0.92rem; font-weight: 600; padding: 6px 10px; border-radius: 6px; }
+  .topbar a:hover { background: #EFF6FF; }
+  .bottombar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    background: #FFFFFF; border-top: 1px solid #E5E7EB; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  }
+  .bottombar-inner {
+    max-width: 800px; margin: 0 auto; padding: 10px 24px;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  }
+  .bottombar a { color: #2563EB; text-decoration: none; font-size: 1.1rem; padding: 6px 10px; border-radius: 6px; }
+  .bottombar a:hover { background: #EFF6FF; }
+  /* [추가: 2026-08-03] 하단바 🖍️ — 형광펜 단어를 설정 화면까지 안 가고 이 화면에서
+     바로 추가·삭제할 수 있는 팝오버. 쓰레기통(숨긴 기사 관리) 바로 왼쪽에 둔다. */
+  .highlight-wrap { position: relative; }
+  .highlight-toggle {
+    background: transparent; border: none; color: #6B7280; font-size: 1.1rem; cursor: pointer;
+    padding: 6px 10px; border-radius: 6px;
+  }
+  .highlight-toggle:hover { background: #EFF6FF; }
+  .highlight-popover {
+    display: none; position: absolute; bottom: 100%; right: 0; margin-bottom: 8px;
+    background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); padding: 12px; width: 220px; z-index: 30;
+  }
+  .highlight-popover.is-open { display: block; }
+  .highlight-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .highlight-chip {
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 14px;
+    font-size: 0.82rem; color: #1F2937; cursor: pointer;
+  }
+  .highlight-chip button {
+    background: transparent; border: none; padding: 0; font-size: 0.8rem; cursor: pointer;
+    color: inherit; line-height: 1;
+  }
+  .highlight-empty { color: #6B7280; font-size: 0.8rem; margin: 0 0 8px; }
+  .highlight-add-form { display: flex; gap: 6px; }
+  .highlight-add-form input { flex: 1; font-size: 0.85rem; padding: 5px 8px; min-width: 0; }
+  .highlight-add-form button { font-size: 0.82rem; padding: 5px 10px; white-space: nowrap; }
+  /* [추가: 2026-08-05] 소제목 미니 목차 — 소제목 하나 안에 기사가 많아지면 원하는
+     소제목을 찾으려고 계속 스크롤해야 하는 문제가 있어, 평소엔 숨겨진 버튼(펼침형,
+     사용자가 고정형 대신 선택)을 눌러야만 목차가 나타나게 했다. 화면을 항상 가리지
+     않으면서, 필요할 때 소제목 이름을 눌러 바로 그 위치로 스크롤 이동한다. */
+  /* [수정: 2026-08-10] 원래 accent(파랑) 배경이라 (확정)/(전송) 버튼과 색이 겹쳐
+     헷갈린다는 피드백 — 눈에 안 튀는 중립색(카드 배경+테두리)으로 바꿨다. */
+  .toc-toggle-btn {
+    position: fixed; right: 20px; bottom: 20px; width: 46px; height: 46px; border-radius: 50%;
+    background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; font-size: 1.2rem; cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .toc-toggle-btn:hover { background: #EFF6FF; }
+  /* [추가: 2026-08-10] 확정된 회차를 텔레그램/이메일로 보내는 플로팅 버튼 — ☰ 바로
+     위에 쌓는다. 이모지 없이 텍스트만(사용자 요청), 정원형 유지.
+     색은 app.config COLOR_SEND — 그 값을 왜 그 톤으로 골랐는지는 config 쪽 주석에 있다. */
+  /* [추가: 2026-08-11] ↩ 되돌리기 — 오른쪽 플로팅 버튼들(발송·목차)과 성격이
+     반대인 "취소" 계열이라 사용자 요청대로 화면 왼쪽 아래에 따로 뒀다. 되돌릴 게 있을
+     때만 렌더링한다(항상 떠 있으면 "뭘 되돌리는지" 알 수 없어 오히려 불안하다). */
+  /* [수정: 2026-09-02] 왼쪽 아래는 이제 두 칸짜리 스택이다 — 아래가 쓰레기통(숨긴 기사),
+     위가 ↩ 되돌리기. 수시 수집 결과 화면(.fab.left / .fab.left.upper)과 같은 배치라
+     두 흐름을 오갈 때 같은 자리에 같은 것이 있다. 쓰레기통이 0건이라 안 그려질 때도 ↩는
+     제자리(위 칸)에 둔다 — 숨기기 한 번에 버튼이 아래에서 위로 뛰면 그게 더 불안하다. */
+  .undo-fab {
+    position: fixed; left: 20px; bottom: 88px; width: 50px; height: 50px; border-radius: 50%;
+    background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; font-size: 1.3rem;
+    cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .undo-fab:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .undo-fab:disabled { opacity: 0.5; cursor: progress; }
+
+  /* 좌하단 쓰레기통 — 수시 화면(.fab.left)과 같은 규격. ↩ 되돌리기가 위로 올라간다. */
+  .trash-fab {
+    position: fixed; left: 20px; bottom: 20px; width: 56px; height: 56px; border-radius: 50%;
+    background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12); cursor: pointer; z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .trash-fab:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .trash-fab .badge {
+    position: absolute; top: -3px; right: -3px; background: #DC2626; color: #FFFFFF;
+    font-size: 0.66rem; font-weight: 700; border-radius: 9px; padding: 0 5px; line-height: 1.55;
+  }
+  .trash-pop {
+    display: none; position: fixed; left: 20px; bottom: 88px; width: 336px;
+    background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 11px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16); padding: 12px 14px; z-index: 210;
+  }
+  .trash-pop.is-open { display: block; }
+  .trash-pop h5 {
+    margin: 0 0 3px; font-size: 0.85rem; color: #1E3A5F;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .trash-pop .tnote { font-size: 0.72rem; color: #6B7280; margin: 0 0 4px; line-height: 1.45; }
+  .trash-pop .trow {
+    display: flex; gap: 8px; align-items: center; padding: 8px 0;
+    border-top: 1px solid #F1F5F9; font-size: 0.8rem;
+  }
+  .trash-pop .trow .tx { flex: 1; color: #6B7280; line-height: 1.4; }
+  .trash-pop .trow .tx b { color: #1E3A5F; }
+  .trash-pop .trow .tm { color: #9CA3AF; font-size: 0.7rem; margin-left: 4px; }
+  .trash-pop .cnt {
+    flex: none; font-size: 0.7rem; font-weight: 700; color: #6B7280;
+    background: #F3F4F6; border-radius: 9px; padding: 1px 7px;
+  }
+  .trash-pop .undo-mini {
+    flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem;
+    color: #6B7280; background: transparent; border: 1px solid #E5E7EB; border-radius: 6px;
+    padding: 3px 8px; cursor: pointer; white-space: nowrap;
+  }
+  .trash-pop .undo-mini:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .trash-pop .undo-mini svg { width: 13px; height: 13px; }
+  .trash-pop .more {
+    display: block; text-align: center; margin: 6px -14px -12px; padding: 9px 0 10px;
+    border-top: 1px solid #E5E7EB; font-size: 0.76rem; font-weight: 600;
+    color: #2563EB; text-decoration: none; border-radius: 0 0 11px 11px;
+  }
+  .trash-pop .more:hover { background: #EFF6FF; }
+
+
+  #name-picker-back { position: fixed; inset: 0; z-index: 39; background: rgba(15,23,42,0.12); }
+  #name-picker { position: fixed; top: 13vh; left: 50%; transform: translateX(-50%); z-index: 40;
+    width: 372px; max-width: calc(100vw - 32px); background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: 10px; box-shadow: 0 10px 30px rgba(15,23,42,0.18); padding: 14px 14px 10px; }
+  .np-title { font-size: 0.92rem; font-weight: 700; color: #1E3A5F; margin: 0 0 9px; }
+  #np-input { width: 100%; font: inherit; font-size: 0.95rem; padding: 8px 10px;
+    border: 1px solid #E5E7EB; border-radius: 6px; color: #1F2937; background: #FFFFFF; }
+  #np-input:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 3px #EFF6FF; }
+  #np-input.is-bad { border-color: #DC2626; box-shadow: 0 0 0 3px #FEF2F2; }
+  .np-lead { font-size: 0.76rem; color: #6B7280; margin: 11px 6px 2px; }
+  .np-list { max-height: 250px; overflow-y: auto; margin: 0 -4px; }
+  .np-row { display: flex; align-items: baseline; gap: 8px; width: calc(100% - 8px);
+    margin: 0 4px; padding: 5px 8px; border: none; background: none; border-radius: 5px;
+    font: inherit; text-align: left; cursor: pointer; color: #1F2937; }
+  .np-row:hover { background: #EFF6FF; }
+  .np-row .np-nm { flex: 1; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 볼드 = 담당자가 직접 고치거나 만든 이름. 직접 만든 소제목이 「다른 소제목」 드롭다운·미니
+     목차에서 이미 볼드인 것과 같은 뜻이라 새 표시를 만들지 않고 그 관례를 그대로 이어쓴다. */
+  .np-row.np-mine .np-nm { font-weight: 700; }
+  .np-row .np-when { font-size: 0.73rem; color: #6B7280; white-space: nowrap; }
+  .np-row.np-used { color: #6B7280; cursor: not-allowed; }
+  .np-row.np-used:hover { background: none; }
+  .np-row.np-used .np-nm { text-decoration: line-through; text-decoration-color: #CBD5E1; font-weight: 400; }
+  .np-row .np-tag { font-size: 0.69rem; color: #6B7280; border: 1px solid #E5E7EB;
+    border-radius: 999px; padding: 0 6px; white-space: nowrap; }
+  /* [추가: 2026-09-10] 회차 구분선 — 기본 목록(안 쳤을 때)에만 그린다. 치면 걸린 이름이
+     대개 1~3건인데 서로 다른 회차라 구분선이 이름 수만큼 붙어(실측 '개각' 2건 → 4줄) 줄만
+     두 배가 되고, 그때 담당자가 묻는 건 "몇 회차 것인가"가 아니라 "그 글자가 든 이름이
+     있나"라서다. 줄 오른쪽 .np-when이 이미 회차를 말하므로 같은 말을 두 번 하는 셈이기도 하다. */
+  .np-sep { font-size: 0.72rem; color: #6B7280; margin: 9px 8px 2px; padding-top: 7px;
+    border-top: 1px dashed #E5E7EB; }
+  .np-sep:first-child { border-top: none; padding-top: 0; margin-top: 2px; }
+  .np-hint { color: #6B7280; font-size: 0.75rem; margin: 7px 6px 0; opacity: 0.85; }
+  .np-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    margin-top: 10px; padding-top: 9px; border-top: 1px solid #E5E7EB; }
+  .np-msg { font-size: 0.76rem; color: #6B7280; flex: 1; }
+  .np-msg.bad { color: #DC2626; }
+  .np-msg.new { color: #2563EB; }
+  .np-btns { display: flex; gap: 6px; }
+  .np-btns button { font: inherit; font-size: 0.85rem; padding: 6px 13px; border-radius: 6px; cursor: pointer; }
+  .np-cancel { background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; }
+  .np-ok { background: #2563EB; color: #FFFFFF; border: none; font-weight: 700; }
+  .np-ok:hover { background: #1D4ED8; }
+  .np-ok:disabled { opacity: 0.45; cursor: not-allowed; }
+  .np-key { font-size: 0.72rem; color: #6B7280; text-align: right; margin: 6px 2px 0; }
+
+  .confirm-send-fab {
+    position: fixed; right: 20px; bottom: 80px; width: 56px; height: 56px; border-radius: 50%;
+    background: #15803D; color: #FFFFFF; border: none; font-size: 0.92rem; font-weight: 700;
+    cursor: pointer; box-shadow: 0 4px 12px rgba(21, 128, 61, 0.4); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .confirm-send-fab:disabled { opacity: 0.6; cursor: not-allowed; }
+  /* 확정본 플로팅 버튼 순서(위→아래): 발송 → ☰ (56px 버튼 + 14px 간격 기준 위치 계산). */
+  /* [추가: 2026-08-10] (확정) 직후 잠깐 뜨는 안내 — 화면이 바로 새로고침되므로 애니메이션
+     없이 짧게(0.9초) 보여주기만 한다. */
+  .confirm-toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 300;
+    background: #1E3A5F; color: #FFFFFF; padding: 10px 20px; border-radius: 8px;
+    font-size: 0.9rem; font-weight: 600; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+  /* 카운트다운은 (발송) 버튼(bottom:80) 바로 위 146px에 둔다. */
+  .send-countdown {
+    position: fixed; right: 20px; bottom: 146px; width: 130px; text-align: right;
+    font-size: 0.78rem; font-weight: 700; color: #DC2626; z-index: 200; white-space: nowrap;
+  }
+  /* [추가: 2026-08-10] 담당자가 아니라 시스템이 대신 전송한 회차 표시 — 카운트다운(빨강,
+     경고성)과 다른 맥락이라 회색으로 톤을 낮췄다.
+     [수정: 2026-08-13] 담당자가 직접 (발송)을 눌렀을 때도 같은 자리에 같은 스타일로
+     표시한다(.auto-sent -> .sent-done으로 이름 변경) — 예전엔 자동 발송만 흔적이 남고
+     사람이 누른 건 토스트가 사라지면 아무것도 안 남아서, 새로고침 후 "내가 보냈나?"를
+     확인할 방법이 없었다(재발송 위험). 사람/기계 구분은 색이 아니라 앞머리 이모지
+     (✔️/🤖)가 맡는다 — 둘 다 "이미 끝난 일"이라 색까지 나눌 이유가 없다(사용자 선택).
+     width는 "(2회)" 같은 꼬리표가 붙어도 잘리지 않게 고정값 대신 내용에 맞춘다
+     (fixed 요소 + width:auto = 내용 폭, right:20px 기준으로 왼쪽으로 늘어난다). */
+  .send-countdown.sent-done { color: #6B7280; width: auto; }
+  /* [추가: 2026-08-11] 카운트다운이 0에 닿는 순간 그 자리에서 바로 바뀌는 완료 문구 —
+     "곧 나갑니다"에 가까운 낙관적 표시라, 서버가 실제로 확인해 남기는 회색 배지
+     (.auto-sent)와는 색을 달리해 파란색으로 둔다. */
+  .send-countdown.auto-sent-just-now { color: #2563EB; width: 170px; }
+  /* [추가: 2026-08-12] 이번 회차 소제목 분류가 LLM 실패로 규칙 기반(단어 빈도)에
+     떨어졌을 때 카운트다운 자리에 대신 뜨는 경고 — 자동발송도 이 경우 보류된다
+     (app.confirm_send.check_pending_confirm_and_send). 빨강(.send-countdown 기본색)을
+     그대로 쓴다 — 경고성이라는 점에서 카운트다운과 같은 색이 맞고, width만 문구
+     길이에 맞춘다. */
+  .send-countdown.classification-warning { width: 210px; white-space: normal; line-height: 1.4; }
+  /* [추가: 2026-08-26] 발송 실패 배너 — 위 classification-warning과 같은 이유로 같은
+     빨강(.send-countdown 기본색)을 그대로 쓴다. 채널·대상 줄이 여러 줄일 수 있어
+     조금 더 넓게 잡는다. */
+  .send-countdown.send-failure { width: 260px; white-space: normal; line-height: 1.4; }
+  /* [수정: 2026-08-18] 하단 (취소)/(적용) 바가 스크롤을 따라 밀려나지 않도록,
+     스크롤 영역(.toc-scroll)과 바깥 상자(.toc-popover)를 분리했다 — max-height와
+     padding은 스크롤 영역 쪽으로 옮겼고 상자 자체의 치수는 그대로다. */
+  .toc-popover {
+    display: none; position: fixed; right: 20px; bottom: 74px; width: 200px;
+    background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15); z-index: 200;
+  }
+  .toc-popover.is-open { display: block; }
+  .toc-scroll { max-height: 320px; overflow-y: auto; padding: 8px; }
+  /* [추가: 2026-08-05] 목차 안에서 소제목 순서까지 바로 바꿀 수 있게 항목마다 작은
+     ▲▼를 붙였다 — 이름 클릭(이동)과 화살표 클릭(순서 변경)을 분리해서, 클릭 하나에
+     동작 하나만 대응하도록 했다(선택 후 상단 고정 화살표 방식은 이름 클릭의 기존
+     "이동" 의미와 충돌해서 채택하지 않음). */
+  .toc-row { display: flex; align-items: center; justify-content: space-between; border-radius: 4px; }
+  .toc-row a {
+    flex: 1; min-width: 0; padding: 6px 8px; font-size: 0.85rem; color: #1F2937;
+    text-decoration: none; border-radius: 4px; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .toc-row a:hover { background: #EFF6FF; }
+  .toc-row-btns { display: flex; gap: 1px; flex-shrink: 0; padding-right: 4px; }
+  .toc-order-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 0.72rem; cursor: pointer;
+    padding: 2px 4px; border-radius: 4px;
+  }
+  .toc-order-btn:hover { background: #EFF6FF; }
+  .toc-order-btn:disabled { opacity: 0.3; cursor: default; }
+  /* [추가: 2026-08-05] 방금 순서를 옮긴 항목을 기사의 "방금 승격" 표시와 같은 노란색으로
+     한 번 표시한다 — 팝오버가 새로고침 후 자동으로 다시 열리는 동안, 여러 개를 연달아
+     옮길 때 방금 뭘 옮겼는지 헷갈리지 않게.
+     [수정: 2026-08-18] 이제 ▲▼가 새로고침을 일으키지 않으므로, 이 표시는 (적용)을
+     누를 때까지 계속 남아 "이번에 뭘 옮겼는지"를 누적해서 보여준다. */
+  .toc-row.toc-row-moved { background: #E7EFE8; }
+  .toc-empty { color: #6B7280; font-size: 0.82rem; padding: 6px 8px; }
+  /* [추가: 2026-08-18] 팝오버 하단 확정 바 — 담당자가 "(적용)을 누르기 전까지는 아무것도
+     바뀌지 않았다"고 믿을 수 있어야 하므로, 서버로 나가는 길은 (적용) 하나뿐이다.
+     구조는 .edit-summary-form을 그대로 따랐다(내용 위 / 오른쪽 정렬 액션 아래, 취소가
+     왼쪽·커밋이 오른쪽) — 이 앱에서 유일하게 "즉시 저장이 아닌" 기존 화면이라 관례를
+     새로 만들 이유가 없다. 바꾼 게 없으면 아예 나타나지 않는다(.undo-fab이 되돌릴 게
+     있을 때만 뜨는 것과 같은 원칙). */
+  .toc-foot {
+    display: none; flex-direction: column; gap: 6px;
+    padding: 8px; border-top: 1px solid #E5E7EB;
+    background: #FFFFFF; border-radius: 0 0 8px 8px;
+  }
+  .toc-foot.is-dirty { display: flex; }
+  .toc-dirty-count { font-size: 0.76rem; color: #6B7280; }
+  .toc-foot-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .toc-foot-actions button { font-size: 0.78rem; padding: 5px 12px; border-radius: 5px; cursor: pointer; }
+  .toc-cancel-btn { background: transparent; color: #6B7280; border: 1px solid #E5E7EB; }
+  .toc-cancel-btn:hover { background: #EFF6FF; }
+  .toc-apply-btn { background: #2563EB; color: #FFFFFF; border: none; font-weight: 700; }
+  .toc-apply-btn:hover { background: #1D4ED8; }
+  .toc-foot-actions button:disabled { opacity: 0.6; cursor: progress; }
+  /* 미확정 상태에서 팝오버를 닫으려 하면 닫지 않고, 어디서 결정해야 하는지만 가리킨다.
+     경고음·모달·confirm() 없이 기존 #EFF6FF색으로 두 번 깜빡이기만 한다 — 실수가 아니라
+     아직 안 끝난 것뿐이라 겁을 줄 이유가 없다. 새 색은 만들지 않는다. */
+  @keyframes toc-nudge { 0%, 100% { background: #FFFFFF; } 25%, 75% { background: #EFF6FF; } }
+  .toc-foot.nudge { animation: toc-nudge 0.5s ease-in-out; }
+  /* [추가: 2026-07-30] app.preview_renderer와 동일한 체크박스 일괄이동 바 —
+     평소엔 숨어있다가 체크박스를 선택하면 왼쪽에 나타나고, 🗑️는 그대로 오른쪽에 남는다. */
+  .bulk-move-bar { display: none; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.85rem; }
+  .bulk-move-bar.is-active { display: flex; }
+  .bulk-move-bar .bulk-move-count { font-weight: 600; color: #1E3A5F; white-space: nowrap; }
+  #bulk-move-select {
+    border: 1px solid #2563EB; border-radius: 4px; padding: 5px 8px; font-size: 0.85rem;
+    color: #1F2937; background: #FFFFFF;
+  }
+  .bulk-move-bar button { padding: 5px 12px; font-size: 0.85rem; }
+  /* [추가: 2026-08-04] 일괄 위/아래 이동 버튼 — 선택한 기사가 서로 다른 소제목에
+     걸쳐 있거나 소제목의 맨 위/아래에 닿으면 비활성화된다(updateBulkMoveBar). */
+  #bulk-move-up, #bulk-move-down { padding: 5px 10px; }
+  #bulk-move-up:disabled, #bulk-move-down:disabled { opacity: 0.35; cursor: not-allowed; }
+  .bulk-move-bar .clear-btn { background: transparent; color: #6B7280; }
+  .bulk-move-bar .clear-btn:hover { background: #EFF6FF; }
+  .article-select { margin-top: 3px; flex-shrink: 0; }
+  .group-move-select {
+    flex-shrink: 0; width: 100px; border: 1px solid #E5E7EB; border-radius: 4px;
+    padding: 2px 4px; font-size: 0.78rem; color: #6B7280; background: #FFFFFF;
+  }
+  /* [추가: 2026-08-04] 소제목별/시간순/언론사순 보기 전환 — 실제 소제목 구성은 그대로
+     두고 화면에 나열하는 순서만 바꾸는 용도라, 다른 액션 버튼과 톤을 맞추되 select임을
+     알 수 있게 테두리를 살짝 강조한다. */
+  .view-mode-select {
+    border: 1px solid #2563EB; border-radius: 6px; padding: 6px 10px; font-size: 0.85rem;
+    color: #1F2937; background: #FFFFFF;
+  }
+  /* [수정: 2026-08-04] 기사가 없을 때만 걸리던 점선 테두리를, 사용자가 직접 만든
+     소제목이면 기사가 있어도 계속 유지되도록 바꿨다(.subheading-empty -> .subheading-custom)
+     — 자동 분류 소제목과 구분되도록, 아이콘 대신 색을 진한 하늘색으로 키워 눈에 더
+     잘 띄게 했다(사용자 피드백: 아이콘은 소제목이 길면 놓치기 쉽지만 테두리는 카드
+     전체를 감싸 계속 보인다). */
+  /* [수정: 2026-08-05] 빈 여백이 너무 넓어 보인다는 피드백 — 패딩을 줄였다. 사실 가장
+     큰 원인은 아래 .subheading h2 쪽 브라우저 기본 margin이었다(같이 수정). */
+  .subheading-custom { border: 2px dashed #7DD3FC; border-radius: 8px; padding: 8px 16px; }
+  .empty-group-hint { color: #6B7280; font-size: 0.85rem; margin: 6px 0 0; }
+  header h1 { font-size: 1.4rem; margin: 0; color: #1E3A5F; }
+  /* [추가: 2026-08-10] "지난 기사"는 복사·다운로드 같은 이 화면의 액션이 아니라 다른
+     화면으로 이동하는 링크라 툴바에서 빼고 제목 옆(내비게이션 자리)으로 옮겼다
+     (시안 A, 사용자 선택) — 회색 톤으로 제목보다 눈에 덜 띄게 둔다. */
+  .header-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+  .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  /* [추가: 2026-08-12] app.preview_renderer.py와 동일한 이유 — 🤖 이모지가 든 버튼만
+     색이모지 글꼴의 line-height 때문에 다른 버튼보다 박스가 커 보이는 문제가 있어
+     height를 고정값으로 못박는다. */
+  .actions button, .actions a.btn { height: 32px; box-sizing: border-box; }
+  /* [추가: 2026-08-10] 정렬 보기 방식(소제목별/시간순 등)은 복사·다운로드·소제목 만들기
+     같은 액션이 아니라 표시 옵션이라, 툴바 맨 오른쪽으로 분리했다(사용자 선택 — 붙여
+     두면 그냥 버튼 하나처럼 섞여 구분이 안 된다는 피드백). margin-left: auto로 같은 줄
+     안에서만 밀어내며, select 자체는 내용만큼만 짧게 유지한다(폭 지정 없음). */
+  .actions .view-mode-select { margin-left: auto; }
+  /* [수정: 2026-08-03] button 태그는 브라우저 기본 스타일상 body의 font-family를 물려받지
+     않아(a 태그와 달리) 지금까지 Arial 등 시스템 기본체로 렌더링되고 있었고, appearance:
+     auto(네이티브 OS 버튼 껍데기)까지 남아있어 폰트를 맞춰도 렌더링이 미묘하게 달랐다 —
+     font-family: inherit·appearance: none으로 고쳤는데도 "txt로 저장"(a 태그)만 여전히
+     글자 위치가 달라 보인다는 세 번째 재지적으로, 크롬이 button 태그 텍스트는 내부적으로
+     수직 중앙 정렬해주지만 a 태그는 그런 처리가 없다는 걸 마지막으로 발견 — align-items:
+     center를 직접 지정해 브라우저 기본 동작에 기대지 않고 두 태그를 완전히 동일하게 그린다. */
+  button, a.btn {
+    background: #2563EB; color: #FFFFFF; border: none; border-radius: 4px;
+    padding: 6px 14px; font-size: 0.9rem; font-family: inherit; cursor: pointer; text-decoration: none;
+    appearance: none; -webkit-appearance: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    user-select: none; -webkit-user-select: none;
+  }
+  button:hover, a.btn:hover { background: #1E3A5F; }
+  /* [수정: 2026-08-03] 화면 상단 액션 툴바(복사·txt로 저장·Telegram 전송·지난 기사)만
+     "정직한 파란색" 원색 채움 대신 톤온톤 소프트 필로 — 디자인 시안 B안(사용자 선택).
+     .actions button 쪽이 위 전역 button 규칙보다 더 구체적이라(class+element > element)
+     이 툴바 안에서만 덮어쓰고, 🗑️/↑/↓ 등 다른 버튼은 그대로 원색 유지. */
+  .actions button, .actions a.btn {
+    background: #EFF6FF; color: #2563EB; font-weight: 600; border-radius: 8px;
+  }
+  .actions button:hover, .actions a.btn:hover { background: #EFF6FF; }
+  /* [수정: 2026-08-03] "+ 새 소제목 만들기"만 나머지 툴바 버튼과 기능이 달라(내용을
+     내보내는 게 아니라 새 그릇을 만드는 것) 시안 A(고스트 아웃라인)로 유일하게 다르게
+     둔다 — .actions .create-group-btn이 위 .actions button보다 구체적이라(class 2개)
+     덮어쓴다. */
+  .actions .create-group-btn {
+    background: transparent; color: #2563EB; border: 1px solid #BFDBFE;
+    border-radius: 6px; font-weight: 400;
+  }
+  .actions .create-group-btn:hover { background: #EFF6FF; border-color: #A9C6F5; }
+  /* [추가: 2026-08-11] 확정본 "🤖 전체 기사 재분류" 버튼 — 왼쪽 그룹 맨 끝(구분선 뒤)에 둔다.
+     [수정: 2026-08-12] 처음엔 채운 연보라였는데, 초안에 같은 기능의 버튼("전체 기사
+     재분류")을 고스트(테두리만)로 만들면서 화면마다 같은 버튼이 다르게 생기는 문제가
+     생겼다(사용자 지적, 스크린샷으로 비교) — **파괴적 동작은 어느 화면에서든 채우면
+     안 된다**는 원칙에 맞춰 확정본도 고스트로 통일했다. 자세한 이유는
+     app/preview_renderer.py의 같은 자리 주석 참고. */
+  .actions-divider { width: 1px; height: 26px; background: #E5E7EB; margin: 0 2px; }
+  /* [수정: 2026-08-26] 고스트(테두리만) → "AI 기사 배정"과 같은 채운 연보라. 사용자 결정 —
+     app/preview_renderer.py의 .reclassify-btn과 같은 이유·같은 배색이라 두 화면이 계속
+     같은 모양을 유지한다. 파괴적이라는 신호는 아이콘(새로고침)과 항상 뜨는 confirm()이 맡는다. */
+  .actions .regen-btn {
+    position: relative; background: #F0EAFB; color: #4A3F8F; border: 1px solid #DCD0F2;
+  }
+  .actions .regen-btn:hover { background: #E7DBFA; border-color: #CBB8ED; }
+  .actions .regen-btn:disabled { opacity: 0.5; cursor: progress; }
+  /* [추가: 2026-08-11] AI가 만든 소제목 표식. 화면 전용이며, 소제목 이름 문자열과
+     완전히 분리된 별도 span이라 복사/다운로드/발송 텍스트에는 절대 따라가지 않는다. */
+  .ai-badge { margin-left: 6px; font-size: 0.8rem; opacity: 0.75; vertical-align: middle; }
+  /* [추가: 2026-08-20] 소제목별 기사 건수 칩 — 이름 바깥 별도 span(복사/다운로드/발송
+     텍스트에 안 새게). 📂 미분류의 빨간 unclassified-count와 같은 모양·중립 회색이라
+     "빨강=처리할 것 / 회색=그냥 정보"로 구분된다. */
+  .subheading-count {
+    margin-left: 6px; font-size: 0.75rem; font-weight: 700; color: #6B7280;
+    background: #F3F4F6; border-radius: 999px; padding: 1px 8px;
+  }
+  /* 헤더의 회차 전체 기사 건수 칩 — 같은 이유로 h1 옆 별도 span. */
+  .total-count-badge {
+    margin-left: 8px; font-size: 0.78rem; font-weight: 700; color: #6B7280;
+    background: #F3F4F6; border-radius: 999px; padding: 2px 10px; vertical-align: middle;
+  }
+  /* 임시 보관함(아직 분류 안 된 기사) 제목 — 소제목이 아니라 대기실이라는 게 읽히도록
+     꺾쇠 없이 회색 기울임꼴로, 확정된 소제목들과 시각적으로 확실히 구분한다. */
+  /* [수정: 2026-08-26] font-style: italic 제거 — app/preview_renderer.py의 같은 자리와
+     동일한 이유(옆 건수 칩·버튼과 밑줄이 안 맞아 한 줄로 안 읽힘). */
+  .unclassified-title { color: #6B7280; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 5px; }
+  /* [수정: 2026-08-21] 빨강 → 앰버(주의 세트) — app.preview_renderer의 같은 배지와
+     동일한 이유(이 화면도 [단독]/[속보] 빨강과 겹친다)로 같이 맞춘다. */
+  .unclassified-count {
+    margin-left: 4px; font-style: normal; font-weight: 700; font-size: 0.8rem;
+    color: #92400E; background: #FEF3C7; border-radius: 999px; padding: 1px 8px;
+  }
+  .subheading { margin-top: 28px; }
+  /* [수정: 2026-08-05] h2 브라우저 기본 margin(위아래 약 15px)이 빈 소제목 카드를 실제
+     내용보다 훨씬 커 보이게 만드는 주범이었다 — margin을 직접 지정해 제거. 겸사겸사
+     ✏️/🗑️/↑↓를 제목 바로 옆이 아니라 줄 오른쪽 끝에 붙이고 싶다는 요청도 이 flex로
+     함께 해결(왼쪽 = 제목, 오른쪽 = 아이콘 묶음). 기사 한 줄(.article summary)은 반대로
+     "짧은 제목 뒤 버튼이 화면 끝까지 멀어지는" 문제 때문에 flex-start를 의도적으로 쓰고
+     있어 그대로 둔다 — 소제목 헤더와 기사 한 줄은 서로 다른 문제라 같은 답을 쓰지 않는다. */
+  .subheading h2 {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    font-size: 1.1rem; color: #1E3A5F; border-bottom: 1px solid #E5E7EB;
+    margin: 0 0 6px; padding-bottom: 6px;
+  }
+  .subheading-title { display: flex; align-items: center; gap: 4px; min-width: 0; }
+  .subheading-icons { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+  .rename-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 0.9rem; cursor: pointer;
+    vertical-align: middle; user-select: none; -webkit-user-select: none;
+  }
+  /* [추가: 2026-08-13] 소제목 🗑️(빈 소제목 삭제·소제목 통째로 숨기기)는 ✏️(이름
+     바꾸기)와 같은 .rename-btn을 공유해 hover 색이 없었다 — 파괴력이 다른 두 액션이
+     같은 무반응 회색이라 어색하다는 지적으로, 기사 단위 🗑️(.hide-btn:hover)와 같은
+     빨강을 이 아이콘에만 추가한다(✏️는 그대로 무채색 유지). */
+  .rename-btn.group-hide-btn:hover { color: #DC2626; }
+  /* [추가: 2026-08-03] 소제목 순서 조정 버튼 — 기사용 .move-btn과 같은 톤이되 소제목
+     헤더 안에 있어 별도 클래스로 둔다. */
+  /* [수정: 2026-08-05] 기사 ↑/↓(.move-btn)과 가로폭이 안 맞아서 나란히 보면 좁아 보였다
+     — 패딩·글자 크기를 .move-btn과 통일했다. */
+  /* [수정: 2026-08-13] 소제목 순서 버튼을 ↑↓에서 ▲▼로 바꿨다 — 기사 순서 버튼(.move-btn)과
+     글리프·색·크기까지 똑같아서 "뭘 옮기는 버튼인지"가 위치로만 구분됐고, 정작 같은 일을
+     하는 목차 팝오버 버튼(.toc-order-btn)은 이미 ▲▼여서 오히려 그쪽과 어긋나 있었다.
+     이제 삼각형=소제목 / 화살표=기사로 대상이 형태만 보고 구분된다.
+     ▲▼는 같은 크기에서 ↑↓보다 크고 무겁게 보여 font-size를 1rem에서 낮춰 균형을 맞춘다. */
+  .order-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 0.78rem; cursor: pointer;
+    vertical-align: middle; padding: 2px 6px; user-select: none; -webkit-user-select: none;
+  }
+  .order-btn:disabled { opacity: 0.35; cursor: default; }
+  .article { margin: 10px 0; line-height: 1.5; padding: 6px 8px; border-radius: 8px; }
+  /* [추가: 2026-08-20] [단독] 기사는 카드 자체를 강조한다(빨강 좌측바 + 연빨강 배경) —
+     담당자 지목: "단독이 가장 중요"이므로 글자색 하나로는 [속보]가 여러 건 나올 때
+     묻힐 수 있다(개수와 무관하게 항상 덩어리로 먼저 보이게). 다른 상태 배경(hover·
+     체크됨·새로 왔다·AI 마감 배정·방금 이동/승격)보다 **먼저** 선언해 가장 낮은
+     우선순위를 준다 — 저 상태들은 전부 "지금 이 순간의 정보"라 "이 기사는 원래
+     중요하다"는 이 배경보다 항상 이겨야 한다(기존 우선순위 원칙과 동일한 방향).
+     app.filters.headline_kind로 판정, app.live_renderer의 .t-scoop/.t-flash와 같은
+     팔레트를 쓴다. */
+  .article.art-scoop { background: #FEF2F2; border-left: 3px solid #DC2626; padding-left: 9px; }
+  .t-scoop { color: #B91C1C; font-weight: 800; }
+  .t-flash { color: #B91C1C; font-weight: 600; }
+  /* [추가: 2026-08-05] 마우스를 올린 기사 줄을 연한 회색으로 표시해 긴 목록에서도 지금
+     어느 줄을 보고 있는지 놓치지 않게 한다. 체크 표시(#EFF6FF, 파란색)·방금 승격
+     표시(노란색)와 겹치지 않는 중립적인 회색을 골랐다 — 이 규칙을 :has(체크됨) 규칙보다
+     먼저 둬서, 체크된 채로 마우스를 올려도 "체크됨" 파란색이 우선 보이게 한다(체크는
+     능동적으로 선택한 상태라 스쳐 지나가는 마우스 오버보다 우선순위가 높아야 한다). */
+  .article:hover { background: #F3F4F6; }
+  /* [추가: 2026-08-21] 사진 추정 기사는 지우지 않고 행 전체를 흐리게 해 "훑을 때는
+     건너뛰고, 확인하고 싶으면 마우스를 올리거나 체크한다"를 표현한다. opacity는
+     background와 다른 속성이라 위/아래 배경색 규칙과 순서 다툼이 없다 — 어떤 배경이
+     깔리든 그 위에 흐림만 얹힌다. 마우스 오버·체크 상태에선 다시 또렷해져, "지금
+     내가 보고 있거나 고른 것"까지 흐려 보이지 않게 한다. */
+  .article.is-photo { opacity: 0.55; }
+  .article.is-photo:hover, .article.is-photo:has(.article-select:checked) { opacity: 1; }
+  /* [추가: 2026-08-03] 일괄 이동용 체크박스를 켠 기사는 연한 배경으로 표시해 "지금
+     뭘 골랐는지" 스크롤하면서도 바로 보이게 한다 (디자인 시안 A, 사용자 선택) —
+     자바스크립트 변경 없이 :has()만으로 동작. */
+  .article:has(.article-select:checked) { background: #EFF6FF; }
+  /* [추가: 2026-08-13] 지난번 이 회차를 봤을 때는 없다가 새로 들어온 기사 — 초안에만
+     있던 표시(app.preview_renderer .is-new-arrival)를 확정본에도 그대로 들여왔다.
+     확정본은 저장된 스냅샷이라 "새 기사가 없다"고 생각하기 쉽지만, 실제로는 📌 담아둔
+     기사 승격·초안에서 예약해둔 기사 합류로 회차 도중에도 늘어난다 — 그게 소제목 안에
+     아무 표시 없이 섞여 들어가 못 찾겠다는 피드백. 색·의미 모두 초안과 동일한 옅은
+     노랑이다(🤖가 움직인 결과인 연보라와는 다른 축 — 이건 "그냥 새로 왔다"는 정보).
+     .just-promoted/.just-moved보다 **먼저** 선언해, 겹칠 때 그쪽이 이긴다: "새로 왔다"는
+     화면을 열 때마다 판정되는 배경 정보고, 저 둘은 방금 내 조작의 결과라 더 급하다.
+     [메모: 2026-09-04] 이 기준선은 📌 담아둔 기사 구획의 행까지 담으므로(그 구획도 같은
+     render_article로 그려져 .article[data-url]이다), **승격은 이 노랑을 유발하지 않는다** —
+     노랑이 붙는 건 담아두기로 그 행이 화면에 처음 생길 때다. 승격 직후 색은 초록이다. */
+  .article.is-new-arrival { background: #FFF9C4; }
+  /* [추가: 2026-08-20] 초안 마감 시점에 방금 자동으로 소제목에 배정된 기사 — 담당자가
+     못 본 사이 AI가 대신 판단해 붙인 것이라 "새로 왔다"(노랑)보다 더 구체적이고 급한
+     정보다. is-new-arrival보다 뒤에 선언해 겹칠 때(거의 항상 겹친다 — 마감 시 새로
+     들어온 기사는 대개 이번이 처음 보는 회차라 새-도착 기준선에도 안 걸려 있다) 이
+     보라색이 이긴다. 다만 just-promoted/just-moved(내가 방금 조작한 결과)보다는
+     앞에 둬 그쪽이 최종 우선한다 — "내 조작"이 "AI가 마감 때 한 일"보다 급하다는
+     기존 원칙(.is-new-arrival 주석)을 그대로 잇는다. border-left는 배경색이 나중
+     규칙에 덮여도(같은 속성이 아니므로) 계속 남아 "이 기사는 그 배정 대상"이라는
+     표식이 사라지지 않는다 — 음영은 담당자가 손대도 계속 남아야 한다(사용자 확인). */
+  .article.finalize-added {
+    border-left: 3px solid #A78BFA; padding-left: 11px;
+  }
+  /* [수정: 2026-08-27] 배경 음영만 별도 클래스로 뗐다 — 배너의 "확인했어요"를 누르면
+     JS가 이 클래스만 걷어내고, 왼쪽 보라 선·🤖 배지는 그대로 남긴다("봤다"는 표시는
+     하되 "어떤 기사였는지"는 계속 알아볼 수 있어야 한다 — 사용자 결정). 선언 위치는
+     예전 그대로라 is-new-arrival(노랑)과의 우선순위도 그대로이고, 음영을 걷어낸
+     뒤에야 그 노랑이 드러난다. */
+  .article.finalize-added-bg { background: #F0EAFB; }
+  .article.finalize-added.is-focused { outline: 2px solid #A78BFA; outline-offset: 2px; }
+  .finalize-added-badge {
+    flex-shrink: 0; padding: 1px 7px; border-radius: 999px; font-size: 0.7rem; font-weight: 700;
+    background: #FFFFFF; color: #4A3F8F; border: 1px solid #DCD0F2; white-space: nowrap;
+    position: relative; top: -0.15em;  /* [수정: 2026-08-21] 제목보다 글자가 작은 알약이라 baseline 정렬만으론 약간 아래로 보인다(실측: 위 여백 +1px, 아래 -2.3px) — 반 칸(0.15em) 올려 제목 글자 높이 한가운데에 맞춘다. */
+  }
+  /* h2 옆 — 마감 시점에 이름 자체가 새로 생긴 소제목. */
+  .new-subheading-badge {
+    font-size: 0.68rem; font-weight: 700; padding: 2px 7px; border-radius: 999px;
+    background: #F0EAFB; color: #4A3F8F; border: 1px solid #DCD0F2; white-space: nowrap;
+    margin-left: 4px; vertical-align: middle;
+  }
+  /* [추가: 2026-08-20] 확인 배너 — 초안의 round-over-banner(마감 알림)와 같은 자리·형태,
+     색만 AI 전용 연보라로 바꿨다. 자동 배정된 기사가 있을 때만 서버가 렌더링하고,
+     JS가 이 회차에서 이미 "확인했어요"를 눌렀는지(localStorage)를 보고 보일지 정한다. */
+  .finalize-banner {
+    display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 21;
+    background: #F4EFFC; border-bottom: 1px solid #DCD0F2;
+  }
+  .finalize-banner.is-visible { display: block; }
+  .finalize-banner-inner {
+    max-width: 800px; margin: 0 auto; padding: 11px 24px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .finalize-banner .msg { flex: 1; min-width: 200px; font-size: 0.86rem; color: #4A3F8F; }
+  .finalize-banner .msg b { color: #372C6E; }
+  .finalize-banner .go {
+    background: #1E3A5F; color: #FFFFFF; border: none; border-radius: 6px;
+    padding: 8px 14px; font-size: 0.84rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+  }
+  .finalize-banner .go:hover { background: #16304D; }
+  .finalize-banner .dismiss {
+    background: transparent; border: none; color: #7C6FA8; font-size: 0.82rem;
+    cursor: pointer; text-decoration: underline; padding: 4px;
+  }
+  /* 배너가 뜨면 그만큼 topbar와 본문을 아래로 밀어 겹치지 않게 한다(높이는 JS가 실측). */
+  body.has-finalize-banner .topbar { top: var(--finalize-banner-h, 0px); }
+  body.has-finalize-banner .container { margin-top: calc(24px + var(--finalize-banner-h, 0px)); }
+  /* [추가: 2026-08-05, 수정: 2026-09-04] "📌 담아둔 기사"에서 승격시킨 기사가 자동분류
+     목록 어디에 들어갔는지 한눈에 안 보여서, 새로고침 직후 딱 한 번 표시한다(체크박스
+     선택 배경색#EFF6FF과는 다른 색이어야 두 상태가 헷갈리지 않는다 — 승격은 "방금 옮김",
+     체크는 "지금 선택 중"으로 의미가 다르다).
+     색은 노랑(row_new)에서 이동 색(row_moved)으로 옮겼다 — 노랑은 "이 화면에서 처음 보는
+     기사"인데 📌 구획은 승격 전부터 같은 화면 아래에 떠 있고(드롭다운이 그 구획 안에 있어
+     안 볼 수가 없다), 아래 is-new-arrival 기준선도 .article[data-url] 전부를 담아 승격된
+     기사를 이미 "새 도착 아님"으로 판정한다. 앱 자신의 판정과 어긋나는 색이었다. */
+  .article.just-promoted { background: #E7EFE8; }
+  /* [수정: 2026-08-05] 노란색은 이미 초안 화면의 "새로 도착한 기사"(.is-new-arrival)
+     표시에 쓰이고 있어 — 순서를 옮긴 기사까지 같은 노란색을 쓰면 서로 다른 의미가 한
+     색으로 겹쳐 헷갈린다는 피드백. 순서 이동 전용으로 연두색을 새로 뺐다(기존 팔레트의
+     형광펜용 라임색 #C6FF00과도 톤이 달라 헷갈리지 않는다).
+     [수정: 2026-09-04] 승격(.just-promoted)도 이 색으로 합류했다 — 둘 다 "내가 방금
+     만진 결과가 어디 갔나"라는 같은 질문에 답한다(위 주석 참고). */
+  .article.just-moved { background: #E7EFE8; }
+  /* [수정: 2026-08-13] summary를 1행(제목이 게시시각·액션 묶음과 폭을 다투던 flex 한
+     줄)에서 2행으로 나눴다 — 제목이 대부분 2~3줄로 꺾이던 문제(실측: 액션 묶음이
+     카드 폭의 약 40%를 고정 점유) 때문. 1행(.title-row)은 체크박스+제목이 카드 전체
+     폭을 쓰고, 2행(.action-row)은 게시시각(좌)+액션 묶음(우)이다. */
+  .article summary {
+    cursor: pointer; display: flex; flex-direction: column; gap: 4px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .article summary::marker { color: #6B7280; }
+  /* [수정: 2026-07-30, 유지: 2026-08-13] 🗑️를 제목 바로 옆(정확히는 같은 카드의 2행)에
+     둔다 — 예전엔 하단 footer에 있어 요약을 펼치면 제목에서 멀어져 어떤 버튼이 어떤
+     기사 것인지 헷갈렸다. */
+  .title-row { display: flex; align-items: baseline; justify-content: flex-start; gap: 8px; }
+  /* [수정: 2026-08-13] 원문보기·복사하기가 액션 묶음에 추가되며 좁은 화면(모바일)에서
+     한 줄에 다 안 들어가 옆으로 45px가량 넘치던 문제(실측) — action-row와 그 안의
+     article-actions 둘 다 wrap을 허용해, 안 들어가면 액션 묶음이 통째로 다음 줄로
+     내려가고(그래도 안 들어가면 아이콘 단위로 더 줄바꿈) 오른쪽 정렬은 유지된다. */
+  .action-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 4px; }
+  /* [추가: 2026-08-07] 모바일 사파리에서 제목(summary)을 눌러 펼치면 그 뒤로 제목 글자가
+     보라색으로 바뀌어 보인다는 제보 — 이 앱 CSS가 지정한 색이 아니라, 사파리가 탭할 때
+     보여주는 하이라이트 효과(-webkit-tap-highlight-color)가 제대로 안 지워지고 남는
+     것으로 보인다(iOS 사파리에서 종종 나타나는 현상). 색을 투명 처리해 아예 안 나타나게
+     막는다. */
+  .title-line { min-width: 0; overflow-wrap: anywhere; color: #1F2937; -webkit-tap-highlight-color: transparent; }
+  /* [수정: 2026-08-05, 2026-08-13] 다른 소제목/원문보기/복사하기/⋯/🗑️/↑↓ 묶음은
+     margin-left: auto로 2행(.action-row) 오른쪽 끝에 고정 — 표 형태처럼 항상 같은
+     자리에 있어야 여러 기사를 훑을 때 클릭 위치가 안 흔들린다. 게시시각은 왼쪽에
+     그대로 둔다. */
+  .article-actions {
+    margin-left: auto; display: flex; align-items: center; justify-content: flex-end;
+    gap: 4px; flex-shrink: 0; flex-wrap: wrap; row-gap: 4px;
+  }
+  /* [수정: 2026-08-21] 표식 없는 사진기사 추정 배지 — app.live_renderer의 실시간현황과
+     같은 "아이콘+문구" 칩·같은 채도 낮은 모래색으로 맞췄다(전에는 제목 줄이 빡빡하다는
+     이유로 아이콘만 썼는데, 사진기사 제외 설정을 기본 끔으로 바꾸며 이 배지가 흔히
+     보이게 됐으니 문구가 바로 읽혀야 한다). */
+
+  /* [추가: 2026-09-03] "앞 회차 기사" 칩 — 회차 마감 순간 네이버 검색이 아직 안 주던
+     기사를 다음 회차가 주워 담았을 때 붙는다(app.scraper.collect_run의 late_pickup,
+     [추가: 2026-09-04] app.preview_renderer._compute_preview_articles의 같은 표식).
+     자리는 제목 줄이 아니라 메타 줄이다 — 제목 줄엔 이미 🤖 "마감 후 자동 배정" 배지가
+     붙고, 회수된 기사는 그 회차에서 처음 보는 기사라 거의 항상 그 배지도 함께 단다.
+     두 표시가 서로 다른 줄을 쓰면 border-left(연보라 띠)를 두고 다툴 일이 없다.
+     그래서 이 표시에는 왼쪽 띠를 주지 않는다 — 띠는 "훑을 때 덩어리로 보이는" 자리라
+     하나만 써야 하고, "AI가 소제목을 대신 정했다"가 담당자가 손볼 일이 더 크다.
+     색은 상단 배너와 같은 "주의"(앰버) 계열이라, 배너에서 [N건]을 눌러 내려왔을 때
+     같은 색이 눈에 들어와 "배너가 말한 게 이거"로 이어져 읽힌다. */
+  .late-badge {
+    flex-shrink: 0; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 0.72rem;
+    color: #92400E; background: #FEF3C7; border: 1px solid #FDE68A; white-space: nowrap;
+  }
+
+  /* 상단 안내 배너 — 초안의 "AI 분류 실패" 상자와 같은 자리(기사 목록 위 흐름 안).
+     회차 마감 배너처럼 화면 상단에 고정하지 않는다: 그건 "지금 하는 작업이 헛수고"라는
+     급한 경고라 그렇게 한 것이고, 이건 그 정도가 아니다. 회수가 0건이면 서버가 이
+     배너를 아예 안 그린다(0건이면 안 그린다 — 📂 미분류 배지·📷 사진 추정 버튼과 같은
+     원칙. 늘 떠 있는 안내는 곧 안 읽히는 안내가 된다). */
+  .late-banner {
+    margin: 0 0 14px; padding: 11px 16px; border-radius: 8px;
+    background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .late-banner .msg { flex: 1; min-width: 220px; font-size: 0.86rem; line-height: 1.5; }
+  .late-banner .cnt {
+    font-family: inherit; font-weight: 800; font-size: 0.86rem; cursor: pointer;
+    border: 1px solid #FDE68A; border-radius: 6px; padding: 2px 9px;
+    background: #FEF3C7; color: #92400E;
+  }
+  .late-banner .cnt:hover { background: #FFFFFF; }
+  .late-banner .q {
+    border: 1px solid #FDE68A; background: #FFFFFF; color: #92400E;
+    border-radius: 6px; padding: 2px 7px; font-size: 0.8rem; cursor: help; line-height: 1.4;
+  }
+  .photo-badge {
+    flex-shrink: 0; padding: 1px 7px; border-radius: 999px; font-size: 0.72rem;
+    color: #6B7280; background: #F3F4F6; border: 1px solid #E5E7EB; white-space: nowrap;
+    position: relative; top: -0.15em;  /* [수정: 2026-08-21] 제목보다 글자가 작은 알약이라 baseline 정렬만으론 약간 아래로 보인다(실측: 위 여백 +1px, 아래 -2.3px) — 반 칸(0.15em) 올려 제목 글자 높이 한가운데에 맞춘다. */
+  }
+  .article-summary { margin: 6px 0 4px 20px; color: #1F2937; font-size: 0.95rem; }
+  /* [수정: 2026-08-13] URL 밑줄 텍스트를 화면에서 없애며(.url 클래스 폐기, "원문보기"
+     아이콘으로 대체) footer엔 이제 extra_buttons_html(담아둔 기사의 승격 조작)만
+     남는다 — 대부분의 기사에선 이 div가 비어 렌더된다(높이 0, 무해). */
+  .article-footer { display: flex; align-items: center; gap: 8px; }
+  /* [수정: 2026-07-30] "이미 확인함" 표시를 브라우저에 영구 기억(localStorage)하는 대신,
+     "지금 펼쳐서 보고 있는 기사"에만 실시간으로 적용한다 — 예전 방식은 클릭했던 기사가
+     전부 보라색으로 남아 화면이 정신없어진다는 피드백에 따른 변경. details가 열려있는
+     동안에만 :has()로 색을 입히므로(자바스크립트 불필요), 닫거나 다른 기사를 열면 이
+     기사는 자동으로 원래 색으로 돌아간다. */
+  /* [수정: 2026-08-21] 색(남색) 대신 opacity로 — 화면에 남는 파랑이 전부 "누를 수
+     있는 것"이 되도록, 상태 표시는 색이 아닌 밝기로만 준다. */
+  .article:has(details[open]) .title-line { opacity: 0.62; }
+  /* [수정: 2026-08-03] 게시 시각은 복사/내보내기 텍스트(_build_plain_text)에는 원래도
+     포함되지 않지만, 화면에서 마우스로 직접 드래그해 복사할 땐 화면에 보이는 대로
+     같이 딸려왔다 — user-select: none으로 이 부분만 드래그 선택 자체가 안 되게 한다
+     (화면 표시는 그대로 유지, 클립보드에만 안 실림). */
+  .pub-time {
+    flex-shrink: 0; color: #6B7280; font-size: 0.8rem; white-space: nowrap;
+    user-select: none; -webkit-user-select: none;
+  }
+  .move-btn, .hide-btn, .copy-btn {
+    flex-shrink: 0; background: transparent; border: none; color: #6B7280; font-size: 1rem;
+    cursor: pointer; padding: 2px 6px; user-select: none; -webkit-user-select: none;
+  }
+  .move-btn:disabled { color: #E5E7EB; cursor: not-allowed; }
+  .hide-btn:hover { color: #DC2626; }
+  /* [수정: 2026-08-14] 원문보기를 아이콘 묶음에서 빼내 게시시각 옆 텍스트 링크로
+     옮겼다 — ↗(원문보기)와 복사 아이콘이 17px 크기에선 둘 다 "네모 두 겹" 실루엣이라
+     구분이 안 된다는 지적(사용자 스크린샷). 성격도 달라서(원문보기=이동, 나머지=편집)
+     자리를 아예 분리하는 게 맞다고 판단 — 왼쪽(게시시각 옆)은 화면을 보는 동작, 오른쪽
+     (article-actions)은 화면을 바꾸는 동작이라는 구획이 이제 색과 위치 둘 다로 드러난다.
+     글자 링크라 클릭 영역도 아이콘보다 넓어져 모바일에서 유리하다. */
+  .time-sep { color: #6B7280; font-size: 0.8rem; margin: 0 2px; user-select: none; -webkit-user-select: none; }
+  .origin-link-text {
+    flex-shrink: 0; color: #2563EB; font-size: 0.8rem; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 2px; white-space: nowrap;
+  }
+  .origin-link-text:hover { text-decoration: underline; }
+  .origin-link-icon { width: 0.75em; height: 0.75em; }
+  /* [추가: 2026-08-21] "검색어 기재부, 정부" — 이 기사가 어떤 검색어로 걸렸는지.
+     게시시각·원문보기와 같은 줄·같은 크기(0.8rem)이고, 라벨("검색어")만 값보다 한 톤
+     더 흐리게 해 값이 먼저 읽히게 한다. 칩으로 만들지 않은 이유·전부 보여주는 이유는
+     render_article의 kw_inline_html 주석 참고. */
+  .kw-inline {
+    font-size: 0.8rem; color: #6B7280;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  /* 돋보기는 값보다 한 톤 흐리게 — 먼저 읽혀야 하는 건 검색어 자체다. 크기는 바로 옆
+     원문보기 아이콘(.origin-link-icon)과 같은 0.75em이라 액션 줄에서 높이가 안 튄다. */
+  .kw-inline .kw-ic { width: 0.75em; height: 0.75em; color: #9CA3AF; flex-shrink: 0; }
+  .kw-inline .kw-v { color: #4B5563; }
+  /* [추가: 2026-08-14] 체크박스가 있는 화면(확정본/초안)에서 게시시각·원문보기가 제목
+     글자 시작점과 다른 줄에서 시작해 왼쪽 끝이 들쭉날쭉하다는 지적(사용자 스크린샷의
+     분홍 사각형) — 브라우저에서 title-line의 실제 렌더 좌표를 재서 맞췄다(28px,
+     체크박스 자체의 기본 여백까지 포함된 값이라 "체크박스 폭+gap" 계산과는 다르다).
+     체크박스가 없는 지난 기사 화면은 :has()가 매치되지 않아 원래대로 0부터 시작한다
+     (article-select CSS 자체가 그 화면엔 없다). */
+  .article:has(.article-select) .action-row { padding-left: 28px; }
+  /* [추가: 2026-08-13] 복사하기 — 클릭하면 아이콘이 1초간 check로 바뀐다(copyArticleIcon).
+     기본 상태는 복사 아이콘만, .is-copied 상태는 check 아이콘만 보인다 — 색은 두
+     상태 모두 그대로 무채색(다른 아이콘 버튼과 통일, 전환 자체가 이미 충분한 신호). */
+  /* [추가: 2026-09-01] 소제목 헤더의 📋(.group-copy-btn)도 같은 전환을 쓴다 — 같은
+     일(복사)에 같은 피드백이어야 하므로 규칙을 복제하지 않고 선택자만 늘린다.
+     색·크기는 옆의 ✏️🗑️와 맞추려고 .rename-btn을 함께 걸었고, 여기서는 아이콘
+     두 개를 겹쳐 두기 위한 display만 준다. */
+  .copy-btn, .group-copy-btn { display: inline-flex; align-items: center; }
+  .copy-btn .icon-done, .group-copy-btn .icon-done { display: none; }
+  .copy-btn.is-copied .icon-default, .group-copy-btn.is-copied .icon-default { display: none; }
+  .copy-btn.is-copied .icon-done, .group-copy-btn.is-copied .icon-done { display: inline-flex; }
+  /* [추가: 2026-08-05] 원문 다시 가져오기 버튼 — 평소엔 숨겨두고 그 기사 카드에
+     마우스를 올렸을 때만 나타난다(제목 옆이 붐비지 않게). */
+  .refetch-btn {
+    flex-shrink: 0; background: transparent; border: none; color: #6B7280; font-size: 1rem;
+    cursor: pointer; padding: 2px 6px; user-select: none; -webkit-user-select: none;
+    opacity: 0; transition: opacity 0.15s;
+  }
+  .article:hover .refetch-btn { opacity: 1; }
+  .refetch-btn:disabled { opacity: 0.35 !important; cursor: not-allowed; }
+  /* [추가: 2026-08-11] "⋯ 더보기" 메뉴 — 원문 다시 불러오기 / 기사제목 직접 수정.
+     예전엔 이 둘과 복사하기까지 셋이 제목 줄에 아이콘으로 직접 붙어 있었고
+     .refetch-btn의 opacity:0으로 숨겼다가 카드 호버 시에만 나타났는데, (1) 호버할
+     때마다 아이콘이 4→8개로 늘어 목록을 훑을 때 산만했고 (2) **모바일엔 호버가 없어
+     아예 누를 수 없었다.** 그래서 ⋯ 버튼은 호버와 무관하게 항상 보이고, 메뉴 안은
+     아이콘 대신 글자로 이름을 보여준다. [수정: 2026-08-13] 복사하기는 다시 메뉴에서
+     빠져나가 상시 노출 아이콘(.copy-btn)이 됐다 — URL 줄이 사라지며 화면에서
+     클립보드로 가는 유일한 경로가 됐기 때문. */
+  .more-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+  .more-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 1.05rem; line-height: 1;
+    cursor: pointer; padding: 3px 7px; border-radius: 4px;
+    user-select: none; -webkit-user-select: none;
+  }
+  .more-btn:hover { background: #EFF6FF; color: #2563EB; }
+  .more-menu {
+    display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 60;
+    min-width: 172px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px;
+    padding: 4px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.13);
+  }
+  .more-wrap.is-open .more-menu { display: block; }
+  .more-menu button {
+    display: block; width: 100%; text-align: left; background: transparent; border: none;
+    padding: 8px 10px; border-radius: 5px; font-size: 0.85rem; color: #1F2937;
+    cursor: pointer; white-space: nowrap;
+  }
+  .more-menu button:hover { background: #EFF6FF; }
+  .more-menu button:disabled { opacity: 0.5; cursor: progress; }
+  /* [추가: 2026-08-18] 🏷 라벨 — PRD.md 기능10, 2026-08-18 목업 대화. 앰버 계열은
+     기존 COLOR_* 팔레트(파랑=담당자 액션/보라=AI 액션)와 겹치지 않는 세 번째 축으로
+     확정했다(MAIN_FLOW_MOCKUP.html의 --label-bg/--label-text 그대로). */
+  .lab-pop-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+  .lab-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 1rem; line-height: 1;
+    cursor: pointer; padding: 3px 6px; border-radius: 4px; display: inline-flex; align-items: center;
+    user-select: none; -webkit-user-select: none;
+  }
+  .lab-btn:hover { background: #EFF6FF; color: #2563EB; }
+  .lab-btn.on { color: #8A5A14; background: #FBF0DA; }
+  .lab-btn .lab-count { font-size: 0.62rem; font-weight: 700; margin-left: 2px; }
+  .lab-pop {
+    position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 60; width: 260px;
+    text-align: left; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px;
+    padding: 11px 12px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.13);
+  }
+  .lab-pop.hidden { display: none; }
+  .lab-pop h4 { margin: 0 0 6px; font-size: 0.66rem; color: #6B7280; font-weight: 700; }
+  .lab-pop .attached { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; min-height: 20px; }
+  .lab-pop .attached .none { font-size: 0.66rem; color: #6B7280; }
+  .lab-pop .known { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+  .lab-pop .known .none { font-size: 0.66rem; color: #6B7280; }
+  .lab-chip {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 0.64rem; font-weight: 700;
+    color: #8A5A14; background: #FBF0DA; border: 1px solid rgba(138, 90, 20, 0.28);
+    border-radius: 20px; padding: 2px 8px; white-space: nowrap;
+  }
+  .lab-chip .x { color: #8A5A14; opacity: 0.55; cursor: pointer; font-weight: 700; }
+  .lab-chip .x:hover { opacity: 1; }
+  .known-chip {
+    font-size: 0.64rem; font-weight: 600; color: #6B7280; cursor: pointer;
+    background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 20px; padding: 2px 8px;
+  }
+  .known-chip:hover { background: #FBF0DA; color: #8A5A14; border-color: rgba(138, 90, 20, 0.28); }
+  .known-chip.used { background: #FBF0DA; color: #8A5A14; border-color: rgba(138, 90, 20, 0.28); font-weight: 700; }
+  .known-chip .n { opacity: 0.6; font-weight: 500; margin-left: 3px; }
+  .lab-pop .addbox { display: flex; gap: 5px; }
+  .lab-pop .addbox input {
+    flex: 1; font-size: 0.72rem; padding: 5px 7px; border: 1px solid #E5E7EB; border-radius: 5px;
+  }
+  .lab-pop .addbox button {
+    font-size: 0.7rem; font-weight: 700; padding: 5px 10px; border-radius: 5px; cursor: pointer;
+    background: #FBF0DA; color: #8A5A14; border: 1px solid rgba(138, 90, 20, 0.28);
+  }
+  .lab-pop .sim-warn {
+    margin-top: 8px; font-size: 0.64rem; line-height: 1.7; color: #8A5A14; background: #FBF0DA;
+    border: 1px dashed rgba(138, 90, 20, 0.28); border-radius: 6px; padding: 6px 8px;
+  }
+  .lab-pop .sim-warn.hidden { display: none; }
+  .lab-pop .sim-warn button {
+    font-size: 0.62rem; font-weight: 700; padding: 3px 8px; border-radius: 20px; cursor: pointer;
+    margin-left: 3px; border: none;
+  }
+  .lab-pop .sim-warn .use { background: #8A5A14; color: #FFFFFF; }
+  .lab-pop .sim-warn .keep { background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; }
+  .lab-pop .hint { font-size: 0.62rem; color: #6B7280; margin: 8px 0 0; line-height: 1.7; }
+  .lab-row {
+    display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 6px;
+    padding-top: 6px; border-top: 1px dashed #E5E7EB;
+  }
+  .lab-row .tagmark { color: #8A5A14; opacity: 0.75; }
+  /* [추가: 2026-08-05] ✏️ 직접 수정 — 🔄가 원문에서도 못 찾는 경우의 최후 수단으로
+     펼쳐지는 인라인 편집 칸. */
+  .edit-summary-form {
+    margin: 8px 0 4px 20px; padding: 10px 12px; border: 1px solid #2563EB; border-radius: 8px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .edit-summary-form input, .edit-summary-form textarea {
+    width: 100%; box-sizing: border-box; padding: 6px 10px; border: 1px solid #E5E7EB; border-radius: 6px;
+    font-size: 0.88rem; color: #1F2937; background: #FFFFFF; font-family: inherit;
+  }
+  .edit-summary-form .edit-summary-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .edit-summary-form button { font-size: 0.82rem; padding: 5px 12px; }
+  .empty { text-align: center; margin-top: 80px; font-size: 1.3rem; color: #6B7280; }
+  .cute-caption { font-family: 'Gaegu', sans-serif; font-size: 1.4rem; margin-top: 6px; }
+  .bottom { margin-top: 40px; background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: 8px; padding: 16px 18px; }
+  .bottom h3 { margin: 0 0 8px; font-size: 1rem; color: #1E3A5F; }
+  .bottom-summary { padding-top: 2px; }
+  .bottom-header-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .bottom-header-row h3 { margin: 0; }
+  .bottom-summary-copy {
+    font-size: 0.78rem; color: #2563EB; background: transparent; border: 1px solid #E5E7EB;
+    border-radius: 6px; padding: 3px 10px; cursor: pointer; font-family: inherit;
+  }
+  .bottom-summary-item { padding: 8px 0; border-bottom: 1px solid #E5E7EB; }
+  .bottom-summary-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .bottom-summary-item strong { display: block; color: #1E3A5F; margin-bottom: 3px; }
+  .bottom-summary-item p { margin: 0; }
+  .manual-divider {
+    display: flex; align-items: center; gap: 10px; margin: 32px 0 4px;
+    color: #6B7280; font-size: 0.75rem;
+  }
+  .manual-divider::before, .manual-divider::after { content: ""; flex: 1; border-top: 1px dashed #E5E7EB; }
+  .manual-zone { border: 1px dashed #E5E7EB; border-radius: 8px; padding: 14px 18px; margin-top: 10px; }
+  .manual-zone-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .manual-zone-title { font-weight: 600; color: #1F2937; font-size: 0.95rem; }
+  .manual-zone-hint { font-size: 0.75rem; color: #6B7280; }
+  /* [추가: 2026-08-26] 제목·건수·배정 버튼을 한 묶음으로 왼쪽에 붙인다 — 📂 소제목 미분류
+     칸의 헤더와 같은 구성(제목 → 건수 → 배정 버튼)이라 두 칸이 같은 줄로 읽힌다.
+     baseline 정렬로는 버튼이 글자 밑선에 매달려 보여 이 묶음만 center로 맞춘다. */
+  .manual-zone-left { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .manual-zone .article:first-child { margin-top: 10px; }
+  /* [추가: 2026-08-05] "+ 직접 키워드 작성하기" — AI 키워드 블록과 별개로, 이용자가
+     자유 서식으로 적어두는 메모 한 줄. 저장된 메모가 있으면 처음부터 열려서 보이고,
+     없으면 버튼을 눌러야 나타난다(is-open 토글). */
+  /* [수정: 2026-08-07] 스크롤해서 기사를 읽다가 메모를 적으려면 위로 되돌아가야 했던
+     문제 — sticky로 고정해 상단 바(topbar, 높이만큼 top: 60px) 바로 아래 붙어서 화면에
+     계속 보이게 한다. background를 명시해야 아래로 스크롤된 기사 카드들이 비쳐 보이지
+     않는다. */
+  .keyword-note-zone {
+    display: none; align-items: center; gap: 8px; border: 1px dashed #E5E7EB; border-radius: 8px;
+    padding: 10px 14px; margin: 10px 0 4px; flex-wrap: wrap;
+    position: sticky; top: 60px; z-index: 15; background: #FFFFFF;
+  }
+  .keyword-note-zone.is-open { display: flex; }
+  /* [수정: 2026-09-07] 「마감 후 자동 배정」 배너가 뜨면 topbar가 배너 높이만큼
+     내려가는데(body.has-finalize-banner .topbar) 이 sticky의 top은 60px 그대로여서
+     메모 칸이 배너·topbar 뒤(z-index 15 < 20·21)에 완전히 가려졌다 — 담당자 눈에는
+     "확정본만 상단 고정이 안 되는" 것으로 보인다. topbar와 같은 변수를 따라가게 한다. */
+  body.has-finalize-banner .keyword-note-zone { top: calc(60px + var(--finalize-banner-h, 0px)); }
+  .keyword-note-zone input {
+    flex: 1; min-width: 220px; padding: 6px 10px; border: 1px solid #E5E7EB; border-radius: 6px;
+    font-size: 0.88rem; color: #1F2937; background: #FFFFFF;
+  }
+  /* [추가: 2026-08-10] 저장된 메모는 곧바로 다시 손대지 않도록 잠가둔다 — (수정)을
+     눌러야 편집 가능해진다(아래 toggleKeywordEditMode). "이미 저장됐다"는 상태를
+     입력칸 자체로도 보여준다는 취지(사용자 피드백). */
+  .keyword-note-zone input:disabled { background: #F8FAFC; color: #6B7280; }
+  .keyword-note-zone button { font-size: 0.82rem; padding: 5px 10px; white-space: nowrap; }
+  /* [추가: 2026-08-26] 직전 회차 메모를 끌어와 미리 채워둔 상태 — 아직 "이번 회차 메모"가
+     아니라는 뜻이라 "주의"(앰버) 계열을 쓴다(설정 화면의 "저장 안 함"과 같은 뜻).
+     flex-wrap 컨테이너 안에서 width:100%로 다음 줄에 온다. */
+  /* [추가: 2026-08-13] 이모지 대신 쓰는 단색 SVG 아이콘(app.icons) 공통 크기·색 —
+     currentColor라 부모의 글자색을 그대로 물려받는다. */
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+
+
+/* ───────── 시안 바깥 틀 ───────── */
+body { background: #EEF2F7; }
+.wrap { max-width: 1000px; margin: 0 auto; padding: 26px 20px 80px; }
+.wrap h1.doc { font-size: 1.3rem; color: #1E3A5F; margin: 0 0 6px; }
+.doc-lead { color: #6B7280; font-size: .88rem; line-height: 1.65; margin: 0 0 14px; }
+.doc-lead b { color: #1F2937; font-weight: 600; }
+.report-note { display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 10px 14px;
+  font-size: .84rem; color: #6B7280; margin: 0 0 18px; }
+.report-note pre { margin: 0; font: inherit; font-family: ui-monospace, Menlo, monospace; font-size: .8rem;
+  background: #F3F4F6; border-radius: 6px; padding: 6px 10px; color: #1F2937; }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 0 0 10px; }
+.seg-doc { display: inline-flex; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; background: #FFFFFF; }
+.seg-doc button { border: 0; background: transparent; padding: 7px 14px; font: inherit; font-size: .85rem;
+  color: #6B7280; cursor: pointer; }
+.seg-doc button + button { border-left: 1px solid #E5E7EB; }
+.seg-doc button.on { background: #2563EB; color: #fff; font-weight: 600; }
+.seg-doc .key { font-size: .7rem; opacity: .6; margin-right: 4px; }
+.stats { font-size: .82rem; color: #6B7280; font-variant-numeric: tabular-nums; }
+.stats b { color: #1F2937; }
+
+.note { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 12px 16px;
+  font-size: .85rem; line-height: 1.65; margin: 0 0 14px; }
+.note h3 { margin: 0 0 4px; font-size: .92rem; color: #1E3A5F; }
+.note .rec { font-size: .72rem; font-weight: 700; color: #2563EB; border: 1px solid #BFDBFE;
+  border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: 1px; }
+.note p { margin: 0 0 6px; color: #1F2937; }
+.note dl { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 2px 10px; margin: 0; }
+.note dt { color: #6B7280; font-weight: 600; }
+.note dd { margin: 0; color: #374151; }
+.note [data-for] { display: none; }
+.note.show-cur [data-for="cur"], .note.show-a [data-for="a"],
+.note.show-b [data-for="b"], .note.show-c [data-for="c"] { display: block; }
+
+/* 앱 화면 틀 — 데스크탑은 실제 .container(본문 800 + 좌우 여백 24×2 + 테두리), 폰은 창 폭 390 */
+.frame { width: 850px; max-width: 100%; }
+.frame.phone { width: 390px; }
+.frame .container { max-width: none; margin: 0; padding-top: 12px; padding-bottom: 24px; }
+.frame.phone .container { border-radius: 0; }
+
+/* ───────── 네 안 토글 ───────── */
+.var { display: none; }
+.show-cur .var-cur, .show-a .var-a, .show-c .var-c { display: inline; }
+.show-b .title-line.var-b { display: grid; }
+
+/* A — 괄호 없이, 언론사를 회색·조금 작은 글자로 제목 앞에 */
+.var-a .ol { color: #6B7280; font-size: .86em; font-weight: 500; margin-right: .5em; }
+
+/* B — 언론사 고정 칸(84px ≈ 6자) + 제목 칸. 메타 줄도 제목 칸에 맞춰 시작 */
+.var-b.title-line { grid-template-columns: 84px minmax(0, 1fr); column-gap: 10px; align-items: baseline; }
+.var-b .ol { color: #6B7280; font-size: .86em; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.show-b .article:has(.article-select) .action-row { padding-left: 122px; }
+
+/* C — 제목 줄엔 제목만, 언론사는 메타 줄 맨 앞 */
+.ol-c { font-size: .8rem; color: #374151; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="doc">기사 제목 줄 — 언론사를 어떻게 보여줄까</h1>
+  <p class="doc-lead">
+    확정본·초안 기사 한 줄의 <b>언론사 표시</b>만 네 가지로 바꿔 봤어요. 나머지(글자 크기·여백·버튼)는 실제 확정본 CSS 그대로예요.<br>
+    샘플은 <b>9월 11일 11:00 회차 실제 기사 19건</b> — 단, <b>[단독] 1건</b>은 9/10 17:00 회차에서 가져왔고,
+    <b>매일경제 빨간 표식</b>은 표식이 붙는 경우를 보려고 한 건(정희용 기사)에 일부러 켰어요.
+    <b>조선일보 한 건은 펼친 상태</b>(제목이 흐려짐), <b>기타 맨 아래 2건은 사진 추정</b>(행 전체가 흐려짐)이에요.
+  </p>
+  <div class="report-note">
+    <span>복사·txt·텔레그램·이메일 텍스트는 <b style="color:#1F2937">네 안 모두 똑같아요</b> — 바뀌는 건 화면뿐</span>
+    <pre>ㅇ (조선일보) 정부 “견조한 경기회복... 중동 불확실성 다소 확대”
+https://n.news.naver.com/mnews/article/023/…</pre>
+  </div>
+
+  <div class="controls">
+    <div class="seg-doc" id="seg-var">
+      <button data-v="cur"><span class="key">1</span>현재</button>
+      <button data-v="a"><span class="key">2</span>A 회색 이름</button>
+      <button data-v="b"><span class="key">3</span>B 이름 칸</button>
+      <button data-v="c"><span class="key">4</span>C 메타 줄로</button>
+    </div>
+    <div class="seg-doc" id="seg-width">
+      <button data-w="desk">데스크탑 800</button>
+      <button data-w="phone">폰 390</button>
+    </div>
+    <span class="stats" id="stats"></span>
+  </div>
+
+  <div class="note" id="note">
+    <div data-for="cur">
+      <h3>현재 — <code>(조선일보) 제목</code></h3>
+      <p>언론사와 제목이 같은 색·같은 굵기이고, 괄호가 둘의 경계를 나눠요. 복사 텍스트와 모양이 같아요.</p>
+    </div>
+    <div data-for="a">
+      <h3>A — 회색 이름, 괄호 없음<span class="rec">추천</span></h3>
+      <p>괄호를 빼고 언론사를 회색·조금 작은 글자로 제목 앞에 둬요. 경계는 괄호 대신 색이 나눠요.</p>
+      <dl>
+        <dt>좋은 점</dt><dd>한 줄 구조 그대로라 줄 수가 안 늘어요(괄호 두 자만큼 오히려 줄어요). 수시 화면(지금도 언론사만 회색)과 한 모양으로 맞추기 쉬워요.</dd>
+        <dt>볼 곳</dt><dd>펼친 조선일보 기사·사진 추정 2건에서 회색 이름이 너무 옅지 않은지, 매일경제 빨간 표식이 회색 속에서도 읽히는지, [단독]·[속보] 빨강과 붙어도 괜찮은지.</dd>
+      </dl>
+    </div>
+    <div data-for="b">
+      <h3>B — 언론사 고정 칸</h3>
+      <p>언론사를 84px 칸(약 6자)에 두고 제목은 칸 오른쪽에서 시작해요. 칸 폭은 실측으로 잡았어요 — 저장된 기사 5,397건 중 <b>99.8%</b>가 언론사 이름 6자 이하.</p>
+      <dl>
+        <dt>좋은 점</dt><dd>제목 시작점이 한 줄로 맞아 표처럼 읽혀요. 목록이 언론사 순이라 같은 언론사가 덩어리로 보여요.</dd>
+        <dt>대가</dt><dd>제목 폭이 약 94px 줄어 두 줄로 꺾이는 기사가 늘어요 — <b>폰 390</b>으로 바꿔 보세요. 7자 이상(코리아중앙데일리 등, 0.2%)은 말줄임(…)이 돼요.</dd>
+      </dl>
+    </div>
+    <div data-for="c">
+      <h3>C — 언론사를 메타 줄로</h3>
+      <p>제목 줄엔 제목만 두고, 언론사는 아래 메타 줄 맨 앞에 둬요(실시간현황과 같은 자리).</p>
+      <dl>
+        <dt>좋은 점</dt><dd>제목 줄이 가장 깨끗하고 제목 폭을 온전히 써요.</dd>
+        <dt>대가</dt><dd>훑을 때 언론사를 보려면 시선이 매번 한 줄 내려가야 해요. 메타 줄이 길어져 좁은 폭에선 버튼 묶음이 다음 줄로 밀려요.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="frame" id="frame">
+    <div class="container" id="screen">
+<section class="subheading"><h2><span class="subheading-title"><input type="checkbox" class="group-select-all"> &lt;정부 경기 회복 평가&gt;<span class="subheading-count">7</span></span><span class="subheading-icons"><button class="rename-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="rename-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button><button class="rename-btn group-hide-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="order-btn" type="button" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="order-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></h2><div class="article"><details><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(KBS) <span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> “경기 회복흐름 견조…중동전쟁·미국 관세 불확실성은 확대”</span></span><span class="title-line var var-a"><span class="ol">KBS</span><span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> “경기 회복흐름 견조…중동전쟁·미국 관세 불확실성은 확대”</span></span><span class="title-line var var-b"><span class="ol" title="KBS">KBS</span><span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> “경기 회복흐름 견조…중동전쟁·미국 관세 불확실성은 확대”</span></span><span class="title-line var var-c"><span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> “경기 회복흐름 견조…중동전쟁·미국 관세 불확실성은 확대”</span></span></div><div class="action-row"><span class="ol-c var var-c">KBS</span><span class="time-sep var var-c">·</span><span class="pub-time">10:00 · 1시간 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/056/0012255453" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>경제정책 인사 및 부동산 의혹</option><option style="font-weight:700">기타</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" disabled title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary"><span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 오늘(11일) 최근 경제 동향을 담은 ‘그린북’ 9월호에서 우리 경제에 대해 “견조한 경기회복 흐름이 이어지는 모습”이라고 표현했습니다. <span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>는 경기 회복 흐름에 대해 지난 6월 공고해지고 있다고... </div></details></div><div class="article"><details><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(SBS) <span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> &quot;견조한 경기 회복세…전쟁·미 관세 불확실성은 다소 확대&quot;</span></span><span class="title-line var var-a"><span class="ol">SBS</span><span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> &quot;견조한 경기 회복세…전쟁·미 관세 불확실성은 다소 확대&quot;</span></span><span class="title-line var var-b"><span class="ol" title="SBS">SBS</span><span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> &quot;견조한 경기 회복세…전쟁·미 관세 불확실성은 다소 확대&quot;</span></span><span class="title-line var var-c"><span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> &quot;견조한 경기 회복세…전쟁·미 관세 불확실성은 다소 확대&quot;</span></span></div><div class="action-row"><span class="ol-c var var-c">SBS</span><span class="time-sep var var-c">·</span><span class="pub-time">10:09 · 56분 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/055/0001387542" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>경제정책 인사 및 부동산 의혹</option><option style="font-weight:700">기타</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary">▲ <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> <span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>가 현재 한국 경제에 대해 &quot;견조한 경기 회복 흐름이 이어지는 모습&quot;이라며 긍정적인 진단을 이어갔습니다. 다만 중동 전쟁과 미국의 관세 부과 조치와 관련한 불확실성은 지난달보다 확대됐다고... </div></details></div><div class="article"><details><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(MBC) <span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> &quot;견조한 경기 회복 이어져‥중동전쟁·美관세 불확실성은 확대&quot;</span></span><span class="title-line var var-a"><span class="ol">MBC</span><span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> &quot;견조한 경기 회복 이어져‥중동전쟁·美관세 불확실성은 확대&quot;</span></span><span class="title-line var var-b"><span class="ol" title="MBC">MBC</span><span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> &quot;견조한 경기 회복 이어져‥중동전쟁·美관세 불확실성은 확대&quot;</span></span><span class="title-line var var-c"><span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> &quot;견조한 경기 회복 이어져‥중동전쟁·美관세 불확실성은 확대&quot;</span></span></div><div class="action-row"><span class="ol-c var var-c">MBC</span><span class="time-sep var var-c">·</span><span class="pub-time">10:28 · 37분 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/214/0001523375" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>경제정책 인사 및 부동산 의혹</option><option style="font-weight:700">기타</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary"><span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 오늘 발표한 &#x27;최근 경제동향&#x27; 9월호에서 &quot;최근 우리 경제는 수출이 큰 폭 증가하고 소비 등 내수가 개선세를 보이고 있다&quot;며 긍정적으로 평가했습니다. 지난달 소매판매 속보 지표를 보면 카드 국내승인액은... </div></details></div><div class="article"><details open><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(조선일보) <span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> “견조한 경기회복... 중동 불확실성 다소 확대”</span></span><span class="title-line var var-a"><span class="ol">조선일보</span><span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> “견조한 경기회복... 중동 불확실성 다소 확대”</span></span><span class="title-line var var-b"><span class="ol" title="조선일보">조선일보</span><span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> “견조한 경기회복... 중동 불확실성 다소 확대”</span></span><span class="title-line var var-c"><span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> “견조한 경기회복... 중동 불확실성 다소 확대”</span></span></div><div class="action-row"><span class="ol-c var var-c">조선일보</span><span class="time-sep var var-c">·</span><span class="pub-time">10:01 · 1시간 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/023/0003997869" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 재경부</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>경제정책 인사 및 부동산 의혹</option><option style="font-weight:700">기타</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary"><span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> ‘최근 경제동향’ 9월호 <span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>가 현재 우리나라 경제 상황을 두고 “견조한 경기회복 흐름이 이어지는 모습”이라고 평가했다. 다만 물가 상승 압력과 취약 계층의 어려운 고용 여건 등 민생 부담은 지속되고... </div></details></div><div class="article"><details><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(머니투데이) <span class="tt">반도체 호황에 <span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> 경기진단도 &#x27;긍정적&#x27;…&quot;경기회복 흐름 이어져&quot;</span></span><span class="title-line var var-a"><span class="ol">머니투데이</span><span class="tt">반도체 호황에 <span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> 경기진단도 &#x27;긍정적&#x27;…&quot;경기회복 흐름 이어져&quot;</span></span><span class="title-line var var-b"><span class="ol" title="머니투데이">머니투데이</span><span class="tt">반도체 호황에 <span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> 경기진단도 &#x27;긍정적&#x27;…&quot;경기회복 흐름 이어져&quot;</span></span><span class="title-line var var-c"><span class="tt">반도체 호황에 <span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> 경기진단도 &#x27;긍정적&#x27;…&quot;경기회복 흐름 이어져&quot;</span></span></div><div class="action-row"><span class="ol-c var var-c">머니투데이</span><span class="time-sep var var-c">·</span><span class="pub-time">10:00 · 1시간 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/008/0005412394" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 재경부</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>경제정책 인사 및 부동산 의혹</option><option style="font-weight:700">기타</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary"><span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 11일 발표한 &#x27;9월 최근 경제동향(그린북)&#x27;에서 &quot;최근 우리 경제는 수출이 큰 폭 증가하고 소비 등 내수가 개선세를 보이는 등 견조한 경기회복 흐름이 이어지는 모습&quot;이라고 평가했다. 지난달엔 &#x27;경기회복... </div></details></div><div class="article"><details><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(서울경제) <span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> “견조한 경기회복 이어져”…중동·美관세 불확실성은 확대</span></span><span class="title-line var var-a"><span class="ol">서울경제</span><span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> “견조한 경기회복 이어져”…중동·美관세 불확실성은 확대</span></span><span class="title-line var var-b"><span class="ol" title="서울경제">서울경제</span><span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> “견조한 경기회복 이어져”…중동·美관세 불확실성은 확대</span></span><span class="title-line var var-c"><span class="tt"><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span> “견조한 경기회복 이어져”…중동·美관세 불확실성은 확대</span></span></div><div class="action-row"><span class="ol-c var var-c">서울경제</span><span class="time-sep var var-c">·</span><span class="pub-time">10:36 · 29분 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/011/0004660848" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 재경부</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>경제정책 인사 및 부동산 의혹</option><option style="font-weight:700">기타</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary"><span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 11일 발표한 ‘최근경제동향(그린북)’ 9월호에서 “수출이 큰 폭 증가하고 소비 등 내수가 개선세를 보이는 등 견조한 경기회복 흐름이 이어지는 모습”이라고 밝혔다. <span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>는 6월 ‘경기 회복흐름이... </div></details></div><div class="article"><details><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(파이낸셜뉴스) <span class="tt"><span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span> &quot;한국 경제, 수출 내수 중심 견조한 경기회복 흐름 지속&quot;</span></span><span class="title-line var var-a"><span class="ol">파이낸셜뉴스</span><span class="tt"><span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span> &quot;한국 경제, 수출 내수 중심 견조한 경기회복 흐름 지속&quot;</span></span><span class="title-line var var-b"><span class="ol" title="파이낸셜뉴스">파이낸셜뉴스</span><span class="tt"><span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span> &quot;한국 경제, 수출 내수 중심 견조한 경기회복 흐름 지속&quot;</span></span><span class="title-line var var-c"><span class="tt"><span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span> &quot;한국 경제, 수출 내수 중심 견조한 경기회복 흐름 지속&quot;</span></span></div><div class="action-row"><span class="ol-c var var-c">파이낸셜뉴스</span><span class="time-sep var var-c">·</span><span class="pub-time">10:00 · 1시간 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/014/0005574374" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 재경부</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>경제정책 인사 및 부동산 의혹</option><option style="font-weight:700">기타</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" disabled title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary"><span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 11일 이 같은 내용을 담은 &#x27;최근 경제동향(그린북 9월호&#x27;를 발표했다. <span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span>는 &quot;최근 우리 경제는 수출이 큰 폭 증가하고 소비 등 내수가 개선세를 보이는 등 견조한 경기회복 흐름이 이어지는 모습... </div></details></div></section><section class="subheading"><h2><span class="subheading-title"><input type="checkbox" class="group-select-all"> &lt;경제정책 인사 및 부동산 의혹&gt;<span class="subheading-count">6</span></span><span class="subheading-icons"><button class="rename-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="rename-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button><button class="rename-btn group-hide-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="order-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="order-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></h2><div class="article art-scoop"><details><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(동아일보) <span class="tt"><span class="t-scoop">[단독]</span><span class="hl-word" data-word="실거주" style="background-color:#FFE7E7;color:#1F2937">실거주</span>했다던 <span class="hl-word" data-word="이형일" style="background-color:#DFF5E9;color:#1F2937">이형일</span> 가족, 전력 사용량 4인 가구의 4분의 1 수준</span></span><span class="title-line var var-a"><span class="ol">동아일보</span><span class="tt"><span class="t-scoop">[단독]</span><span class="hl-word" data-word="실거주" style="background-color:#FFE7E7;color:#1F2937">실거주</span>했다던 <span class="hl-word" data-word="이형일" style="background-color:#DFF5E9;color:#1F2937">이형일</span> 가족, 전력 사용량 4인 가구의 4분의 1 수준</span></span><span class="title-line var var-b"><span class="ol" title="동아일보">동아일보</span><span class="tt"><span class="t-scoop">[단독]</span><span class="hl-word" data-word="실거주" style="background-color:#FFE7E7;color:#1F2937">실거주</span>했다던 <span class="hl-word" data-word="이형일" style="background-color:#DFF5E9;color:#1F2937">이형일</span> 가족, 전력 사용량 4인 가구의 4분의 1 수준</span></span><span class="title-line var var-c"><span class="tt"><span class="t-scoop">[단독]</span><span class="hl-word" data-word="실거주" style="background-color:#FFE7E7;color:#1F2937">실거주</span>했다던 <span class="hl-word" data-word="이형일" style="background-color:#DFF5E9;color:#1F2937">이형일</span> 가족, 전력 사용량 4인 가구의 4분의 1 수준</span></span></div><div class="action-row"><span class="ol-c var var-c">동아일보</span><span class="time-sep var var-c">·</span><span class="pub-time">16:22 · 18시간 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/020/0003747196" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 재경부, 이형일, 재정경제기획위원회</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>정부 경기 회복 평가</option><option style="font-weight:700">기타</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" disabled title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary"><span class="hl-word" data-word="이형일" style="background-color:#DFF5E9;color:#1F2937">이형일</span> 부총리 겸 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 장관 후보자 가족이 실제 거주했다고 밝힌 경기 과천시 주공9단지의 전력 사용량이 전입 기간 일반적인 4인 가구의 4분의 1 수준에 그친 것으로 나타났다. 전입 기간조차 <span class="hl-word" data-word="실거주" style="background-color:#FFE7E7;color:#1F2937">실거주</span>하지... </div></details></div><div class="article"><details><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(동아일보) <span class="tt">정점식 “김승원 국정조사 받아야…로비·주가조작 게이트”</span></span><span class="title-line var var-a"><span class="ol">동아일보</span><span class="tt">정점식 “김승원 국정조사 받아야…로비·주가조작 게이트”</span></span><span class="title-line var var-b"><span class="ol" title="동아일보">동아일보</span><span class="tt">정점식 “김승원 국정조사 받아야…로비·주가조작 게이트”</span></span><span class="title-line var var-c"><span class="tt">정점식 “김승원 국정조사 받아야…로비·주가조작 게이트”</span></span></div><div class="action-row"><span class="ol-c var var-c">동아일보</span><span class="time-sep var var-c">·</span><span class="pub-time">09:24 · 1시간 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/020/0003747398" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 이형일</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>정부 경기 회복 평가</option><option style="font-weight:700">기타</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary">국민의힘 정희용 사무총장은 강신철 국방부 장관 후보자와 <span class="hl-word" data-word="이형일" style="background-color:#DFF5E9;color:#1F2937">이형일</span> 부총리 겸 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 장관 후보자, 홍지선 국토교통부 장관 후보자, 이소영 중소벤처기업부 장관 후보자의 부동산 의혹에 대해 집중 비판했다. 그는 각... </div></details></div><div class="article"><details><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(매일경제) <span class="tt"><span class="t-flash">[속보]</span> 李대통령 지지율 38%…부동산·개각에 최저치 경신</span></span><span class="title-line var var-a"><span class="ol">매일경제</span><span class="tt"><span class="t-flash">[속보]</span> 李대통령 지지율 38%…부동산·개각에 최저치 경신</span></span><span class="title-line var var-b"><span class="ol" title="매일경제">매일경제</span><span class="tt"><span class="t-flash">[속보]</span> 李대통령 지지율 38%…부동산·개각에 최저치 경신</span></span><span class="title-line var var-c"><span class="tt"><span class="t-flash">[속보]</span> 李대통령 지지율 38%…부동산·개각에 최저치 경신</span></span></div><div class="action-row"><span class="ol-c var var-c">매일경제</span><span class="time-sep var var-c">·</span><span class="pub-time">10:24 · 41분 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/009/0005733763" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>정부 경기 회복 평가</option><option style="font-weight:700">기타</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary">세제 개편안을 수정하고 국토교통부·<span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 등 경제정책 인적 개편에 나섰으나 효과가 없었던 셈이다. 김승원 법무부 장관 후보자에 대해서는 적합하다는 의견은 22%에 그쳤다. 부적합하다는 유권자는 43%에... </div></details></div><div class="article"><details><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(<span style="color:#DC2626">매일경제</span>) <span class="tt">국민의힘 정희용 “국토부 장관 후보자, 집값 급등 전 영끌해 집 샀다”</span></span><span class="title-line var var-a"><span class="ol"><span style="color:#DC2626">매일경제</span></span><span class="tt">국민의힘 정희용 “국토부 장관 후보자, 집값 급등 전 영끌해 집 샀다”</span></span><span class="title-line var var-b"><span class="ol" title="매일경제"><span style="color:#DC2626">매일경제</span></span><span class="tt">국민의힘 정희용 “국토부 장관 후보자, 집값 급등 전 영끌해 집 샀다”</span></span><span class="title-line var var-c"><span class="tt">국민의힘 정희용 “국토부 장관 후보자, 집값 급등 전 영끌해 집 샀다”</span></span></div><div class="action-row"><span class="ol-c var var-c"><span style="color:#DC2626">매일경제</span></span><span class="time-sep var var-c">·</span><span class="pub-time">10:02 · 1시간 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/009/0005733729" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 이형일</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>정부 경기 회복 평가</option><option style="font-weight:700">기타</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary">정 의원은 또 “<span class="hl-word" data-word="이형일" style="background-color:#DFF5E9;color:#1F2937">이형일</span> <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 장관 후보자는 경기도 과천의 아파트를 매입 후 17년 간 보유하면서도 <span class="hl-word" data-word="실거주" style="background-color:#FFE7E7;color:#1F2937">실거주</span>는 겨우 4개월에 불과했다”며 “현재는 재건축이 진행중”이라고 지적했다. 그는 “이재명 <span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>는 <span class="hl-word" data-word="실거주" style="background-color:#FFE7E7;color:#1F2937">실거주</span>... </div></details></div><div class="article"><details><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(헤럴드경제) <span class="tt">국힘 “김승원, 정치→치정→로비…청문회 대신 국정조사 필요”</span></span><span class="title-line var var-a"><span class="ol">헤럴드경제</span><span class="tt">국힘 “김승원, 정치→치정→로비…청문회 대신 국정조사 필요”</span></span><span class="title-line var var-b"><span class="ol" title="헤럴드경제">헤럴드경제</span><span class="tt">국힘 “김승원, 정치→치정→로비…청문회 대신 국정조사 필요”</span></span><span class="title-line var var-c"><span class="tt">국힘 “김승원, 정치→치정→로비…청문회 대신 국정조사 필요”</span></span></div><div class="action-row"><span class="ol-c var var-c">헤럴드경제</span><span class="time-sep var var-c">·</span><span class="pub-time">09:48 · 1시간 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/016/0002695852" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 이형일</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>정부 경기 회복 평가</option><option style="font-weight:700">기타</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary">정희용 사무총장은 “다른 장관 후보자들의 부동산 의혹 또한 간과하기 어려운 수준”이라 강신철 국방부 장관 후보자, 이소영 중소벤처기업부 장관 후보자, <span class="hl-word" data-word="이형일" style="background-color:#DFF5E9;color:#1F2937">이형일</span> <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 장관 후보자 등에 대한 의혹을 짚었다. 정... </div></details></div><div class="article"><details><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(YTN) <span class="tt">44명 요구했는데 &#x27;모조리 거부&#x27;...또 &#x27;증인 0명 청문회&#x27; 열린다 [자막뉴스]</span></span><span class="title-line var var-a"><span class="ol">YTN</span><span class="tt">44명 요구했는데 &#x27;모조리 거부&#x27;...또 &#x27;증인 0명 청문회&#x27; 열린다 [자막뉴스]</span></span><span class="title-line var var-b"><span class="ol" title="YTN">YTN</span><span class="tt">44명 요구했는데 &#x27;모조리 거부&#x27;...또 &#x27;증인 0명 청문회&#x27; 열린다 [자막뉴스]</span></span><span class="title-line var var-c"><span class="tt">44명 요구했는데 &#x27;모조리 거부&#x27;...또 &#x27;증인 0명 청문회&#x27; 열린다 [자막뉴스]</span></span></div><div class="action-row"><span class="ol-c var var-c">YTN</span><span class="time-sep var var-c">·</span><span class="pub-time">10:00 · 1시간 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/052/0002405631" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">구윤철</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>정부 경기 회복 평가</option><option style="font-weight:700">기타</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" disabled title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary">정동영, 정성호, 김영훈, <span class="hl-word" data-word="구윤철" style="background-color:#E4F1FC;color:#1F2937">구윤철</span>, 윤호중, 정은경, 원민경, 그리고 한성숙 총리까지, 모두 증인 없는 청문회였습니다. 그런데 증인이 있을 때도, 정작 핵심 증인은 빠지기도 했습니다. 대표적인 사례가 강선우 여성가족부... </div></details></div></section><section class="subheading"><h2><span class="subheading-title"><input type="checkbox" class="group-select-all"> &lt;기타&gt;<span class="subheading-count">6</span></span><span class="subheading-icons"><button class="rename-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="rename-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button><button class="rename-btn group-hide-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="order-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="order-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></h2><div class="article"><details><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(MBC) <span class="tt">[시선집중] 박홍근 “청년은 전략적 투자처. 문화예술패스, 34세까지 확대. 헬스장도 가능”</span></span><span class="title-line var var-a"><span class="ol">MBC</span><span class="tt">[시선집중] 박홍근 “청년은 전략적 투자처. 문화예술패스, 34세까지 확대. 헬스장도 가능”</span></span><span class="title-line var var-b"><span class="ol" title="MBC">MBC</span><span class="tt">[시선집중] 박홍근 “청년은 전략적 투자처. 문화예술패스, 34세까지 확대. 헬스장도 가능”</span></span><span class="title-line var var-c"><span class="tt">[시선집중] 박홍근 “청년은 전략적 투자처. 문화예술패스, 34세까지 확대. 헬스장도 가능”</span></span></div><div class="action-row"><span class="ol-c var var-c">MBC</span><span class="time-sep var var-c">·</span><span class="pub-time">10:28 · 37분 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/214/0001523374" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제기획위원회</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>정부 경기 회복 평가</option><option>경제정책 인사 및 부동산 의혹</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" disabled title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary">‘경제성장과 재정건전성의 균형을 달성한 것’이라고 이렇게 평가까지 긍정적으로 해줬습니다. 그래서... 예를 들어 발달장애인과 관련해서도 제가 작년 국정기획위원회 파견 나갈 때부터 이미 국정과제 반영을 하기... </div></details></div><div class="article"><details><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(머니투데이) <span class="tt">수은, 아프리카 10개국 고위급 면담…국내 기업 진출 &#x27;마중물&#x27;</span></span><span class="title-line var var-a"><span class="ol">머니투데이</span><span class="tt">수은, 아프리카 10개국 고위급 면담…국내 기업 진출 &#x27;마중물&#x27;</span></span><span class="title-line var var-b"><span class="ol" title="머니투데이">머니투데이</span><span class="tt">수은, 아프리카 10개국 고위급 면담…국내 기업 진출 &#x27;마중물&#x27;</span></span><span class="title-line var var-c"><span class="tt">수은, 아프리카 10개국 고위급 면담…국내 기업 진출 &#x27;마중물&#x27;</span></span></div><div class="action-row"><span class="ol-c var var-c">머니투데이</span><span class="time-sep var var-c">·</span><span class="pub-time">09:48 · 1시간 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/008/0005412382" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>정부 경기 회복 평가</option><option>경제정책 인사 및 부동산 의혹</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary">KOAFEC는 한국과 아프리카 간 경제·개발 협력을 강화하기 위해 2006년 출범한 협의체로 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>와 아프리카개발은행(AfDB), 수은이 공동 주최한다. 올해 회의에서는 &#x27;인공지능(AI)과 디지털 인프라를 활용한 아프리카의... </div></details></div><div class="article"><details><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(서울경제) <span class="tt">폴스타 시총 95% 증발…적자 폭증에 ‘존속 능력’까지 흔들</span></span><span class="title-line var var-a"><span class="ol">서울경제</span><span class="tt">폴스타 시총 95% 증발…적자 폭증에 ‘존속 능력’까지 흔들</span></span><span class="title-line var var-b"><span class="ol" title="서울경제">서울경제</span><span class="tt">폴스타 시총 95% 증발…적자 폭증에 ‘존속 능력’까지 흔들</span></span><span class="title-line var var-c"><span class="tt">폴스타 시총 95% 증발…적자 폭증에 ‘존속 능력’까지 흔들</span></span></div><div class="action-row"><span class="ol-c var var-c">서울경제</span><span class="time-sep var var-c">·</span><span class="pub-time">10:00 · 1시간 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/011/0004660830" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제기획위원회</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>정부 경기 회복 평가</option><option>경제정책 인사 및 부동산 의혹</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary">▲ AI 프리즘* 맞춤형 경제 브리핑 * 편집자 주: ‘AI PRISM’(Personalized Report &amp; Insight Summarizing Media)은... 경북지방노동위원회로부터 조정 중지 결정을 받았다. 노조는 적정 인력 확보와 용역 업체의 임금·단체협약... </div></details></div><div class="article"><details><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(서울경제) <span class="tt">오픈AI vs 앤트로픽 매출 비교도 제각각…AI 기업 실적 ‘착시’ 주의보</span></span><span class="title-line var var-a"><span class="ol">서울경제</span><span class="tt">오픈AI vs 앤트로픽 매출 비교도 제각각…AI 기업 실적 ‘착시’ 주의보</span></span><span class="title-line var var-b"><span class="ol" title="서울경제">서울경제</span><span class="tt">오픈AI vs 앤트로픽 매출 비교도 제각각…AI 기업 실적 ‘착시’ 주의보</span></span><span class="title-line var var-c"><span class="tt">오픈AI vs 앤트로픽 매출 비교도 제각각…AI 기업 실적 ‘착시’ 주의보</span></span></div><div class="action-row"><span class="ol-c var var-c">서울경제</span><span class="time-sep var var-c">·</span><span class="pub-time">10:00 · 1시간 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/011/0004660833" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>정부 경기 회복 평가</option><option>경제정책 인사 및 부동산 의혹</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary"><span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>의 2026년 세제개편안에는 전용 계좌를 통해 BDC에 납입하는 투자자에게 배당소득의 9.9%(지방세 포함)를 분리과세하는 특례가 포함됐다. BDC는 자산 총액의 60% 이상을 비상장 벤처·혁신기업과 코넥스... </div></details></div><div class="article is-photo"><details><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(연합뉴스) <span class="tt">최근 경제동향 브리핑</span></span><span class="title-line var var-a"><span class="ol">연합뉴스</span><span class="tt">최근 경제동향 브리핑</span></span><span class="title-line var var-b"><span class="ol" title="연합뉴스">연합뉴스</span><span class="tt">최근 경제동향 브리핑</span></span><span class="title-line var var-c"><span class="tt">최근 경제동향 브리핑</span></span><span class="photo-badge" title="제목에 [포토] 표식은 없지만 사진기사로 추정됩니다">📷 사진 추정</span></div><div class="action-row"><span class="ol-c var var-c">연합뉴스</span><span class="time-sep var var-c">·</span><span class="pub-time">10:02 · 1시간 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/001/0016304178" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>정부 경기 회복 평가</option><option>경제정책 인사 및 부동산 의혹</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary">임홍기 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 경제분석과장이 11일 세종시 <span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>세종청사에서 2026년 9월 최근 경제동향에 관해 브리핑하고 있다. 2026.9.11</div></details></div><div class="article is-photo"><details><summary><div class="title-row"><input type="checkbox" class="article-select" onclick="event.stopPropagation();"><span class="title-line var var-cur">(뉴시스) <span class="tt"><span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span>, 26년 9월 최근 경제 동향 브리핑</span></span><span class="title-line var var-a"><span class="ol">뉴시스</span><span class="tt"><span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span>, 26년 9월 최근 경제 동향 브리핑</span></span><span class="title-line var var-b"><span class="ol" title="뉴시스">뉴시스</span><span class="tt"><span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span>, 26년 9월 최근 경제 동향 브리핑</span></span><span class="title-line var var-c"><span class="tt"><span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span>, 26년 9월 최근 경제 동향 브리핑</span></span><span class="photo-badge" title="제목에 [포토] 표식은 없지만 사진기사로 추정됩니다">📷 사진 추정</span></div><div class="action-row"><span class="ol-c var var-c">뉴시스</span><span class="time-sep var var-c">·</span><span class="pub-time">10:00 · 1시간 전</span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/003/0014184030" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="time-sep">·</span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 재경부</span></span><span class="article-actions" onclick="event.stopPropagation(); event.preventDefault();"><select class="group-move-select"><option selected disabled>다른 소제목</option><option>정부 경기 회복 평가</option><option>경제정책 인사 및 부동산 의혹</option></select><button class="copy-btn" type="button" title="복사하기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="iconbtn lab-btn" type="button" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="more-wrap"><button class="more-btn" type="button" title="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span><button class="hide-btn" type="button" title="숨기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" disabled title="아래로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><div class="article-summary">임홍기 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 경제분석과장이 11일 오전 세종시 <span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>세종청사에서 26년 9월 최근 경제 동향 브리핑을 하고 있다. 2026.09.11. dahora83@newsis.com</div></details></div></section>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var screen = document.getElementById('screen');
+  var note = document.getElementById('note');
+  var frame = document.getElementById('frame');
+  var stats = document.getElementById('stats');
+  var cur = 'cur';
+
+  function measure() {
+    var total = 0, lines = 0, multi = 0, cut = 0;
+    screen.querySelectorAll('.article').forEach(function (art) {
+      var el = cur === 'b' ? art.querySelector('.var-b .tt') : art.querySelector('.title-line.var-' + cur);
+      var lh = parseFloat(getComputedStyle(el).lineHeight);
+      var n = Math.round(el.getBoundingClientRect().height / lh);
+      total += 1; lines += n; if (n > 1) multi += 1;
+    });
+    if (cur === 'b') {
+      screen.querySelectorAll('.var-b .ol').forEach(function (o) { if (o.scrollWidth > o.clientWidth + 1) cut += 1; });
+    }
+    stats.innerHTML = '제목 줄 합계 <b>' + lines + '줄</b> · 두 줄 이상 꺾인 기사 <b>' + multi + '</b>/' + total +
+      (cur === 'b' ? ' · 이름이 잘린 언론사 <b>' + cut + '</b>' : '');
+  }
+
+  function setVar(v) {
+    cur = v;
+    ['cur', 'a', 'b', 'c'].forEach(function (k) {
+      screen.classList.toggle('show-' + k, k === v);
+      note.classList.toggle('show-' + k, k === v);
+    });
+    document.querySelectorAll('#seg-var button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === v); });
+    measure();
+  }
+  function setWidth(w) {
+    frame.classList.toggle('phone', w === 'phone');
+    document.querySelectorAll('#seg-width button').forEach(function (b) { b.classList.toggle('on', b.dataset.w === w); });
+    requestAnimationFrame(measure);
+  }
+
+  document.querySelectorAll('#seg-var button').forEach(function (b) {
+    b.addEventListener('click', function () { setVar(b.dataset.v); });
+  });
+  document.querySelectorAll('#seg-width button').forEach(function (b) {
+    b.addEventListener('click', function () { setWidth(b.dataset.w); });
+  });
+  document.addEventListener('keydown', function (e) {
+    var map = { '1': 'cur', '2': 'a', '3': 'b', '4': 'c' };
+    if (map[e.key] && !e.target.closest('input, select, textarea')) setVar(map[e.key]);
+  });
+  // 시안의 버튼·체크박스는 모양만 — 누르면 펼치기가 같이 토글되지 않게만 막는다.
+  screen.querySelectorAll('.subheading-icons button, .article-actions *').forEach(function (el) {
+    el.addEventListener('click', function (e) { e.stopPropagation(); });
+  });
+  screen.querySelectorAll('details').forEach(function (d) { d.addEventListener('toggle', measure); });
+
+  setVar('cur');
+  setWidth('desk');
+  // 첫 계산이 글꼴·레이아웃이 자리 잡기 전에 돌면 줄 수가 틀린다 — 자리 잡은 뒤 다시 잰다.
+  window.addEventListener('load', measure);
+  window.addEventListener('resize', measure);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>수시 모니터링 — 수집 원본 → 수집 확정본</title>
+<style>
+  :root {
+    --bg:#F8FAFC; --card:#FFF; --header:#1E3A5F; --accent:#2563EB;
+    --text:#1F2937; --muted:#6B7280; --border:#E5E7EB; --hover:#EFF6FF;
+    --adhoc-bg:#E3F1EE; --adhoc-text:#146B5E;
+    --ai-bg:#EDE9FE; --ai-text:#6D28D9;
+    --pin-gray:#6B7280; --pin-gray-bg:#F3F4F6;
+    --warn-bg:#FFFBEB; --warn-border:#FCD34D; --warn-text:#92400E;
+    --row-new:#FFF9C4;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:'Pretendard','Noto Sans KR',sans-serif; }
+  /* 앱과 동일 규격 (app/icons.py .ic) */
+  .ic { width:1em; height:1em; stroke:currentColor; fill:none; stroke-width:1.9;
+    stroke-linecap:round; stroke-linejoin:round; vertical-align:-0.15em; flex-shrink:0; }
+
+  .mockup-note { background:#1E3A5F; color:#fff; padding:9px 24px; font-size:0.8rem; text-align:center; }
+  .mockup-note b { color:#FDE68A; }
+
+  .topbar { background:var(--card); border-bottom:1px solid var(--border); box-shadow:0 2px 8px rgba(0,0,0,.06); }
+  .topbar-inner { max-width:880px; margin:0 auto; padding:11px 24px; display:flex; justify-content:space-between; align-items:center; }
+  .topbar a { color:var(--accent); text-decoration:none; font-size:0.9rem; font-weight:600; padding:6px 10px; border-radius:6px; }
+  .steps { display:flex; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .step-btn { border:none; background:var(--card); color:var(--muted); font:inherit; font-size:0.84rem;
+    font-weight:600; padding:8px 15px; cursor:pointer; border-right:1px solid var(--border); }
+  .step-btn:last-child { border-right:none; }
+  .step-btn.active.s1 { background:var(--adhoc-bg); color:var(--adhoc-text); }
+  .step-btn.active.s2 { background:var(--ai-bg); color:var(--ai-text); }
+
+  .container { max-width:880px; margin:0 auto; padding:20px 24px 90px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px 22px; margin-bottom:14px; }
+  h1.page-title { color:var(--header); font-size:1.2rem; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+  .page-title .tag { font-size:.67rem; font-weight:700; padding:2px 9px; border-radius:20px; }
+  .tag.s1 { background:var(--adhoc-bg); color:var(--adhoc-text); }
+  .tag.s2 { background:var(--ai-text); color:#fff; }
+  .page-sub { color:var(--muted); font-size:.82rem; margin:0 0 14px; }
+
+  /* 상단 공유 메타 — 두 화면 동일 */
+  .meta-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
+  .chip { display:inline-flex; align-items:center; gap:5px; font-size:.78rem; padding:4px 10px;
+    border-radius:20px; border:1px solid var(--border); background:var(--bg); color:var(--muted); }
+  .chip.or { border-color:var(--accent); color:var(--accent); background:var(--hover); }
+  .chip.and { border-color:var(--adhoc-text); color:var(--adhoc-text); background:var(--adhoc-bg); }
+  .edit-btn { margin-left:auto; font-size:.78rem; color:var(--accent); background:none;
+    border:1px solid var(--border); border-radius:6px; padding:5px 11px; cursor:pointer; font-family:inherit; }
+  .search-bar { display:flex; gap:8px; margin-bottom:4px; }
+  .search-bar input[type=search] { flex:1; font:inherit; font-size:.86rem; border:1px solid var(--border);
+    border-radius:8px; padding:8px 12px; background:var(--bg); }
+  .search-bar select { font:inherit; font-size:.84rem; border:1px solid var(--border); border-radius:8px;
+    padding:8px 10px; background:var(--bg); color:var(--text); }
+
+  /* ---- STEP 1 ---- */
+  .scr-toolbar { display:flex; align-items:center; gap:10px; margin:14px 0 6px; padding:9px 12px;
+    background:var(--bg); border:1px solid var(--border); border-radius:8px; font-size:.83rem; }
+  .scr-toolbar .cnt { color:var(--muted); }
+  .scr-toolbar .cnt b { color:var(--text); }
+  .scr-toolbar .cnt .inb { color:var(--adhoc-text); }
+  .spacer { flex:1; }
+  .selectall-lbl { display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--muted); }
+
+  .row { display:flex; align-items:flex-start; gap:10px; padding:10px 4px; border-bottom:1px solid var(--border); }
+  .row:last-child { border-bottom:none; }
+  .row:hover { background:var(--hover); }
+  .row input[type=checkbox] { margin-top:4px; width:16px; height:16px; accent-color:var(--adhoc-text); cursor:pointer; flex-shrink:0; }
+  .row-body { flex:1; min-width:0; }
+  .row-title { font-size:.92rem; line-height:1.5; }
+  .row-title .outlet { color:var(--muted); font-weight:600; }
+  .row-meta { display:flex; align-items:center; gap:7px; margin-top:3px; font-size:.75rem; color:var(--muted); flex-wrap:wrap; }
+  .row.is-new { background:var(--row-new); }
+  .row.is-new:hover { background:#FBF3AE; }
+  .newtag { font-size:.66rem; background:#EAB308; color:#fff; padding:1px 6px; border-radius:10px; font-weight:700; }
+  .row.is-in { opacity:.62; }
+
+  /* 넣기 버튼 — 아이콘 + 글자, 폭 고정(행마다 안 흔들리게) */
+  .add-btn { display:inline-flex; align-items:center; justify-content:center; gap:5px;
+    min-width:118px; font:inherit; font-size:.78rem; font-weight:600; padding:5px 10px;
+    border:1px solid var(--adhoc-text); color:var(--adhoc-text); background:var(--card);
+    border-radius:7px; cursor:pointer; flex-shrink:0; }
+  .add-btn:hover { background:var(--adhoc-bg); }
+  .add-btn.done { border-color:var(--border); color:var(--muted); background:var(--bg); cursor:default; }
+
+  .bulk-bar { position:sticky; bottom:0; margin:10px -22px -20px; padding:12px 22px;
+    background:var(--card); border-top:2px solid var(--adhoc-text); border-radius:0 0 12px 12px;
+    display:flex; align-items:center; gap:12px; box-shadow:0 -2px 10px rgba(0,0,0,.07); }
+  .bulk-bar .cnt { font-size:.85rem; color:var(--muted); }
+  .bulk-bar .cnt b { color:var(--adhoc-text); font-size:1.02rem; }
+  .bulk-btn { margin-left:auto; background:var(--adhoc-text); color:#fff; border:none; border-radius:8px;
+    padding:9px 17px; font:inherit; font-size:.86rem; font-weight:700; cursor:pointer;
+    display:flex; align-items:center; gap:6px; }
+
+  /* ---- STEP 2 ---- */
+  .subgroup { margin-bottom:16px; }
+  .subgroup h2 { font-size:.95rem; color:var(--header); margin:0 0 4px; display:flex; align-items:center; gap:6px; }
+  .s2-row { display:flex; align-items:flex-start; gap:8px; padding:9px 4px; border-bottom:1px solid var(--border); }
+  .s2-row:last-child { border-bottom:none; }
+  .s2-row:hover { background:var(--hover); }
+  .s2-body { flex:1; min-width:0; }
+  .s2-title { font-size:.92rem; line-height:1.5; }
+  .s2-title .outlet { color:var(--muted); font-weight:600; }
+  .s2-meta { margin-top:3px; font-size:.75rem; color:var(--muted); }
+  .s2-acts { display:flex; align-items:center; gap:1px; flex-shrink:0; }
+  .icon-btn { border:none; background:none; color:var(--muted); border-radius:6px; padding:4px 6px;
+    cursor:pointer; display:inline-flex; align-items:center; font-size:1rem; }
+  .icon-btn:hover { background:var(--hover); color:var(--accent); }
+  .icon-btn.pin-on { color:#fff; background:var(--pin-gray); }
+  .sel-mini { font:inherit; font-size:.76rem; border:1px solid var(--border); border-radius:6px;
+    padding:3px 6px; color:var(--muted); background:var(--card); }
+
+  .callout { background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:8px;
+    padding:10px 14px; font-size:.81rem; color:var(--warn-text); margin-bottom:13px; }
+  .callout b { display:block; margin-bottom:2px; }
+  .callout-go { display:inline-block; margin-top:6px; font-size:.8rem; font-weight:700;
+    color:var(--warn-text); text-decoration:none; border-bottom:1px solid var(--warn-border); }
+  /* 조건에서 벗어났지만 직접 넣은 기사라 유지 — 오류가 아니라 규칙이 일한 것이므로 중립 회색 */
+  .keep-tag { font-size:.7rem; color:var(--muted); background:var(--bg); border:1px solid var(--border);
+    border-radius:10px; padding:1px 7px; margin-left:6px; white-space:nowrap; font-weight:400; }
+
+  .decided { background:#ECFDF5; border:1px solid #6EE7B7; border-radius:10px; padding:16px 18px; margin-top:22px; }
+  .decided h3 { margin:0 0 10px; font-size:.95rem; color:#065F46; }
+  .decided table { width:100%; border-collapse:collapse; font-size:.82rem; }
+  .decided th,.decided td { text-align:left; padding:7px 9px; border-bottom:1px solid #A7F3D0; vertical-align:top; }
+  .decided th { color:#047857; font-size:.75rem; font-weight:600; }
+  .decided td b { color:#065F46; }
+</style>
+</head>
+<body>
+
+<div class="mockup-note">🎨 목업 — 실제 데이터 아님 · <b>탭으로 [수집 원본] ↔ [수집 확정본] 전환</b></div>
+
+<div class="topbar"><div class="topbar-inner">
+  <a href="#">홈</a>
+  <div class="steps">
+    <button class="step-btn s1 active" id="tab1" onclick="showStep(1)">① 수집 원본</button>
+    <button class="step-btn s2" id="tab2" onclick="showStep(2)">② 수집 확정본</button>
+  </div>
+  <a href="#">수시 보관함</a>
+</div></div>
+
+<div class="container">
+
+<!-- ============ STEP 1 : 수집 원본 ============ -->
+<div id="step1">
+  <div class="card">
+    <h1 class="page-title">9/1 세제개편안 <span class="tag s1">수집 원본</span></h1>
+    <p class="page-sub">최신순 · 걸러지지 않은 원본 178건 — 확정본에 실을 기사를 골라주세요</p>
+
+    <div class="meta-row">
+      <span class="chip or">세제</span>
+      <span class="chip or">세제개편안</span>
+      <span class="chip and">＋정부</span>
+      <span class="chip">08:10 ~ 11:10</span>
+      <button class="edit-btn">✎ 편집</button>
+    </div>
+    <div class="search-bar">
+      <input type="search" placeholder="제목으로 찾기…">
+      <select><option>전체 언론사</option><option>등록 언론사만</option></select>
+    </div>
+
+    <div class="scr-toolbar">
+      <span class="cnt">원본 <b>178건</b> · 확정본에 넣음 <b class="inb" id="inCount">1건</b></span>
+      <div class="spacer"></div>
+      <label class="selectall-lbl"><input type="checkbox" onclick="toggleAll(this)"> 전체 선택</label>
+    </div>
+
+    <div id="rows1">
+      <div class="row is-new">
+        <input type="checkbox" onchange="sync()">
+        <div class="row-body">
+          <div class="row-title"><span class="outlet">(KBS)</span> 정부, 부동산 세제개편안 발표…다주택자 종부세 완화</div>
+          <div class="row-meta"><span class="newtag">NEW</span><span>11:42 게시</span><span>원문보기</span></div>
+        </div>
+        <button class="add-btn" onclick="putIn(this)">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          확정본에 넣기</button>
+      </div>
+
+      <div class="row is-new">
+        <input type="checkbox" onchange="sync()">
+        <div class="row-body">
+          <div class="row-title"><span class="outlet">(연합뉴스)</span> 세제개편안, 국회 통과 험로 예고</div>
+          <div class="row-meta"><span class="newtag">NEW</span><span>11:38 게시</span><span>원문보기</span></div>
+        </div>
+        <button class="add-btn" onclick="putIn(this)">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          확정본에 넣기</button>
+      </div>
+
+      <div class="row is-in">
+        <input type="checkbox" disabled>
+        <div class="row-body">
+          <div class="row-title"><span class="outlet">(조선일보)</span> 여당 "세제개편, 서민 부담 완화가 핵심"</div>
+          <div class="row-meta"><span>11:20 게시</span><span>원문보기</span></div>
+        </div>
+        <button class="add-btn done" disabled>✔ 넣음</button>
+      </div>
+
+      <div class="row">
+        <input type="checkbox" onchange="sync()">
+        <div class="row-body">
+          <div class="row-title"><span class="outlet">(스포츠서울)</span> [포토] 세제개편안 브리핑 하는 재경부 차관</div>
+          <div class="row-meta"><span>11:15 게시</span><span>원문보기</span></div>
+        </div>
+        <button class="add-btn" onclick="putIn(this)">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          확정본에 넣기</button>
+      </div>
+
+      <div class="row">
+        <input type="checkbox" onchange="sync()">
+        <div class="row-body">
+          <div class="row-title"><span class="outlet">(매일경제)</span> 종부세 완화, 시장 반응은 "글쎄"</div>
+          <div class="row-meta"><span>10:58 게시</span><span>원문보기</span></div>
+        </div>
+        <button class="add-btn" onclick="putIn(this)">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          확정본에 넣기</button>
+      </div>
+
+      <div class="row">
+        <input type="checkbox" onchange="sync()">
+        <div class="row-body">
+          <div class="row-title"><span class="outlet">(이데일리)</span> 세제개편안과 무관한 지역축제 소식…행사 400여 개 참여</div>
+          <div class="row-meta"><span>10:40 게시</span><span>원문보기</span></div>
+        </div>
+        <button class="add-btn" onclick="putIn(this)">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          확정본에 넣기</button>
+      </div>
+
+      <div class="row">
+        <input type="checkbox" onchange="sync()">
+        <div class="row-body">
+          <div class="row-title"><span class="outlet">(한국경제)</span> 야당 "세제개편안, 부자감세 시즌2"</div>
+          <div class="row-meta"><span>10:22 게시</span><span>원문보기</span></div>
+        </div>
+        <button class="add-btn" onclick="putIn(this)">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          확정본에 넣기</button>
+      </div>
+    </div>
+
+    <div class="bulk-bar" id="bulkbar" style="display:none">
+      <span class="cnt">선택 <b id="selN">0</b>건</span>
+      <button class="bulk-btn" onclick="putInSelected()">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+        선택한 기사 확정본에 넣기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ STEP 2 : 수집 확정본 ============ -->
+<div id="step2" style="display:none">
+  <div class="card">
+    <h1 class="page-title">9/1 세제개편안 <span class="tag s2">수집 확정본</span></h1>
+    <p class="page-sub">언론사 우선순위순 · 원본 178건 중 <b>5건</b>을 넣었어요</p>
+
+    <div class="meta-row">
+      <span class="chip or">세제</span>
+      <span class="chip or">세제개편안</span>
+      <span class="chip and">＋정부</span>
+      <span class="chip">08:10 ~ 11:10</span>
+      <button class="edit-btn">✎ 편집</button>
+    </div>
+    <div class="search-bar">
+      <input type="search" placeholder="제목으로 찾기…">
+      <select><option>전체 언론사</option><option>등록 언론사만</option></select>
+    </div>
+
+    <div class="callout">
+      <b>⬅ 수집 원본에 새 기사 2건이 들어왔어요</b>
+      아직 확인 안 한 기사예요 — 놓친 게 없는지 봐주세요<br>
+      <a class="callout-go" href="#" onclick="showStep(1);return false;">수집 원본 보기 →</a>
+    </div>
+
+    <div class="subgroup">
+      <h2>&lt;정부·여당 입장&gt; <span style="font-size:.7rem">🤖</span></h2>
+      <div class="s2-row">
+        <div class="s2-body">
+          <div class="s2-title"><span class="outlet">(KBS)</span> 정부, 부동산 세제개편안 발표…다주택자 종부세 완화</div>
+          <div class="s2-meta">11:42 게시 · 원문보기</div>
+        </div>
+        <div class="s2-acts">
+          <select class="sel-mini"><option>다른 소제목</option></select>
+          <button class="icon-btn" title="정기 확정본에 담아두기"><svg class="ic" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg></button>
+          <button class="icon-btn" title="숨기기"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+          <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+          <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+        </div>
+      </div>
+      <div class="s2-row">
+        <div class="s2-body">
+          <div class="s2-title"><span class="outlet">(조선일보)</span> 여당 "세제개편, 서민 부담 완화가 핵심"</div>
+          <div class="s2-meta">11:20 게시 · 원문보기</div>
+        </div>
+        <div class="s2-acts">
+          <select class="sel-mini"><option>다른 소제목</option></select>
+          <button class="icon-btn pin-on" title="담아뒀어요 — 눌러서 취소"><svg class="ic" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg></button>
+          <button class="icon-btn" title="숨기기"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+          <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+          <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="subgroup">
+      <h2>&lt;야당·시장 반응&gt; <span style="font-size:.7rem">🤖</span></h2>
+      <div class="s2-row">
+        <div class="s2-body">
+          <div class="s2-title"><span class="outlet">(한국경제)</span> 야당 "세제개편안, 부자감세 시즌2"</div>
+          <div class="s2-meta">10:22 게시 · 원문보기</div>
+        </div>
+        <div class="s2-acts">
+          <select class="sel-mini"><option>다른 소제목</option></select>
+          <button class="icon-btn" title="정기 확정본에 담아두기"><svg class="ic" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg></button>
+          <button class="icon-btn" title="숨기기"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+          <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+          <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+        </div>
+      </div>
+      <div class="s2-row">
+        <div class="s2-body">
+          <div class="s2-title"><span class="outlet">(매일경제)</span> 종부세 완화, 시장 반응은 "글쎄"<span class="keep-tag" title="나중에 검색어를 좁혀 조건에서 벗어났지만, 직접 넣은 기사라 그대로 둡니다">조건 밖 · 유지</span></div>
+          <div class="s2-meta">10:58 게시 · 원문보기</div>
+        </div>
+        <div class="s2-acts">
+          <select class="sel-mini"><option>다른 소제목</option></select>
+          <button class="icon-btn" title="정기 확정본에 담아두기"><svg class="ic" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg></button>
+          <button class="icon-btn" title="숨기기"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+          <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+          <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="subgroup">
+      <h2 style="color:var(--muted);font-style:italic">📂 소제목 미분류 <span style="font-size:.72rem;font-weight:400">1건</span></h2>
+      <div class="s2-row">
+        <div class="s2-body">
+          <div class="s2-title"><span class="outlet">(연합뉴스)</span> 세제개편안, 국회 통과 험로 예고</div>
+          <div class="s2-meta">11:38 게시 · 원문보기</div>
+        </div>
+        <div class="s2-acts">
+          <select class="sel-mini"><option>다른 소제목</option></select>
+          <button class="icon-btn" title="정기 확정본에 담아두기"><svg class="ic" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg></button>
+          <button class="icon-btn" title="숨기기"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+          <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+          <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 반영한 결정 ============ -->
+<div class="decided">
+  <h3>✅ 이 목업에 반영한 결정</h3>
+  <table>
+    <tr><th style="width:130px">항목</th><th>결정</th><th style="width:44%">근거</th></tr>
+    <tr><td>아이콘</td><td><b>기존 <code>in</code> 그대로</b> (트레이 ↓)</td>
+        <td>새로 만들 것 0개. 이미 "넣기" 뜻으로 쓰는 아이콘</td></tr>
+    <tr><td>이모지/SVG</td><td><b>단색 SVG</b></td>
+        <td>수시 카드 행은 전부 SVG — 여기만 이모지면 그 줄이 튐</td></tr>
+    <tr><td>버튼 모양</td><td><b>아이콘 + 글자</b>, 폭 고정 118px</td>
+        <td>글자 버튼 = 상태를 말하는 자리. 폭 고정이라 행마다 안 흔들림</td></tr>
+    <tr><td>라벨</td><td><code>확정본에 넣기</code> → <code>✔ 넣음</code></td>
+        <td>툴팁엔 <code>수집 확정본에 넣기</code>로 풀네임</td></tr>
+    <tr><td>넣은 뒤</td><td><b>비활성 + 행 흐리게</b></td>
+        <td>단방향. 빼려면 확정본에서 🗑 — 정기 「스크랩됨」과 같은 규칙</td></tr>
+    <tr><td>체크박스 기본값</td><td><b>전부 해제 (고르기)</b></td>
+        <td>저장된 카드 실측 — 아래 참고</td></tr>
+    <tr><td>다시 불러오기<br>검색어 편집</td><td><b>수집 원본에만</b> — 확정본엔 없음</td>
+        <td>확정본에서 검색하면 안 고른 기사가 직접 들어와 흐름이 거꾸로 감. 그 순간 "고른 것만 있는 화면"이 아니게 됨</td></tr>
+    <tr><td>확정본의 알림</td><td><b>「새 기사 N건」</b> 배너<br>(안 고른 전체 수 아님)</td>
+        <td>178건 중 5건을 골랐으면 173건이 안 고른 채 남는 게 <b>정상 종료 상태</b>. 그 수를 띄우면 항상 떠서 신호가 죽음. 변화(새로 들어옴)만 알린다</td></tr>
+    <tr><td>조건 면제</td><td>확정본에 넣은 기사는<br><b>검색어를 좁혀도 유지</b></td>
+        <td>검색 결과가 아니라 담당자가 손으로 만든 보고서라서. 수시 코드에 이미 <code>added_by:"manual"</code>이 시간창 검사에서 면제되는 같은 규칙이 있음</td></tr>
+  </table>
+  <p style="font-size:.81rem;color:#065F46;margin:12px 0 0;line-height:1.7">
+    <b>체크박스 기본값 근거(실측, 2026-09-02):</b> 저장된 수시 카드 16개 중 기사가 있는 9개를 세보니
+    <b>수집 건수 중앙값 64건</b>(최대 517건)인데 <b>숨김은 1,002건 중 1건(0.1%)</b>,
+    <b>소제목이 배정된 카드는 0개</b>였다. 즉 지금 수시 카드는 <b>한 번도 보고서까지 간 적이 없다</b> —
+    너무 많이 긁혀 그대로는 못 쓰는 상태로 쌓여만 있었고, 그게 스크리닝이 필요한 이유다.
+    517건에서 20건을 고르는 작업이라면 전체선택으로 시작할 때 <b>497번 해제</b> vs
+    전체해제로 시작할 때 <b>20번 선택</b>이라, 방향이 명백하다.
+  </p>
+</div>
+
+</div>
+
+<script>
+function showStep(n){
+  step1.style.display = n===1?'':'none';
+  step2.style.display = n===2?'':'none';
+  tab1.classList.toggle('active', n===1);
+  tab2.classList.toggle('active', n===2);
+}
+function boxes(){ return [...document.querySelectorAll('#rows1 input[type=checkbox]:not([disabled])')]; }
+function sync(){
+  var n = boxes().filter(b=>b.checked).length;
+  selN.textContent = n;
+  bulkbar.style.display = n ? 'flex' : 'none';
+}
+function toggleAll(el){ boxes().forEach(b=>b.checked=el.checked); sync(); }
+function putIn(btn){
+  var row = btn.closest('.row');
+  row.classList.add('is-in'); row.classList.remove('is-new');
+  row.querySelector('input').checked = false;
+  row.querySelector('input').disabled = true;
+  btn.outerHTML = '<button class="add-btn done" disabled>✔ 넣음</button>';
+  inCount.textContent = document.querySelectorAll('.add-btn.done').length + '건';
+  sync();
+}
+function putInSelected(){
+  boxes().filter(b=>b.checked).forEach(b=>putIn(b.closest('.row').querySelector('.add-btn')));
+}
+</script>
+</body>
+</html>

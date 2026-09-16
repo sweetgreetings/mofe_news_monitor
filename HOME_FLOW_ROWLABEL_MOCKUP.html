@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>홈 흐름도 — 정기·수시 이름표 시안</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .page { max-width: 960px; margin: 0 auto; padding: 28px 20px 120px; }
+  .intro { margin: 0 0 30px; }
+  .intro h1 { font-size: 1.2rem; color: #1E3A5F; margin: 0 0 6px; }
+  .intro p { font-size: 0.84rem; color: #6B7280; margin: 0 0 6px; line-height: 1.7; }
+  .intro b { color: #1F2937; }
+  .opt { margin-bottom: 56px; }
+  .opt h2 { font-size: 1.05rem; color: #1E3A5F; margin: 0 0 4px; }
+  .opt .why { font-size: 0.82rem; color: #6B7280; margin: 0 0 12px; line-height: 1.7; }
+  .opt .why b { color: #1F2937; }
+  .rec { display: inline-block; font-size: 0.72rem; font-weight: 700; color: #fff; background: #2563EB;
+    border-radius: 6px; padding: 2px 8px; margin-left: 6px; vertical-align: 2px; }
+  .hint { display: inline-block; font-size: 0.74rem; color: #2563EB; background: #EFF6FF; border-radius: 6px;
+    padding: 2px 8px; margin-left: 6px; font-weight: 600; vertical-align: 2px; }
+  .muted-tag { display: inline-block; font-size: 0.72rem; color: #6B7280; background: #F1F5F9; border-radius: 6px;
+    padding: 2px 8px; margin-left: 6px; font-weight: 600; vertical-align: 2px; }
+  .card { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 17px 20px; }
+  .card-h { display: flex; align-items: center; justify-content: space-between; margin: 0 0 13px; }
+  .card-h h3 { font-size: 0.78rem; font-weight: 700; color: #6B7280; margin: 0; }
+  .gearlink { font-size: 0.76rem; font-weight: 500; color: #6B7280; text-decoration: none; border: 1px solid #E5E7EB;
+    border-radius: 20px; padding: 4px 11px; }
+
+  /* ── 지금 구현(landing_renderer)과 같은 칸 값 ── */
+  .tile { position: relative; text-decoration: none; display: flex; align-items: center; justify-content: center;
+    gap: 10px; padding: 0 12px; min-height: 60px; border-radius: 12px; border: 1px solid transparent;
+    transition: background .12s, border-color .12s, transform .12s, box-shadow .12s; }
+  .tile .nm { display: flex; align-items: center; gap: 9px; font-size: 1.02rem; font-weight: 700;
+    letter-spacing: -0.01em; white-space: nowrap; }
+  .tile .nm .e { font-size: 1.15rem; }
+  .tile:hover { transform: translateY(-1px); z-index: 5; box-shadow: 0 4px 12px rgba(30,58,95,.09); }
+  .ar { display: flex; align-items: center; justify-content: center; color: #CBD5E1; }
+  .ar svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .t-live { background: #FEF2F2; color: #DC2626; }
+  .t-reg { background: #EFF6FF; color: #1E3A5F; } .t-reg.draft { color: #2563EB; } .t-reg:hover { border-color: #BFDBFE; }
+  .t-regarch { background: #fff; border-color: #E5E7EB; color: #46586F; } .t-regarch:hover { background: #F8FAFC; border-color: #BFDBFE; }
+  .t-ad { background: #E3F1EE; color: #146B5E; } .t-ad:hover { border-color: rgba(20,107,94,.24); }
+  .t-adarch { background: #fff; border-color: rgba(20,107,94,.24); color: #146B5E; } .t-adarch:hover { background: #F0F7F5; }
+  .tile.t-adnew { background: #fff; border: 1px dashed rgba(20,107,94,.45); color: #146B5E; }
+  .tile.t-adnew:hover { background: #F0F7F5; border-style: solid; }
+  .tile.t-regkw { background: #fff; border: 1px dashed #BFDBFE; color: #46586F; }
+  .tile.t-regkw:hover { background: #F8FAFC; border-style: solid; }
+  .tile.t-live.slim { min-height: 42px; background: #fff; border: 1px dashed #FCA5A5; }
+  .t-live.slim .nm { font-size: 0.94rem; }
+  .tile.t-live.slim:hover { background: #FEF2F2; border-style: solid; }
+  .t-lab { grid-column: 1 / -1; background: #FBF0DA; color: #8A5A14; } .t-lab:hover { border-color: rgba(138,90,20,.28); }
+  .tagset { margin-left: 14px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag-chip { font-size: 0.74rem; font-weight: 600; color: #8A5A14; background: rgba(255,255,255,.75);
+    border: 1px solid rgba(138,90,20,.22); border-radius: 20px; padding: 3px 10px; }
+  .gap { grid-column: 1 / -1; height: 6px; }
+  .conn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    height: 30px; font-size: 0.72rem; font-weight: 600; color: #9CA3AF; }
+  .conn::before { content: ""; width: 0; height: 9px; border-left: 2px dotted #FCA5A5; }
+  .conn::after { content: ""; width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-top: 5px solid #FCA5A5; }
+
+  /* 말풍선 — 지금 구현과 같은 세 층 */
+  .tip { position: absolute; top: calc(100% + 8px); left: 50%; z-index: 10; width: 280px; background: #fff;
+    border: 1px solid #E5E7EB; border-radius: 10px; box-shadow: 0 10px 28px rgba(30,58,95,.15); padding: 11px 14px 12px;
+    display: flex; flex-direction: column; gap: 4px; text-align: left; opacity: 0; visibility: hidden;
+    transform: translate(-50%, -4px); pointer-events: none; white-space: normal;
+    transition: opacity .12s, transform .12s, visibility 0s linear .12s; }
+  .tip::before { content: ""; position: absolute; top: -6px; left: 50%; margin-left: -5px; width: 10px; height: 10px;
+    background: #fff; border-left: 1px solid #E5E7EB; border-top: 1px solid #E5E7EB; transform: rotate(45deg); }
+  .tile:hover .tip { opacity: 1; visibility: visible; transform: translate(-50%, 0);
+    transition: opacity .12s .15s, transform .12s .15s, visibility 0s .15s; }
+  .tip b { font-size: 0.88rem; font-weight: 700; color: inherit; }
+  .tip .tb { font-size: 0.78rem; font-weight: 500; color: #6B7280; line-height: 1.6; }
+  .tip .nx { display: flex; gap: 6px; margin-top: 3px; padding-top: 7px; border-top: 1px solid #E5E7EB;
+    font-size: 0.74rem; font-weight: 600; color: #6B7280; }
+
+  /* ── A. 지금(D안) 격자 ── */
+  .flD { display: grid;
+    grid-template-columns: minmax(0,.72fr) 26px minmax(0,1fr) 26px minmax(0,1fr) 26px minmax(0,1fr);
+    align-items: stretch; row-gap: 12px; }
+  .flD .side { grid-column: 3; }
+
+  /* ── B·C. 왼쪽 이름표 열 + 10px 틈 ── */
+  .flR { display: grid;
+    grid-template-columns: var(--rl-w, 118px) 10px minmax(0,.72fr) 26px minmax(0,1fr) 26px minmax(0,1fr) 26px minmax(0,1fr);
+    align-items: stretch; row-gap: 12px; }
+  .flR .side { grid-column: 5; }
+  .flR .conn { grid-column: 5; }
+  /* 이름표 — 칸이 아니라 글자. 누르는 곳이 아니라서 칸 모양(바탕·테두리)을 안 준다.
+     왼쪽 3px 띠만 그 줄의 색으로 칠해 「이 줄은 이 이름」을 잇는다. */
+  .rl { grid-column: 1; display: flex; flex-direction: column; justify-content: center; gap: 3px;
+    padding: 2px 0 2px 11px; border-left: 3px solid; border-radius: 1px; min-width: 0; }
+  .rl .n { font-size: 0.9rem; font-weight: 800; letter-spacing: -0.01em; white-space: nowrap; }
+  .rl .d { font-size: 0.72rem; font-weight: 500; color: #6B7280; line-height: 1.4; word-break: keep-all; }
+  .phone .rl .d br { display: none; }
+  .rl.reg { border-color: #93C5FD; } .rl.reg .n { color: #1E3A5F; }
+  .rl.ad { border-color: rgba(20,107,94,.5); } .rl.ad .n { color: #146B5E; }
+  .flR .t-lab { grid-column: 1 / -1; }
+
+  /* ── C. 입구 칸이 방식을 한 줄 더 말한다 ── */
+  .tile.two { flex-direction: column; gap: 3px; }
+  .tile.two .s { font-size: 0.7rem; font-weight: 600; opacity: .72; white-space: nowrap; }
+
+  /* ── D. 줄 위 머리글(비교용) ── */
+  .rh { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 8px; margin: 4px 0 -4px; }
+  .rh .n { font-size: 0.84rem; font-weight: 800; }
+  .rh .d { font-size: 0.74rem; color: #6B7280; }
+  .rh .dot { width: 8px; height: 8px; border-radius: 50%; align-self: center; }
+  .rh.reg .n { color: #1E3A5F; } .rh.reg .dot { background: #93C5FD; }
+  .rh.ad .n { color: #146B5E; } .rh.ad .dot { background: rgba(20,107,94,.5); }
+  .rh.ad { margin-top: 10px; }
+
+  /* ── 폰 폭 미리보기 — 실제 구현의 @media (max-width: 640px) 규칙을 클래스로 흉내 ── */
+  .phone { width: 380px; max-width: 100%; margin: 0 auto; border: 1px solid #E5E7EB; border-radius: 22px;
+    padding: 18px 14px; background: #F8FAFC; }
+  .phone .card { padding: 14px 14px; }
+  .phone .flR, .phone .flD { grid-template-columns: minmax(0,1fr); row-gap: 8px; }
+  .phone .ar, .phone .conn, .phone .blank { display: none; }
+  .phone .flR .side { grid-column: 1; }
+  .phone .flR .t-lab { grid-column: 1; }
+  .phone .fl-top { margin-bottom: 8px; }
+  /* 좁은 화면에선 이름표가 그 줄의 머리글이 된다 — 띠를 아래 선으로 눕힌다 */
+  .phone .rl { flex-direction: row; align-items: baseline; gap: 8px; border-left: 0; padding: 10px 0 4px;
+    border-bottom: 2px solid; }
+  .phone .rl.reg { border-color: #93C5FD; } .phone .rl.ad { border-color: rgba(20,107,94,.5); }
+  .phone .tile .tip { display: none; }
+
+  .note { margin-top: 12px; font-size: 0.8rem; color: #6B7280; line-height: 1.75; padding-left: 20px; }
+  .note li { margin-bottom: 2px; }
+  .note b { color: #1F2937; }
+  .diffbox { margin-top: 40px; background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 16px 20px; }
+  .diffbox h2 { font-size: 0.95rem; color: #1E3A5F; margin: 0 0 8px; }
+  .diffbox .tw { overflow-x: auto; }
+  .diffbox table { border-collapse: collapse; width: 100%; font-size: 0.8rem; }
+  .diffbox th, .diffbox td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #F1F5F9; vertical-align: top; }
+  .diffbox th { color: #6B7280; font-weight: 600; font-size: 0.74rem; }
+  .diffbox td:first-child { white-space: nowrap; font-weight: 600; }
+  code { font-size: 0.92em; background: #F1F5F9; border-radius: 4px; padding: 0 4px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro">
+    <h1>홈 흐름도 — 정기·수시 이름표 시안</h1>
+    <p>지금 화면에서 <b>「정기」「수시」라는 글자는 맨 오른쪽 보관함 두 칸에만</b> 있어요. 두 줄이 어떻게 다른지(<b>앱이 정해진 시각마다 알아서</b> 모으느냐,
+      <b>사안이 생기면 담당자가 직접</b> 시작하느냐)는 화면 어디에도 안 적혀 있고, 두 줄은 모양도 칸 이름도 거의 같아요.
+      그래서 보는 사람에겐 <b>색만 다른 똑같은 줄 두 개</b>로 읽혀요.</p>
+    <p>이 시안은 칸 이름은 그대로 두고 <b>줄에 이름을 붙이는</b> 방법 셋을 지금 화면과 나란히 놨어요. 칸마다 마우스를 올리면 지금처럼 말풍선이 떠요.
+      👉 <a href="#optB"><b>B안(추천)</b></a>부터 보셔도 돼요.</p>
+  </div>
+
+  <!-- ─────────── A ─────────── -->
+  <section class="opt">
+    <h2>A. 지금 (9/15 D안) <span class="muted-tag">기준</span></h2>
+    <p class="why">줄에 이름이 없어요. 오늘 D안에서 뺀 줄 제목도 정기 쪽은 <code>모니터링 · 일자 › 시간대</code>였어서, <b>정기 줄에 「정기」라는 이름이 붙은 적은 한 번도 없었어요</b>.
+      「어느 줄이 정기인가」는 끝까지 읽어 보관함 이름에서 거꾸로 짐작해야 하고, 「정기가 뭔가」는 말풍선을 열어야만 알 수 있어요.</p>
+    <div class="card">
+      <div class="card-h"><h3>화면 바로 가기</h3><a class="gearlink" href="#">⚙ 설정</a></div>
+      <div class="flD">
+        <span></span><span></span>
+        <a class="tile t-live slim side" href="#"><span class="nm"><span class="e">🔴</span>실시간</span>
+          <span class="tip"><b>거르지 않은 오늘 기사 전부</b><span class="tb">검색어에 걸린 오늘 기사를 시간순으로 다 보여줘요. 안 봐도 초안은 알아서 모여요.</span><span class="nx">📌 담아두기 → 초안·확정본</span></span></a>
+      </div>
+      <div class="flD"><span></span><span></span><div class="conn side">📌 담아두기</div></div>
+      <div class="flD">
+        <a class="tile t-regkw" href="#"><span class="nm"><span class="e">🔍</span>검색어</span>
+          <span class="tip"><b>정기 스크랩 검색어</b><span class="tb">켜 둔 그룹은 실시간에, 정기 스크랩을 체크한 그룹은 초안·확정본에도 들어가요.</span><span class="nx">저장 → 실시간은 바로 · 정기는 다음 회차부터</span></span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-reg draft" href="#"><span class="nm"><span class="e">⛏️</span>초안</span>
+          <span class="tip"><b>14:00 회차 진행 중</b><span class="tb">마감 전까지 모이는 기사를 미리 정리하는 곳이에요.</span><span class="nx">14:00 회차 마감 → 확정본</span></span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-reg" href="#"><span class="nm"><span class="e">💎</span>확정본</span>
+          <span class="tip"><b>11:00 회차 · 발송 완료</b><span class="tb">마감된 회차의 보고서예요. 여기서 발송해요.</span><span class="nx">다음 회차 마감 → 정기 보관함</span></span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-regarch" href="#"><span class="nm"><span class="e">🗄️</span>정기 보관함</span>
+          <span class="tip"><b>지난 회차 모아보기</b><span class="tb">날짜 › 회차별로 1년 동안 쌓여요.</span></span></a>
+
+        <a class="tile t-adnew" href="#"><span class="nm"><span class="e">🔎</span>새 수집</span>
+          <span class="tip"><b>사안·검색어·시간을 정해 모아요</b><span class="tb">지난 1년 동안 한 수집이 조건째 목록으로 남아 있어, 골라서 다시 쓸 수 있어요.</span><span class="nx">수집 → 수집 원본</span></span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-ad" href="#"><span class="nm"><span class="e">📃</span>수집 원본</span>
+          <span class="tip"><b>인사청문회</b><span class="tb">11:00~13:05 · 이형일, 재정경제부<br>조건에 걸린 기사를 거르지 않고 다 보여줘요.</span><span class="nx">골라 보내기 → 수집 확정본</span></span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-ad" href="#"><span class="nm"><span class="e">🗂️</span>수집 확정본</span>
+          <span class="tip"><b>인사청문회</b><span class="tb">원본에서 기사를 보내면 같은 이름으로 생겨요.</span><span class="nx">자정 → 수시 보관함</span></span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-adarch" href="#"><span class="nm"><span class="e">📚</span>수시 보관함</span>
+          <span class="tip"><b>지난 수집 확정본 모아보기</b><span class="tb">사안 › 날짜별로 1년 동안 쌓여요. 원본은 새 수집에서 다시 찾아요.</span></span></a>
+
+        <div class="gap"></div>
+        <a class="tile t-lab" href="#"><span class="nm"><span class="e">🏷️</span>라벨 보관함</span>
+          <span class="tagset"><span class="tag-chip">사진 아님</span><span class="tag-chip">비상경제본부회의</span><span class="tag-chip">테스트</span></span>
+          <span class="tip"><b>라벨 붙인 기사 모아보기</b><span class="tb">정기·수시를 가리지 않고 모여요. 원래 회차가 지워져도 남아요.</span></span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────── B ─────────── -->
+  <section class="opt" id="optB">
+    <h2>B. 왼쪽 이름표 — 이름 + 누가·언제 <span class="rec">추천</span> <span class="hint">마우스를 올려보세요</span></h2>
+    <p class="why">줄마다 왼쪽에 이름표를 달았어요. 첫 줄은 이름(<b>정기 모니터링 / 수시 모니터링</b>), 둘째 줄은 <b>두 흐름을 가르는 기준 하나</b> — 누가·언제 시작하는지 — 만 적어요.
+      이름표는 누르는 곳이 아니라서 칸 모양(바탕·테두리)을 안 주고, 왼쪽 띠만 그 줄의 색으로 칠해 「이 줄 = 이 이름」을 이어요.
+      칸 이름은 한 글자도 안 바꿔요 — 9/2에 짝으로 맞춘 <code>원본 ↔ 확정본</code>이 그대로 남아요.</p>
+    <div class="card">
+      <div class="card-h"><h3>화면 바로 가기</h3><a class="gearlink" href="#">⚙ 설정</a></div>
+      <div class="flR">
+        <span></span><span></span><span></span><span></span>
+        <a class="tile t-live slim side" href="#"><span class="nm"><span class="e">🔴</span>실시간</span>
+          <span class="tip"><b>거르지 않은 오늘 기사 전부</b><span class="tb">검색어에 걸린 오늘 기사를 시간순으로 다 보여줘요. 안 봐도 초안은 알아서 모여요.</span><span class="nx">📌 담아두기 → 초안·확정본</span></span></a>
+      </div>
+      <div class="flR"><div class="conn">📌 담아두기</div></div>
+      <div class="flR">
+        <div class="rl reg"><span class="n">정기 모니터링</span><span class="d">정해진 시각마다 <br>앱이 알아서</span></div>
+        <span></span>
+        <a class="tile t-regkw" href="#"><span class="nm"><span class="e">🔍</span>검색어</span>
+          <span class="tip"><b>정기 스크랩 검색어</b><span class="tb">켜 둔 그룹은 실시간에, 정기 스크랩을 체크한 그룹은 초안·확정본에도 들어가요.</span><span class="nx">저장 → 실시간은 바로 · 정기는 다음 회차부터</span></span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-reg draft" href="#"><span class="nm"><span class="e">⛏️</span>초안</span>
+          <span class="tip"><b>14:00 회차 진행 중</b><span class="tb">마감 전까지 모이는 기사를 미리 정리하는 곳이에요.</span><span class="nx">14:00 회차 마감 → 확정본</span></span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-reg" href="#"><span class="nm"><span class="e">💎</span>확정본</span>
+          <span class="tip"><b>11:00 회차 · 발송 완료</b><span class="tb">마감된 회차의 보고서예요. 여기서 발송해요.</span><span class="nx">다음 회차 마감 → 정기 보관함</span></span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-regarch" href="#"><span class="nm"><span class="e">🗄️</span>정기 보관함</span>
+          <span class="tip"><b>지난 회차 모아보기</b><span class="tb">날짜 › 회차별로 1년 동안 쌓여요.</span></span></a>
+
+        <div class="rl ad"><span class="n">수시 모니터링</span><span class="d">사안이 생기면 <br>내가 직접</span></div>
+        <span></span>
+        <a class="tile t-adnew" href="#"><span class="nm"><span class="e">🔎</span>새 수집</span>
+          <span class="tip"><b>사안·검색어·시간을 정해 모아요</b><span class="tb">지난 1년 동안 한 수집이 조건째 목록으로 남아 있어, 골라서 다시 쓸 수 있어요.</span><span class="nx">수집 → 수집 원본</span></span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-ad" href="#"><span class="nm"><span class="e">📃</span>수집 원본</span>
+          <span class="tip"><b>인사청문회</b><span class="tb">11:00~13:05 · 이형일, 재정경제부<br>조건에 걸린 기사를 거르지 않고 다 보여줘요.</span><span class="nx">골라 보내기 → 수집 확정본</span></span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-ad" href="#"><span class="nm"><span class="e">🗂️</span>수집 확정본</span>
+          <span class="tip"><b>인사청문회</b><span class="tb">원본에서 기사를 보내면 같은 이름으로 생겨요.</span><span class="nx">자정 → 수시 보관함</span></span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-adarch" href="#"><span class="nm"><span class="e">📚</span>수시 보관함</span>
+          <span class="tip"><b>지난 수집 확정본 모아보기</b><span class="tb">사안 › 날짜별로 1년 동안 쌓여요. 원본은 새 수집에서 다시 찾아요.</span></span></a>
+
+        <div class="gap"></div>
+        <a class="tile t-lab" href="#"><span class="nm"><span class="e">🏷️</span>라벨 보관함</span>
+          <span class="tagset"><span class="tag-chip">사진 아님</span><span class="tag-chip">비상경제본부회의</span><span class="tag-chip">테스트</span></span>
+          <span class="tip"><b>라벨 붙인 기사 모아보기</b><span class="tb">정기·수시를 가리지 않고 모여요. 원래 회차가 지워져도 남아요.</span></span></a>
+      </div>
+    </div>
+    <ul class="note">
+      <li><b>🏷️ 라벨 보관함은 이름표 열까지 한 줄 전체</b>를 써요 — 두 이름표 어느 쪽에도 안 속한다(=둘 다에 걸친다)는 게 자리로 읽혀요.</li>
+      <li>🔴 실시간은 이름표가 없지만 정기 이름표 바로 위, 정기 줄 칸에 매달려 있어 정기 것으로 읽혀요.</li>
+      <li>칸 폭은 이름표 118px만큼 줄어요(1칸 215 → 181px, 이 시안에서 잰 값). 카드 높이는 지금과 같아요. 가장 긴 「📚 수시 보관함」도 한 줄에 들어가요.</li>
+      <li>둘째 줄 문구 후보: <code>정해진 시각마다 앱이 알아서</code> / <code>사안이 생기면 내가 직접</code>(이 시안) ·
+        <code>매일 자동으로</code> / <code>필요할 때 직접</code>(더 짧게) — 핵심은 <b>「자동 ↔ 직접」 한 쌍</b>이 보이는 거예요.</li>
+    </ul>
+  </section>
+
+  <!-- ─────────── C ─────────── -->
+  <section class="opt">
+    <h2>C. 이름표는 이름만, 방식은 입구 칸이 말한다 <span class="hint">마우스를 올려보세요</span></h2>
+    <p class="why">이름표엔 이름만 두고, 「누가·언제」는 줄 맨 앞 <b>입구 칸 안에 한 줄</b>로 옮겼어요 — 담당자가 실제로 누르는 자리에서 차이를 말하게 하려는 안이에요.
+      정기 검색어는 <b>한 번 정해두면</b> 끝이고 새 수집은 <b>할 때마다</b> 정한다는 게 두 입구에서 맞붙어요.
+      대신 오늘 D안에서 칸마다 두 줄이던 걸 한 줄로 줄였는데, <b>입구 두 칸만 다시 두 줄</b>이 돼요.</p>
+    <div class="card">
+      <div class="card-h"><h3>화면 바로 가기</h3><a class="gearlink" href="#">⚙ 설정</a></div>
+      <div class="flR" style="--rl-w: 104px">
+        <span></span><span></span><span></span><span></span>
+        <a class="tile t-live slim side" href="#"><span class="nm"><span class="e">🔴</span>실시간</span>
+          <span class="tip"><b>거르지 않은 오늘 기사 전부</b><span class="tb">검색어에 걸린 오늘 기사를 시간순으로 다 보여줘요. 안 봐도 초안은 알아서 모여요.</span><span class="nx">📌 담아두기 → 초안·확정본</span></span></a>
+      </div>
+      <div class="flR" style="--rl-w: 104px"><div class="conn">📌 담아두기</div></div>
+      <div class="flR" style="--rl-w: 104px">
+        <div class="rl reg"><span class="n">정기 모니터링</span></div>
+        <span></span>
+        <a class="tile t-regkw two" href="#"><span class="nm"><span class="e">🔍</span>검색어</span><span class="s">한 번 정해두면 자동</span>
+          <span class="tip"><b>정기 스크랩 검색어</b><span class="tb">켜 둔 그룹은 실시간에, 정기 스크랩을 체크한 그룹은 초안·확정본에도 들어가요.</span><span class="nx">저장 → 실시간은 바로 · 정기는 다음 회차부터</span></span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-reg draft" href="#"><span class="nm"><span class="e">⛏️</span>초안</span>
+          <span class="tip"><b>14:00 회차 진행 중</b><span class="tb">마감 전까지 모이는 기사를 미리 정리하는 곳이에요.</span><span class="nx">14:00 회차 마감 → 확정본</span></span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-reg" href="#"><span class="nm"><span class="e">💎</span>확정본</span>
+          <span class="tip"><b>11:00 회차 · 발송 완료</b><span class="tb">마감된 회차의 보고서예요. 여기서 발송해요.</span><span class="nx">다음 회차 마감 → 정기 보관함</span></span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-regarch" href="#"><span class="nm"><span class="e">🗄️</span>정기 보관함</span>
+          <span class="tip"><b>지난 회차 모아보기</b><span class="tb">날짜 › 회차별로 1년 동안 쌓여요.</span></span></a>
+
+        <div class="rl ad"><span class="n">수시 모니터링</span></div>
+        <span></span>
+        <a class="tile t-adnew two" href="#"><span class="nm"><span class="e">🔎</span>새 수집</span><span class="s">사안마다 직접</span>
+          <span class="tip"><b>사안·검색어·시간을 정해 모아요</b><span class="tb">지난 1년 동안 한 수집이 조건째 목록으로 남아 있어, 골라서 다시 쓸 수 있어요.</span><span class="nx">수집 → 수집 원본</span></span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-ad" href="#"><span class="nm"><span class="e">📃</span>수집 원본</span>
+          <span class="tip"><b>인사청문회</b><span class="tb">11:00~13:05 · 이형일, 재정경제부<br>조건에 걸린 기사를 거르지 않고 다 보여줘요.</span><span class="nx">골라 보내기 → 수집 확정본</span></span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-ad" href="#"><span class="nm"><span class="e">🗂️</span>수집 확정본</span>
+          <span class="tip"><b>인사청문회</b><span class="tb">원본에서 기사를 보내면 같은 이름으로 생겨요.</span><span class="nx">자정 → 수시 보관함</span></span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-adarch" href="#"><span class="nm"><span class="e">📚</span>수시 보관함</span>
+          <span class="tip"><b>지난 수집 확정본 모아보기</b><span class="tb">사안 › 날짜별로 1년 동안 쌓여요. 원본은 새 수집에서 다시 찾아요.</span></span></a>
+
+        <div class="gap"></div>
+        <a class="tile t-lab" href="#"><span class="nm"><span class="e">🏷️</span>라벨 보관함</span>
+          <span class="tagset"><span class="tag-chip">사진 아님</span><span class="tag-chip">비상경제본부회의</span><span class="tag-chip">테스트</span></span>
+          <span class="tip"><b>라벨 붙인 기사 모아보기</b><span class="tb">정기·수시를 가리지 않고 모여요. 원래 회차가 지워져도 남아요.</span></span></a>
+      </div>
+    </div>
+    <ul class="note">
+      <li>흠: 입구 칸의 둘째 줄은 <b>그 칸 하나의 설명</b>으로 읽혀요. 「정기 줄 전체가 자동」이라는 뜻은 B만큼 곧장 안 와요.</li>
+      <li>이름표만 보면 A보다 확실히 낫지만, 「정기」와 「수시」가 <b>무엇으로 갈리는지</b>는 입구 칸까지 읽어야 알아요.</li>
+    </ul>
+  </section>
+
+  <!-- ─────────── D ─────────── -->
+  <section class="opt">
+    <h2>D. 줄 위 머리글 (비교용)</h2>
+    <p class="why">「카테고리를 나눈다」고 하면 가장 먼저 떠오르는 모양이에요 — 오늘 D안에서 뺀 줄 제목 자리에 이번엔 <b>가르는 기준</b>을 적었어요.
+      문제는 정기 쪽이에요. 🔴 실시간이 초안 위에 매달려 있어서 <b>정기 머리글과 정기 칸 사이에 실시간이 끼어요</b>(머리글이 실시간 이름처럼 읽혀요).
+      카드 높이도 두 줄만큼 늘어나 옆 카드들과 밑선이 더 벌어져요. 비교용으로만 뒀어요.</p>
+    <div class="card">
+      <div class="card-h"><h3>화면 바로 가기</h3><a class="gearlink" href="#">⚙ 설정</a></div>
+      <div class="flD">
+        <div class="rh reg"><span class="dot"></span><span class="n">정기 모니터링</span><span class="d">정해진 시각마다 앱이 알아서</span></div>
+        <span></span><span></span>
+        <a class="tile t-live slim side" href="#"><span class="nm"><span class="e">🔴</span>실시간</span></a>
+      </div>
+      <div class="flD"><span></span><span></span><div class="conn side">📌 담아두기</div></div>
+      <div class="flD">
+        <a class="tile t-regkw" href="#"><span class="nm"><span class="e">🔍</span>검색어</span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-reg draft" href="#"><span class="nm"><span class="e">⛏️</span>초안</span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-reg" href="#"><span class="nm"><span class="e">💎</span>확정본</span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-regarch" href="#"><span class="nm"><span class="e">🗄️</span>정기 보관함</span></a>
+        <div class="rh ad"><span class="dot"></span><span class="n">수시 모니터링</span><span class="d">사안이 생기면 내가 직접</span></div>
+        <a class="tile t-adnew" href="#"><span class="nm"><span class="e">🔎</span>새 수집</span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-ad" href="#"><span class="nm"><span class="e">📃</span>수집 원본</span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-ad" href="#"><span class="nm"><span class="e">🗂️</span>수집 확정본</span></a>
+        <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <a class="tile t-adarch" href="#"><span class="nm"><span class="e">📚</span>수시 보관함</span></a>
+        <div class="gap"></div>
+        <a class="tile t-lab" href="#"><span class="nm"><span class="e">🏷️</span>라벨 보관함</span>
+          <span class="tagset"><span class="tag-chip">사진 아님</span><span class="tag-chip">비상경제본부회의</span><span class="tag-chip">테스트</span></span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────── 폰 ─────────── -->
+  <section class="opt">
+    <h2>B를 폰 폭(640px 이하)에서</h2>
+    <p class="why">좁은 화면에선 지금처럼 칸이 한 줄씩 쌓이고 화살표가 숨어요. 이름표는 <b>그 줄 칸들 위의 머리글</b>로 눕고, 왼쪽 띠가 아래 선으로 바뀌어요.
+      이 미리보기는 🔴 실시간을 <b>정기 머리글 아래</b>로 내린 모양이에요 — 지금 구현 순서(실시간 격자가 맨 위)대로 쌓으면 머리글 위로 올라가 D에서 걸리던 「끼어듦」이 생겨요. 구현할 때 좁은 화면에서만 순서를 바꿔요.</p>
+    <div class="phone">
+      <div class="card">
+        <div class="card-h"><h3>화면 바로 가기</h3><a class="gearlink" href="#">⚙ 설정</a></div>
+        <div class="flR">
+          <div class="rl reg"><span class="n">정기 모니터링</span><span class="d">정해진 시각마다 <br>앱이 알아서</span></div>
+          <a class="tile t-live slim side" href="#"><span class="nm"><span class="e">🔴</span>실시간</span></a>
+          <a class="tile t-regkw" href="#"><span class="nm"><span class="e">🔍</span>검색어</span></a>
+          <a class="tile t-reg draft" href="#"><span class="nm"><span class="e">⛏️</span>초안</span></a>
+          <a class="tile t-reg" href="#"><span class="nm"><span class="e">💎</span>확정본</span></a>
+          <a class="tile t-regarch" href="#"><span class="nm"><span class="e">🗄️</span>정기 보관함</span></a>
+          <div class="rl ad"><span class="n">수시 모니터링</span><span class="d">사안이 생기면 <br>내가 직접</span></div>
+          <a class="tile t-adnew" href="#"><span class="nm"><span class="e">🔎</span>새 수집</span></a>
+          <a class="tile t-ad" href="#"><span class="nm"><span class="e">📃</span>수집 원본</span></a>
+          <a class="tile t-ad" href="#"><span class="nm"><span class="e">🗂️</span>수집 확정본</span></a>
+          <a class="tile t-adarch" href="#"><span class="nm"><span class="e">📚</span>수시 보관함</span></a>
+          <a class="tile t-lab" href="#"><span class="nm"><span class="e">🏷️</span>라벨 보관함</span></a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="diffbox">
+    <h2>지금 홈과 달라지는 점 (B 기준)</h2>
+    <div class="tw">
+    <table>
+      <tr><th>자리</th><th>지금</th><th>바뀐 뒤</th></tr>
+      <tr><td>줄 이름</td><td>없음 (정기는 한 번도 없었음)</td><td>왼쪽 이름표 <code>정기 모니터링</code> / <code>수시 모니터링</code> + 둘째 줄에 누가·언제</td></tr>
+      <tr><td>칸 이름 여덟 개</td><td>—</td><td><b>그대로</b> (원본 ↔ 확정본 짝 유지)</td></tr>
+      <tr><td>칸 폭</td><td>215px</td><td>181px (이름표 118px + 틈 10px만큼) · 카드 높이는 그대로</td></tr>
+      <tr><td>🏷️ 라벨 보관함</td><td>칸 줄 전체</td><td>이름표 열까지 전체 — 어느 이름표에도 안 속함</td></tr>
+      <tr><td>말풍선</td><td>—</td><td>그대로 (칸마다 세 층)</td></tr>
+      <tr><td>CLAUDE.md 「본업 화면은 자기를 해명하지 않는다」</td><td>—</td><td>예외로 적어야 해요. 근거는 <code>정기 보관함</code>과 같아요 — <b>짝이 있으면 양쪽 다 이름이 있어야</b> 해요.
+        오늘 뺀 줄 제목(<code>일자 › 시간대</code>)은 보관함 구조 설명이라 빠져도 됐고, 이번 이름표는 두 줄을 가르는 기준이라 성격이 달라요.</td></tr>
+    </table>
+    </div>
+  </div>
+</div>
+</body>
+</html>

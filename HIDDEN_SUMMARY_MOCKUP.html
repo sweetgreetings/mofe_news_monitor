@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>쓰레기통 — 제목 누르면 요약 목업</title>
+<style>
+  /* ── 실제 /hidden 화면(app/settings_server.py _BASE_STYLE + render_hidden_page)에서 그대로 옮긴 값 ── */
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .outer { padding: 24px 24px 40px; }
+  .container {
+    max-width: 800px; margin: 0 auto 24px; padding: 24px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: 8px; box-sizing: border-box;
+  }
+  h1 { font-size: 1.3rem; color: #1E3A5F; margin-top: 0; }
+  .caption { color: #6B7280; font-size: 0.78rem; margin: 0 0 12px; }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+  button { font-family: inherit; }
+
+  .hidden-row { display: flex; align-items: center; gap: 9px; padding: 8px 12px; font-size: 0.9rem; border-top: 1px solid #F1F5F9; }
+  .hidden-row:first-child { border-top: none; }
+  .hidden-row:hover { background: #F3F4F6; }
+  .hidden-row.sel { background: #EFF6FF; }
+  .hidden-row .name { flex: 1; line-height: 1.45; }
+  .hidden-row .title-outlet { color: #6B7280; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  .hidden-row .pub-time { color: #6B7280; font-size: 0.76rem; white-space: nowrap; margin-left: 6px; }
+  .undo-btn {
+    flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 0.76rem;
+    padding: 4px 9px; background: transparent; color: #6B7280; border: 1px solid #E5E7EB;
+    border-radius: 6px; cursor: pointer; white-space: nowrap;
+  }
+  .undo-btn:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .undo-btn svg { width: 13px; height: 13px; }
+  .hid-group { border: 1px solid #E5E7EB; border-radius: 9px; margin-bottom: 10px; background: #FFFFFF; overflow: hidden; }
+  .hid-group > summary {
+    display: flex; align-items: center; gap: 9px; padding: 10px 12px; font-size: 0.88rem;
+    background: #F8FAFC; cursor: pointer; list-style: none;
+  }
+  .hid-group > summary::-webkit-details-marker { display: none; }
+  .hid-group[open] > summary { border-bottom: 1px solid #E5E7EB; }
+  .hid-group > summary::before { content: "▸"; color: #6B7280; font-size: 0.72rem; width: 10px; flex: none; }
+  .hid-group[open] > summary::before { content: "▾"; }
+  .hid-group .gtitle { flex: 1; color: #1F2937; }
+  .hid-group .gtitle b { color: #1E3A5F; }
+  .hid-group .gwhen { color: #9CA3AF; font-size: 0.74rem; margin-left: 5px; }
+  .hid-group .gcount { flex: none; font-size: 0.74rem; font-weight: 700; color: #6B7280; background: #F3F4F6; border-radius: 9px; padding: 1px 8px; }
+  .hid-solo { border: 1px solid #E5E7EB; border-radius: 9px; margin-bottom: 10px; background: #FFFFFF; overflow: hidden; }
+  .hid-day { margin-bottom: 14px; }
+  .hid-day > summary {
+    display: flex; align-items: center; gap: 8px; padding: 6px 2px; margin-bottom: 8px;
+    font-size: 0.92rem; font-weight: 700; color: #1E3A5F; cursor: pointer; list-style: none;
+    border-bottom: 1px solid #E5E7EB;
+  }
+  .hid-day > summary::-webkit-details-marker { display: none; }
+  .hid-day > summary::before { content: "▸"; color: #6B7280; font-size: 0.72rem; width: 10px; flex: none; }
+  .hid-day[open] > summary::before { content: "▾"; }
+  .hid-day .chip-today { font-size: 0.72rem; font-weight: 600; background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; border-radius: 20px; padding: 1px 8px; }
+  .hid-day .dn { font-size: 0.74rem; font-weight: 700; color: #6B7280; background: #F3F4F6; border-radius: 9px; padding: 1px 8px; }
+  .hid-day .ro { margin-left: auto; font-size: 0.74rem; font-weight: 500; color: #9CA3AF; }
+  .hidden-row .src {
+    flex: none; font-size: 0.76rem; padding: 4px 9px; color: #6B7280; text-decoration: none;
+    border: 1px solid #E5E7EB; border-radius: 6px; white-space: nowrap;
+  }
+  .hidden-row .src:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .hid-check { flex: none; width: 14px; height: 14px; margin: 0; cursor: pointer; }
+  .bulk-restore {
+    display: none; position: sticky; top: 0; z-index: 5; align-items: center; gap: 8px;
+    background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px;
+    padding: 8px 12px; font-size: 0.84rem; color: #1E3A5F; margin-bottom: 12px;
+  }
+  .bulk-restore.on { display: flex; }
+  .bulk-restore .n { font-weight: 700; }
+  .bulk-restore .sp { flex: 1; }
+  .bulk-restore .go { display: inline-flex; align-items: center; gap: 5px; background: #2563EB; color: #FFFFFF; border: none; border-radius: 6px; padding: 5px 11px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+  .bulk-restore .go svg { width: 13px; height: 13px; }
+  .bulk-restore .clr { background: transparent; color: #6B7280; border: 1px solid #E5E7EB; border-radius: 6px; padding: 5px 10px; font-size: 0.8rem; cursor: pointer; }
+
+  /* ── 새로 붙는 것 (A·B 공통) ──
+     기사 한 줄을 <details>로 감싼다 — 확정본 기사(render_article)와 같은 구조.
+     체크박스·복구 버튼·링크는 summary 안에 있어도 누를 때 펼쳐지지 않는다(상호작용
+     요소는 details를 안 여닫는다 — 브라우저 기본 동작). */
+  .hrow > summary { list-style: none; }
+  .hrow > summary::-webkit-details-marker { display: none; }
+  .hrow.has-sum > summary { cursor: pointer; }
+  .hrow:not(.has-sum) > summary { cursor: default; }
+  /* 펼친 기사는 제목만 흐리게 — 확정본의 .article:has(details[open]) .title-line { opacity: .62 } 그대로 */
+  .hrow[open] > summary .ttl { opacity: 0.62; }
+  .h-sum { margin: 0 12px 10px 35px; font-size: 0.86rem; line-height: 1.6; color: #1F2937; }
+  .hid-day.ro-day .h-sum { margin-left: 12px; }
+  .h-sum .origin-link-text { margin-left: 6px; }
+  .h-sum .origin-link-text:first-child { margin-left: 0; }
+  /* 확정본 액션 줄의 게시시각 · 원문보기 값 그대로 */
+  .time-sep { color: #6B7280; font-size: 0.76rem; margin: 0 3px; }
+  .origin-link-text {
+    color: #2563EB; font-size: 0.78rem; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 2px; white-space: nowrap;
+  }
+  .origin-link-text:hover { text-decoration: underline; }
+  .origin-link-icon { width: 0.75em; height: 0.75em; }
+
+  /* ── 목업 전용 ── */
+  .mock-ctl { max-width: 800px; margin: 0 auto 14px; border: 1.5px dashed #CBD5E1; border-radius: 12px;
+    background: #F8FAFC; padding: 12px 16px; font-size: 0.82rem; color: #475569;
+    display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; box-sizing: border-box; }
+  .mock-ctl b { color: #1E3A5F; }
+  .mock-ctl .grp { display: inline-flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+  .mock-ctl .seg { font: inherit; font-size: 0.8rem; padding: 4px 10px; border: 1px solid #CBD5E1; background: #fff;
+    border-radius: 7px; cursor: pointer; color: #475569; }
+  .mock-ctl .seg:hover { background: #F1F5F9; }
+  .mock-ctl .seg.on { background: #1E3A5F; border-color: #1E3A5F; color: #fff; font-weight: 600; }
+  .mock-tag { font-size: 0.72rem; color: #94A3B8; }
+  .mode-note { max-width: 800px; margin: 0 auto 14px; font-size: 0.84rem; color: #334155; line-height: 1.6;
+    background: #fff; border: 1px solid #E2E8F0; border-left: 3px solid #93C5FD; border-radius: 8px; padding: 10px 14px; box-sizing: border-box; }
+  .notes { max-width: 800px; margin: 0 auto; font-size: 0.86rem; color: #334155; line-height: 1.65; }
+  .notes h3 { color: #1E3A5F; font-size: 0.98rem; margin: 20px 0 8px; }
+  .notes .cmp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .notes .cmp > div { border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px; background: #fff; }
+  .notes .cmp > div.rec { border-color: #93C5FD; background: #F8FBFF; }
+  .notes .cmp b { color: #1E3A5F; }
+  .notes .rec-tag { font-size: 0.7rem; color: #2563EB; border: 1px solid #BFDBFE; border-radius: 10px; padding: 0 6px; margin-left: 4px; }
+  .notes code { font-size: 0.8rem; background: #F1F5F9; padding: 1px 5px; border-radius: 4px; }
+  .ref-row { border: 1px solid #E5E7EB; border-radius: 8px; background: #fff; padding: 8px 12px; font-size: 1rem; margin: 6px 0 4px; }
+  .ref-row .l2 { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 0.8rem; color: #6B7280; }
+  .ref-row .title-outlet { color: #6B7280; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  @media (max-width: 640px) { .notes .cmp { grid-template-columns: minmax(0, 1fr); } }
+</style>
+</head>
+<body>
+<div class="outer">
+
+<div class="mock-ctl">
+  <b>보기</b>
+  <span class="grp">
+    <button class="seg" data-mode="now">지금</button>
+    <button class="seg" data-mode="A">A · 원문보기는 펼친 요약 안</button>
+    <button class="seg on" data-mode="B">B · 원문보기는 시각 옆 (추천)</button>
+  </span>
+  <span class="mock-tag">실제 쓰레기통 기록 · 제목을 눌러보세요</span>
+</div>
+<div class="mode-note" id="mode-note"></div>
+
+<div class="container">
+  <h1>🗑️ 숨긴 기사 관리 · 오늘 158건</h1>
+  <p class="caption">🧹 자정이 지나면 숨김은 저절로 풀립니다. 다만 여기서는 최근 7일치를 계속 볼 수 있습니다.</p>
+  <div class="bulk-restore" id="bulk-restore">
+    <span class="n" id="bulk-count">0개 선택됨</span>
+    <span class="sp"></span>
+    <button type="button" class="go"><svg class="ic" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg> 선택한 기사 복구</button>
+    <button type="button" class="clr" onclick="clearSel()">선택 해제</button>
+  </div>
+  <div id="list"></div>
+</div>
+
+<div class="notes">
+  <h3>공통 (A·B 둘 다)</h3>
+  <ul>
+    <li><b>제목을 누르면 그 줄 아래로 요약이 펼쳐집니다.</b> 확정본·초안과 같은 동작이고, 펼친 기사는 제목만 흐려지는 것도 확정본과 같습니다.</li>
+    <li>체크박스·<code>복구</code>·원문보기를 눌러도 요약은 안 펼쳐집니다(버튼·링크는 펼치기와 따로 동작).</li>
+    <li>지난 날짜 줄의 테두리 <code>원문</code> 버튼은 없어집니다.</li>
+    <li>여러 건 묶음·날짜의 ▸▾는 그대로입니다. 기사 줄에는 삼각형을 안 붙입니다. 확정본 기사 줄에도 없고, 세 겹이 되면 무엇이 접히는지 헷갈립니다.</li>
+    <li>좌하단 팝오버는 지금 그대로 둡니다(요약 창이라 펼치지 않음).</li>
+  </ul>
+
+  <h3>정할 것: 원문보기 자리</h3>
+  <div class="cmp">
+    <div><b>A · 펼친 요약 끝에</b><br>
+      줄이 지금과 똑같이 깔끔합니다. 대신 원문을 열려면 <b>항상 두 번</b>(제목 → 원문보기) 눌러야 하고,
+      요약이 없는 기록은 펼쳐도 원문보기 하나만 나오는 빈 칸이 됩니다(맨 아래 9월 11일 줄).</div>
+    <div class="rec"><b>B · 게시시각 옆에 늘</b><span class="rec-tag">추천</span><br>
+      <b>확정본 기사 줄과 같은 모양</b>입니다: 제목 = 요약, <code>시각 · 원문보기</code> = 원문.
+      원문은 한 번에 열리고, 요약이 없는 기록은 그냥 안 펼쳐지면 됩니다(빈 칸이 안 생김).
+      줄마다 파란 글자 하나가 늘어나는 게 대가입니다.
+      <div class="ref-row">
+        <span class="title-outlet">노컷뉴스</span>관계자와 대화하는 이형일 후보자
+        <div class="l2">11:41 <span class="time-sep">·</span><a class="origin-link-text" href="#">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a></div>
+      </div>
+      <span class="mock-tag">↑ 참고: 확정본 기사 줄(두 줄 구조)</span>
+    </div>
+  </div>
+
+  <h3>데이터 (A·B 같음)</h3>
+  <ul>
+    <li>요약은 <b>숨기는 순간 같이 저장</b>합니다(제목·언론사를 숨길 때 같이 저장하는 것과 같은 방식). 지금 쓰레기통 663건 중 14%는 초안 임시 캐시에만 요약이 있어서, 저장하지 않으면 회차가 넘어갈 때 요약이 사라집니다.</li>
+    <li>이미 쌓인 옛 기록은 회차 파일에서 찾아 채웁니다(85%). 끝내 못 찾는 기록(지금 2건)은 요약 없이 보입니다.</li>
+    <li><code>hidden_articles.json</code> 217KB → 약 370KB. 되돌리기 기록은 약 4MB → 7MB.</li>
+  </ul>
+</div>
+</div>
+
+<script>
+// 실제 data/hidden_articles.json 기록 + 회차 파일·초안 캐시에서 찾은 요약
+var UNDO = '<svg class="ic" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg>';
+var EXT = '<svg class="ic origin-link-icon" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>';
+var DAYS = [
+  {label: '9월 15일 (화)', today: true, count: 158, batches: [
+    {rows: [{o: '노컷뉴스', t: '관계자와 대화하는 이형일 후보자', p: '11:41', u: 'https://n.news.naver.com/mnews/article/079/0004189438',
+      s: '이형일 경제부총리 겸 재정경제부 장관 후보자가 15일 서울 여의도 국회 재정경제기획위원회에서 열린 인사청문회에서 관계자와 대화를 하고 있다.'}]},
+    {rows: [{o: '매일경제', t: '경북도, 미래 신소재 ‘그래핀’ 주도권 확보…산학연과 협의체 출범', p: '13:17', u: 'https://n.news.naver.com/mnews/article/009/0005735391',
+      s: '이날 협의체에는 지광철 재정경제부 초혁신경제추진단장, 이재형 산업통상부 섬유탄소나노과장 직무대리, 양금희 경상북도 경제부지사, 박용선 포항시장, 이병훈 포항공대 나노융합기술원장과 그래핀 관련 기업인...'}]},
+    {rows: [{o: 'YTN', t: '김승원 청문회 여야 격돌...\'가족 특혜\' 해명하며 울컥', p: '12:11', u: 'https://n.news.naver.com/mnews/article/052/0002407231',
+      s: '[앵커] 이형일 경제부총리 겸 재정경제부 장관 후보자와 이소영 중기부 장관 후보자 청문회도 동시에 열리고 있는데요, 상황은 어떻습니까? [기자] 이형일, 이소영 두 후보자 청문회 역시 야당의 송곳 질의가 이어지고...'}]},
+    {group: '서울 주택공급 계획 검토', when: '13:19', open: true, rows: [
+      {o: '이데일리', t: '與오기형 "오세훈 \'신통기획\' 31만호 착공? 순증 주택 8.7만세대"', p: '10:59', u: 'https://n.news.naver.com/mnews/article/018/0006369559',
+        s: '오기형 더불어민주당 의원이 10일 서울 영등포구 여의도동 한국금융투자협회에서 열린 ‘제5차 퇴직연금혁신포럼’에서 축사하고 있다.(사진=이영훈 기자) 국회 재정경제기획위원회 소속 오기형 더불어민주당...'},
+      {o: '조선비즈', t: '“신통기획 절반 이상이 ‘2030년 이후’ 착공… 단기 공급대책 필요"', p: '12:19', u: 'https://n.news.naver.com/mnews/article/366/0001192450',
+        s: '15일 국회 재정경제기획위원회 소속 오기형 더불어민주당 의원(서울 도봉구을)이 서울시로부터 제출받은 자료를 분석한 결과, 신통기획 착공계획 물량의 55.5%가 2030~2031년에 집중돼 있다. 통상 착공에서 준공까지는...'},
+      {o: '매일경제', t: '오기형 “2030년까지 서울 주택공급 공백 뭘로 메우나…단기대책 필요”', p: '10:57', u: 'https://n.news.naver.com/mnews/article/009/0005735323',
+        s: '오기형 민주 의원, 주택공급계획 분석 “이주수요 집중땐 주거비 상승” 우려 15일 국회 재정경제기획위원회 소속 오기형 의원(더불어민주당, 서울 도봉구을)은 서울시가 제출한 자료 (2031년 주택공급 계획)에...'}
+    ]}
+  ]},
+  {label: '9월 11일 (금)', today: false, count: 1, open: true, batches: [
+    {rows: [{o: '뉴스1', t: '답변하는 구윤철 부총리', p: '14:26', u: 'https://n.news.naver.com/mnews/article/421/0009165221', s: ''}]}
+  ]},
+  {label: '9월 9일 (수)', today: false, count: 5, open: true, batches: [
+    {group: '법인카드 유흥업소 결제액', when: '09:00', open: true, rows: [
+      {o: 'SBS', t: '작년 유흥업소서 긁은 법카 5천516억 원…룸살롱서 3천26억 썼다', p: '06:05', u: 'https://n.news.naver.com/mnews/article/055/0001386864',
+        s: '오늘(9일) 국회 재정경제기획위원회 소속 더불어민주당 문진석 의원이 국세청, 여신금융협회 등에서 받은 자료를 보면 지난해 법인카드 유흥업소 사용 금액은 5천516억 원으로 집계됐습니다. 지난해 전체 법인카드...'},
+      {o: '매일경제', t: '“룸살롱서만 3000억”…법인카드 유흥업소 결제액 보니', p: '06:55', u: 'https://n.news.naver.com/mnews/article/009/0005732376',
+        s: '9일 국회 재정경제기획위원회 소속 문진석 더불어민주당 의원이 국세청과 여신금융협회에서 받은 자료에 따르면 지난해 유흥업소의 법인카드 결제액은 5516억원으로 집계됐다. 전체 법인카드 사용액...'},
+      {o: '한국일보', t: '작년 \'법카\' 유흥업소서 5516억 긁었다… 룸살롱에만 3026억', p: '07:21', u: 'https://n.news.naver.com/mnews/article/469/0000952952',
+        s: '9일 국회 재정경제기획위원회 소속 문진석 더불어민주당 의원이 국세청과 여신금융협회 등에서 받은 자료에 따르면, 작년 법인카드 유흥업소 사용 금액은 5,516억원이다. 지난해 전체 법인카드 사용액 204조6...'}
+    ]}
+  ]}
+];
+var NOTES = {
+  now: '<b>지금</b> — 오늘 줄은 제목을 눌러도 아무 일이 없고 원문으로 갈 길도 없습니다. 지난 날짜 줄만 오른쪽에 테두리 <code>원문</code> 버튼이 있습니다.',
+  A: '<b>A</b> — 제목을 누르면 요약이 펼쳐지고, 요약 끝에 <code>원문보기</code>가 붙습니다. 줄 모양은 지금과 같습니다. 요약이 없는 9월 11일 줄은 펼치면 원문보기만 나옵니다.',
+  B: '<b>B (추천)</b> — 제목을 누르면 요약이 펼쳐지고, 원문보기는 게시시각 옆에 늘 있습니다(확정본과 같은 <code>시각 · 원문보기</code>). 요약이 없는 9월 11일 줄은 안 펼쳐지고 원문보기만 씁니다.'
+};
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function origin(u) { return '<a class="origin-link-text" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer" title="' + esc(u) + '">원문보기' + EXT + '</a>'; }
+
+function rowHtml(r, today, mode) {
+  var check = today ? '<input type="checkbox" class="hid-check row-check" onchange="toggleRow(this)">' : '';
+  var undo = today ? '<button type="button" class="undo-btn" title="이 기사만 되돌리기">' + UNDO + ' 복구</button>' : '';
+  var ttl = '<span class="ttl"><span class="title-outlet">' + esc(r.o) + '</span>' + esc(r.t) + '</span>';
+  if (mode === 'now') {
+    var act = today ? undo : '<a class="src" href="' + esc(r.u) + '" target="_blank" rel="noopener" title="원문 기사 열기">원문</a>';
+    return '<div class="hidden-row">' + check + '<span class="name">' + ttl + '<span class="pub-time">' + r.p + '</span></span>' + act + '</div>';
+  }
+  var time = mode === 'B'
+    ? '<span class="pub-time">' + r.p + '</span><span class="time-sep">·</span>' + origin(r.u)
+    : '<span class="pub-time">' + r.p + '</span>';
+  var body = '';
+  if (mode === 'A') body = '<p class="h-sum">' + (r.s ? esc(r.s) : '') + origin(r.u) + '</p>';
+  else if (r.s) body = '<p class="h-sum">' + esc(r.s) + '</p>';
+  var expandable = mode === 'A' || !!r.s;
+  var line = check + '<span class="name">' + ttl + time + '</span>' + undo;
+  // 요약이 없으면 펼칠 게 없으므로 details가 아니라 평범한 줄로 그린다
+  if (!expandable) return '<div class="hidden-row">' + line + '</div>';
+  return '<details class="hrow has-sum"><summary class="hidden-row">' + line + '</summary>' + body + '</details>';
+}
+
+function render(mode) {
+  var out = '';
+  DAYS.forEach(function (d) {
+    var inner = '';
+    d.batches.forEach(function (b) {
+      var rows = b.rows.map(function (r) { return rowHtml(r, d.today, mode); }).join('');
+      if (b.rows.length === 1) { inner += '<div class="hid-solo">' + rows + '</div>'; return; }
+      var headCheck = d.today ? '<input type="checkbox" class="hid-check" onclick="event.stopPropagation()" onchange="toggleBatch(this)">' : '';
+      var headUndo = d.today ? '<button type="button" class="undo-btn" onclick="event.stopPropagation()">' + UNDO + ' 모두 복구</button>' : '';
+      inner += '<details class="hid-group"' + (b.open ? ' open' : '') + '><summary>' + headCheck +
+        '<span class="gtitle"><b>' + esc(b.group) + '</b>에서 숨김<span class="gwhen">' + b.when + '</span></span>' +
+        '<span class="gcount">' + b.rows.length + '건</span>' + headUndo + '</summary>' + rows + '</details>';
+    });
+    var chip = d.today ? '<span class="chip-today">오늘</span>' : '';
+    var ro = d.today ? '' : '<span class="ro">숨김이 풀린 기록 · 보기 전용</span>';
+    out += '<details class="hid-day' + (d.today ? '' : ' ro-day') + '"' + (d.today || d.open ? ' open' : '') + '><summary><span class="d">' +
+      d.label + '</span>' + chip + '<span class="dn">' + d.count + '건</span>' + ro + '</summary>' + inner + '</details>';
+  });
+  document.getElementById('list').innerHTML = out;
+  document.getElementById('mode-note').innerHTML = NOTES[mode];
+  // 첫 기사를 펼쳐 둔 채로 — 펼친 모양을 바로 보이게
+  if (mode !== 'now') { var first = document.querySelector('.hrow.has-sum'); if (first) first.open = true; }
+  refreshSel();
+}
+function toggleRow(cb) { cb.closest('.hidden-row').classList.toggle('sel', cb.checked); refreshSel(); }
+function toggleBatch(cb) {
+  cb.closest('.hid-group').querySelectorAll('.row-check').forEach(function (x) {
+    x.checked = cb.checked; x.closest('.hidden-row').classList.toggle('sel', cb.checked);
+  });
+  refreshSel();
+}
+function refreshSel() {
+  var n = document.querySelectorAll('.row-check:checked').length;
+  document.getElementById('bulk-count').textContent = n + '개 선택됨';
+  document.getElementById('bulk-restore').classList.toggle('on', n > 0);
+}
+function clearSel() {
+  document.querySelectorAll('.hid-check').forEach(function (x) { x.checked = false; });
+  document.querySelectorAll('.hidden-row.sel').forEach(function (x) { x.classList.remove('sel'); });
+  refreshSel();
+}
+document.querySelectorAll('.mock-ctl .seg').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    document.querySelectorAll('.mock-ctl .seg').forEach(function (b) { b.classList.remove('on'); });
+    btn.classList.add('on');
+    render(btn.dataset.mode);
+  });
+});
+render('B');
+</script>
+</body>
+</html>

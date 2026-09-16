@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
+<rect width="100%" height="100%" fill="#F8FAFC"/>
+<g id="Sidebar">
+<rect x="0" y="0" width="240" height="900" rx="0" fill="#1E3A5F"/>
+<rect x="24" y="28" width="28" height="28" rx="8" fill="#FFFFFF"/>
+<text x="38" y="47" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="14" font-weight="700" fill="#1E3A5F" text-anchor="middle" letter-spacing="0" xml:space="preserve">재</text>
+<text x="62" y="42" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="start" letter-spacing="0" xml:space="preserve">AI 언론 모니터링</text>
+<text x="62" y="60" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="400" fill="#A9C3EF" text-anchor="start" letter-spacing="0" xml:space="preserve">재정경제부</text>
+<text x="24" y="126" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="start" letter-spacing="0" xml:space="preserve">정기 모니터링</text>
+<text x="32" y="162" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="13" font-weight="400" fill="#A9C3EF" text-anchor="start" letter-spacing="0" xml:space="preserve">초안</text>
+<rect x="12" y="176" width="216" height="34" rx="8" fill="#2563EB"/>
+<text x="32" y="198" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="start" letter-spacing="0" xml:space="preserve">확정본</text>
+<text x="32" y="234" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="13" font-weight="400" fill="#A9C3EF" text-anchor="start" letter-spacing="0" xml:space="preserve">보관함</text>
+<text x="24" y="284" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="14" font-weight="500" fill="#A9C3EF" text-anchor="start" letter-spacing="0" xml:space="preserve">수시 모니터링</text>
+<text x="32" y="320" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="13" font-weight="400" fill="#A9C3EF" text-anchor="start" letter-spacing="0" xml:space="preserve">새 수집</text>
+<text x="32" y="356" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="13" font-weight="400" fill="#A9C3EF" text-anchor="start" letter-spacing="0" xml:space="preserve">수집본</text>
+<text x="32" y="392" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="13" font-weight="400" fill="#A9C3EF" text-anchor="start" letter-spacing="0" xml:space="preserve">수집함</text>
+<text x="24" y="442" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="14" font-weight="500" fill="#A9C3EF" text-anchor="start" letter-spacing="0" xml:space="preserve">동향 보고</text>
+</g>
+<g id="TopBar">
+<rect x="240" y="0" width="1200" height="76" rx="0" fill="#FFFFFF"/>
+<line x1="240" y1="76" x2="1440" y2="76" stroke="#E5E7EB" stroke-width="1"/>
+<text x="272" y="36" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="22" font-weight="700" fill="#1F2937" text-anchor="start" letter-spacing="0" xml:space="preserve">확정본</text>
+<rect x="346" y="20" width="62" height="22" rx="11" fill="#E3F1EE"/>
+<text x="377" y="35" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="700" fill="#146B5E" text-anchor="middle" letter-spacing="0" xml:space="preserve">발송 대기</text>
+<text x="272" y="58" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="400" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">2026. 8. 20. (목)  ·  2회차  ·  09:30 ~ 11:00 스크랩</text>
+<rect x="1068" y="20" width="108" height="36" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="1122" y="43" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="13" font-weight="500" fill="#1F2937" text-anchor="middle" letter-spacing="0" xml:space="preserve">엑셀 내보내기</text>
+<rect x="1188" y="20" width="96" height="36" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="1236" y="43" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="13" font-weight="500" fill="#1F2937" text-anchor="middle" letter-spacing="0" xml:space="preserve">미리보기</text>
+<rect x="1296" y="20" width="112" height="36" rx="8" fill="#2563EB"/>
+<text x="1352" y="43" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle" letter-spacing="0" xml:space="preserve">발송하기</text>
+</g>
+<g id="SummaryStrip">
+<rect x="272" y="104" width="180" height="72" rx="12" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="292" y="130" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="400" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">총 기사</text>
+<text x="292" y="156" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="20" font-weight="700" fill="#1F2937" text-anchor="start" letter-spacing="0" xml:space="preserve">42건</text>
+<rect x="468" y="104" width="180" height="72" rx="12" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="488" y="130" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="400" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">소제목</text>
+<text x="488" y="156" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="20" font-weight="700" fill="#1F2937" text-anchor="start" letter-spacing="0" xml:space="preserve">3개</text>
+<rect x="664" y="104" width="180" height="72" rx="12" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="684" y="130" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="400" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">언론사</text>
+<text x="684" y="156" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="20" font-weight="700" fill="#1F2937" text-anchor="start" letter-spacing="0" xml:space="preserve">18곳</text>
+<rect x="860" y="104" width="180" height="72" rx="12" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="880" y="130" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="400" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">기관장 언급</text>
+<text x="880" y="156" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="20" font-weight="700" fill="#1F2937" text-anchor="start" letter-spacing="0" xml:space="preserve">5건</text>
+</g>
+<g id="ArticleList">
+<rect x="272" y="204" width="1136" height="232" rx="12" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="292" y="231" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="14" font-weight="700" fill="#2563EB" text-anchor="start" letter-spacing="0" xml:space="preserve">① 세제 개편안</text>
+<rect x="422" y="216" width="44" height="20" rx="10" fill="#EFF6FF"/>
+<text x="444" y="230" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="700" fill="#2563EB" text-anchor="middle" letter-spacing="0" xml:space="preserve">3건</text>
+<line x1="292" y1="248" x2="1356" y2="248" stroke="#E5E7EB"/>
+<rect x="292" y="269" width="18" height="18" rx="5" fill="#2563EB"/>
+<path d="M 296 278 l 4 4 l 7 -8" stroke="#FFFFFF" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="324" y="283" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="14" font-weight="500" fill="#1F2937" text-anchor="start" letter-spacing="0" xml:space="preserve">재정경제부, 하반기 세제 개편안 발표… 중산층 감세 폭 확대</text>
+<text x="324" y="301" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="500" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">연합뉴스</text>
+<text x="400" y="301" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="400" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">·  발행 09:42</text>
+<rect x="1190" y="268" width="84" height="22" rx="11" fill="#FBF0DA"/>
+<text x="1232" y="283" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="500" fill="#8A5A14" text-anchor="middle" letter-spacing="0" xml:space="preserve">소제목 변경</text>
+<rect x="1284" y="268" width="72" height="22" rx="11" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="1320" y="283" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="500" fill="#6B7280" text-anchor="middle" letter-spacing="0" xml:space="preserve">원문 열기</text>
+<line x1="324" y1="308" x2="1356" y2="308" stroke="#F1F5F9"/>
+<rect x="292" y="329" width="18" height="18" rx="5" fill="#2563EB"/>
+<path d="M 296 338 l 4 4 l 7 -8" stroke="#FFFFFF" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="324" y="343" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="14" font-weight="500" fill="#1F2937" text-anchor="start" letter-spacing="0" xml:space="preserve">법인세 최고세율 조정안 포함… 재계 "환영"</text>
+<text x="324" y="361" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="500" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">한국경제</text>
+<text x="400" y="361" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="400" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">·  발행 09:55</text>
+<rect x="1190" y="328" width="84" height="22" rx="11" fill="#FBF0DA"/>
+<text x="1232" y="343" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="500" fill="#8A5A14" text-anchor="middle" letter-spacing="0" xml:space="preserve">소제목 변경</text>
+<rect x="1284" y="328" width="72" height="22" rx="11" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="1320" y="343" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="500" fill="#6B7280" text-anchor="middle" letter-spacing="0" xml:space="preserve">원문 열기</text>
+<line x1="324" y1="368" x2="1356" y2="368" stroke="#F1F5F9"/>
+<rect x="292" y="389" width="18" height="18" rx="5" fill="#2563EB"/>
+<path d="M 296 398 l 4 4 l 7 -8" stroke="#FFFFFF" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="324" y="403" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="14" font-weight="500" fill="#1F2937" text-anchor="start" letter-spacing="0" xml:space="preserve">세제 개편 두고 야당 반발, "부자 감세" 공방</text>
+<text x="324" y="421" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="500" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">서울신문</text>
+<text x="400" y="421" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="400" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">·  발행 10:12</text>
+<rect x="1190" y="388" width="84" height="22" rx="11" fill="#FBF0DA"/>
+<text x="1232" y="403" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="500" fill="#8A5A14" text-anchor="middle" letter-spacing="0" xml:space="preserve">소제목 변경</text>
+<rect x="1284" y="388" width="72" height="22" rx="11" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="1320" y="403" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="500" fill="#6B7280" text-anchor="middle" letter-spacing="0" xml:space="preserve">원문 열기</text>
+<rect x="272" y="460" width="1136" height="172" rx="12" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="292" y="487" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="14" font-weight="700" fill="#2563EB" text-anchor="start" letter-spacing="0" xml:space="preserve">② 가계부채·금융</text>
+<rect x="422" y="472" width="44" height="20" rx="10" fill="#EFF6FF"/>
+<text x="444" y="486" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="700" fill="#2563EB" text-anchor="middle" letter-spacing="0" xml:space="preserve">2건</text>
+<line x1="292" y1="504" x2="1356" y2="504" stroke="#E5E7EB"/>
+<rect x="292" y="525" width="18" height="18" rx="5" fill="#2563EB"/>
+<path d="M 296 534 l 4 4 l 7 -8" stroke="#FFFFFF" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="324" y="539" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="14" font-weight="500" fill="#1F2937" text-anchor="start" letter-spacing="0" xml:space="preserve">가계부채 증가세 둔화… 정책 효과 나타나</text>
+<text x="324" y="557" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="500" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">매일경제</text>
+<text x="400" y="557" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="400" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">·  발행 10:20</text>
+<rect x="1190" y="524" width="84" height="22" rx="11" fill="#FBF0DA"/>
+<text x="1232" y="539" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="500" fill="#8A5A14" text-anchor="middle" letter-spacing="0" xml:space="preserve">소제목 변경</text>
+<rect x="1284" y="524" width="72" height="22" rx="11" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="1320" y="539" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="500" fill="#6B7280" text-anchor="middle" letter-spacing="0" xml:space="preserve">원문 열기</text>
+<line x1="324" y1="564" x2="1356" y2="564" stroke="#F1F5F9"/>
+<rect x="292" y="585" width="18" height="18" rx="5" fill="#2563EB"/>
+<path d="M 296 594 l 4 4 l 7 -8" stroke="#FFFFFF" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="324" y="599" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="14" font-weight="500" fill="#1F2937" text-anchor="start" letter-spacing="0" xml:space="preserve">DSR 규제 완화 검토설에 시장 촉각</text>
+<text x="324" y="617" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="500" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">조선일보</text>
+<text x="400" y="617" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="400" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">·  발행 10:34</text>
+<rect x="1190" y="584" width="84" height="22" rx="11" fill="#FBF0DA"/>
+<text x="1232" y="599" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="500" fill="#8A5A14" text-anchor="middle" letter-spacing="0" xml:space="preserve">소제목 변경</text>
+<rect x="1284" y="584" width="72" height="22" rx="11" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="1320" y="599" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="500" fill="#6B7280" text-anchor="middle" letter-spacing="0" xml:space="preserve">원문 열기</text>
+<rect x="272" y="656" width="1136" height="172" rx="12" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="292" y="683" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="14" font-weight="700" fill="#2563EB" text-anchor="start" letter-spacing="0" xml:space="preserve">③ 고용·물가</text>
+<rect x="422" y="668" width="44" height="20" rx="10" fill="#EFF6FF"/>
+<text x="444" y="682" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="700" fill="#2563EB" text-anchor="middle" letter-spacing="0" xml:space="preserve">2건</text>
+<line x1="292" y1="700" x2="1356" y2="700" stroke="#E5E7EB"/>
+<rect x="292" y="721" width="18" height="18" rx="5" fill="#2563EB"/>
+<path d="M 296 730 l 4 4 l 7 -8" stroke="#FFFFFF" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="324" y="735" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="14" font-weight="500" fill="#1F2937" text-anchor="start" letter-spacing="0" xml:space="preserve">7월 취업자 수 증가폭 확대… 청년 고용은 여전히 부진</text>
+<text x="324" y="753" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="500" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">KBS</text>
+<text x="400" y="753" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="400" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">·  발행 10:48</text>
+<rect x="1190" y="720" width="84" height="22" rx="11" fill="#FBF0DA"/>
+<text x="1232" y="735" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="500" fill="#8A5A14" text-anchor="middle" letter-spacing="0" xml:space="preserve">소제목 변경</text>
+<rect x="1284" y="720" width="72" height="22" rx="11" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="1320" y="735" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="500" fill="#6B7280" text-anchor="middle" letter-spacing="0" xml:space="preserve">원문 열기</text>
+<line x1="324" y1="760" x2="1356" y2="760" stroke="#F1F5F9"/>
+<rect x="292" y="781" width="18" height="18" rx="5" fill="#2563EB"/>
+<path d="M 296 790 l 4 4 l 7 -8" stroke="#FFFFFF" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="324" y="795" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="14" font-weight="500" fill="#1F2937" text-anchor="start" letter-spacing="0" xml:space="preserve">소비자물가 2%대 진입, 장관 "안정세 지속될 것"</text>
+<text x="324" y="813" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="500" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">중앙일보</text>
+<text x="400" y="813" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="12" font-weight="400" fill="#6B7280" text-anchor="start" letter-spacing="0" xml:space="preserve">·  발행 10:57</text>
+<rect x="1190" y="780" width="84" height="22" rx="11" fill="#FBF0DA"/>
+<text x="1232" y="795" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="500" fill="#8A5A14" text-anchor="middle" letter-spacing="0" xml:space="preserve">소제목 변경</text>
+<rect x="1284" y="780" width="72" height="22" rx="11" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+<text x="1320" y="795" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-size="11" font-weight="500" fill="#6B7280" text-anchor="middle" letter-spacing="0" xml:space="preserve">원문 열기</text>
+</g>
+</svg>

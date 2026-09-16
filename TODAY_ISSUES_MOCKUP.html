@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>오늘의 쟁점 카드 — 이름·부제·빈 상태 시안</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; background:#F8FAFC; color:#1F2937;
+    font-family: "Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif; }
+  .page { max-width: 700px; margin: 0 auto; padding: 28px 20px 60px; }
+  h1.t { font-size:1.05rem; color:#1E3A5F; margin:0 0 4px; }
+  p.lead { font-size:0.8rem; color:#6B7280; margin:0 0 26px; line-height:1.7; }
+
+  .sec { margin: 0 0 30px; }
+  .seclab { font-size:0.68rem; font-weight:700; color:#6B7280; letter-spacing:.02em;
+    margin:0 0 7px 2px; display:flex; align-items:center; gap:7px; }
+  .tag { font-size:0.6rem; font-weight:700; border-radius:20px; padding:2px 8px; }
+  .tag.now  { background:#F1F3F5; color:#6B7280; }
+  .tag.rec  { background:#EFF6FF; color:#2563EB; }
+  .tag.alt  { background:#FFF7ED; color:#B45309; }
+  .note { font-size:0.72rem; color:#6B7280; margin:7px 0 0 2px; line-height:1.65; }
+  .note b { color:#1F2937; }
+
+  /* ── 실제 home.html 카드 CSS 그대로 ── */
+  .card { background:#FFFFFF; border:1px solid #E5E7EB; border-radius:10px;
+    padding:17px 20px; margin:0; }
+  .card h2 { font-size:0.78rem; font-weight:700; color:#6B7280; margin:0 0 13px;
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .card h2 .sub { font-weight:500; opacity:0.8; }
+  .irow { border-bottom:1px solid #E5E7EB; padding:10px 0; }
+  .irow:last-of-type { border-bottom:none; }
+  .rowhead { display:flex; align-items:center; gap:9px; }
+  .rank { width:19px; height:19px; border-radius:50%; background:#EFF6FF; color:#2563EB;
+    font-size:0.67rem; font-weight:700; flex-shrink:0; display:flex;
+    align-items:center; justify-content:center; }
+  .iname { font-size:0.9rem; font-weight:600; color:#1E3A5F; }
+  .chips { display:flex; gap:4px; flex-wrap:wrap; }
+  .gchip { font-size:0.61rem; font-weight:600; color:#6B7280; border:1px solid #E5E7EB;
+    border-radius:20px; padding:1px 7px; white-space:nowrap; }
+  .icount { margin-left:auto; font-size:0.87rem; font-weight:700; flex-shrink:0; }
+  .etcline { display:flex; align-items:center; gap:10px; font-size:0.77rem;
+    background:#F6F7F9; border:1px solid #E5E7EB; color:#6B7280; border-radius:8px;
+    padding:9px 14px; margin-top:13px; flex-wrap:wrap; }
+  .etcline b { color:#1F2937; }
+  .etcline .why { margin-left:auto; font-size:0.71rem; opacity:.9; }
+
+  /* 시안 강조용(목업 전용) */
+  mark.hl { background:#FEF3C7; padding:0 3px; border-radius:3px; }
+  .ghost { border-style:dashed; background:#FBFCFD; color:#9CA3AF;
+    display:flex; align-items:center; justify-content:center; height:74px;
+    font-size:0.78rem; }
+</style></head><body><div class="page">
+
+<h1 class="t">오늘의 쟁점 카드 — 이름 · 부제 · 빈 상태</h1>
+<p class="lead">아래 카드는 <code>home.html</code>의 실제 CSS를 그대로 복사해 만든 것이라 화면에 붙였을 때와 같게 보인다.
+기사 내용은 8/31 실제 회차에서 가져왔다.</p>
+
+<div class="sec">
+  <div class="seclab">지금 <span class="tag now">현재</span></div>
+  <div class="card">
+    <h2>오늘의 쟁점 <span class="sub">분류된 19건 기준 · 회차마다 갱신 · 일정 기사 1건 제외</span></h2>
+    <div class="irow"><div class="rowhead"><span class="rank">1</span><span class="iname">6개 부처 개각 논의 및 평가</span><span class="chips"><span class="gchip">재정경제부</span></span><span class="icount">9건</span></div></div>
+    <div class="irow"><div class="rowhead"><span class="rank">2</span><span class="iname">경제부총리·재정경제부 인사</span><span class="chips"><span class="gchip">재정경제부</span></span><span class="icount">8건</span></div></div>
+    <div class="irow"><div class="rowhead"><span class="rank">3</span><span class="iname">경제 개각 인사</span><span class="chips"><span class="gchip">재경위</span></span><span class="icount">7건</span></div></div>
+    <div class="etcline"><span>기타 <b>77건</b></span><span class="why">쟁점으로 묶이지 않은 기사</span></div>
+  </div>
+  <p class="note">부제 3개 중 <b>둘은 중복</b>(건수는 행마다·상단 카드에 이미 있음), <b>하나는 자기해명</b>(일정 기사 제외).
+  남은 “회차마다 갱신”은 정기를 아는 사람만 알아듣는 말.</p>
+</div>
+
+<div class="sec">
+  <div class="seclab">시안 A <span class="tag rec">추천</span></div>
+  <div class="card">
+    <h2><mark class="hl">오늘의 주요 주제</mark> <span class="sub"><mark class="hl">4회차 기준</mark></span></h2>
+    <div class="irow"><div class="rowhead"><span class="rank">1</span><span class="iname">6개 부처 개각 논의 및 평가</span><span class="chips"><span class="gchip">재정경제부</span></span><span class="icount">9건</span></div></div>
+    <div class="irow"><div class="rowhead"><span class="rank">2</span><span class="iname">경제부총리·재정경제부 인사</span><span class="chips"><span class="gchip">재정경제부</span></span><span class="icount">8건</span></div></div>
+    <div class="irow"><div class="rowhead"><span class="rank">3</span><span class="iname">경제 개각 인사</span><span class="chips"><span class="gchip">재경위</span></span><span class="icount">7건</span></div></div>
+    <div class="etcline"><span>기타 <b>77건</b></span><span class="why">주제로 묶이지 않은 기사</span></div>
+  </div>
+  <p class="note">“주요”는 이 앱이 이미 쓰는 말(<code>🤖 AI가 추출한 주요 키워드</code>)이라 뜻이 이어지고,
+  “주제”는 실제로 보여주는 것(소제목)과 정확히 맞는다. 부제는 <b>근거 하나</b>만 남긴다.</p>
+</div>
+
+<div class="sec">
+  <div class="seclab">시안 B — 네가 제안한 이름 <span class="tag alt">비교용</span></div>
+  <div class="card">
+    <h2><mark class="hl">오늘의 주요 내용</mark> <span class="sub">4회차 기준</span></h2>
+    <div class="irow"><div class="rowhead"><span class="rank">1</span><span class="iname">6개 부처 개각 논의 및 평가</span><span class="chips"><span class="gchip">재정경제부</span></span><span class="icount">9건</span></div></div>
+    <div class="irow"><div class="rowhead"><span class="rank">2</span><span class="iname">경제부총리·재정경제부 인사</span><span class="chips"><span class="gchip">재정경제부</span></span><span class="icount">8건</span></div></div>
+    <div class="irow"><div class="rowhead"><span class="rank">3</span><span class="iname">경제 개각 인사</span><span class="chips"><span class="gchip">재경위</span></span><span class="icount">7건</span></div></div>
+    <div class="etcline"><span>기타 <b>77건</b></span><span class="why">묶이지 않은 기사</span></div>
+  </div>
+  <p class="note">“내용”은 “기사”보다는 낫다(기사 목록을 약속하지 않으니까). 다만 <b>무엇의 목록인지 안 알려주고</b>,
+  화면의 다른 어휘(키워드 · 소제목 · 사안)와도 안 이어진다. 아래 “기타 77건”을 뭐라 부를지 마땅치 않은 것도 같은 이유.</p>
+</div>
+
+<div class="sec">
+  <div class="seclab">시안 A — 회차가 1건뿐일 때 (앱을 방금 켠 경우)</div>
+  <div class="card">
+    <h2>오늘의 주요 주제 <span class="sub"><mark class="hl">1회차 기준</mark></span></h2>
+    <div class="irow"><div class="rowhead"><span class="rank">1</span><span class="iname">국회 예결위 결산 심사</span><span class="chips"><span class="gchip">예결위</span></span><span class="icount">5건</span></div></div>
+    <div class="irow"><div class="rowhead"><span class="rank">2</span><span class="iname">부동산 공급 대책</span><span class="chips"><span class="gchip">재정경제부</span></span><span class="icount">3건</span></div></div>
+    <div class="etcline"><span>기타 <b>15건</b></span><span class="why">주제로 묶이지 않은 기사</span></div>
+  </div>
+  <p class="note">숨기지 않고 <b>스스로 경고하게</b> 둔다. “1회차 기준”이 보이면 이 순위를 하루의 결론으로 안 읽는다 —
+  정기를 안 쓰는 사람에게도, 컴퓨터를 껐다 켠 날의 너에게도 같이 통한다.</p>
+</div>
+
+<div class="sec">
+  <div class="seclab">회차가 0건일 때 — 카드를 아예 안 그림</div>
+  <div class="card ghost">〔 오늘의 주요 주제 카드가 이 자리에 없음 〕</div>
+  <p class="note">자정~첫 회차 사이, 그리고 정기를 전혀 안 쓰는 사람의 화면.
+  지금의 <code>💤 오늘 분류된 쟁점이 아직 없습니다</code>를 대신한다.</p>
+</div>
+
+</div></body></html>

@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>실시간현황 — URL 줄 시안</title>
+<style>
+  :root { --bg:#F8FAFC; --card:#FFFFFF; --text:#1F2937; --muted:#6B7280; --border:#E5E7EB;
+          --accent:#2563EB; --header:#1E3A5F; --hover:#EFF6FF; --rowhover:#F3F4F6;
+          --ok:#15803D; --warn:#B45309; --warnbg:#FFFBEB; --warnbd:#FDE68A; }
+  * { box-sizing: border-box; }
+  /* 실서비스 실시간현황은 body에 line-height를 지정하지 않는다(= normal).
+     설명 글에만 따로 1.6을 주고, 기사 행에는 절대 상속시키지 않는다 — 여기에 1.5를 주면
+     행이 14px 부풀어 시안 비교가 통째로 틀어진다(실제로 한 번 그렇게 만들었다). */
+  body { margin:0; background:var(--bg); color:var(--text);
+         font-family: Pretendard, "Noto Sans KR", sans-serif; }
+  h1, .sub, .note, .pdesc, .measure, .toolbar, table.cmp, h2.sec { line-height:1.6; }
+  .ic { width:1em; height:1em; stroke:currentColor; fill:none; stroke-width:1.9;
+        stroke-linecap:round; stroke-linejoin:round; vertical-align:-0.15em; flex-shrink:0; }
+  .wrap { max-width:1000px; margin:0 auto; padding:28px 20px 80px; }
+  h1 { font-size:1.4rem; color:var(--header); margin:0 0 6px; }
+  .sub { color:var(--muted); font-size:.9rem; margin:0 0 22px; }
+  .note { background:var(--card); border:1px solid var(--border); border-radius:10px;
+          padding:14px 16px; margin:0 0 14px; font-size:.9rem; }
+  .note h3 { margin:0 0 8px; font-size:.95rem; color:var(--header); }
+  .note ul { margin:0; padding-left:18px; }
+  .note li { margin:4px 0; }
+  .note.keep { background:var(--warnbg); border-color:var(--warnbd); }
+  .note b { color:var(--header); }
+  .tick { color:var(--ok); font-weight:600; }
+
+  /* ── 시안 패널 ───────────────────────────────── */
+  .panel { margin:26px 0 0; }
+  .phead { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin:0 0 8px; }
+  .pname { font-size:1.05rem; font-weight:700; color:var(--header); }
+  .ptag { font-size:.74rem; padding:2px 8px; border-radius:999px; border:1px solid var(--border);
+          color:var(--muted); background:var(--card); }
+  .ptag.now { border-color:#D1D5DB; }
+  .ptag.rec { background:#ECFDF5; border-color:#A7F3D0; color:var(--ok); }
+  .pdesc { color:var(--muted); font-size:.86rem; margin:0 0 10px; }
+  .measure { font-size:.82rem; color:var(--muted); margin:0 0 10px; }
+  .measure b { color:var(--header); font-variant-numeric:tabular-nums; }
+
+  .container { max-width:800px; margin:0; padding:24px; background:var(--card);
+               border:1px solid var(--border); border-radius:8px; }
+
+  /* ── 실서비스와 같은 값(app/live_renderer.py에서 실측해 옮김) ── */
+  .live-row { display:flex; align-items:center; justify-content:space-between; gap:12px;
+              padding:12px 12px 12px 14px; border-top:1px solid var(--border);
+              border-left:3px solid transparent; position:relative; }
+  .live-row:hover { background:var(--rowhover); }
+  .live-row.is-scrapped { border-left-color:var(--accent); background:var(--hover); opacity:.86; }
+  .live-row.is-auto-drafted { border-left-color:#4A3F8F; background:#F0EAFB; opacity:.86; }
+  .live-row.is-hidden { opacity:.5; text-decoration:line-through; }
+  .live-row-text { min-width:0; }
+  .outlet-tag { color:var(--muted); font-size:.8rem; }
+  .row-group-tag { display:inline-block; margin-left:6px; max-width:90px; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; vertical-align:-2px; padding:1px 7px;
+    border-radius:999px; font-size:.69rem; color:var(--accent); background:#FEF2F2;
+    border:1px solid var(--border); }
+  .pub-time { color:var(--muted); font-size:.78rem; margin-left:6px; }
+  .kw-inline { display:inline-flex; align-items:center; gap:4px; margin-left:6px;
+    font-size:.78rem; color:var(--muted); vertical-align:-1px; }
+  .kw-inline .kw-ic { width:.75em; height:.75em; color:#9CA3AF; }
+  .kw-inline .kw-v { display:inline-block; max-width:210px; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; vertical-align:-3px; color:#4B5563; }
+  .photo-badge { display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px;
+    font-size:.69rem; color:var(--muted); background:#F3F4F6; border:1px solid var(--border);
+    white-space:nowrap; vertical-align:1px; }
+  .live-title { font-size:.95rem; margin:2px 0; color:var(--text); }
+  .live-title summary { cursor:pointer; }
+  .live-title summary::marker { color:var(--muted); }
+  .live-summary { margin:6px 0 4px 20px; color:var(--text); font-size:.9rem; }
+  .live-url { font-size:.78rem; overflow-wrap:anywhere; }
+  .live-url a { color:var(--accent); text-decoration:underline; }
+  .hl-word { background:#E4F1FC; color:var(--text); }
+  .t-flash { color:#B91C1C; font-weight:600; }
+  .live-row-actions { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  .add-btn { min-width:84px; padding:6px 9px; font-size:.8rem; border:1px solid var(--border);
+    background:var(--card); border-radius:6px; color:var(--text); cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; gap:4px; white-space:nowrap;
+    font-family:inherit; }
+  .add-btn.added { color:var(--muted); }
+  .copy-btn { padding:6px 10px; font-size:.8rem; border:none; background:transparent;
+    color:var(--text); cursor:pointer; display:inline-flex; align-items:center; gap:4px;
+    font-family:inherit; white-space:nowrap; }
+  .more-btn, .hide-from-live-btn { border:none; background:transparent; color:var(--muted);
+    cursor:pointer; line-height:1; }
+  .more-btn { font-size:1.05rem; padding:3px 7px; }
+  .hide-from-live-btn { font-size:1rem; padding:4px 6px; }
+
+  /* ── 시안별 차이는 여기뿐 ─────────────────────── */
+  /* A안(현행): URL 줄을 그대로 두고, 원문보기 링크는 없다. */
+  .v-a .origin-link-text { display:none; }
+  /* B·C안: URL 줄을 없애고 원문보기 링크 하나로 대신한다. */
+  .v-b .live-url, .v-c .live-url { display:none; }
+  .origin-link-text { flex-shrink:0; color:var(--accent); font-size:.78rem; text-decoration:none;
+    display:inline-flex; align-items:center; gap:2px; white-space:nowrap; margin-left:6px; }
+  .origin-link-text:hover { text-decoration:underline; }
+  .origin-link-icon { width:.75em; height:.75em; }
+  /* B안 — 메타 줄을 flex로 바꿔 검색어가 남는 자리만 먹게 한다(확정본 .kw-inline과 같은 방식).
+     그래서 원문보기가 끼어들어도 메타 줄이 두 줄로 접히지 않는다. */
+  .v-b .live-meta, .v-c .live-meta { display:flex; align-items:center; min-width:0; }
+  /* 검색어만 줄어들고 나머지는 절대 안 줄어든다 — 이 한 줄이 빠지면 언론사 이름이
+     두 줄로 접혀 행이 되레 커진다(실제로 C안에서 그렇게 만들었다). */
+  .v-b .live-meta > *, .v-c .live-meta > * { flex-shrink:0; }
+  .v-b .live-meta .kw-inline, .v-c .live-meta .kw-inline { flex:0 1 auto; min-width:0; }
+  .v-b .live-meta .kw-v, .v-c .live-meta .kw-v { max-width:none; }
+  /* C안 — 원문보기를 메타 줄 오른쪽 끝에 고정한다(누르는 자리가 행마다 안 흔들린다). */
+  .v-c .live-meta .origin-link-text { margin-left:auto; order:9; padding-left:10px; }
+
+  /* 행 높이 눈금 */
+  .rulers .live-row::after { content:attr(data-h) "px"; position:absolute; right:-52px; top:50%;
+    transform:translateY(-50%); font-size:.68rem; color:var(--muted);
+    font-variant-numeric:tabular-nums; }
+  .rulers .container { margin-right:56px; }
+
+  .toolbar { position:sticky; top:0; z-index:5; background:var(--bg); padding:10px 0 12px;
+             border-bottom:1px solid var(--border); margin-bottom:6px; display:flex;
+             align-items:center; gap:14px; flex-wrap:wrap; font-size:.86rem; }
+  .toolbar label { display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
+
+  table.cmp { border-collapse:collapse; width:100%; margin:10px 0 0; font-size:.88rem;
+              background:var(--card); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  table.cmp th, table.cmp td { padding:9px 12px; text-align:left; border-bottom:1px solid var(--border); }
+  table.cmp th { background:#F9FAFB; color:var(--header); font-weight:600; }
+  table.cmp td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  table.cmp tr:last-child td { border-bottom:none; }
+  table.cmp tr.rec td { background:#F6FEF9; }
+  .win { color:var(--ok); font-weight:600; }
+  .lose { color:#B91C1C; }
+  h2.sec { font-size:1.1rem; color:var(--header); margin:34px 0 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>실시간현황 기사 행 — URL 줄을 어떻게 할까</h1>
+  <p class="sub">실시간현황 화면에서 그대로 뽑은 기사 8건(2026-09-16 13:47) · 실서비스와 같은 800px 폭·같은 CSS 값<br>수치는 같은 날 <b>14:05 화면 766건 전수</b>를 브라우저에서 직접 잰 값이다(추정 아님).</p>
+
+  <div class="note">
+    <h3>지금 무엇이 문제인가</h3>
+    <ul>
+      <li>한 행이 <b>세 줄</b>이다 — 메타(언론사·그룹·시각·검색어) / 제목 / <b>URL 통째</b>.</li>
+      <li>URL 줄 폭 실측: 중앙값 <b>308px</b>, 최대 478px. <b>한 줄을 통째로 쓰는데, 담는 정보는 행 맨 앞 언론사 이름이 이미 말해 준다.</b></li>
+      <li>기본 행 82px, 766건이 쌓인 지금 문서 높이가 <b>65,074px</b>. 상단 고정 영역이 433px이라 첫 화면(900px)에 보이는 기사가 <b>5.7건</b>뿐이다.</li>
+    </ul>
+  </div>
+
+  <div class="note keep">
+    <h3>⚠ 반드시 지켜야 하는 두 가지 (2026-08-13 사용자 결정, HISTORY.md)</h3>
+    <ul>
+      <li><b>원문 보기는 접근이 빨라야 한다</b> → 메뉴(⋯) 뒤로 숨기지 않는다. 항상 보이는 링크 한 번 클릭.</li>
+      <li><b>제목 클릭은 요약 펼치기다</b> → 제목 자체를 원문 링크로 바꿀 수 없다.</li>
+    </ul>
+    <p style="margin:8px 0 0">아래 B·C안은 둘 다 이 조건을 지킨다. 제목을 링크로 바꾸는 안은 두 번째 조건에 걸려 애초에 뺐다.</p>
+  </div>
+
+  <div class="note">
+    <h3><span class="tick">✓</span> 다른 화면은 이미 이렇게 바꿨다 — 실시간만 남았다</h3>
+    <ul>
+      <li><b>정기 확정본·초안 (2026-08-14)</b> — “밑줄 텍스트 URL이 화면을 산만하게 만들고 줄바꿈·잘림이 잦다”는 지적으로 URL 줄을 없애고 게시시각 옆 <b>원문보기</b> 링크로 옮겼다.</li>
+      <li><b>수시 (2026-08-19)</b> — 같은 변경. 당시 목업 실측 <b>한 건당 21.2px 절약</b>, A안 채택.</li>
+      <li>그때 함께 정한 조건이 “URL이 화면에 없으면 <b>복사</b>가 클립보드로 가는 유일한 길이니 상시 노출한다”였는데, <b>실시간은 2026-09-01에 이미 복사를 상시 노출로 바꿔 놨다.</b> 전제가 이미 갖춰져 있다.</li>
+    </ul>
+  </div>
+
+  <div class="toolbar">
+    <label><input type="checkbox" id="rulerChk" /> 행 높이 눈금 보기</label>
+    <label><input type="checkbox" id="hideStates" /> 상태 행(스크랩됨·자동 선별·숨김) 감추기</label>
+    <span style="color:var(--muted)">제목을 누르면 요약이 펼쳐진다 — 실제 화면과 같다</span>
+  </div>
+
+  <div class="panel" id="p-a">
+    <div class="phead"><span class="pname">A안 · 현행</span><span class="ptag now">지금 화면</span></div>
+    <p class="pdesc">메타 / 제목 / URL 세 줄. URL 문자열이 그대로 노출된다.</p>
+    <p class="measure" id="m-a"></p>
+    <div class="container v-a">
+      <div class="live-row ">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">한국경제TV</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="row-group-tag" title="재경위">재경위</span><span class="pub-time">13:38 · 9분 전</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/215/0001266170" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">기획재정부, 기재부, 재정경제기획위원회</span></span></div>
+          <details class="live-title"><summary>기획처 신임 예산실장에 김명중...호남 출신은 6년 만</summary><p class="live-summary">기획재정부 국유재산정책과장, 홍보담당관, 법사예산과장, 예산총괄과장, 예산정책과장을 역임하는 등 예산·재정분야의 요직을 두루 거쳤다.</p></details>
+          <div class="live-url"><a href="https://n.news.naver.com/mnews/article/215/0001266170" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/215/0001266170</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg>담아두기</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row ">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">incheonnews.com</span><span class="row-group-tag" title="예결위">예결위</span><span class="pub-time">13:20 · 27분 전</span><a class="origin-link-text" href="http://www.incheonnews.com/news/articleView.html?idxno=440578" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">예산결산특별위원회</span></span></div>
+          <details class="live-title"><summary>[강화군의회, 기록으로 묻다①] 7,915억 추경 심사했는데 감액은 500만원…첫 예산심사 무엇을 걸러냈나 &lt; 정치 &lt; 기사본문 - 인천뉴스</summary><p class="live-summary">의회는 7월 27일부터 30일까지 나흘간 예산결산특별위원회를 열어 각 부서의 예산안을 심사했다.</p></details>
+          <div class="live-url"><a href="http://www.incheonnews.com/news/articleView.html?idxno=440578" target="_blank" rel="noopener noreferrer">http://www.incheonnews.com/news/articleView.html?idxno=440578</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg>담아두기</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row ">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">taxtimes.co.kr</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">10:04 · 3시간 전</span><a class="origin-link-text" href="https://www.taxtimes.co.kr/news/article.html?no=276880" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><span class="photo-badge">📷 사진 추정</span></div>
+          <details class="live-title"><summary>[인사]<span class="hl-word">재정경제부</span> 실장급(1명)</summary><p class="live-summary">국민경제자문회의 지원단장 박홍기(소득법인세정책관) -2026. 9. 16日字</p></details>
+          <div class="live-url"><a href="https://www.taxtimes.co.kr/news/article.html?no=276880" target="_blank" rel="noopener noreferrer">https://www.taxtimes.co.kr/news/article.html?no=276880</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg>담아두기</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row ">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">강원일보</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">11:27 · 2시간 전</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/087/0001218364" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">기획재정부</span></span></div>
+          <details class="live-title"><summary><span class="t-flash">[속보]</span> 윤석열 ‘한덕수 재판 위증’ 항소심도 무죄</summary><p class="live-summary">윤 전 대통령이 애초 국무회의를 열 계획 없이 국무위원 6명만 불렀다가 한 전 총리의 건의를 받은 뒤 의사정족수를 갖추기 위해…</p></details>
+          <div class="live-url"><a href="https://n.news.naver.com/mnews/article/087/0001218364" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/087/0001218364</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg>담아두기</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row is-scrapped">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">뉴스1</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">10:55 · 2시간 전</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/421/0009173335" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 재경부</span></span></div>
+          <details class="live-title"><summary>한은, 외환보유액 순위표 삭제…공식 회의·문서 없었다</summary><p class="live-summary">재정경제부와는 사전에 의견을 교환했다고 답했다. 다만 협의 시점이나 재경부가 제시한 구체적인 의견은 답변서에 담기지 않았다.</p></details>
+          <div class="live-url"><a href="https://n.news.naver.com/mnews/article/421/0009173335" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/421/0009173335</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn added" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>스크랩됨</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row is-auto-drafted">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">파이낸셜뉴스</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">13:45 · 2분 전</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/014/0005576669" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 구윤철</span></span></div>
+          <details class="live-title"><summary>800조 예산도 삼킨 집값…정기국회 '부동산 블랙홀'</summary><p class="live-summary">전날 이형일 경제부총리 겸 재정경제부 장관 후보자 인사청문회에서는 후보자의 과거 주택 매입을 둘러싼 갭투자 공방이 벌어졌다.</p></details>
+          <div class="live-url"><a href="https://n.news.naver.com/mnews/article/014/0005576669" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/014/0005576669</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn added" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5.4" r="1.4"/><path d="M12 6.8v2.3"/><rect x="4.5" y="9.1" width="15" height="10.9" rx="4"/><circle cx="9" cy="14.3" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="14.3" r="1" fill="currentColor" stroke="none"/><path d="M9 17.3h6"/><path d="M4.5 13.2h-2M19.5 13.2h2"/></svg>자동 선별</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row is-hidden">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">뉴시스</span><span class="row-group-tag" title="재경위">재경위</span><span class="pub-time">13:32 · 15분 전</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/003/0014194260" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재경위, 재정경제기획위원회</span></span></div>
+          <details class="live-title"><summary>산업부, 17일 대미투자 국회 보고 연기요청…18일 MOU도 무산</summary><p class="live-summary">한편 산중위는 정부의 요청에 동의했으며 재경위 동의가 이뤄지면 대미 투자 프로젝트 보고 연기가 공식화될 전망이다.</p></details>
+          <div class="live-url"><a href="https://n.news.naver.com/mnews/article/003/0014194260" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/003/0014194260</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn added" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>숨김</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row ">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">ajunews.com</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">13:42 · 5분 전</span><a class="origin-link-text" href="https://www.ajunews.com/view/20260916133843355" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span></div>
+          <details class="live-title"><summary>&lt;오늘의 인사&gt;</summary><p class="live-summary">아주경제=정세희 기자 ssss308@ajunews.com ◇기획예산처 ▷예산실장 김명중 ◇재정경제부 ▷국민경제자문회의 지원단장 박홍기</p></details>
+          <div class="live-url"><a href="https://www.ajunews.com/view/20260916133843355" target="_blank" rel="noopener noreferrer">https://www.ajunews.com/view/20260916133843355</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg>담아두기</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div></div>
+  </div>
+
+  <div class="panel" id="p-b">
+    <div class="phead"><span class="pname">B안 · 게시시각 옆 원문보기</span><span class="ptag rec">추천</span></div>
+    <p class="pdesc">URL 줄을 없애고 <b>시각 바로 뒤</b>에 원문보기 링크를 둔다 — 확정본·초안·수시와 <b>같은 자리·같은 글자</b>. 메타 줄을 flex로 바꿔 검색어가 남는 자리만 먹으므로 줄이 접히지 않는다.</p>
+    <p class="measure" id="m-b"></p>
+    <div class="container v-b">
+      <div class="live-row ">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">한국경제TV</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="row-group-tag" title="재경위">재경위</span><span class="pub-time">13:38 · 9분 전</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/215/0001266170" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">기획재정부, 기재부, 재정경제기획위원회</span></span></div>
+          <details class="live-title"><summary>기획처 신임 예산실장에 김명중...호남 출신은 6년 만</summary><p class="live-summary">기획재정부 국유재산정책과장, 홍보담당관, 법사예산과장, 예산총괄과장, 예산정책과장을 역임하는 등 예산·재정분야의 요직을 두루 거쳤다.</p></details>
+          <div class="live-url"><a href="https://n.news.naver.com/mnews/article/215/0001266170" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/215/0001266170</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg>담아두기</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row ">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">incheonnews.com</span><span class="row-group-tag" title="예결위">예결위</span><span class="pub-time">13:20 · 27분 전</span><a class="origin-link-text" href="http://www.incheonnews.com/news/articleView.html?idxno=440578" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">예산결산특별위원회</span></span></div>
+          <details class="live-title"><summary>[강화군의회, 기록으로 묻다①] 7,915억 추경 심사했는데 감액은 500만원…첫 예산심사 무엇을 걸러냈나 &lt; 정치 &lt; 기사본문 - 인천뉴스</summary><p class="live-summary">의회는 7월 27일부터 30일까지 나흘간 예산결산특별위원회를 열어 각 부서의 예산안을 심사했다.</p></details>
+          <div class="live-url"><a href="http://www.incheonnews.com/news/articleView.html?idxno=440578" target="_blank" rel="noopener noreferrer">http://www.incheonnews.com/news/articleView.html?idxno=440578</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg>담아두기</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row ">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">taxtimes.co.kr</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">10:04 · 3시간 전</span><a class="origin-link-text" href="https://www.taxtimes.co.kr/news/article.html?no=276880" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><span class="photo-badge">📷 사진 추정</span></div>
+          <details class="live-title"><summary>[인사]<span class="hl-word">재정경제부</span> 실장급(1명)</summary><p class="live-summary">국민경제자문회의 지원단장 박홍기(소득법인세정책관) -2026. 9. 16日字</p></details>
+          <div class="live-url"><a href="https://www.taxtimes.co.kr/news/article.html?no=276880" target="_blank" rel="noopener noreferrer">https://www.taxtimes.co.kr/news/article.html?no=276880</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg>담아두기</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row ">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">강원일보</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">11:27 · 2시간 전</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/087/0001218364" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">기획재정부</span></span></div>
+          <details class="live-title"><summary><span class="t-flash">[속보]</span> 윤석열 ‘한덕수 재판 위증’ 항소심도 무죄</summary><p class="live-summary">윤 전 대통령이 애초 국무회의를 열 계획 없이 국무위원 6명만 불렀다가 한 전 총리의 건의를 받은 뒤 의사정족수를 갖추기 위해…</p></details>
+          <div class="live-url"><a href="https://n.news.naver.com/mnews/article/087/0001218364" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/087/0001218364</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg>담아두기</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row is-scrapped">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">뉴스1</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">10:55 · 2시간 전</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/421/0009173335" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 재경부</span></span></div>
+          <details class="live-title"><summary>한은, 외환보유액 순위표 삭제…공식 회의·문서 없었다</summary><p class="live-summary">재정경제부와는 사전에 의견을 교환했다고 답했다. 다만 협의 시점이나 재경부가 제시한 구체적인 의견은 답변서에 담기지 않았다.</p></details>
+          <div class="live-url"><a href="https://n.news.naver.com/mnews/article/421/0009173335" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/421/0009173335</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn added" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>스크랩됨</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row is-auto-drafted">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">파이낸셜뉴스</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">13:45 · 2분 전</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/014/0005576669" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 구윤철</span></span></div>
+          <details class="live-title"><summary>800조 예산도 삼킨 집값…정기국회 '부동산 블랙홀'</summary><p class="live-summary">전날 이형일 경제부총리 겸 재정경제부 장관 후보자 인사청문회에서는 후보자의 과거 주택 매입을 둘러싼 갭투자 공방이 벌어졌다.</p></details>
+          <div class="live-url"><a href="https://n.news.naver.com/mnews/article/014/0005576669" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/014/0005576669</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn added" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5.4" r="1.4"/><path d="M12 6.8v2.3"/><rect x="4.5" y="9.1" width="15" height="10.9" rx="4"/><circle cx="9" cy="14.3" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="14.3" r="1" fill="currentColor" stroke="none"/><path d="M9 17.3h6"/><path d="M4.5 13.2h-2M19.5 13.2h2"/></svg>자동 선별</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row is-hidden">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">뉴시스</span><span class="row-group-tag" title="재경위">재경위</span><span class="pub-time">13:32 · 15분 전</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/003/0014194260" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재경위, 재정경제기획위원회</span></span></div>
+          <details class="live-title"><summary>산업부, 17일 대미투자 국회 보고 연기요청…18일 MOU도 무산</summary><p class="live-summary">한편 산중위는 정부의 요청에 동의했으며 재경위 동의가 이뤄지면 대미 투자 프로젝트 보고 연기가 공식화될 전망이다.</p></details>
+          <div class="live-url"><a href="https://n.news.naver.com/mnews/article/003/0014194260" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/003/0014194260</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn added" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>숨김</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row ">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">ajunews.com</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">13:42 · 5분 전</span><a class="origin-link-text" href="https://www.ajunews.com/view/20260916133843355" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span></div>
+          <details class="live-title"><summary>&lt;오늘의 인사&gt;</summary><p class="live-summary">아주경제=정세희 기자 ssss308@ajunews.com ◇기획예산처 ▷예산실장 김명중 ◇재정경제부 ▷국민경제자문회의 지원단장 박홍기</p></details>
+          <div class="live-url"><a href="https://www.ajunews.com/view/20260916133843355" target="_blank" rel="noopener noreferrer">https://www.ajunews.com/view/20260916133843355</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg>담아두기</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div></div>
+  </div>
+
+  <div class="panel" id="p-c">
+    <div class="phead"><span class="pname">C안 · 메타 줄 오른쪽 끝 고정</span></div>
+    <p class="pdesc">같은 링크를 메타 줄 <b>오른쪽 끝</b>에 고정한다. 누르는 자리가 행마다 안 흔들리는 대신, 다른 세 화면과 자리가 달라진다.</p>
+    <p class="measure" id="m-c"></p>
+    <div class="container v-c">
+      <div class="live-row ">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">한국경제TV</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="row-group-tag" title="재경위">재경위</span><span class="pub-time">13:38 · 9분 전</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/215/0001266170" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">기획재정부, 기재부, 재정경제기획위원회</span></span></div>
+          <details class="live-title"><summary>기획처 신임 예산실장에 김명중...호남 출신은 6년 만</summary><p class="live-summary">기획재정부 국유재산정책과장, 홍보담당관, 법사예산과장, 예산총괄과장, 예산정책과장을 역임하는 등 예산·재정분야의 요직을 두루 거쳤다.</p></details>
+          <div class="live-url"><a href="https://n.news.naver.com/mnews/article/215/0001266170" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/215/0001266170</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg>담아두기</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row ">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">incheonnews.com</span><span class="row-group-tag" title="예결위">예결위</span><span class="pub-time">13:20 · 27분 전</span><a class="origin-link-text" href="http://www.incheonnews.com/news/articleView.html?idxno=440578" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">예산결산특별위원회</span></span></div>
+          <details class="live-title"><summary>[강화군의회, 기록으로 묻다①] 7,915억 추경 심사했는데 감액은 500만원…첫 예산심사 무엇을 걸러냈나 &lt; 정치 &lt; 기사본문 - 인천뉴스</summary><p class="live-summary">의회는 7월 27일부터 30일까지 나흘간 예산결산특별위원회를 열어 각 부서의 예산안을 심사했다.</p></details>
+          <div class="live-url"><a href="http://www.incheonnews.com/news/articleView.html?idxno=440578" target="_blank" rel="noopener noreferrer">http://www.incheonnews.com/news/articleView.html?idxno=440578</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg>담아두기</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row ">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">taxtimes.co.kr</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">10:04 · 3시간 전</span><a class="origin-link-text" href="https://www.taxtimes.co.kr/news/article.html?no=276880" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><span class="photo-badge">📷 사진 추정</span></div>
+          <details class="live-title"><summary>[인사]<span class="hl-word">재정경제부</span> 실장급(1명)</summary><p class="live-summary">국민경제자문회의 지원단장 박홍기(소득법인세정책관) -2026. 9. 16日字</p></details>
+          <div class="live-url"><a href="https://www.taxtimes.co.kr/news/article.html?no=276880" target="_blank" rel="noopener noreferrer">https://www.taxtimes.co.kr/news/article.html?no=276880</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg>담아두기</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row ">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">강원일보</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">11:27 · 2시간 전</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/087/0001218364" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">기획재정부</span></span></div>
+          <details class="live-title"><summary><span class="t-flash">[속보]</span> 윤석열 ‘한덕수 재판 위증’ 항소심도 무죄</summary><p class="live-summary">윤 전 대통령이 애초 국무회의를 열 계획 없이 국무위원 6명만 불렀다가 한 전 총리의 건의를 받은 뒤 의사정족수를 갖추기 위해…</p></details>
+          <div class="live-url"><a href="https://n.news.naver.com/mnews/article/087/0001218364" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/087/0001218364</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg>담아두기</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row is-scrapped">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">뉴스1</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">10:55 · 2시간 전</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/421/0009173335" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 재경부</span></span></div>
+          <details class="live-title"><summary>한은, 외환보유액 순위표 삭제…공식 회의·문서 없었다</summary><p class="live-summary">재정경제부와는 사전에 의견을 교환했다고 답했다. 다만 협의 시점이나 재경부가 제시한 구체적인 의견은 답변서에 담기지 않았다.</p></details>
+          <div class="live-url"><a href="https://n.news.naver.com/mnews/article/421/0009173335" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/421/0009173335</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn added" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>스크랩됨</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row is-auto-drafted">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">파이낸셜뉴스</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">13:45 · 2분 전</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/014/0005576669" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 구윤철</span></span></div>
+          <details class="live-title"><summary>800조 예산도 삼킨 집값…정기국회 '부동산 블랙홀'</summary><p class="live-summary">전날 이형일 경제부총리 겸 재정경제부 장관 후보자 인사청문회에서는 후보자의 과거 주택 매입을 둘러싼 갭투자 공방이 벌어졌다.</p></details>
+          <div class="live-url"><a href="https://n.news.naver.com/mnews/article/014/0005576669" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/014/0005576669</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn added" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5.4" r="1.4"/><path d="M12 6.8v2.3"/><rect x="4.5" y="9.1" width="15" height="10.9" rx="4"/><circle cx="9" cy="14.3" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="14.3" r="1" fill="currentColor" stroke="none"/><path d="M9 17.3h6"/><path d="M4.5 13.2h-2M19.5 13.2h2"/></svg>자동 선별</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row is-hidden">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">뉴시스</span><span class="row-group-tag" title="재경위">재경위</span><span class="pub-time">13:32 · 15분 전</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/003/0014194260" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재경위, 재정경제기획위원회</span></span></div>
+          <details class="live-title"><summary>산업부, 17일 대미투자 국회 보고 연기요청…18일 MOU도 무산</summary><p class="live-summary">한편 산중위는 정부의 요청에 동의했으며 재경위 동의가 이뤄지면 대미 투자 프로젝트 보고 연기가 공식화될 전망이다.</p></details>
+          <div class="live-url"><a href="https://n.news.naver.com/mnews/article/003/0014194260" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/003/0014194260</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn added" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>숨김</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div>
+      <div class="live-row ">
+        <div class="live-row-text">
+          <div class="live-meta"><span class="outlet-tag">ajunews.com</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">13:42 · 5분 전</span><a class="origin-link-text" href="https://www.ajunews.com/view/20260916133843355" target="_blank" rel="noopener noreferrer" title="원문 보기">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span></div>
+          <details class="live-title"><summary>&lt;오늘의 인사&gt;</summary><p class="live-summary">아주경제=정세희 기자 ssss308@ajunews.com ◇기획예산처 ▷예산실장 김명중 ◇재정경제부 ▷국민경제자문회의 지원단장 박홍기</p></details>
+          <div class="live-url"><a href="https://www.ajunews.com/view/20260916133843355" target="_blank" rel="noopener noreferrer">https://www.ajunews.com/view/20260916133843355</a></div>
+        </div>
+        <div class="live-row-actions">
+          <button class="add-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg>담아두기</button>
+          <button class="copy-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>복사</button>
+          <span class="more-wrap"><button class="more-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button></span>
+          <button class="hide-from-live-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </div></div>
+  </div>
+
+  <h2 class="sec">766건 전수 실측 비교</h2>
+  <table class="cmp" id="cmpTable">
+    <tr><th>항목</th><th style="text-align:right">A안(현행)</th><th style="text-align:right">B안(추천)</th><th style="text-align:right">C안</th></tr>
+    <tr><td>기본 행 높이</td><td class="num" id="ha"></td><td class="num" id="hb"></td><td class="num" id="hc"></td></tr>
+    <tr><td>766건 전체 높이(기본 행 × 766)</td><td class="num" id="ta"></td><td class="num" id="tb"></td><td class="num" id="tc"></td></tr>
+    <tr><td>첫 화면(900px)에 보이는 기사</td><td class="num" id="va"></td><td class="num" id="vb"></td><td class="num" id="vc"></td></tr>
+    <tr><td>메타 줄이 두 줄로 접히는 행<br><span style="color:var(--muted);font-size:.8rem">(766건에서 직접 셈)</span></td><td class="num">20건 (2.6%)</td><td class="num"><span class="win">5건 (0.7%)</span></td><td class="num"><span class="win">5건 (0.7%)</span></td></tr>
+    <tr><td>검색어가 잘려 보이는 행<br><span style="color:var(--muted);font-size:.8rem">(마우스를 올리면 전체가 뜬다 — 확정본과 같음)</span></td><td class="num">0건</td><td class="num"><span class="lose">69건 (9.0%)</span></td><td class="num"><span class="lose">69건 (9.0%)</span></td></tr>
+    <tr class="rec"><td>다른 화면과 같은 자리인가</td><td class="num">아니오</td><td class="num"><span class="win">예 (확정본·초안·수시)</span></td><td class="num">아니오</td></tr>
+  </table>
+  <p style="font-size:.8rem;color:var(--muted);margin:8px 2px 0">표의 “기본 행 높이”는 이 목업 표본 8건을 브라우저가 실제로 잰 값(83px)이다. 같은 시각 실서비스 화면은 82px로 1px 낮은데, 표본이 달라서 생긴 차이일 뿐 구조는 같다 — 줄어드는 폭(−18px)은 양쪽이 같다.</p>
+
+  <div class="note" style="margin-top:14px">
+    <h3>같이 따라오는 것</h3>
+    <ul>
+      <li><b>복사·발송 텍스트는 한 글자도 안 바뀐다.</b> URL은 지금도 화면 표시일 뿐이고, 복사 본문은 <code>data-copy-text</code>가 따로 들고 있다(CODING_CONVENTIONS.md §4).</li>
+      <li>잃는 것 하나 — <b>URL을 눈으로 확인하던 길</b>. 다만 언론사 이름이 이미 행 맨 앞에 있고, 세 화면이 이미 이 방식으로 돌고 있다.</li>
+      <li>고칠 자리는 <code>app/live_renderer.py</code> <code>_render_row</code>(<code>.live-url</code> 줄 → <code>.origin-link-text</code>)와 <code>.kw-inline</code>·메타 줄 CSS 두 군데뿐이다.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+(function () {
+  var VIEWPORT = 900, CHROME = 433, TOTAL = 766;
+  function baseHeight(panel) {
+    // 상태·긴 제목 때문에 튀는 행을 빼고, 가장 흔한 높이(최빈값)를 그 시안의 기본 행 높이로 본다.
+    var rows = panel.querySelectorAll('.live-row'), tally = {}, best = 0, bestN = 0;
+    rows.forEach(function (r) {
+      var h = Math.round(r.getBoundingClientRect().height);
+      r.setAttribute('data-h', h);
+      tally[h] = (tally[h] || 0) + 1;
+      if (tally[h] > bestN) { bestN = tally[h]; best = h; }
+    });
+    return best;
+  }
+  function fmt(n) { return n.toLocaleString('ko-KR'); }
+  function run() {
+    var res = {};
+    ['a', 'b', 'c'].forEach(function (k) {
+      var h = baseHeight(document.getElementById('p-' + k));
+      res[k] = h;
+      var total = h * TOTAL, vis = (VIEWPORT - CHROME) / h;
+      document.getElementById('h' + k).textContent = h + 'px';
+      document.getElementById('t' + k).textContent = fmt(total) + 'px';
+      document.getElementById('v' + k).textContent = vis.toFixed(1) + '건';
+      var saved = (res.a - h) * TOTAL;
+      document.getElementById('m-' + k).innerHTML = k === 'a'
+        ? '행 <b>' + h + 'px</b> · 766건이면 <b>' + fmt(total) + 'px</b> · 첫 화면에 <b>' + vis.toFixed(1) + '건</b>'
+        : '행 <b>' + h + 'px</b> (−' + (res.a - h) + 'px) · 766건이면 <b>' + fmt(total) + 'px</b> '
+          + '(<span class="win">' + fmt(saved) + 'px, ' + Math.round(saved / (res.a * TOTAL) * 100) + '% 단축</span>) · '
+          + '첫 화면에 <b>' + vis.toFixed(1) + '건</b>';
+    });
+  }
+  document.getElementById('rulerChk').addEventListener('change', function (e) {
+    document.querySelectorAll('.panel').forEach(function (p) { p.classList.toggle('rulers', e.target.checked); });
+  });
+  document.getElementById('hideStates').addEventListener('change', function (e) {
+    document.querySelectorAll('.live-row.is-scrapped, .live-row.is-auto-drafted, .live-row.is-hidden')
+      .forEach(function (r) { r.style.display = e.target.checked ? 'none' : ''; });
+    run();
+  });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(run); else run();
+  run();
+})();
+</script>
+</body>
+</html>

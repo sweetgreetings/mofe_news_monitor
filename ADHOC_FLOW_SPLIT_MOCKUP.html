@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>수시 모니터링 4단 흐름 — 시안</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #EEF1F5; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; font-size: 14px; }
+  a { color: #2563EB; }
+  button { font: inherit; cursor: pointer; }
+  .mk { max-width: 860px; margin: 0 auto; padding: 24px 16px 140px; }
+
+  /* ── 시안 머리 (앱 화면이 아님) ── */
+  .mk-head h1 { font-size: 1.2rem; color: #1E3A5F; margin: 0 0 6px; }
+  .mk-head p { font-size: 0.84rem; color: #6B7280; margin: 0 0 16px; line-height: 1.7; }
+  .mk-head b { color: #1F2937; }
+  .steps { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; position: sticky; top: 0; z-index: 60;
+    background: #EEF1F5; padding: 8px 0; }
+  .steps button { border: 1px solid #CBD5E1; background: #fff; color: #334155; border-radius: 22px; padding: 7px 14px;
+    font-size: 0.86rem; font-weight: 600; display: inline-flex; gap: 6px; align-items: center; }
+  .steps button .n { display: inline-flex; width: 19px; height: 19px; border-radius: 50%; background: #E2E8F0; color: #475569;
+    align-items: center; justify-content: center; font-size: 0.72rem; }
+  .steps button.on { background: #146B5E; border-color: #146B5E; color: #fff; }
+  .steps button.on .n { background: rgba(255,255,255,.25); color: #fff; }
+  .steps .arr { color: #94A3B8; }
+  .memo { background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 10px; padding: 12px 16px; margin-bottom: 14px;
+    font-size: 0.82rem; line-height: 1.75; color: #57534E; }
+  .memo h2 { font-size: 0.9rem; margin: 0 0 4px; color: #92400E; }
+  .memo ul { margin: 4px 0 0; padding-left: 18px; }
+  .memo b { color: #1F2937; }
+  .memo .q { display: block; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #FCD34D; color: #92400E; }
+  .gone { color: #9CA3AF; text-decoration: line-through; }
+  .screen { display: none; }
+  .screen.on { display: block; }
+
+  /* ── 앱 화면 틀 ── */
+  .frame { border: 1px solid #CBD5E1; border-radius: 12px; overflow: hidden; background: #F8FAFC; position: relative;
+    box-shadow: 0 6px 24px rgba(15,23,42,.08); }
+  .topbar { background: #fff; border-bottom: 1px solid #E5E7EB; }
+  .topbar-inner { max-width: 800px; margin: 0 auto; padding: 12px 24px; display: flex; justify-content: space-between; }
+  .topbar a { text-decoration: none; font-size: 0.86rem; font-weight: 600; color: #2563EB; }
+  .container { max-width: 800px; margin: 0 auto; padding: 20px 20px 90px; }
+  .card { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 18px 20px; }
+  .card + .card { margin-top: 14px; }
+  .page-title { font-size: 1.2rem; color: #1E3A5F; margin: 0 0 3px; }
+  .page-sub { font-size: 0.8rem; color: #6B7280; margin: 0 0 14px; line-height: 1.6; }
+
+  .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 0.76rem; color: #4B5563; border: 1px solid #E5E7EB;
+    background: #fff; border-radius: 20px; padding: 3px 10px; white-space: nowrap; }
+  .chip.edit { color: #2563EB; border-color: #BFDBFE; }
+  .chip.teal { color: #146B5E; background: #E3F1EE; border-color: rgba(20,107,94,.24); font-weight: 600; text-decoration: none; }
+  .btn { border: 1px solid #BFDBFE; background: #fff; color: #2563EB; border-radius: 8px; padding: 6px 11px; font-size: 0.8rem; font-weight: 600; }
+  .btn.solid { background: #2563EB; border-color: #2563EB; color: #fff; }
+  .btn.pill { border-radius: 20px; }
+  .btn.ai { background: #F0EAFB; border-color: #DCD0F2; color: #4A3F8F; }
+  .exp { display: flex; gap: 6px; }
+
+  /* 기사 행 — 지금 수시 화면과 같은 규격 */
+  .art { position: relative; display: flex; gap: 8px; align-items: flex-start; padding: 10px 8px; border-radius: 8px; margin-bottom: 4px; }
+  .art:hover { background: #F3F4F6; }
+  .art input[type=checkbox] { margin-top: 4px; }
+  .art .body { flex: 1; min-width: 0; }
+  .a-title { font-size: 1rem; line-height: 1.5; }
+  .a-title .outlet { color: #6B7280; font-size: 0.86em; font-weight: 500; margin-right: .5em; }
+  .hl { background: #DBEAFE; border-radius: 3px; padding: 0 2px; }
+  .a-bot { display: flex; align-items: center; gap: 8px; margin-top: 3px; font-size: 0.8rem; color: #6B7280; flex-wrap: wrap; }
+  .a-bot .src { color: #2563EB; font-weight: 600; text-decoration: none; }
+  .a-bot .kw { color: #9CA3AF; }
+  .acts { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+  .ico { border: none; background: none; color: #6B7280; width: 26px; height: 26px; border-radius: 6px; font-size: 0.9rem; }
+  .ico:hover { background: #EFF6FF; color: #2563EB; }
+  .ico.del:hover { color: #DC2626; background: #FEF2F2; }
+  .sel { font-size: 0.76rem; border: 1px solid #E5E7EB; border-radius: 6px; padding: 3px 6px; color: #4B5563; background: #fff; }
+  .art.new { background: #FFF9C4; }
+  .art.photo .a-title, .art.photo .a-bot > :not(.pchip) { opacity: .55; }
+  .art.photo:hover .a-title, .art.photo:hover .a-bot > * { opacity: 1; }
+  .pchip { font-size: 0.72rem; color: #6B7280; background: #F3F4F6; border-radius: 10px; padding: 1px 7px; }
+  /* 보냄 — 띠 + 내용 흐리기 (지금 규칙 그대로). 칩은 버튼 자리로 합쳤다 */
+  .art.sent { box-shadow: inset 3px 0 0 #146B5E; }
+  .art.sent .a-title, .art.sent .a-bot { opacity: .55; }
+  .art.sent:hover .a-title, .art.sent:hover .a-bot { opacity: 1; }
+  .send { display: inline-flex; border: 1px solid rgba(20,107,94,.35); border-radius: 7px; overflow: visible; position: relative; }
+  .send .go { border: none; background: #E3F1EE; color: #146B5E; font-size: 0.76rem; font-weight: 700; padding: 4px 9px;
+    border-radius: 6px 0 0 6px; min-width: 76px; }
+  .send .go:hover { background: #D2E9E4; }
+  .send .more { border: none; border-left: 1px solid rgba(20,107,94,.25); background: #E3F1EE; color: #146B5E; padding: 4px 6px;
+    border-radius: 0 6px 6px 0; font-size: 0.7rem; }
+  .send.done { border-color: #E5E7EB; }
+  .send.done .go { background: #fff; color: #9CA3AF; cursor: default; font-weight: 600; border-radius: 6px; }
+  .send.done .more { display: none; }
+  .menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; background: #fff; border: 1px solid #E5E7EB; border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(30,58,95,.15); width: 240px; padding: 6px; display: none; }
+  .menu.open { display: block; }
+  .menu .mi { display: block; width: 100%; text-align: left; border: none; background: none; padding: 7px 9px; border-radius: 7px; font-size: 0.8rem; color: #1F2937; }
+  .menu .mi:hover { background: #EFF6FF; }
+  .menu .mi small { display: block; color: #9CA3AF; font-size: 0.72rem; }
+  .menu .sep { height: 1px; background: #F1F5F9; margin: 4px 0; }
+
+  /* 소제목 */
+  .grp { margin-top: 18px; }
+  .grp h3 { display: flex; align-items: center; gap: 6px; font-size: 0.98rem; color: #1E3A5F; margin: 0 0 6px; padding-bottom: 5px; border-bottom: 1px solid #E5E7EB; }
+  .grp h3 .cnt { font-size: 0.74rem; color: #9CA3AF; font-weight: 500; }
+  .grp h3 .gi { margin-left: auto; display: flex; gap: 2px; }
+  .grp.unc h3 { font-style: italic; color: #6B7280; }
+  .mv { border: none; background: none; color: #9CA3AF; font-size: 0.85rem; width: 20px; }
+
+  /* 하단 선택 바 — 지금 수시의 흰 띠 */
+  .bbar { position: absolute; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid #E5E7EB;
+    box-shadow: 0 -4px 16px rgba(15,23,42,.06); transform: translateY(100%); transition: transform .18s; z-index: 40; }
+  .bbar.show { transform: none; }
+  .bbar-inner { max-width: 800px; margin: 0 auto; padding: 11px 24px; display: flex; align-items: center; gap: 12px; font-size: 0.84rem; }
+  .bbar .vr { width: 1px; height: 22px; background: #E5E7EB; }
+  .bbar .clr { margin-left: auto; border: none; background: none; color: #6B7280; font-size: 0.8rem; }
+
+  .fab { position: absolute; left: 20px; width: 56px; height: 56px; border-radius: 50%; background: #fff; border: 1px solid #E5E7EB;
+    box-shadow: 0 2px 8px rgba(15,23,42,.12); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; z-index: 25; }
+  .fab .badge { position: absolute; top: -4px; right: -4px; background: #DC2626; color: #fff; font-size: 0.66rem; font-weight: 700;
+    border-radius: 10px; padding: 1px 6px; }
+
+  .toast { position: absolute; left: 50%; top: 64px; transform: translateX(-50%); background: #1E3A5F; color: #fff; border-radius: 10px;
+    padding: 9px 16px; font-size: 0.82rem; z-index: 50; opacity: 0; transition: opacity .2s; pointer-events: none; white-space: nowrap; }
+  .toast.show { opacity: 1; }
+
+  /* ── 1. 새 수집 ── */
+  .field { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .field > label { width: 70px; font-size: 0.84rem; color: #374151; font-weight: 600; }
+  .inp { font: inherit; font-size: 0.88rem; padding: 7px 11px; border: 1px solid #E5E7EB; border-radius: 8px; background: #fff; }
+  .kwbox { flex: 1; min-width: 240px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; border: 1px solid #E5E7EB;
+    border-radius: 8px; padding: 5px 8px; background: #fff; min-height: 38px; }
+  .kwc { background: #EFF6FF; color: #1E40AF; border-radius: 16px; padding: 3px 10px; font-size: 0.8rem; font-weight: 600; }
+  .kwbox .ph { color: #9CA3AF; font-size: 0.85rem; flex: 1; }
+  .radios { margin-left: 80px; font-size: 0.8rem; color: #4B5563; line-height: 1.9; }
+  .flash { animation: fl 1s ease; }
+  @keyframes fl { 0% { background: #D1FAE5; } 100% { background: transparent; } }
+
+  .hist-h { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .hist-h h2 { font-size: 0.98rem; color: #1E3A5F; margin: 0; }
+  .hist-h .sub { font-size: 0.76rem; color: #9CA3AF; }
+  .hist-h .inp { margin-left: auto; width: 220px; font-size: 0.8rem; padding: 6px 10px; }
+  .hist { max-height: 330px; overflow-y: auto; margin-top: 8px; border-top: 1px solid #F1F5F9; }
+  .hm { font-size: 0.72rem; font-weight: 700; color: #9CA3AF; padding: 10px 4px 3px; letter-spacing: .02em; }
+  .hr { display: flex; align-items: baseline; gap: 12px; padding: 7px 8px; border-radius: 7px; cursor: pointer; font-size: 0.86rem; }
+  .hr:hover { background: #F0F7F5; }
+  .hr .d { width: 64px; flex-shrink: 0; color: #9CA3AF; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+  .hr .is { font-weight: 700; color: #1F2937; flex-shrink: 0; }
+  .hr .kws { color: #4B5563; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hr .kws .all { font-size: 0.7rem; color: #146B5E; background: #E3F1EE; border-radius: 8px; padding: 0 6px; margin-left: 4px; font-weight: 600; }
+  .hr .x { font-size: 0.72rem; color: #9CA3AF; }
+  .hr .open { margin-left: auto; font-size: 0.74rem; color: #2563EB; text-decoration: none; opacity: 0; flex-shrink: 0; }
+  .hr:hover .open { opacity: 1; }
+  .hr.picked { background: #E3F1EE; }
+
+  /* ── 2·3. 카드 화면 ── */
+  .tabs { background: #E3F1EE; border-radius: 12px 12px 0 0; padding: 8px 12px 0; }
+  .tabs .cap { font-size: 0.72rem; color: #146B5E; font-weight: 600; margin: 0 4px 6px; }
+  .tabs .row { display: flex; gap: 4px; align-items: flex-end; }
+  .tab { background: rgba(255,255,255,.55); border-radius: 8px 8px 0 0; padding: 7px 12px; font-size: 0.8rem; color: #146B5E; font-weight: 600; }
+  .tab.on { background: #fff; color: #1F2937; }
+  .tab .c { color: #9CA3AF; font-weight: 500; margin-left: 4px; }
+  .tab.add { border: 1px dashed rgba(20,107,94,.45); background: transparent; }
+  .cardbody { border-radius: 0 0 12px 12px; }
+  .hd { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .hd h1 { font-size: 1.15rem; color: #1E3A5F; margin: 0; }
+  .hd h1 .nm { border-bottom: 1px dashed #93C5FD; padding: 0 4px; }
+  .kindchip { font-size: 0.72rem; font-weight: 700; color: #146B5E; background: #E3F1EE; border-radius: 8px; padding: 2px 8px; }
+  .hd .right { margin-left: auto; }
+  .meta { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tool { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid #F1F5F9; border-bottom: 1px solid #F1F5F9; margin-bottom: 8px; }
+  .tool .right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+  .filter { font-size: 0.82rem; color: #374151; display: inline-flex; gap: 5px; align-items: center; }
+  .listcap { font-size: 0.8rem; color: #6B7280; margin: 10px 2px 6px; }
+  .listcap b { color: #1F2937; }
+  .pairlink { display: inline-block; font-size: 0.8rem; font-weight: 700; color: #146B5E; text-decoration: none;
+    background: #E3F1EE; border: 1px solid rgba(20,107,94,.24); border-radius: 20px; padding: 5px 12px; }
+  .pairlink .n { font-variant-numeric: tabular-nums; }
+  .pairlink.bump { animation: bump .5s ease; }
+  @keyframes bump { 30% { transform: scale(1.08); } }
+
+  /* ── 4. 보관함 ── */
+  .qbar { background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+  .qrow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 0.82rem; }
+  .qrow:last-child { margin-bottom: 0; }
+  .qrow > span:first-child { width: 48px; color: #6B7280; font-weight: 600; }
+  .seg { display: inline-flex; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; }
+  .seg b { font-weight: 600; font-size: 0.78rem; padding: 5px 11px; background: #fff; color: #4B5563; border-right: 1px solid #E5E7EB; }
+  .seg b:last-child { border-right: none; }
+  .seg b.on { background: #2563EB; color: #fff; }
+  .resline { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #6B7280; margin-bottom: 8px; }
+  .resline .exp { margin-left: auto; }
+  .ar-issue { border: 1px solid #E5E7EB; border-radius: 10px; margin-bottom: 8px; background: #fff; }
+  .ar-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-size: 0.86rem; }
+  .ar-row .tw { color: #9CA3AF; width: 12px; }
+  .ar-row .nm { font-weight: 700; }
+  .ar-row .kw { color: #6B7280; font-size: 0.78rem; }
+  .ar-row .stat { margin-left: auto; color: #6B7280; font-size: 0.76rem; }
+  .ar-row .exp .btn { padding: 3px 8px; font-size: 0.72rem; border-color: #E5E7EB; color: #4B5563; }
+  .ar-day { border-top: 1px solid #F1F5F9; margin-left: 20px; }
+  .ar-card { border-top: 1px solid #F1F5F9; margin-left: 20px; }
+  .ar-card .ar-row .nm { font-weight: 600; color: #146B5E; }
+  .src-note { font-size: 0.72rem; color: #9CA3AF; }
+</style>
+</head>
+<body>
+<div class="mk">
+  <div class="mk-head">
+    <h1>수시 모니터링 4단 흐름 — 시안</h1>
+    <p><b>원본은 거르지 않은 로데이터</b>(실시간처럼 숨김·소제목 없음), <b>판단은 전부 확정본에서</b>,
+      <b>확정본은 원본에서 처음 보낼 때 저절로 생긴다</b>, <b>보관함엔 확정본만</b> 쌓인다 — 정해주신 네 가지를 화면에 옮겼어요.
+      노란 상자는 시안 설명이고 앱 화면이 아니에요. 기사 제목과 「지난 수집」 목록은 실제 저장된 데이터예요(보낸 상태·다른 확정본 같은 상황은 설명용).</p>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-s="1" class="on"><span class="n">1</span>🔎 새 수집</button><span class="arr">→</span>
+    <button data-s="2"><span class="n">2</span>📃 수집 원본</button><span class="arr">→</span>
+    <button data-s="3"><span class="n">3</span>🗂️ 수집 확정본</button><span class="arr">→</span>
+    <button data-s="4"><span class="n">4</span>📚 수시 보관함</button>
+  </nav>
+
+  <!-- ═══════════════════ 1. 새 수집 ═══════════════════ -->
+  <section class="screen on" id="s1">
+    <div class="memo">
+      <h2>🔎 새 수집 — 조건을 정하는 곳</h2>
+      <ul>
+        <li>입력 폼은 <b>지금 그대로</b>예요.</li>
+        <li>아래에 <b>「지난 수집」 1년치</b>가 <b>날짜 · 사안명 · 검색어</b> 단어로만 한 줄씩 붙어요. 건수·시간창은 안 적어요(단어만).</li>
+        <li><b>줄을 누르면 그 사안·검색어·검색 방식이 폼에 채워져요</b>(한번 눌러보세요). 수집 시간은 안 가져와요 — 지난날의 시간창은 오늘 의미가 없어요.
+          자정이 지나면 지난 원본은 다시 불러올 수 없어서, 조건을 다시 쓰는 게 이 목록의 쓸모예요.</li>
+        <li>마우스를 올리면 오른쪽에 <b>원본 열기 ↗</b>가 떠요. 지난 원본을 다시 볼 수 있는 곳은 여기뿐이에요(보관함엔 확정본만 쌓이니까요).</li>
+        <li>같은 날 같은 조건으로 여러 번 모은 건 한 줄로 합치고 <b>×3</b>으로 적어요. 달이 바뀌면 옅은 구분선을 넣고, 오른쪽 위 칸으로 사안명·검색어를 찾아요.</li>
+      </ul>
+    </div>
+    <div class="frame">
+      <div class="topbar"><div class="topbar-inner"><a href="#">홈</a><a href="#">수집 원본</a><a href="#">수집 확정본</a><a href="#">수시 보관함</a></div></div>
+      <div class="container">
+        <div class="card" id="newform">
+          <h1 class="page-title">새 수집</h1>
+          <p class="page-sub">오늘 안에서 시간대를 정해 한 번에 모읍니다 · 검색어는 최대 5개</p>
+          <div class="field"><label>사안</label>
+            <select class="inp" id="f-issue" style="width:190px"><option>+ 새 사안 만들기</option></select>
+            <input class="inp" id="f-newissue" placeholder="새 사안 이름 (예: 재경위)" style="flex:1;min-width:180px"></div>
+          <div class="field"><label>검색어</label>
+            <div class="kwbox" id="f-kw"><span class="ph">검색어 입력</span><span style="margin-left:auto;font-size:.76rem;color:#2563EB;font-weight:700">+ 추가</span>
+              <span style="font-size:.74rem;color:#9CA3AF">0 / 5</span></div></div>
+          <div class="radios" id="f-mode">
+            <label><input type="radio" name="m" checked> 검색어 중 <b>하나라도</b> 있으면 가져와요</label><br>
+            <label><input type="radio" name="m"> 검색어가 <b>모두</b> 있는 기사만 가져와요</label></div>
+          <div class="field" style="margin-top:10px"><label>수집시간</label>
+            <input class="inp" value="00:00" style="width:90px"> ~ <input class="inp" value="14:05" style="width:90px">
+            <button class="btn solid pill">지금</button>
+            <button class="btn solid" style="margin-left:auto">🔎 수집</button></div>
+        </div>
+
+        <div class="card">
+          <div class="hist-h"><h2>지난 수집</h2><span class="sub">1년 · 누르면 위에 채워져요</span>
+            <input class="inp" id="h-q" placeholder="사안명·검색어로 찾기"></div>
+          <div class="hist" id="hist"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 2. 수집 원본 ═══════════════════ -->
+  <section class="screen" id="s2">
+    <div class="memo">
+      <h2>📃 수집 원본 — 로데이터 (실시간처럼)</h2>
+      <ul>
+        <li><b>소제목이 없어요.</b> 183건이 한 목록에 <b>시간순(최신 먼저)</b>으로 나와요. 🗑 숨기기·↑↓·「다른 소제목」·소제목 배정/추가·🏷 라벨·
+          📷 사진 추정 모아 보기·복사/txt가 전부 빠지고 확정본으로 가요.</li>
+        <li>기사마다 남는 건 <b>[확정본으로]</b>(한 번 누르면 끝) · 복사 · ⋯(원문 다시 불러오기 / 제목 직접 수정)뿐이에요. 한번 눌러보세요.</li>
+        <li><b>확정본은 따로 안 만들어요.</b> 처음 보내는 순간 <b>같은 사안명의 확정본이 저절로 생기고</b>, 오른쪽 위 청록 알약(<b>🗂️ 확정본 N건 →</b>)이 그리로 데려가요.
+          보내기 전엔 이 알약이 <b>「🗂️ 확정본 — 보내면 생겨요」</b>로 흐리게 보여요.</li>
+        <li>여러 원본을 확정본 하나에 모으는 길도 남아요 — <b>▾</b>를 누르면 오늘 만든 다른 확정본이나 새 확정본을 고를 수 있어요.</li>
+        <li>보낸 기사: <b>왼쪽 청록 띠 + 내용 흐리기</b>는 지금 그대로. 「✓ …로 보냄」 칩은 버튼 자리로 합쳐 <b>[✓ 보냄]</b>이 됐어요(실시간의 「📌 담아두기 ↔ ✔️ 스크랩됨」과 같은 모양이에요).
+          보내기를 취소하려면 확정본에서 숨기면 되고, 그러면 여기 표시가 저절로 풀려요(지금 규칙 그대로).</li>
+        <li>안 보낼 기사는 <b>그냥 목록에 남아요.</b> 새로 들어온 건 노랑, 걸러 보려면 「아직 안 보낸 기사만」.</li>
+        <li>xlsx만 남겼어요 — 로데이터를 통째로 뽑는 건 원본에 어울리지만, 복사/txt는 소제목이 붙는 <b>보고서 형식</b>이라 확정본의 몫이에요.</li>
+      </ul>
+      <span class="q">❓ 정할 것 — <b>xlsx를 원본에도 둘까요?</b> 빼면 원본 화면엔 내보내기가 아예 없어져요.</span>
+    </div>
+    <div class="frame" id="f2">
+      <div class="topbar"><div class="topbar-inner"><a href="#">홈</a><a href="#">새 수집</a><a href="#">수집 확정본</a><a href="#">수시 보관함</a></div></div>
+      <div class="container">
+        <div class="tabs"><div class="cap">📃 오늘 만든 수집 원본</div>
+          <div class="row"><span class="tab on">인사청문회<span class="c">183건</span> ×</span><span class="tab">대정부질문<span class="c">18건</span> ×</span><span class="tab add">+ 새 수집</span></div></div>
+        <div class="card cardbody" style="border-top:none">
+          <div class="hd"><h1>수시 모니터링 13시 05분 기준(<span class="nm">인사청문회</span>)</h1>
+            <span class="right"><button class="btn solid pill">⟳ 지금까지 불러오기</button></span></div>
+          <div class="meta">
+            <span class="chip">🔍 이형일 117 · 재정경제부 118 + <b style="color:#146B5E">이형일·재정경제부</b></span>
+            <span class="chip">🕐 11:00 ~ 13:05</span>
+            <span class="chip">📥 10:06 6건 · … · 13:05 +117건 (4회)</span>
+            <span class="chip edit">✎ 편집</span>
+          </div>
+          <div class="tool">
+            <label class="filter"><input type="checkbox" id="unsent"> 아직 안 보낸 기사만 <span style="color:#9CA3AF" id="unsent-n">(180)</span></label>
+            <span class="right"><button class="btn">⬇ xlsx</button>
+              <a class="pairlink" href="#" id="pair" onclick="go(3);return false">🗂️ 확정본 <span class="n" id="pair-n">3</span>건 →</a></span>
+          </div>
+          <div class="listcap"><b>183건</b> · 최신순 · <span style="background:#FFF9C4;padding:0 4px;border-radius:3px">노랑</span> = 13:05 불러오기로 새로 들어온 117건</div>
+          <div id="rawlist"></div>
+          <div style="text-align:center;color:#9CA3AF;font-size:.78rem;padding:10px">… 169건 더</div>
+        </div>
+      </div>
+      <div class="bbar" id="bbar2"><div class="bbar-inner">
+        <b id="selN">0건</b> 선택 <span class="vr"></span>
+        <span class="send" style="border-color:rgba(20,107,94,.35)"><button class="go" onclick="bulkSend()">확정본으로 보내기</button><button class="more">▾</button></span>
+        <button class="clr" onclick="clearSel()">선택 해제</button></div></div>
+      <div class="toast" id="toast"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 3. 수집 확정본 ═══════════════════ -->
+  <section class="screen" id="s3">
+    <div class="memo">
+      <h2>🗂️ 수집 확정본 — 여기서 판단해요 (정기의 초안 + 확정본 자리)</h2>
+      <ul>
+        <li>원본에서 보낸 기사가 <b>언론사 순서대로 제자리에 끼워져</b> 들어와요(지금 모음과 같은 규칙 — 매번 다시 줄 세우지 않아서 ↑↓로 맞춘 순서가 안 흐트러져요).</li>
+        <li>원본에서 빠진 것들이 전부 여기 있어요: <b>🤖 소제목 배정</b> · 소제목 추가 · ↑↓ · 「다른 소제목」 · 🗑 숨기기 · 🏷 라벨 · 📷 사진 추정 모아 보기 · 복사/txt/xlsx.</li>
+        <li>새로 보낸 기사는 <b>📂 소제목 미분류</b>에 쌓이고, 🤖 소제목 배정을 누르면 기존 소제목에 끼워 넣어요. 골라낸 일부만 다루니 AI 분류 상한(150건)에 걸릴 일이 거의 없어요
+          (지금 원본 25장 중 3장이 150건을 넘어 AI 분류가 안 됐어요).</li>
+        <li>머리줄에 시각이 없어요(<b>수시 모니터링 (인사청문회)</b>) — 시간창이 없는 카드라 「N시 기준」이 가리킬 게 없어요(지금 모음 규칙 그대로).
+          메타 칩 <b>📥 인사청문회 원본 12건 ↗</b>이 원본으로 돌아가는 길이에요.</li>
+      </ul>
+      <span class="q">❓ 정할 것 — <b>머리줄에 원본의 시각을 붙일까요?</b> 사안 하나에 원본 하나(1:1)가 대부분이 되니 「13시 05분 기준(인사청문회)」로 쓸 수도 있어요. 다만 원본 두 개를 모은 확정본에선 기준 시각이 둘이라 다시 모호해져요.</span>
+    </div>
+    <div class="frame">
+      <div class="topbar"><div class="topbar-inner"><a href="#">홈</a><a href="#">새 수집</a><a href="#">수집 원본</a><a href="#">수시 보관함</a></div></div>
+      <div class="container">
+        <div class="card">
+          <div class="hd"><h1>수시 모니터링 (<span class="nm">인사청문회</span>)</h1><span class="kindchip">확정본</span></div>
+          <div class="meta"><a class="chip teal" href="#" onclick="go(2);return false">📥 인사청문회 원본 12건 ↗</a></div>
+          <div class="tool">
+            <button class="btn ai">🤖 소제목 배정 (3)</button>
+            <input class="inp" placeholder="새 소제목 이름" style="width:150px;font-size:.8rem;padding:5px 9px">
+            <button class="btn" style="border-color:#E5E7EB;color:#4B5563">+ 소제목 추가</button>
+            <span class="right exp"><button class="btn">⧉ 복사</button><button class="btn">⬇ txt</button><button class="btn">⬇ xlsx</button></span>
+          </div>
+          <button class="btn" style="margin:2px 0 4px">📷 사진 추정 모아 보기 (2)</button>
+
+          <div class="grp"><h3>&lt;다주택 과세 발언 공방&gt; <span class="cnt">4건</span>
+            <span class="gi"><button class="ico">⧉</button><button class="ico del">🗑</button><button class="mv">▲</button><button class="mv">▼</button></span></h3>
+            <div id="g1"></div></div>
+          <div class="grp"><h3>&lt;경제 현안 답변&gt; <span class="cnt">3건</span>
+            <span class="gi"><button class="ico">⧉</button><button class="ico del">🗑</button><button class="mv">▲</button><button class="mv">▼</button></span></h3>
+            <div id="g2"></div></div>
+          <div class="grp"><h3>&lt;청문회 현장&gt; <span class="cnt">2건</span>
+            <span class="gi"><button class="ico">⧉</button><button class="ico del">🗑</button><button class="mv">▲</button><button class="mv">▼</button></span></h3>
+            <div id="g3"></div></div>
+          <div class="grp unc"><h3>📂 소제목 미분류 <span class="cnt">3건</span></h3>
+            <div id="g4"></div></div>
+        </div>
+      </div>
+      <div class="fab" style="bottom:88px;width:50px;height:50px;left:23px">↩</div>
+      <div class="fab" style="bottom:20px">🗑<span class="badge">2</span></div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ 4. 수시 보관함 ═══════════════════ -->
+  <section class="screen" id="s4">
+    <div class="memo">
+      <h2>📚 수시 보관함 — 확정본만 쌓여요 (정기 보관함과 같은 자리)</h2>
+      <ul>
+        <li>화면 모양은 <b>지금 그대로</b>(사안명·기간 조회, 사안 ▸ 날짜 ▸ 카드, 복사/txt/xlsx, 선택 삭제). 달라지는 건 <b>원본이 목록에서 빠진다</b>는 것 하나예요.</li>
+        <li>확정본이 저절로 생기므로 보관함에도 따로 넣을 게 없어요 — 만들어진 순간부터 여기 보여요.</li>
+        <li>한 건도 보내지 않은 원본은 확정본이 없으니 여기 안 나와요 → <b>새 수집의 「지난 수집」</b>에서 찾아요.</li>
+        <li>확정본 줄에 <span class="src-note">원본 1개</span>처럼 어느 원본에서 왔는지 옅게 적어요(누르면 확정본이 열리고, 원본은 그 화면의 📥 칩에서).</li>
+      </ul>
+      <span class="q">❓ 정할 것 — <b>지금 저장된 원본 25장은요?</b> 확정본이 하나도 없어서(유일한 모음 1장도 비어 있어요) 새 규칙대로면 <b>보관함이 텅 비어요.</b>
+        예전 원본은 소제목·숨김까지 하던 「원본 겸 확정본」이었으니, <b>전환하는 날 이전의 원본은 보관함에 그대로 두는 걸</b> 추천해요(칩으로 「예전 원본」 표시).</span>
+    </div>
+    <div class="frame">
+      <div class="topbar"><div class="topbar-inner"><a href="#">홈</a><span></span><span></span><span></span></div></div>
+      <div class="container">
+        <div class="card">
+          <h1 class="page-title">수시 보관함</h1>
+          <p class="page-sub">사안별로 쌓인 수집 확정본 · 1년간 보관됩니다</p>
+          <div class="qbar">
+            <div class="qrow"><span>사안명</span><input class="inp" placeholder="사안 이름 일부만 넣어도 됩니다 (예: 세수)" style="flex:1;font-size:.8rem;padding:6px 10px"><button class="btn">검색</button></div>
+            <div class="qrow"><span>기간</span><span class="seg"><b>1일</b><b>7일</b><b>1개월</b><b class="on">전체</b></span></div>
+          </div>
+          <div class="resline">전체 기간 · 사안 <b style="color:#1F2937">3개</b> · 확정본 <b style="color:#1F2937">4개</b> · 기사 <b style="color:#1F2937">41건</b>
+            <span class="exp"><button class="btn" style="border-color:#E5E7EB;color:#4B5563">선택 삭제</button><button class="btn">복사</button><button class="btn">txt</button><button class="btn">xlsx</button></span></div>
+
+          <div class="ar-issue">
+            <div class="ar-row"><span class="tw">▾</span><span class="nm">인사청문회</span><span class="kw">이형일 · 재정경제부</span><span class="stat">날짜 1 · 확정본 1 · 12건</span>
+              <span class="exp"><button class="btn">복사</button><button class="btn">txt</button><button class="btn">xlsx</button></span></div>
+            <div class="ar-day">
+              <div class="ar-row"><span class="tw">▾</span><span class="nm">9월 15일 (월)</span><span class="stat">확정본 1 · 12건</span>
+                <span class="exp"><button class="btn">복사</button><button class="btn">txt</button><button class="btn">xlsx</button></span></div>
+              <div class="ar-card"><div class="ar-row"><span class="tw"></span><span class="nm">🗂️ 인사청문회</span><span class="src-note">원본 1개</span><span class="stat">12건</span>
+                <span class="exp"><button class="btn">복사</button><button class="btn">txt</button><button class="btn">xlsx</button></span><button class="ico del">🗑</button></div></div>
+            </div>
+          </div>
+          <div class="ar-issue">
+            <div class="ar-row"><span class="tw">▾</span><span class="nm">대정부질문</span><span class="kw">재정경제부 · 대정부질문</span><span class="stat">날짜 1 · 확정본 1 · 9건</span>
+              <span class="exp"><button class="btn">복사</button><button class="btn">txt</button><button class="btn">xlsx</button></span></div>
+            <div class="ar-day">
+              <div class="ar-row"><span class="tw">▾</span><span class="nm">9월 11일 (목)</span><span class="stat">확정본 1 · 9건</span>
+                <span class="exp"><button class="btn">복사</button><button class="btn">txt</button><button class="btn">xlsx</button></span></div>
+              <div class="ar-card"><div class="ar-row"><span class="tw"></span><span class="nm">🗂️ 대정부질문</span><span class="src-note">원본 2개 (대정부질문 · 재경위)</span><span class="stat">9건</span>
+                <span class="exp"><button class="btn">복사</button><button class="btn">txt</button><button class="btn">xlsx</button></span><button class="ico del">🗑</button></div></div>
+            </div>
+          </div>
+          <div class="ar-issue">
+            <div class="ar-row"><span class="tw">▸</span><span class="nm">재경위</span><span class="kw">재경위 · 재정경제기획위원회</span><span class="stat">날짜 2 · 확정본 2 · 20건</span>
+              <span class="exp"><button class="btn">복사</button><button class="btn">txt</button><button class="btn">xlsx</button></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ── 화면 전환 ── */
+function go(n) {
+  document.querySelectorAll('.screen').forEach(function (s) { s.classList.toggle('on', s.id === 's' + n); });
+  document.querySelectorAll('#steps button').forEach(function (b) { b.classList.toggle('on', b.dataset.s == n); });
+  window.scrollTo({ top: 0 });
+}
+document.querySelectorAll('#steps button').forEach(function (b) { b.onclick = function () { go(b.dataset.s); }; });
+
+/* ── 1. 지난 수집 (실제 저장된 카드 25장 → 같은 날·같은 조건은 한 줄) ── */
+var H = [
+  ['9월', null],
+  ['9/15 (월)', '인사청문회', ['이형일', '재정경제부'], true, 1, '20260915-100621-ef75'],
+  ['9/11 (목)', '대정부질문', ['재정경제부', '대정부질문'], true, 1],
+  ['9/11 (목)', '테스트음식', ['소고기', '스테이크'], false, 1],
+  ['9/3 (수)', '재경위', ['재경위', '재정경제기획위원회'], false, 1],
+  ['9/2 (화)', '이형일', ['재정경제부', '이형일'], false, 2],
+  ['9/2 (화)', '이형일', ['재정경제부', '이형일'], true, 1],
+  ['9/2 (화)', '햄버거', ['햄버거', '감자튀김'], false, 2],
+  ['9/1 (월)', '9/1 부동산세제개편', ['비거주', '1주택'], false, 1],
+  ['9/1 (월)', '세재개편안 확정', ['세재개편안', '재정경제부'], false, 1],
+  ['9/1 (월)', '9/1 민생대책', ['민생대책', '디지털온누리상품권'], true, 1],
+  ['9/1 (월)', '9/1 민생대책', ['민생대책', '디지털온누리상품권'], false, 1],
+  ['9/1 (월)', '9/1 국무회의', ['재정경제부', '국무회의'], false, 1],
+  ['8월', null],
+  ['8/25 (월)', '테스트3', ['햄버거', '돈까스'], false, 1],
+  ['8/25 (월)', '재경위', ['재경위', '재정경제기획위원회'], false, 1],
+  ['8/25 (월)', '예결위', ['예결위', '예산결산특별위원회'], false, 1],
+  ['8/24 (일)', '재경위', ['재경위', '재정경제'], false, 1],
+  ['8/21 (목)', '재경위', ['재경위', '재정경제위원회'], false, 1],
+  ['8/21 (목)', '시험', ['예산'], false, 6]
+];
+function renderHist(q) {
+  q = (q || '').trim();
+  var out = '', lastMonth = '';
+  H.forEach(function (h, i) {
+    if (!h[1]) { lastMonth = h[0]; return; }
+    var hay = h[1] + ' ' + h[2].join(' ');
+    if (q && hay.indexOf(q) < 0) return;
+    if (lastMonth) { out += '<div class="hm">' + lastMonth + '</div>'; lastMonth = ''; }
+    out += '<div class="hr" data-i="' + i + '"><span class="d">' + h[0] + '</span><span class="is">' + h[1] + '</span>' +
+      '<span class="kws">' + h[2].join(' · ') + (h[3] ? '<span class="all">모두</span>' : '') + '</span>' +
+      (h[4] > 1 ? '<span class="x">×' + h[4] + '</span>' : '') +
+      '<a class="open" href="#" onclick="event.stopPropagation();go(2);return false">원본 열기 ↗</a></div>';
+  });
+  document.getElementById('hist').innerHTML = out || '<div style="padding:14px;color:#9CA3AF;font-size:.8rem">찾은 수집이 없어요</div>';
+  document.querySelectorAll('.hr').forEach(function (r) { r.onclick = function () { pick(+r.dataset.i, r); }; });
+}
+function pick(i, row) {
+  var h = H[i];
+  document.querySelectorAll('.hr').forEach(function (r) { r.classList.remove('picked'); });
+  row.classList.add('picked');
+  var sel = document.getElementById('f-issue');
+  sel.innerHTML = '<option>' + h[1] + '</option><option>+ 새 사안 만들기</option>';
+  document.getElementById('f-newissue').style.display = 'none';
+  document.getElementById('f-kw').innerHTML = h[2].map(function (k) { return '<span class="kwc">' + k + ' ×</span>'; }).join('') +
+    '<span class="ph"></span><span style="font-size:.74rem;color:#9CA3AF">' + h[2].length + ' / 5</span>';
+  var r = document.querySelectorAll('#f-mode input'); r[h[3] ? 1 : 0].checked = true;
+  var f = document.getElementById('newform'); f.classList.remove('flash'); void f.offsetWidth; f.classList.add('flash');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+renderHist();
+document.getElementById('h-q').oninput = function () { renderHist(this.value); };
+
+/* ── 2. 수집 원본 (실제 인사청문회 카드의 최신 14건) ── */
+var RAW = [
+  ['12:55', '뉴시스', '<span class="hl">이형일</span> "\'다주택 징벌적 과세\' 발언, 민간 임대 필요하다는 취지"', 'new'],
+  ['12:54', '전자신문', '[포토] 여당 질의 답변하는 <span class="hl">이형일</span> 후보자', 'new photo'],
+  ['12:54', '전자신문', '[포토] <span class="hl">이형일</span> \'갸웃\'', 'new photo'],
+  ['12:53', '머니투데이', '강민국 "다주택 과세 180도 번복"…<span class="hl">이형일</span> "민간임대 소신 그대로"', 'new sent'],
+  ['12:46', '머니투데이', '정태호 "관료 제 역할 못한 \'부동산 세제 논의\' 실망"…<span class="hl">이형일</span> "송구"', 'new'],
+  ['12:45', '머니투데이', '정성호 "부총리가 중심 놓치면 중구난방"…<span class="hl">이형일</span>에 \'경제원톱\' 주문', 'new sent'],
+  ['12:31', '뉴스1', '<span class="hl">이형일</span> "전세사기·시장 불안에 개인 다주택자 공급 고수 어려워"', 'new'],
+  ['12:28', '이데일리', '<span class="hl">이형일</span> 부총리 후보 "경상수지 흑자 2900억달러 넘을 것"', 'new sent'],
+  ['12:28', '뉴스1', '생각에 잠긴 <span class="hl">이형일</span> 후보자', 'new photo'],
+  ['12:28', '뉴스1', '선서하는 <span class="hl">이형일</span> 후보자', 'new photo'],
+  ['12:23', '연합뉴스', '인사청문회에서 인사말 하는 <span class="hl">이형일</span> 부총리 겸 <span class="hl">재정경제부</span> 장관 후보자', 'new photo'],
+  ['12:23', '뉴스1', '<span class="hl">이형일</span> "500조 규모 퇴직연금, 수익률 저조…법안 준비 중"', 'new'],
+  ['12:21', '연합뉴스', '질문에 답하는 <span class="hl">이형일</span> 부총리 겸 <span class="hl">재정경제부</span> 장관 후보자', 'new photo'],
+  ['12:20', '연합뉴스', '주택 문제 관련 질의에 답하는 <span class="hl">이형일</span> 부총리 겸 <span class="hl">재정경제부</span> 장관 후보자', 'new photo']
+];
+var pairN = 3, firstMenu = null;
+function rawRow(a, i) {
+  var sent = a[3].indexOf('sent') >= 0, photo = a[3].indexOf('photo') >= 0;
+  return '<div class="art ' + a[3] + '" data-i="' + i + '">' +
+    '<input type="checkbox" class="pick" ' + (sent ? 'disabled' : '') + '>' +
+    '<div class="body"><div class="a-title"><span class="outlet">' + a[1] + '</span>' + a[2] + '</div>' +
+    '<div class="a-bot"><span>' + a[0] + ' · ' + (Math.max(1, 70 - i * 3)) + '분 전</span><a class="src" href="#">원문보기 ↗</a>' +
+    '<span class="kw">🔍 이형일, 재정경제부</span>' + (photo ? '<span class="pchip">📷 사진 추정</span>' : '') +
+    '<span class="acts">' +
+      '<span class="send' + (sent ? ' done' : '') + '"><button class="go" onclick="sendOne(' + i + ')">' + (sent ? '✓ 보냄' : '확정본으로') + '</button>' +
+      '<button class="more" onclick="toggleMenu(event,this)">▾</button>' +
+      '<div class="menu"><button class="mi" onclick="sendOne(' + i + ')">🗂️ 인사청문회<small>이 원본의 확정본 · 기본</small></button>' +
+      '<button class="mi" onclick="sendOne(' + i + ',\'대정부질문\')">🗂️ 대정부질문<small>오늘 만든 다른 확정본</small></button>' +
+      '<div class="sep"></div><button class="mi" onclick="sendOne(' + i + ',\'새 확정본\')">+ 새 확정본 만들어 보내기</button></div></span>' +
+      '<button class="ico" title="복사">⧉</button><button class="ico" title="더보기">⋯</button>' +
+    '</span></div></div></div>';
+}
+function renderRaw() {
+  document.getElementById('rawlist').innerHTML = RAW.map(rawRow).join('');
+  document.querySelectorAll('#rawlist .pick').forEach(function (c) { c.onchange = updSel; });
+  applyUnsent();
+}
+function toast(t) { var el = document.getElementById('toast'); el.textContent = t; el.classList.add('show');
+  clearTimeout(el._t); el._t = setTimeout(function () { el.classList.remove('show'); }, 1800); }
+function sendOne(i, where) {
+  if (RAW[i][3].indexOf('sent') >= 0) return;
+  RAW[i][3] += ' sent';
+  if (!where) { pairN++; var p = document.getElementById('pair'); document.getElementById('pair-n').textContent = pairN;
+    p.classList.remove('bump'); void p.offsetWidth; p.classList.add('bump'); toast('인사청문회 확정본으로 보냈어요 · ' + pairN + '건'); }
+  else if (where === '새 확정본') toast('새 확정본을 만들어 보냈어요');
+  else toast(where + ' 확정본으로 보냈어요');
+  renderRaw(); updSel();
+}
+function toggleMenu(e, b) { e.stopPropagation(); var m = b.nextElementSibling; var o = m.classList.contains('open');
+  document.querySelectorAll('.menu.open').forEach(function (x) { x.classList.remove('open'); }); if (!o) m.classList.add('open'); }
+document.addEventListener('click', function () { document.querySelectorAll('.menu.open').forEach(function (x) { x.classList.remove('open'); }); });
+function updSel() { var n = document.querySelectorAll('#rawlist .pick:checked').length;
+  document.getElementById('selN').textContent = n + '건'; document.getElementById('bbar2').classList.toggle('show', n > 0); }
+function clearSel() { document.querySelectorAll('#rawlist .pick:checked').forEach(function (c) { c.checked = false; }); updSel(); }
+function bulkSend() { var picked = [];
+  document.querySelectorAll('#rawlist .pick:checked').forEach(function (c) { picked.push(+c.closest('.art').dataset.i); });
+  picked.forEach(function (i) { if (RAW[i][3].indexOf('sent') < 0) { RAW[i][3] += ' sent'; pairN++; } });
+  document.getElementById('pair-n').textContent = pairN; toast(picked.length + '건을 인사청문회 확정본으로 보냈어요 · ' + pairN + '건');
+  renderRaw(); updSel(); }
+function applyUnsent() { var on = document.getElementById('unsent').checked, left = 0;
+  document.querySelectorAll('#rawlist .art').forEach(function (r) { var s = r.classList.contains('sent'); if (!s) left++;
+    r.style.display = on && s ? 'none' : ''; });
+  document.getElementById('unsent-n').textContent = '(' + (183 - pairN) + ')'; }
+document.getElementById('unsent').onchange = applyUnsent;
+renderRaw();
+
+/* ── 3. 수집 확정본 — 소제목 안은 언론사 순 ── */
+function doneRow(o, t, extra, tm) {
+  return '<div class="art ' + (extra || '') + '"><input type="checkbox"><div class="body"><div class="a-title"><span class="outlet">' + o + '</span>' + t + '</div>' +
+    '<div class="a-bot"><span>' + tm + '</span><a class="src" href="#">원문보기 ↗</a><span class="kw">🔍 이형일, 재정경제부</span>' +
+    (extra === 'photo' ? '<span class="pchip">📷 사진 추정</span>' : '') +
+    '<span class="acts"><select class="sel"><option>다른 소제목</option></select><button class="mv">↑</button><button class="mv">↓</button>' +
+    '<button class="ico">⧉</button><button class="ico">🏷</button><button class="ico">⋯</button><button class="ico del">🗑</button></span></div></div></div>';
+}
+document.getElementById('g1').innerHTML =
+  doneRow('머니투데이', '강민국 "다주택 과세 180도 번복"…<span class="hl">이형일</span> "민간임대 소신 그대로"', '', '12:53 · 1시간 전') +
+  doneRow('머니투데이', '정태호 "관료 제 역할 못한 \'부동산 세제 논의\' 실망"…<span class="hl">이형일</span> "송구"', '', '12:46 · 1시간 전') +
+  doneRow('뉴시스', '<span class="hl">이형일</span> "\'다주택 징벌적 과세\' 발언, 민간 임대 필요하다는 취지"', '', '12:55 · 1시간 전') +
+  doneRow('뉴스1', '<span class="hl">이형일</span> "전세사기·시장 불안에 개인 다주택자 공급 고수 어려워"', '', '12:31 · 1시간 전');
+document.getElementById('g2').innerHTML =
+  doneRow('머니투데이', '정성호 "부총리가 중심 놓치면 중구난방"…<span class="hl">이형일</span>에 \'경제원톱\' 주문', '', '12:45 · 1시간 전') +
+  doneRow('이데일리', '<span class="hl">이형일</span> 부총리 후보 "경상수지 흑자 2900억달러 넘을 것"', '', '12:28 · 1시간 전') +
+  doneRow('뉴스1', '<span class="hl">이형일</span> "500조 규모 퇴직연금, 수익률 저조…법안 준비 중"', '', '12:23 · 1시간 전');
+document.getElementById('g3').innerHTML =
+  doneRow('연합뉴스', '인사청문회에서 인사말 하는 <span class="hl">이형일</span> 부총리 겸 <span class="hl">재정경제부</span> 장관 후보자', 'photo', '12:23 · 1시간 전') +
+  doneRow('뉴스1', '선서하는 <span class="hl">이형일</span> 후보자', 'photo', '12:28 · 1시간 전');
+document.getElementById('g4').innerHTML =
+  doneRow('MBC', '<span class="hl">이형일</span> "경기회복 온기 고르게"‥물가안정 첫 과제로', 'new', '12:04 · 2시간 전') +
+  doneRow('연합뉴스', '여야, <span class="hl">이형일</span> \'비거주 1주택\' 공방…"투기 세력"·"갭투자 아냐"', 'new', '12:17 · 1시간 전') +
+  doneRow('뉴스1', '<span class="hl">이형일</span> "비거주 예외사유, 저는 해당 안 돼…절대 신청 안 하겠다"', 'new', '12:18 · 1시간 전');
+</script>
+</body>
+</html>

@@ -1,0 +1,231 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1366" viewBox="0 0 1440 1366">
+<rect width="100%" height="100%" fill="#F8FAFC"/>
+<g id="topbar">
+<rect x="0" y="0" width="1440" height="54.5" fill="#FFFFFF"/>
+<text x="490" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">홈</text>
+<text x="924.5" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">설정</text>
+</g>
+<g id="Page">
+<rect x="455" y="24" width="530" height="1193.9" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+</g>
+<g id="form">
+<rect x="480" y="332.4" width="480" height="400" rx="6" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="495" y="351.6" width="36" height="24" rx="4" fill="#2563EB"/>
+<rect x="539" y="347.4" width="238.9" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="550" y="369.2" font-family="Arial" font-size="16" font-weight="600" fill="#1F2937" xml:space="preserve">주중</text>
+<rect x="785.9" y="353.6" width="75.4" height="20" rx="10" fill="#EFF6FF"/>
+<rect x="875.3" y="350.9" width="69.7" height="25.5" rx="4" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="499" y="392.9" width="13" height="13" fill="none"/>
+<rect x="543.8" y="392.9" width="13" height="13" fill="none"/>
+<rect x="588.5" y="392.9" width="13" height="13" fill="none"/>
+<rect x="633.3" y="392.9" width="13" height="13" fill="none"/>
+<rect x="678.1" y="392.9" width="13" height="13" fill="none"/>
+<rect x="722.8" y="392.9" width="13" height="13" fill="none"/>
+<rect x="767.6" y="392.9" width="13" height="13" fill="none"/>
+<rect x="499" y="430.1" width="13" height="13" fill="none"/>
+<rect x="519" y="419.9" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="530" y="441.7" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">0</text>
+<rect x="591.5" y="418.9" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="596.5" y="442.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">00</text>
+<rect x="658.6" y="419.9" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="669.6" y="441.7" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">6</text>
+<rect x="731.1" y="418.9" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="736.1" y="442.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">00</text>
+<rect x="791.6" y="423.9" width="38.3" height="25.5" rx="4" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="499" y="473.6" width="13" height="13" fill="none"/>
+<rect x="519" y="463.4" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="530" y="485.2" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">6</text>
+<rect x="591.5" y="462.4" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="596.5" y="485.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">00</text>
+<rect x="658.6" y="463.4" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="669.6" y="485.2" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">9</text>
+<rect x="731.1" y="462.4" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="736.1" y="485.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">30</text>
+<rect x="791.6" y="467.4" width="38.3" height="25.5" rx="4" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="499" y="517.1" width="13" height="13" fill="none"/>
+<rect x="519" y="506.9" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="530" y="528.7" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">9</text>
+<rect x="591.5" y="505.9" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="596.5" y="529.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">30</text>
+<rect x="658.6" y="506.9" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="669.6" y="528.7" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">11</text>
+<rect x="731.1" y="505.9" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="736.1" y="529.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">00</text>
+<rect x="791.6" y="510.9" width="38.3" height="25.5" rx="4" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="499" y="560.6" width="13" height="13" fill="none"/>
+<rect x="519" y="550.4" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="530" y="572.2" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">11</text>
+<rect x="591.5" y="549.4" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="596.5" y="572.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">00</text>
+<rect x="658.6" y="550.4" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="669.6" y="572.2" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">14</text>
+<rect x="731.1" y="549.4" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="736.1" y="572.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">00</text>
+<rect x="791.6" y="554.4" width="38.3" height="25.5" rx="4" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="499" y="604.1" width="13" height="13" fill="none"/>
+<rect x="519" y="593.9" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="530" y="615.7" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">14</text>
+<rect x="591.5" y="592.9" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="596.5" y="616.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">00</text>
+<rect x="658.6" y="593.9" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="669.6" y="615.7" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">17</text>
+<rect x="731.1" y="592.9" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="736.1" y="616.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">00</text>
+<rect x="791.6" y="597.9" width="38.3" height="25.5" rx="4" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="499" y="647.6" width="13" height="13" fill="none"/>
+<rect x="519" y="637.4" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="530" y="659.2" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">17</text>
+<rect x="591.5" y="636.4" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="596.5" y="659.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">00</text>
+<rect x="658.6" y="637.4" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="669.6" y="659.2" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">19</text>
+<rect x="731.1" y="636.4" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="736.1" y="659.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">30</text>
+<rect x="791.6" y="641.4" width="38.3" height="25.5" rx="4" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="495" y="679.9" width="120.3" height="37.5" rx="4" fill="#FFFFFF" stroke="#2563EB" stroke-width="1"/>
+<rect x="480" y="746.4" width="480" height="313" rx="6" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="495" y="765.6" width="36" height="24" rx="4" fill="#2563EB"/>
+<rect x="539" y="761.4" width="322.3" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="550" y="783.2" font-family="Arial" font-size="16" font-weight="600" fill="#1F2937" xml:space="preserve">주말</text>
+<rect x="875.3" y="764.9" width="69.7" height="25.5" rx="4" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="499" y="806.9" width="13" height="13" fill="none"/>
+<rect x="543.8" y="806.9" width="13" height="13" fill="none"/>
+<rect x="588.5" y="806.9" width="13" height="13" fill="none"/>
+<rect x="633.3" y="806.9" width="13" height="13" fill="none"/>
+<rect x="678.1" y="806.9" width="13" height="13" fill="none"/>
+<rect x="722.8" y="806.9" width="13" height="13" fill="none"/>
+<rect x="767.6" y="806.9" width="13" height="13" fill="none"/>
+<rect x="499" y="844.1" width="13" height="13" fill="none"/>
+<rect x="519" y="833.9" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="530" y="855.7" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">0</text>
+<rect x="591.5" y="832.9" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="596.5" y="856.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">00</text>
+<rect x="658.6" y="833.9" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="669.6" y="855.7" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">10</text>
+<rect x="731.1" y="832.9" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="736.1" y="856.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">00</text>
+<rect x="791.6" y="837.9" width="38.3" height="25.5" rx="4" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="499" y="887.6" width="13" height="13" fill="none"/>
+<rect x="519" y="877.4" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="530" y="899.2" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">10</text>
+<rect x="591.5" y="876.4" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="596.5" y="899.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">00</text>
+<rect x="658.6" y="877.4" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="669.6" y="899.2" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">13</text>
+<rect x="731.1" y="876.4" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="736.1" y="899.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">00</text>
+<rect x="791.6" y="881.4" width="38.3" height="25.5" rx="4" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="499" y="931.1" width="13" height="13" fill="none"/>
+<rect x="519" y="920.9" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="530" y="942.7" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">13</text>
+<rect x="591.5" y="919.9" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="596.5" y="943.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">00</text>
+<rect x="658.6" y="920.9" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="669.6" y="942.7" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">16</text>
+<rect x="731.1" y="919.9" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="736.1" y="943.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">00</text>
+<rect x="791.6" y="924.9" width="38.3" height="25.5" rx="4" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="499" y="974.6" width="13" height="13" fill="none"/>
+<rect x="519" y="964.4" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="530" y="986.2" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">07</text>
+<rect x="591.5" y="963.4" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="596.5" y="986.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">--</text>
+<rect x="658.6" y="964.4" width="68" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="669.6" y="986.2" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">09</text>
+<rect x="731.1" y="963.4" width="50.5" height="35.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="736.1" y="986.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">--</text>
+<rect x="791.6" y="968.4" width="38.3" height="25.5" rx="4" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="495" y="1006.9" width="120.3" height="37.5" rx="4" fill="#FFFFFF" stroke="#2563EB" stroke-width="1"/>
+<rect x="480" y="1075.4" width="106.5" height="37.5" rx="4" fill="#FFFFFF" stroke="#2563EB" stroke-width="1"/>
+<rect x="0" y="1281.5" width="1440" height="60.5" fill="#FFFFFF"/>
+<rect x="480" y="1294.5" width="480" height="35.5" rx="4" fill="#2563EB"/>
+<text x="505.3" y="366.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="10.9" font-weight="700" fill="#FFFFFF" xml:space="preserve">ON</text>
+<text x="794.9" y="367.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="11.8" font-weight="700" fill="#2563EB" xml:space="preserve">오늘 적용 중</text>
+<text x="910.2" y="367.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">그룹 삭제</text>
+<text x="518" y="403.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">월</text>
+<text x="562.8" y="403.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">화</text>
+<text x="607.5" y="403.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">수</text>
+<text x="652.3" y="403.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">목</text>
+<text x="697.1" y="403.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">금</text>
+<text x="741.8" y="403.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">토</text>
+<text x="786.6" y="403.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">일</text>
+<text x="587" y="441.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="646" y="441.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">~</text>
+<text x="726.6" y="441.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="810.8" y="440.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">del</text>
+<text x="587" y="484.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="646" y="484.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">~</text>
+<text x="726.6" y="484.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="810.8" y="483.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">del</text>
+<text x="587" y="528.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="646" y="528.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">~</text>
+<text x="726.6" y="528.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="810.8" y="527.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">del</text>
+<text x="587" y="571.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="646" y="571.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">~</text>
+<text x="726.6" y="571.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="810.8" y="570.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">del</text>
+<text x="587" y="615.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="646" y="615.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">~</text>
+<text x="726.6" y="615.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="810.8" y="614.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">del</text>
+<text x="587" y="658.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="646" y="658.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">~</text>
+<text x="726.6" y="658.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="810.8" y="657.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">del</text>
+<text x="555.2" y="703.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#2563EB" xml:space="preserve">+ 시간대 추가</text>
+<text x="505.3" y="780.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="10.9" font-weight="700" fill="#FFFFFF" xml:space="preserve">ON</text>
+<text x="910.2" y="781.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">그룹 삭제</text>
+<text x="518" y="817.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">월</text>
+<text x="562.8" y="817.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">화</text>
+<text x="607.5" y="817.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">수</text>
+<text x="652.3" y="817.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">목</text>
+<text x="697.1" y="817.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">금</text>
+<text x="741.8" y="817.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">토</text>
+<text x="786.6" y="817.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#1F2937" xml:space="preserve">일</text>
+<text x="587" y="855.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="646" y="855.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">~</text>
+<text x="726.6" y="855.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="810.8" y="854.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">del</text>
+<text x="587" y="898.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="646" y="898.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">~</text>
+<text x="726.6" y="898.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="810.8" y="897.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">del</text>
+<text x="587" y="942.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="646" y="942.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">~</text>
+<text x="726.6" y="942.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="810.8" y="941.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">del</text>
+<text x="587" y="985.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="646" y="985.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">~</text>
+<text x="726.6" y="985.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">:</text>
+<text x="810.8" y="984.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="12.8" font-weight="400" fill="#6B7280" xml:space="preserve">del</text>
+<text x="555.2" y="1030.4" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#2563EB" xml:space="preserve">+ 시간대 추가</text>
+<text x="533.2" y="1098.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#2563EB" xml:space="preserve">+ 그룹 추가</text>
+<text x="720" y="1317" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#FFFFFF" xml:space="preserve">저장</text>
+</g>
+<g id="h1">
+<text x="480" y="119.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="20.8" font-weight="700" fill="#1E3A5F" xml:space="preserve">⏰ 수집 시간</text>
+</g>
+<g id="hint">
+<text x="480" y="152.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">스크랩할 회차마다 시작~종료 시간대를 24시간제로 등록하세요 (예: 07:30 ~ 09:30).
+    그</text>
+<text x="480" y="168.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">시간대에 게시된 기사만 그 회차에 모입니다. 그룹당 등록한 개수만큼 하루에 자동
+    실행됩니</text>
+<text x="480" y="184.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">다 (그룹당 최소 1개, 최대 10개). 분은 00·30만 고를 수
+    있습니다. del 버튼으로 바로 비우</text>
+<text x="480" y="200.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">거나, 시작·종료 둘 다 빈 칸으로 둬도 그 자리는
+    삭제됩니다.</text>
+<text x="480" y="216.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">시간대 왼쪽 체크박스는 개별 on/off, 그룹 왼쪽 ON/OFF는 그룹째 켜고 끕니다.
+    &quot;주중&quot;/&quot;주</text>
+<text x="480" y="232.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">말&quot;처럼 그룹을 나눠두고 요일을 체크해두면, 오늘 요일이 들어 있는 그룹이
+    자동으로 쓰입</text>
+<text x="480" y="248.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">니다(그룹은 최대 5개). 켜둔 그룹이 하나뿐이면 요일과
+    무관하게 그 그룹이 쓰입니다 — 연</text>
+<text x="480" y="264.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">휴처럼 예외인 날 그룹 하나만 켜두는 용도입니다.
+    지금 쓰이는 그룹에는 &quot;오늘 적용 중&quot; 배</text>
+<text x="480" y="280.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">지가 붙습니다.</text>
+<text x="480" y="296.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">화면 상단 &quot;언론 모니터링 [종료시각] 기준&quot; 제목도 지금 적용 중인 그룹의 종료 시각을
+    그대</text>
+<text x="480" y="312.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">로 따라갑니다.</text>
+</g>
+</svg>

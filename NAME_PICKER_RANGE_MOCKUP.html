@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>소제목 이름 고르기 창 — 목록 범위 시안</title>
+<style>
+  body { background: #F8FAFC; color: #1F2937; margin: 0; padding: 28px 24px 60px;
+         font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  h1 { font-size: 1.15rem; color: #1E3A5F; margin: 0 0 6px; }
+  .sub { color: #6B7280; font-size: 0.85rem; margin: 0 0 18px; line-height: 1.6; }
+  .ctl { display: flex; gap: 18px; flex-wrap: wrap; align-items: center;
+         background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px;
+         padding: 10px 14px; margin-bottom: 22px; font-size: 0.83rem; }
+  .ctl b { color: #1E3A5F; font-weight: 700; margin-right: 6px; }
+  .ctl button { font: inherit; font-size: 0.82rem; padding: 5px 11px; margin-right: 4px;
+                border: 1px solid #E5E7EB; background: #FFFFFF; color: #6B7280;
+                border-radius: 999px; cursor: pointer; }
+  .ctl button.on { background: #2563EB; border-color: #2563EB; color: #fff; font-weight: 700; }
+  .row { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+  .pane { width: 400px; }
+  .pane h2 { font-size: 0.9rem; color: #1E3A5F; margin: 0 0 3px; }
+  .pane .tag { font-size: 0.75rem; color: #6B7280; margin: 0 0 10px; }
+  .pane .note { font-size: 0.8rem; color: #6B7280; line-height: 1.65; margin: 12px 2px 0; }
+  .pane .note b { color: #1F2937; }
+  .pane.reco h2::after { content: " ← 추천"; color: #2563EB; font-size: 0.8rem; }
+  .np-box { position: static !important; transform: none !important; width: 372px;
+            box-shadow: 0 2px 8px rgba(15,23,42,0.08) !important; }
+  .np-sep { font-size: 0.72rem; color: #6B7280; margin: 9px 8px 2px; padding-top: 7px;
+            border-top: 1px dashed #E5E7EB; }
+  .np-sep:first-child { border-top: none; padding-top: 0; margin-top: 2px; }
+  .empty { font-size: 0.8rem; color: #DC2626; margin: 11px 6px 0; }
+  .scrollnote { font-size: 0.72rem; color: #6B7280; text-align: right; margin: 3px 4px 0; }
+
+  .np-back-unused { position: fixed; inset: 0; z-index: 39; background: rgba(15,23,42,0.12); }
+  .np-box { position: fixed; top: 13vh; left: 50%; transform: translateX(-50%); z-index: 40;
+    width: 372px; max-width: calc(100vw - 32px); background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: 10px; box-shadow: 0 10px 30px rgba(15,23,42,0.18); padding: 14px 14px 10px; }
+  .np-title { font-size: 0.92rem; font-weight: 700; color: #1E3A5F; margin: 0 0 9px; }
+  .np-input { width: 100%; font: inherit; font-size: 0.95rem; padding: 8px 10px;
+    border: 1px solid #E5E7EB; border-radius: 6px; color: #1F2937; background: #FFFFFF; }
+  .np-input:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 3px #EFF6FF; }
+  .np-input.is-bad { border-color: #DC2626; box-shadow: 0 0 0 3px #FEF2F2; }
+  .np-lead { font-size: 0.76rem; color: #6B7280; margin: 11px 6px 2px; }
+  .np-list { max-height: 250px; overflow-y: auto; margin: 0 -4px; }
+  .np-row { display: flex; align-items: baseline; gap: 8px; width: calc(100% - 8px);
+    margin: 0 4px; padding: 5px 8px; border: none; background: none; border-radius: 5px;
+    font: inherit; text-align: left; cursor: pointer; color: #1F2937; }
+  .np-row:hover { background: #EFF6FF; }
+  .np-row .np-nm { flex: 1; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 볼드 = 담당자가 직접 고치거나 만든 이름. 직접 만든 소제목이 「다른 소제목」 드롭다운·미니
+     목차에서 이미 볼드인 것과 같은 뜻이라 새 표시를 만들지 않고 그 관례를 그대로 이어쓴다. */
+  .np-row.np-mine .np-nm { font-weight: 700; }
+  .np-row .np-when { font-size: 0.73rem; color: #6B7280; white-space: nowrap; }
+  .np-row.np-used { color: #6B7280; cursor: not-allowed; }
+  .np-row.np-used:hover { background: none; }
+  .np-row.np-used .np-nm { text-decoration: line-through; text-decoration-color: #CBD5E1; font-weight: 400; }
+  .np-row .np-tag { font-size: 0.69rem; color: #6B7280; border: 1px solid #E5E7EB;
+    border-radius: 999px; padding: 0 6px; white-space: nowrap; }
+  .np-hint { color: #6B7280; font-size: 0.75rem; margin: 7px 6px 0; opacity: 0.85; }
+  .np-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    margin-top: 10px; padding-top: 9px; border-top: 1px solid #E5E7EB; }
+  .np-msg { font-size: 0.76rem; color: #6B7280; flex: 1; }
+  .np-msg.bad { color: #DC2626; }
+  .np-msg.new { color: #2563EB; }
+  .np-btns { display: flex; gap: 6px; }
+  .np-btns button { font: inherit; font-size: 0.85rem; padding: 6px 13px; border-radius: 6px; cursor: pointer; }
+  .np-cancel { background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; }
+  .np-ok { background: #2563EB; color: #FFFFFF; border: none; font-weight: 700; }
+  .np-ok:hover { background: #1D4ED8; }
+  .np-ok:disabled { opacity: 0.45; cursor: not-allowed; }
+  .np-key { font-size: 0.72rem; color: #6B7280; text-align: right; margin: 6px 2px 0; }
+
+</style></head><body>
+
+<h1>소제목 이름 고르기 창 — 목록을 「전날까지」로 넓히면</h1>
+<p class="sub">
+  실제 화면 CSS와 <b>실제 저장된 소제목 이름</b>으로 그렸습니다. 목록 높이 상한(250px, 약 8줄)과
+  스크롤은 지금도 이미 걸려 있는 값 그대로입니다.
+</p>
+
+<div class="ctl">
+  <span><b>상황</b>
+    <button data-sit="now" class="on">지금 (오늘 회차 3개)</button>
+    <button data-sit="full">하루가 다 찬 저녁</button>
+  </span>
+  <span><b>창 상태</b>
+    <button data-st="open" class="on">연 직후</button>
+    <button data-st="edit">현재 이름을 고치는 중</button>
+  </span>
+</div>
+
+<div class="row">
+  <section class="pane">
+    <h2>A. 지금 방식 — 직전 회차 하나</h2>
+    <p class="tag">회차 1개의 소제목만</p>
+    <div class="np-box" data-v="a"></div>
+    <p class="note">직전 회차가 비면 <b>목록이 통째로 사라집니다</b> — 오늘 아침에 겪으신 그 화면입니다.
+      「지금」 상황으로 두고 보세요. 이름을 고치기 시작해도 같은 일이 벌어집니다.</p>
+  </section>
+
+  <section class="pane reco">
+    <h2>B. 전날까지 전부 — 한 줄로</h2>
+    <p class="tag">오늘 + 어제, 최신 회차순 · 이름 중복 제거</p>
+    <div class="np-box" data-v="b"></div>
+    <p class="note">위 8줄이 사실상 직전 회차라 <b>연 직후 보이는 화면은 A와 거의 같고</b>,
+      더 뒤엣것은 스크롤하거나 한두 글자 치면 나옵니다. 회차가 비어도 목록이 안 죽습니다.</p>
+  </section>
+
+  <section class="pane">
+    <h2>C. 전날까지 전부 — 회차로 나눠서</h2>
+    <p class="tag">B와 같은 목록에 회차 구분선만 추가</p>
+    <div class="np-box" data-v="c"></div>
+    <p class="note">「지금 이어지는 사안」이 어디까지인지가 눈에 걸립니다. 대신 줄이 늘어
+      한 화면에 보이는 이름이 <b>8줄에서 5~6줄로 줄고</b>, 오른쪽 회차 표시와 같은 말을 두 번 합니다.</p>
+  </section>
+</div>
+
+<script>
+var POOL = {"now": {"prev": {"label": "직전 회차 · 오늘 19:30", "items": []}, "all": [{"name": "경제 회복세, 철강산업 고도화 - 경제관계장관회의", "kind": "mine", "when": "오늘 09:30"}, {"name": "기타", "kind": "ai", "when": "오늘 09:30"}, {"name": "무역범죄 단속 강화 - 경제관계장관회의", "kind": "mine", "when": "오늘 09:30"}, {"name": "미래대응기금 관련", "kind": "mine", "when": "오늘 09:30"}, {"name": "지식산업센터 공실 해소 - 경제관계장관회의", "kind": "mine", "when": "오늘 09:30"}, {"name": "개각 후보자 부동산 논란", "kind": "ai", "when": "오늘 06:00"}, {"name": "국회·재계 경제협력 강화", "kind": "ai", "when": "오늘 06:00"}, {"name": "정부 세제개편안 추진", "kind": "ai", "when": "오늘 06:00"}, {"name": "청년 고용률 악화", "kind": "ai", "when": "오늘 06:00"}, {"name": "추석 물가안정대책", "kind": "ai", "when": "오늘 06:00"}, {"name": "퇴직연금 국채투자 상품 출시", "kind": "ai", "when": "오늘 06:00"}, {"name": "피치와 무디스, 정부예산안 긍정 평가", "kind": "mine", "when": "어제 17:00"}, {"name": "추석 물가 안정대책", "kind": "ai", "when": "어제 17:00"}, {"name": "한-아프리카 경제협력 장관회의", "kind": "mine", "when": "어제 17:00"}, {"name": "일자리전담반 TF", "kind": "mine", "when": "어제 14:00"}, {"name": "바가지요금 근절 TF 등", "kind": "mine", "when": "어제 14:00"}, {"name": "지역정책 및 행정개편", "kind": "ai", "when": "어제 11:00"}, {"name": "EDCF 분석", "kind": "mine", "when": "어제 09:30"}, {"name": "대미투자 관련", "kind": "mine", "when": "어제 09:30"}, {"name": "주택분 종합부동산세 유형별 현황", "kind": "mine", "when": "어제 09:30"}, {"name": "공공기관 지방 이전", "kind": "ai", "when": "어제 06:00"}, {"name": "부동산 세제 개편", "kind": "ai", "when": "어제 06:00"}, {"name": "자본시장 규제 개편", "kind": "ai", "when": "어제 06:00"}, {"name": "환율·금융시장 안정", "kind": "ai", "when": "어제 06:00"}]}, "full": {"prev": {"label": "직전 회차 · 오늘 17:00", "items": [{"name": "기타", "kind": "ai"}, {"name": "피치와 무디스, 정부예산안 긍정 평가", "kind": "mine"}, {"name": "추석 물가 안정대책", "kind": "ai"}, {"name": "한-아프리카 경제협력 장관회의", "kind": "mine"}]}, "all": [{"name": "기타", "kind": "ai", "when": "오늘 17:00"}, {"name": "피치와 무디스, 정부예산안 긍정 평가", "kind": "mine", "when": "오늘 17:00"}, {"name": "추석 물가 안정대책", "kind": "ai", "when": "오늘 17:00"}, {"name": "한-아프리카 경제협력 장관회의", "kind": "mine", "when": "오늘 17:00"}, {"name": "일자리전담반 TF", "kind": "mine", "when": "오늘 14:00"}, {"name": "바가지요금 근절 TF 등", "kind": "mine", "when": "오늘 14:00"}, {"name": "지역정책 및 행정개편", "kind": "ai", "when": "오늘 11:00"}, {"name": "EDCF 분석", "kind": "mine", "when": "오늘 09:30"}, {"name": "대미투자 관련", "kind": "mine", "when": "오늘 09:30"}, {"name": "주택분 종합부동산세 유형별 현황", "kind": "mine", "when": "오늘 09:30"}, {"name": "공공기관 지방 이전", "kind": "ai", "when": "오늘 06:00"}, {"name": "부동산 세제 개편", "kind": "ai", "when": "오늘 06:00"}, {"name": "자본시장 규제 개편", "kind": "ai", "when": "오늘 06:00"}, {"name": "환율·금융시장 안정", "kind": "ai", "when": "오늘 06:00"}, {"name": "공급망 위기대응 훈련", "kind": "ai", "when": "어제 17:00"}, {"name": "대미 투자 협상 진전", "kind": "ai", "when": "어제 17:00"}, {"name": "무디스 면담", "kind": "mine", "when": "어제 17:00"}, {"name": "부동산 세제 개편 논의", "kind": "ai", "when": "어제 17:00"}, {"name": "윤석열 경호시설 예산 삭제", "kind": "ai", "when": "어제 17:00"}, {"name": "의원 비리 수사", "kind": "ai", "when": "어제 17:00"}, {"name": "후보자 인사청문 가결", "kind": "mine", "when": "어제 17:00"}, {"name": "한·아프리카 경제협력 장관회의", "kind": "ai", "when": "어제 17:00"}, {"name": "항만공사 통합 논란", "kind": "mine", "when": "어제 17:00"}, {"name": "국채 토큰화 실증시범사업 TF", "kind": "mine", "when": "어제 14:00"}, {"name": "비거주 1주택자 세제 논의", "kind": "ai", "when": "어제 14:00"}, {"name": "야당 후보자 정책 비판", "kind": "ai", "when": "어제 14:00"}, {"name": "후보자, 다주택자 과세 언급", "kind": "mine", "when": "어제 14:00"}, {"name": "개각 인사 비판", "kind": "mine", "when": "어제 11:00"}, {"name": "민통선 농지 논쟁", "kind": "mine", "when": "어제 09:30"}, {"name": "LH 부채 해소 방안", "kind": "ai", "when": "어제 06:00"}, {"name": "개각 및 인사이동", "kind": "ai", "when": "어제 06:00"}, {"name": "경제부처 장관 후보자 부동산 논란", "kind": "ai", "when": "어제 06:00"}, {"name": "공공기관 재정 관리 문제", "kind": "ai", "when": "어제 06:00"}, {"name": "공공일자리 사업 관리 문제", "kind": "ai", "when": "어제 06:00"}, {"name": "금융인력의 지방 이전 적응 문제", "kind": "ai", "when": "어제 06:00"}, {"name": "대미투자 사업 추진", "kind": "ai", "when": "어제 06:00"}, {"name": "부동산 임대소득 과세 문제", "kind": "ai", "when": "어제 06:00"}, {"name": "정부 부처 이전 및 인프라 조성", "kind": "ai", "when": "어제 06:00"}, {"name": "환율과 소득 동향", "kind": "ai", "when": "어제 06:00"}]}};
+var SIT = "now", ST = "open";
+var EDITED = "개각 후보자 부동산 논란들";   // 현재 이름 끝에 한 글자 덧붙인 상태
+
+function rowHtml(it, showWhen) {
+  var mine = it.kind === "mine" ? " np-mine" : "";
+  return '<button type="button" class="np-row' + mine + '">' +
+         '<span class="np-nm">' + it.name + '</span>' +
+         '<span class="np-when">' + (showWhen ? (it.when || "") : "") + '</span></button>';
+}
+function render(box, v) {
+  var pool = POOL[SIT];
+  var editing = ST === "edit";
+  var value = editing ? EDITED : "개각 후보자 부동산 논란";
+  var q = editing ? value : "";
+  var hits = q ? pool.all.filter(function(i) { return i.name.indexOf(q) >= 0; }) : null;
+
+  var lead = "", body = "", hint = "", foot = "", scroll = "";
+  if (v === "a") {
+    if (editing) {
+      // 지금 동작: 검색 0건이면 목록 자리를 통째로 안 그린다
+      if (hits.length) { lead = "오늘·어제에서 찾은 이름"; body = hits.map(function(i){return rowHtml(i,true);}).join(""); }
+      else { body = '<p class="empty">— 목록 자리가 통째로 사라집니다 —</p>'; }
+    } else if (pool.prev.items.length) {
+      lead = pool.prev.label;
+      body = pool.prev.items.map(function(i){ return rowHtml(i, false); }).join("");
+      hint = "치면 오늘·어제 쓴 이름 전부에서 찾아요";
+    } else {
+      body = '<p class="empty">— 직전 회차가 비어 목록이 통째로 사라집니다 —</p>';
+    }
+  } else {
+    // B·C: 검색 결과가 0건이면 기본 목록(오늘·어제 전부)으로 되돌아간다
+    var items = (q && hits.length) ? hits : pool.all;
+    var back = q && !hits.length;
+    lead = (q && hits.length) ? "오늘·어제에서 찾은 이름"
+         : (back ? "찾은 이름이 없어요 · 최근 쓴 이름" : "최근 쓴 이름 · 오늘·어제");
+    if (v === "b") {
+      body = items.map(function(i){ return rowHtml(i, true); }).join("");
+    } else {
+      var last = null;
+      body = items.map(function(i) {
+        var sep = (i.when !== last) ? '<p class="np-sep">' + i.when + (last === null ? " · 직전 회차" : "") + '</p>' : "";
+        last = i.when;
+        return sep + rowHtml(i, false);
+      }).join("");
+    }
+    hint = q ? "" : "치면 그 자리에서 걸러져요";
+    scroll = items.length + "줄 · 스크롤";
+  }
+  foot = editing ? '<span class="np-msg new">처음 쓰는 이름이에요</span>'
+                 : '<span class="np-msg"></span>';
+  box.innerHTML =
+    '<p class="np-title">소제목 이름 바꾸기</p>' +
+    '<input type="text" class="np-input" value="' + value + '">' +
+    (lead ? '<p class="np-lead">' + lead + '</p>' : "") +
+    '<div class="np-list">' + body + '</div>' +
+    (scroll ? '<p class="scrollnote">' + scroll + '</p>' : "") +
+    (hint ? '<p class="np-hint">' + hint + '</p>' : "") +
+    '<div class="np-foot">' + foot +
+      '<span class="np-btns"><button type="button" class="np-cancel">취소</button>' +
+      '<button type="button" class="np-ok">바꾸기</button></span></div>' +
+    '<p class="np-key">Enter 적용 · Esc 닫기</p>';
+}
+function paint() {
+  ["a","b","c"].forEach(function(v) { render(document.querySelector('.np-box[data-v="' + v + '"]'), v); });
+}
+document.querySelectorAll(".ctl button").forEach(function(b) {
+  b.onclick = function() {
+    var key = b.dataset.sit ? "sit" : "st";
+    document.querySelectorAll('.ctl button[data-' + key + ']').forEach(function(o){ o.classList.remove("on"); });
+    b.classList.add("on");
+    if (key === "sit") { SIT = b.dataset.sit; } else { ST = b.dataset.st; }
+    paint();
+  };
+});
+paint();
+</script>
+</body></html>

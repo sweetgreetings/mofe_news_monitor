@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>정책 단어 추이 — 전용 화면 목업</title><style>
+  body { margin: 0; background: #F8FAFC; color: #1F2937;
+    font-family: 'Pretendard', 'Noto Sans KR', -apple-system, sans-serif; }
+  .container { max-width: 980px; margin: 0 auto; padding: 84px 24px 60px; }
+  h1 { font-size: 1.35rem; color: #1E3A5F; margin: 0 0 4px; }
+  .sub { color: #6B7280; font-size: 0.85rem; margin: 0 0 20px; }
+  .card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px;
+    padding: 18px 20px; margin-bottom: 16px; }
+  .card h2 { font-size: 1rem; color: #1E3A5F; margin: 0 0 12px;
+    display: flex; align-items: center; gap: 8px; }
+  .card h2 .right { margin-left: auto; font-weight: 400; font-size: 0.82rem; color: #6B7280; }
+  .hint { color: #6B7280; font-size: 0.8rem; }
+
+  /* 상단바 — app/renderer.py .topbar와 같은 규격 */
+  .topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 20; background: #FFFFFF;
+    border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .topbar-inner { max-width: 980px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: space-between; align-items: center; }
+  .topbar a { color: #2563EB; text-decoration: none; font-size: 0.92rem; font-weight: 600;
+    padding: 6px 10px; border-radius: 6px; }
+  .topbar a:hover { background: #EFF6FF; }
+  .topbar .nav-group { display: flex; gap: 2px; }
+
+  button, a.btn { background: #2563EB; color: #FFFFFF; border: none; border-radius: 4px;
+    padding: 8px 16px; font-size: 0.92rem; font-family: inherit; cursor: pointer;
+    text-decoration: none; appearance: none; -webkit-appearance: none;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  button:hover, a.btn:hover { background: #1E3A5F; }
+  button:disabled { background: #E5E7EB; color: #6B7280; cursor: not-allowed; }
+  button.ghost { background: transparent; color: #2563EB; border: 1px solid #BFD3F5; }
+  button.ghost:hover { background: #EFF6FF; color: #1E3A5F; }
+  input[type=text], input[type=date] { background: #F8FAFC; color: #1F2937;
+    border: 1px solid #E5E7EB; border-radius: 4px; padding: 7px 10px;
+    font-size: 0.92rem; font-family: inherit; }
+  input[type=text]:focus, input[type=date]:focus { outline: 2px solid #BFD3F5; border-color: #2563EB; }
+
+  /* ── 지켜보는 단어 ── */
+  .word-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .wchip { display: inline-flex; align-items: center; gap: 7px; padding: 6px 8px 6px 10px;
+    border: 1px solid #E5E7EB; border-radius: 999px; background: #FFFFFF; font-size: 0.88rem; }
+  .wchip .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .wchip .cnt { color: #6B7280; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+  .wchip .x { border: none; background: transparent; color: #6B7280; cursor: pointer;
+    padding: 0 2px; font-size: 0.95rem; line-height: 1; }
+  .wchip .x:hover { background: transparent; color: #DC2626; }
+  .wchip.slot-empty { border-style: dashed; color: #9CA3AF; background: #FCFCFD; }
+  .add-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .preview-cnt { font-size: 0.8rem; color: #6B7280; }
+  .quick { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #E5E7EB; }
+  .quick .qlabel { font-size: 0.8rem; color: #6B7280; margin-bottom: 7px; }
+  .qchip { display: inline-block; border: 1px solid #E5E7EB; background: #F8FAFC; color: #1F2937;
+    border-radius: 999px; padding: 4px 11px; font-size: 0.82rem; margin: 0 6px 6px 0;
+    cursor: pointer; font-family: inherit; }
+  .qchip:hover { background: #EFF6FF; border-color: #2563EB; color: #1E3A5F; }
+  .surge { margin-top: 12px; background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E;
+    border-radius: 6px; padding: 8px 11px; font-size: 0.81rem; display: flex; align-items: center; gap: 8px; }
+  .surge button { margin-left: auto; background: transparent; color: #92400E;
+    border: 1px solid #E0BE72; border-radius: 4px; padding: 4px 10px; font-size: 0.78rem; white-space: nowrap; }
+  .surge button:hover { background: #FDF2D8; }
+  .warn-line { margin-top: 10px; background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E;
+    border-radius: 6px; padding: 8px 11px; font-size: 0.82rem; }
+
+  /* ── 기간 바 ── */
+  .period-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    padding-bottom: 14px; margin-bottom: 6px; border-bottom: 1px solid #E5E7EB; }
+  .seg { display: inline-flex; border: 1px solid #E5E7EB; border-radius: 6px; overflow: hidden; }
+  .seg button { background: #FFFFFF; color: #1F2937; border: none; border-right: 1px solid #E5E7EB;
+    border-radius: 0; padding: 7px 14px; font-size: 0.86rem; }
+  .seg button:last-child { border-right: none; }
+  .seg button:hover { background: #EFF6FF; color: #1E3A5F; }
+  .seg button.on { background: #2563EB; color: #FFFFFF; }
+  .unit-badge { font-size: 0.78rem; color: #1E3A5F; background: #EFF6FF;
+    border: 1px solid #BFD3F5; border-radius: 999px; padding: 3px 10px; }
+  .period-bar .sep { color: #D1D5DB; }
+
+  /* ── 그래프 ── */
+  .chart-wrap { position: relative; overflow-x: auto; }
+  svg.chart { display: block; width: 100%; height: auto; min-width: 620px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px;
+    padding-top: 12px; border-top: 1px solid #F1F3F5; }
+  .legend .li { display: inline-flex; align-items: center; gap: 7px; font-size: 0.83rem; }
+  .legend .li .dot { width: 11px; height: 3px; border-radius: 2px; }
+  .legend .li .n { color: #6B7280; font-variant-numeric: tabular-nums; font-size: 0.78rem; }
+  .caption { color: #6B7280; font-size: 0.78rem; margin-top: 10px; }
+  #tip { position: absolute; pointer-events: none; background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,0.10); padding: 8px 10px;
+    font-size: 0.8rem; display: none; z-index: 5; min-width: 128px; }
+  #tip .th { font-weight: 700; color: #1E3A5F; margin-bottom: 5px; }
+  #tip .tr { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+  #tip .tr .dot { width: 8px; height: 8px; border-radius: 50%; }
+  #tip .tr .v { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+  /* ── 표 ── */
+  .table-scroll { overflow-x: auto; }
+  table { border-collapse: collapse; font-size: 0.84rem; width: 100%; }
+  th, td { border-bottom: 1px solid #E5E7EB; padding: 7px 10px; text-align: right;
+    white-space: nowrap; font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; position: sticky; left: 0;
+    background: #FFFFFF; z-index: 1; }
+  thead th { color: #6B7280; font-weight: 600; font-size: 0.79rem; background: #FFFFFF; }
+  tbody td.sum { font-weight: 700; color: #1E3A5F; }
+  td.na { color: #C7CBD1; }
+  .wdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    margin-right: 7px; vertical-align: 0; }
+
+  .mock-note { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E;
+    border-radius: 8px; padding: 12px 14px; font-size: 0.82rem; line-height: 1.65; margin-bottom: 16px; }
+  .mock-note b { color: #7C3F0A; }
+  .mock-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem;
+    color: #92400E; margin-top: 8px; cursor: pointer; }
+</style></head><body>
+
+<div class="topbar"><div class="topbar-inner">
+  <div class="nav-group">
+    <a href="HOME_TREND_CARD_MOCKUP.html">← 홈</a><a href="#">스크랩 확정본</a><a href="#">정기 보관함</a>
+  </div>
+  <div class="nav-group"><a href="#">⚙️ 설정</a></div>
+</div></div>
+
+<div class="container">
+  <h1>📈 정책 단어 추이</h1>
+  <p class="sub">정기 수집 기사의 제목·요약에 그 단어가 몇 번 등장했는지 · 최대 8개 단어 비교 · 숨긴 기사 제외</p>
+
+  <div class="mock-note">
+    <b>목업 안내.</b> 그래프·표의 숫자는 <b>실제 저장된 회차 데이터</b>(2026-08-11 ~ 08-27, 79회차 2,466건)에서 뽑은 진짜 건수입니다.
+    그 이전 구간은 데이터가 아직 없어 설계대로 <b>“기록 없음”</b>으로 그려집니다 — 6개월·1년 탭을 누르면 지금은 이렇게 보인다는 뜻이고,
+    2027년 8월이면 12개 점이 다 찹니다.
+    <label class="mock-toggle"><input type="checkbox" id="fill-demo" /> 목업 전용 — 과거 구간을 예시값으로 채워서 다 찬 모습 보기</label>
+  </div>
+
+  <!-- ════════ 지켜보는 단어 ════════ -->
+  <div class="card">
+    <h2>🔤 지켜보는 단어 <span class="right"><span id="slot-used">6</span>/8 · 홈 그래프에는 위에서 3개만 나옵니다</span></h2>
+    <div class="word-chips" id="chips"></div>
+
+    <div class="add-row" id="add-row">
+      <input type="text" id="word-input" placeholder="단어를 직접 입력  (예: 가계부채)" list="kw-list" style="width: 260px;" />
+      <datalist id="kw-list"></datalist>
+      <button id="add-btn">+ 추가</button>
+      <span class="preview-cnt" id="preview-cnt"></span>
+    </div>
+    <div id="similar-warn"></div>
+    <div class="surge">📌 <b>기재부</b> — 최근 3일 9건 (직전 3일 0건, <b>9.0배</b>). 지금 지켜보는 단어 밖입니다.
+      <button onclick="addWord('기재부')">추이에 추가</button></div>
+
+    <div class="quick">
+      <div class="qlabel">등록 검색어에서 고르기</div>
+      <div id="quick-chips"></div>
+    </div>
+  </div>
+
+  <!-- ════════ 그래프 ════════ -->
+  <div class="card">
+    <div class="period-bar">
+      <div class="seg" id="range-seg">
+        <button data-r="7" class="on">7일</button><button data-r="30">1개월</button>
+        <button data-r="90">3개월</button><button data-r="180">6개월</button><button data-r="365">1년</button>
+      </div>
+      <span class="unit-badge" id="unit-badge">일별 집계</span>
+      <span class="sep">|</span>
+      <input type="date" id="d-start" value="2026-08-21" /> ~ <input type="date" id="d-end" value="2026-08-27" />
+      <button class="ghost" id="apply-range">조회</button>
+    </div>
+
+    <div class="chart-wrap">
+      <svg class="chart" id="chart" viewBox="0 0 900 300" role="img" aria-label="정책 단어 추이 꺾은선 그래프"></svg>
+      <div id="tip"></div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <p class="caption" id="caption"></p>
+  </div>
+
+  <!-- ════════ 표 ════════ -->
+  <div class="card">
+    <h2>📊 <span id="tbl-unit">월</span>별 건수
+      <span class="right">
+        <button class="ghost" onclick="alert('목업입니다 — 실제로는 표 텍스트를 클립보드에 복사합니다.')">📋 복사</button>
+        <button class="ghost" onclick="alert('목업입니다 — 실제로는 POST /download-excel 로 .xlsx를 내려받습니다.\n파일명: 2026-03~08_정책단어추이.xlsx')">⬇ 엑셀</button>
+      </span>
+    </h2>
+    <div class="table-scroll"><table id="tbl"></table></div>
+    <p class="caption">보고서에 붙이는 건 그림이 아니라 숫자라, 그래프와 같은 집계 단위로 표를 같이 둡니다. “—”는 그 구간에 저장된 회차가 아예 없다는 뜻(0건과 다름).</p>
+  </div>
+</div>
+
+<script>
+const REAL_DATES = ["2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14", "2026-08-15", "2026-08-16", "2026-08-17", "2026-08-18", "2026-08-19", "2026-08-20", "2026-08-21", "2026-08-22", "2026-08-23", "2026-08-24", "2026-08-25", "2026-08-26", "2026-08-27"];
+const REAL = {"재정경제부": {"2026-08-11": 70, "2026-08-12": 126, "2026-08-13": 220, "2026-08-14": 109, "2026-08-15": 12, "2026-08-16": 16, "2026-08-17": 47, "2026-08-18": 59, "2026-08-19": 66, "2026-08-20": 183, "2026-08-21": 155, "2026-08-22": 5, "2026-08-23": 13, "2026-08-24": 121, "2026-08-25": 94, "2026-08-26": 101, "2026-08-27": 42}, "예산": {"2026-08-11": 4, "2026-08-12": 9, "2026-08-13": 18, "2026-08-14": 5, "2026-08-15": 5, "2026-08-16": 1, "2026-08-17": 2, "2026-08-18": 10, "2026-08-19": 9, "2026-08-20": 24, "2026-08-21": 41, "2026-08-22": 8, "2026-08-23": 4, "2026-08-24": 252, "2026-08-25": 231, "2026-08-26": 119, "2026-08-27": 21}, "구윤철": {"2026-08-11": 49, "2026-08-12": 38, "2026-08-13": 81, "2026-08-14": 19, "2026-08-15": 2, "2026-08-16": 2, "2026-08-17": 5, "2026-08-18": 3, "2026-08-19": 33, "2026-08-20": 102, "2026-08-21": 68, "2026-08-22": 1, "2026-08-23": 3, "2026-08-24": 64, "2026-08-25": 29, "2026-08-26": 51, "2026-08-27": 31}, "예결위": {"2026-08-11": 0, "2026-08-12": 1, "2026-08-13": 0, "2026-08-14": 0, "2026-08-15": 0, "2026-08-16": 0, "2026-08-17": 0, "2026-08-18": 0, "2026-08-19": 0, "2026-08-20": 3, "2026-08-21": 2, "2026-08-22": 0, "2026-08-23": 0, "2026-08-24": 72, "2026-08-25": 59, "2026-08-26": 44, "2026-08-27": 1}, "세제": {"2026-08-11": 45, "2026-08-12": 50, "2026-08-13": 38, "2026-08-14": 10, "2026-08-15": 4, "2026-08-16": 4, "2026-08-17": 40, "2026-08-18": 19, "2026-08-19": 10, "2026-08-20": 22, "2026-08-21": 20, "2026-08-22": 2, "2026-08-23": 2, "2026-08-24": 33, "2026-08-25": 25, "2026-08-26": 23, "2026-08-27": 8}, "부동산": {"2026-08-11": 13, "2026-08-12": 35, "2026-08-13": 55, "2026-08-14": 8, "2026-08-15": 2, "2026-08-16": 0, "2026-08-17": 29, "2026-08-18": 8, "2026-08-19": 5, "2026-08-20": 15, "2026-08-21": 17, "2026-08-22": 2, "2026-08-23": 0, "2026-08-24": 9, "2026-08-25": 22, "2026-08-26": 12, "2026-08-27": 1}, "예산결산특별위원회": {"2026-08-11": 0, "2026-08-12": 0, "2026-08-13": 0, "2026-08-14": 0, "2026-08-15": 0, "2026-08-16": 0, "2026-08-17": 0, "2026-08-18": 0, "2026-08-19": 0, "2026-08-20": 2, "2026-08-21": 4, "2026-08-22": 0, "2026-08-23": 2, "2026-08-24": 236, "2026-08-25": 191, "2026-08-26": 77, "2026-08-27": 12}, "기획재정부": {"2026-08-11": 10, "2026-08-12": 5, "2026-08-13": 12, "2026-08-14": 6, "2026-08-15": 5, "2026-08-16": 2, "2026-08-17": 8, "2026-08-18": 14, "2026-08-19": 23, "2026-08-20": 11, "2026-08-21": 9, "2026-08-22": 1, "2026-08-23": 1, "2026-08-24": 15, "2026-08-25": 17, "2026-08-26": 17, "2026-08-27": 0}};
+const TOTALS = {"재정경제부": 1439, "예산": 763, "구윤철": 581, "예결위": 182, "세제": 355, "부동산": 233, "예산결산특별위원회": 524, "기획재정부": 156};
+
+// ══════════════════════════════════════════════════════════════════
+// 목업 상태
+// ══════════════════════════════════════════════════════════════════
+const TODAY = "2026-08-27";
+// 8색 categorical 램프 — dataviz 검증기 통과(light, 표면 #FFFFFF):
+//   CVD 최악 인접쌍 ΔE 9.1 / 일반시야 최악 19.6 / 대비 WARN 3건은 직접 라벨 + 표로 보완
+const COLORS = ["#2a78d6","#eb6834","#1baf7a","#eda100","#e87ba4","#008300","#4a3aa7","#e34948"];
+const MAXW = 8;
+const REGISTERED = ["재정경제부","재경부","기획재정부","구윤철","이형일","예결위","예산결산특별위원회",
+  "양도세","종부세","보유세","ISA","IMF","물가안정","초과세수","인플레이션","세제 개편"];
+let picked = ["재정경제부","예산","구윤철","예결위","세제","부동산"];
+let rangeDays = 7, customRange = null, fillDemo = false;
+
+const FIRST_REAL = REAL_DATES[0], DEMO_FROM = "2025-08-27";
+const realSet = new Set(REAL_DATES);
+
+function hash(s){ let x=2166136261; for(let i=0;i<s.length;i++){ x^=s.charCodeAt(i); x=Math.imul(x,16777619);} return (x>>>0)/4294967296; }
+function synth(w, ds){
+  const d = new Date(ds+"T00:00:00");
+  const base = 5 + Math.floor(hash(w)*38);
+  const wk = (d.getDay()===0||d.getDay()===6) ? 0.16 : 1;
+  const wave = 1 + 0.55*Math.sin(d.getTime()/86400000/9 + hash(w)*40);
+  return Math.max(0, Math.round(base*wave*wk*(0.55+0.9*hash(w+ds))));
+}
+// 그 날짜에 저장된 회차가 있는가 (없으면 0건이 아니라 "기록 없음")
+function hasRecord(ds){
+  if (realSet.has(ds)) return true;
+  return fillDemo && ds >= DEMO_FROM && ds < FIRST_REAL;
+}
+// 그 날짜·그 단어의 건수. 실제 저장 데이터가 있으면 그것, 없으면(목업 전용) 예시값.
+function dayCount(w, ds){
+  if (realSet.has(ds)) return (REAL[w] && REAL[w][ds] !== undefined) ? REAL[w][ds] : synth(w, ds);
+  return synth(w, ds);
+}
+function isReal(w){ return REAL[w] !== undefined; }
+
+// ══════════════════════════════════════════════════════════════════
+// 구간 만들기 — 기간이 길어지면 집계 단위를 자동으로 넓힌다
+//   ~31일 일별 · ~100일 주별 · 그 이상 월별
+// ══════════════════════════════════════════════════════════════════
+const KRDAY = ["일","월","화","수","목","금","토"];
+const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+
+function buildBuckets(){
+  let start, end;
+  if (customRange) { start = new Date(customRange[0]+"T00:00:00"); end = new Date(customRange[1]+"T00:00:00"); }
+  else { end = new Date(TODAY+"T00:00:00"); start = addDays(end, -(rangeDays-1)); }
+  const days = Math.round((end-start)/86400000)+1;
+  const unit = days<=31 ? "day" : (days<=100 ? "week" : "month");
+  const all = []; for (let d=new Date(start); d<=end; d=addDays(d,1)) all.push(fmt(d));
+  const out = [];
+  if (unit==="day") {
+    all.forEach(ds => { const w = new Date(ds+"T00:00:00").getDay();
+      out.push({ label: ds.slice(5).replace("-","/")+`(${KRDAY[w]})`, dates:[ds],
+                 wd: w, weekend: [0,6].includes(w) }); });
+  } else if (unit==="week") {
+    let cur = null;
+    all.forEach(ds => {
+      const d = new Date(ds+"T00:00:00"), mon = addDays(d, -((d.getDay()+6)%7));
+      const key = fmt(mon);
+      if (!cur || cur.key!==key) { cur = { key, label: key.slice(5).replace("-","/"), dates:[] }; out.push(cur); }
+      cur.dates.push(ds);
+    });
+  } else {
+    let cur = null;
+    all.forEach(ds => {
+      const key = ds.slice(0,7);
+      if (!cur || cur.key!==key) {
+        // 1년 구간은 8월이 두 번 나오므로 첫 칸과 1월에는 연도를 붙인다
+        const m = +key.slice(5), yr = key.slice(2,4);
+        cur = { key, label: (out.length===0 || m===1) ? `${yr}.${m}월` : `${m}월`, dates:[] };
+        out.push(cur);
+      }
+      cur.dates.push(ds);
+    });
+  }
+  out.forEach(b => { b.record = b.dates.some(hasRecord); b.partial = b.dates.includes(TODAY); });
+  return { buckets: out, unit, days };
+}
+function bucketValue(w,b){ return b.record ? b.dates.filter(hasRecord).reduce((s,ds)=>s+dayCount(w,ds),0) : null; }
+
+// ══════════════════════════════════════════════════════════════════
+// 그래프
+// ══════════════════════════════════════════════════════════════════
+const W=900,H=300,PL=44,PR=136,PT=14,PB=34;
+let LAST = null;
+
+function drawChart(){
+  const { buckets, unit, days } = buildBuckets();
+  const svg = document.getElementById("chart");
+  const series = picked.map((w,i)=>({ word:w, color:COLORS[i], values: buckets.map(b=>bucketValue(w,b)) }));
+  const nums = series.flatMap(s=>s.values).filter(v=>v!==null);
+  let ymax = Math.max(1, ...nums);
+  const nice = [10,20,50,100,150,200,300,400,500,750,1000,1500,2000,3000,5000,10000];
+  ymax = nice.find(n=>n>=ymax) || Math.ceil(ymax/1000)*1000;
+  const n = buckets.length;
+  const step = n>1 ? (W-PL-PR)/(n-1) : 0;
+  const xAt = i => PL + i*step;
+  const yAt = v => PT + (1 - v/ymax)*(H-PT-PB);
+  const out = [];
+
+  // 주말 음영 — 일별일 때만. 회차가 3개뿐이라 총량이 구조적으로 낮은 날임을 알린다.
+  if (unit==="day") buckets.forEach((b,i)=>{ if(b.weekend)
+    out.push(`<rect x="${(xAt(i)-step/2).toFixed(1)}" y="${PT}" width="${step.toFixed(1)}" height="${H-PT-4}" fill="#EDF0F3"/>`); });
+
+  // "기록 없음" 연속 구간 — 0으로 잇지 않고 배경 + 라벨, 선은 끊는다
+  let i=0;
+  while(i<n){
+    if(buckets[i].record){ i++; continue; }
+    let j=i; while(j+1<n && !buckets[j+1].record) j++;
+    const x0=xAt(i)-step/2, x1=xAt(j)+step/2;
+    out.push(`<rect x="${x0.toFixed(1)}" y="${PT}" width="${(x1-x0).toFixed(1)}" height="${H-PT-PB}" fill="#EAEDF1"/>`);
+    if(x1-x0>62) out.push(`<text x="${((x0+x1)/2).toFixed(1)}" y="${PT+(H-PT-PB)/2}" text-anchor="middle" font-size="11" fill="#9CA3AF">기록 없음</text>`);
+    i=j+1;
+  }
+
+  // 격자 + y축
+  for(let g=0; g<=4; g++){
+    const v = ymax*g/4, y = yAt(v);
+    out.push(`<line x1="${PL}" y1="${y.toFixed(1)}" x2="${W-PR}" y2="${y.toFixed(1)}" stroke="#EEF0F2" stroke-width="1"/>`);
+    out.push(`<text x="${PL-8}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="10.5" fill="#9CA3AF">${v}</text>`);
+  }
+  // x축 라벨 — 10개 안쪽으로 솎아낸다
+  const skip = Math.max(1, Math.ceil(n/10));
+  buckets.forEach((b,idx)=>{
+    const show = unit==="day" ? (n<=10 || b.wd===1 || idx===n-1) : (idx%skip===0 || idx===n-1);
+    if(!show) return;
+    const em = unit==="day" && b.weekend;
+    out.push(`<text x="${xAt(idx).toFixed(1)}" y="${H-12}" text-anchor="middle" font-size="10.5" fill="${em?"#4B5563":"#9CA3AF"}" font-weight="${em?600:400}">${b.label}</text>`);
+  });
+
+  // 선 — null에서 끊고, 마지막(집계 중) 구간만 점선
+  series.forEach(s=>{
+    let seg=[];
+    const flush = ()=>{
+      if(seg.length>1){
+        const endsAtLast = seg[seg.length-1].i===n-1 && buckets[n-1].partial;
+        const solid = endsAtLast ? seg.slice(0,-1) : seg;
+        if(solid.length>1) out.push(`<polyline fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="${solid.map(p=>xAt(p.i).toFixed(1)+","+yAt(p.v).toFixed(1)).join(" ")}"/>`);
+        if(endsAtLast){ const a=seg[seg.length-2], b=seg[seg.length-1];
+          out.push(`<line x1="${xAt(a.i).toFixed(1)}" y1="${yAt(a.v).toFixed(1)}" x2="${xAt(b.i).toFixed(1)}" y2="${yAt(b.v).toFixed(1)}" stroke="${s.color}" stroke-width="2" stroke-dasharray="4 3" stroke-linecap="round"/>`); }
+      } else if(seg.length===1){
+        out.push(`<circle cx="${xAt(seg[0].i).toFixed(1)}" cy="${yAt(seg[0].v).toFixed(1)}" r="3.2" fill="${s.color}"/>`);
+      }
+      seg=[];
+    };
+    s.values.forEach((v,idx)=>{ if(v===null){ flush(); } else seg.push({i:idx,v}); });
+    flush();
+    if(n<=32) s.values.forEach((v,idx)=>{ if(v===null) return;
+      const last = idx===n-1 && buckets[n-1].partial;
+      out.push(`<circle cx="${xAt(idx).toFixed(1)}" cy="${yAt(v).toFixed(1)}" r="${last?4:2.8}" fill="${last?"#FFFFFF":s.color}" stroke="${s.color}" stroke-width="${last?2:1.5}"/>`); });
+    else { const li = s.values.map((v,idx)=>v===null?-1:idx).filter(x=>x>=0).pop();
+      if(li!==undefined){ const last=li===n-1&&buckets[n-1].partial;
+        out.push(`<circle cx="${xAt(li).toFixed(1)}" cy="${yAt(s.values[li]).toFixed(1)}" r="${last?4:3}" fill="${last?"#FFFFFF":s.color}" stroke="${s.color}" stroke-width="2"/>`); } }
+  });
+
+  // 직접 라벨(오른쪽 여백) — 겹치면 위아래로 밀어낸다. 대비 WARN 색을 보완하는 장치.
+  const labels = series.map(s=>{
+    const li = s.values.map((v,idx)=>v===null?-1:idx).filter(x=>x>=0).pop();
+    return li===undefined ? null : { word:s.word, color:s.color, y:yAt(s.values[li]), v:s.values[li], x:xAt(li) };
+  }).filter(Boolean).sort((a,b)=>a.y-b.y);
+  for(let k=1;k<labels.length;k++) if(labels[k].y-labels[k-1].y<14) labels[k].y=labels[k-1].y+14;
+  const over = labels.length ? labels[labels.length-1].y-(H-PB) : 0;
+  if(over>0) labels.forEach(l=>l.y-=over);
+  labels.forEach(l=>{
+    const nm = l.word.length>7 ? l.word.slice(0,6)+"…" : l.word;
+    out.push(`<line x1="${(l.x+4).toFixed(1)}" y1="${l.y.toFixed(1)}" x2="${W-PR+6}" y2="${l.y.toFixed(1)}" stroke="${l.color}" stroke-width="1" stroke-dasharray="2 2" opacity="0.5"/>`);
+    out.push(`<text x="${W-PR+11}" y="${(l.y+3.6).toFixed(1)}" font-size="11.5" fill="#1F2937">${nm} <tspan fill="#6B7280">${l.v}</tspan></text>`);
+  });
+  out.push(`<g id="hover-layer"></g>`);
+  svg.innerHTML = out.join("");
+  LAST = { buckets, series, unit, days, xAt, yAt, step, n };
+
+  // 범례 — 2개 이상이면 항상 있어야 한다(색만으로 정체성을 지지 않게)
+  document.getElementById("legend").innerHTML = series.map(s=>{
+    const tot = s.values.filter(v=>v!==null).reduce((a,b)=>a+b,0);
+    return `<span class="li"><span class="dot" style="background:${s.color}"></span>${s.word}
+      <span class="n">${tot.toLocaleString()}건${isReal(s.word)?"":" · 예시"}</span></span>`;
+  }).join("");
+
+  const unitKr = unit==="day"?"일별":(unit==="week"?"주별":"월별");
+  document.getElementById("unit-badge").textContent = unitKr + " 집계";
+  document.getElementById("tbl-unit").textContent = unit==="day"?"일":(unit==="week"?"주":"월");
+  document.getElementById("caption").innerHTML =
+    `${days}일 구간 · ${unitKr} 집계 · 정기 수집 기사의 제목+요약 문자열 기준 (소제목 분류와 무관) ·
+     회색 구간은 저장된 회차가 없는 구간(0건 아님) · ${unit==="day"?"옅은 세로 띠는 주말(회차 3개, 날짜 라벨까지 덮음) · ":""}마지막 점선·빈 원은 아직 집계 중`;
+  drawTable();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 표
+// ══════════════════════════════════════════════════════════════════
+function drawTable(){
+  const { buckets, series } = LAST;
+  const head = `<thead><tr><th>단어</th>${buckets.map(b=>`<th>${b.label}</th>`).join("")}<th>합계</th></tr></thead>`;
+  const body = series.map(s=>{
+    const tot = s.values.filter(v=>v!==null).reduce((a,b)=>a+b,0);
+    return `<tr><td><span class="wdot" style="background:${s.color}"></span>${s.word}</td>` +
+      s.values.map(v=>v===null?`<td class="na">—</td>`:`<td>${v.toLocaleString()}</td>`).join("") +
+      `<td class="sum">${tot.toLocaleString()}</td></tr>`;
+  }).join("");
+  document.getElementById("tbl").innerHTML = head + `<tbody>${body}</tbody>`;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 크로스헤어 + 툴팁
+// ══════════════════════════════════════════════════════════════════
+const chartEl = document.getElementById("chart"), tipEl = document.getElementById("tip");
+chartEl.addEventListener("mousemove", e=>{
+  if(!LAST) return;
+  const r = chartEl.getBoundingClientRect(), sx = (e.clientX-r.left)*(W/r.width);
+  const idx = Math.max(0, Math.min(LAST.n-1, Math.round((sx-PL)/(LAST.step||1))));
+  const b = LAST.buckets[idx], hl = chartEl.querySelector("#hover-layer");
+  hl.innerHTML = `<line x1="${LAST.xAt(idx).toFixed(1)}" y1="${PT}" x2="${LAST.xAt(idx).toFixed(1)}" y2="${H-PB}" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="3 3"/>` +
+    (b.record ? LAST.series.map(s=>s.values[idx]===null?"":
+      `<circle cx="${LAST.xAt(idx).toFixed(1)}" cy="${LAST.yAt(s.values[idx]).toFixed(1)}" r="4.5" fill="${s.color}" stroke="#FFFFFF" stroke-width="2"/>`).join("") : "");
+  tipEl.style.display = "block";
+  const head = b.dates.length>1 ? b.dates[0]+" ~ "+b.dates[b.dates.length-1]
+    : `${b.dates[0]} (${KRDAY[new Date(b.dates[0]+"T00:00:00").getDay()]})`;
+  tipEl.innerHTML = `<div class="th">${head}${b.partial?" · 집계 중":""}</div>` +
+    (b.record ? LAST.series.map(s=>`<div class="tr"><span class="dot" style="background:${s.color}"></span>${s.word}<span class="v">${s.values[idx]===null?"—":s.values[idx].toLocaleString()}</span></div>`).join("")
+              : `<div style="color:#9CA3AF">저장된 회차 없음</div>`);
+  const px = (LAST.xAt(idx)/W)*r.width;
+  tipEl.style.left = Math.min(r.width-150, Math.max(0, px+14)) + "px";
+  tipEl.style.top = "18px";
+});
+chartEl.addEventListener("mouseleave", ()=>{ tipEl.style.display="none";
+  const hl = chartEl.querySelector("#hover-layer"); if(hl) hl.innerHTML=""; });
+
+// ══════════════════════════════════════════════════════════════════
+// 단어 입력 / 칩
+// ══════════════════════════════════════════════════════════════════
+function totalOf(w){
+  const { buckets } = LAST || buildBuckets();
+  return (LAST?LAST.buckets:buckets).map(b=>bucketValue(w,b)).filter(v=>v!==null).reduce((a,b)=>a+b,0);
+}
+function renderChips(){
+  const box = document.getElementById("chips");
+  box.innerHTML = picked.map((w,i)=>
+    `<span class="wchip"><span class="dot" style="background:${COLORS[i]}"></span>${w}
+      <span class="cnt">${totalOf(w).toLocaleString()}건</span>
+      <button class="x" title="빼기" onclick="removeWord('${w}')">×</button></span>`).join("") +
+    (picked.length<MAXW ? `<span class="wchip slot-empty">+ ${MAXW-picked.length}개 더 넣을 수 있어요</span>` : "");
+  document.getElementById("slot-used").textContent = picked.length;
+  document.getElementById("add-row").style.display = picked.length>=MAXW ? "none" : "flex";
+  document.getElementById("quick-chips").innerHTML =
+    REGISTERED.filter(w=>!picked.includes(w)).map(w=>`<button class="qchip" onclick="addWord('${w}')">${w}</button>`).join("")
+    || `<span class="hint">등록 검색어를 모두 넣었어요.</span>`;
+  document.getElementById("kw-list").innerHTML = REGISTERED.map(w=>`<option value="${w}">`).join("");
+}
+function addWord(w){
+  w = (w||"").trim(); if(!w) return;
+  if(picked.includes(w)) { warn(`이미 지켜보는 단어예요: “${w}”`); return; }
+  if(picked.length>=MAXW) { warn(`최대 ${MAXW}개까지만 비교할 수 있어요. 하나를 먼저 빼주세요.`); return; }
+  picked.push(w); document.getElementById("word-input").value = "";
+  warn(""); redraw();
+}
+function removeWord(w){ picked = picked.filter(x=>x!==w); warn(""); redraw(); }
+function warn(msg){
+  document.getElementById("similar-warn").innerHTML = msg ? `<div class="warn-line">${msg}</div>` : "";
+}
+document.getElementById("add-btn").onclick = ()=>addWord(document.getElementById("word-input").value);
+document.getElementById("word-input").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); addWord(e.target.value);} });
+// 비슷한 단어 경고 — 막지는 않는다(라벨 화면의 checkSimilarLabel과 같은 방식)
+document.getElementById("word-input").addEventListener("input", e=>{
+  const v = e.target.value.trim();
+  const pv = document.getElementById("preview-cnt");
+  if(!v){ pv.textContent=""; warn(""); return; }
+  const sim = picked.filter(w=>w!==v && (w.includes(v)||v.includes(w)));
+  warn(sim.length ? `비슷한 단어가 이미 있어요: “${sim.join("”, “")}” — 두 단어가 같은 기사를 겹쳐 셀 수 있어요. 그대로 추가해도 됩니다.` : "");
+  pv.textContent = isReal(v) ? `이 구간 ${totalOf(v).toLocaleString()}건` : "추가하면 건수를 계산합니다";
+});
+
+// ══════════════════════════════════════════════════════════════════
+// 기간 바
+// ══════════════════════════════════════════════════════════════════
+document.querySelectorAll("#range-seg button").forEach(b=>{
+  b.onclick = ()=>{
+    document.querySelectorAll("#range-seg button").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on"); rangeDays = +b.dataset.r; customRange = null;
+    const end = new Date(TODAY+"T00:00:00");
+    document.getElementById("d-end").value = TODAY;
+    document.getElementById("d-start").value = fmt(addDays(end,-(rangeDays-1)));
+    redraw();
+  };
+});
+document.getElementById("apply-range").onclick = ()=>{
+  const s = document.getElementById("d-start").value, e = document.getElementById("d-end").value;
+  if(!s||!e||s>e){ warn("시작일이 종료일보다 늦어요."); return; }
+  customRange = [s,e];
+  document.querySelectorAll("#range-seg button").forEach(x=>x.classList.remove("on"));
+  warn(""); redraw();
+};
+document.getElementById("fill-demo").onchange = e=>{ fillDemo = e.target.checked; redraw(); };
+
+function redraw(){ drawChart(); renderChips(); }
+redraw();
+</script>
+</body></html>

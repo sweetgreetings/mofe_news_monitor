@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>워드클라우드 제외어 — 칩 시안</title>
+<style>
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .mockbar { background: #1E3A5F; color: #fff; font-size: .78rem; text-align: center; padding: 8px 12px; line-height: 1.6; }
+  .mockbar b { color: #FDE68A; }
+
+  .frame-label { max-width: 800px; margin: 28px auto 8px; padding: 0 4px; font-size: .82rem; color: #6B7280; font-weight: 700; }
+  .frame-label span { font-weight: 500; }
+
+  /* 실제 설정 화면(app/settings_server.py _BASE_STYLE) 규격 그대로 — 800px 카드 */
+  .page { max-width: 800px; margin: 0 auto; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; }
+  .topbar { border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .topbar-inner { padding: 12px 24px; display: flex; justify-content: space-between; }
+  .topbar a { color: #2563EB; text-decoration: none; font-size: .92rem; font-weight: 600; padding: 6px 10px; border-radius: 6px; }
+  .topbar a:hover { background: #EFF6FF; }
+  .container { padding: 20px 24px 24px; }
+  h1 { font-size: 1.3rem; color: #1E3A5F; margin: 4px 0 10px; }
+  .hint { color: #6B7280; font-size: .85rem; margin: 0 0 16px; line-height: 1.6; }
+
+  .save-bar { border-top: 1px solid #E5E7EB; box-shadow: 0 -2px 8px rgba(0,0,0,.08); padding: 12px 24px; }
+  .save-bar button { width: 100%; background: #2563EB; color: #fff; border: none; border-radius: 4px; padding: 8px 16px; font-size: 1rem; font-family: inherit; cursor: pointer; }
+  .save-bar button:hover { background: #1E3A5F; }
+  .save-bar button.idle { background: #CBD5E1; color: #64748B; cursor: default; }
+  .save-msg { display: none; align-items: flex-start; gap: 8px; font-size: .82rem; line-height: 1.5; border-radius: 7px; padding: 9px 11px; margin-bottom: 10px; }
+  .save-msg.show { display: flex; }
+  .save-msg .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+  .save-msg.dirty { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
+  .save-msg.dirty .dot { background: #F59E0B; }
+  .save-msg.saved { background: #EFF6FF; border: 1px solid #BFDBFE; color: #2563EB; }
+  .save-msg.saved .dot { background: #2563EB; }
+
+  /* ── 칩 상자 — /keywords 칩과 같은 모양·같은 ×. 색만 중립 회색:
+        검색어 칩의 파랑은 "검색 ON"이라는 뜻인데, 제외어엔 ON/OFF가 없어서다. ── */
+  .chipbox { border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px; background: #FFFFFF; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .chip { display: inline-flex; align-items: center; border-radius: 999px; font-size: .9rem; line-height: 1;
+    background: #F8FAFC; border: 1px solid #CBD5E1; color: #1F2937; }
+  .chip-body { padding: 7px 3px 7px 12px; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip-x { border: none; background: transparent; color: inherit; font-size: 1rem; line-height: 1; font-family: inherit;
+    padding: 7px 10px 7px 6px; cursor: pointer; opacity: .55; border-radius: 0 999px 999px 0; }
+  .chip-x:hover { opacity: 1; color: #DC2626; background: rgba(220,38,38,.08); }
+  .chip.just-added { animation: kwpop .55s ease-out; }
+  .chip.bump { animation: kwbump .6s ease-out; }
+  @keyframes kwpop { 0% { transform: scale(.85); background: #FFF9C4; } 100% { transform: scale(1); } }
+  @keyframes kwbump { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-3px); background: #FFF9C4; } 60% { transform: translateX(3px); background: #FFF9C4; } }
+  .chip-add { display: inline-flex; align-items: center; gap: 4px; border: 1px dashed #E5E7EB; background: #FFFFFF;
+    border-radius: 999px; padding: 5px 12px; color: #6B7280; }
+  .chip-add:focus-within { border-color: #2563EB; border-style: solid; background: #EFF6FF; }
+  .chip-add input { border: none; outline: none; background: transparent; font: inherit; font-size: .9rem; width: 110px; color: #1F2937; }
+  .chip-add input::placeholder { color: #9CA3AF; }
+  .chip-add .plus { font-size: .95rem; color: #2563EB; font-weight: 700; }
+  .meta { display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; font-size: .78rem; color: #6B7280; }
+  .count { font-variant-numeric: tabular-nums; }
+  .count.full { color: #DC2626; font-weight: 600; }
+  .empty { font-size: .85rem; color: #9CA3AF; padding: 6px 2px; }
+
+  /* ── 시안 B 전용: 오늘 워드클라우드에서 고르기 ── */
+  .sect { font-size: .8rem; font-weight: 700; color: #6B7280; margin: 22px 0 9px; }
+  .sect span { font-weight: 500; }
+  .sugglist { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sugg { background: #FFFFFF; color: #1F2937; border: 1px solid #E5E7EB; border-radius: 20px;
+    padding: 5px 11px; font-size: .82rem; cursor: pointer; font-family: inherit; }
+  .sugg:hover { background: #FEF2F2; border-color: #FECACA; color: #DC2626; }
+  .sugg:hover::before { content: "− "; }
+  .sugg i { font-style: normal; font-size: .72rem; color: #9CA3AF; margin-left: 3px; }
+  .sugg.kw { color: #6B7280; }
+  .sugg:disabled { opacity: .4; cursor: not-allowed; }
+  .sugg:disabled:hover { background: #FFFFFF; border-color: #E5E7EB; color: #1F2937; }
+  .sugg:disabled:hover::before { content: ""; }
+
+  .notes { max-width: 800px; margin: 10px auto 0; padding: 0 4px; font-size: .8rem; color: #6B7280; line-height: 1.7; }
+  .notes li { margin: 2px 0; }
+  .notes b { color: #1F2937; }
+  .spacer { height: 48px; }
+</style></head><body>
+
+<div class="mockbar">
+  시안 — <b>/wordcloud-exclude</b> 입력칸 + del 버튼 → 칩 한 상자로 · 둘 다 실제로 눌러볼 수 있어요
+  (입력 후 <b>Enter</b> 또는 <b>쉼표</b>로 추가 · <b>×</b>로 빼기 · 저장은 목업이라 실제로 안 됩니다)
+</div>
+
+<!-- ========================= 시안 A ========================= -->
+<div class="frame-label">시안 A <span>— 요청하신 그대로: 칩 나란히 + × 삭제</span></div>
+<div class="page" data-frame="A">
+  <div class="topbar"><div class="topbar-inner"><a href="#">홈</a><a href="#">설정</a></div></div>
+  <div class="container">
+    <h1>☁️ 워드클라우드 제외어</h1>
+    <p class="hint">진입 화면 워드클라우드에서 빼고 싶은 단어를 등록하세요. 검색어·형광펜 단어와는 별개입니다.</p>
+    <div class="chipbox">
+      <div class="chips"></div>
+      <div class="meta"><span>Enter 또는 쉼표로 추가 · ×로 빼기</span><span class="count"></span></div>
+    </div>
+  </div>
+  <div class="save-bar">
+    <div class="save-msg"><span class="dot"></span><span class="save-text"></span></div>
+    <button type="button" class="save-btn idle">저장</button>
+  </div>
+</div>
+<ul class="notes">
+  <li><b>(최대 15개)</b>는 제목에서 빼고 상자 오른쪽 아래 <b>4 / 15</b>로 옮겼어요. 다 차면 빨간 숫자가 되고 입력칩이 사라져요.</li>
+  <li>이미 있는 단어를 또 치면 새로 안 생기고, 있던 칩이 살짝 흔들려요(검색어 화면의 "같은 그룹 안 중복은 조용히 하나로"와 같은 규칙).</li>
+  <li>칩 색은 회색이에요 — 검색어 화면 칩의 파랑은 "검색 ON"이라는 뜻이라, ON/OFF가 없는 제외어에 쓰면 뜻이 섞여요. 모양·×·입력칩은 그 화면과 똑같아요.</li>
+</ul>
+
+<!-- ========================= 시안 B ========================= -->
+<div class="frame-label">시안 B <span>— A + "오늘 워드클라우드에 뜬 단어"에서 눌러 빼기</span></div>
+<div class="page" data-frame="B">
+  <div class="topbar"><div class="topbar-inner"><a href="#">홈</a><a href="#">설정</a></div></div>
+  <div class="container">
+    <h1>☁️ 워드클라우드 제외어</h1>
+    <p class="hint">진입 화면 워드클라우드에서 빼고 싶은 단어를 등록하세요. 검색어·형광펜 단어와는 별개입니다.</p>
+    <div class="chipbox">
+      <div class="chips"></div>
+      <div class="meta"><span>Enter 또는 쉼표로 추가 · ×로 빼기</span><span class="count"></span></div>
+    </div>
+    <div class="sect">오늘 워드클라우드에 뜬 단어 <span>— 누르면 위로 올라가요 · 숫자는 오늘 등장 횟수</span></div>
+    <div class="sugglist"></div>
+  </div>
+  <div class="save-bar">
+    <div class="save-msg"><span class="dot"></span><span class="save-text"></span></div>
+    <button type="button" class="save-btn idle">저장</button>
+  </div>
+</div>
+<ul class="notes">
+  <li>아래 단어들은 <b>오늘(9/11) 실제 워드클라우드 상위 20개</b>를 그대로 뽑은 거예요. <b>최근·이라고·모습·이어지·보이</b>처럼 딱 빼고 싶을 단어가 이미 섞여 있어요 — 홈에서 보고 → 설정 와서 → 글자 치던 걸 한 번 누르기로 줄여요.</li>
+  <li>회색 글자(이형일)는 등록 검색어예요 — 홈 워드클라우드가 검색어를 회색으로 칠하는 것과 같은 표시.</li>
+  <li>×로 뺀 단어가 오늘 워드클라우드에 있던 단어면 아래 목록으로 되돌아가요. 목록은 앱이 "빼라"고 추천하는 게 아니라 그냥 오늘 뜬 단어를 보여줄 뿐이에요.</li>
+</ul>
+<div class="spacer"></div>
+
+<script>
+  var MAX = 15;
+  var SAVED = ["국회", "재정경제부", "구윤철", "부총리"];   // data/settings.json 현재 값
+  // 2026-09-11 오늘 회차 4개 기준 extract_keyword_frequencies 상위 20개 (실측)
+  var TODAY = [["최근",17],["경제",17],["이라고",15],["견조",14],["모습",14],["이어지",14],["흐름",14],
+    ["소비",12],["수출",12],["증가",12],["경기회복",11],["그린북",11],["개선세",11],["내수가",11],
+    ["이형일",10,1],["후보자",10],["보이",10],["9월호",9],["경기",8],["한성숙",7]];
+
+  function esc(s) { return s.replace(/[&<>"]/g, function (c) { return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+
+  document.querySelectorAll(".page").forEach(function (page) {
+    var words = SAVED.slice();
+    var savedSnap = SAVED.join("\n");
+    var justSaved = false;
+    var chipsEl = page.querySelector(".chips");
+    var countEl = page.querySelector(".count");
+    var suggEl = page.querySelector(".sugglist");
+    var msg = page.querySelector(".save-msg");
+    var msgText = page.querySelector(".save-text");
+    var btn = page.querySelector(".save-btn");
+
+    function render(focusInput, addedWord) {
+      var h = words.map(function (w) {
+        return '<span class="chip' + (w === addedWord ? " just-added" : "") + '" data-word="' + esc(w) + '">' +
+          '<span class="chip-body" title="' + esc(w) + '">' + esc(w) + '</span>' +
+          '<button type="button" class="chip-x" title="제외어에서 빼기">×</button></span>';
+      }).join("");
+      if (words.length < MAX) {
+        h += '<span class="chip-add"><span class="plus">+</span><input type="text" placeholder="단어 입력" maxlength="30"></span>';
+      }
+      chipsEl.innerHTML = h;
+      countEl.textContent = words.length + " / " + MAX + (words.length >= MAX ? " · 가득 참" : "");
+      countEl.className = "count" + (words.length >= MAX ? " full" : "");
+
+      chipsEl.querySelectorAll(".chip-x").forEach(function (x) {
+        x.onclick = function () {
+          var w = x.parentNode.dataset.word;
+          words = words.filter(function (v) { return v !== w; });
+          justSaved = false; render(false);
+        };
+      });
+      var inp = chipsEl.querySelector(".chip-add input");
+      if (inp) {
+        // 한글 조합 중 Enter는 조합이 끝난 뒤에 읽는다 — 안 그러면 Enter를 두 번 눌러야
+        // 하거나 마지막 글자가 새 입력칸에 딸려 들어간다. 두 번 불려도 첫 번째가 칸을
+        // 비우므로 두 번째는 빈 값이라 아무 일도 안 한다(그래서 늘 "지금" 입력칸을 읽는다).
+        inp.onkeydown = function (e) {
+          if (e.key !== "Enter" && e.keyCode !== 13) return;
+          e.preventDefault();
+          var composing = e.isComposing || e.keyCode === 229;
+          setTimeout(function () {
+            var cur = chipsEl.querySelector(".chip-add input");
+            if (cur && cur.value.trim()) add(cur.value, true);
+          }, composing ? 30 : 0);
+        };
+        inp.oninput = function () { if (inp.value.indexOf(",") >= 0) add(inp.value, true); };
+        if (focusInput) inp.focus();
+      }
+
+      if (suggEl) {
+        suggEl.innerHTML = TODAY.filter(function (t) { return words.indexOf(t[0]) < 0; }).map(function (t) {
+          return '<button type="button" class="sugg' + (t[2] ? " kw" : "") + '" data-word="' + esc(t[0]) + '"' +
+            (words.length >= MAX ? " disabled" : "") + (t[2] ? ' title="등록 검색어"' : "") + '>' +
+            esc(t[0]) + ' <i>' + t[1] + '</i></button>';
+        }).join("");
+        suggEl.querySelectorAll(".sugg").forEach(function (b) { b.onclick = function () { add(b.dataset.word, false); }; });
+      }
+      refreshSave();
+    }
+
+    function add(raw, fromInput) {
+      var parts = raw.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+      var last = null;
+      parts.forEach(function (w) {
+        if (words.indexOf(w) >= 0) { bump(w); return; }
+        if (words.length >= MAX) return;
+        words.push(w); last = w;
+      });
+      justSaved = false;
+      render(fromInput, last);
+    }
+
+    function bump(w) {
+      setTimeout(function () {
+        chipsEl.querySelectorAll(".chip").forEach(function (c) {
+          if (c.dataset.word === w) { c.classList.remove("bump"); void c.offsetWidth; c.classList.add("bump"); }
+        });
+      }, 0);
+    }
+
+    function refreshSave() {
+      var dirty = words.join("\n") !== savedSnap;
+      msg.className = "save-msg";
+      btn.className = "save-btn";
+      if (dirty) {
+        msg.classList.add("dirty", "show");
+        msgText.innerHTML = "<b>아직 저장하지 않았습니다.</b> 아래 저장을 눌러야 홈 워드클라우드에 반영됩니다.";
+      } else if (justSaved) {
+        msg.classList.add("saved", "show");
+        msgText.innerHTML = "<b>저장했습니다.</b> 홈 워드클라우드에 바로 반영됩니다.";
+        btn.classList.add("idle");
+      } else {
+        btn.classList.add("idle");
+      }
+    }
+
+    btn.onclick = function () {
+      if (words.join("\n") === savedSnap) return;
+      savedSnap = words.join("\n"); justSaved = true; refreshSave();
+    };
+
+    render(false);
+  });
+</script>
+</body></html>

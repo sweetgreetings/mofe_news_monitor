@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>보낸 기사 표시 — 세 안 비교 (ADHOC_DESIGN.md §6.13)</title>
+<style>
+  /* 값은 전부 app/adhoc/renderer.py render_card_page에서 가져왔다.
+     새로 만든 색은 하나도 없다 — 띠는 COLOR_ADHOC_TEXT(#146B5E, 수시 정체성),
+     흐리기는 📷 사진 추정 기사가 쓰는 opacity 0.55 그대로. */
+  body { margin: 0; background: #F8FAFC; color: #1F2937;
+         font-family: 'Pretendard', 'Noto Sans KR', -apple-system, sans-serif; }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+        stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 34px 24px 90px; }
+  .mk-h1 { color: #1E3A5F; font-size: 1.32rem; margin: 0 0 6px; }
+  .mk-lead { color: #6B7280; font-size: .88rem; margin: 0 0 24px; line-height: 1.65; }
+  .mk-lead b { color: #1F2937; }
+
+  /* ── 조작판 (목업 전용) ── */
+  .panel { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px 20px;
+           margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.04); position: sticky; top: 0; z-index: 30; }
+  .prow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .prow + .prow { margin-top: 11px; padding-top: 11px; border-top: 1px solid #E5E7EB; }
+  .plab { font-size: .8rem; font-weight: 700; color: #6B7280; width: 68px; flex: none; }
+  .opt { display: inline-flex; align-items: center; gap: 6px; font-size: .84rem; color: #6B7280;
+         cursor: pointer; border: 1px solid #E5E7EB; border-radius: 8px; padding: 6px 12px; background: #fff; }
+  .opt:hover { background: #F3F4F6; }
+  .opt.on { border-color: #146B5E; background: #E3F1EE; color: #146B5E; font-weight: 700; }
+  .opt input { margin: 0; }
+  .rec { font-size: .7rem; background: #146B5E; color: #fff; border-radius: 9px; padding: 1px 7px; font-weight: 700; }
+  .cntline { font-size: .82rem; color: #6B7280; margin-left: auto; }
+  .cntline b { color: #1E3A5F; font-size: .95rem; }
+
+  /* ── 실제 화면 ── */
+  .frame { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 18px 22px 22px; }
+  .report-head { font-size: 1.1rem; font-weight: 700; color: #1E3A5F; }
+  .meta-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 10px 0 0; font-size: .8rem; }
+  .chip { background: #F1F2F4; border: 1px solid #E5E7EB; border-radius: 14px; padding: 3px 11px; color: #6B7280; }
+  h2.sub { color: #1E3A5F; font-size: 1rem; margin: 20px 0 6px; display: flex; align-items: center; gap: 6px; }
+  h2.sub .cnt { font-size: .76rem; color: #6B7280; font-weight: 400; }
+  h2.sub .sub-acts { margin-left: auto; display: flex; align-items: center; gap: 2px; }
+  .order-btn { background: transparent; border: none; color: #6B7280; font-size: .78rem; cursor: pointer; padding: 2px 4px; }
+
+  .article { padding: 8px 9px; border-radius: 8px; margin: 2px 0; border-bottom: 1px solid #F1F2F4;
+             border-left: 3px solid transparent; transition: opacity .12s; }
+  .article:hover { background: #F3F4F6; }
+  .a-top { display: flex; align-items: flex-start; gap: 8px; }
+  .bulk-chk { margin-top: 4px; flex: none; }
+  .a-title { font-size: .93rem; }
+  .a-title .outlet { color: #6B7280; }
+  .a-bot { display: flex; align-items: center; gap: 6px; margin: 5px 0 0 25px; }
+  .a-time { font-size: .78rem; color: #6B7280; }
+  .a-time-sep { color: #D1D5DB; font-size: .78rem; }
+  .origin-link { color: #2563EB; text-decoration: none; font-size: .78rem; display: inline-flex; align-items: center; gap: 3px; }
+  .a-acts { display: flex; gap: 4px; align-items: center; margin-left: auto; }
+  .icon-btn { border: none; background: none; color: #6B7280; border-radius: 6px; padding: 4px 6px;
+              cursor: pointer; display: inline-flex; align-items: center; font: inherit; }
+  .icon-btn:hover { background: #E5E7EB; color: #1F2937; }
+  .sel-sm { font: inherit; font-size: .78rem; padding: 3px 8px; border: 1px solid #E5E7EB;
+            border-radius: 7px; background: #fff; color: #6B7280; }
+  .sel-sm.to-bundle { border-color: rgba(20,107,94,.35); color: #146B5E; }
+  .sent-tag { font-size: .72rem; color: #146B5E; background: #E3F1EE; border: 1px solid rgba(20,107,94,.22);
+              border-radius: 10px; padding: 1px 8px; margin-left: 6px; display: none;
+              align-items: center; gap: 3px; white-space: nowrap; }
+
+  /* 흐리기는 행 전체가 아니라 「내용」(제목·액션 줄)에만 건다 — 행에 걸면 왼쪽 띠와
+     ✓칩까지 같이 흐려져서, 정작 "가시적"을 담당해야 할 둘이 약해진다.
+     신호는 100%, 내용만 55%. hover하면 내용도 또렷해진다. */
+  .article.sent .a-title, .article.sent .a-bot { opacity: .55; transition: opacity .12s; }
+  .article.sent:hover .a-title, .article.sent:hover .a-bot { opacity: 1; }
+  .article.sent .a-top { align-items: center; }
+
+  /* ══ 안 A — 음영만 ══ */
+  /* (위 공통 규칙만 적용 — 띠도 칩도 없다) */
+
+  /* ══ 안 B — 띠 + 음영 + 칩 (추천) ══ */
+  body.vB .article.sent { border-left-color: #146B5E; }
+  body.vB .article.sent .sent-tag { display: inline-flex; }
+
+  /* ══ 안 C — 아래로 내리기 ══ */
+  body.vC .article.sent .sent-tag { display: inline-flex; }
+  .sent-divider { display: none; align-items: center; gap: 10px; margin: 14px 0 4px;
+                  font-size: .76rem; color: #9CA3AF; }
+  .sent-divider::before, .sent-divider::after { content: ""; flex: 1; height: 1px; background: #E5E7EB; }
+  body.vC .sent-divider { display: flex; }
+
+  /* 「아직 안 보낸 기사만」 필터 */
+  body.filtered .article.sent { display: none; }
+  body.filtered .sent-divider { display: none; }
+
+  /* ── 해설 ── */
+  .verdict { margin-top: 14px; border-radius: 12px; padding: 15px 19px; font-size: .85rem; line-height: 1.7; }
+  .verdict h4 { margin: 0 0 8px; font-size: .92rem; }
+  .verdict ul { margin: 6px 0 0; padding-left: 19px; }
+  .verdict li { margin: 3px 0; }
+  .v-good { background: #E3F1EE; border: 1px solid rgba(20,107,94,.25); color: #146B5E; }
+  .v-good h4 { color: #146B5E; }
+  .v-mid { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
+  .v-mid h4 { color: #92400E; }
+  .v-bad { background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B; }
+  .v-bad h4 { color: #991B1B; }
+  .verdict.hidden { display: none; }
+  .tip { font-size: .8rem; color: #6B7280; margin: 12px 2px 0; line-height: 1.6; }
+  .tip b { color: #1F2937; }
+</style>
+</head>
+<body class="vB">
+<svg style="display:none">
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20 12l-8 8-8-8V4h8z"/><circle cx="8.5" cy="7.5" r="1.2"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M4 13h4l1.5 3h5L16 13h4"/><path d="M5.5 5h13l1.5 8v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-5z"/></symbol>
+</svg>
+
+<div class="wrap">
+  <h1 class="mk-h1">"이 기사는 모음으로 보냈다"를 어떻게 보여줄까</h1>
+  <p class="mk-lead">
+    종부세 원본, <b>8건 중 3건</b>을 「9/2 예결위 보고」로 보낸 상태.
+    보낸 기사가 <b>2·4·7번째로 흩어져</b> 있는 게 핵심이다 — 몰려 있으면 세 안이 다 비슷해 보인다.<br>
+    위 조작판으로 갈아 끼우면서 비교해봐. <b>보낸 행에 마우스를 올려보는 것</b>도 잊지 말고.
+  </p>
+
+  <div class="panel">
+    <div class="prow">
+      <span class="plab">표시 방식</span>
+      <label class="opt" id="oA"><input type="radio" name="v" value="A"> 안 A · 음영만</label>
+      <label class="opt on" id="oB"><input type="radio" name="v" value="B" checked> 안 B · 띠+음영+칩 <span class="rec">추천</span></label>
+      <label class="opt" id="oC"><input type="radio" name="v" value="C"> 안 C · 아래로 내리기</label>
+    </div>
+    <div class="prow">
+      <span class="plab">필터</span>
+      <label class="opt" id="oF"><input type="checkbox" id="filt"> 아직 안 보낸 기사만</label>
+      <span class="cntline">화면에 보이는 기사 <b id="shown">8</b>건 / 전체 8건</span>
+    </div>
+  </div>
+
+  <div class="frame">
+    <div class="report-head">종부세 <span style="font-weight:400;font-size:.86rem;color:#6B7280;">· 09:00~14:00</span></div>
+    <div class="meta-row">
+      <span class="chip">🔍 종부세, 종합부동산세</span>
+      <span class="chip">📥 14:02 · 8건</span>
+    </div>
+
+    <h2 class="sub">&lt;세율 인하 논의&gt; <span class="cnt" id="subcnt">8건</span>
+      <span class="sub-acts">
+        <button class="icon-btn" title="이 소제목 복사"><svg class="ic"><use href="#i-copy"/></svg></button>
+        <button class="icon-btn" style="color:#146B5E;" title="이 소제목 통째로 모음에 보내기"><svg class="ic"><use href="#i-inbox"/></svg></button>
+        <button class="icon-btn"><svg class="ic"><use href="#i-trash"/></svg></button>
+        <button class="order-btn">▲</button><button class="order-btn">▼</button>
+      </span>
+    </h2>
+
+    <div id="list">
+      <!-- 기사 8건. data-sent="1"이 보낸 것 -->
+    </div>
+    <div class="sent-divider" id="divider">보낸 기사 3건</div>
+    <div id="sentlist"></div>
+  </div>
+
+  <div class="verdict v-mid hidden" id="vA">
+    <h4>안 A — 음영만</h4>
+    흐려지긴 하는데, <b>페이지를 훑을 때는 거의 안 보인다.</b> 8건이라 티가 나는 거고 43건짜리 실제 원본에서는
+    행 사이 대비가 묻힌다. 그리고 <b>왜 흐린지</b>를 화면이 말해주지 않는다 —
+    📷 사진 추정 기사도 같은 <code>opacity: 0.55</code>를 쓰기 때문에 둘이 구분이 안 된다.
+    <ul><li>훑기 ✗ &nbsp;· 이유 설명 ✗ &nbsp;· 정렬 안 건드림 ✓</li></ul>
+  </div>
+
+  <div class="verdict v-good hidden" id="vB">
+    <h4>안 B — 띠 + 음영 + 칩 <span class="rec">추천</span></h4>
+    세 겹이 <b>서로 다른 거리</b>에서 일한다.
+    <ul>
+      <li><b>왼쪽 청록 띠</b> — 페이지를 훑을 때. 왼쪽 가장자리만 따라가면 어디까지 처리했는지 한눈에 보인다. <b>이게 "아주 가시적"을 담당한다.</b></li>
+      <li><b>opacity 0.55</b> — 행에 눈이 닿을 때. hover하면 또렷해져서 "지금 보는 것"은 안 가려진다</li>
+      <li><b>✓ …로 보냄 칩</b> — 읽을 때. <b>어느 모음</b>으로 갔는지까지</li>
+    </ul>
+    배경색을 안 건드리는 게 핵심이다 — 이 행엔 이미 hover 회색 / 체크 파랑 / 방금 옮김 세이지가 붙는데,
+    네 번째 배경색을 넣으면 겹칠 때 뭐가 이기는지 아무도 모른다.
+  </div>
+
+  <div class="verdict v-bad hidden" id="vC">
+    <h4>안 C — 아래로 내리기</h4>
+    깔끔해 보이는데, 대가가 화면 밖에 있다.
+    <ul>
+      <li><b>담당자의 ↑↓ 순서가 깨진다.</b> CLAUDE.md가 명시적으로 금지한 동작이고
+          (HISTORY.md "담당자 &gt; AI: 정렬·분류 우선순위 3종"), 실제로 사고가 났던 지점이다</li>
+      <li><b>되돌릴 때 자리를 기억해야 한다.</b> 모음에서 숨기면 「보냄」이 풀리는데,
+          그때 원래 몇 번째였는지를 저장해뒀어야 한다 — 저장할 게 하나 는다</li>
+      <li><b>필터와 하는 일이 겹친다.</b> 위 「아직 안 보낸 기사만」을 켜보면 안다 —
+          필터가 이미 같은 문제를 더 깨끗하게 푼다</li>
+    </ul>
+    <b>필터를 켠 채로 A·B·C를 갈아 끼워보면 셋이 완전히 똑같아진다.</b> 그게 C가 필요 없다는 증거다.
+  </div>
+
+  <p class="tip">
+    <b>확인해볼 것 셋</b> —
+    ① 안 B에서 페이지를 눈으로 훑어보기(왼쪽 띠만 따라가도 3건이 잡힌다) ·
+    ② 보낸 행에 마우스 올려보기(또렷해진다) ·
+    ③ 필터를 켠 채로 세 안을 갈아 끼워보기(구분이 사라진다)
+  </p>
+</div>
+
+<script>
+  var DATA = [
+    { o:"KBS",      t:"종부세 세율 인하안, 기재위 소위 통과",        m:"13:41", s:0 },
+    { o:"한국경제",  t:"1주택 종부세 공제 확대 놓고 여야 이견",       m:"12:55", s:1 },
+    { o:"연합뉴스",  t:"종부세 과세표준 조정안 국회 제출",           m:"12:20", s:0 },
+    { o:"조선일보",  t:"\"보유세 개편 없이 종부세만 손질\" 지적",      m:"11:47", s:1 },
+    { o:"매일경제",  t:"종부세 완화 시 세수 1.2조 감소 전망",         m:"11:12", s:0 },
+    { o:"중앙일보",  t:"시장 \"거래 절벽 해소엔 역부족\"",            m:"10:38", s:0 },
+    { o:"서울경제",  t:"종부세 개편 논의, 지방세 보전이 관건",         m:"10:04", s:1 },
+    { o:"이데일리",  t:"여당 \"연내 처리\" vs 야당 \"졸속\"",          m:"09:31", s:0 }
+  ];
+
+  function rowHtml(a) {
+    return '<div class="article' + (a.s ? ' sent' : '') + '">' +
+      '<div class="a-top"><input type="checkbox" class="bulk-chk">' +
+      '<div class="a-title"><span class="outlet">(' + a.o + ')</span> ' + a.t + '</div>' +
+      '<span class="sent-tag"><svg class="ic"><use href="#i-check"/></svg> 9/2 예결위 보고로 보냄</span></div>' +
+      '<div class="a-bot"><span class="a-time">' + a.m + '</span><span class="a-time-sep">·</span>' +
+      '<a class="origin-link" href="#" onclick="return false">원문보기<svg class="ic"><use href="#i-ext"/></svg></a>' +
+      '<span class="a-acts">' +
+      '<select class="sel-sm"><option>다른 소제목</option></select>' +
+      (a.s ? '<select class="sel-sm to-bundle" disabled><option>보냄</option></select>'
+           : '<select class="sel-sm to-bundle"><option>모음으로 ▾</option><option>9/2 예결위 보고</option></select>') +
+      '<button class="icon-btn"><svg class="ic"><use href="#i-copy"/></svg></button>' +
+      '<button class="icon-btn"><svg class="ic"><use href="#i-tag"/></svg></button>' +
+      '<button class="icon-btn"><svg class="ic"><use href="#i-trash"/></svg></button>' +
+      '<button class="icon-btn"><svg class="ic"><use href="#i-up"/></svg></button>' +
+      '<button class="icon-btn"><svg class="ic"><use href="#i-down"/></svg></button>' +
+      '</span></div></div>';
+  }
+
+  function render() {
+    var v = document.querySelector('input[name=v]:checked').value;
+    var list = document.getElementById('list'), sentl = document.getElementById('sentlist');
+    if (v === 'C') {
+      // 안 C만 보낸 기사를 목록 끝으로 옮긴다 — 나머지는 원래 자리 그대로.
+      list.innerHTML  = DATA.filter(function (a) { return !a.s; }).map(rowHtml).join('');
+      sentl.innerHTML = DATA.filter(function (a) { return  a.s; }).map(rowHtml).join('');
+    } else {
+      list.innerHTML  = DATA.map(rowHtml).join('');
+      sentl.innerHTML = '';
+    }
+    document.body.className = 'v' + v + (document.getElementById('filt').checked ? ' filtered' : '');
+    ['A','B','C'].forEach(function (k) {
+      document.getElementById('o' + k).classList.toggle('on', k === v);
+      document.getElementById('v' + k).classList.toggle('hidden', k !== v);
+    });
+    var filt = document.getElementById('filt').checked;
+    document.getElementById('oF').classList.toggle('on', filt);
+    var n = filt ? DATA.filter(function (a) { return !a.s; }).length : DATA.length;
+    document.getElementById('shown').textContent = n;
+    document.getElementById('subcnt').textContent = n + '건' + (filt ? ' (전체 8건)' : '');
+  }
+
+  document.querySelectorAll('input[name=v]').forEach(function (r) { r.addEventListener('change', render); });
+  document.getElementById('filt').addEventListener('change', render);
+  render();
+</script>
+</body>
+</html>

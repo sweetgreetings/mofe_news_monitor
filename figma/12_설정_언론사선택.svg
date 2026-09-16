@@ -1,0 +1,504 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="2805" viewBox="0 0 1440 2805">
+<rect width="100%" height="100%" fill="#F8FAFC"/>
+<g id="topbar">
+<rect x="0" y="0" width="1440" height="54.5" fill="#FFFFFF"/>
+<text x="490" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">홈</text>
+<text x="924.5" y="31.2" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="14.7" font-weight="600" fill="#2563EB" xml:space="preserve">설정</text>
+</g>
+<g id="Page">
+<rect x="455" y="24" width="530" height="2632.9" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+</g>
+<g id="form">
+<rect x="480" y="140.4" width="177.5" height="32.5" rx="4" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1"/>
+<text x="491" y="162.2" font-family="Arial" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">언론사 검색</text>
+<rect x="665.5" y="141.6" width="76.6" height="30" rx="4" fill="#FFFFFF" stroke="#2563EB" stroke-width="1"/>
+<rect x="750.1" y="141.6" width="76.6" height="30" rx="4" fill="#FFFFFF" stroke="#2563EB" stroke-width="1"/>
+<rect x="838.7" y="150.1" width="13" height="13" fill="none"/>
+<rect x="480" y="212.9" width="480" height="1" fill="#E5E7EB"/>
+<rect x="484" y="224.9" width="13" height="13" fill="none"/>
+<rect x="730" y="224.9" width="13" height="13" fill="none"/>
+<rect x="484" y="253.9" width="13" height="13" fill="none"/>
+<rect x="730" y="253.9" width="13" height="13" fill="none"/>
+<rect x="484" y="282.9" width="13" height="13" fill="none"/>
+<rect x="730" y="282.9" width="13" height="13" fill="none"/>
+<rect x="484" y="311.9" width="13" height="13" fill="none"/>
+<rect x="730" y="311.9" width="13" height="13" fill="none"/>
+<rect x="480" y="369.9" width="480" height="1" fill="#E5E7EB"/>
+<rect x="484" y="381.9" width="13" height="13" fill="none"/>
+<rect x="730" y="381.9" width="13" height="13" fill="none"/>
+<rect x="484" y="410.9" width="13" height="13" fill="none"/>
+<rect x="730" y="410.9" width="13" height="13" fill="none"/>
+<rect x="484" y="439.9" width="13" height="13" fill="none"/>
+<rect x="730" y="439.9" width="13" height="13" fill="none"/>
+<rect x="484" y="468.9" width="13" height="13" fill="none"/>
+<rect x="730" y="468.9" width="13" height="13" fill="none"/>
+<rect x="484" y="497.9" width="13" height="13" fill="none"/>
+<rect x="730" y="497.9" width="13" height="13" fill="none"/>
+<rect x="484" y="526.9" width="13" height="13" fill="none"/>
+<rect x="480" y="584.9" width="480" height="1" fill="#E5E7EB"/>
+<rect x="484" y="596.9" width="13" height="13" fill="none"/>
+<rect x="730" y="596.9" width="13" height="13" fill="none"/>
+<rect x="484" y="625.9" width="13" height="13" fill="none"/>
+<rect x="730" y="625.9" width="13" height="13" fill="none"/>
+<rect x="484" y="654.9" width="13" height="13" fill="none"/>
+<rect x="730" y="654.9" width="13" height="13" fill="none"/>
+<rect x="484" y="683.9" width="13" height="13" fill="none"/>
+<rect x="730" y="683.9" width="13" height="13" fill="none"/>
+<rect x="484" y="712.9" width="13" height="13" fill="none"/>
+<rect x="730" y="712.9" width="13" height="13" fill="none"/>
+<rect x="480" y="770.9" width="480" height="1" fill="#E5E7EB"/>
+<rect x="484" y="782.9" width="13" height="13" fill="none"/>
+<rect x="730" y="782.9" width="13" height="13" fill="none"/>
+<rect x="484" y="811.9" width="13" height="13" fill="none"/>
+<rect x="480" y="869.9" width="480" height="1" fill="#E5E7EB"/>
+<rect x="484" y="881.9" width="13" height="13" fill="none"/>
+<rect x="730" y="881.9" width="13" height="13" fill="none"/>
+<rect x="484" y="910.9" width="13" height="13" fill="none"/>
+<rect x="730" y="910.9" width="13" height="13" fill="none"/>
+<rect x="484" y="939.9" width="13" height="13" fill="none"/>
+<rect x="730" y="939.9" width="13" height="13" fill="none"/>
+<rect x="484" y="968.9" width="13" height="13" fill="none"/>
+<rect x="480" y="1026.9" width="480" height="1" fill="#E5E7EB"/>
+<rect x="484" y="1038.9" width="13" height="13" fill="none"/>
+<rect x="730" y="1038.9" width="13" height="13" fill="none"/>
+<rect x="484" y="1067.9" width="13" height="13" fill="none"/>
+<rect x="480" y="1125.9" width="480" height="1" fill="#E5E7EB"/>
+<rect x="484" y="1137.9" width="13" height="13" fill="none"/>
+<rect x="730" y="1137.9" width="13" height="13" fill="none"/>
+<rect x="484" y="1166.9" width="13" height="13" fill="none"/>
+<rect x="730" y="1166.9" width="13" height="13" fill="none"/>
+<rect x="484" y="1195.9" width="13" height="13" fill="none"/>
+<rect x="730" y="1195.9" width="13" height="13" fill="none"/>
+<rect x="480" y="1253.9" width="480" height="1" fill="#E5E7EB"/>
+<rect x="484" y="1265.9" width="13" height="13" fill="none"/>
+<rect x="730" y="1265.9" width="13" height="13" fill="none"/>
+<rect x="484" y="1294.9" width="13" height="13" fill="none"/>
+<rect x="730" y="1294.9" width="13" height="13" fill="none"/>
+<rect x="484" y="1323.9" width="13" height="13" fill="none"/>
+<rect x="730" y="1323.9" width="13" height="13" fill="none"/>
+<rect x="484" y="1352.9" width="13" height="13" fill="none"/>
+<rect x="730" y="1352.9" width="13" height="13" fill="none"/>
+<rect x="484" y="1381.9" width="13" height="13" fill="none"/>
+<rect x="0" y="2720.5" width="1440" height="60.5" fill="#FFFFFF"/>
+<rect x="480" y="2733.5" width="480" height="35.5" rx="4" fill="#2563EB"/>
+<text x="703.8" y="160.7" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#2563EB" xml:space="preserve">전체 선택</text>
+<text x="788.4" y="160.7" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#2563EB" xml:space="preserve">전체 해제</text>
+<text x="858.7" y="160.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">선택된 항목만 보기</text>
+<text x="480" y="204.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="700" fill="#1E3A5F" xml:space="preserve">방송사</text>
+<text x="500" y="237.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">KBS</text>
+<text x="746" y="237.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">MBC</text>
+<text x="500" y="266.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">SBS</text>
+<text x="746" y="266.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">YTN</text>
+<text x="500" y="295.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">MBN</text>
+<text x="746" y="295.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">JTBC</text>
+<text x="500" y="324.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">TV조선</text>
+<text x="746" y="324.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">채널A</text>
+<text x="480" y="361.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="700" fill="#1E3A5F" xml:space="preserve">전국종합일간</text>
+<text x="500" y="394.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">조선일보</text>
+<text x="746" y="394.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">동아일보</text>
+<text x="500" y="423.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">중앙일보</text>
+<text x="746" y="423.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">문화일보</text>
+<text x="500" y="452.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">한국일보</text>
+<text x="746" y="452.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">서울신문</text>
+<text x="500" y="481.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">세계일보</text>
+<text x="746" y="481.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">경향신문</text>
+<text x="500" y="510.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">한겨레</text>
+<text x="746" y="510.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">국민일보</text>
+<text x="500" y="539.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">아시아투데이</text>
+<text x="480" y="576.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="700" fill="#1E3A5F" xml:space="preserve">경제일간</text>
+<text x="500" y="609.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">매일경제</text>
+<text x="746" y="609.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">한국경제</text>
+<text x="500" y="638.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">머니투데이</text>
+<text x="746" y="638.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">이데일리</text>
+<text x="500" y="667.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">서울경제</text>
+<text x="746" y="667.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">파이낸셜뉴스</text>
+<text x="500" y="696.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">헤럴드경제</text>
+<text x="746" y="696.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">아시아경제</text>
+<text x="500" y="725.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">조선비즈</text>
+<text x="746" y="725.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">조세일보</text>
+<text x="480" y="762.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="700" fill="#1E3A5F" xml:space="preserve">영자일간</text>
+<text x="500" y="795.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">코리아중앙데일리</text>
+<text x="746" y="795.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">코리아타임스</text>
+<text x="500" y="824.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">코리아헤럴드</text>
+<text x="480" y="861.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="700" fill="#1E3A5F" xml:space="preserve">통신사 및 종합 일간지</text>
+<text x="500" y="894.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">연합뉴스</text>
+<text x="746" y="894.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">뉴시스</text>
+<text x="500" y="923.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">뉴스1</text>
+<text x="746" y="923.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">노컷뉴스</text>
+<text x="500" y="952.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">뉴스핌</text>
+<text x="746" y="952.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">더팩트</text>
+<text x="500" y="981.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">이코노미스트</text>
+<text x="480" y="1018.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="700" fill="#1E3A5F" xml:space="preserve">전문일간</text>
+<text x="500" y="1051.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">전자신문</text>
+<text x="746" y="1051.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">디지털타임스</text>
+<text x="500" y="1080.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">IT조선</text>
+<text x="480" y="1117.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="700" fill="#1E3A5F" xml:space="preserve">기타 언론사</text>
+<text x="500" y="1150.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">프레시안</text>
+<text x="746" y="1150.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">데일리안</text>
+<text x="500" y="1179.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">매일신문</text>
+<text x="746" y="1179.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">농민신문</text>
+<text x="500" y="1208.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">땅집고</text>
+<text x="746" y="1208.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">경기일보</text>
+<text x="480" y="1245.4" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="15.2" font-weight="700" fill="#1E3A5F" xml:space="preserve">주간지</text>
+<text x="500" y="1278.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">한경비즈니스</text>
+<text x="746" y="1278.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">주간조선</text>
+<text x="500" y="1307.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">매경이코노미</text>
+<text x="746" y="1307.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">시사저널</text>
+<text x="500" y="1336.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">시사IN</text>
+<text x="746" y="1336.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">신동아</text>
+<text x="500" y="1365.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">주간동아</text>
+<text x="746" y="1365.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">주간경향</text>
+<text x="500" y="1394.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">한겨레21</text>
+<text x="720" y="2756.1" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#FFFFFF" xml:space="preserve">저장</text>
+</g>
+<g id="order-list">
+<rect x="660" y="1449.9" width="51.6" height="22" rx="4" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<rect x="788.6" y="1449.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1475.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1475.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1501.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1501.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1527.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1527.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1553.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1553.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1579.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1579.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1605.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1605.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1631.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1631.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1657.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1657.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1683.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1683.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1709.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1709.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1735.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1735.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1761.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1761.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1787.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1787.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1813.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1813.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1839.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1839.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1865.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1865.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1891.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1891.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1917.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1917.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1943.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1943.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1969.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1969.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="1995.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="1995.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2021.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2021.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2047.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2047.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2073.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2073.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2099.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2099.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2125.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2125.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2151.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2151.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2177.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2177.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2203.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2203.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2229.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2229.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2255.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2255.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2281.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2281.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2307.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2307.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2333.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2333.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2359.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2359.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2385.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2385.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2411.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2411.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2437.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2437.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2463.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2463.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2489.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2489.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2515.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2515.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="660" y="2541.9" width="51.6" height="22" rx="4" fill="none" stroke="#C7D9F7" stroke-width="1"/>
+<rect x="788.6" y="2541.9" width="51.6" height="22" rx="4" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+<text x="480" y="1429.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">선택한 언론사 (43개)</text>
+<text x="480" y="1465.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">1.</text>
+<text x="514" y="1465.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">KBS</text>
+<text x="685.8" y="1464.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#E5E7EB" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1464.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#E5E7EB" xml:space="preserve">↑</text>
+<text x="767.9" y="1464.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1464.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1491.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">2.</text>
+<text x="514" y="1491.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">SBS</text>
+<text x="685.8" y="1490.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1490.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1490.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1490.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1517.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">3.</text>
+<text x="514" y="1517.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">MBC</text>
+<text x="685.8" y="1516.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1516.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1516.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1516.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1543.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">4.</text>
+<text x="514" y="1543.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">TV조선</text>
+<text x="685.8" y="1542.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1542.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1542.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1542.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1569.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">5.</text>
+<text x="514" y="1569.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">조선일보</text>
+<text x="685.8" y="1568.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1568.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1568.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1568.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1595.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">6.</text>
+<text x="514" y="1595.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">동아일보</text>
+<text x="685.8" y="1594.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1594.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1594.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1594.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1621.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">7.</text>
+<text x="514" y="1621.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">중앙일보</text>
+<text x="685.8" y="1620.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1620.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1620.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1620.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1647.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">8.</text>
+<text x="514" y="1647.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">문화일보</text>
+<text x="685.8" y="1646.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1646.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1646.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1646.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1673.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">9.</text>
+<text x="514" y="1673.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">한국일보</text>
+<text x="685.8" y="1672.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1672.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1672.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1672.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1699.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">10.</text>
+<text x="514" y="1699.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">서울신문</text>
+<text x="685.8" y="1698.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1698.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1698.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1698.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1725.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">11.</text>
+<text x="514" y="1725.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">경향신문</text>
+<text x="685.8" y="1724.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1724.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1724.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1724.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1751.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">12.</text>
+<text x="514" y="1751.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">매일경제</text>
+<text x="685.8" y="1750.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1750.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1750.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1750.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1777.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">13.</text>
+<text x="514" y="1777.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">한국경제</text>
+<text x="685.8" y="1776.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1776.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1776.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1776.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1803.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">14.</text>
+<text x="514" y="1803.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">머니투데이</text>
+<text x="685.8" y="1802.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1802.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1802.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1802.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1829.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">15.</text>
+<text x="514" y="1829.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">서울경제</text>
+<text x="685.8" y="1828.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1828.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1828.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1828.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1855.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">16.</text>
+<text x="514" y="1855.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">파이낸셜뉴스</text>
+<text x="685.8" y="1854.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1854.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1854.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1854.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1881.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">17.</text>
+<text x="514" y="1881.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">헤럴드경제</text>
+<text x="685.8" y="1880.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1880.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1880.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1880.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1907.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">18.</text>
+<text x="514" y="1907.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">아시아경제</text>
+<text x="685.8" y="1906.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1906.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1906.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1906.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1933.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">19.</text>
+<text x="514" y="1933.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">프레시안</text>
+<text x="685.8" y="1932.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1932.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1932.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1932.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1959.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">20.</text>
+<text x="514" y="1959.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">전자신문</text>
+<text x="685.8" y="1958.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1958.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1958.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1958.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="1985.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">21.</text>
+<text x="514" y="1985.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">조선비즈</text>
+<text x="685.8" y="1984.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="1984.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="1984.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="1984.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2011.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">22.</text>
+<text x="514" y="2011.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">디지털타임스</text>
+<text x="685.8" y="2010.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2010.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2010.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2010.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2037.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">23.</text>
+<text x="514" y="2037.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">YTN</text>
+<text x="685.8" y="2036.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2036.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2036.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2036.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2063.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">24.</text>
+<text x="514" y="2063.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">세계일보</text>
+<text x="685.8" y="2062.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2062.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2062.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2062.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2089.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">25.</text>
+<text x="514" y="2089.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">한겨레</text>
+<text x="685.8" y="2088.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2088.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2088.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2088.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2115.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">26.</text>
+<text x="514" y="2115.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">국민일보</text>
+<text x="685.8" y="2114.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2114.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2114.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2114.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2141.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">27.</text>
+<text x="514" y="2141.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">이데일리</text>
+<text x="685.8" y="2140.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2140.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2140.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2140.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2167.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">28.</text>
+<text x="514" y="2167.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">연합뉴스</text>
+<text x="685.8" y="2166.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2166.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2166.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2166.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2193.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">29.</text>
+<text x="514" y="2193.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">뉴시스</text>
+<text x="685.8" y="2192.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2192.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2192.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2192.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2219.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">30.</text>
+<text x="514" y="2219.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">뉴스1</text>
+<text x="685.8" y="2218.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2218.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2218.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2218.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2245.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">31.</text>
+<text x="514" y="2245.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">매일신문</text>
+<text x="685.8" y="2244.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2244.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2244.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2244.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2271.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">32.</text>
+<text x="514" y="2271.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">노컷뉴스</text>
+<text x="685.8" y="2270.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2270.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2270.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2270.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2297.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">33.</text>
+<text x="514" y="2297.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">JTBC</text>
+<text x="685.8" y="2296.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2296.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2296.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2296.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2323.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">34.</text>
+<text x="514" y="2323.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">코리아중앙데일리</text>
+<text x="685.8" y="2322.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2322.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2322.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2322.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2349.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">35.</text>
+<text x="514" y="2349.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">코리아타임스</text>
+<text x="685.8" y="2348.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2348.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2348.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2348.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2375.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">36.</text>
+<text x="514" y="2375.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">코리아헤럴드</text>
+<text x="685.8" y="2374.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2374.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2374.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2374.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2401.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">37.</text>
+<text x="514" y="2401.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">한경비즈니스</text>
+<text x="685.8" y="2400.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2400.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2400.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2400.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2427.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">38.</text>
+<text x="514" y="2427.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">매경이코노미</text>
+<text x="685.8" y="2426.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2426.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2426.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2426.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2453.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">39.</text>
+<text x="514" y="2453.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">시사저널</text>
+<text x="685.8" y="2452.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2452.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2452.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2452.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2479.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">40.</text>
+<text x="514" y="2479.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">아시아투데이</text>
+<text x="685.8" y="2478.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2478.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2478.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2478.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2505.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">41.</text>
+<text x="514" y="2505.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">뉴스핌</text>
+<text x="685.8" y="2504.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2504.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2504.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2504.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2531.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">42.</text>
+<text x="514" y="2531.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">데일리안</text>
+<text x="685.8" y="2530.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2530.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2530.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↓</text>
+<text x="814.4" y="2530.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↓</text>
+<text x="480" y="2557.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#6B7280" xml:space="preserve">43.</text>
+<text x="514" y="2557.7" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="16" font-weight="400" fill="#1F2937" xml:space="preserve">시사IN</text>
+<text x="685.8" y="2556.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">5개 ↑</text>
+<text x="732.4" y="2556.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#6B7280" xml:space="preserve">↑</text>
+<text x="767.9" y="2556.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#E5E7EB" xml:space="preserve">↓</text>
+<text x="814.4" y="2556.9" text-anchor="middle" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="13.6" font-weight="400" fill="#E5E7EB" xml:space="preserve">5개 ↓</text>
+</g>
+<g id="h1">
+<text x="480" y="119.9" font-family="Pretendard, 'Noto Sans KR', sans-serif" font-size="20.8" font-weight="700" fill="#1E3A5F" xml:space="preserve">📰 언론사 선택 · 순서 지정</text>
+</g>
+</svg>

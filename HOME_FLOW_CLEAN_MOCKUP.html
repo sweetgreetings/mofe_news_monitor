@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>홈 흐름도 — 시원하게 시안</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F8FAFC; color: #1F2937;
+    font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .page { max-width: 960px; margin: 0 auto; padding: 28px 20px 60px; }
+  .opt { margin-bottom: 44px; }
+  .opt h1 { font-size: 1.05rem; color: #1E3A5F; margin: 0 0 4px; }
+  .opt .why { font-size: 0.82rem; color: #6B7280; margin: 0 0 12px; line-height: 1.6; }
+  .opt .why b { color: #1F2937; }
+  .card { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 17px 20px; }
+
+  /* ═══ 현재 (landing_renderer.py 그대로) ═══ */
+  .cur .flowsec { margin-bottom: 12px; }
+  .cur .flowsec:last-child { margin-bottom: 0; }
+  .cur .flowlab { font-size: 0.66rem; color: #6B7280; font-weight: 700; margin: 0 0 6px 2px; }
+  .cur .flowhead { display: flex; align-items: center; justify-content: space-between; margin: 0 0 6px 2px; }
+  .cur .flowhead .flowlab { margin: 0; }
+  .cur .gearlink { font-size: 0.73rem; color: #6B7280; text-decoration: none; border: 1px solid #E5E7EB;
+    border-radius: 20px; padding: 4px 11px; }
+  .cur .flow { display: flex; align-items: stretch; flex-wrap: wrap; }
+  .cur .flow a { text-decoration: none; display: flex; flex-direction: column; gap: 2px;
+    padding: 9px 14px; border-radius: 9px; min-width: 118px; flex: 1; }
+  .cur .lbl { font-size: 0.81rem; font-weight: 700; }
+  .cur .st { font-size: 0.7rem; font-weight: 600; color: #6B7280; }
+  .cur .arr { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 5px; }
+  .cur .arr span { color: #E5E7EB; font-size: 1.1rem; }
+  .cur .arr em { font-style: normal; font-size: 0.55rem; color: #6B7280; }
+  .cur a.live { background: #FEF2F2; } .cur a.live .lbl { color: #DC2626; }
+  .cur a.draft { background: #EFF6FF; } .cur a.draft .lbl { color: #2563EB; }
+  .cur a.done { background: #EFF6FF; } .cur a.done .lbl { color: #1E3A5F; }
+  .cur a.arch { background: #F1F3F5; } .cur a.arch .lbl { color: #6B7280; }
+  .cur a.adhoc { background: #E3F1EE; } .cur a.adhoc .lbl { color: #146B5E; }
+  .cur a.archad { background: #F0F7F5; } .cur a.archad .lbl { color: #146B5E; }
+  .cur .solo a { background: #FBF0DA; flex-direction: row; align-items: center; gap: 9px; }
+  .cur .solo .lbl { color: #8A5A14; }
+  .cur .tagset { margin-left: auto; display: flex; gap: 4px; flex-wrap: wrap; }
+  .cur .tag-chip { font-size: 0.6rem; font-weight: 700; color: #8A5A14; background: rgba(255,255,255,0.8);
+    border: 1px solid rgba(138,90,20,0.22); border-radius: 20px; padding: 2px 7px; }
+
+  /* ═══ A — 글자만 키움 (구조·건수 그대로) ═══ */
+  .big .flowlab { font-size: 0.8rem; }
+  .big .lbl { font-size: 1rem; }
+  .big .st { font-size: 0.85rem; }
+  .big .arr em { font-size: 0.7rem; }
+  .big .flow a { padding: 11px 16px; }
+  .big .tag-chip { font-size: 0.72rem; }
+
+  /* ═══ B / C — 덜어내고 키움 ═══ */
+  .fl { display: grid; grid-template-columns: minmax(0,1fr) 30px minmax(0,1fr) 30px minmax(0,1fr);
+    align-items: stretch; row-gap: 12px; }
+  .fl .gap { grid-column: 1 / -1; height: 6px; }
+  .tile { text-decoration: none; display: flex; flex-direction: column; justify-content: center; gap: 3px;
+    padding: 0 18px; min-height: 60px; border-radius: 12px; border: 1px solid transparent;
+    transition: background .12s, border-color .12s; }
+  .tile .nm { display: flex; align-items: center; gap: 10px; font-size: 1.02rem; font-weight: 700;
+    letter-spacing: -0.01em; }
+  .tile .nm .e { font-size: 1.15rem; }
+  .tile .sub { font-size: 0.78rem; font-weight: 500; color: #6B7280; padding-left: 30px; }
+  .tile .sub.act { color: inherit; opacity: 0.75; }
+  .ar { display: flex; align-items: center; justify-content: center; color: #CBD5E1; }
+  .ar svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round; }
+
+  /* 지금 손대는 칸은 색을 채우고, 보관함(지난 것)은 흰 바탕 + 테두리로 한 발 물러선다 */
+  .t-live { background: #FEF2F2; color: #DC2626; }
+  .t-live:hover { border-color: #FCA5A5; }
+  .t-reg  { background: #EFF6FF; color: #1E3A5F; }
+  .t-reg.draft { color: #2563EB; }
+  .t-reg:hover { border-color: #BFDBFE; }
+  .t-regarch { background: #fff; border-color: #E5E7EB; color: #475569; }
+  .t-regarch:hover { background: #F8FAFC; border-color: #CBD5E1; }
+  .t-ad   { background: #E3F1EE; color: #146B5E; }
+  .t-ad:hover { border-color: #9FD3C7; }
+  .t-adarch { background: #fff; border-color: #CFE5DF; color: #146B5E; }
+  .t-adarch:hover { background: #F0F7F5; }
+  .t-lab  { background: #FBF0DA; color: #8A5A14; flex-direction: row; align-items: center;
+    justify-content: flex-start; grid-column: 1 / -1; }
+  .t-lab:hover { border-color: rgba(138,90,20,0.3); }
+  .t-lab .chips { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  .t-lab .chip { font-size: 0.74rem; font-weight: 600; color: #8A5A14; background: rgba(255,255,255,.75);
+    border: 1px solid rgba(138,90,20,0.2); border-radius: 20px; padding: 3px 10px; }
+
+  .gearcell { grid-column: 3 / -1; display: flex; align-items: center; justify-content: flex-end; }
+  .gear { font-size: 0.8rem; color: #6B7280; text-decoration: none; border: 1px solid #E5E7EB;
+    border-radius: 20px; padding: 6px 13px; display: inline-flex; align-items: center; gap: 5px; }
+  .gear:hover { background: #EFF6FF; }
+  .gear svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.9; }
+
+  @media (max-width: 640px) {
+    .fl { grid-template-columns: minmax(0,1fr); row-gap: 8px; }
+    .ar { display: none; }
+    .gearcell { grid-column: 1; justify-content: flex-start; }
+  }
+
+  /* ═══ D — 호버 설명 말풍선 ═══ */
+  .hv .tile { position: relative; transition: background .12s, border-color .12s, transform .12s, box-shadow .12s; }
+  /* z-index: 아래 줄 칸(뒤에 그려지는 형제)이 말풍선을 덮지 않게 올린 칸을 위로 */
+  .hv .tile:hover, .hv .tile:focus-visible { transform: translateY(-1px); z-index: 5;
+    box-shadow: 0 4px 12px rgba(30,58,95,.09); outline: none; }
+  .tip { position: absolute; top: calc(100% + 8px); left: 0; z-index: 10; width: 280px;
+    background: #fff; border: 1px solid #E5E7EB; border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(30,58,95,.15); padding: 11px 14px 12px;
+    display: flex; flex-direction: column; gap: 4px; text-align: left;
+    opacity: 0; visibility: hidden; transform: translateY(-4px); pointer-events: none;
+    transition: opacity .12s, transform .12s, visibility 0s linear .12s; }
+  .tip::before { content: ""; position: absolute; top: -6px; left: 22px; width: 10px; height: 10px;
+    background: #fff; border-left: 1px solid #E5E7EB; border-top: 1px solid #E5E7EB; transform: rotate(45deg); }
+  .tip.r { left: auto; right: 0; } .tip.r::before { left: auto; right: 22px; }
+  /* 칸 위를 스치듯 지나갈 때 툭툭 뜨지 않게 0.15초 뒤에 연다 — 홈 [단독]/[속보] 칩과 같은 이유 */
+  .hv .tile:hover .tip, .hv .tile:focus-visible .tip { opacity: 1; visibility: visible; transform: none;
+    transition: opacity .12s .15s, transform .12s .15s, visibility 0s .15s; }
+  .tip b { font-size: 0.88rem; font-weight: 700; color: inherit; }
+  .tip span { font-size: 0.78rem; font-weight: 500; color: #6B7280; line-height: 1.6; }
+  .tip .nx { display: flex; align-items: center; gap: 6px; margin-top: 3px; padding-top: 7px;
+    border-top: 1px solid #F1F5F9; font-size: 0.74rem; color: #6B7280; font-weight: 600; }
+  .tip .nx i { font-style: normal; color: #CBD5E1; }
+  .hint { display: inline-block; font-size: 0.74rem; color: #2563EB; background: #EFF6FF;
+    border-radius: 6px; padding: 2px 8px; margin-left: 6px; font-weight: 600; }
+
+  .note { margin-top: 10px; font-size: 0.78rem; color: #6B7280; line-height: 1.7; }
+  .note li { margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ─────────────────────────── 현재 ─────────────────────────── -->
+<section class="opt">
+  <h1>지금</h1>
+  <p class="why">색 칸 여섯 가지 · 칸마다 두 줄 · 줄 제목 넷 · 화살표 설명 넷 — 한 카드 안에 글자 덩어리가 <b>26개</b>예요.
+    두 흐름의 칸 폭도 화살표 설명 길이에 따라 조금씩 어긋나 있어요.</p>
+  <div class="card cur">
+    <div class="flowsec">
+      <div class="flowhead"><p class="flowlab">실시간</p><a class="gearlink" href="#">⚙ 설정</a></div>
+      <div class="flow"><a class="live" href="#"><span class="lbl">🔴 실시간</span><span class="st">0건</span></a></div>
+    </div>
+    <div class="flowsec">
+      <p class="flowlab">모니터링 · 일자 › 시간대</p>
+      <div class="flow">
+        <a class="draft" href="#"><span class="lbl">⛏️ 초안</span><span class="st">39건</span></a>
+        <span class="arr"><span>→</span><em>회차 마감</em></span>
+        <a class="done" href="#"><span class="lbl">💎 확정본</span><span class="st">09:30 · 27건</span></a>
+        <span class="arr"><span>→</span><em>다음 회차</em></span>
+        <a class="arch" href="#"><span class="lbl">🗄️ 정기 보관함</span><span class="st">오늘 2회차</span></a>
+      </div>
+    </div>
+    <div class="flowsec">
+      <p class="flowlab">수시 모니터링 · 사안 › 일자</p>
+      <div class="flow">
+        <a class="adhoc" href="#"><span class="lbl">🔎 수집 원본</span><span class="st">오늘 0건</span></a>
+        <span class="arr"><span>→</span><em>골라 보내기</em></span>
+        <a class="adhoc" href="#"><span class="lbl">🗂️ 수집 확정본</span><span class="st">오늘 0건</span></a>
+        <span class="arr"><span>→</span><em>자정</em></span>
+        <a class="archad" href="#"><span class="lbl">📚 수시 보관함</span><span class="st">&nbsp;</span></a>
+      </div>
+    </div>
+    <div class="flowsec solo">
+      <p class="flowlab">라벨 · 회차와 사안을 가로질러</p>
+      <div class="flow"><a href="#"><span style="font-size:.95rem">🏷️</span><span class="lbl">라벨 보관함</span>
+        <span class="tagset"><span class="tag-chip">사진 아님 2</span><span class="tag-chip">비상경제본부회의 1</span><span class="tag-chip">테스트 1</span></span></a></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── A ─────────────────────────── -->
+<section class="opt">
+  <h1>A. 글자만 키움</h1>
+  <p class="why">구조는 그대로 두고 글자만 한 단계씩 키웠어요. <b>읽기는 쉬워지는데 더 빽빽해져요</b> —
+    덩어리 26개가 그대로 커졌을 뿐이라서요.</p>
+  <div class="card cur big">
+    <div class="flowsec">
+      <div class="flowhead"><p class="flowlab">실시간</p><a class="gearlink" href="#">⚙ 설정</a></div>
+      <div class="flow"><a class="live" href="#"><span class="lbl">🔴 실시간</span><span class="st">0건</span></a></div>
+    </div>
+    <div class="flowsec">
+      <p class="flowlab">모니터링 · 일자 › 시간대</p>
+      <div class="flow">
+        <a class="draft" href="#"><span class="lbl">⛏️ 초안</span><span class="st">39건</span></a>
+        <span class="arr"><span>→</span><em>회차 마감</em></span>
+        <a class="done" href="#"><span class="lbl">💎 확정본</span><span class="st">09:30 · 27건</span></a>
+        <span class="arr"><span>→</span><em>다음 회차</em></span>
+        <a class="arch" href="#"><span class="lbl">🗄️ 정기 보관함</span><span class="st">오늘 2회차</span></a>
+      </div>
+    </div>
+    <div class="flowsec">
+      <p class="flowlab">수시 모니터링 · 사안 › 일자</p>
+      <div class="flow">
+        <a class="adhoc" href="#"><span class="lbl">🔎 수집 원본</span><span class="st">오늘 0건</span></a>
+        <span class="arr"><span>→</span><em>골라 보내기</em></span>
+        <a class="adhoc" href="#"><span class="lbl">🗂️ 수집 확정본</span><span class="st">오늘 0건</span></a>
+        <span class="arr"><span>→</span><em>자정</em></span>
+        <a class="archad" href="#"><span class="lbl">📚 수시 보관함</span><span class="st">&nbsp;</span></a>
+      </div>
+    </div>
+    <div class="flowsec solo">
+      <p class="flowlab">라벨 · 회차와 사안을 가로질러</p>
+      <div class="flow"><a href="#"><span style="font-size:1.1rem">🏷️</span><span class="lbl">라벨 보관함</span>
+        <span class="tagset"><span class="tag-chip">사진 아님 2</span><span class="tag-chip">비상경제본부회의 1</span><span class="tag-chip">테스트 1</span></span></a></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── B ─────────────────────────── -->
+<section class="opt">
+  <h1>B. 덜어내고 키움</h1>
+  <p class="why">건수 줄·줄 제목·화살표 설명을 전부 빼고, 남은 <b>이름만 크게</b>. 칸을 3칸 격자에 맞춰 두 흐름이 위아래로 정확히 줄 서요.
+    지금 손대는 칸은 색을 채우고, 보관함(지난 것)은 흰 바탕+테두리로 한 발 물러서요.</p>
+  <div class="card">
+    <div class="fl">
+      <a class="tile t-live" href="#"><span class="nm"><span class="e">🔴</span>실시간</span></a>
+      <span></span>
+      <span class="gearcell"><a class="gear" href="#"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>설정</a></span>
+
+      <div class="gap"></div>
+      <a class="tile t-reg draft" href="#" title="회차 마감 → 확정본"><span class="nm"><span class="e">⛏️</span>초안</span></a>
+      <span class="ar"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      <a class="tile t-reg" href="#" title="다음 회차 → 정기 보관함"><span class="nm"><span class="e">💎</span>확정본</span></a>
+      <span class="ar"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      <a class="tile t-regarch" href="#"><span class="nm"><span class="e">🗄️</span>정기 보관함</span></a>
+
+      <a class="tile t-ad" href="#" title="골라 보내기 → 수집 확정본"><span class="nm"><span class="e">🔎</span>수집 원본</span></a>
+      <span class="ar"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      <a class="tile t-ad" href="#" title="자정 → 수시 보관함"><span class="nm"><span class="e">🗂️</span>수집 확정본</span></a>
+      <span class="ar"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      <a class="tile t-adarch" href="#"><span class="nm"><span class="e">📚</span>수시 보관함</span></a>
+
+      <div class="gap"></div>
+      <a class="tile t-lab" href="#"><span class="nm"><span class="e">🏷️</span>라벨 보관함</span>
+        <span class="chips"><span class="chip">사진 아님</span><span class="chip">비상경제본부회의</span><span class="chip">테스트</span></span></a>
+    </div>
+  </div>
+  <ul class="note">
+    <li>빠진 것: 건수 줄 6개 · 줄 제목 4개 · 화살표 설명 4개(<code>회차 마감</code> 등 — 칸에 마우스를 올리면 툴팁으로 남아요) · 라벨 칩 숫자.</li>
+    <li>오늘 몇 건 모였는지는 바로 위 건수 줄이 이미 말하고 있어서, 여기서 빼도 홈에서 사라지는 정보는 없어요.</li>
+  </ul>
+</section>
+
+<!-- ─────────────────────────── C ─────────────────────────── -->
+<section class="opt">
+  <h1>C. B + 「누르면 어디로 가나」 한 줄</h1>
+  <p class="why">B에서 숫자 대신 <b>눌렀을 때 쓸모 있는 말</b>만 칸 안에 작게 남겨요. 할 말이 없는 칸은 한 줄 그대로.</p>
+  <div class="card">
+    <div class="fl">
+      <a class="tile t-live" href="#"><span class="nm"><span class="e">🔴</span>실시간</span></a>
+      <span></span>
+      <span class="gearcell"><a class="gear" href="#"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>설정</a></span>
+
+      <div class="gap"></div>
+      <a class="tile t-reg draft" href="#"><span class="nm"><span class="e">⛏️</span>초안</span><span class="sub">11:00 회차 진행 중</span></a>
+      <span class="ar"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      <a class="tile t-reg" href="#"><span class="nm"><span class="e">💎</span>확정본</span><span class="sub">09:30 회차 · 발송 완료</span></a>
+      <span class="ar"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      <a class="tile t-regarch" href="#"><span class="nm"><span class="e">🗄️</span>정기 보관함</span></a>
+
+      <a class="tile t-ad" href="#"><span class="nm"><span class="e">🔎</span>수집 원본</span><span class="sub act">+ 새로 수집</span></a>
+      <span class="ar"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      <a class="tile t-ad" href="#"><span class="nm"><span class="e">🗂️</span>수집 확정본</span><span class="sub act">+ 새로 만들기</span></a>
+      <span class="ar"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      <a class="tile t-adarch" href="#"><span class="nm"><span class="e">📚</span>수시 보관함</span></a>
+
+      <div class="gap"></div>
+      <a class="tile t-lab" href="#"><span class="nm"><span class="e">🏷️</span>라벨 보관함</span>
+        <span class="chips"><span class="chip">사진 아님</span><span class="chip">비상경제본부회의</span><span class="chip">테스트</span></span></a>
+    </div>
+  </div>
+  <ul class="note">
+    <li>수시 두 칸은 오늘 카드가 있으면 그 <b>사안명</b>(예: <code>예결위</code>)을, 없으면 <code>+ 새로 수집</code>/<code>+ 새로 만들기</code>를 적어요 —
+      지금도 카드가 없으면 누르는 순간 새로 만드는 화면으로 가는데, 칸에는 <code>오늘 0건</code>이라고만 적혀 있어서 그걸 알 수 없었어요.
+      (게다가 그 <code>건</code>은 기사가 아니라 카드 수였어요.)</li>
+    <li>확정본의 <code>발송 완료</code>/<code>자동 발송 대기</code>는 이미 회차 파일에 저장된 값이라 새로 세는 비용이 없어요.</li>
+  </ul>
+</section>
+
+<!-- ─────────────────────────── C — 지금 실제 상태 ─────────────────────────── -->
+<section class="opt">
+  <h1>C. 지금 실제 상태로 (09월 15일 10:07 · 수시 「인사청문회」 만든 뒤)</h1>
+  <p class="why">저장된 실제 값으로 채웠어요. 수집 원본 칸이 <b>누르면 열리는 카드의 사안명</b>으로 바뀌어요.</p>
+  <div class="card">
+    <div class="fl">
+      <a class="tile t-live" href="#"><span class="nm"><span class="e">🔴</span>실시간</span></a>
+      <span></span>
+      <span class="gearcell"><a class="gear" href="#"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>설정</a></span>
+
+      <div class="gap"></div>
+      <a class="tile t-reg draft" href="#"><span class="nm"><span class="e">⛏️</span>초안</span><span class="sub">11:00 회차 진행 중</span></a>
+      <span class="ar"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      <a class="tile t-reg" href="#"><span class="nm"><span class="e">💎</span>확정본</span><span class="sub">09:30 회차</span></a>
+      <span class="ar"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      <a class="tile t-regarch" href="#"><span class="nm"><span class="e">🗄️</span>정기 보관함</span></a>
+
+      <a class="tile t-ad" href="#" title="인사청문회 · 09:06~10:06 · 이형일, 재정경제부"><span class="nm"><span class="e">🔎</span>수집 원본</span><span class="sub act">인사청문회</span></a>
+      <span class="ar"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      <a class="tile t-ad" href="#"><span class="nm"><span class="e">🗂️</span>수집 확정본</span><span class="sub act">+ 새로 만들기</span></a>
+      <span class="ar"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      <a class="tile t-adarch" href="#"><span class="nm"><span class="e">📚</span>수시 보관함</span></a>
+
+      <div class="gap"></div>
+      <a class="tile t-lab" href="#"><span class="nm"><span class="e">🏷️</span>라벨 보관함</span>
+        <span class="chips"><span class="chip">사진 아님</span><span class="chip">비상경제본부회의</span><span class="chip">테스트</span></span></a>
+    </div>
+  </div>
+  <ul class="note">
+    <li><b>수집 원본</b> <code>인사청문회</code> — 누르면 바로 그 카드가 열려요. 마우스를 올리면 툴팁에 시간창·검색어(<code>09:06~10:06 · 이형일, 재정경제부</code>)가 떠요.
+      오늘 카드를 더 만들면 <b>가장 최근에 만든 카드</b>의 사안명으로 바뀌어요(링크가 원래 그 카드로 가요).</li>
+    <li><b>수집 확정본</b>은 오늘 만든 게 없어서 <code>+ 새로 만들기</code>예요. 하나 만들면 그 이름이 여기에 떠요.</li>
+    <li><b>확정본</b> <code>09:30 회차</code> — 이 회차엔 발송 기록이 없어요(자동 발송도 꺼져 있어요). 앱 밖에서 처리했을 수도 있어서
+      <code>미발송</code>이라고 단정하지 않고 아무것도 안 붙였어요(정기 보관함과 같은 규칙). 발송하면 <code>09:30 회차 · 발송 완료</code>가 돼요.</li>
+  </ul>
+</section>
+
+<!-- ─────────────────────────── D — B + 호버 설명 ─────────────────────────── -->
+<section class="opt">
+  <h1>D. 평소엔 B, 마우스를 올리면 설명 <span class="hint">칸 위에 마우스를 올려보세요</span></h1>
+  <p class="why">평소엔 <b>이름만</b>(B와 똑같이 시원하게), 올리면 그 칸 아래에 말풍선이 떠요.
+    맨 위 굵은 줄 = <b>지금 상태</b>(C의 한 줄), 그 아래 = <b>어떤 곳인지</b>, 맨 아래 = <b>다음 단계</b>(지금 화살표 밑에 깨알같이 적힌 말).</p>
+  <div class="card hv">
+    <div class="fl">
+      <a class="tile t-live" href="#"><span class="nm"><span class="e">🔴</span>실시간</span>
+        <span class="tip"><b>거르지 않은 오늘 기사 전부</b>
+          <span>검색어에 걸린 오늘 기사를 시간순으로 다 보여줘요.</span>
+          <span class="nx">📌 담아두기 <i>→</i> 확정본 아래 「담아둔 기사」</span></span></a>
+      <span></span>
+      <span class="gearcell"><a class="gear" href="#"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>설정</a></span>
+
+      <div class="gap"></div>
+      <a class="tile t-reg draft" href="#"><span class="nm"><span class="e">⛏️</span>초안</span>
+        <span class="tip"><b>11:00 회차 진행 중</b>
+          <span>마감 전까지 모이는 기사를 미리 정리하는 곳이에요.</span>
+          <span class="nx">11:00 회차 마감 <i>→</i> 확정본</span></span></a>
+      <span class="ar"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      <a class="tile t-reg" href="#"><span class="nm"><span class="e">💎</span>확정본</span>
+        <span class="tip"><b>09:30 회차</b>
+          <span>마감된 회차의 보고서예요. 여기서 발송해요.</span>
+          <span class="nx">다음 회차 마감 <i>→</i> 정기 보관함</span></span></a>
+      <span class="ar"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      <a class="tile t-regarch" href="#"><span class="nm"><span class="e">🗄️</span>정기 보관함</span>
+        <span class="tip r"><b>지난 회차 모아보기</b>
+          <span>날짜 › 회차별로 1년 동안 쌓여요.</span></span></a>
+
+      <a class="tile t-ad" href="#"><span class="nm"><span class="e">🔎</span>수집 원본</span>
+        <span class="tip"><b>인사청문회</b>
+          <span>09:06~10:06 · 이형일, 재정경제부<br>누르면 이 카드가 열려요.</span>
+          <span class="nx">골라 보내기 <i>→</i> 수집 확정본</span></span></a>
+      <span class="ar"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      <a class="tile t-ad" href="#"><span class="nm"><span class="e">🗂️</span>수집 확정본</span>
+        <span class="tip"><b>오늘 만든 수집 확정본이 없어요</b>
+          <span>원본에서 골라 담아 보고서로 묶는 곳이에요. 누르면 새로 만들어요.</span>
+          <span class="nx">자정 <i>→</i> 수시 보관함</span></span></a>
+      <span class="ar"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      <a class="tile t-adarch" href="#"><span class="nm"><span class="e">📚</span>수시 보관함</span>
+        <span class="tip r"><b>지난 수시 모니터링 모아보기</b>
+          <span>사안 › 날짜별로 1년 동안 쌓여요.</span></span></a>
+
+      <div class="gap"></div>
+      <a class="tile t-lab" href="#"><span class="nm"><span class="e">🏷️</span>라벨 보관함</span>
+        <span class="chips"><span class="chip">사진 아님</span><span class="chip">비상경제본부회의</span><span class="chip">테스트</span></span>
+        <span class="tip"><b>라벨 붙인 기사 모아보기</b>
+          <span>정기·수시를 가리지 않고 모여요. 원래 회차가 지워져도 남아요.</span></span></a>
+    </div>
+  </div>
+  <ul class="note">
+    <li>말풍선은 0.15초 뒤에 떠요 — 칸 위를 스치듯 지나갈 때 툭툭 뜨지 않게요(홈의 [단독]/[속보] 칩과 같은 지연).</li>
+    <li>브라우저 기본 툴팁(<code>title</code>)은 1초 넘게 기다려야 뜨고 작은 회색 글자라서, 이렇게 직접 그린 말풍선으로 했어요.</li>
+    <li>말풍선에도 <code>오늘 N건</code> 같은 숫자는 안 넣었어요. 라벨 칩 숫자도 B처럼 뺐어요.</li>
+  </ul>
+</section>
+
+</div>
+</body>
+</html>

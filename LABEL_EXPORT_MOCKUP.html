@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>라벨 보관함 — 복사·txt 목업</title>
+<style>
+  /* ── 실제 라벨 보관함(app/settings_server.py _BASE_STYLE + _LABEL_STYLE)에서 그대로 옮긴 값 ── */
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .container {
+    max-width: 800px; margin: 0 auto 24px; padding: 24px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: 8px;
+  }
+  h1 { font-size: 1.3rem; color: #1E3A5F; }
+  .hint { color: #6B7280; font-size: 0.85rem; margin-bottom: 16px; }
+  button, a.btn {
+    background: #2563EB; color: #FFFFFF; border: none; border-radius: 4px;
+    padding: 8px 16px; font-size: 1rem; font-family: inherit; cursor: pointer; text-decoration: none;
+    appearance: none; -webkit-appearance: none;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  button:hover, a.btn:hover { background: #1E3A5F; }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+  .lab-topbar {
+    display: flex; align-items: center; gap: 10px; padding-bottom: 12px;
+    border-bottom: 1px solid #E5E7EB; margin-bottom: 16px; flex-wrap: wrap;
+  }
+  .lab-topbar h1 { margin: 0; font-size: 1.05rem; }
+  .lab-topbar .spacer { margin-left: auto; }
+  a.btn.ghost { background: transparent; color: #6B7280; border: 1px solid #E5E7EB; }
+  a.btn.ghost:hover { background: #EFF6FF; color: #2563EB; }
+  .lab-filter-chip {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 0.8rem; font-weight: 600;
+    background: #FFFFFF; border: 1px solid #E5E7EB; color: #1F2937; border-radius: 20px;
+    padding: 5px 12px; margin: 0 6px 6px 0; text-decoration: none; cursor: pointer;
+  }
+  .lab-filter-chip .n { color: #6B7280; font-weight: 500; font-size: 0.72rem; }
+  .lab-filter-chip:hover { background: #FBF0DA; }
+  .lab-filter-chip.on { background: #8A5A14; border-color: #8A5A14; color: #FFFFFF; }
+  .lab-filter-chip.on .n { color: rgba(255, 255, 255, 0.75); }
+  .lab-chipbar { margin-bottom: 6px; }
+  .lab-listhead {
+    display: flex; align-items: center; gap: 8px; margin: 12px 0 10px; font-size: 0.86rem; color: #1E3A5F;
+    font-weight: 700;
+  }
+  .arc-row { border: 1px solid #E5E7EB; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .arc-row:hover { background: #EFF6FF; }
+  .arc-title { font-size: 0.9rem; color: #1F2937; }
+  .arc-meta {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 7px;
+    font-size: 0.72rem; color: #6B7280;
+  }
+  .snap-tag { font-size: 0.66rem; background: #F8FAFC; color: #1F2937; border: 1px solid #E5E7EB; border-radius: 4px; padding: 1px 6px; }
+  .snap-tag.sub { background: #EFF6FF; color: #1E3A5F; }
+  .snap-tag.src-reg { background: #F8FAFC; color: #6B7280; }
+  .arc-meta a.origin-link { color: #2563EB; text-decoration: none; }
+  .arc-labels { display: inline-flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+  .lab-chip {
+    display: inline-flex; align-items: center; gap: 3px; font-size: 0.66rem; font-weight: 700;
+    color: #8A5A14; background: #FBF0DA; border: 1px solid rgba(138, 90, 20, 0.28);
+    border-radius: 20px; padding: 2px 8px; white-space: nowrap;
+  }
+  .lab-chip .x { color: #8A5A14; opacity: 0.55; font-size: 0.9rem; line-height: 1; }
+
+  /* ── 제안: 정기·수시 보관함의 .exp 버튼 묶음과 같은 값(app/history_renderer.py) ── */
+  .exp { display: inline-flex; gap: 4px; flex: none; margin-left: auto; }
+  .exp button { border: 1px solid #E5E7EB; background: #FFFFFF; color: #6B7280; border-radius: 6px;
+    padding: 4px 11px; font-size: 0.75rem; cursor: pointer; font-family: inherit; white-space: nowrap; font-weight: 400; }
+  .exp button:hover { background: #EFF6FF; color: #2563EB; border-color: #BFDBFE; }
+  /* 지금: 버튼에 class="btn ghost sm"이 붙어 있지만 이 화면 CSS엔 a.btn.ghost뿐이라
+     공용 button 규칙(큰 파란 채움)으로 그려진다 — 스크린샷 그대로 */
+  .now-xlsx { margin-left: auto; }
+
+  /* ── 목업 전용 ── */
+  .wrap-outer { padding: 24px 24px 0; }
+  .mock-ctl { max-width: 800px; margin: 0 auto 14px; border: 1.5px dashed #CBD5E1; border-radius: 12px;
+    background: #F8FAFC; padding: 12px 16px; font-size: 0.82rem; color: #475569;
+    display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; box-sizing: border-box; }
+  .mock-ctl b { color: #1E3A5F; }
+  .mock-ctl .grp { display: inline-flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+  .mock-ctl .seg { font: inherit; font-size: 0.8rem; padding: 4px 10px; border: 1px solid #CBD5E1; background: #fff;
+    border-radius: 7px; cursor: pointer; color: #475569; }
+  .mock-ctl .seg:hover { background: #F1F5F9; }
+  .mock-ctl .seg.on { background: #1E3A5F; border-color: #1E3A5F; color: #fff; font-weight: 600; }
+  .mock-tag { font-size: 0.72rem; color: #94A3B8; }
+  .outer { padding: 0 24px; }
+  .preview { max-width: 800px; margin: 0 auto 14px; border: 1.5px dashed #CBD5E1; border-radius: 12px;
+    background: #FFFFFF; padding: 14px 18px; box-sizing: border-box; }
+  .preview .ph { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .preview .ph b { color: #1E3A5F; font-size: 0.9rem; }
+  .preview pre { margin: 0; background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: 8px; padding: 12px 14px;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.8rem; line-height: 1.6;
+    white-space: pre-wrap; word-break: break-all; color: #1F2937; }
+  .preview .fname { font-size: 0.76rem; color: #6B7280; margin-top: 8px; }
+  .preview .fname code { background: #F1F5F9; padding: 1px 5px; border-radius: 4px; }
+  .toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); background: #1E3A5F; color: #fff;
+    font-size: 0.82rem; padding: 9px 16px; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.18);
+    max-width: calc(100% - 48px); }
+  .notes { max-width: 800px; margin: 0 auto 40px; background: #fff; border: 1px solid #E5E7EB; border-radius: 12px;
+    padding: 20px 22px; box-sizing: border-box; }
+  .notes h3 { font-size: 0.98rem; color: #1E3A5F; margin: 4px 0 10px; }
+  .notes p, .notes li { font-size: 0.86rem; color: #374151; line-height: 1.65; }
+  .notes ul { margin: 0 0 6px; padding-left: 18px; }
+  .notes .cmp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 6px; }
+  .notes .cmp > div { border: 1px solid #E5E7EB; border-radius: 10px; padding: 10px 12px; font-size: 0.82rem; line-height: 1.6; }
+  .notes .cmp > div.rec { border-color: #93C5FD; background: #F8FBFF; }
+  .notes .cmp b { color: #1E3A5F; }
+  .notes .rec-tag { font-size: 0.7rem; color: #2563EB; border: 1px solid #BFDBFE; border-radius: 10px; padding: 0 6px; margin-left: 4px; }
+  .notes code { font-size: 0.8rem; background: #F1F5F9; padding: 1px 5px; border-radius: 4px; }
+  @media (max-width: 640px) {
+    .notes .cmp { grid-template-columns: minmax(0, 1fr); }
+    .wrap-outer, .outer { padding-left: 16px; padding-right: 16px; }
+    .container { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap-outer">
+<div class="mock-ctl">
+  <span class="mock-tag">목업 조작 · 실제 화면엔 없음</span>
+  <span class="grp"><b>버튼</b>
+    <button class="seg" data-k="mode" data-v="now">지금</button>
+    <button class="seg on" data-k="mode" data-v="new">제안</button>
+  </span>
+  <span class="grp"><b>머리줄</b>
+    <button class="seg on" data-k="head" data-v="fmt">A &lt;라벨명&gt;</button>
+    <button class="seg" data-k="head" data-v="raw">B 라벨명 그대로</button>
+  </span>
+  <span class="grp"><b>순서</b>
+    <button class="seg on" data-k="order" data-v="labeled">라벨 붙인 최신순 (지금)</button>
+    <button class="seg" data-k="order" data-v="pub">발행 최신순</button>
+  </span>
+</div>
+</div>
+
+<div class="outer">
+<div class="container">
+  <div class="lab-topbar">
+    <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg> 라벨 보관함</h1>
+    <span class="spacer"></span>
+    <a class="btn ghost" href="#" onclick="return false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M19.1 14.4a1.5 1.5 0 0 0 .3 1.7l.1.1a1.9 1.9 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-1.7-.3 1.5 1.5 0 0 0-.9 1.4v.2a1.9 1.9 0 1 1-3.8 0v-.1a1.5 1.5 0 0 0-1-1.4 1.5 1.5 0 0 0-1.7.3l-.1.1a1.9 1.9 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0 .3-1.7 1.5 1.5 0 0 0-1.4-.9h-.2a1.9 1.9 0 1 1 0-3.8h.1a1.5 1.5 0 0 0 1.4-1 1.5 1.5 0 0 0-.3-1.7l-.1-.1a1.9 1.9 0 1 1 2.6-2.6l.1.1a1.5 1.5 0 0 0 1.7.3h.1a1.5 1.5 0 0 0 .9-1.4v-.2a1.9 1.9 0 1 1 3.8 0v.1a1.5 1.5 0 0 0 .9 1.4 1.5 1.5 0 0 0 1.7-.3l.1-.1a1.9 1.9 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0-.3 1.7v.1a1.5 1.5 0 0 0 1.4.9h.2a1.9 1.9 0 1 1 0 3.8h-.1a1.5 1.5 0 0 0-1.4.9Z"/></svg> 라벨 관리</a>
+  </div>
+  <div class="lab-chipbar" id="chips"></div>
+  <div id="body"></div>
+</div>
+</div>
+
+<div class="outer">
+<div class="preview" id="preview">
+  <div class="ph"><b>복사·txt에 들어가는 글자</b><span class="mock-tag">목업에서만 보이는 미리보기 · 위 조작을 바꾸면 바로 바뀝니다</span></div>
+  <pre id="pv-text"></pre>
+  <div class="fname" id="pv-fname"></div>
+</div>
+</div>
+
+<div class="outer">
+<div class="notes">
+  <h3>무엇이 바뀌나</h3>
+  <ul>
+    <li>목록 머리줄(<code>사진 아님 · 2건</code>) 오른쪽이 <b>[복사] [txt] [xlsx]</b> 세 개가 됩니다. 정기 보관함·수시 보관함의
+        버튼 묶음(<code>.exp</code>)과 <b>같은 순서, 같은 모양</b>입니다(작은 회색 테두리, 마우스를 올리면 파랑).</li>
+    <li>덤으로 고치는 것: 지금 <code>⬇ xlsx</code>는 큰 파란 채움 버튼으로 그려지는데 의도한 모양이 아닙니다.
+        버튼에 <code>btn ghost sm</code>를 붙였지만 이 화면 CSS엔 <code>a.btn.ghost</code>(링크용)만 있고 <code>.sm</code>은 아예 없어서,
+        공용 <code>button</code> 규칙이 적용되고 있습니다. 위 조작판에서 <b>지금 ↔ 제안</b>을 눌러 비교해 보세요.</li>
+    <li><b>복사</b>는 누르면 글자가 잠깐 <code>복사했습니다</code>로 바뀝니다(두 보관함의 <code>copyArchiveText</code>와 같은 피드백).
+        <b>txt</b>는 공용 <code>/download-text</code>로 보냅니다. 새 엔드포인트는 없습니다.</li>
+    <li>라벨을 여러 개 골라 걸리는 기사가 0건이면(💤) 지금 xlsx처럼 <b>세 버튼 모두 안 그립니다</b>. 칩 두 개를 같이 눌러 확인할 수 있어요.</li>
+  </ul>
+
+  <h3 style="margin-top:18px">텍스트 규칙 (이미 정한 것)</h3>
+  <ul>
+    <li><b>평평한 목록</b>입니다. 소제목으로 나누지 않습니다. 라벨 자체가 묶음이고, 회차마다 AI가 이름을 새로 지어서 나누면 같은 사안이 쪼개집니다.</li>
+    <li>기사 줄은 <b>「기사 제목 형식」 설정</b>(<code>ㅇ ({outlet}) {title}</code>)을 그대로 따릅니다. URL 줄과 기사 사이 빈 줄도 다른 화면과 똑같고,
+        발행일은 넣지 않습니다. 날짜가 필요하면 xlsx에 있습니다.</li>
+    <li>제목을 교정해 둔 기사(⋯ → 원문 다시 불러오기·직접 수정)는 <b>교정한 제목</b>으로 나갑니다. 화면·xlsx와 같습니다.</li>
+    <li>숨긴 기사도 들어갑니다. 화면·xlsx도 넣고 있고, 숨김은 "그 회차 보고서에서 뺐다"는 뜻이지 라벨을 뗐다는 뜻이 아닙니다.</li>
+    <li>파일명은 xlsx 규칙과 같습니다: <code>2026-09-15_라벨_사진 아님.txt</code>. 라벨이 여러 개면 <code>+</code>로 잇습니다.</li>
+  </ul>
+
+  <h3 style="margin-top:18px">정할 것 ① 머리줄</h3>
+  <div class="cmp">
+    <div class="rec"><b>A &lt;라벨명&gt;</b><span class="rec-tag">추천</span><br>
+      담당자가 정한 「소제목 형식」(<code>&lt;{section}&gt;</code>)을 라벨명에 입힙니다. 보고서에 붙이면 <b>소제목 한 칸처럼</b> 읽히고,
+      나중에 형식을 <code>■ {section}</code>으로 바꾸면 여기도 따라갑니다. 여러 개면 <code>&lt;세제 + 보고서&gt;</code>.</div>
+    <div><b>B 라벨명 그대로</b><br>
+      라벨은 소제목이 아니라 태그라서, 소제목 형식을 빌려 쓰는 게 뜻이 어긋난다고 볼 수도 있습니다.
+      다만 붙여 넣은 뒤 담당자가 괄호를 직접 다는 일이 생깁니다.</div>
+  </div>
+
+  <h3 style="margin-top:18px">정할 것 ② 순서</h3>
+  <div class="cmp">
+    <div><b>라벨 붙인 최신순 (지금)</b><br>
+      지금 화면 순서 그대로라 코드가 안 바뀌고, "방금 붙인 게 맨 위"라서 라벨을 붙이며 확인하기 좋습니다.
+      그런데 보고서에 붙여 넣으면 <b>담당자가 라벨을 붙인 순서</b>가 되어 읽는 사람에게는 뒤섞여 보입니다.
+      <code>사진 아님</code>에서도 11:21 기사가 12:11 기사보다 위에 있습니다.</div>
+    <div class="rec"><b>발행 최신순</b><span class="rec-tag">추천</span><br>
+      보고서처럼 읽힙니다. 여러 날에 걸쳐 모은 주제 라벨이면 더 그렇습니다. 대신 화면과 내보내기는 같아야 하므로
+      <b>화면 순서도 같이 바뀝니다</b>. xlsx도 이 순서를 따라가고, "방금 붙인 게 맨 위"는 사라집니다.</div>
+  </div>
+  <p style="margin-top:14px">언론사 우선순위순은 넣지 않았습니다. 라벨 보관함은 여러 날이 섞여 있어서, 언론사로 줄 세우면 날짜가 뒤죽박죽이 됩니다.</p>
+</div>
+</div>
+
+<script>
+// 실제 data/labels.json 4건 + 설정값(article_line_template · subheading_format_template)
+var TODAY = '2026-09-15';
+var LINE_TPL = 'ㅇ ({outlet}) {title}';
+var SUB_TPL = '<{section}>';
+var ARTS = [
+  {labels: ['사진 아님'], outlet: '뉴스핌', title: '윤호중 "법무부·성평등부, 내년 상반기 세종 이전...검·경은 청사 신축 후"',
+   pub: '2026-09-03 11:21', scrap: '2026-09-03 14:00', group: '행정·공공기관 이전·세종 이행계획',
+   labeled: '2026-09-03T13:35:08', url: 'https://www.newspim.com/news/view/20260903000606'},
+  {labels: ['사진 아님'], outlet: '뉴스핌', title: '[종합] 외교부·통일부도 세종 이전...윤호중 " 대통령실 이전시기 맞춰 검토"',
+   pub: '2026-09-03 12:11', scrap: '2026-09-03 14:00', group: '행정·공공기관 이전·세종 이행계획',
+   labeled: '2026-09-03T13:31:29', url: 'https://www.newspim.com/news/view/20260903000684'},
+  {labels: ['비상경제본부회의'], outlet: '조선일보', title: '정부, 코로나 때 장기연체한 소상공인 채무조정…“희생 감수한 것에 재기 기회 주는 것”',
+   pub: '2026-08-28 08:45', scrap: '2026-08-28 09:30', group: '코로나 피해 소상공인 채무조정',
+   labeled: '2026-08-28T09:11:49', url: 'https://n.news.naver.com/mnews/article/023/0003995403'},
+  {labels: ['테스트'], outlet: '머니투데이', title: '李대통령 "청렴도 31위 부끄러운 일…정치권 부패 청산해야"',
+   pub: '2026-08-21 16:28', scrap: '2026-08-21 17:00', group: '정부 부패 청산 추진',
+   labeled: '2026-08-21T16:53:06', url: 'https://n.news.naver.com/mnews/article/008/0005403105'}
+];
+var CHIPS = [['사진 아님', 2], ['비상경제본부회의', 1], ['테스트', 1]];
+var S = {mode: 'new', head: 'fmt', order: 'labeled', sel: ['사진 아님']};
+
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function fmt(tpl, map) { return tpl.replace(/\{(\w+)\}/g, function (m, k) { return map[k] != null ? map[k] : m; }); }
+
+function rows() {
+  var r = ARTS.filter(function (a) { return S.sel.every(function (l) { return a.labels.indexOf(l) >= 0; }); });
+  r.sort(S.order === 'pub'
+    ? function (a, b) { return b.pub.localeCompare(a.pub); }
+    : function (a, b) { return b.labeled.localeCompare(a.labeled); });
+  return r;
+}
+function headLine() {
+  var name = S.sel.join(' + ');
+  return S.head === 'fmt' ? fmt(SUB_TPL, {section: name}) : name;
+}
+function buildText(r) {
+  var lines = [headLine()];
+  r.forEach(function (a) {
+    lines.push(fmt(LINE_TPL, {outlet: a.outlet, title: a.title}));
+    lines.push(a.url);
+    lines.push('');
+  });
+  return lines.join('\n').replace(/\s+$/, '') + '\n';
+}
+function fname(ext) { return TODAY + '_라벨_' + S.sel.join('+') + '.' + ext; }
+
+function render() {
+  document.getElementById('chips').innerHTML = CHIPS.map(function (c) {
+    var on = S.sel.indexOf(c[0]) >= 0;
+    return '<a class="lab-filter-chip' + (on ? ' on' : '') + '" data-chip="' + esc(c[0]) + '">' +
+      esc(c[0]) + '<span class="n">' + c[1] + '</span></a>';
+  }).join('');
+
+  var body = document.getElementById('body');
+  var pv = document.getElementById('preview');
+  if (!S.sel.length) {
+    body.innerHTML = '<p class="hint">라벨을 하나 이상 골라 보세요.</p>';
+    pv.hidden = true; return;
+  }
+  var r = rows();
+  if (!r.length) {
+    body.innerHTML = '<div style="text-align:center;padding:40px 0;">💤<p class="hint">이 조합에 걸리는 기사가 없어요.</p></div>';
+    pv.hidden = true; return;
+  }
+  var acts = S.mode === 'now'
+    ? '<button type="button" class="now-xlsx" data-act="xlsx">⬇ xlsx</button>'
+    : '<span class="exp"><button type="button" data-act="copy">복사</button>' +
+      '<button type="button" data-act="txt">txt</button>' +
+      '<button type="button" data-act="xlsx">xlsx</button></span>';
+  var head = '<div class="lab-listhead">' + esc(S.sel.join(' + ')) + ' · ' + r.length + '건 ' + acts + '</div>';
+  body.innerHTML = head + r.map(function (a) {
+    return '<div class="arc-row"><div class="arc-title">' + esc(a.title) + '</div><div class="arc-meta">' +
+      '<span class="snap-tag src-reg">회차</span><span>' + a.scrap + '</span><span>·</span>' +
+      '<span>' + a.pub + ' 발행</span><span>·</span><span>' + esc(a.outlet) + '</span>' +
+      '<span class="snap-tag sub">' + esc(fmt(SUB_TPL, {section: a.group})) + '</span>' +
+      '<a class="origin-link" href="' + esc(a.url) + '" target="_blank" rel="noopener noreferrer">원문보기 ↗</a>' +
+      '<span class="arc-labels">' + a.labels.map(function (l) {
+        return '<span class="lab-chip">' + esc(l) + ' <span class="x">×</span></span>';
+      }).join('') + '</span></div></div>';
+  }).join('');
+
+  pv.hidden = S.mode === 'now';
+  document.getElementById('pv-text').textContent = buildText(r);
+  document.getElementById('pv-fname').innerHTML = 'txt 파일명 <code>' + esc(fname('txt')) + '</code>';
+}
+
+function toast(msg) {
+  var t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(function () { t.remove(); }, 2200);
+}
+function copyText(btn, text) {
+  function done() {
+    var o = btn.textContent; btn.textContent = '복사했습니다';
+    setTimeout(function () { btn.textContent = o; }, 900);
+  }
+  function fallback() {
+    var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+    ta.select(); try { document.execCommand('copy'); done(); } catch (e) { alert('복사에 실패했습니다.'); }
+    ta.remove();
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+  else fallback();
+}
+
+document.addEventListener('click', function (e) {
+  var seg = e.target.closest('.seg');
+  if (seg) {
+    S[seg.dataset.k] = seg.dataset.v;
+    document.querySelectorAll('.seg[data-k="' + seg.dataset.k + '"]').forEach(function (b) { b.classList.toggle('on', b === seg); });
+    render(); return;
+  }
+  var chip = e.target.closest('[data-chip]');
+  if (chip) {
+    var n = chip.dataset.chip, i = S.sel.indexOf(n);
+    if (i >= 0) S.sel.splice(i, 1); else S.sel.push(n);
+    render(); return;
+  }
+  var act = e.target.closest('[data-act]');
+  if (act) {
+    var a = act.dataset.act;
+    if (a === 'copy') copyText(act, buildText(rows()));
+    else toast('⬇ ' + fname(a) + ' 내려받기 (목업이라 실제로 받지는 않아요)');
+  }
+});
+render();
+</script>
+</body>
+</html>

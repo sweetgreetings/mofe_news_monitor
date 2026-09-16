@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>앞 회차 기사 회수 — 배너·칩 색 시안</title>
+<style>
+  :root{
+    --bg:#F8FAFC; --card:#FFFFFF; --header:#1E3A5F; --accent:#2563EB;
+    --text:#1F2937; --muted:#6B7280; --soft:#4B5563; --faint:#9CA3AF;
+    --border:#E5E7EB; --hover:#EFF6FF; --row-hover:#F3F4F6; --divider-soft:#F1F5F9;
+    --warn-bg:#FFFBEB; --warn-border:#FDE68A; --warn-text:#92400E; --warn-chip:#FEF3C7; --warn-dot:#F59E0B;
+    --accent-border:#BFDBFE;
+    --ai-mark:#A78BFA; --ai-bg:#F0EAFB; --ai-text:#4A3F8F; --ai-border:#DCD0F2; --ai-banner-bg:#F4EFFC;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font-family:'Pretendard','Noto Sans KR',-apple-system,BlinkMacSystemFont,sans-serif;}
+  .page{max-width:940px;margin:0 auto;padding:28px 20px 80px}
+  h1{font-size:1.25rem;color:var(--header);margin:0 0 6px}
+  .lede{color:var(--muted);font-size:.88rem;line-height:1.6;margin:0 0 28px}
+  .lede code{background:var(--divider-soft);padding:1px 5px;border-radius:4px;font-size:.85em}
+  h2.sec{font-size:1rem;color:var(--header);margin:36px 0 4px;padding-top:20px;border-top:1px solid var(--border)}
+  .sechint{color:var(--muted);font-size:.82rem;margin:0 0 16px;line-height:1.6}
+  .frame{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:0;overflow:hidden;margin-bottom:22px}
+  .frame-cap{display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--divider-soft);
+             border-bottom:1px solid var(--border);font-size:.8rem;color:var(--soft);font-weight:700}
+  .frame-cap .tag{font-weight:800;letter-spacing:.02em}
+  .frame-cap .note{font-weight:400;color:var(--muted)}
+  .stage{padding:18px 20px 20px}
+  .stage h1.run{font-size:1.05rem;color:var(--header);margin:0 0 14px}
+
+  /* ---- 배너 공통(기존 .finalize-banner 규격: inner max 800, padding 11px 24px, msg .86rem) ---- */
+  .lb{border-radius:8px;border:1px solid;margin:0 0 14px}
+  .lb-inner{padding:11px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .lb .msg{flex:1;min-width:220px;font-size:.86rem;line-height:1.5}
+  .lb .cnt{font-weight:800;border:none;border-radius:6px;padding:2px 9px;font-size:.86rem;
+           cursor:pointer;font-family:inherit}
+  .lb .q{border:none;background:transparent;cursor:pointer;font-size:.8rem;opacity:.65;padding:2px 4px}
+
+  .lb.amber{background:var(--warn-bg);border-color:var(--warn-border);color:var(--warn-text)}
+  .lb.amber .cnt{background:var(--warn-chip);color:var(--warn-text);box-shadow:inset 0 0 0 1px var(--warn-border)}
+  .lb.gray{background:#F9FAFB;border-color:var(--border);color:var(--soft)}
+  .lb.gray .cnt{background:var(--row-hover);color:var(--text);box-shadow:inset 0 0 0 1px var(--border)}
+  .lb.blue{background:var(--hover);border-color:var(--accent-border);color:var(--header)}
+  .lb.blue .cnt{background:var(--card);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-border)}
+
+  /* ---- 기사 행(실제 .article 규격) ---- */
+  .article{margin:10px 0;line-height:1.5;padding:6px 8px;border-radius:8px}
+  .article:hover{background:var(--row-hover)}
+  .a-top{display:flex;align-items:flex-start;gap:6px}
+  .a-title{font-size:1rem;font-weight:600}
+  .a-meta{margin-left:28px;font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .a-out{color:var(--soft);font-weight:600}
+  /* 회수 표시 — 왼쪽 3px 띠 (기존 .finalize-added와 같은 규격) */
+  .article.late{border-left:3px solid;padding-left:11px}
+  .article.late.amber{border-left-color:var(--warn-dot)}
+  .article.late.gray{border-left-color:var(--faint)}
+  .article.late.blue{border-left-color:var(--accent)}
+  /* 칩 — 기존 .photo-badge와 같은 규격 */
+  .chip{flex-shrink:0;padding:1px 7px;border-radius:999px;font-size:.72rem;white-space:nowrap;
+        position:relative;top:-.05em;border:1px solid}
+  .chip.amber{color:var(--warn-text);background:var(--warn-chip);border-color:var(--warn-border)}
+  .chip.gray{color:var(--muted);background:var(--row-hover);border-color:var(--border)}
+  .chip.blue{color:var(--accent);background:var(--hover);border-color:var(--accent-border)}
+  /* 기존 것들 */
+  .chip.photo{color:var(--muted);background:var(--row-hover);border-color:var(--border)}
+  .badge-ai{flex-shrink:0;padding:1px 7px;border-radius:999px;font-size:.7rem;font-weight:700;
+            background:var(--card);color:var(--ai-text);border:1px solid var(--ai-border);
+            white-space:nowrap;position:relative;top:-.15em}
+  .article.aiadd{border-left:3px solid var(--ai-mark);padding-left:11px;background:var(--ai-bg)}
+  .kw{color:var(--faint)}
+
+  .verdict{display:flex;gap:10px;align-items:flex-start;font-size:.83rem;line-height:1.6;
+           padding:10px 12px;border-radius:8px;background:var(--divider-soft);color:var(--soft);margin-top:2px}
+  .verdict b{color:var(--header)}
+  .good{color:#15803D;font-weight:700}
+  .bad{color:#B91C1C;font-weight:700}
+
+  .tipbox{position:relative;display:inline-block}
+  .tip{background:#111827;color:#fff;font-size:.78rem;line-height:1.6;padding:10px 12px;border-radius:8px;
+       max-width:430px;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+  .tip b{color:#FDE68A}
+  table.cmp{border-collapse:collapse;width:100%;font-size:.83rem;margin-top:8px}
+  table.cmp th,table.cmp td{border:1px solid var(--border);padding:8px 10px;text-align:left;vertical-align:top}
+  table.cmp th{background:var(--divider-soft);color:var(--header);font-weight:700}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>앞 회차 기사 회수 — 배너·칩 색 시안</h1>
+<p class="lede">
+  회차 마감 시각에 네이버 검색이 아직 안 준 기사를 <b>다음 회차가 주워 담을 때</b> 화면에 붙는 표시.<br>
+  문구는 확정된 3안(<code>건수를 누르면 그 기사로 이동</code>), 여기서 정할 건 <b>색</b> 하나.<br>
+  아래 기사는 2026-09-03 11:00 회차에서 실제로 빠졌던 것들이다.
+</p>
+
+<!-- ══════════ 1. 배너 색 3안 ══════════ -->
+<h2 class="sec">1. 배너 — 확정본 기사 목록 맨 위</h2>
+<p class="sechint">
+  자리는 <code>AI 분류 실패</code> 배너가 뜨는 그 자리(기사 목록 위 안내 박스). 0건이면 아예 안 그린다.<br>
+  <b>[3건]</b>은 버튼 — 누르면 첫 해당 기사로 스크롤한다(초안의 <code>[미분류 N건]</code> 배지와 같은 동작).
+</p>
+
+<div class="frame">
+  <div class="frame-cap"><span class="tag">A안</span> 앰버 — “주의” 계열 <span class="note">회차 마감 배너와 같은 색</span></div>
+  <div class="stage">
+    <h1 class="run">언론 모니터링 14시 기준</h1>
+    <div class="lb amber"><div class="lb-inner">
+      <span class="msg">📥 <b>11:00 회차 기사</b> <button class="cnt">3건</button> 이 뒤늦게 수집돼 함께 담겼어요.</span>
+      <button class="q" title="왜 이런 일이 생기나요?">ⓘ</button>
+    </div></div>
+    <div class="article late amber">
+      <div class="a-top"><span class="a-title">이형일, 과천 아파트 비거주 논란에 "현재 재건축으로 멸실"</span></div>
+      <div class="a-meta"><span class="a-out">파이낸셜뉴스</span> · 10:57 게시 · <span class="kw">🔍 이형일</span>
+        <span class="chip amber">⏱ 앞 회차 기사</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="frame">
+  <div class="frame-cap"><span class="tag">B안</span> 중립 회색 <span class="note">📷 사진 추정 칩과 같은 색</span></div>
+  <div class="stage">
+    <h1 class="run">언론 모니터링 14시 기준</h1>
+    <div class="lb gray"><div class="lb-inner">
+      <span class="msg">📥 <b>11:00 회차 기사</b> <button class="cnt">3건</button> 이 뒤늦게 수집돼 함께 담겼어요.</span>
+      <button class="q" title="왜 이런 일이 생기나요?">ⓘ</button>
+    </div></div>
+    <div class="article late gray">
+      <div class="a-top"><span class="a-title">이형일, 과천 아파트 비거주 논란에 "현재 재건축으로 멸실"</span></div>
+      <div class="a-meta"><span class="a-out">파이낸셜뉴스</span> · 10:57 게시 · <span class="kw">🔍 이형일</span>
+        <span class="chip gray">⏱ 앞 회차 기사</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="frame">
+  <div class="frame-cap"><span class="tag">C안</span> 파랑 — “담당자가 하는 일” 계열</div>
+  <div class="stage">
+    <h1 class="run">언론 모니터링 14시 기준</h1>
+    <div class="lb blue"><div class="lb-inner">
+      <span class="msg">📥 <b>11:00 회차 기사</b> <button class="cnt">3건</button> 이 뒤늦게 수집돼 함께 담겼어요.</span>
+      <button class="q" title="왜 이런 일이 생기나요?">ⓘ</button>
+    </div></div>
+    <div class="article late blue">
+      <div class="a-top"><span class="a-title">이형일, 과천 아파트 비거주 논란에 "현재 재건축으로 멸실"</span></div>
+      <div class="a-meta"><span class="a-out">파이낸셜뉴스</span> · 10:57 게시 · <span class="kw">🔍 이형일</span>
+        <span class="chip blue">⏱ 앞 회차 기사</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ 2. 목록 안에서 ══════════ -->
+<h2 class="sec">2. 목록 안에 섞였을 때 — 눈에 걸리나?</h2>
+<p class="sechint">색은 “한 건만 볼 때”가 아니라 “다른 기사들 사이에 섞였을 때” 눈에 걸리는지로 판단해야 한다. 같은 목록을 세 색으로.</p>
+
+<div class="frame">
+  <div class="frame-cap"><span class="tag">A안</span> 앰버</div>
+  <div class="stage">
+    <div class="article"><div class="a-top"><span class="a-title">한국, 세계은행 협력기금에 5억5000만달러 출연…230개 사업 지원</span></div>
+      <div class="a-meta"><span class="a-out">연합뉴스</span> · 13:41 게시 · <span class="kw">🔍 재정경제부</span></div></div>
+    <div class="article late amber"><div class="a-top"><span class="a-title">이형일, 과천 아파트 비거주 논란에 "현재 재건축으로 멸실"</span></div>
+      <div class="a-meta"><span class="a-out">파이낸셜뉴스</span> · 10:57 게시 · <span class="kw">🔍 이형일</span> <span class="chip amber">⏱ 앞 회차 기사</span></div></div>
+    <div class="article"><div class="a-top"><span class="a-title">정부, 추석 할인 확대 등 추가 지원 검토…중동발 민생 부담 대응</span></div>
+      <div class="a-meta"><span class="a-out">아시아경제</span> · 12:12 게시 · <span class="kw">🔍 재정경제부</span></div></div>
+    <div class="article late amber"><div class="a-top"><span class="a-title">[2026 정기국회]③ 820조 예산전쟁 시작…'162조' 미래대응기금 충돌</span></div>
+      <div class="a-meta"><span class="a-out">아시아경제</span> · 11:00 게시 · <span class="kw">🔍 예결위</span> <span class="chip amber">⏱ 앞 회차 기사</span></div></div>
+    <div class="article"><div class="a-top"><span class="a-title">[포토] 국무회의 입장하는 이형일 부총리</span> <span class="chip photo">📷 사진 추정</span></div>
+      <div class="a-meta"><span class="a-out">뉴스1</span> · 12:30 게시 · <span class="kw">🔍 이형일</span></div></div>
+  </div>
+</div>
+
+<div class="frame">
+  <div class="frame-cap"><span class="tag">B안</span> 중립 회색</div>
+  <div class="stage">
+    <div class="article"><div class="a-top"><span class="a-title">한국, 세계은행 협력기금에 5억5000만달러 출연…230개 사업 지원</span></div>
+      <div class="a-meta"><span class="a-out">연합뉴스</span> · 13:41 게시 · <span class="kw">🔍 재정경제부</span></div></div>
+    <div class="article late gray"><div class="a-top"><span class="a-title">이형일, 과천 아파트 비거주 논란에 "현재 재건축으로 멸실"</span></div>
+      <div class="a-meta"><span class="a-out">파이낸셜뉴스</span> · 10:57 게시 · <span class="kw">🔍 이형일</span> <span class="chip gray">⏱ 앞 회차 기사</span></div></div>
+    <div class="article"><div class="a-top"><span class="a-title">정부, 추석 할인 확대 등 추가 지원 검토…중동발 민생 부담 대응</span></div>
+      <div class="a-meta"><span class="a-out">아시아경제</span> · 12:12 게시 · <span class="kw">🔍 재정경제부</span></div></div>
+    <div class="article late gray"><div class="a-top"><span class="a-title">[2026 정기국회]③ 820조 예산전쟁 시작…'162조' 미래대응기금 충돌</span></div>
+      <div class="a-meta"><span class="a-out">아시아경제</span> · 11:00 게시 · <span class="kw">🔍 예결위</span> <span class="chip gray">⏱ 앞 회차 기사</span></div></div>
+    <div class="article"><div class="a-top"><span class="a-title">[포토] 국무회의 입장하는 이형일 부총리</span> <span class="chip photo">📷 사진 추정</span></div>
+      <div class="a-meta"><span class="a-out">뉴스1</span> · 12:30 게시 · <span class="kw">🔍 이형일</span></div></div>
+    <div class="verdict"><span><b class="bad">문제</b> — <code>📷 사진 추정</code> 칩과 색이 똑같다. 뜻이 다른 두 표시가 같은 회색이면 서로를 구분 못 한다.</span></div>
+  </div>
+</div>
+
+<div class="frame">
+  <div class="frame-cap"><span class="tag">C안</span> 파랑</div>
+  <div class="stage">
+    <div class="article"><div class="a-top"><span class="a-title">한국, 세계은행 협력기금에 5억5000만달러 출연…230개 사업 지원</span></div>
+      <div class="a-meta"><span class="a-out">연합뉴스</span> · 13:41 게시 · <span class="kw">🔍 재정경제부</span></div></div>
+    <div class="article late blue"><div class="a-top"><span class="a-title">이형일, 과천 아파트 비거주 논란에 "현재 재건축으로 멸실"</span></div>
+      <div class="a-meta"><span class="a-out">파이낸셜뉴스</span> · 10:57 게시 · <span class="kw">🔍 이형일</span> <span class="chip blue">⏱ 앞 회차 기사</span></div></div>
+    <div class="article"><div class="a-top"><span class="a-title">정부, 추석 할인 확대 등 추가 지원 검토…중동발 민생 부담 대응</span></div>
+      <div class="a-meta"><span class="a-out">아시아경제</span> · 12:12 게시 · <span class="kw">🔍 재정경제부</span></div></div>
+    <div class="article late blue"><div class="a-top"><span class="a-title">[2026 정기국회]③ 820조 예산전쟁 시작…'162조' 미래대응기금 충돌</span></div>
+      <div class="a-meta"><span class="a-out">아시아경제</span> · 11:00 게시 · <span class="kw">🔍 예결위</span> <span class="chip blue">⏱ 앞 회차 기사</span></div></div>
+    <div class="article"><div class="a-top"><span class="a-title">[포토] 국무회의 입장하는 이형일 부총리</span> <span class="chip photo">📷 사진 추정</span></div>
+      <div class="a-meta"><span class="a-out">뉴스1</span> · 12:30 게시 · <span class="kw">🔍 이형일</span></div></div>
+    <div class="verdict"><span><b class="bad">문제</b> — 파랑은 이 앱에서 <b>“담당자가 누르는 것”</b>(복사·저장·설정)과 <b>“확정본 계열 상태”</b>를 뜻한다. 여긴 누를 것도 없고 확정 상태도 아니라 뜻이 어긋난다.</span></div>
+  </div>
+</div>
+
+<!-- ══════════ 3. 충돌 ══════════ -->
+<h2 class="sec">3. 기존 연보라와 겹칠 때 — 겹쳐도 된다</h2>
+<p class="sechint">
+  앱엔 이미 <b>「마감 후 자동 배정」</b> 표시가 있다 — 연보라 왼쪽 띠 + 🤖 배지 + 연보라 배경.<br>
+  뒤늦게 회수된 기사는 그 회차에서 처음 보는 기사라 <b>거의 항상 이 자동 배정 대상이기도 하다.</b>
+  <b class="good">그런데 자리가 안 겹친다</b> — 띠·배지는 “AI가 배정했다”, 칩은 “뒤늦게 담겼다”로 각자 다른 자리를 쓴다.
+  <code>border-left</code>는 하나뿐이라 띠끼리는 싸우지만, <b>띠 하나 + 칩 하나는 안 싸운다.</b>
+</p>
+
+<div class="frame">
+  <div class="frame-cap"><span class="tag">겹친 기사</span> 연보라 배경 위에 노랑 칩 <span class="note">대비 확인용</span></div>
+  <div class="stage">
+    <div class="article aiadd">
+      <div class="a-top"><span class="a-title">이형일, 과천 아파트 비거주 논란에 "현재 재건축으로 멸실"</span>
+        <span class="badge-ai">🤖 마감 후 자동 배정</span></div>
+      <div class="a-meta"><span class="a-out">파이낸셜뉴스</span> · 10:57 게시 · <span class="kw">🔍 이형일</span>
+        <span class="chip amber">⏱ 앞 회차 기사</span></div>
+    </div>
+    <div class="verdict"><span>
+      한 기사가 두 가지 사실을 말한다 — <b>왼쪽 띠·🤖 = “AI가 소제목을 대신 정했다”</b>,
+      <b>⏱ 칩 = “앞 회차 시간대인데 이번에 담겼다”</b>. 서로 지우지 않는다.
+    </span></div>
+  </div>
+</div>
+
+<div class="frame">
+  <div class="frame-cap"><span class="tag">⏱ 칩이 장식이 아닌 이유</span> 🤖 ⊃ ⏱</div>
+  <div class="stage">
+    <div class="article aiadd"><div class="a-top"><span class="a-title">[2026 정기국회]③ 820조 예산전쟁 시작…'162조' 미래대응기금 충돌</span>
+        <span class="badge-ai">🤖 마감 후 자동 배정</span></div>
+      <div class="a-meta"><span class="a-out">아시아경제</span> · 11:00 게시 · <span class="kw">🔍 예결위</span>
+        <span class="chip amber">⏱ 앞 회차 기사</span></div></div>
+    <div class="article aiadd"><div class="a-top"><span class="a-title">추석 성수품 50% 할인…정부, 민생안정 대책 추가 검토</span>
+        <span class="badge-ai">🤖 마감 후 자동 배정</span></div>
+      <div class="a-meta"><span class="a-out">연합뉴스</span> · 13:52 게시 · <span class="kw">🔍 재정경제부</span></div></div>
+    <div class="verdict"><span>
+      아래 기사는 <b>마감 직전에 정상 수집된</b> 새 기사라 🤖만 붙고 ⏱은 없다.
+      즉 <b>🤖 붙은 기사 중 일부만 ⏱</b>이라 행마다 값이 변한다 — 정보가 맞다.
+      (행마다 값이 안 변하는 표시는 장식이라 빼는 게 이 앱 기준이다.)
+    </span></div>
+  </div>
+</div>
+
+<div class="frame">
+  <div class="frame-cap"><span class="tag">실제 목록</span> 확정본에서 이렇게 보인다</div>
+  <div class="stage">
+    <h1 class="run">언론 모니터링 14시 기준</h1>
+    <div class="lb amber"><div class="lb-inner">
+      <span class="msg">📥 <b>11:00 회차 기사</b> <button class="cnt">3건</button> 이 뒤늦게 수집돼 함께 담겼어요.</span>
+      <button class="q" title="왜 이런 일이 생기나요?">ⓘ</button>
+    </div></div>
+    <div class="article"><div class="a-top"><span class="a-title">한국, 세계은행 협력기금에 5억5000만달러 출연…230개 사업 지원</span></div>
+      <div class="a-meta"><span class="a-out">연합뉴스</span> · 13:41 게시 · <span class="kw">🔍 재정경제부</span></div></div>
+    <div class="article aiadd"><div class="a-top"><span class="a-title">이형일, 과천 아파트 비거주 논란에 "현재 재건축으로 멸실"</span>
+        <span class="badge-ai">🤖 마감 후 자동 배정</span></div>
+      <div class="a-meta"><span class="a-out">파이낸셜뉴스</span> · 10:57 게시 · <span class="kw">🔍 이형일</span>
+        <span class="chip amber">⏱ 앞 회차 기사</span></div></div>
+    <div class="article"><div class="a-top"><span class="a-title">정부, 추석 할인 확대 등 추가 지원 검토…중동발 민생 부담 대응</span></div>
+      <div class="a-meta"><span class="a-out">아시아경제</span> · 12:12 게시 · <span class="kw">🔍 재정경제부</span></div></div>
+    <div class="article aiadd"><div class="a-top"><span class="a-title">[2026 정기국회]③ 820조 예산전쟁 시작…'162조' 미래대응기금 충돌</span>
+        <span class="badge-ai">🤖 마감 후 자동 배정</span></div>
+      <div class="a-meta"><span class="a-out">아시아경제</span> · 11:00 게시 · <span class="kw">🔍 예결위</span>
+        <span class="chip amber">⏱ 앞 회차 기사</span></div></div>
+    <div class="article"><div class="a-top"><span class="a-title">[포토] 국무회의 입장하는 이형일 부총리</span> <span class="chip photo">📷 사진 추정</span></div>
+      <div class="a-meta"><span class="a-out">뉴스1</span> · 12:30 게시 · <span class="kw">🔍 이형일</span></div></div>
+  </div>
+</div>
+
+<!-- ══════════ 4. 툴팁 ══════════ -->
+<h2 class="sec">4. 툴팁 — 배너의 ⓘ 를 눌렀을 때</h2>
+<p class="sechint">화면 본문에는 네이버에 대한 주장을 한 줄도 안 쓰고, 이유는 전부 여기로 내린다.</p>
+<div class="frame"><div class="stage">
+  <div class="lb amber" style="margin-bottom:8px"><div class="lb-inner">
+    <span class="msg">📥 <b>11:00 회차 기사</b> <button class="cnt">3건</button> 이 뒤늦게 수집돼 함께 담겼어요.</span>
+    <button class="q" style="opacity:1;background:#fff;border-radius:6px;box-shadow:inset 0 0 0 1px var(--warn-border)">ⓘ</button>
+  </div></div>
+  <div class="tip">
+    네이버가 앱에 주는 검색 결과에는 기사가 몇 분~수십 분 늦게 올라오는 경우가 있습니다.<br>
+    <b>네이버 뉴스 화면에는 이미 보이더라도 검색 결과에는 아직 없을 수 있습니다.</b><br>
+    그래서 앞 회차에 담기지 못한 기사를 다음 회차에서 함께 담습니다.
+  </div>
+</div></div>
+
+<!-- ══════════ 5. 결론 ══════════ -->
+<h2 class="sec">5. 정리</h2>
+<table class="cmp">
+  <tr><th style="width:70px">안</th><th style="width:120px">색</th><th>판단</th></tr>
+  <tr><td><b>A</b></td><td>앰버(주의)</td>
+      <td><span class="good">추천.</span> 이 앱에서 앰버는 <b>“지금 보고 있는 게 네가 생각하는 그거랑 조금 다르다”</b>는 뜻으로 이미 쓰인다(회차 마감 배너). 여기 뜻과 정확히 같다. 다른 어떤 표시와도 색이 안 겹친다.</td></tr>
+  <tr><td><b>B</b></td><td>중립 회색</td>
+      <td><span class="bad">비추.</span> <code>📷 사진 추정</code> 칩과 색이 같아 구분이 안 된다. 회색은 “참고용 메타”라 담당자가 판단할 일이라는 신호가 안 선다.</td></tr>
+  <tr><td><b>C</b></td><td>파랑(accent)</td>
+      <td><span class="bad">비추.</span> 파랑은 “누르는 것”과 “확정본 상태”라는 다른 뜻을 이미 갖고 있다.</td></tr>
+</table>
+<div class="verdict" style="margin-top:14px"><span>
+  <b>확정 = 배너 A안(앰버) + 기사엔 노랑 칩만(왼쪽 띠 없음).</b><br>기존 연보라(마감 후 자동 배정)와 겹쳐도 자리가 달라 서로를 안 지운다.<br>새 색은 하나도 안 만들었다 — 전부 <code>app/config.py</code>의 <code>COLOR_WARN_*</code> 기존 값이다.
+</span></div>
+
+</div>
+</body>
+</html>

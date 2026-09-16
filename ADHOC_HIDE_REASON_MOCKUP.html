@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>수시 — 숨김 사유 기록 · 복구 음영 시안</title>
+<style>
+  :root {
+    --bg:#F8FAFC; --card:#FFFFFF; --header:#1E3A5F; --accent:#2563EB;
+    --text:#1F2937; --muted:#6B7280; --border:#E5E7EB; --hover:#EFF6FF;
+    --row-hover:#F3F4F6; --row-moved:#E7EFE8; --row-new:#FFF9C4;
+    --warn-text:#92400E; --warn-bg:#FFFBEB; --warn-border:#FDE68A; --warn-chip:#FEF3C7;
+    --divider-soft:#F1F5F9; --text-faint:#9CA3AF; --error:#DC2626;
+    --adhoc-bg:#E3F1EE; --adhoc-text:#146B5E; --pin-gray-bg:#F3F5F7;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic",sans-serif; line-height:1.55; }
+  .wrap { max-width:920px; margin:0 auto; padding:28px 24px 90px; }
+  h1 { font-size:1.15rem; color:var(--header); margin:0 0 4px; }
+  .lede { font-size:.85rem; color:var(--muted); margin:0 0 26px; }
+  h2.sec { font-size:.95rem; color:var(--header); margin:34px 0 6px;
+    padding-top:18px; border-top:1px solid var(--border); }
+  h2.sec .num { color:var(--text-faint); font-weight:400; margin-right:6px; }
+  .sec-note { font-size:.82rem; color:var(--muted); margin:0 0 14px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:11px; padding:16px 18px; }
+  .card + .card { margin-top:14px; }
+  .tag-now, .tag-a, .tag-b {
+    display:inline-block; font-size:.7rem; font-weight:700; border-radius:9px;
+    padding:1px 9px; margin-bottom:9px; letter-spacing:.02em; }
+  .tag-now { background:var(--divider-soft); color:var(--muted); border:1px solid var(--border); }
+  .tag-a { background:var(--hover); color:var(--accent); border:1px solid rgba(37,99,235,.25); }
+  .tag-b { background:var(--adhoc-bg); color:var(--adhoc-text); border:1px solid rgba(20,107,94,.25); }
+  .verdict { font-size:.8rem; color:var(--muted); margin-top:11px;
+    padding-top:10px; border-top:1px dashed var(--border); }
+  .verdict b { color:var(--text); }
+
+  /* ---- 실제 화면의 기사 행 (app/adhoc/renderer.py .article) ---- */
+  .list { border:1px solid var(--border); border-radius:10px; background:var(--card); padding:4px 12px; }
+  .gh { display:flex; align-items:center; gap:7px; font-size:.9rem; color:var(--header);
+    font-weight:600; margin:14px 0 6px; padding-bottom:6px; border-bottom:1px solid var(--divider-soft); }
+  .gh .icon-btn { padding:3px 5px; }
+  .gh .sp { margin-left:auto; display:flex; gap:2px; }
+  .article { padding:9px 10px; border-radius:7px; border-bottom:1px solid var(--divider-soft); }
+  .article:last-child { border-bottom:none; }
+  .article:hover { background:var(--row-hover); }
+  .a-top { display:flex; align-items:flex-start; gap:8px; }
+  .bulk-chk { margin-top:4px; flex:none; }
+  .a-title { font-size:.93rem; }
+  .a-title .outlet { color:var(--muted); }
+  .a-bot { display:flex; align-items:center; gap:6px; margin:5px 0 0 25px; }
+  .a-time { font-size:.78rem; color:var(--muted); }
+  .a-time-sep { color:var(--text-faint); font-size:.78rem; }
+  .origin-link { color:var(--accent); text-decoration:none; font-size:.78rem;
+    display:inline-flex; align-items:center; gap:3px; white-space:nowrap; }
+  .a-bot { flex-wrap:wrap; }
+  .a-acts { display:flex; gap:4px; align-items:center; margin-left:auto; }
+  .icon-btn { border:none; background:none; color:var(--muted); border-radius:6px;
+    padding:4px 6px; cursor:pointer; display:inline-flex; align-items:center; font:inherit; }
+  .icon-btn:hover { background:var(--border); color:var(--text); }
+  .icon-btn.group-hide-btn:hover { color:var(--error); }
+  .sel-sm { font:inherit; font-size:.78rem; padding:3px 8px; border:1px solid var(--border);
+    border-radius:7px; background:var(--card); color:var(--muted); }
+  svg.ic { width:15px; height:15px; stroke:currentColor; fill:none;
+    stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  svg.ic.sm { width:13px; height:13px; }
+
+  /* ---- 제안: 복구 음영 ---- */
+  .article.just-restored { background:var(--row-moved); }
+  .restore-banner {
+    display:flex; align-items:center; gap:8px; margin:0 0 10px;
+    background:var(--row-moved); border:1px solid #CFE0D2; border-radius:8px;
+    padding:8px 12px; font-size:.83rem; color:#2F5D3A; }
+  .restore-banner .x { margin-left:auto; background:none; border:none; cursor:pointer;
+    color:#2F5D3A; font-size:1rem; line-height:1; padding:2px 4px; }
+
+  /* ---- 「목록 밖 기사」 팝오버 (.fab-pop) ---- */
+  .pop { width:360px; background:var(--card); border:1px solid var(--border);
+    border-radius:11px; box-shadow:0 8px 24px rgba(0,0,0,.16); padding:12px 14px; }
+  .pop h5 { margin:0 0 8px; font-size:.85rem; color:var(--header);
+    display:flex; align-items:center; gap:5px; }
+  .pop .lead { font-size:.74rem; color:var(--muted); margin:-4px 0 6px; }
+  .pop .row { display:flex; gap:8px; align-items:flex-start; padding:7px 0;
+    border-top:1px solid var(--divider-soft); font-size:.82rem; }
+  .pop .row .tx { flex:1; color:var(--muted); }
+  .btn.sm.mute { font:inherit; font-size:.76rem; padding:3px 9px; border-radius:7px;
+    border:1px solid var(--border); background:var(--card); color:var(--muted);
+    cursor:pointer; display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+  .btn.sm.mute:hover { background:var(--hover); color:var(--accent); border-color:var(--accent); }
+  .out-tag { font-size:.72rem; color:var(--warn-text); background:var(--warn-chip);
+    border:1px solid var(--warn-border); border-radius:10px; padding:1px 8px; white-space:nowrap; }
+
+  /* 제안: 사유 한 줄 */
+  .why { display:block; font-size:.73rem; color:var(--text-faint); margin-top:2px; }
+  .why .how { color:var(--muted); }
+
+  /* 제안 B: 통째 숨김 묶음 */
+  .batch { border:1px solid var(--warn-border); background:var(--warn-bg);
+    border-radius:9px; padding:8px 10px; margin:8px 0; }
+  .batch > summary { list-style:none; cursor:pointer; display:flex; align-items:center;
+    gap:6px; font-size:.79rem; color:var(--warn-text); }
+  .batch > summary::-webkit-details-marker { display:none; }
+  .batch > summary .caret { transition:transform .15s; display:inline-flex; }
+  .batch[open] > summary .caret { transform:rotate(90deg); }
+  .batch > summary .cnt { font-weight:700; }
+  .batch > summary .when { color:#A16207; font-weight:400; margin-left:auto; font-size:.73rem; }
+  .batch .items { margin-top:6px; padding-top:4px; border-top:1px dashed var(--warn-border); }
+  .batch .items .row { border-top:none; padding:4px 0; font-size:.78rem; }
+  .batch .bar { display:flex; margin-top:7px; }
+  .batch .bar .btn { margin-left:auto; }
+
+  .side { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; }
+  .side > div { flex:1 1 340px; min-width:320px; }
+  .cap { font-size:.76rem; color:var(--muted); margin:0 0 7px; }
+  .fab-demo { display:inline-flex; position:relative; width:52px; height:52px; border-radius:50%;
+    background:var(--card); border:1px solid var(--border); box-shadow:0 2px 8px rgba(0,0,0,.12);
+    align-items:center; justify-content:center; color:var(--muted); cursor:pointer; }
+  .fab-demo .badge { position:absolute; top:-3px; right:-3px; background:var(--error);
+    color:#fff; font-size:.66rem; font-weight:700; border-radius:9px; padding:0 5px; line-height:1.5; }
+  ul.pts { margin:8px 0 0; padding-left:18px; font-size:.82rem; color:var(--muted); }
+  ul.pts li { margin:4px 0; }
+  ul.pts b { color:var(--text); }
+  code { background:var(--divider-soft); border-radius:4px; padding:1px 5px;
+    font-size:.78rem; color:var(--header); }
+  .demo-hint { font-size:.76rem; color:var(--adhoc-text); background:var(--adhoc-bg);
+    border-radius:7px; padding:6px 10px; display:inline-block; margin-bottom:10px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76V4h6v6.76l2 3.24H7l2-3.24z"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.6 13.4L12 4.8H4v8l8.6 8.6a2 2 0 0 0 2.8 0l5.2-5.2a2 2 0 0 0 0-2.8z"/><circle cx="7.5" cy="7.5" r="1.2"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></symbol>
+  <symbol id="i-caret" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></symbol>
+</svg>
+
+<div class="wrap">
+  <h1>수시 모니터링 — 숨김 사유 기록 · 복구 음영 시안</h1>
+  <p class="lede">
+    대상 화면: 수집 확정본(<code>/adhoc/card</code>) · 좌하단 「목록 밖 기사」 팝오버.
+    색·행 구조는 <code>app/adhoc/renderer.py</code> 실제 값 그대로.
+  </p>
+
+  <!-- ================= 1. 지금 ================= -->
+  <h2 class="sec"><span class="num">1</span>지금 — 팝오버가 아는 게 없다</h2>
+  <p class="sec-note">
+    카드는 기사에 <code>hidden: True</code> 불리언 하나만 저장한다. 언제·어떤 동작으로
+    숨겼는지 기록이 없어서, 단건 🗑로 뺀 것과 「소제목 통째 숨기기」로 딸려 들어간 것이
+    목록에서 완전히 같아 보인다.
+  </p>
+  <div class="card">
+    <span class="tag-now">현재 동작</span>
+    <div class="side">
+      <div>
+        <p class="cap">좌하단 🗑 (건수 배지) → 팝오버</p>
+        <div class="pop">
+          <h5><svg class="ic"><use href="#i-trash"/></svg> 목록 밖 기사 6건</h5>
+          <div class="lead">조건 때문에 빠진 기사는 검색어를 되돌리면 저절로 돌아와요. 직접 숨긴 기사만 복구 버튼이 있어요.</div>
+          <div class="row"><span class="tx">(서울경제) 이형일 부총리 후보자 "대규모 주택매입 시스템, 관계부처와 협의 중"</span>
+            <button class="btn sm mute"><svg class="ic sm"><use href="#i-undo"/></svg> 복구</button></div>
+          <div class="row"><span class="tx">(연합뉴스) 이형일 "재정 건전성 기조 유지…내년 예산 조정 불가피"</span>
+            <button class="btn sm mute"><svg class="ic sm"><use href="#i-undo"/></svg> 복구</button></div>
+          <div class="row"><span class="tx">(머니투데이) 이형일 후보자 인청 준비단 첫 회의</span>
+            <button class="btn sm mute"><svg class="ic sm"><use href="#i-undo"/></svg> 복구</button></div>
+          <div class="row"><span class="tx">(뉴시스) 이형일 "부동산 공급대책 속도 낼 것"</span>
+            <button class="btn sm mute"><svg class="ic sm"><use href="#i-undo"/></svg> 복구</button></div>
+          <div class="row"><span class="tx">(이데일리) 국회 예결위, 결산 심사 이틀째</span>
+            <span class="out-tag">시간창 밖</span></div>
+          <div class="row"><span class="tx">(한국경제) 세제개편 후속 시행령 입법예고</span>
+            <span class="out-tag">검색어에 안 걸림</span></div>
+        </div>
+      </div>
+      <div>
+        <ul class="pts">
+          <li>앞의 <b>4건이 왜 숨겨졌는지</b> 이 화면 어디에도 없다 — 단건인지, 「이형일 인청」 소제목을 통째로 숨겼을 때 딸려온 건지 구분 불가.</li>
+          <li>정렬이 <code>card["articles"]</code> 배열 순서라 <b>방금 숨긴 게 위로 오지도 않는다.</b>
+            (정기는 <code>hidden_at</code>을 저장해 최근순 정렬 → 그 정렬이 사유를 대신함. 수시엔 그 근거가 없다.)</li>
+          <li>1건만 복구하면 <b>나머지 3건이 여전히 숨어 있다는 사실을 알 방법이 없다.</b></li>
+        </ul>
+      </div>
+    </div>
+    <p class="cap" style="margin-top:14px">복구를 누르면 → 303 리다이렉트 → 전체 리로드</p>
+    <div class="list" style="opacity:.85">
+      <div class="article">
+        <div class="a-top"><input type="checkbox" class="bulk-chk">
+          <div class="a-title"><span class="outlet">(서울경제)</span> 이형일 부총리 후보자 "대규모 주택매입 시스템, 관계부처와 협의 중"</div></div>
+        <div class="a-bot"><span class="a-time">11:46</span><span class="a-time-sep">·</span>
+          <a class="origin-link" href="#" onclick="return false">원문보기<svg class="ic sm"><use href="#i-ext"/></svg></a>
+          <span class="a-acts"><select class="sel-sm"><option>다른 소제목</option></select>
+        <button class="icon-btn"><svg class="ic"><use href="#i-pin"/></svg></button>
+        <button class="icon-btn"><svg class="ic"><use href="#i-copy"/></svg></button>
+        <button class="icon-btn"><svg class="ic"><use href="#i-tag"/></svg></button>
+        <button class="icon-btn"><svg class="ic"><use href="#i-trash"/></svg></button>
+        <button class="icon-btn"><svg class="ic"><use href="#i-up"/></svg></button>
+        <button class="icon-btn"><svg class="ic"><use href="#i-down"/></svg></button></span></div>
+      </div>
+    </div>
+    <p class="cap" style="margin-top:7px">
+      원래 자리로 조용히 복귀 · <b>음영 없음 · 스크롤 없음</b> · 화면은 맨 위로 튐.
+      목록이 길면 뭐가 어디로 갔는지 확인 불가.
+    </p>
+  </div>
+
+  <!-- ================= 2. 사유 기록 시안 ================= -->
+  <h2 class="sec"><span class="num">2</span>숨김 사유 기록 — 두 시안</h2>
+  <p class="sec-note">
+    저장은 둘 다 같다: <code>hidden: True</code> → <code>hidden_at</code>(시각) +
+    <code>hidden_by</code>(<code>"single"</code> / <code>"group"</code>) +
+    <code>hidden_group</code>(통째 숨김일 때 그 소제목 이름). 차이는 <b>보여주는 방식</b>.
+  </p>
+
+  <div class="side">
+    <div>
+      <div class="card">
+        <span class="tag-a">시안 A — 행마다 사유 한 줄</span>
+        <div class="pop" style="width:auto">
+          <h5><svg class="ic"><use href="#i-trash"/></svg> 목록 밖 기사 6건</h5>
+          <div class="lead">최근에 숨긴 것부터 보여줘요. 조건 때문에 빠진 기사는 검색어를 되돌리면 저절로 돌아와요.</div>
+          <div class="row"><span class="tx">(연합뉴스) 이형일 "재정 건전성 기조 유지…내년 예산 조정 불가피"
+            <span class="why">11:41 · <span class="how">「이형일 인청」 통째 숨김</span></span></span>
+            <button class="btn sm mute"><svg class="ic sm"><use href="#i-undo"/></svg> 복구</button></div>
+          <div class="row"><span class="tx">(머니투데이) 이형일 후보자 인청 준비단 첫 회의
+            <span class="why">11:41 · <span class="how">「이형일 인청」 통째 숨김</span></span></span>
+            <button class="btn sm mute"><svg class="ic sm"><use href="#i-undo"/></svg> 복구</button></div>
+          <div class="row"><span class="tx">(뉴시스) 이형일 "부동산 공급대책 속도 낼 것"
+            <span class="why">11:41 · <span class="how">「이형일 인청」 통째 숨김</span></span></span>
+            <button class="btn sm mute"><svg class="ic sm"><use href="#i-undo"/></svg> 복구</button></div>
+          <div class="row"><span class="tx">(서울경제) 이형일 부총리 후보자 "대규모 주택매입 시스템…"
+            <span class="why">11:38 · <span class="how">직접 숨김</span></span></span>
+            <button class="btn sm mute"><svg class="ic sm"><use href="#i-undo"/></svg> 복구</button></div>
+          <div class="row"><span class="tx">(이데일리) 국회 예결위, 결산 심사 이틀째</span>
+            <span class="out-tag">시간창 밖</span></div>
+          <div class="row"><span class="tx">(한국경제) 세제개편 후속 시행령 입법예고</span>
+            <span class="out-tag">검색어에 안 걸림</span></div>
+        </div>
+        <div class="verdict">
+          <b>된다</b> — 사유가 행마다 붙고 최근순 정렬이 생긴다.<br>
+          <b>안 되는 것</b> — 같은 문구가 3줄 반복되고, 그래도 "이 묶음이 4건이었다"는
+          <b>한 번에 안 읽힌다.</b> 세어야 안다.
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <span class="tag-b">시안 B — 통째 숨김은 묶음으로 &nbsp;<b>(추천)</b></span>
+        <div class="pop" style="width:auto">
+          <h5><svg class="ic"><use href="#i-trash"/></svg> 목록 밖 기사 6건</h5>
+          <div class="lead">최근에 숨긴 것부터 보여줘요. 조건 때문에 빠진 기사는 검색어를 되돌리면 저절로 돌아와요.</div>
+          <details class="batch" open>
+            <summary>
+              <span class="caret"><svg class="ic sm"><use href="#i-caret"/></svg></span>
+              <span>「이형일 인청」 통째 숨김 · <span class="cnt">3건</span></span>
+              <span class="when">11:41</span>
+            </summary>
+            <div class="items">
+              <div class="row"><span class="tx">(연합뉴스) 이형일 "재정 건전성 기조 유지…내년 예산 조정 불가피"</span>
+                <button class="btn sm mute">복구</button></div>
+              <div class="row"><span class="tx">(머니투데이) 이형일 후보자 인청 준비단 첫 회의</span>
+                <button class="btn sm mute">복구</button></div>
+              <div class="row"><span class="tx">(뉴시스) 이형일 "부동산 공급대책 속도 낼 것"</span>
+                <button class="btn sm mute">복구</button></div>
+            </div>
+            <div class="bar"><button class="btn sm mute"><svg class="ic sm"><use href="#i-undo"/></svg> 3건 한 번에 복구</button></div>
+          </details>
+          <div class="row"><span class="tx">(서울경제) 이형일 부총리 후보자 "대규모 주택매입 시스템…"
+            <span class="why">11:38 · <span class="how">직접 숨김</span></span></span>
+            <button class="btn sm mute"><svg class="ic sm"><use href="#i-undo"/></svg> 복구</button></div>
+          <div class="row"><span class="tx">(이데일리) 국회 예결위, 결산 심사 이틀째</span>
+            <span class="out-tag">시간창 밖</span></div>
+          <div class="row"><span class="tx">(한국경제) 세제개편 후속 시행령 입법예고</span>
+            <span class="out-tag">검색어에 안 걸림</span></div>
+        </div>
+        <div class="verdict">
+          <b>왜 이쪽</b> — 실제로 겪은 사고("기억에 없는데 숨어 있었다")는
+          <b>한 클릭에 N건이 들어가는 입구</b>가 만든다. 묶음이 그 입구를 그대로 되비춘다:
+          숨긴 단위 = 복구 단위.<br>
+          단건은 지금처럼 평평하게 두고, <b>묶음일 때만</b> 접이식이 된다.
+          <span style="color:var(--warn-text)">앰버</span>는 이미 이 팝오버의 "조건 밖" 칩이 쓰는 색 —
+          새 색을 안 만든다.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 3. 복구 음영 ================= -->
+  <h2 class="sec"><span class="num">3</span>복구 음영 — 눌러서 확인</h2>
+  <p class="sec-note">
+    색은 <code>COLOR_ROW_MOVED</code> <code>#E7EFE8</code>(세이지) — 정기 <code>.just-moved</code>와
+    같은 값·같은 계열. <b>노랑(<code>.is-new-arrival</code>)은 쓰지 않는다</b>: "네이버에서 새로 들어왔다"는
+    뜻이 이미 박혀 있어서, 원래 있던 기사가 돌아온 복구와 정면으로 어긋난다.
+  </p>
+  <div class="card">
+    <span class="tag-b">제안 동작</span>
+    <p class="demo-hint">↓ 아래 팝오버의 복구 버튼을 실제로 눌러보면 위 목록이 어떻게 반응하는지 볼 수 있어.</p>
+
+    <div id="banner-slot"></div>
+    <div class="list" id="demo-list">
+      <div class="gh">&lt;이형일 인청&gt;
+        <span class="sp">
+          <button class="icon-btn"><svg class="ic"><use href="#i-copy"/></svg></button>
+          <button class="icon-btn group-hide-btn"><svg class="ic"><use href="#i-trash"/></svg></button>
+        </span>
+      </div>
+      <div id="g-incheong"></div>
+      <div class="gh">&lt;주택 공급대책&gt;
+        <span class="sp">
+          <button class="icon-btn"><svg class="ic"><use href="#i-copy"/></svg></button>
+          <button class="icon-btn group-hide-btn"><svg class="ic"><use href="#i-trash"/></svg></button>
+        </span>
+      </div>
+      <div id="g-housing">
+        <div class="article">
+          <div class="a-top"><input type="checkbox" class="bulk-chk">
+            <div class="a-title"><span class="outlet">(한국경제)</span> 주택 공급 로드맵, 이달 말 발표</div></div>
+          <div class="a-bot"><span class="a-time">10:12</span><span class="a-time-sep">·</span>
+            <a class="origin-link" href="#" onclick="return false">원문보기<svg class="ic sm"><use href="#i-ext"/></svg></a>
+            <span class="a-acts"><select class="sel-sm"><option>다른 소제목</option></select>
+              <button class="icon-btn"><svg class="ic"><use href="#i-pin"/></svg></button>
+              <button class="icon-btn"><svg class="ic"><use href="#i-trash"/></svg></button></span></div>
+        </div>
+        <div class="article">
+          <div class="a-top"><input type="checkbox" class="bulk-chk">
+            <div class="a-title"><span class="outlet">(KBS)</span> 국토부 "매입임대 물량 확대 검토"</div></div>
+          <div class="a-bot"><span class="a-time">09:58</span><span class="a-time-sep">·</span>
+            <a class="origin-link" href="#" onclick="return false">원문보기<svg class="ic sm"><use href="#i-ext"/></svg></a>
+            <span class="a-acts"><select class="sel-sm"><option>다른 소제목</option></select>
+              <button class="icon-btn"><svg class="ic"><use href="#i-pin"/></svg></button>
+              <button class="icon-btn"><svg class="ic"><use href="#i-trash"/></svg></button></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;margin-top:18px">
+      <div class="fab-demo"><svg class="ic"><use href="#i-trash"/></svg><span class="badge" id="fab-badge">4</span></div>
+      <div class="pop" id="demo-pop" style="width:400px">
+        <h5><svg class="ic"><use href="#i-trash"/></svg> 목록 밖 기사 <span id="pop-count">4</span>건</h5>
+        <div class="lead">최근에 숨긴 것부터 보여줘요.</div>
+        <div id="pop-rows"></div>
+      </div>
+    </div>
+
+    <div class="verdict">
+      <b>음영만으론 부족하다</b> — 화면 밖에 있는 음영은 없는 것과 같다. 그래서 세 개가 한 세트:
+      <ul class="pts" style="margin-top:6px">
+        <li><b>세이지 음영</b> — 복구된 행. 정기와 같은 <code>#E7EFE8</code>.</li>
+        <li><b>그 행으로 스크롤</b> — 단건 복구일 때. (정기 <code>scrollToUnclassified</code> 선례)</li>
+        <li><b>"N건이 돌아왔어요" 배너</b> — 묶음 복구일 때. 스크롤 대상이 여럿이라 색만 남는 경우.</li>
+      </ul>
+      <div style="margin-top:9px">
+        구현 경로는 정기에 이미 있다 — <code>sessionStorage</code>에 URL을 남기고 리로드 후
+        <code>.just-restored</code>를 붙이는 방식(<code>app/renderer.py:2281</code>).
+        <b>다만 수시 <code>.article</code>엔 <code>data-url</code>이 없어서</b>(체크박스에만 있다)
+        그것부터 붙여야 그 선례를 그대로 쓸 수 있다.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var HIDDEN = [
+  { url:'u1', outlet:'연합뉴스', title:'이형일 "재정 건전성 기조 유지…내년 예산 조정 불가피"',
+    at:'11:41', by:'group', group:'이형일 인청', time:'11:20' },
+  { url:'u2', outlet:'머니투데이', title:'이형일 후보자 인청 준비단 첫 회의',
+    at:'11:41', by:'group', group:'이형일 인청', time:'11:02' },
+  { url:'u3', outlet:'뉴시스', title:'이형일 "부동산 공급대책 속도 낼 것"',
+    at:'11:41', by:'group', group:'이형일 인청', time:'10:47' },
+  { url:'u4', outlet:'서울경제', title:'이형일 부총리 후보자 "대규모 주택매입 시스템, 관계부처와 협의 중"',
+    at:'11:38', by:'single', group:'이형일 인청', time:'11:46' }
+];
+
+function ic(name, sm) { return '<svg class="ic' + (sm ? ' sm' : '') + '"><use href="#i-' + name + '"/></svg>'; }
+
+function renderPop() {
+  var rows = '', batches = {}, singles = [];
+  HIDDEN.forEach(function (a) {
+    if (a.by === 'group') { (batches[a.group] = batches[a.group] || []).push(a); }
+    else { singles.push(a); }
+  });
+  Object.keys(batches).forEach(function (g) {
+    var items = batches[g];
+    rows += '<details class="batch" open><summary>'
+      + '<span class="caret">' + ic('caret', true) + '</span>'
+      + '<span>「' + g + '」 통째 숨김 · <span class="cnt">' + items.length + '건</span></span>'
+      + '<span class="when">' + items[0].at + '</span></summary><div class="items">'
+      + items.map(function (a) {
+          return '<div class="row"><span class="tx">(' + a.outlet + ') ' + a.title + '</span>'
+            + '<button class="btn sm mute" onclick="restore([\'' + a.url + '\'])">복구</button></div>';
+        }).join('')
+      + '</div><div class="bar"><button class="btn sm mute" onclick="restore([' 
+      + items.map(function (a) { return "'" + a.url + "'"; }).join(',') + '])">'
+      + ic('undo', true) + ' ' + items.length + '건 한 번에 복구</button></div></details>';
+  });
+  singles.forEach(function (a) {
+    rows += '<div class="row"><span class="tx">(' + a.outlet + ') ' + a.title
+      + '<span class="why">' + a.at + ' · <span class="how">직접 숨김</span></span></span>'
+      + '<button class="btn sm mute" onclick="restore([\'' + a.url + '\'])">'
+      + ic('undo', true) + ' 복구</button></div>';
+  });
+  if (!HIDDEN.length) {
+    rows = '<div class="row"><span class="tx" style="font-style:italic">숨긴 기사가 없어요.</span></div>';
+  }
+  document.getElementById('pop-rows').innerHTML = rows;
+  document.getElementById('pop-count').textContent = HIDDEN.length;
+  document.getElementById('fab-badge').textContent = HIDDEN.length;
+}
+
+function articleHtml(a) {
+  return '<div class="article just-restored" data-url="' + a.url + '">'
+    + '<div class="a-top"><input type="checkbox" class="bulk-chk">'
+    + '<div class="a-title"><span class="outlet">(' + a.outlet + ')</span> ' + a.title + '</div></div>'
+    + '<div class="a-bot"><span class="a-time">' + a.time + '</span><span class="a-time-sep">·</span>'
+    + '<a class="origin-link" href="#" onclick="return false">원문보기' + ic('ext', true) + '</a>'
+    + '<span class="a-acts"><select class="sel-sm"><option>다른 소제목</option></select>'
+    + '<button class="icon-btn">' + ic('pin') + '</button>'
+    + '<button class="icon-btn">' + ic('copy') + '</button>'
+    + '<button class="icon-btn">' + ic('tag') + '</button>'
+    + '<button class="icon-btn">' + ic('trash') + '</button>'
+    + '<button class="icon-btn">' + ic('up') + '</button>'
+    + '<button class="icon-btn">' + ic('down') + '</button></span></div></div>';
+}
+
+function restore(urls) {
+  var back = HIDDEN.filter(function (a) { return urls.indexOf(a.url) >= 0; });
+  HIDDEN = HIDDEN.filter(function (a) { return urls.indexOf(a.url) < 0; });
+  var slot = document.getElementById('g-incheong');
+  back.forEach(function (a) { slot.insertAdjacentHTML('beforeend', articleHtml(a)); });
+  renderPop();
+
+  var bs = document.getElementById('banner-slot');
+  if (back.length > 1) {
+    bs.innerHTML = '<div class="restore-banner">' + ic('check')
+      + '<span><b>' + back.length + '건</b>이 「이형일 인청」으로 돌아왔어요.</span>'
+      + '<button class="x" onclick="this.parentNode.remove()">×</button></div>';
+  } else {
+    bs.innerHTML = '';
+    var el = slot.querySelector('[data-url="' + back[0].url + '"]');
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  }
+}
+renderPop();
+</script>
+</body>
+</html>

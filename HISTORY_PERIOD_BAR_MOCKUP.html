@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>정기 보관함 기간 조회 바 — 시안</title>
+<style>
+  :root { --bg:#F8FAFC; --card:#FFFFFF; --text:#1F2937; --muted:#6B7280; --border:#E5E7EB;
+          --accent:#2563EB; --header:#1E3A5F; --hover:#EFF6FF; --rowhover:#F3F4F6;
+          --ok:#15803D; --warnT:#B45309; --warnBg:#FFFBEB; --warnBd:#FDE68A; --err:#B91C1C; }
+  * { box-sizing: border-box; }
+  /* 실서비스 화면은 body에 line-height를 안 준다(= normal). 설명 글에만 따로 준다 —
+     여기에 1.5를 주면 기사 행이 14px 부풀어 시안 비교가 통째로 틀어진다. */
+  body { margin:0; background:var(--bg); color:var(--text);
+         font-family: Pretendard, "Noto Sans KR", sans-serif; }
+  h1, .sub, .note, .pdesc, .measure, .toolbar, table.cmp, h2.sec, .legend { line-height:1.6; }
+  .ic { width:1em; height:1em; stroke:currentColor; fill:none; stroke-width:1.9;
+        stroke-linecap:round; stroke-linejoin:round; vertical-align:-0.15em; flex-shrink:0; }
+  .wrap { max-width:1040px; margin:0 auto; padding:28px 20px 90px; }
+  h1 { font-size:1.4rem; color:var(--header); margin:0 0 6px; }
+  .sub { color:var(--muted); font-size:.9rem; margin:0 0 20px; }
+  .note { background:var(--card); border:1px solid var(--border); border-radius:10px;
+          padding:14px 16px; margin:0 0 14px; font-size:.9rem; }
+  .note h3 { margin:0 0 8px; font-size:.95rem; color:var(--header); }
+  .note ul { margin:0; padding-left:18px; } .note li { margin:4px 0; }
+  .note.keep { background:var(--warnBg); border-color:var(--warnBd); }
+  .note b { color:var(--header); }
+  .panel { margin:26px 0 0; }
+  .phead { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin:0 0 6px; }
+  .pname { font-size:1.05rem; font-weight:700; color:var(--header); }
+  .ptag { font-size:.74rem; padding:2px 8px; border-radius:999px; border:1px solid var(--border);
+          color:var(--muted); background:var(--card); }
+  .ptag.rec { background:#ECFDF5; border-color:#A7F3D0; color:var(--ok); }
+  .pdesc { color:var(--muted); font-size:.86rem; margin:0 0 8px; }
+  .measure { font-size:.82rem; color:var(--muted); margin:0 0 10px; }
+  .measure b { color:var(--header); font-variant-numeric:tabular-nums; }
+  .win { color:var(--ok); font-weight:600; } .lose { color:var(--err); }
+  table.cmp { border-collapse:collapse; width:100%; margin:10px 0 0; font-size:.88rem;
+              background:var(--card); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  table.cmp th, table.cmp td { padding:9px 12px; text-align:left; border-bottom:1px solid var(--border); }
+  table.cmp th { background:#F9FAFB; color:var(--header); font-weight:600; }
+  table.cmp td.num, table.cmp th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  table.cmp tr:last-child td { border-bottom:none; }
+  h2.sec { font-size:1.1rem; color:var(--header); margin:34px 0 10px; }
+  .toolbar { position:sticky; top:0; z-index:5; background:var(--bg); padding:10px 0 12px;
+             border-bottom:1px solid var(--border); margin-bottom:6px; display:flex;
+             align-items:center; gap:14px; flex-wrap:wrap; font-size:.86rem; }
+  .toolbar label { display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
+  /* 화면 뼈대 — 실서비스와 같은 800px 폭 */
+  .screen { width:850px; }
+  .fakebar { height:54px; background:var(--card); border:1px solid var(--border);
+             border-bottom:none; border-radius:8px 8px 0 0; display:flex; align-items:center;
+             justify-content:space-between; padding:0 24px; font-size:.92rem; font-weight:600;
+             color:var(--accent); }
+  .fakebar span { color:var(--muted); font-weight:400; font-size:.8rem; }
+  .container { max-width:800px; padding:24px; background:var(--card);
+               border:1px solid var(--border); border-radius:0 0 8px 8px; }
+  .zone { position:relative; }
+  .zone::after { content:attr(data-z); position:absolute; right:-64px; top:0; bottom:0;
+    width:56px; border-left:2px solid #C7D2FE; font-size:.68rem; color:#4F46E5;
+    display:flex; align-items:center; padding-left:6px; font-variant-numeric:tabular-nums; }
+  .measurebox { outline:1px dashed #C7D2FE; outline-offset:2px; }
+
+  .pb-panel .container { padding:24px; border-radius:8px; }
+  .pb-panel h1.rt { font-size:1.4rem; color:var(--header); margin:0 0 4px; }
+  .page-sub { color:var(--muted); font-size:.82rem; margin:0 0 14px; }
+  .period-bar { margin:14px 0; padding:10px 12px; background:var(--bg);
+    border:1px solid var(--border); border-radius:10px; }
+  .prow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .prow + .prow { margin-top:6px; }
+  .plabel { font-size:.84rem; color:var(--header); font-weight:600; }
+  .seg { display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+  .seg-btn { padding:6px 15px; font-size:.82rem; border:none; background:var(--card);
+    color:var(--text); cursor:pointer; font-family:inherit; border-right:1px solid var(--border); }
+  .seg-btn:last-child { border-right:none; }
+  .seg-btn.on { background:var(--accent); color:#fff; }
+  .phint { font-size:.78rem; color:var(--muted); }
+  .pdate { width:126px; height:30px; font-size:.82rem; padding:4px 8px;
+    border:1px solid var(--border); border-radius:6px; font-family:inherit; }
+  .go { padding:6px 14px; font-size:.82rem; border:1px solid var(--accent); border-radius:6px;
+    background:var(--card); color:var(--accent); cursor:pointer; font-family:inherit; }
+  .pdiv { width:1px; align-self:stretch; background:var(--border); margin:0 4px; }
+  .result-bar { display:flex; align-items:center; gap:8px; margin:14px 0 8px; font-size:.84rem; }
+  .result-bar .grow { color:var(--header); font-weight:600; }
+  .exp { margin-left:auto; display:inline-flex; gap:4px; }
+  .exp button, .del-btn { font-size:.78rem; padding:4px 10px; border:1px solid var(--border);
+    border-radius:6px; background:var(--card); color:var(--accent); cursor:pointer; font-family:inherit; }
+  .del-btn { color:var(--muted); }
+  .daterow { display:flex; align-items:center; gap:8px; padding:12px 6px;
+    border-top:1px solid var(--border); font-size:.92rem; }
+  .daterow .dname { font-weight:600; color:var(--header); }
+  .chip-today { font-size:.7rem; color:var(--accent); background:var(--hover);
+    border:1px solid var(--border); border-radius:999px; padding:1px 8px; }
+  /* B안 — 한 줄. 안내 문구 둘을 뺀다. */
+  .v-b .prow + .prow { margin-top:0; }
+  /* C안 — 직접 지정은 접어 둔다 */
+  .v-c .custom-range { display:none; }
+  .v-c .custom-range.open { display:inline-flex; }
+  .disc { font-size:.8rem; color:var(--muted); background:none; border:none; cursor:pointer;
+    font-family:inherit; padding:4px 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>정기 보관함 기간 조회 바 — 컨트롤 6개에 101px</h1>
+  <p class="sub">2026-09-16 정기 보관함 화면에서 잰 값 그대로 · 800px 폭</p>
+
+  <div class="note">
+    <h3>지금 무엇이 문제인가</h3>
+    <ul>
+      <li>상자가 <b>101px</b>인데 안에 든 건 <b>빠른 설정 4개 + 날짜 입력 2개 + 조회 버튼</b>이 전부다.
+        가로로는 800px 중 <b>절반이 비어 있는데</b> 세로로 두 줄을 쓴다.</li>
+      <li>두 줄을 만드는 건 사실상 <b>안내 문구 두 개</b>다 —
+        <code>날짜 기준으로 조회합니다</code>와 <code>시작일 ~ 종료일을 직접 넣고 조회</code>.
+        앞의 것은 <b>「기간」이라는 라벨이 이미 한 말</b>이고, 뒤의 것은
+        <b>날짜 칸 두 개와 ~ 기호가 이미 한 말</b>이다.</li>
+      <li>CLAUDE.md의 <b>“본업 화면은 자기를 해명하지 않는다”</b>가 정확히 이 경우다.</li>
+    </ul>
+  </div>
+
+  <div class="note keep">
+    <h3>⚠ 건드리지 않는 것</h3>
+    <ul>
+      <li><b>컨트롤은 하나도 안 뺀다.</b> 1일·7일·1개월·전체, 직접 입력, 조회 — 전부 그대로다.</li>
+      <li><b>아래 결과 줄</b>(<code>전체 기간 · 37일</code> + 복사·txt·xlsx)은 성격이 다른 줄이라 합치지 않는다.
+        800px에 둘을 한 줄로 밀어 넣으면 폭이 모자란다(실측 610 + 200 &gt; 776).</li>
+      <li>같은 모양의 <b>수시 보관함 기간 바</b>도 같이 바꿔야 두 화면이 안 어긋난다.</li>
+    </ul>
+  </div>
+
+  <div class="panel pb-panel" id="p-a">
+    <div class="phead"><span class="pname">A안 · 현행</span><span class="ptag">지금 화면</span></div>
+    <p class="pdesc">두 줄 — 각 줄 끝에 안내 문구가 하나씩 붙어 있다.</p>
+    <p class="measure" id="m-a"></p>
+    <div class="screen"><div class="container v-a">
+      <h1 class="rt">📚 정기 보관함</h1>
+      <p class="page-sub">날짜별로 쌓인 스크랩 · 최근 1년 보관됩니다</p>
+      
+      <div class="period-bar">
+        <div class="prow"><span class="plabel">기간</span>
+          <span class="seg"><button class="seg-btn">1일</button><button class="seg-btn">7일</button>
+            <button class="seg-btn">1개월</button><button class="seg-btn on">전체</button></span>
+          <span class="phint">날짜 기준으로 조회합니다</span></div>
+        <div class="prow"><input class="pdate" type="date" /> ~ <input class="pdate" type="date" />
+          <button class="go">조회</button>
+          <span class="phint">시작일 ~ 종료일을 직접 넣고 조회</span></div>
+      </div>
+      <div class="result-bar"><span class="grow">전체 기간 · 37일</span>
+        <span class="exp"><button class="del-btn">선택 삭제</button>
+        <button>복사</button><button>txt</button><button>xlsx</button></span></div>
+      <div class="daterow"><span class="dname">9월 16일 (수)</span><span class="chip-today">오늘</span>
+        <span class="exp"><button>복사</button><button>txt</button><button>xlsx</button></span></div>
+      <div class="daterow"><span class="dname">9월 15일 (화)</span>
+        <span class="exp"><button>복사</button><button>txt</button><button>xlsx</button></span></div>
+      <div class="daterow"><span class="dname">9월 14일 (월)</span>
+        <span class="exp"><button>복사</button><button>txt</button><button>xlsx</button></span></div>
+      <div class="daterow"><span class="dname">9월 13일 (일)</span>
+        <span class="exp"><button>복사</button><button>txt</button><button>xlsx</button></span></div></div></div>
+  </div>
+  <div class="panel pb-panel" id="p-b">
+    <div class="phead"><span class="pname">B안 · 안내 문구 빼고 한 줄로</span><span class="ptag rec">추천</span></div>
+    <p class="pdesc">빠른 설정과 직접 입력을 세로선 하나로 나눠 한 줄에 놓았다. <b>컨트롤은 그대로, 문구만 뺐다.</b></p>
+    <p class="measure" id="m-b"></p>
+    <div class="screen"><div class="container v-b">
+      <h1 class="rt">📚 정기 보관함</h1>
+      <p class="page-sub">날짜별로 쌓인 스크랩 · 최근 1년 보관됩니다</p>
+      
+      <div class="period-bar">
+        <div class="prow"><span class="plabel">기간</span>
+          <span class="seg"><button class="seg-btn">1일</button><button class="seg-btn">7일</button>
+            <button class="seg-btn">1개월</button><button class="seg-btn on">전체</button></span>
+          <span class="pdiv"></span>
+          <input class="pdate" type="date" /> ~ <input class="pdate" type="date" />
+          <button class="go">조회</button></div>
+      </div>
+      <div class="result-bar"><span class="grow">전체 기간 · 37일</span>
+        <span class="exp"><button class="del-btn">선택 삭제</button>
+        <button>복사</button><button>txt</button><button>xlsx</button></span></div>
+      <div class="daterow"><span class="dname">9월 16일 (수)</span><span class="chip-today">오늘</span>
+        <span class="exp"><button>복사</button><button>txt</button><button>xlsx</button></span></div>
+      <div class="daterow"><span class="dname">9월 15일 (화)</span>
+        <span class="exp"><button>복사</button><button>txt</button><button>xlsx</button></span></div>
+      <div class="daterow"><span class="dname">9월 14일 (월)</span>
+        <span class="exp"><button>복사</button><button>txt</button><button>xlsx</button></span></div>
+      <div class="daterow"><span class="dname">9월 13일 (일)</span>
+        <span class="exp"><button>복사</button><button>txt</button><button>xlsx</button></span></div></div></div>
+  </div>
+  <div class="panel pb-panel" id="p-c">
+    <div class="phead"><span class="pname">C안 · 직접 지정은 접어두기</span><span class="ptag">기각</span></div>
+    <p class="pdesc">빠른 설정만 늘 보이고 날짜 직접 입력은 「직접 지정 ▾」 뒤로 접는 안. <b>만들어 재보니 B안과 높이가 같다</b> — 어차피 한 줄이라 더 벌 게 없다. (눌러서 펼쳐보세요)</p>
+    <p class="measure" id="m-c"></p>
+    <div class="screen"><div class="container v-c">
+      <h1 class="rt">📚 정기 보관함</h1>
+      <p class="page-sub">날짜별로 쌓인 스크랩 · 최근 1년 보관됩니다</p>
+      
+      <div class="period-bar">
+        <div class="prow"><span class="plabel">기간</span>
+          <span class="seg"><button class="seg-btn">1일</button><button class="seg-btn">7일</button>
+            <button class="seg-btn">1개월</button><button class="seg-btn on">전체</button></span>
+          <button class="disc" onclick="this.parentNode.querySelector('.custom-range').classList.toggle('open')">직접 지정 ▾</button>
+          <span class="custom-range" style="align-items:center;gap:8px">
+            <input class="pdate" type="date" /> ~ <input class="pdate" type="date" />
+            <button class="go">조회</button></span></div>
+      </div>
+      <div class="result-bar"><span class="grow">전체 기간 · 37일</span>
+        <span class="exp"><button class="del-btn">선택 삭제</button>
+        <button>복사</button><button>txt</button><button>xlsx</button></span></div>
+      <div class="daterow"><span class="dname">9월 16일 (수)</span><span class="chip-today">오늘</span>
+        <span class="exp"><button>복사</button><button>txt</button><button>xlsx</button></span></div>
+      <div class="daterow"><span class="dname">9월 15일 (화)</span>
+        <span class="exp"><button>복사</button><button>txt</button><button>xlsx</button></span></div>
+      <div class="daterow"><span class="dname">9월 14일 (월)</span>
+        <span class="exp"><button>복사</button><button>txt</button><button>xlsx</button></span></div>
+      <div class="daterow"><span class="dname">9월 13일 (일)</span>
+        <span class="exp"><button>복사</button><button>txt</button><button>xlsx</button></span></div></div></div>
+  </div>
+
+  <div class="note" style="margin-top:14px">
+    <h3>C안을 기각한 이유 — 목업으로 재보고 알았다</h3>
+    <p style="margin:0">접든 안 접든 <b>어차피 한 줄</b>이라 높이가 <b>B안과 똑같이 52px</b>이다.
+    버는 건 0px인데 날짜를 직접 넣을 때마다 <b>클릭이 한 번 더</b> 든다.
+    “접으면 더 짧아지겠지”는 만들어 재보기 전까지의 짐작이었다.</p>
+  </div>
+
+  <h2 class="sec">비교</h2>
+  <table class="cmp">
+    <tr><th>항목</th><th class="num">A안(현행)</th><th class="num">B안(추천)</th><th class="num">C안(기각)</th></tr>
+    <tr><td>기간 바 높이</td><td class="num" id="ba"></td><td class="num" id="bb"></td><td class="num" id="bc"></td></tr>
+    <tr><td>페이지 맨 위 → 첫 날짜 줄</td><td class="num" id="da"></td><td class="num" id="db"></td><td class="num" id="dc"></td></tr>
+    <tr><td>날짜를 직접 넣으려면</td><td class="num">바로 입력</td><td class="num"><span class="win">바로 입력</span></td><td class="num"><span class="lose">한 번 펼쳐야 함</span></td></tr>
+    <tr><td>빠진 컨트롤</td><td class="num">—</td><td class="num"><span class="win">없음</span></td><td class="num"><span class="win">없음</span></td></tr>
+  </table>
+  <p style="font-size:.8rem;color:var(--muted);margin:8px 2px 0">
+    실서비스 기간 바는 <b>101px</b>인데 이 목업 A안은 88px로 나온다 — 날짜 입력칸의 OS 기본 렌더링 차이다.
+    줄어드는 폭은 실제로는 이 목업(−36px)보다 큰 <b>−49px</b>이 된다.</p>
+
+  <div class="note" style="margin-top:14px">
+    <h3>고칠 자리</h3>
+    <ul>
+      <li><code>app/history_renderer.py</code>의 <code>.period-bar</code> 마크업에서 <code>.phint</code> 두 개를 빼고
+        두 <code>.prow</code>를 하나로.</li>
+      <li><code>app/adhoc/archive_renderer.py</code>의 같은 모양 바도 같이.</li>
+      <li>조회 로직·URL 파라미터(<code>?start=&amp;end=&amp;preset=</code>)는 <b>한 줄도 안 바뀐다.</b></li>
+    </ul>
+  </div>
+
+</div>
+<script>
+
+(function () {
+  function run() {
+    var res = {};
+    ['a', 'b', 'c'].forEach(function (k) {
+      var panel = document.getElementById('p-' + k);
+      var bar = Math.round(panel.querySelector('.period-bar').getBoundingClientRect().height);
+      var screenTop = panel.querySelector('.screen').getBoundingClientRect().top;
+      var firstDate = Math.round(panel.querySelector('.daterow').getBoundingClientRect().top - screenTop);
+      res[k] = bar;
+      document.getElementById('b' + k).textContent = bar + 'px';
+      document.getElementById('d' + k).textContent = firstDate + 'px';
+      document.getElementById('m-' + k).innerHTML = (k === 'a')
+        ? '기간 바 <b>' + bar + 'px</b> · 첫 날짜 줄까지 <b>' + firstDate + 'px</b>'
+        : '기간 바 <b>' + bar + 'px</b> (<span class="win">−' + (res.a - bar) + 'px, '
+          + Math.round((res.a - bar) / res.a * 100) + '%</span>) · 첫 날짜 줄까지 <b>' + firstDate + 'px</b>';
+    });
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(run);
+  run();
+})();
+
+</script>
+</body>
+</html>

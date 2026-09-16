@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>홈 흐름도 — 정렬 시안</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .page { max-width: 960px; margin: 0 auto; padding: 28px 20px 80px; }
+  .opt { margin-bottom: 48px; }
+  .opt h1 { font-size: 1.05rem; color: #1E3A5F; margin: 0 0 4px; }
+  .opt .why { font-size: 0.82rem; color: #6B7280; margin: 0 0 12px; line-height: 1.6; }
+  .opt .why b { color: #1F2937; }
+  .card { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 17px 20px; }
+
+  /* ── 지금 구현과 같은 값 ── */
+  .fl { display: grid; grid-template-columns: minmax(0,1fr) 30px minmax(0,1fr) 30px minmax(0,1fr);
+    align-items: stretch; row-gap: 12px; }
+  .fl .gap { grid-column: 1 / -1; height: 6px; }
+  .tile { position: relative; text-decoration: none; display: flex; align-items: center; gap: 10px;
+    padding: 0 18px; min-height: 60px; border-radius: 12px; border: 1px solid transparent;
+    transition: background .12s, border-color .12s, transform .12s, box-shadow .12s; }
+  .tile .nm { display: flex; align-items: center; gap: 10px; font-size: 1.02rem; font-weight: 700; letter-spacing: -0.01em; }
+  .tile .nm .e { font-size: 1.15rem; }
+  .tile:hover { transform: translateY(-1px); z-index: 5; box-shadow: 0 4px 12px rgba(30,58,95,.09); }
+  .ar { display: flex; align-items: center; justify-content: center; color: #CBD5E1; }
+  .ar svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .t-live { background: #FEF2F2; color: #DC2626; } .t-live:hover { border-color: #FECACA; }
+  .t-reg { background: #EFF6FF; color: #1E3A5F; } .t-reg.draft { color: #2563EB; } .t-reg:hover { border-color: #BFDBFE; }
+  .t-regarch { background: #fff; border-color: #E5E7EB; color: #46586F; } .t-regarch:hover { background: #F8FAFC; border-color: #BFDBFE; }
+  .t-ad { background: #E3F1EE; color: #146B5E; } .t-ad:hover { border-color: rgba(20,107,94,.24); }
+  .t-adarch { background: #fff; border-color: rgba(20,107,94,.24); color: #146B5E; } .t-adarch:hover { background: #F0F7F5; }
+  .t-lab { grid-column: 1 / -1; background: #FBF0DA; color: #8A5A14; } .t-lab:hover { border-color: rgba(138,90,20,.28); }
+  .tagset { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .tag-chip { font-size: 0.74rem; font-weight: 600; color: #8A5A14; background: rgba(255,255,255,.75);
+    border: 1px solid rgba(138,90,20,.22); border-radius: 20px; padding: 3px 10px; }
+  .gearcell { grid-column: 3 / -1; display: flex; align-items: center; justify-content: flex-end; }
+  .gearlink { font-size: 0.8rem; color: #6B7280; text-decoration: none; border: 1px solid #E5E7EB;
+    border-radius: 20px; padding: 6px 13px; }
+
+  .tip { position: absolute; top: calc(100% + 8px); left: 0; z-index: 10; width: 280px; background: #fff;
+    border: 1px solid #E5E7EB; border-radius: 10px; box-shadow: 0 10px 28px rgba(30,58,95,.15); padding: 11px 14px 12px;
+    display: flex; flex-direction: column; gap: 4px; text-align: left; opacity: 0; visibility: hidden;
+    transform: translateY(-4px); pointer-events: none; transition: opacity .12s, transform .12s, visibility 0s linear .12s; }
+  .tip::before { content: ""; position: absolute; top: -6px; left: 22px; width: 10px; height: 10px; background: #fff;
+    border-left: 1px solid #E5E7EB; border-top: 1px solid #E5E7EB; transform: rotate(45deg); }
+  .tip.r { left: auto; right: 0; } .tip.r::before { left: auto; right: 22px; }
+  .tile:hover .tip { opacity: 1; visibility: visible; transform: none; transition: opacity .12s .15s, transform .12s .15s, visibility 0s .15s; }
+  .tip b { font-size: 0.88rem; font-weight: 700; color: inherit; }
+  .tip .tb { font-size: 0.78rem; font-weight: 500; color: #6B7280; line-height: 1.6; }
+  .tip .nx { display: flex; gap: 6px; margin-top: 3px; padding-top: 7px; border-top: 1px solid #E5E7EB;
+    font-size: 0.74rem; font-weight: 600; color: #6B7280; }
+
+  /* ── B. 가운데 정렬 (한 줄) ── */
+  .mid .tile { justify-content: center; }
+  /* 말풍선도 칸 가운데 아래로 — 오른쪽 끝 맞춤(.r)이 필요 없어진다 */
+  .mid .tip, .mid .tip.r { left: 50%; right: auto; transform: translate(-50%, -4px); }
+  .mid .tile:hover .tip { transform: translate(-50%, 0); }
+  .mid .tip::before, .mid .tip.r::before { left: 50%; right: auto; margin-left: -5px; }
+  /* 라벨 칸: 이름 + 칩을 한 덩어리로 가운데에 */
+  .mid .t-lab .tagset { margin-left: 14px; justify-content: flex-start; }
+
+  /* ── C. 아이콘 위 · 이름 아래 ── */
+  .stack .tile:not(.t-lab) { flex-direction: column; justify-content: center; gap: 6px; min-height: 84px; padding: 12px; }
+  .stack .tile:not(.t-lab) .nm { flex-direction: column; gap: 5px; font-size: 0.98rem; }
+  .stack .tile:not(.t-lab) .nm .e { font-size: 1.5rem; line-height: 1; }
+  .stack .tip, .stack .tip.r { left: 50%; right: auto; transform: translate(-50%, -4px); }
+  .stack .tile:hover .tip { transform: translate(-50%, 0); }
+  .stack .tip::before, .stack .tip.r::before { left: 50%; right: auto; margin-left: -5px; }
+  .stack .t-lab { justify-content: center; }
+  .stack .t-lab .tagset { margin-left: 14px; justify-content: flex-start; }
+
+  /* ── D. 실시간을 정기 줄 맨 앞으로 (4칸 대응표) ── */
+  .card-h { display: flex; align-items: center; justify-content: space-between; margin: 0 0 13px; }
+  .card-h h2 { font-size: 0.78rem; font-weight: 700; color: #6B7280; margin: 0; }
+  .fl4 { display: grid; grid-template-columns: minmax(0,1fr) 26px minmax(0,1fr) 26px minmax(0,1fr) 26px minmax(0,1fr);
+    align-items: stretch; row-gap: 12px; }
+  .fl4 .tile { justify-content: center; padding: 0 12px; }
+  .fl4 .tip, .fl4 .tip.r { left: 50%; right: auto; transform: translate(-50%, -4px); }
+  .fl4 .tile:hover .tip { transform: translate(-50%, 0); }
+  .fl4 .tip::before, .fl4 .tip.r::before { left: 50%; right: auto; margin-left: -5px; }
+  .fl4 .span2 { grid-column: 1 / 4; }
+  .fl4 .t-lab { grid-column: 1 / -1; }
+  .fl4 .t-lab .tagset { margin-left: 14px; justify-content: flex-start; }
+  .fl4 .gap { grid-column: 1 / -1; height: 6px; }
+  /* 수시 원본 칸 — 정기의 「실시간 + 초안」 두 자리를 겸한다는 걸 칸 폭으로 말한다 */
+  .colhead { font-size: 0.72rem; font-weight: 700; color: #9CA3AF; text-align: center; padding-bottom: 2px; letter-spacing: .02em; }
+
+  .note { margin-top: 10px; font-size: 0.78rem; color: #6B7280; line-height: 1.7; }
+  .hint { display: inline-block; font-size: 0.74rem; color: #2563EB; background: #EFF6FF; border-radius: 6px; padding: 2px 8px; margin-left: 6px; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="page">
+<template id="flow">
+  <div class="fl">
+    <a class="tile t-live" href="#"><span class="nm"><span class="e">🔴</span>실시간</span>
+      <span class="tip"><b>거르지 않은 오늘 기사 전부</b><span class="tb">검색어에 걸린 오늘 기사를 시간순으로 다 보여줘요.</span><span class="nx">📌 담아두기 → 확정본 아래 「담아둔 기사」</span></span></a>
+    <span></span>
+    <span class="gearcell"><a class="gearlink" href="#">⚙ 설정</a></span>
+    <div class="gap"></div>
+    <a class="tile t-reg draft" href="#"><span class="nm"><span class="e">⛏️</span>초안</span>
+      <span class="tip"><b>11:00 회차 진행 중</b><span class="tb">마감 전까지 모이는 기사를 미리 정리하는 곳이에요.</span><span class="nx">11:00 회차 마감 → 확정본</span></span></a>
+    <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+    <a class="tile t-reg" href="#"><span class="nm"><span class="e">💎</span>확정본</span>
+      <span class="tip"><b>09:30 회차</b><span class="tb">마감된 회차의 보고서예요. 여기서 발송해요.</span><span class="nx">다음 회차 마감 → 정기 보관함</span></span></a>
+    <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+    <a class="tile t-regarch" href="#"><span class="nm"><span class="e">🗄️</span>정기 보관함</span>
+      <span class="tip r"><b>지난 회차 모아보기</b><span class="tb">날짜 › 회차별로 1년 동안 쌓여요.</span></span></a>
+    <a class="tile t-ad" href="#"><span class="nm"><span class="e">🔎</span>수집 원본</span>
+      <span class="tip"><b>인사청문회</b><span class="tb">09:06~10:15 · 이형일, 재정경제부<br>누르면 이 카드가 열려요.</span><span class="nx">골라 보내기 → 수집 확정본</span></span></a>
+    <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+    <a class="tile t-ad" href="#"><span class="nm"><span class="e">🗂️</span>수집 확정본</span>
+      <span class="tip"><b>오늘 만든 수집 확정본이 없어요</b><span class="tb">원본에서 골라 담아 보고서로 묶는 곳이에요. 누르면 새로 만들어요.</span><span class="nx">자정 → 수시 보관함</span></span></a>
+    <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+    <a class="tile t-adarch" href="#"><span class="nm"><span class="e">📚</span>수시 보관함</span>
+      <span class="tip r"><b>지난 수시 모니터링 모아보기</b><span class="tb">사안 › 날짜별로 1년 동안 쌓여요.</span></span></a>
+    <div class="gap"></div>
+    <a class="tile t-lab" href="#"><span class="nm"><span class="e">🏷️</span>라벨 보관함</span>
+      <span class="tagset"><span class="tag-chip">사진 아님</span><span class="tag-chip">비상경제본부회의</span><span class="tag-chip">테스트</span></span>
+      <span class="tip"><b>라벨 붙인 기사 모아보기</b><span class="tb">정기·수시를 가리지 않고 모여요. 원래 회차가 지워져도 남아요.</span></span></a>
+  </div>
+</template>
+
+<section class="opt">
+  <h1>A. 지금 (왼쪽 정렬)</h1>
+  <p class="why">칸 폭이 241px인데 이름은 80~120px라 <b>오른쪽 절반이 비어</b> 글자가 왼쪽으로 쏠려 보여요.</p>
+  <div class="card" data-flow></div>
+</section>
+
+<section class="opt">
+  <h1>B. 가운데 정렬 <span class="hint">칸 위에 마우스를 올려보세요</span></h1>
+  <p class="why">높이·구조는 그대로 두고 칸 안의 아이콘+이름만 가운데로. <b>말풍선도 칸 가운데 아래</b>로 떠요.
+    라벨 칸은 이름과 칩을 한 덩어리로 묶어 가운데에 둬요.</p>
+  <div class="card mid" data-flow></div>
+</section>
+
+<section class="opt">
+  <h1>C. 아이콘 위 · 이름 아래 <span class="hint">칸 위에 마우스를 올려보세요</span></h1>
+  <p class="why">앱 아이콘처럼 세로로 쌓아 가운데 정렬. 가장 "타일" 느낌이지만 <b>칸 높이가 60 → 84px</b>로 커져 카드가 약 50px 길어져요.</p>
+  <div class="card stack" data-flow></div>
+</section>
+
+<template id="flow4">
+    <a class="tile t-live" href="#"><span class="nm"><span class="e">🔴</span>실시간</span>
+      <span class="tip"><b>거르지 않은 오늘 기사 전부</b><span class="tb">검색어에 걸린 오늘 기사를 시간순으로 다 보여줘요.</span><span class="nx">📌 담아두기 → 초안·확정본</span></span></a>
+    <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+    <a class="tile t-reg draft" href="#"><span class="nm"><span class="e">⛏️</span>초안</span>
+      <span class="tip"><b>11:00 회차 진행 중</b><span class="tb">마감 전까지 모이는 기사를 미리 정리하는 곳이에요.</span><span class="nx">11:00 회차 마감 → 확정본</span></span></a>
+    <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+    <a class="tile t-reg" href="#"><span class="nm"><span class="e">💎</span>확정본</span>
+      <span class="tip"><b>09:30 회차</b><span class="tb">마감된 회차의 보고서예요. 여기서 발송해요.</span><span class="nx">다음 회차 마감 → 정기 보관함</span></span></a>
+    <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+    <a class="tile t-regarch" href="#"><span class="nm"><span class="e">🗄️</span>정기 보관함</span>
+      <span class="tip"><b>지난 회차 모아보기</b><span class="tb">날짜 › 회차별로 1년 동안 쌓여요.</span></span></a>
+
+    <a class="tile t-ad span2" href="#"><span class="nm"><span class="e">🔎</span>수집 원본</span>
+      <span class="tip"><b>인사청문회</b><span class="tb">09:06~10:15 · 이형일, 재정경제부<br>누르면 이 카드가 열려요.</span><span class="nx">골라 보내기 → 수집 확정본</span></span></a>
+    <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+    <a class="tile t-ad" href="#"><span class="nm"><span class="e">🗂️</span>수집 확정본</span>
+      <span class="tip"><b>오늘 만든 수집 확정본이 없어요</b><span class="tb">원본에서 골라 담아 보고서로 묶는 곳이에요. 누르면 새로 만들어요.</span><span class="nx">자정 → 수시 보관함</span></span></a>
+    <span class="ar"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+    <a class="tile t-adarch" href="#"><span class="nm"><span class="e">📚</span>수시 보관함</span>
+      <span class="tip"><b>지난 수시 모니터링 모아보기</b><span class="tb">사안 › 날짜별로 1년 동안 쌓여요.</span></span></a>
+
+    <div class="gap"></div>
+    <a class="tile t-lab" href="#"><span class="nm"><span class="e">🏷️</span>라벨 보관함</span>
+      <span class="tagset"><span class="tag-chip">사진 아님</span><span class="tag-chip">비상경제본부회의</span><span class="tag-chip">테스트</span></span>
+      <span class="tip"><b>라벨 붙인 기사 모아보기</b><span class="tb">정기·수시를 가리지 않고 모여요. 원래 회차가 지워져도 남아요.</span></span></a>
+</template>
+
+<section class="opt">
+  <h1>D. 실시간을 정기 줄 맨 앞으로 <span class="hint">칸 위에 마우스를 올려보세요</span></h1>
+  <p class="why">정기는 <b>실시간 → 초안 → 확정본 → 정기 보관함</b> 네 칸, 수시는 <b>수집 원본이 두 칸 폭</b>을 차지해요 —
+    수시엔 실시간 화면이 따로 없고 원본이 그 자리와 초안 자리를 겸하기 때문이에요(CLAUDE.md의 정기↔수시 대응표 그대로).
+    실시간이 한 줄을 통째로 쓰지 않으니 설정은 다른 카드처럼 제목 줄 오른쪽으로 옮겼어요.</p>
+  <div class="card">
+    <div class="card-h"><h2>화면 바로 가기</h2><a class="gearlink" href="#">⚙ 설정</a></div>
+    <div class="fl4" data-flow4></div>
+  </div>
+</section>
+
+<section class="opt">
+  <h1>E. D + 단계 이름(열 머리) <span class="hint">칸 위에 마우스를 올려보세요</span></h1>
+  <p class="why">"정기·수시"라는 가로 범주에 더해 <b>세로로 "무슨 단계인가"</b>를 한 줄 얹어요. 두 흐름에서 같은 열이 같은 일을 한다는 게
+    바로 읽혀요. 대신 글자 네 개가 다시 생겨요.</p>
+  <div class="card">
+    <div class="card-h"><h2>화면 바로 가기</h2><a class="gearlink" href="#">⚙ 설정</a></div>
+    <div class="fl4" data-flow4 data-head></div>
+  </div>
+</section>
+</div>
+<script>
+  var tpl = document.getElementById('flow').innerHTML;
+  document.querySelectorAll('[data-flow]').forEach(function (el) { el.innerHTML = tpl; });
+  var tpl4 = document.getElementById('flow4').innerHTML;
+  var head = ['모이는 대로', '', '정리', '', '보고서', '', '보관'].map(function (t) {
+    return '<div class="colhead">' + t + '</div>'; }).join('');
+  document.querySelectorAll('[data-flow4]').forEach(function (el) {
+    el.innerHTML = (el.hasAttribute('data-head') ? head : '') + tpl4; });
+</script>
+</body>
+</html>

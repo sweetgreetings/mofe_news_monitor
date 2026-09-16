@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>오늘만 회차 나누기 — 시안</title>
+<style>
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; font-size: 14px; }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1.doc { color: #1E3A5F; font-size: 1.35rem; margin: 0 0 6px; }
+  .lead { color: #6B7280; margin: 0 0 18px; line-height: 1.6; }
+  h2.opt { color: #1E3A5F; font-size: 1.05rem; margin: 34px 0 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .rec { background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; border-radius: 12px; padding: 2px 10px; font-size: 0.75rem; font-weight: 700; }
+  .opt-sub { color: #6B7280; margin: 0 0 12px; font-size: 0.86rem; line-height: 1.6; }
+  .pc { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-top: 10px; font-size: 0.83rem; line-height: 1.6; }
+  .pc div { border-radius: 9px; padding: 9px 12px; }
+  .pc .pro { background: #FFFFFF; border: 1px solid #E5E7EB; }
+  .pc .con { background: #FFFFFF; border: 1px solid #E5E7EB; }
+  .pc b { display: block; color: #1E3A5F; font-size: 0.8rem; margin-bottom: 2px; }
+  .pc ul { margin: 0; padding-left: 18px; }
+  @media (max-width: 640px) { .pc { grid-template-columns: minmax(0, 1fr); } }
+
+  /* 시안 속 지금 시각 */
+  .clock { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: 10px; padding: 10px 14px; font-size: 0.85rem; color: #6B7280; position: sticky; top: 8px; z-index: 30;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+  .clock b { color: #1E3A5F; }
+  .seg { display: inline-flex; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; background: #FFFFFF; }
+  .seg button { border: none; background: #FFFFFF; color: #6B7280; font: inherit; font-size: 0.82rem; padding: 6px 14px;
+    cursor: pointer; border-right: 1px solid #E5E7EB; font-variant-numeric: tabular-nums; }
+  .seg button:last-child { border-right: none; }
+  .seg button.on { background: #2563EB; color: #FFFFFF; font-weight: 600; }
+  .clock .reset { margin-left: auto; border: 1px solid #E5E7EB; background: #FFFFFF; color: #6B7280; border-radius: 6px;
+    padding: 5px 12px; font: inherit; font-size: 0.8rem; cursor: pointer; }
+  .clock .reset:hover { background: #EFF6FF; color: #2563EB; }
+
+  /* 미니 화면 틀 */
+  .screen { border: 1px solid #D1D5DB; border-radius: 12px; overflow: hidden; background: #F8FAFC; position: relative; }
+  .s-top { background: #FFFFFF; border-bottom: 1px solid #E5E7EB; padding: 9px 16px; display: flex; justify-content: space-between; }
+  .s-top span { color: #2563EB; font-weight: 600; font-size: 0.85rem; }
+  .s-body { padding: 16px 18px 56px; }
+  .s-body.short { padding-bottom: 18px; }
+  #a-screen .s-body { min-height: 400px; }
+
+  /* 초안 머리줄 */
+  .d-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .d-head h3 { color: #1E3A5F; font-size: 1.05rem; margin: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+  .d-head .slotlab { font-weight: 600; }
+  .cnt { font-size: 0.78rem; background: #EFF6FF; color: #2563EB; border-radius: 10px; padding: 2px 9px; font-weight: 600; }
+  .split-btn { margin-left: auto; border: 1px solid #BFDBFE; background: #FFFFFF; color: #2563EB; border-radius: 7px;
+    padding: 5px 11px; font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: inline-flex; gap: 5px; align-items: center; }
+  .split-btn:hover { background: #EFF6FF; }
+  /* "오늘만"은 수집 시간 화면의 "오늘 적용 중" 배지와 같은 계열(오늘에만 해당하는 상태) */
+  .today-chip { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; background: #FEF3C7; color: #B45309;
+    border: 1px solid #FDE68A; border-radius: 12px; padding: 3px 4px 3px 10px; font-size: 0.76rem; font-weight: 700; }
+  .today-chip button { border: none; background: #FFFFFF; color: #92400E; border-radius: 10px; padding: 1px 9px; font: inherit;
+    font-size: 0.74rem; font-weight: 600; cursor: pointer; }
+  .today-chip button:hover { background: #FFFBEB; }
+  .acts { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0 14px; }
+  .acts span { border: 1px solid #E5E7EB; background: #FFFFFF; color: #6B7280; border-radius: 6px; padding: 4px 10px; font-size: 0.76rem; }
+  .acts span.ai { background: #F0EAFB; color: #4A3F8F; border-color: #DCD0F2; }
+  .done-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #EFF6FF; border: 1px solid #BFDBFE;
+    color: #1E3A5F; border-radius: 9px; padding: 9px 12px; font-size: 0.84rem; margin: 12px 0 0; }
+  .done-line a { margin-left: auto; color: #2563EB; font-weight: 600; text-decoration: none; }
+  .sub-h { color: #1E3A5F; font-weight: 700; font-size: 0.9rem; margin: 14px 0 6px; }
+  .art { background: #FFFFFF; border-radius: 8px; padding: 7px 10px; margin-bottom: 6px; font-size: 0.86rem; display: flex; gap: 8px; }
+  .art .o { color: #6B7280; font-size: 0.86em; font-weight: 500; }
+  .art .t { color: #9CA3AF; font-size: 0.76rem; margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .countdown { position: absolute; right: 16px; bottom: 14px; font-size: 0.76rem; font-weight: 700; color: #6B7280; font-variant-numeric: tabular-nums; }
+
+  /* 나누기 팝오버 */
+  .pop { position: absolute; right: 16px; top: 88px; width: 360px; max-width: calc(100% - 32px); background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,0.16); padding: 14px 16px; z-index: 5; }
+  .pop h4 { margin: 0 0 2px; color: #1E3A5F; font-size: 0.95rem; }
+  .pop .q { color: #6B7280; font-size: 0.8rem; margin: 0 0 10px; }
+  .tchips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tchip { border: 1px solid #E5E7EB; background: #FFFFFF; border-radius: 8px; padding: 5px 10px; cursor: pointer; font: inherit;
+    font-size: 0.84rem; color: #1F2937; font-variant-numeric: tabular-nums; display: flex; flex-direction: column; align-items: center; line-height: 1.25; }
+  .tchip small { font-size: 0.68rem; color: #9CA3AF; }
+  .tchip:hover { border-color: #2563EB; }
+  .tchip.on { border-color: #2563EB; background: #2563EB; color: #FFFFFF; }
+  .tchip.on small { color: #DBEAFE; }
+  .preview { margin-top: 12px; border-top: 1px solid #F1F5F9; padding-top: 10px; }
+  .prow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: baseline; font-size: 0.82rem; padding: 4px 0; }
+  .prow .l { font-variant-numeric: tabular-nums; }
+  .prow .l b { color: #1E3A5F; }
+  .prow .r { color: #2563EB; font-weight: 600; font-size: 0.78rem; white-space: nowrap; }
+  .prow .r.stay { color: #6B7280; font-weight: 500; }
+  .pnote { font-size: 0.76rem; color: #6B7280; margin: 8px 0 0; line-height: 1.55; }
+  .pnote.warn { color: #92400E; }
+  .pfoot { display: flex; justify-content: flex-end; gap: 6px; margin-top: 12px; }
+  .btn { font: inherit; font-size: 0.82rem; padding: 6px 13px; border-radius: 7px; cursor: pointer; border: 1px solid #2563EB;
+    background: #2563EB; color: #FFFFFF; font-weight: 600; }
+  .btn.mute { background: #FFFFFF; color: #6B7280; border-color: #E5E7EB; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* B안 — 수집 시간 화면 */
+  .gblock { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 12px 14px; }
+  .ghead { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .tog { width: 34px; height: 18px; border-radius: 9px; background: #2563EB; position: relative; flex: none; }
+  .tog::after { content: ""; position: absolute; right: 2px; top: 2px; width: 14px; height: 14px; background: #FFFFFF; border-radius: 50%; }
+  .gname { font-weight: 700; color: #1E3A5F; }
+  .active-badge { background: #FEF3C7; color: #B45309; border-radius: 10px; padding: 1px 8px; font-size: 0.72rem; font-weight: 700; }
+  .trow { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 0.85rem; font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+  .trow .tm { border: 1px solid #E5E7EB; border-radius: 6px; padding: 3px 9px; background: #F9FAFB; }
+  .trow .del { color: #9CA3AF; font-size: 0.75rem; }
+  .trow .cut { color: #2563EB; font-size: 0.78rem; font-weight: 600; margin-left: 4px; cursor: default; }
+  .trow.extra { border: 1px dashed #FDE68A; background: #FFFBEB; border-radius: 8px; padding: 4px 8px; margin: 2px -8px; }
+  .trow.extra .tm { background: #FFFFFF; }
+  .trow.extra .today-chip { margin-left: 0; padding: 1px 8px; }
+  .bgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+  .bcap { font-size: 0.76rem; color: #6B7280; margin: 0 0 5px; font-weight: 600; }
+  @media (max-width: 640px) { .bgrid { grid-template-columns: minmax(0, 1fr); } }
+
+  /* C안 — 카운트다운 */
+  .cd-click { position: absolute; right: 16px; bottom: 14px; font-size: 0.76rem; font-weight: 700; color: #6B7280;
+    border-bottom: 1px dashed #9CA3AF; cursor: pointer; font-variant-numeric: tabular-nums; }
+  .cd-hint { position: absolute; right: 16px; bottom: 38px; background: #1F2937; color: #FFFFFF; font-size: 0.72rem; border-radius: 6px; padding: 4px 8px; }
+
+  /* 비교표 */
+  .tbl-wrap { overflow-x: auto; }
+  table.cmp { width: 100%; border-collapse: collapse; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; overflow: hidden; font-size: 0.84rem; }
+  table.cmp th, table.cmp td { text-align: left; padding: 9px 12px; border-bottom: 1px solid #F1F5F9; vertical-align: top; line-height: 1.5; }
+  table.cmp th { background: #F8FAFC; color: #1E3A5F; font-size: 0.8rem; }
+  table.cmp td:first-child { color: #1E3A5F; font-weight: 600; white-space: nowrap; }
+  .no { color: #DC2626; }
+  .yes { color: #2563EB; font-weight: 600; }
+  .q-list { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 12px 16px 12px 34px; margin: 0; line-height: 1.7; font-size: 0.87rem; }
+  .q-list li + li { margin-top: 6px; }
+  .q-list .mine { color: #6B7280; font-size: 0.8rem; }
+  details.impl { margin-top: 16px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 10px 14px; font-size: 0.82rem; line-height: 1.65; color: #4B5563; }
+  details.impl summary { cursor: pointer; color: #1E3A5F; font-weight: 600; }
+  code { background: #F1F5F9; border-radius: 4px; padding: 0 4px; font-size: 0.92em; }
+</style>
+</head><body>
+<div class="wrap">
+  <h1 class="doc">오늘만 회차 나누기 — 시안</h1>
+  <p class="lead">기사가 몰리는 날 <b>진행 중인 회차 하나를 오늘만 둘로 나눕니다.</b> 예를 들어 14시~17시 회차를 16시에서 끊으면 16시 확정본이 하나 더 생기고, 자정이 지나면 원래 수집 시간대로 돌아갑니다.
+    수집 시간 설정은 한 글자도 안 바뀝니다.</p>
+
+  <div class="clock">
+    시안 속 지금 시각
+    <div class="seg" id="clock-seg">
+      <button type="button" class="on" data-now="16:35">16:35</button>
+      <button type="button" data-now="16:15">16:15</button>
+      <button type="button" data-now="15:10">15:10</button>
+    </div>
+    <span id="clock-note">16시가 이미 지난 경우</span>
+    <button type="button" class="reset" onclick="resetAll()">처음부터 다시</button>
+  </div>
+
+  <!-- ───────── A안 ───────── -->
+  <h2 class="opt">A안 · 초안 머리줄에서 나누기 <span class="rec">추천</span></h2>
+  <p class="opt-sub">"오늘 기사가 많다"는 걸 알아채는 곳이 초안이라, 나누는 곳도 거기에 둡니다. 끊을 시각을 고르면 앞·뒤로 몇 건씩 갈리는지 누르기 전에 보여줍니다. 아래 화면에서 직접 눌러보세요.</p>
+
+  <div class="screen" id="a-screen">
+    <div class="s-top"><span>홈</span><span>실시간 · 확정본</span></div>
+    <div class="s-body">
+      <div class="d-head">
+        <h3>
+          <svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h6"/><path d="M14 2v6h6v3"/><path d="M20.5 13.5a1.6 1.6 0 0 1 2.2 2.2L18 20.5l-3 .8.8-3Z"/></svg>
+          초안 <span class="slotlab" id="a-slotlab"></span>
+          <span class="cnt" id="a-cnt"></span>
+        </h3>
+        <span id="a-head-right"></span>
+      </div>
+      <div id="a-done"></div>
+      <div class="acts"><span>복사</span><span>txt</span><span class="ai">AI 모든 기사 재분류</span><span>소제목별 ▾</span></div>
+      <div class="sub-h">&lt;공공기관 2차 이전 추진&gt;</div>
+      <div class="art"><span class="o">연합뉴스</span> 공공기관 2차 이전 로드맵, 연내 발표 가닥<span class="t">16:21 게시</span></div>
+      <div class="art"><span class="o">한국경제</span> 이전 대상 기관 노조 "졸속 추진" 반발<span class="t">15:48 게시</span></div>
+      <div class="sub-h">&lt;2027년 예산안 당정협의&gt;</div>
+      <div class="art"><span class="o">뉴시스</span> 당정, 내년 예산 총지출 증가율 4%대 공감<span class="t">15:02 게시</span></div>
+      <div class="pop" id="a-pop" hidden></div>
+    </div>
+    <span class="countdown" id="a-countdown"></span>
+  </div>
+
+  <div class="pc">
+    <div class="pro"><b>좋은 점</b><ul>
+      <li>필요를 느끼는 화면에서 바로 나눌 수 있어요.</li>
+      <li>기사가 몇 건씩 갈리는지 미리 보여줄 수 있어요(초안이 기사를 이미 들고 있어서요).</li>
+      <li>앞 시각으로 나눈 뒤엔 머리줄 칩 하나가 상태와 취소를 함께 맡아요.</li></ul></div>
+    <div class="con"><b>아쉬운 점</b><ul>
+      <li>머리줄에 버튼이 하나 늘어요(평소엔 안 쓰는 버튼).</li>
+      <li>나중 회차(예: 19시 30분)는 그 회차가 초안이 됐을 때만 나눌 수 있어요.</li></ul></div>
+  </div>
+
+  <!-- ───────── B안 ───────── -->
+  <h2 class="opt">B안 · 수집 시간 설정에서 나누기</h2>
+  <p class="opt-sub">시간대를 원래 다루는 화면이라 자리는 자연스럽습니다. 오늘 적용 중인 그룹의 줄마다 <b>✂ 오늘만 나누기</b>가 붙고, 나눈 줄은 점선 상자로 보여요.</p>
+  <div class="bgrid">
+    <div>
+      <p class="bcap">나누기 전</p>
+      <div class="gblock">
+        <div class="ghead"><span class="tog"></span><span class="gname">주중</span><span class="active-badge">오늘 적용 중</span></div>
+        <div class="trow"><span class="tm">11:00</span>~<span class="tm">14:00</span><span class="del">del</span></div>
+        <div class="trow"><span class="tm">14:00</span>~<span class="tm">17:00</span><span class="del">del</span><span class="cut">✂ 오늘만 나누기</span></div>
+        <div class="trow"><span class="tm">17:00</span>~<span class="tm">19:30</span><span class="del">del</span></div>
+      </div>
+    </div>
+    <div>
+      <p class="bcap">16시로 나눈 뒤</p>
+      <div class="gblock">
+        <div class="ghead"><span class="tog"></span><span class="gname">주중</span><span class="active-badge">오늘 적용 중</span></div>
+        <div class="trow"><span class="tm">11:00</span>~<span class="tm">14:00</span><span class="del">del</span></div>
+        <div class="trow extra"><span class="tm">14:00</span>~<span class="tm">16:00</span><span class="today-chip">오늘만</span></div>
+        <div class="trow extra"><span class="tm">16:00</span>~<span class="tm">17:00</span><span class="today-chip">오늘만</span></div>
+        <div class="trow"><span class="tm">17:00</span>~<span class="tm">19:30</span><span class="del">del</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="pc">
+    <div class="pro"><b>좋은 점</b><ul>
+      <li>시간대를 다루는 곳이 한 곳으로 모여요.</li>
+      <li>나중 회차도 미리 나눠 둘 수 있어요.</li></ul></div>
+    <div class="con"><b>아쉬운 점</b><ul>
+      <li>초안에서 "많다" → 홈 → 설정 → 수집 시간으로 세 번 건너가야 해요.</li>
+      <li>이 화면은 기사를 모르니 "몇 건씩 갈리는지"를 못 보여줘요.</li>
+      <li>저장 버튼이 있는 폼 안에 즉시 실행되는 동작이 섞여요.</li></ul></div>
+  </div>
+
+  <!-- ───────── C안 ───────── -->
+  <h2 class="opt">C안 · 카운트다운을 눌러 나누기</h2>
+  <p class="opt-sub">오른쪽 아래 "수집 종료시간까지 … 남음"이 곧 회차의 끝이라, 그걸 누르면 A안과 같은 팝오버가 뜨게 합니다.</p>
+  <div class="screen">
+    <div class="s-top"><span>홈</span><span>실시간 · 확정본</span></div>
+    <div class="s-body short" style="min-height:70px;">
+      <div class="d-head"><h3>초안 <span class="slotlab">(17시 예정 · 지금 16시 35분 기준)</span> <span class="cnt">전체 64건</span></h3></div>
+    </div>
+    <span class="cd-hint">눌러서 회차 나누기</span>
+    <span class="cd-click">⏱ 수집 종료시간까지 00:24:59 남음</span>
+  </div>
+  <div class="pc">
+    <div class="pro"><b>좋은 점</b><ul><li>머리줄에 아무것도 안 늘어요.</li><li>"회차의 끝"을 가리키는 글자라 뜻은 맞아요.</li></ul></div>
+    <div class="con"><b>아쉬운 점</b><ul><li>지금껏 누르는 곳이 아니었던 글자라, 알려주지 않으면 아무도 못 찾아요.</li><li>작은 회색 글자라 누르기 쉽지 않아요.</li></ul></div>
+  </div>
+
+  <!-- ───────── 비교 ───────── -->
+  <h2 class="opt">설정을 손으로 고치는 것과 뭐가 다른가</h2>
+  <p class="opt-sub">오늘 16시 35분에 수집 시간을 직접 나눴을 때와 비교했어요. 코드에서 확인한 내용입니다.</p>
+  <div class="tbl-wrap"><table class="cmp">
+    <tr><th></th><th>설정 직접 수정(지금)</th><th>오늘만 나누기(이 시안)</th></tr>
+    <tr><td>내일</td><td class="no">직접 되돌려야 해요 — 안 그러면 매일 16시 회차가 생겨요</td><td class="yes">자정에 저절로 원래대로</td></tr>
+    <tr><td>소제목 이름표 · ▲▼ 순서</td><td class="no">17시 회차에 묶여 있어 16시 확정본엔 안 따라와요</td><td class="yes">나뉜 두 회차에 모두 이어져요</td></tr>
+    <tr><td>AI 소제목 이름</td><td class="no">16시 확정본에서 AI가 처음부터 다시 지어요 — 초안의 분류가 "17시 회차" 이름으로 저장돼 있어 못 찾아요</td><td class="yes">나누는 순간 새 회차 이름으로 복사해 그대로 이어요</td></tr>
+    <tr><td>AI 소제목으로 옮긴 기사</td><td class="no">이름이 새로 지어지면 풀려서 제자리로 돌아가요(직접 만든 소제목으로 옮긴 건 남아요)</td><td class="yes">따라와요</td></tr>
+    <tr><td>숨김 · 직접 만든 소제목</td><td>따라와요</td><td>따라와요</td></tr>
+    <tr><td>기사 빠짐 · 겹침</td><td colspan="2">둘 다 없어요 — 앞 회차를 60분 거슬러 다시 훑고, 이미 실린 기사는 URL로 빼는 장치가 이미 있어요</td></tr>
+    <tr><td>정기 보관함</td><td colspan="2">16:00 기준 회차가 평범하게 한 줄 더 남아요(따로 표시 안 해요)</td></tr>
+  </table></div>
+
+  <h2 class="opt">정해 주실 것</h2>
+  <ol class="q-list">
+    <li><b>들어가는 자리</b> — A · B · C 중에서요. <span class="mine">(제 추천: A. 수집 시간 화면에는 B의 점선 줄을 <b>보여주기만</b> 해서 오늘 시간대가 거짓말을 안 하게 두고, 취소는 초안 칩 한 곳에만)</span></li>
+    <li><b>키워드 작성 메모</b>를 나뉜 두 회차에 복사할까요? 메모는 회차별로 저장돼서, 그냥 두면 16시 확정본의 메모 칸이 비어요. <span class="mine">(제 추천: 둘 다 복사 — 원래 한 회차에 쓴 메모라서요. 회차 사이에 메모를 끌고 가지 않는다는 원칙과는 다른 경우로 봤어요)</span></li>
+    <li><b>한 회차를 여러 번</b> 나눌 수 있게 할까요? (16시에 나눈 뒤 16시 30분에 또) <span class="mine">(제 추천: 허용 — A안 화면에서도 나눈 뒤 버튼이 남아 있어요)</span></li>
+  </ol>
+
+  <details class="impl"><summary>구현할 때 지켜야 할 것 (메모)</summary>
+    <ul>
+      <li>"오늘만" 경계는 <code>data/today_slot_splits.json</code>(<code>{date, ends: [...]}</code>, 자정 초기화)에 두고, 스케줄을 읽는 곳(<code>_resolve_schedule_times</code>)이 오늘의 시간창에 끼워 넣는다. <code>settings.json</code>은 안 건드린다.</li>
+      <li>시간표는 전부 <code>app.settings.active_schedule_times()</code> 한 곳을 거친다(스케줄러·초안·확정본 수집 창·실시간·홈·정기 보관함). 경계는 <b>여기 한 곳에만</b> 끼운다 — 두 곳에서 따로 끼우면 스케줄러와 초안이 서로 다른 회차를 보게 된다.</li>
+      <li>나눌 때 원래 회차(<code>(오늘, 17:00)</code>) 이름으로 저장된 것 일곱 가지를 새 회차 이름으로 <b>복사</b>한다(옮기지 않고 복사 — 두 회차 모두 쓰기 때문): ① AI 분류 캐시(<code>_find_reusable</code>/<code>_find_partial</code>이 회차가 같아야만 재사용한다 — 빠지면 확정본이 AI를 새로 부른다) ② 이름표 <code>group_labels</code> ③ 소제목 순서 <code>group_order</code> ④ 키워드 메모(<code>날짜|HH:MM</code>) ⑤ 자동 분류 1회 기록 <code>auto_classify_turns</code> ⑥ 초안 기억 <code>draft_seen</code> ⑦ AI 재분류 실패 횟수(메모리). 복사 목록은 한 함수에 모으고, 회차 이름으로 저장하는 새 저장소가 생기면 여기에 넣는다.</li>
+      <li>되돌리기(↩)는 나누기 이전 단계로 못 건너가게 막는다 — 되돌리기는 파일을 통째로 복원하므로, 나누기 전 기록을 복원하면 방금 복사한 새 회차 몫이 지워진다.</li>
+      <li>나누기를 누른 탭은 새로고침한다. 다른 탭에 열어둔 옛 초안은 마감 시각이 옛 값으로 박혀 있으니, 초안이 마감 시각을 가끔 서버에 물어 바뀌었으면 기존 "회차 마감" 띠를 띄운다.</li>
+      <li>그날 수집 시간 설정을 고쳐 경계가 어느 시간대 안에도 안 들어가게 되면(그 칸을 지움 등) 그 경계는 무시한다.</li>
+      <li>지난 시각으로 나누면 다음 tick에 보충 수집으로 곧바로 도므로 새 실행 경로가 필요 없다. 생긴 확정본은 오늘 회차라 지울 수 없으니 확인창이 "되돌릴 수 없어요"를 말한다.</li>
+      <li>앞 시각으로 나눈 경우만 그 시각 전까지 취소할 수 있다. 취소하면 복사해 둔 새 회차 쪽 기록을 지운다.</li>
+      <li>자동 발송은 원래 설정을 그대로 따른다(지금은 꺼져 있음). 하루 마지막 회차 30분 지연은 마지막 칸에만 계속 걸린다.</li>
+      <li>예전에 없앤 "지금 마감하기"(2026-08-11)와 다른 점: 그건 열려 있는 시간창을 중간에 닫았고, 이건 경계를 하나 더 두는 것이라 위의 60분 되돌아보기가 그대로 적용된다.</li>
+    </ul>
+  </details>
+</div>
+
+<script>
+// 반 시간 단위 기사 수(시안용 가짜 값). 키 = 그 30분 칸의 시작 시각.
+var BINS = {
+  "16:35": {"14:00": 9, "14:30": 11, "15:00": 8, "15:30": 13, "16:00": 14, "16:30": 9},
+  "16:15": {"14:00": 9, "14:30": 11, "15:00": 8, "15:30": 13, "16:00": 8},
+  "15:10": {"14:00": 9, "14:30": 11, "15:00": 3}
+};
+var CLOCK_NOTES = {
+  "16:35": "16시가 이미 지난 경우",
+  "16:15": "지금은 16시 15분인데 16시 30분에 끊고 싶은 경우",
+  "15:10": "아직 16시 전인 경우"
+};
+var HALVES = ["14:00", "14:30", "15:00", "15:30", "16:00", "16:30"];
+var S = { now: "16:35", start: "14:00", end: "17:00", pick: null, open: false,
+          done: null, future: null };
+
+function kr(hm) {
+  var h = parseInt(hm.slice(0, 2), 10), m = parseInt(hm.slice(3), 10);
+  return m ? h + "시 " + m + "분" : h + "시";
+}
+function count(from, to) {
+  var bins = BINS[S.now], n = 0;
+  HALVES.forEach(function (k) { if (k >= from && k < to) n += (bins[k] || 0); });
+  return n;
+}
+function mins(hm) { return parseInt(hm.slice(0, 2), 10) * 60 + parseInt(hm.slice(3), 10); }
+function hms(sec) {
+  var p = function (v) { return (v < 10 ? "0" : "") + v; };
+  return p(Math.floor(sec / 3600)) + ":" + p(Math.floor(sec % 3600 / 60)) + ":" + p(sec % 60);
+}
+
+function render() {
+  var slotEnd = S.future || S.end;
+  var shownFrom = S.done || S.start;
+  document.getElementById("a-slotlab").textContent =
+    "(" + kr(slotEnd) + " 예정 · 지금 " + kr(S.now) + " 기준)";
+  document.getElementById("a-cnt").textContent = "전체 " + count(shownFrom, "24:00") + "건";
+
+  var right = document.getElementById("a-head-right");
+  if (S.future) {
+    right.outerHTML = '<span id="a-head-right" class="today-chip">✂ 오늘만 ' + kr(S.future) +
+      '에 나눔 <button type="button" onclick="cancelFuture()">취소</button></span>';
+  } else {
+    right.outerHTML = '<button id="a-head-right" type="button" class="split-btn" onclick="togglePop()">' +
+      '<svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12"/></svg> 회차 나누기</button>';
+  }
+
+  document.getElementById("a-done").innerHTML = S.done
+    ? '<div class="done-line">✂ ' + kr(S.done) + ' 회차를 확정본으로 넘겼어요 · ' + count(S.start, S.done) +
+      '건 <a href="#" onclick="return false">확정본 열기 →</a></div>'
+    : "";
+
+  document.getElementById("a-countdown").textContent =
+    "⏱ 수집 종료시간까지 " + hms((mins(slotEnd) - mins(S.now)) * 60 - 1) + " 남음";
+
+  var pop = document.getElementById("a-pop");
+  pop.hidden = !S.open;
+  if (S.open) pop.innerHTML = popHtml();
+}
+
+function popHtml() {
+  var from = S.done || S.start;
+  var chips = HALVES.concat(["17:00"]).filter(function (t) { return t > from && t < S.end; });
+  var h = '<h4>이 회차를 오늘만 둘로 나눠요</h4>' +
+    '<p class="q">' + kr(from) + ' ~ ' + kr(S.end) + ' 회차를 어디서 끊을까요?</p><div class="tchips">';
+  chips.forEach(function (t) {
+    var passed = t <= S.now;
+    h += '<button type="button" class="tchip' + (S.pick === t ? " on" : "") + '" onclick="pick(\'' + t + '\')">' +
+      t + '<small>' + (passed ? "지남" : "예정") + '</small></button>';
+  });
+  h += '</div>';
+  if (S.pick) {
+    var t = S.pick, passed = t <= S.now;
+    h += '<div class="preview">';
+    if (passed) {
+      h += row(kr(from) + ' ~ ' + kr(t), count(from, t) + '건', '지금 바로 ' + kr(t) + ' 확정본으로', false);
+      h += row(kr(t) + ' ~ ' + kr(S.end), count(t, "24:00") + '건', '초안에 남아 ' + kr(S.end) + '에 마감', true);
+      h += '<p class="pnote warn">' + kr(t) + ' 확정본은 곧바로 생기고, 생긴 뒤엔 되돌릴 수 없어요.</p>';
+    } else {
+      h += row(kr(from) + ' ~ ' + kr(t), '지금 ' + count(from, "24:00") + '건', kr(t) + '에 마감돼 확정본으로', true);
+      h += row(kr(t) + ' ~ ' + kr(S.end), '', '새 초안으로, ' + kr(S.end) + '에 마감', true);
+      h += '<p class="pnote">' + kr(t) + ' 전까지는 머리줄에서 취소할 수 있어요.</p>';
+    }
+    h += '<p class="pnote">내일은 원래 수집 시간대로 돌아가요.</p></div>';
+  }
+  h += '<div class="pfoot"><button type="button" class="btn mute" onclick="togglePop()">닫기</button>' +
+    '<button type="button" class="btn" onclick="apply()"' + (S.pick ? "" : " disabled") + '>' +
+    (S.pick ? (S.pick <= S.now ? "나누고 " + kr(S.pick) + " 확정본 만들기" : kr(S.pick) + "에 나누기") : "나누기") +
+    '</button></div>';
+  return h;
+}
+function row(label, n, dest, stay) {
+  return '<div class="prow"><span class="l"><b>' + label + '</b>' + (n ? ' · ' + n : '') + '</span>' +
+    '<span class="r' + (stay ? " stay" : "") + '">→ ' + dest + '</span></div>';
+}
+
+function togglePop() { S.open = !S.open; S.pick = null; render(); }
+function pick(t) { S.pick = t; render(); }
+function apply() {
+  if (!S.pick) return;
+  if (S.pick <= S.now) S.done = S.pick; else S.future = S.pick;
+  S.open = false; S.pick = null; render();
+}
+function cancelFuture() { S.future = null; render(); }
+function resetAll() { S.done = null; S.future = null; S.open = false; S.pick = null; render(); }
+
+document.getElementById("clock-seg").addEventListener("click", function (e) {
+  var b = e.target.closest("button"); if (!b) return;
+  document.querySelectorAll("#clock-seg button").forEach(function (x) { x.classList.toggle("on", x === b); });
+  S.now = b.dataset.now;
+  document.getElementById("clock-note").textContent = CLOCK_NOTES[S.now];
+  resetAll();
+});
+render();
+</script>
+</body></html>

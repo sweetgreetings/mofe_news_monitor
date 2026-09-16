@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>오늘의 쟁점 카드 — 시안</title>
+<style>
+  :root {
+    --bg:#F8FAFC; --card:#FFFFFF; --header:#1E3A5F; --accent:#2563EB;
+    --text:#1F2937; --muted:#6B7280; --border:#E5E7EB; --hover:#EFF6FF;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", sans-serif; }
+  .page { max-width: 700px; margin: 0 auto; padding: 28px 20px 60px; }
+  .pagetitle { font-size: 1.05rem; font-weight: 700; color: var(--header); margin: 0 0 4px; }
+  .pagedesc { font-size: 0.78rem; color: var(--muted); margin: 0 0 26px; line-height: 1.7; }
+
+  .lab { font-size: 0.72rem; font-weight: 700; color: var(--accent);
+    margin: 26px 0 7px; letter-spacing: .02em; }
+  .lab.now { color: var(--muted); }
+  .labnote { font-size: 0.73rem; color: var(--muted); margin: 0 0 8px; line-height: 1.65; }
+
+  /* ── 실제 홈 카드 CSS 그대로 ── */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 17px 20px; margin-bottom: 13px; }
+  .card h2 { font-size: 0.78rem; font-weight: 700; color: var(--muted); margin: 0 0 13px;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card h2 .sub { font-weight: 500; opacity: 0.8; }
+  .irow { border-bottom: 1px solid var(--border); padding: 10px 0; }
+  .irow:last-of-type { border-bottom: none; }
+  .rowhead { display: flex; align-items: center; gap: 9px; }
+  .rank { width: 19px; height: 19px; border-radius: 50%; background: var(--hover); color: var(--accent);
+    font-size: 0.67rem; font-weight: 700; flex-shrink: 0; display: flex; align-items: center;
+    justify-content: center; }
+  .iname { font-size: 0.9rem; font-weight: 600; color: var(--header); }
+  .chips { display: flex; gap: 4px; flex-wrap: wrap; }
+  .gchip { font-size: 0.61rem; font-weight: 600; color: var(--muted); border: 1px solid var(--border);
+    border-radius: 20px; padding: 1px 7px; white-space: nowrap; }
+  .icount { margin-left: auto; font-size: 0.87rem; font-weight: 700; flex-shrink: 0; }
+  .etcline { display: flex; align-items: center; gap: 10px; font-size: 0.77rem;
+    background: #F6F7F9; border: 1px solid var(--border); color: var(--muted); border-radius: 8px;
+    padding: 9px 14px; margin-top: 13px; flex-wrap: wrap; }
+  .etcline b { color: var(--text); }
+  .etcline .why { margin-left: auto; font-size: 0.71rem; opacity: 0.9; }
+
+  /* ── 시안에서만 쓰는 변형 ── */
+  .icount.soft { font-size: 0.78rem; font-weight: 600; color: var(--muted); }
+  .icount.pct  { font-size: 0.78rem; font-weight: 700; color: var(--muted); }
+  .bar { margin-left: auto; width: 84px; height: 5px; border-radius: 3px;
+    background: var(--border); flex-shrink: 0; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); opacity: .55; border-radius: 3px; }
+  .barwrap { margin-left: auto; display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+  .barwrap .icount { margin-left: 0; }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="pagetitle">홈 · 「오늘의 쟁점」 카드 시안</p>
+  <p class="pagedesc">
+    같은 데이터(2026-09-02 실제 화면 값)로 다섯 가지. A안이 요청한 그대로고,
+    B·C·D는 “행별 건수를 어떻게 처리할까”만 다르다. 부제와 기타 줄 처리는 A~D 모두 동일.
+  </p>
+
+  <!-- ══ 현재 ══ -->
+  <p class="lab now">현재</p>
+  <div class="card">
+    <h2>오늘의 쟁점 <span class="sub">분류된 47건 기준 · 회차마다 갱신 · 일정 기사 1건 제외</span></h2>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">1</span><span class="iname">김용범 정책실장 사퇴</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="icount">11건</span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">2</span><span class="iname">부동산 세제개편안 원상복구</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="icount">7건</span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">3</span><span class="iname">8월 물가동향 및 정부 대책</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="icount">7건</span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">4</span><span class="iname">개각 및 경제팀 인사</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="icount">6건</span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">5</span><span class="iname">경제부처 장관 후보자 인사청문</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="icount">4건</span></div></div>
+    <div class="etcline"><span>기타 <b>7건</b></span>
+      <span class="why">쟁점으로 묶이지 않은 기사</span></div>
+  </div>
+
+  <!-- ══ A ══ -->
+  <p class="lab">A안 — 요청한 그대로 (건수 없음)</p>
+  <p class="labnote">부제는 <b>분류된 47건 기준</b>만, 행별 건수 삭제, 기타 줄 삭제.</p>
+  <div class="card">
+    <h2>오늘의 쟁점 <span class="sub">분류된 47건 기준</span></h2>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">1</span><span class="iname">김용범 정책실장 사퇴</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">2</span><span class="iname">부동산 세제개편안 원상복구</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">3</span><span class="iname">8월 물가동향 및 정부 대책</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">4</span><span class="iname">개각 및 경제팀 인사</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">5</span><span class="iname">경제부처 장관 후보자 인사청문</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span></div></div>
+  </div>
+
+  <!-- ══ B ══ -->
+  <p class="lab">B안 — 백분위(%)</p>
+  <p class="labnote">
+    분류된 47건을 분모로 한 비율. 1위 23%가 “네 자리 중 하나”라는 뜻인데,
+    그 47이 화면에 남아 있어야 읽히는 숫자라 부제를 못 지운다.
+  </p>
+  <div class="card">
+    <h2>오늘의 쟁점 <span class="sub">분류된 47건 기준</span></h2>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">1</span><span class="iname">김용범 정책실장 사퇴</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="icount pct">23%</span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">2</span><span class="iname">부동산 세제개편안 원상복구</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="icount pct">15%</span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">3</span><span class="iname">8월 물가동향 및 정부 대책</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="icount pct">15%</span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">4</span><span class="iname">개각 및 경제팀 인사</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="icount pct">13%</span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">5</span><span class="iname">경제부처 장관 후보자 인사청문</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="icount pct">9%</span></div></div>
+  </div>
+
+  <!-- ══ C ══ -->
+  <p class="lab">C안 — 막대만 (숫자 없음)</p>
+  <p class="labnote">
+    1위를 꽉 찬 길이로 두고 나머지를 그 비율로. 모수를 설명할 필요가 없어 부제를
+    통째로 지워도 성립한다 — 격차만 보여주고 값은 말하지 않는다.
+  </p>
+  <div class="card">
+    <h2>오늘의 쟁점</h2>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">1</span><span class="iname">김용범 정책실장 사퇴</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="bar"><i style="width:100%"></i></span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">2</span><span class="iname">부동산 세제개편안 원상복구</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="bar"><i style="width:64%"></i></span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">3</span><span class="iname">8월 물가동향 및 정부 대책</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="bar"><i style="width:64%"></i></span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">4</span><span class="iname">개각 및 경제팀 인사</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="bar"><i style="width:55%"></i></span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">5</span><span class="iname">경제부처 장관 후보자 인사청문</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="bar"><i style="width:36%"></i></span></div></div>
+  </div>
+
+  <!-- ══ D ══ -->
+  <p class="lab">D안 — 건수를 회색으로 눕히기</p>
+  <p class="labnote">
+    값은 남기되 무게만 덜었다(굵은 검정 0.87rem → 회색 0.78rem). 상단 건수 줄을
+    2rem에서 본문 한 줄로 눕혔던 것과 같은 방식.
+  </p>
+  <div class="card">
+    <h2>오늘의 쟁점</h2>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">1</span><span class="iname">김용범 정책실장 사퇴</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="icount soft">11건</span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">2</span><span class="iname">부동산 세제개편안 원상복구</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="icount soft">7건</span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">3</span><span class="iname">8월 물가동향 및 정부 대책</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="icount soft">7건</span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">4</span><span class="iname">개각 및 경제팀 인사</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="icount soft">6건</span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">5</span><span class="iname">경제부처 장관 후보자 인사청문</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="icount soft">4건</span></div></div>
+  </div>
+
+  <!-- ══ E ══ -->
+  <p class="lab">E안 — 막대 + 건수 (C+D)</p>
+  <p class="labnote">격차는 막대가, 값은 회색 숫자가. 오른쪽이 조금 붐빈다.</p>
+  <div class="card">
+    <h2>오늘의 쟁점</h2>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">1</span><span class="iname">김용범 정책실장 사퇴</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="barwrap"><span class="bar"><i style="width:100%"></i></span>
+        <span class="icount soft">11</span></span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">2</span><span class="iname">부동산 세제개편안 원상복구</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="barwrap"><span class="bar"><i style="width:64%"></i></span>
+        <span class="icount soft">7</span></span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">3</span><span class="iname">8월 물가동향 및 정부 대책</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="barwrap"><span class="bar"><i style="width:64%"></i></span>
+        <span class="icount soft">7</span></span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">4</span><span class="iname">개각 및 경제팀 인사</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="barwrap"><span class="bar"><i style="width:55%"></i></span>
+        <span class="icount soft">6</span></span></div></div>
+    <div class="irow"><div class="rowhead">
+      <span class="rank">5</span><span class="iname">경제부처 장관 후보자 인사청문</span>
+      <span class="chips"><span class="gchip">재정경제부</span></span>
+      <span class="barwrap"><span class="bar"><i style="width:36%"></i></span>
+        <span class="icount soft">4</span></span></div></div>
+  </div>
+</div>
+</body>
+</html>

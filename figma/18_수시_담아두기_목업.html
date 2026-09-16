@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>수시 → 정기 담아두기 목업</title>
+<style>
+  :root {
+    --bg:#F8FAFC; --card:#FFFFFF; --header:#1E3A5F; --accent:#2563EB;
+    --text:#1F2937; --muted:#6B7280; --border:#E5E7EB; --hover:#EFF6FF;
+    --error:#DC2626; --divider-soft:#F1F3F5; --sep-faint:#D1D5DB;
+    --adhoc-bg:#E3F1EE; --adhoc-text:#146B5E;
+    --label-bg:#FBF0DA; --label-text:#8A5A14;
+    --pin-bg:#FFF9C4; --pin-text:#8A6D1A;
+  }
+  body {
+    margin:0; padding:22px 16px 60px; background:var(--bg); color:var(--text);
+    font-family:'Pretendard','Noto Sans KR',sans-serif;
+  }
+  .wrap { max-width:660px; margin:0 auto; display:flex; flex-direction:column; gap:16px; }
+  .panel { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:16px 18px; }
+  .panel > h2 {
+    font-size:0.86rem; font-weight:700; color:var(--header); margin:0 0 3px;
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  }
+  .panel > .why { font-size:0.74rem; color:var(--muted); margin:0 0 13px; line-height:1.6; }
+  .tally {
+    font-size:0.63rem; font-weight:700; border-radius:20px; padding:2px 8px;
+    background:var(--bg); border:1px solid var(--border); color:var(--muted);
+  }
+  .tally.good { background:var(--adhoc-bg); border-color:transparent; color:var(--adhoc-text); }
+  .tally.bad  { background:#FDECEC; border-color:transparent; color:var(--error); }
+  .verdict { font-size:0.63rem; font-weight:700; border-radius:20px; padding:2px 8px; }
+  .verdict.pick { background:var(--adhoc-bg); color:var(--adhoc-text); }
+  .verdict.no   { background:#FDECEC; color:var(--error); }
+
+  /* ── 수시 기사 행 (app/adhoc/renderer.py _render_article_row 재현) ── */
+  .article { padding:8px 9px; border-radius:8px; margin:2px 0; border-bottom:1px solid var(--divider-soft); }
+  .a-top { display:flex; align-items:flex-start; gap:8px; }
+  .bulk-chk { margin:2px 0 0; }
+  .a-title { font-size:0.93rem; line-height:1.45; }
+  .a-title .outlet { color:var(--muted); }
+  .a-bot { display:flex; align-items:center; gap:6px; margin:5px 0 0 25px; }
+  .a-time { font-size:0.78rem; color:var(--muted); }
+  .a-time-sep { color:var(--sep-faint); }
+  .origin-link { color:var(--accent); font-size:0.78rem; text-decoration:none; display:inline-flex; align-items:center; gap:3px; }
+  .a-acts { display:flex; gap:4px; align-items:center; margin-left:auto; }
+  .icon-btn {
+    border:none; background:none; color:var(--muted); cursor:pointer;
+    padding:4px; border-radius:5px; display:inline-flex; align-items:center; line-height:1;
+  }
+  .icon-btn:hover { background:var(--border); }
+  .icon-btn[disabled] { opacity:0.35; cursor:default; }
+  .sel-sm { font:inherit; font-size:0.78rem; padding:3px 8px; border:1px solid var(--border); border-radius:6px; background:#fff; color:var(--muted); }
+  .lab-btn.on { color:var(--label-text); }
+  .lab-count { font-size:0.62rem; font-weight:700; margin-left:2px; }
+  .lab-row { display:flex; align-items:center; gap:5px; flex-wrap:wrap; margin:4px 0 0 25px; }
+  .lab-row .tagmark { color:var(--label-text); display:inline-flex; }
+  .lab-chip {
+    display:inline-flex; align-items:center; gap:3px; font-size:0.66rem; font-weight:700;
+    color:var(--label-text); background:var(--label-bg); border-radius:20px; padding:2px 8px;
+  }
+  .ic { width:1em; height:1em; stroke:currentColor; fill:none; stroke-width:1.9;
+    stroke-linecap:round; stroke-linejoin:round; vertical-align:-0.15em; flex-shrink:0; }
+  .ic-lg { width:15px; height:15px; }
+
+  /* ── 📌 담아두기 (신규) — 라벨 버튼의 .on 관례를 그대로 따른다 ── */
+  .pin-btn { font-size:0.82rem; filter:grayscale(1) opacity(0.5); }
+  .pin-btn:hover { filter:none; }
+  .pin-btn.on { filter:none; background:var(--pin-bg); }
+
+  /* ── ⋯ 더보기 (C안) ── */
+  .more-wrap { position:relative; display:inline-flex; }
+  .more-menu {
+    position:absolute; top:calc(100% + 5px); right:0; z-index:3; width:150px;
+    background:#fff; border:1px solid var(--border); border-radius:8px; padding:4px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.10); text-align:left;
+  }
+  .more-menu button {
+    display:flex; align-items:center; gap:7px; width:100%; font:inherit; font-size:0.76rem;
+    color:var(--text); background:none; border:none; padding:7px 9px; border-radius:5px; cursor:pointer;
+  }
+  .more-menu button:hover { background:var(--hover); }
+  .menu-empty { font-size:0.7rem; color:var(--muted); padding:8px 9px; line-height:1.5; }
+
+  /* ── 확정본 착지 지점 미리보기 ── */
+  .manual-zone { border:1px dashed var(--border); border-radius:8px; padding:13px 16px; }
+  .manual-zone-head { display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .manual-zone-title { font-weight:600; color:var(--text); font-size:0.9rem; }
+  .manual-zone-hint { font-size:0.72rem; color:var(--muted); }
+  .from-tag {
+    font-size:0.6rem; font-weight:700; color:var(--adhoc-text); background:var(--adhoc-bg);
+    border-radius:20px; padding:2px 7px; margin-left:6px; white-space:nowrap;
+  }
+  /* ── 카드 헤더 · 메타칩 · 경고 배너 (app/adhoc/renderer.py 실제 값 재현) ── */
+  .report-head { display:flex; align-items:center; gap:2px; flex-wrap:wrap; font-size:1.1rem; font-weight:700; color:var(--header); }
+  .issue-input { font:inherit; font-size:1.02rem; font-weight:700; color:var(--header); border:none;
+    border-bottom:2px dashed var(--accent); background:var(--hover); padding:2px 8px; border-radius:4px 4px 0 0; width:150px; }
+  .meta-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:12px; font-size:0.8rem; }
+  .chip { background:var(--divider-soft); border:1px solid var(--border); border-radius:14px; padding:3px 11px; color:var(--muted); }
+  .edit-btn { font:inherit; font-size:0.76rem; padding:3px 11px; border-radius:14px; cursor:pointer;
+    border:1px dashed rgba(37,99,235,0.35); background:#fff; color:var(--accent); font-weight:600;
+    display:inline-flex; align-items:center; gap:5px; }
+  .warn { background:#FFF8E1; border:1px solid #F2D98B; color:#8A6D1A; border-radius:8px;
+    padding:9px 13px; font-size:0.8rem; margin-top:12px; line-height:1.55; }
+  /* ── [신규 제안] 이 사안의 지난 회차 ── */
+  .issue-thread {
+    display:inline-flex; align-items:center; gap:5px; margin-top:7px;
+    font-size:0.78rem; color:var(--adhoc-text); text-decoration:none; font-weight:600;
+  }
+  .issue-thread:hover { text-decoration:underline; }
+  .issue-thread .n {
+    font-size:0.66rem; font-weight:700; background:var(--adhoc-bg); color:var(--adhoc-text);
+    border-radius:20px; padding:1px 7px;
+  }
+  .btn-dis { font:inherit; font-size:0.8rem; padding:5px 11px; border-radius:8px;
+    border:1px solid var(--border); background:#fff; color:var(--muted); opacity:0.45; }
+  .note { font-size:0.73rem; color:var(--muted); line-height:1.65; margin:12px 0 0;
+    border-top:1px dashed var(--border); padding-top:11px; }
+  .note b { color:var(--header); }
+  code { font-size:0.94em; background:var(--bg); border:1px solid var(--border); border-radius:4px; padding:0 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ═══════ A안: 지금 ═══════ -->
+  <div class="panel">
+    <h2>A · 지금 <span class="tally">컨트롤 6개</span></h2>
+    <p class="why">다른 소제목 · 복사 · 라벨 · 숨기기 · 위 · 아래. 담아두기가 없어서 수시에서 찾은 기사를 정기로 넘길 방법이 아예 없다.</p>
+    <div class="article">
+      <div class="a-top">
+        <input type="checkbox" class="bulk-chk">
+        <div class="a-title"><span class="outlet">(연합뉴스)</span> 예결위, 기획처 예산안 심사 착수… 재정준칙 놓고 공방</div>
+      </div>
+      <div class="a-bot">
+        <span class="a-time">10:24</span>
+        <span class="a-time-sep">·</span>
+        <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
+        <span class="a-acts">
+          <select class="sel-sm"><option>다른 소제목</option></select>
+          <button class="icon-btn" title="복사"><svg class="ic ic-lg" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg></button>
+          <button class="icon-btn lab-btn on" title="라벨"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M20.6 13.4 12 22l-9-9V4a1 1 0 0 1 1-1h9Z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg><span class="lab-count">1</span></button>
+          <button class="icon-btn" title="숨기기"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+          <button class="icon-btn" disabled title="위로"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+          <button class="icon-btn" title="아래로"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+        </span>
+      </div>
+      <div class="lab-row">
+        <span class="tagmark"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 13.4 12 22l-9-9V4a1 1 0 0 1 1-1h9Z"/></svg></span>
+        <span class="lab-chip">예산 ×</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ B안: 📌만 추가 (추천) ═══════ -->
+  <div class="panel">
+    <h2>B · 📌 하나만 추가 <span class="tally good">컨트롤 7개</span> <span class="verdict pick">추천</span></h2>
+    <p class="why">📌는 아이콘 하나라 폭 부담이 거의 없다. 담아둔 상태는 라벨 버튼이 이미 쓰는 <code>.on</code> 관례를 그대로 따라 노랑으로 채워 표시한다 — 새 개념 0.</p>
+    <div class="article">
+      <div class="a-top">
+        <input type="checkbox" class="bulk-chk">
+        <div class="a-title"><span class="outlet">(연합뉴스)</span> 예결위, 기획처 예산안 심사 착수… 재정준칙 놓고 공방</div>
+      </div>
+      <div class="a-bot">
+        <span class="a-time">10:24</span>
+        <span class="a-time-sep">·</span>
+        <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
+        <span class="a-acts">
+          <select class="sel-sm"><option>다른 소제목</option></select>
+          <button class="icon-btn pin-btn" title="정기 확정본에 담아두기">📌</button>
+          <button class="icon-btn" title="복사"><svg class="ic ic-lg" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg></button>
+          <button class="icon-btn lab-btn on" title="라벨"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M20.6 13.4 12 22l-9-9V4a1 1 0 0 1 1-1h9Z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg><span class="lab-count">1</span></button>
+          <button class="icon-btn" title="숨기기"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+          <button class="icon-btn" disabled title="위로"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+          <button class="icon-btn" title="아래로"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+        </span>
+      </div>
+      <div class="lab-row">
+        <span class="tagmark"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 13.4 12 22l-9-9V4a1 1 0 0 1 1-1h9Z"/></svg></span>
+        <span class="lab-chip">예산 ×</span>
+      </div>
+    </div>
+
+    <p class="why" style="margin:14px 0 0">↓ 담아둔 뒤 (다시 누르면 취소 — 실시간 화면의 토글과 같은 동작)</p>
+    <div class="article">
+      <div class="a-top">
+        <input type="checkbox" class="bulk-chk">
+        <div class="a-title"><span class="outlet">(연합뉴스)</span> 예결위, 기획처 예산안 심사 착수… 재정준칙 놓고 공방</div>
+      </div>
+      <div class="a-bot">
+        <span class="a-time">10:24</span>
+        <span class="a-time-sep">·</span>
+        <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
+        <span class="a-acts">
+          <select class="sel-sm"><option>다른 소제목</option></select>
+          <button class="icon-btn pin-btn on" title="담아뒀어요 — 눌러서 취소">📌</button>
+          <button class="icon-btn" title="복사"><svg class="ic ic-lg" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg></button>
+          <button class="icon-btn lab-btn on" title="라벨"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M20.6 13.4 12 22l-9-9V4a1 1 0 0 1 1-1h9Z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg><span class="lab-count">1</span></button>
+          <button class="icon-btn" title="숨기기"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+          <button class="icon-btn" disabled title="위로"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+          <button class="icon-btn" title="아래로"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+        </span>
+      </div>
+      <div class="lab-row">
+        <span class="tagmark"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 13.4 12 22l-9-9V4a1 1 0 0 1 1-1h9Z"/></svg></span>
+        <span class="lab-chip">예산 ×</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ C안: ⋯ 더보기 도입 ═══════ -->
+  <div class="panel">
+    <h2>C · ⋯ 더보기까지 도입 <span class="tally bad">컨트롤 7개 (그대로)</span> <span class="verdict no">이득 없음</span></h2>
+    <p class="why">정기 화면은 <b>복사 · 원문 다시 불러오기 · 제목 직접 수정</b> 셋을 메뉴로 넣어서 이득이 컸다. 그런데 수시엔 뒤의 둘이 아직 없다 — 메뉴에 넣을 게 <b>복사 하나뿐</b>이라, 버튼 1개 빼고 ⋯ 1개를 더하니 총 개수가 그대로다.</p>
+    <div class="article">
+      <div class="a-top">
+        <input type="checkbox" class="bulk-chk">
+        <div class="a-title"><span class="outlet">(연합뉴스)</span> 예결위, 기획처 예산안 심사 착수… 재정준칙 놓고 공방</div>
+      </div>
+      <div class="a-bot">
+        <span class="a-time">10:24</span>
+        <span class="a-time-sep">·</span>
+        <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
+        <span class="a-acts">
+          <select class="sel-sm"><option>다른 소제목</option></select>
+          <button class="icon-btn pin-btn" title="정기 확정본에 담아두기">📌</button>
+          <button class="icon-btn lab-btn on" title="라벨"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M20.6 13.4 12 22l-9-9V4a1 1 0 0 1 1-1h9Z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg><span class="lab-count">1</span></button>
+          <button class="icon-btn" title="숨기기"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+          <button class="icon-btn" disabled title="위로"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+          <button class="icon-btn" title="아래로"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+          <span class="more-wrap">
+            <button class="icon-btn" title="더보기"><svg class="ic ic-lg" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg></button>
+            <span class="more-menu">
+              <button><svg class="ic ic-lg" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg> 복사하기</button>
+              <div class="menu-empty">…끝. 넣을 게 이거 하나뿐이다.</div>
+            </span>
+          </span>
+        </span>
+      </div>
+      <div class="lab-row" style="margin-top:52px">
+        <span class="tagmark"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 13.4 12 22l-9-9V4a1 1 0 0 1 1-1h9Z"/></svg></span>
+        <span class="lab-chip">예산 ×</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ 착지 지점 ═══════ -->
+  <div class="panel">
+    <h2>📌 누르면 어디로 가나 — 정기 확정본 맨 아래</h2>
+    <p class="why">기존 <code>manual_articles.json</code>을 그대로 쓴다. 새 저장소도, 새 구획도 안 만든다. 여기 있는 동안엔 <b>복사·txt·텔레그램·이메일에 안 나간다</b> — 실어 보내려면 소제목 드롭다운으로 한 번 더 옮겨야 한다.</p>
+    <div class="manual-zone">
+      <div class="manual-zone-head">
+        <span class="manual-zone-title">📌 담아둔 기사</span>
+        <span class="manual-zone-hint">화면에만 보여요 · 내보내기·발송에는 안 실려요 · 자정에 비워져요</span>
+      </div>
+      <div class="article" style="margin-top:10px">
+        <div class="a-top">
+          <div class="a-title"><span class="outlet">(연합뉴스)</span> 예결위, 기획처 예산안 심사 착수… 재정준칙 놓고 공방<span class="from-tag">수시 · 예결위</span></div>
+        </div>
+        <div class="a-bot" style="margin-left:0">
+          <span class="a-time">10:24</span>
+          <span class="a-time-sep">·</span>
+          <select class="sel-sm"><option>확정본에 넣기…</option></select>
+        </div>
+      </div>
+    </div>
+    <p class="note">
+      <b>출처 칩(<span class="from-tag" style="margin:0">수시 · 예결위</span>)은 새로 제안하는 것</b> — 지금 실시간에서 담아온 기사엔 출처 표시가 없다.
+      수시가 열리면 담아둔 기사가 두 곳(실시간 · 수시)에서 오게 되고, 예결위처럼 <b>재경부 소관이 아닌 사안</b>에서 온 기사는
+      확정본에 넣을지 판단할 때 어디서 왔는지가 근거가 된다. 라벨 보관함이 이미 쓰는 출처 태그(정기 / 사안명)와 같은 방식이다.
+    </p>
+  </div>
+
+
+  <!-- ═══════ [신규 제안] 이 사안의 지난 회차 ═══════ -->
+  <div class="panel">
+    <h2>➕ 이 사안의 지난 회차 <span class="verdict pick">새 제안</span></h2>
+    <p class="why">사안은 몇 주 가는데 카드는 하루씩 끊긴다. 어제 예결위 카드는 지금 <b>수시 보관함</b>("지나간 것" 서랍)에 있어서, 아직 진행 중인 사안을 거기서 뒤져 찾아야 한다. 사안명 바로 아래 한 줄이면 "이어보기"가 된다.</p>
+    <div class="report-head">
+      수시 모니터링 10시 57분 기준(<input class="issue-input" value="예결위">)
+    </div>
+    <a class="issue-thread" href="#">🗂️ 이 사안의 지난 회차 <span class="n">3</span> →</a>
+    <div class="meta-row">
+      <span class="chip">🔍 예결위 8 · 예산결산특별위원회 38</span>
+      <span class="chip">🕐 09:57 ~ 10:57</span>
+      <span class="chip">📥 10:57 (~10:57) 41건</span>
+      <button class="edit-btn">✏️ 편집</button>
+    </div>
+    <p class="note">
+      <b>새 엔드포인트가 0개다.</b> 링크는 <code>/adhoc?q={사안명}</code> 하나면 된다 — 수시 보관함이 이미
+      <b>사안명 부분일치 검색</b>을 지원하므로, 누르면 그 사안의 날짜별 카드가 이미 있는 화면에 그대로 걸러져 나온다.
+      지난 회차가 0개면 이 줄을 아예 안 그린다(홈의 "오늘 사안 없음"과 같은 원칙 — 빈 껍데기를 보여주지 않는다).
+    </p>
+  </div>
+
+  <!-- ═══════ 참고: 어제 카드를 열면 (이미 구현돼 있음) ═══════ -->
+  <div class="panel">
+    <h2>참고 · 어제 카드를 열면 <span class="tally">이미 이렇게 동작함</span></h2>
+    <p class="why">이건 새로 만들 게 아니라 <b>지금도 이미 되는 것</b>이다(<code>app/adhoc/renderer.py</code> <code>is_stale</code>). 읽고 정리하는 건 다 되고, <b>재수집만</b> 막힌다.</p>
+    <div class="report-head">
+      수시 모니터링 19시 30분 기준(<input class="issue-input" value="예결위">)
+    </div>
+    <a class="issue-thread" href="#">🗂️ 이 사안의 지난 회차 <span class="n">3</span> →</a>
+    <div class="warn">🕐 <b>2026-08-24 기준</b>으로 수집한 카드입니다 (오늘은 2026-08-25). 시간대를 그대로 다시 수집하면 <b>2026-08-25</b> 날짜로 검색됩니다 — 같은 사안 아래 오늘 회차를 새로 만들어주세요.</div>
+    <div class="meta-row">
+      <span class="chip">🔍 예결위 12</span>
+      <span class="chip">🕐 00:00 ~ 19:30</span>
+      <span class="chip">📥 19:30 (~19:30) 27건</span>
+      <button class="btn-dis" disabled>↻ 다시 불러오기</button>
+    </div>
+    <p class="note">
+      숨기기 · 소제목 이동 · 소제목 배정 · 📌 담아두기는 <b>전부 그대로 된다</b>. 막히는 건 재수집뿐이고,
+      "오늘의 수집 결과" 탭 줄도 이 화면에선 안 그려진다(오늘 카드가 아닌데 오늘 탭에 끼면 모순이라서).
+      <b>그러니 어제 사안을 "볼 수 있냐"의 답은 예스다</b> — 다만 지금은 그리로 가는 길이 보관함뿐이고, 위 링크가 그 길을 하나 더 낸다.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>
