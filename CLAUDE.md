@@ -14,10 +14,10 @@
 | CLAUDE.md | 지금 유효한 규칙 (이 파일) |
 | [HISTORY.md](HISTORY.md) | 변경 경위·실측·기각안 |
 | [CODING_CONVENTIONS.md](CODING_CONVENTIONS.md) | 설계·UX·검증 원칙 |
-| [PRD.md](PRD.md) / [prd_lite.md](prd_lite.md) | 기획서 (기능 번호 "기능N 규칙M"의 출처) |
-| [DESIGN.md](DESIGN.md) | 초기 설계 문서 |
+| [PRD.md](PRD.md) | 기획서 (기능 번호 "기능N 규칙M"의 출처). 요약판은 [archive/prd_lite.md](archive/prd_lite.md) |
+| [DESIGN.md](DESIGN.md) | 초기 설계 문서(보관용, 지금 동작과 다른 곳이 많다) |
 | [ADHOC_DESIGN.md](ADHOC_DESIGN.md) | 수시 모니터링 설계 근거 (§ 번호로 인용됨) |
-| [MORNING_ISSUES_DESIGN.md](MORNING_ISSUES_DESIGN.md) | 실시간 우선 구조 설계 근거 |
+| [archive/](archive/) | 끝난 설계 문서(`MORNING_ISSUES_DESIGN.md`)·요약 기획서·정리 전 CLAUDE.md |
 | [AI_RULES.md](AI_RULES.md) | LLM 시스템 프롬프트 **원본** (코드가 이 파일을 직접 읽는다 — 고치면 바로 반영) |
 | [LLM_COST_USAGE.md](LLM_COST_USAGE.md) | Claude API 호출 지점·비용 |
 | [MULTIUSER_ROLLOUT_CHECKLIST.md](MULTIUSER_ROLLOUT_CHECKLIST.md) | 다중 사용자 확장 시 준비 항목 (현재 구조엔 해당 없음) |

@@ -2,8 +2,8 @@
 
 **한 줄**: 이 앱에서 검색어의 상위집합은 **실시간현황**인데, 화면과 홈 쟁점 카드가 둘 다 그걸 거꾸로 다루고 있다. 화면 문구(A)와 쟁점 카드 원천(B)을 순서대로 바로잡는다.
 
-- 확정 후 유효 규칙은 [CLAUDE.md](CLAUDE.md)로, 배경·시행착오는 [HISTORY.md](HISTORY.md)로 옮긴다.
-- [ADHOC_DESIGN.md](ADHOC_DESIGN.md)와 같은 성격의 **확정 스펙 원본**이다.
+- 확정 후 유효 규칙은 [CLAUDE.md](../CLAUDE.md)로, 배경·시행착오는 [HISTORY.md](../HISTORY.md)로 옮긴다.
+- [ADHOC_DESIGN.md](../ADHOC_DESIGN.md)와 같은 성격의 **확정 스펙 원본**이다.
 - 작업 순서: **A → B**, 그리고 A·B와 별개로 **C(결함 수정)**.
 
 ---
@@ -55,7 +55,7 @@
 
 설계 초기에 "정기 스크랩을 안 쓰는 사용자도 쟁점을 봐야 한다"를 1번 근거로 삼았으나 **틀렸다.**
 
-`app/settings.py` `validate_schedule_groups`: *"그룹은 최소 1개, 그 중 최소 1개는 enabled여야 한다(전부 꺼두면 아무 회차도 실행되지 않으므로)"* — **이 앱에서 정기를 안 쓰는 사용자는 만들어질 수 없다.** 이 앱은 재정경제부 단일 사용자 로컬 전용이고([CLAUDE.md](CLAUDE.md) "What this app is"), 다중 사용자는 [MULTIUSER_ROLLOUT_CHECKLIST.md](MULTIUSER_ROLLOUT_CHECKLIST.md)가 스스로 "현재 구조에는 적용되지 않는 미래 문서"라고 못박고 있다.
+`app/settings.py` `validate_schedule_groups`: *"그룹은 최소 1개, 그 중 최소 1개는 enabled여야 한다(전부 꺼두면 아무 회차도 실행되지 않으므로)"* — **이 앱에서 정기를 안 쓰는 사용자는 만들어질 수 없다.** 이 앱은 재정경제부 단일 사용자 로컬 전용이고([CLAUDE.md](../CLAUDE.md) "What this app is"), 다중 사용자는 [MULTIUSER_ROLLOUT_CHECKLIST.md](../MULTIUSER_ROLLOUT_CHECKLIST.md)가 스스로 "현재 구조에는 적용되지 않는 미래 문서"라고 못박고 있다.
 
 없는 사용자를 위해 지금 설계를 늘리지 않는다. 이 문서의 근거는 §1.3(오늘 972건짜리 실측) 하나다.
 
@@ -76,7 +76,7 @@
 
 **"정식"을 지우는 이유**: 실시간을 비공식·미완으로 규정하는 말이라, 실제 계층(실시간 ⊇ 정기)과 정반대 인상을 준다. 실시간현황은 임시 화면이 아니라 상위집합이다.
 
-**버튼 이름 교정**: `:602`가 `"→ 스크랩"`을 안내하는데 그 버튼은 2026-08-11에 **`📌 담아두기`**로 바뀌었다([HISTORY.md](HISTORY.md) 참고). 화면에 없는 컨트롤을 안내하는 죽은 문구다. (`live_renderer.py:930,966`과 `settings_server.py:4651`의 같은 문자열은 주석이라 화면과 무관 — 같이 손볼지는 선택.)
+**버튼 이름 교정**: `:602`가 `"→ 스크랩"`을 안내하는데 그 버튼은 2026-08-11에 **`📌 담아두기`**로 바뀌었다([HISTORY.md](../HISTORY.md) 참고). 화면에 없는 컨트롤을 안내하는 죽은 문구다. (`live_renderer.py:930,966`과 `settings_server.py:4651`의 같은 문자열은 주석이라 화면과 무관 — 같이 손볼지는 선택.)
 
 ### 2.2 그룹 카드 배지 (`_KEYWORD_GROUPS_SCRIPT`)
 
@@ -90,7 +90,7 @@
 
 - `🔴 실시간` — **항상 표시**(그룹이 `enabled`인 한). "기본은 실시간"을 글이 아니라 구조로 말한다.
 - `💎 정기` — `include_in_scrap`이 켜졌을 때만.
-- 색은 홈 흐름도가 이미 쓰는 실시간/확정본 계열을 그대로 재사용한다(새 색 만들지 않는다 — [CLAUDE.md](CLAUDE.md) "Design direction" 규칙 1).
+- 색은 홈 흐름도가 이미 쓰는 실시간/확정본 계열을 그대로 재사용한다(새 색 만들지 않는다 — [CLAUDE.md](../CLAUDE.md) "Design direction" 규칙 1).
 - 그룹이 `enabled=False`면 배지 둘 다 흐리게 — 지금 칩이 흐려지는 것과 같은 처리.
 
 이러면 화면을 훑는 것만으로 "실시간이 전부, 정기는 그중 일부"가 읽힌다.
@@ -313,7 +313,7 @@ python3 -c "import json,glob;print({k for f in glob.glob('data/articles/*.json')
 08-26  2위  부동산 세제개편안 논란      {부동산, 세제개편안, 논란}   → Jaccard 0.2 < 0.4, 남남 처리
 ```
 
-이름 이어쓰기 힌트(`carryover_names`)를 어제 창까지 확장하면 확률은 오르지만 **보장이 아니다**([CLAUDE.md](CLAUDE.md): best-effort). 화면이 "이어짐"을 전제하면 안 되므로 비교는 넣지 않는다.
+이름 이어쓰기 힌트(`carryover_names`)를 어제 창까지 확장하면 확률은 오르지만 **보장이 아니다**([CLAUDE.md](../CLAUDE.md): best-effort). 화면이 "이어짐"을 전제하면 안 되므로 비교는 넣지 않는다.
 
 ---
 
