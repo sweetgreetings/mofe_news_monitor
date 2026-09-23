@@ -107,7 +107,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [수정: 2026-09-16] 카드 위 여백 60→44px — 60px은 상단 고정바(54px)를 피하려는 값인데 글자 위로
      30px이 비었다. 44px이면 16px 남는다. 확정본·초안·실시간·정기 보관함·설정·수시·정책 단어 추이
      일곱 화면이 같은 값을 써야 화면을 오갈 때 제목이 들썩이지 않는다(수시·추이는 84→68px 형태).
-     시안 SUBHEAD_SPACING_MOCKUP.html B안. */
+     시안 파일은 정리하며 없앴다(당시 B안). */
   .container {{ padding-top: 44px; padding-bottom: 56px; }}
   /* 상단바 CSS는 app/topnav.py 한 곳 — 모든 화면이 같은 값을 쓴다. */
 {topnav_style}
@@ -181,6 +181,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .undo-fab:disabled {{ opacity: 0.5; cursor: progress; }}
 {hidden_trash_style}
 {scroll_top_style}
+{refresh_link_style}
 {hide_batch_style}
 {url_add_style}
 {note_history_style}
@@ -347,7 +348,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [추가: 2026-08-10] "지난 기사"는 복사·다운로드 같은 이 화면의 액션이 아니라 다른
      화면으로 이동하는 링크라 툴바에서 빼고 제목 옆(내비게이션 자리)으로 옮겼다
      (시안 A, 사용자 선택) — 회색 톤으로 제목보다 눈에 덜 띄게 둔다. */
-  .header-top {{ display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }}
+  .header-top {{ display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; }}
   .actions {{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }}
   /* [추가: 2026-08-12] app.preview_renderer.py와 동일한 이유 — 🤖 이모지가 든 버튼만
      색이모지 글꼴의 line-height 때문에 다른 버튼보다 박스가 커 보이는 문제가 있어
@@ -474,7 +475,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .order-btn:disabled {{ opacity: 0.35; cursor: default; }}
   /* [수정: 2026-09-16] 행 여백 한 단계씩 축소 — padding 6→4px, 제목·메타 줄 사이 4→2px,
      행 사이 10→6px. 글자·버튼 크기는 그대로다(한 건 74 → 64px). 확정본·초안·정기 보관함·
-     수시 네 파일에 같은 값이 복제돼 있으니 한쪽만 고치지 않는다. 시안 ARTICLE_ROW_DENSITY_MOCKUP.html B안. */
+     수시 네 파일에 같은 값이 복제돼 있으니 한쪽만 고치지 않는다. 시안 파일은 정리하며 없앴다(당시 B안). */
   .article {{ margin: 6px 0; line-height: 1.5; padding: 4px 8px; border-radius: var(--r-md); }}
   /* [추가: 2026-08-20] [단독] 기사는 카드 자체를 강조한다(빨강 좌측바 + 연빨강 배경) —
      담당자 지목: "단독이 가장 중요"이므로 글자색 하나로는 [속보]가 여러 건 나올 때
@@ -829,7 +830,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      않는다. */
   .keyword-note-zone {{
     display: none; align-items: center; gap: 8px; border: 1px dashed {border}; border-radius: var(--r-lg);
-    padding: 10px 14px; margin: 10px 0 4px; flex-wrap: wrap;
+    padding: 10px 14px; margin: 14px 0 4px; flex-wrap: wrap;
     position: sticky; top: 60px; z-index: 15; background: {card};
   }}
   .keyword-note-zone.is-open {{ display: flex; }}
@@ -894,6 +895,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
           <option value="time">시간순</option>
           <option value="outlet">언론사순</option>
         </select>
+        {refresh_link_html}
       </span>
     </div>
   </header>
@@ -939,6 +941,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <script>
 {hidden_trash_script}
 {scroll_top_script}
+{refresh_link_script}
 {hide_batch_script}
 {range_select_script}
 {url_add_script}
@@ -3938,6 +3941,9 @@ def render_page(
         scroll_top_style=scroll_top_style(),
         scroll_top_html=scroll_top_html(),
         scroll_top_script=scroll_top_script(),
+        refresh_link_style=refresh_link_style(),
+        refresh_link_html=refresh_link_html("confirmed"),
+        refresh_link_script=refresh_link_script(),
         hide_batch_style=hide_batch_style(),
         hide_batch_script=hide_batch_script(),
         range_select_script=range_select_script(".article-select", ".article"),
@@ -4680,6 +4686,101 @@ def scroll_top_script() -> str:
 })();
 """
 
+
+# [추가: 2026-09-23] 확정본·초안 툴바 오른쪽 끝의 「새로고침」 — 두 화면이 이 한 곳의 CSS·마크업·JS를
+# 쓴다(휴지통·맨 위로 버튼과 같은 이유 — 두 화면이 같은 자리에 같은 것을 보여줘야 하는데 코드가
+# 갈리면 한쪽만 고쳐져 어긋난다).
+#
+# 이 버튼을 단 화면은 둘뿐이다. **화면이 스스로 바뀌지 않는데 뒤에서 값이 변하는 자리**가 그
+# 둘이기 때문이다 — 초안은 회차가 진행 중이라 기사가 계속 들어오고, 확정본은 자동발송
+# 카운트다운이 0에 닿아도 결과가 새로고침 전까지 안 보인다. 수시 원본에는 「지금까지 다시
+# 수집」이 이미 그 자리에 있고(더 강한 동작이라 나란히 두면 뜻이 겹친다), 수시 확정본·두
+# 보관함은 담당자가 손댈 때만 바뀌어 이 버튼이 할 일이 없다. 전체 기사에는 예전부터 본문
+# 새로고침(.refresh-btn)이 있다.
+REFRESH_LINK_STYLE = """
+  /* 툴바 규칙상 왼쪽은 보고서 내용을 바꾸는 박스 버튼, 오른쪽은 가져가거나 보기만 바꾸는 글자다.
+     새로고침은 내용을 하나도 바꾸지 않고 지금 화면을 다시 불러오기만 하므로 오른쪽에 선다.
+     다만 「복사 · 텍스트 · 엑셀」 옆에 같은 모양으로 그냥 붙이면 가져가기가 넷으로 읽히기 때문에,
+     세로선으로 가르고 아이콘을 앞에 붙여 다른 갈래임을 말한다. 높이·여백·색은 가져가기 글자와
+     같은 값이라 한 줄이 가지런하다. */
+  .actions .refresh-link {{
+    background: transparent; border: none; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 4px;
+    height: var(--h-tb); padding: 0 8px; box-sizing: border-box; border-radius: var(--r-md);
+    font-size: var(--fs-md); font-weight: 500; color: {text_soft}; white-space: nowrap;
+  }}
+  .actions .refresh-link:hover {{
+    background: transparent; color: {accent}; text-decoration: underline; text-underline-offset: 3px;
+  }}
+  /* 누른 뒤 — 서버가 화면을 다시 만드는 동안(초안은 네이버 재검색까지 한다) 이 표시가 유일하게
+     「지금 뭔가 하고 있다」를 말한다. 브라우저 새로고침 대신 화면에 버튼을 둔 이유가 이것과 아래
+     스크롤 유지 둘뿐이라, 하나라도 빼면 버튼도 뺀다. */
+  .actions .refresh-link.is-loading {{
+    color: {text_faint}; pointer-events: none; text-decoration: none;
+  }}
+  .actions .refresh-link.is-loading .ic {{ animation: refresh-link-spin 0.9s linear infinite; }}
+  @keyframes refresh-link-spin {{ to {{ transform: rotate(360deg); }} }}
+"""
+
+
+def refresh_link_style() -> str:
+    """툴바 「새로고침」 CSS — 템플릿 안에 {{refresh_link_style}}로 끼워 넣는다."""
+    return REFRESH_LINK_STYLE.format(**PALETTE)
+
+
+def refresh_link_html(screen: str) -> str:
+    """툴바 오른쪽 묶음 맨 뒤에 붙는 세로선 + 「새로고침」. screen은 "preview"|"confirmed".
+
+    링크는 설정 서버 절대주소다 — 정기 화면은 file://로 열릴 수도 있는데, 그때 상대경로로
+    새로고침하면 서버가 다시 만들지 않은 **디스크의 옛 파일**을 그대로 다시 읽는다.
+    """
+    path = "/preview.html" if screen == "preview" else "/index.html"
+    href = f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}{path}"
+    tip = (
+        "지금까지 모인 기사를 다시 불러옵니다"
+        if screen == "preview"
+        else "이 회차를 다시 불러옵니다"
+    )
+    return (
+        '<span class="actions-divider"></span>'
+        f'<a class="refresh-link" href="{href}" onclick="startScreenRefresh(this)" '
+        f'title="{tip}">{icon("refresh")}새로고침</a>'
+    )
+
+
+def refresh_link_script() -> str:
+    """「새로고침」 JS — 누르는 순간 「불러오는 중…」으로 바꾸고, 보던 자리를 적어 둔다.
+
+    이동 자체는 <a href>가 한다. 다만 같은 주소라도 <a> 이동은 브라우저가 스크롤을
+    복원하지 않는(location.reload()와 다른) 새 이동이라, 수시 화면(adhocScroll)과 같은
+    방식으로 위치를 직접 적었다가 되살린다 — 기사 목록 가운데를 보다가 눌렀는데 맨 위로
+    튀면 「지금까지 모인 것 다시 보기」라는 이 버튼의 쓸모가 사라진다. 10초가 지난 값과
+    다른 화면에서 적은 값은 버리고, 한 번 쓰면 지운다.
+    """
+    return (
+        "function startScreenRefresh(el) {\n"
+        '  el.classList.add("is-loading");\n'
+        f"  el.innerHTML = '{icon('refresh')}불러오는 중…';\n"
+        "  try {\n"
+        '    sessionStorage.setItem("screenRefreshScroll", JSON.stringify(\n'
+        "      {y: window.scrollY, at: Date.now(), path: location.pathname}));\n"
+        "  } catch (e) {}\n"
+        "}\n"
+        "(function() {\n"
+        "  var raw = null;\n"
+        "  try {\n"
+        '    raw = sessionStorage.getItem("screenRefreshScroll");\n'
+        '    sessionStorage.removeItem("screenRefreshScroll");\n'
+        "  } catch (e) {}\n"
+        "  if (!raw) return;\n"
+        "  var saved = null;\n"
+        "  try { saved = JSON.parse(raw); } catch (e) { return; }\n"
+        "  if (!saved || saved.path !== location.pathname) return;\n"
+        "  if (!saved.y || Date.now() - saved.at > 10000) return;\n"
+        '  window.addEventListener("load", function() { window.scrollTo(0, saved.y); });\n'
+        "})();\n"
+    )
+
 # [추가: 2026-09-16] 🏷 라벨 팝오버 CSS/JS — 확정본·초안·**정기 보관함** 세 화면이 같이 쓴다.
 # 원래는 app/renderer.py와 app/preview_renderer.py에 같은 값이 복붙돼 있었는데, 실제로 이미
 # 갈라져 있었다(초안 쪽 onclick 세 자리에 event.preventDefault()가 빠져 있었다). 정기 보관함이
@@ -4687,7 +4788,7 @@ def scroll_top_script() -> str:
 LABEL_POPOVER_STYLE = """
   /* [추가: 2026-08-18] 🏷 라벨 — PRD.md 기능10, 2026-08-18 목업 대화. 앰버 계열은
      기존 COLOR_* 팔레트(파랑=담당자 액션/보라=AI 액션)와 겹치지 않는 세 번째 축으로
-     확정했다(MAIN_FLOW_MOCKUP.html의 --label-bg/--label-text 그대로). */
+     확정했다(당시 시안의 --label-bg/--label-text 그대로). */
   .lab-pop-wrap {{ position: relative; display: inline-flex; flex-shrink: 0; }}
   .lab-btn {{
     background: transparent; border: none; color: {muted}; font-size: 1rem; line-height: 1;

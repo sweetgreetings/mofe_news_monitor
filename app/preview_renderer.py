@@ -109,9 +109,9 @@ from app.renderer import (
     scroll_top_html,
     scroll_top_script,
     scroll_top_style,
-    float_status_html,
-    float_status_script,
-    float_status_style,
+    refresh_link_html,
+    refresh_link_script,
+    refresh_link_style,
     hide_batch_script,
     hide_batch_style,
     range_select_script,
@@ -269,7 +269,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .undo-fab:disabled {{ opacity: 0.5; cursor: progress; }}
 {hidden_trash_style}
 {scroll_top_style}
-{float_status_style}
+{refresh_link_style}
 {hide_batch_style}
 {name_picker_style}
   .toc-toggle-btn {{
@@ -526,8 +526,11 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      차 있어도 점선 테두리를 유지해 자동 분류 소제목과 구분되게 한다. */
   .subheading-custom {{ border: 2px dashed {custom_group_border}; border-radius: var(--r-lg); padding: 8px 16px; }}
   .empty-group-hint {{ color: {muted}; font-size: var(--fs-md); margin: 6px 0 0; }}
-  header h1 {{ font-size: var(--fs-xl); margin-bottom: 6px; color: {header}; }}
-  .preview-head {{ display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }}
+  /* 제목 아래 여백은 .preview-head가 쥔다(h1은 0) — 확정본 .header-top과 같은 값이라
+     두 화면을 오갈 때 제목·툴바·메모 칸의 간격이 같다. */
+  header h1 {{ font-size: var(--fs-xl); margin: 0; color: {header}; }}
+  .preview-head {{ display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+    margin-bottom: 16px; }}
   .preview-hint {{
     font-size: var(--fs-md); color: {muted}; background: {hover}; border-radius: var(--r-lg);
     padding: 10px 14px; margin-bottom: 20px; line-height: 1.6;
@@ -535,7 +538,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [추가: 2026-08-11] hint가 빈 문자열이면(위 round-countdown 중복 안내문 삭제) 박스
      자체를 완전히 접어 빈 여백이 남지 않게 한다. */
   .preview-hint:empty {{ display: none; }}
-  .actions {{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }}
+  .actions {{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }}
   /* [추가: 2026-08-12] 툴바 버튼 높이를 고정값으로 못박는다 — 🤖 이모지가 들어간
      버튼만 브라우저에 따라 색이모지 글꼴의 내부 line-height가 라틴/한글 텍스트보다
      커서 박스 자체가 다른 버튼보다 눈에 띄게 부풀어 보이는 문제가 실제로 있었다
@@ -594,7 +597,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .order-btn:disabled {{ opacity: 0.35; cursor: default; }}
   /* [수정: 2026-09-16] 행 여백 한 단계씩 축소 — padding 6→4px, 제목·메타 줄 사이 4→2px,
      행 사이 10→6px. 글자·버튼 크기는 그대로다(한 건 74 → 64px). 확정본·초안·정기 보관함·
-     수시 네 파일에 같은 값이 복제돼 있으니 한쪽만 고치지 않는다. 시안 ARTICLE_ROW_DENSITY_MOCKUP.html B안. */
+     수시 네 파일에 같은 값이 복제돼 있으니 한쪽만 고치지 않는다. 시안 파일은 정리하며 없앴다(당시 B안). */
   .article {{ margin: 6px 0; line-height: 1.5; padding: 4px 8px; border-radius: var(--r-md); }}
   /* [추가: 2026-08-20] app.renderer와 동일 — [단독] 카드 강조 + 말머리 글자색.
      우선순위 원칙도 동일(다른 상태 배경보다 먼저 선언해 가장 낮은 우선순위). */
@@ -798,7 +801,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [수정: 2026-08-07] app.renderer와 동일 — 스크롤 중에도 계속 보이도록 sticky 고정. */
   .keyword-note-zone {{
     display: none; align-items: center; gap: 8px; border: 1px dashed {border}; border-radius: var(--r-lg);
-    padding: 10px 14px; margin: 10px 0 4px; flex-wrap: wrap;
+    padding: 10px 14px; margin: 14px 0 4px; flex-wrap: wrap;
     position: sticky; top: 60px; z-index: 15; background: {card};
   }}
   .keyword-note-zone.is-open {{ display: flex; }}
@@ -858,7 +861,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 {undo_fab_html}
 {hidden_trash_html}
 {name_picker_html}
-{float_status_html}
+<span class="round-countdown" id="round-countdown"></span>
 {scroll_top_html}
 <button type="button" class="toc-toggle-btn" onclick="toggleTocPopover()" title="소제목 목차"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
 <div class="toc-popover" id="toc-popover"></div>
@@ -999,7 +1002,7 @@ document.addEventListener("keydown", function (e) {{ if (e.key === "Escape") clo
 }})();
 {hidden_trash_script}
 {scroll_top_script}
-{float_status_script}
+{refresh_link_script}
 {hide_batch_script}
 {range_select_script}
 {name_picker_script}
@@ -2430,14 +2433,10 @@ def _theme() -> dict:
         "scroll_top_style": scroll_top_style(),
         "scroll_top_html": scroll_top_html(),
         "scroll_top_script": scroll_top_script(),
-        # [추가: 2026-09-23] 회차 카운트다운 줄 끝의 「새로고침」 — 확정본(app.renderer)과 같은
-        # 코드. 초안은 열 때마다 네이버를 다시 검색하므로, 이 버튼이 곧 「지금까지 모인 것 다시
-        # 보기」다. 카운트다운 span 자체도 이 마크업 안에 들어 있다.
-        "float_status_style": float_status_style(),
-        "float_status_html": float_status_html(
-            '<span class="round-countdown" id="round-countdown"></span>', "preview"
-        ),
-        "float_status_script": float_status_script(),
+        # [추가: 2026-09-23] 툴바 오른쪽 끝의 「새로고침」 — 확정본(app.renderer)과 같은 코드.
+        # 초안은 열 때마다 네이버를 다시 검색하므로, 이 버튼이 곧 「지금까지 모인 것 다시 보기」다.
+        "refresh_link_style": refresh_link_style(),
+        "refresh_link_script": refresh_link_script(),
         "hide_batch_style": hide_batch_style(),
         "hide_batch_script": hide_batch_script(),
         "range_select_script": range_select_script(".article-select", ".article"),
@@ -3351,6 +3350,7 @@ def _actions_html(
         '<option value="time">시간순</option>'
         '<option value="outlet">언론사순</option>'
         "</select>"
+        f"{refresh_link_html('preview')}"
         "</span>"
     )
 
