@@ -109,6 +109,9 @@ from app.renderer import (
     scroll_top_html,
     scroll_top_script,
     scroll_top_style,
+    float_status_html,
+    float_status_script,
+    float_status_style,
     hide_batch_script,
     hide_batch_style,
     range_select_script,
@@ -266,6 +269,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .undo-fab:disabled {{ opacity: 0.5; cursor: progress; }}
 {hidden_trash_style}
 {scroll_top_style}
+{float_status_style}
 {hide_batch_style}
 {name_picker_style}
   .toc-toggle-btn {{
@@ -693,6 +697,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [추가: 2026-09-01] app.renderer와 동일 — 소제목 헤더의 📋(.group-copy-btn)도
      같은 아이콘 전환을 쓴다(색·크기는 옆 ✏️🗑️와 같은 .rename-btn에서 물려받는다). */
   .copy-btn, .group-copy-btn {{ display: inline-flex; align-items: center; }}
+  .copy-btn .icon-default, .group-copy-btn .icon-default {{ display: inline-flex; }}
   .copy-btn .icon-done, .group-copy-btn .icon-done {{ display: none; }}
   .copy-btn.is-copied .icon-default, .group-copy-btn.is-copied .icon-default {{ display: none; }}
   .copy-btn.is-copied .icon-done, .group-copy-btn.is-copied .icon-done {{ display: inline-flex; }}
@@ -853,7 +858,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 {undo_fab_html}
 {hidden_trash_html}
 {name_picker_html}
-<span class="round-countdown" id="round-countdown"></span>
+{float_status_html}
 {scroll_top_html}
 <button type="button" class="toc-toggle-btn" onclick="toggleTocPopover()" title="소제목 목차"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
 <div class="toc-popover" id="toc-popover"></div>
@@ -994,6 +999,7 @@ document.addEventListener("keydown", function (e) {{ if (e.key === "Escape") clo
 }})();
 {hidden_trash_script}
 {scroll_top_script}
+{float_status_script}
 {hide_batch_script}
 {range_select_script}
 {name_picker_script}
@@ -1041,11 +1047,13 @@ document.addEventListener("click", function(e) {{
 }});
 // [수정: 2026-08-13] app.renderer와 동일 — 복사하기가 상시 노출 아이콘이 되며
 // 글자 치환 대신 아이콘을 1초간 check로 바꾼다.
-function copyArticleIcon(btn) {{
+// flashEl: ✓로 바꿀 대상(없으면 누른 버튼). ⋯ 메뉴의 「복사하기」는 메뉴가 곧 닫히므로 ⋯ 버튼을 넘긴다.
+function copyArticleIcon(btn, flashEl) {{
+  var mark = flashEl || btn;
   navigator.clipboard.writeText(btn.dataset.copyText).then(function() {{
-    btn.classList.add("is-copied");
-    clearTimeout(btn._copyTimer);
-    btn._copyTimer = setTimeout(function() {{ btn.classList.remove("is-copied"); }}, 1000);
+    mark.classList.add("is-copied");
+    clearTimeout(mark._copyTimer);
+    mark._copyTimer = setTimeout(function() {{ mark.classList.remove("is-copied"); }}, 1000);
   }}).catch(function() {{
     alert("복사에 실패했습니다.");
   }});
@@ -2422,6 +2430,14 @@ def _theme() -> dict:
         "scroll_top_style": scroll_top_style(),
         "scroll_top_html": scroll_top_html(),
         "scroll_top_script": scroll_top_script(),
+        # [추가: 2026-09-23] 회차 카운트다운 줄 끝의 「새로고침」 — 확정본(app.renderer)과 같은
+        # 코드. 초안은 열 때마다 네이버를 다시 검색하므로, 이 버튼이 곧 「지금까지 모인 것 다시
+        # 보기」다. 카운트다운 span 자체도 이 마크업 안에 들어 있다.
+        "float_status_style": float_status_style(),
+        "float_status_html": float_status_html(
+            '<span class="round-countdown" id="round-countdown"></span>', "preview"
+        ),
+        "float_status_script": float_status_script(),
         "hide_batch_style": hide_batch_style(),
         "hide_batch_script": hide_batch_script(),
         "range_select_script": range_select_script(".article-select", ".article"),
