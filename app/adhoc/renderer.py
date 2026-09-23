@@ -942,7 +942,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      EXPORT_LINKS_STYLE)과 같은 값. 박스는 내용을 바꾸는 버튼, 글자는 가져가는 것. */
   .toolbar .export-links {{ display: inline-flex; align-items: center; }}
   .toolbar .export-links button {{ font: inherit; font-size: var(--fs-md); background: transparent; border: none;
-    color: {text_soft}; font-weight: 500; padding: 6px 8px; border-radius: var(--r-md); cursor: pointer; }}
+    color: {text_soft}; font-weight: 500; height: var(--h-tb); padding: 0 8px; box-sizing: border-box;
+    border-radius: var(--r-md); cursor: pointer; }}
   .toolbar .export-links button:hover {{ color: {accent}; text-decoration: underline; text-underline-offset: 3px; }}
   /* 「보기 순서」 — 정기 확정본(app.renderer .view-mode-select)과 같은 값·같은 자리(가져가기
      글자 오른쪽). 화면에 나열하는 순서만 바꾸는 보기라 오른쪽 묶음에 선다. */
