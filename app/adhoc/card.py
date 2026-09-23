@@ -473,7 +473,7 @@ def list_cards(issue_id: Optional[str] = None) -> list[dict]:
 # 메모리에만 두므로 앱을 켤 때 한 번은 전부 연다.
 _SUMMARY_FIELDS = (
     "id", "kind", "raw", "issue_id", "report_title", "collect_date",
-    "keywords", "must_keywords", "created_at",
+    "keywords", "must_keywords", "created_at", "version",
 )
 _summary_cache: dict[str, tuple] = {}
 _summary_lock = threading.Lock()
@@ -540,6 +540,11 @@ def cards_for_date(date_str: str) -> list[dict]:
 # 원본 하나 = 검색 조건 하나다. 조건을 바꾸려면 새로 수집하고, 같은 날 같은 사안의 원본이
 # 여럿이면 화면에서 「인사청문회 #2」로 가른다. 첫 원본엔 번호를 안 붙인다 — 두 번째가 생기는
 # 순간 이미 보던 탭 이름이 바뀌면 안 된다. 번호는 화면 전용이라 사안명·보고서 첫 줄엔 없다.
+#
+# 번호가 하는 일은 「이름이 같은 카드를 가르는 것」 하나뿐이다. 그래서 담당자가 머리줄에서
+# 이름을 고쳐 그 판만 다른 이름이 되면 번호를 떼고 보여준다(_name_shared) — 가를 것이 없는데
+# 남아 있으면 어디에도 없는 판을 가리킨다. 적어 둔 version 값은 그대로 두므로 이름을 되돌리면
+# 번호도 그대로 돌아오고, 가운데를 지워도 뒤 번호가 안 바뀐다.
 
 
 def issue_key(card: dict) -> str:
@@ -568,12 +573,27 @@ def version_of(card: dict, versions: Optional[list[dict]] = None) -> int:
     return ids.index(card["id"]) + 1 if card["id"] in ids else 1
 
 
+def _name_shared(row: dict, siblings: list[dict]) -> bool:
+    """같은 사안의 다른 원본이 이 카드와 같은 이름을 쓰고 있는가 — 번호를 보일지 가른다."""
+    name = (row.get("report_title") or "").strip()
+    return any(
+        c["id"] != row["id"] and (c.get("report_title") or "").strip() == name for c in siblings
+    )
+
+
+def _suffix_for(row: dict, siblings: list[dict], stored: int = 0) -> str:
+    """원본 한 장의 「 #2」 — 첫 판이거나 이름이 혼자면 빈 문자열."""
+    n = stored or version_of(row, siblings)
+    if n < 2 or not _name_shared(row, siblings):
+        return ""
+    return f" #{n}"
+
+
 def version_suffix(card: dict, day_cards: Optional[list[dict]] = None) -> str:
-    """화면 이름 뒤에 붙일 「 #2」 — 확정본이거나 첫 원본이면 빈 문자열."""
+    """화면 이름 뒤에 붙일 「 #2」 — 확정본·첫 원본·이름이 혼자인 판이면 빈 문자열."""
     if is_bundle(card):
         return ""
-    n = version_of(card, raw_versions(card, day_cards))
-    return f" #{n}" if n >= 2 else ""
+    return _suffix_for(card, raw_versions(card, day_cards))
 
 
 def version_ids(card: dict, day_cards: Optional[list[dict]] = None) -> set:
@@ -658,16 +678,18 @@ def bundle_label(bundle: dict) -> str:
     return f"{name} {t}" if t else name
 
 
-_SOURCE_SUFFIX_CACHE: dict = {}
-
-
 def source_version_suffix(bundle: dict) -> str:
     """확정본을 처음 만든 원본의 「 #2」 — 원본 탭 이름과 같은 번호를 목록 이름에 단다.
-    첫 원본에서 만들었거나 원본에서 만든 확정본이 아니면 빈 문자열. 만들 때 적어 둔
-    source_version이 먼저이고, 그 전 확정본은 원본 카드를 열어 센다(카드마다 한 번만)."""
-    if bundle.get("source_version"):
-        n = int(bundle["source_version"])
-        return f" #{n}" if n >= 2 else ""
+    첫 원본에서 만들었거나 원본에서 만든 확정본이 아니면 빈 문자열.
+
+    **번호를 보일지는 지금 원본 이름으로 가른다**(version_suffix와 같은 규칙) — 담당자가
+    원본 이름을 고쳐 그 판에서 번호가 떨어졌는데 확정본 이름에만 남으면 화면 어디에도 없는
+    판을 가리킨다. 번호 값 자체는 만들 때 적어 둔 source_version이 먼저다.
+
+    카드 파일은 안 연다 — 요약 목록(list_card_summaries, mtime 캐시)에 이름·사안·판 번호가
+    다 있다. 원본이 지워졌으면 적어 둔 번호로 물러선다.
+    """
+    stored = int(bundle.get("source_version") or 0)
     # source_card_id가 생기기 전 확정본은 담긴 기사를 보낸 원본으로 대신 센다.
     src_id = bundle.get("source_card_id") or next(
         ((a.get("sent_from") or {}).get("card_id") for a in bundle.get("articles", [])
@@ -676,10 +698,12 @@ def source_version_suffix(bundle: dict) -> str:
     )
     if not src_id:
         return ""
-    if src_id not in _SOURCE_SUFFIX_CACHE:
-        src = load_card(src_id)
-        _SOURCE_SUFFIX_CACHE[src_id] = version_suffix(src) if src else ""
-    return _SOURCE_SUFFIX_CACHE[src_id]
+    rows = list_card_summaries()
+    src = next((r for r in rows if r["id"] == src_id), None)
+    if src is None:
+        return f" #{stored}" if stored >= 2 else ""
+    day = [r for r in rows if r.get("collect_date") == src.get("collect_date")]
+    return _suffix_for(src, raw_versions(src, day), stored=stored)
 
 
 def sent_index(source_ids, bundles: list[dict]) -> dict:
@@ -694,12 +718,13 @@ def sent_index(source_ids, bundles: list[dict]) -> dict:
     ids = {source_ids} if isinstance(source_ids, str) else set(source_ids)
     index: dict = {}
     for bundle in bundles:
+        label = bundle_label(bundle)  # 확정본마다 한 번만 — 기사마다 부르면 카드 목록을 되풀이해 훑는다
         for article in bundle["articles"]:
             if article.get("hidden"):
                 continue
             if (article.get("sent_from") or {}).get("card_id") not in ids:
                 continue
-            index.setdefault(article["url"], bundle_label(bundle))
+            index.setdefault(article["url"], label)
     return index
 
 

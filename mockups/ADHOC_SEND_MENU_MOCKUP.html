@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>수시 원본 「확정본으로 ▾」 메뉴 시안</title>
+<style>
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+    --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%;
+    --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14); }
+  body { margin: 0; background: #F8FAFC; color: #1F2937;
+    font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .container { max-width: 980px; margin: 0 auto; padding: 40px 24px 120px; }
+  h1 { color: #1E3A5F; font-size: var(--fs-xl); margin: 0 0 6px; }
+  .sub { color: #6B7280; font-size: var(--fs-md); margin: 0 0 28px; }
+  .card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+    padding: 22px 24px; margin-bottom: 18px; }
+  .card h2 { font-size: var(--fs-lg); color: #1E3A5F; margin: 0 0 4px; }
+  .card h2 .pick { font-size: var(--fs-xs); color: #146B5E; background: #E3F1EE;
+    border: 1px solid rgba(20,107,94,0.24); border-radius: var(--r-pill);
+    padding: 1px 8px; margin-left: 8px; vertical-align: 2px; font-weight: 600; }
+  .card h2 .no { font-size: var(--fs-xs); color: #B91C1C; background: #FEF2F2;
+    border: 1px solid #FECACA; border-radius: var(--r-pill);
+    padding: 1px 8px; margin-left: 8px; vertical-align: 2px; font-weight: 600; }
+  .why { color: #4B5563; font-size: var(--fs-md); margin: 0 0 18px; line-height: 1.7; }
+  .why b { color: #1F2937; }
+  .stage { background: #F8FAFC; border: 1px dashed #E5E7EB; border-radius: var(--r-md);
+    padding: 26px 20px 150px; }
+
+  /* ---- 실제 화면에서 그대로 옮겨온 값 (app/adhoc/renderer.py) ---- */
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+  .article { padding: 4px 8px; border-radius: var(--r-md); margin: 6px 0; line-height: 1.5; }
+  .article:hover { background: #F3F4F6; }
+  .a-top { display: flex; align-items: flex-start; gap: 8px; }
+  .bulk-chk { width: 16px; height: 16px; margin: 3px 3px 0 4px; flex: none; accent-color: #2563EB; }
+  .a-title { font-size: var(--fs-base); }
+  .a-title .outlet { color: #6B7280; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  .a-bot { display: flex; align-items: center; gap: 8px; margin: 2px 0 0 31px;
+    opacity: 0.55; transition: opacity 0.12s; }
+  .article:hover .a-bot { opacity: 1; }
+  .a-time { font-size: var(--fs-sm); color: #6B7280; white-space: nowrap; }
+  .a-time-sep { color: #6B7280; font-size: var(--fs-sm); margin: 0 2px; }
+  .origin-link { color: #6B7280; font-size: var(--fs-sm); text-decoration: none;
+    display: inline-flex; align-items: center; gap: 3px; }
+  .kw-inline { font-size: var(--fs-sm); color: #6B7280; display: inline-flex; align-items: center; gap: 4px; }
+  .kw-inline .kw-ic { width: 0.75em; height: 0.75em; color: #9CA3AF; }
+  .kw-inline .kw-v { color: #4B5563; }
+  .a-acts { display: flex; gap: 4px; align-items: center; margin-left: auto;
+    justify-content: flex-end; flex-shrink: 0; }
+  .icon-btn { border: none; background: none; color: #6B7280; border-radius: var(--r-md);
+    padding: 4px 6px; cursor: pointer; display: inline-flex; align-items: center; }
+  .send-split { display: inline-flex; align-items: stretch; border: 1px solid rgba(20, 107, 94, 0.24);
+    border-radius: var(--r-md); flex-shrink: 0; }
+  .send-split .send-go, .send-split .send-more { border: none; background: #E3F1EE; color: #146B5E;
+    font: inherit; font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
+  .send-split .send-go { padding: 3px 9px; border-radius: var(--r-md) 0 0 var(--r-md); min-width: 74px; }
+  .send-split .send-more { padding: 3px 6px; border-left: 1px solid rgba(20, 107, 94, 0.24);
+    border-radius: 0 var(--r-md) var(--r-md) 0; font-size: var(--fs-xs); }
+  .more-wrap { position: relative; display: inline-flex; }
+  .more-menu { position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 60;
+    min-width: 172px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+    padding: 4px; box-shadow: var(--sh-pop); }
+  .more-menu button { display: block; width: 100%; text-align: left; background: transparent;
+    border: none; padding: 8px 10px; border-radius: var(--r-sm); font-size: var(--fs-md);
+    color: #1F2937; cursor: pointer; white-space: nowrap; }
+  .more-menu button:hover { background: #EFF6FF; }
+  .more-menu .menu-sep { display: block; height: 1px; background: #E5E7EB; margin: 4px 0; }
+  /* 지금 화면의 규칙 — 이 줄바꿈이 사진 2의 어긋남을 만든다 */
+  .now .more-menu button { display: flex; flex-wrap: wrap; align-items: center; gap: 0 5px; }
+
+  /* ---- A안 : 칸 머리 + 폴더 뺌 + 시각은 오른쪽 끝 회색 ---- */
+  .a-plan .more-menu { min-width: 230px; }
+  .a-plan .more-menu .mh { display: block; padding: 6px 10px 3px; font-size: var(--fs-xs);
+    color: #9CA3AF; font-weight: 600; }
+  .a-plan .more-menu button { display: flex; align-items: center; gap: 6px; }
+  .a-plan .more-menu button .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .a-plan .more-menu button small { margin-left: auto; padding-left: 12px; color: #9CA3AF;
+    font-size: var(--fs-xs); font-weight: 400; }
+
+  /* ---- B안 : 폴더 유지, 줄바꿈만 막음 ---- */
+  .b-plan .more-menu { min-width: 230px; }
+  .b-plan .more-menu button { display: flex; align-items: center; gap: 6px; }
+  .b-plan .more-menu button .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .b-plan .more-menu button small { margin-left: auto; padding-left: 12px; color: #9CA3AF;
+    font-size: var(--fs-xs); font-weight: 400; }
+
+  /* ---- C안 : 숫자 원형 ---- */
+  .c-plan .more-menu { min-width: 230px; }
+  .c-plan .more-menu button { display: flex; align-items: center; gap: 7px; }
+  .c-plan .num { width: 18px; height: 18px; border-radius: var(--r-circle); flex: none;
+    background: #E3F1EE; color: #146B5E; border: 1px solid rgba(20,107,94,0.3);
+    font-size: var(--fs-xs); font-weight: 700; display: inline-flex;
+    align-items: center; justify-content: center; }
+  .c-plan .more-menu button .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .c-plan .more-menu button small { margin-left: auto; padding-left: 12px; color: #9CA3AF;
+    font-size: var(--fs-xs); font-weight: 400; }
+
+  .note { margin: 16px 0 0; padding: 12px 14px; background: #FFFBEB; border: 1px solid #FDE68A;
+    border-radius: var(--r-md); color: #92400E; font-size: var(--fs-sm); line-height: 1.7; }
+  .note b { color: #78350F; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>수시 원본 — 「확정본으로 ▾」 메뉴</h1>
+  <p class="sub">기사 행의 ▾를 눌렀을 때 열리는 목록. 지금 모습과 세 가지 안.</p>
+
+  <!-- ===== 지금 ===== -->
+  <div class="card now">
+    <h2>지금</h2>
+    <p class="why">이름이 길면 <b>글자만 아랫줄로 내려가고 폴더 아이콘은 윗줄에 혼자 남는다</b>
+      (<code>.send-split .more-menu button</code>의 <code>flex-wrap: wrap</code>).
+      두 줄 다 <code>#3 15:39</code>로 끝나서 무엇이 다른지도 이름 앞머리로만 알 수 있다.</p>
+    <div class="stage">
+      <div class="article">
+        <div class="a-top">
+          <input type="checkbox" class="bulk-chk" checked>
+          <div class="a-title"><span class="outlet">매일신문</span>세탁 분쟁 42.9%가 소비자 과실… 명절 기름얼룩 물티슈 금지</div>
+        </div>
+        <div class="a-bot">
+          <span class="a-time">15:31 · 8분 전</span>
+          <span class="a-time-sep">·</span>
+          <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="a-time-sep">·</span>
+          <span class="kw-inline"><svg class="ic kw-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">꽃게</span></span>
+          <span class="a-acts">
+            <span class="send-split">
+              <button type="button" class="send-go">확정본으로</button>
+              <span class="more-wrap">
+                <button type="button" class="send-more">▾</button>
+                <span class="more-menu">
+                  <button type="button"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.6h8.8A1.5 1.5 0 0 1 21 9.1v9.4a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5Z"/></svg> 꽃게 #3 15:39</button>
+                  <button type="button"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.6h8.8A1.5 1.5 0 0 1 21 9.1v9.4a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5Z"/></svg> 꽃게_직접 만든 #3 15:39</button>
+                  <span class="menu-sep"></span>
+                  <button type="button">+ 새 확정본 만들어 보내기</button>
+                </span>
+              </span>
+            </span>
+            <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/></svg></button>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== A안 ===== -->
+  <div class="card a-plan">
+    <h2>A안 — 칸으로 가르고, 폴더는 빼고, 시각은 오른쪽 끝 회색<span class="pick">추천</span></h2>
+    <p class="why">
+      ① <b>칸 머리</b>로 「이 원본의 확정본」과 「오늘 다른 확정본」을 가른다 —
+      확정본 화면의 「옮기기 ▾」가 이미 쓰는 문법(<code>.move-h</code>)이라 대칭이 맞다.<br>
+      ② <b>폴더 아이콘은 뺀다</b> — 줄이 전부 확정본이라 아이콘이 가르는 게 없고,
+      「+ 새 확정본」 줄만 아이콘이 없어 들여쓰기가 어긋난다.<br>
+      ③ <b>시각은 오른쪽 끝에 작은 회색</b>(<code>margin-left:auto</code>) — 이름은 한 줄 말줄임.
+      「옮기기 ▾」의 건수 <code>small</code>과 같은 자리·같은 색이다.
+    </p>
+    <div class="stage">
+      <div class="article">
+        <div class="a-top">
+          <input type="checkbox" class="bulk-chk" checked>
+          <div class="a-title"><span class="outlet">매일신문</span>세탁 분쟁 42.9%가 소비자 과실… 명절 기름얼룩 물티슈 금지</div>
+        </div>
+        <div class="a-bot">
+          <span class="a-time">15:31 · 8분 전</span>
+          <span class="a-time-sep">·</span>
+          <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="a-time-sep">·</span>
+          <span class="kw-inline"><svg class="ic kw-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">꽃게</span></span>
+          <span class="a-acts">
+            <span class="send-split">
+              <button type="button" class="send-go">확정본으로</button>
+              <span class="more-wrap">
+                <button type="button" class="send-more">▾</button>
+                <span class="more-menu">
+                  <span class="mh">이 원본의 확정본</span>
+                  <button type="button"><span class="nm">꽃게 #3</span><small>15:39</small></button>
+                  <span class="mh">오늘 다른 확정본</span>
+                  <button type="button"><span class="nm">꽃게_직접 만든 #3</span><small>15:39</small></button>
+                  <button type="button"><span class="nm">재산세</span><small>15:20</small></button>
+                  <span class="menu-sep"></span>
+                  <button type="button"><span class="nm">+ 새 확정본 만들어 보내기</span></button>
+                </span>
+              </span>
+            </span>
+            <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/></svg></button>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== B안 ===== -->
+  <div class="card b-plan">
+    <h2>B안 — 폴더는 두고 줄바꿈만 막음</h2>
+    <p class="why">가장 작게 고치는 안. 어긋남은 사라지지만
+      <b>어느 줄이 이 원본 것이고 어느 줄이 다른 사안 것인지는 여전히 이름으로만 안다.</b>
+      「+ 새 확정본」 줄의 들여쓰기 어긋남도 그대로다.</p>
+    <div class="stage">
+      <div class="article">
+        <div class="a-top">
+          <input type="checkbox" class="bulk-chk" checked>
+          <div class="a-title"><span class="outlet">매일신문</span>세탁 분쟁 42.9%가 소비자 과실… 명절 기름얼룩 물티슈 금지</div>
+        </div>
+        <div class="a-bot">
+          <span class="a-time">15:31 · 8분 전</span>
+          <span class="a-time-sep">·</span>
+          <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="a-acts">
+            <span class="send-split">
+              <button type="button" class="send-go">확정본으로</button>
+              <span class="more-wrap">
+                <button type="button" class="send-more">▾</button>
+                <span class="more-menu">
+                  <button type="button"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.6h8.8A1.5 1.5 0 0 1 21 9.1v9.4a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5Z"/></svg><span class="nm">꽃게 #3</span><small>15:39</small></button>
+                  <button type="button"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.6h8.8A1.5 1.5 0 0 1 21 9.1v9.4a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5Z"/></svg><span class="nm">꽃게_직접 만든 #3</span><small>15:39</small></button>
+                  <button type="button"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.6h8.8A1.5 1.5 0 0 1 21 9.1v9.4a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5Z"/></svg><span class="nm">재산세</span><small>15:20</small></button>
+                  <span class="menu-sep"></span>
+                  <button type="button"><span class="nm">+ 새 확정본 만들어 보내기</span></button>
+                </span>
+              </span>
+            </span>
+            <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/></svg></button>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== C안 ===== -->
+  <div class="card c-plan">
+    <h2>C안 — 폴더 자리에 숫자 원형<span class="no">권하지 않음</span></h2>
+    <p class="why">
+      ① <b>동그라미는 이 앱에서 떠 있는 버튼과 점에만 쓴다</b>(모양 규칙) — 목록 줄 앞에 달면 그 약속이 깨진다.<br>
+      ② 여기 숫자는 <b>확정본 순번이 아니라 「몇 번째 원본에서 나왔나」(#3)</b>다.
+      원형으로 키우면 「1번 확정본·2번 확정본」으로 읽혀 뜻이 바뀐다.
+      게다가 지금 화면은 <b>둘 다 원본 #3에서 나와서 번호가 같은 게 정상</b>이라, 번호를 키워도 안 갈라진다.
+    </p>
+    <div class="stage">
+      <div class="article">
+        <div class="a-top">
+          <input type="checkbox" class="bulk-chk" checked>
+          <div class="a-title"><span class="outlet">매일신문</span>세탁 분쟁 42.9%가 소비자 과실… 명절 기름얼룩 물티슈 금지</div>
+        </div>
+        <div class="a-bot">
+          <span class="a-time">15:31 · 8분 전</span>
+          <span class="a-time-sep">·</span>
+          <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="a-acts">
+            <span class="send-split">
+              <button type="button" class="send-go">확정본으로</button>
+              <span class="more-wrap">
+                <button type="button" class="send-more">▾</button>
+                <span class="more-menu">
+                  <button type="button"><span class="num">3</span><span class="nm">꽃게</span><small>15:39</small></button>
+                  <button type="button"><span class="num">3</span><span class="nm">꽃게_직접 만든</span><small>15:39</small></button>
+                  <span class="menu-sep"></span>
+                  <button type="button"><span class="nm">+ 새 확정본 만들어 보내기</span></button>
+                </span>
+              </span>
+            </span>
+            <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/></svg></button>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>덧 — 목록에 무엇이 뜨는지</h2>
+    <p class="why">지금 메뉴는 <b>「직접 만든 확정본」만이 아니라 오늘 만든 확정본을 전부</b> 싣는다
+      (<code>bundles_for_date(오늘)</code>, 기본 확정본 하나만 뺀다).
+      다른 사안·다른 판(#1·#2)에서 나온 확정본도 들어온다 — 직접 만든 게 3개면 3개 다 뜨고,
+      거기에 다른 사안 확정본까지 섞인다. 이건 규칙대로이고 유지하는 게 맞다
+      (원본 하나를 여러 보고서로 갈라 보내는 게 이 화면의 일이고, 여기선 <b>복사</b>라 원본이 안 상한다).
+      다만 <b>그 섞임이 이름으로만 구분되는 게 문제</b>라서 A안이 칸을 가른다.</p>
+    <p class="note"><b>따로 확인한 것</b> — 「+ 새 확정본 만들어 보내기」로 만든 확정본은
+      <code>source_card_id</code>·<code>source_version</code>이 비어 있고 <b>사안도 새로 하나 생긴다</b>.
+      그래서 목록 이름의 <code>#3</code>은 저장된 값이 아니라 「담긴 기사를 보낸 원본」을 되짚어 센 값이고,
+      수시 보관함 사안별 보기에선 원본과 다른 줄에 선다. 고칠지는 따로 정할 일이다.</p>
+  </div>
+</div>
+</body>
+</html>

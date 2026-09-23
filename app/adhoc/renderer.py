@@ -77,6 +77,7 @@ from app.adhoc.card import (
     ordered_group_names,
     raw_row_states,
     sent_index,
+    source_version_suffix,
     version_ids,
     version_suffix,
     window_of,
@@ -100,7 +101,7 @@ from app.config import (
     PALETTE,
 )
 from app.filters import HEADLINE_TAG_RE, headline_kind, looks_like_photo_caption, photo_badge_tip
-from app.sorter import sort_by_pub_desc
+from app.sorter import outlet_sort_key, sort_by_pub_desc
 from app.icons import icon
 from app.labels import labels_for_url
 from app.llm_classifier import MAX_ARTICLES_FOR_CLASSIFY
@@ -833,9 +834,17 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .send-split .send-more {{ padding: 3px 6px; border-left: 1px solid {adhoc_border_soft};
     border-radius: 0 var(--r-md) var(--r-md) 0; font-size: var(--fs-xs); }}
   .send-split .send-go:hover, .send-split .send-more:hover {{ filter: brightness(0.96); }}
-  .send-split .more-menu button small {{ display: block; color: {text_faint}; font-size: var(--fs-xs); font-weight: 400; }}
-  .send-split .more-menu button {{ display: flex; flex-wrap: wrap; align-items: center; gap: 0 5px; }}
-  .send-split .more-menu button small {{ flex-basis: 100%; padding-left: 1.3em; }}
+  /* 「확정본으로 ▾」 목록 (시안 ADHOC_SEND_MENU_MOCKUP.html A안) — 칸 머리(.mh)로 「이 원본의
+     확정본」과 「오늘 다른 확정본」을 가르고, 이름(.nm)은 한 줄 말줄임, 시각은 오른쪽 끝
+     작은 회색. 「옮기기 ▾」(.move-menu)와 같은 문법이라 값도 같이 맞춘다. 이름을 줄바꿈시키면
+     아이콘·시각만 윗줄에 남아 어긋난다(옛 flex-wrap). */
+  .send-split .more-menu {{ min-width: 214px; max-width: 300px; }}  /* max-width가 있어야 .nm의 말줄임이 실제로 걸린다 — 없으면 긴 사안명이 메뉴를 늘린다 */
+  .send-split .more-menu .mh {{ display: block; padding: 6px 10px 3px; font-size: var(--fs-xs);
+    color: {text_faint}; font-weight: 600; }}
+  .send-split .more-menu button {{ display: flex; align-items: center; gap: 6px; }}
+  .send-split .more-menu button .nm {{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+  .send-split .more-menu button small {{ margin-left: auto; padding-left: 12px; color: {text_faint};
+    font-size: var(--fs-xs); font-weight: 400; }}
   /* [추가: 2026-09-17] 「옮기기 ▾」 메뉴 — 칸 이름(.move-h), 다른 사안 확정본의 건수(small).
      .flip-up은 행 메뉴가 화면 아래에서 열릴 자리가 모자랄 때 JS가 붙인다(toggleArticleMenu). */
   .move-btn {{ cursor: pointer; display: inline-flex; align-items: center; gap: 3px; }}
@@ -929,6 +938,13 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .toolbar .export-links button {{ font: inherit; font-size: var(--fs-md); background: transparent; border: none;
     color: {text_soft}; font-weight: 500; padding: 6px 8px; border-radius: var(--r-md); cursor: pointer; }}
   .toolbar .export-links button:hover {{ color: {accent}; text-decoration: underline; text-underline-offset: 3px; }}
+  /* 「보기 순서」 — 정기 확정본(app.renderer .view-mode-select)과 같은 값·같은 자리(가져가기
+     글자 오른쪽). 화면에 나열하는 순서만 바꾸는 보기라 오른쪽 묶음에 선다. */
+  .view-mode-select {{
+    border: 1px solid {accent}; border-radius: var(--r-md); font-size: var(--fs-md);
+    height: var(--h-tb); padding: 0 9px; box-sizing: border-box;
+    color: {text}; background: {card};
+  }}
   .send-done.raw-unhide {{ color: {muted}; }}
   .send-done.raw-unhide:not(:disabled) {{ cursor: pointer; }}
   .send-done.raw-unhide:not(:disabled):hover {{ border-color: {text_faint}; color: {text}; }}
@@ -1925,7 +1941,7 @@ def _render_article_row(
     card: dict, article: dict, group_names: list[str], is_first: bool, is_last: bool,
     known_labels_html: str = "", sent_to: str = "", bundle_options_html: str = "",
     is_new: bool = False, raw_menu_html: str = "", raw_hidden_tip: str = "",
-    move_bundles_html: str = "",
+    move_bundles_html: str = "", outlet_rank: int = 0,
 ) -> str:
     """sent_to: 이 기사를 이미 받아간 모음 이름(없으면 빈 문자열). 저장된 값이 아니라
     card.sent_index가 매번 다시 계산한 값이다 — 모음에서 숨기면 그 즉시 풀려야 하므로
@@ -1947,7 +1963,11 @@ def _render_article_row(
     되돌린다.
 
     move_bundles_html: [추가: 2026-09-17] 확정본 행의 「옮기기 ▾」 메뉴 아랫칸 「다른 사안
-    확정본으로」에 들어갈 버튼들(_move_menu_html). 빈 문자열이면 그 칸을 안 그린다."""
+    확정본으로」에 들어갈 버튼들(_move_menu_html). 빈 문자열이면 그 칸을 안 그린다.
+
+    outlet_rank: 툴바의 「보기 순서」가 「언론사순」으로 다시 세울 때 쓰는 자리 번호 —
+    정기 확정본(app.renderer.render_article)과 같은 뜻·같은 이름이다. 화면 전용이라
+    저장값·복사·발송엔 안 나간다."""
     raw = is_raw(card)
     settings = load_settings()
     # [추가: 2026-09-02] 제목 맨 앞 [단독]/[속보]는 배지로 감싸지 않고 글자색만 바꾼다 —
@@ -2245,7 +2265,7 @@ def _render_article_row(
     if _kind == "단독":
         article_class += " art-scoop"
 
-    return f"""<div class="{article_class}">
+    return f"""<div class="{article_class}" data-outlet-rank="{outlet_rank}">
   <details>
     <summary>
       <div class="a-top">
@@ -2526,10 +2546,12 @@ def render_card_page(
     raw_default = default_bundle_for(card, day_bundles) if raw_mode else None
     # [추가: 2026-09-15] 「불러올 때마다 새 확정본」 — 이 원본 시각의 확정본이 아직 없으면 보낼
     # 때 이 이름으로 생긴다(card.bundle_label과 같은 모양).
-    raw_default_label = (
-        bundle_label(raw_default) if raw_default
-        else f'{card["report_title"]}{version_suffix(card, day_cards)} {window_of(card)["end"]}'.strip()
+    raw_default_name = (
+        raw_default["report_title"] + source_version_suffix(raw_default) if raw_default
+        else card["report_title"] + version_suffix(card, day_cards)
     )
+    raw_default_when = bundle_time(raw_default) if raw_default else window_of(card)["end"]
+    raw_default_label = f"{raw_default_name} {raw_default_when}".strip()
     # 원본 행 상태 — 보냄 / 숨김(원본에서 🗑, 또는 확정본에서 뺌). 처리 안 한 기사는 안 담긴다.
     raw_states = raw_row_states(card, day_bundles, source_ids) if raw_mode else {}
 
@@ -2542,23 +2564,41 @@ def render_card_page(
         return "숨긴 기사예요 — 눌러서 되돌려요"
 
     def _raw_menu(onclick: str) -> str:
+        """원본 행·선택 바의 「확정본으로 ▾」 목록 (시안 ADHOC_SEND_MENU_MOCKUP.html A안).
+
+        이 원본이 기본으로 보낼 확정본과 「오늘 다른 확정본」을 **칸 머리(.mh)로 가른다** —
+        목록엔 오늘 만든 확정본이 전부 들어와(다른 사안·다른 판 포함) 이름만으로는 어느
+        쪽인지 안 보인다. 확정본 화면의 「옮기기 ▾」(.move-h)와 같은 문법이다.
+
+        폴더 아이콘은 달지 않는다 — 줄이 전부 확정본이라 아이콘이 가르는 게 없고,
+        「+ 새 확정본」 줄만 아이콘이 없어 들여쓰기가 어긋난다. 시각은 이름 뒤에 붙이지
+        않고 오른쪽 끝 작은 회색(small)으로 뺀다(「옮기기 ▾」의 건수와 같은 자리).
+        """
         if not (raw_mode and can_send):
             return ""
+
+        def row(value: str, name: str, when: str) -> str:
+            return (
+                f'<button type="button" data-bundle="{html.escape(value)}" onclick="{onclick}">'
+                f'<span class="nm">{html.escape(name)}</span>'
+                + (f"<small>{html.escape(when)}</small>" if when else "")
+                + "</button>"
+            )
+
         own = (
-            f'<button type="button" data-bundle="__auto__" onclick="{onclick}">'
-            f'{icon("folder")} {html.escape(raw_default_label)}'
-            '</button>'
+            '<span class="mh">이 원본의 확정본</span>'
+            + row("__auto__", raw_default_name, raw_default_when)
         )
-        others = "".join(
-            f'<button type="button" data-bundle="{html.escape(b["id"])}" onclick="{onclick}">'
-            f'{icon("folder")} {html.escape(bundle_label(b))}</button>'
+        other_rows = "".join(
+            row(b["id"], b["report_title"] + source_version_suffix(b), bundle_time(b))
             for b in today_bundles
             if not raw_default or b["id"] != raw_default["id"]
         )
+        others = f'<span class="mh">오늘 다른 확정본</span>{other_rows}' if other_rows else ""
         return (
             own + others
             + f'<span class="menu-sep"></span><button type="button" data-bundle="__new__" onclick="{onclick}">'
-            "+ 새 확정본 만들어 보내기</button>"
+            '<span class="nm">+ 새 확정본 만들어 보내기</span></button>'
         )
 
     raw_menu_html = _raw_menu("sendRaw(this)")
@@ -2589,6 +2629,12 @@ def render_card_page(
     # [추가: 2026-09-01] 소제목별 복사 텍스트에 쓸 설정 — 소제목마다 다시 읽지 않도록
     # 한 번만 읽어 넘긴다(기사 제목 형식·소제목 형식은 정기 설정을 그대로 상속).
     settings = load_settings()
+    # 「보기 순서」의 「언론사순」이 쓰는 자리 번호 — 정기 확정본과 같은 키(outlet_sort_key)로
+    # 화면 전체를 한 번만 세운다. 화면 전용이라 저장값·복사·txt·엑셀·발송엔 안 나간다.
+    rank_by_url = {
+        a["url"]: i
+        for i, a in enumerate(sorted((a for _, arts in groups for a in arts), key=outlet_sort_key))
+    }
     sections = []
     raw_sent_n = raw_hidden_n = raw_open_n = 0
     if raw_mode:
@@ -2711,6 +2757,7 @@ def render_card_page(
                     bundle_options_html=bundle_options_html,
                     is_new=a["url"] in new_urls,
                     move_bundles_html=move_bundles_html,
+                    outlet_rank=rank_by_url.get(a["url"], 0),
                 )
                 for i, a in enumerate(visible)
             )
@@ -3068,6 +3115,7 @@ def render_card_page(
     {unsent_filter_html}
     <span style="flex:1"></span>
     {export_links_html}
+    {view_mode_html}
   </div>"""
         # [수정: 2026-09-17] 「이동할 소제목 선택」 드롭다운 + 「옮기기」 버튼 → 「옮기기 ▾」 하나.
         # 메뉴는 늘 위로 열리고(.up), 고르면 바로 옮긴다. 목록은 행의 메뉴와 같다(_move_menu_html).
