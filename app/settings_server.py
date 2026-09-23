@@ -7036,7 +7036,7 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def _handle_save_manual_keyword_note(self, form: dict) -> None:
-        """"+ 직접 키워드 작성하기"의 저장/삭제 버튼이 fetch로 호출한다(saveKeywordNote/
+        """"+ 한 줄 메모"의 저장/삭제 버튼이 fetch로 호출한다(saveKeywordNote/
         clearKeywordNote) — 하단 💬 AI 요약 블록과 무관한, 이용자가 자유
         서식으로 적어두는 메모 한 줄을 저장한다(app.manual_keyword_note). 완성본은
         정적 파일이라 즉시 다시 그려야 다음 접속에도 바로 보인다(초안·실시간 현황은

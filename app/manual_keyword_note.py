@@ -1,4 +1,4 @@
-# Design Ref: 사용자 요청(2026-08-05) — "+ 직접 키워드 작성하기" 버튼으로 이용자가 자유
+# Design Ref: 사용자 요청(2026-08-05) — "+ 한 줄 메모" 버튼으로 이용자가 자유
 # 서식으로 적어두는 메모/키워드 한 줄. 하단 💬 AI 요약 블록과는 완전히 별개다
 # (예전엔 그 위에 있던 "🤖 AI가 추출한 주요 키워드"와 대비해 설명했는데,
 #  그 블록은 2026-09-10에 없앴다 — HISTORY.md 참고).
@@ -147,7 +147,7 @@ def past_notes(run_key: Optional[RoundKey] = None, prev_days: int = 1) -> list:
 def save_manual_keyword_note(text: str, run_key: Optional[RoundKey] = None) -> None:
     """메모 텍스트를 그 회차 자리에 저장한다. run_key를 생략하면 "지금 진행 중인/방금
     끝난 회차"에 붙여 저장한다. 빈 문자열로 저장하면 그 회차 메모만 지운다("작성 전"
-    상태로 되돌아가 버튼이 다시 "+ 직접 키워드 작성하기"로 보이고, 내보내기 텍스트에도
+    상태로 되돌아가 버튼이 다시 "+ 한 줄 메모"로 보이고, 내보내기 텍스트에도
     안 실린다) — 다른 회차 메모는 건드리지 않는다.
     """
     key = run_key if run_key is not None else _current_round_key()

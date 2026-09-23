@@ -784,7 +784,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      한 묶음으로 왼쪽에 붙여, 📂 소제목 미분류 칸 헤더와 같은 구성으로 읽히게 한다. */
   .manual-zone-left {{ display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }}
   .manual-zone .article:first-child {{ margin-top: 10px; }}
-  /* [추가: 2026-08-05] app.renderer와 동일 — 직접 키워드 작성 메모 칸. */
+  /* [추가: 2026-08-05] app.renderer와 동일 — "+ 한 줄 메모" 칸. */
   /* [수정: 2026-08-07] app.renderer와 동일 — 스크롤 중에도 계속 보이도록 sticky 고정. */
   .keyword-note-zone {{
     display: none; align-items: center; gap: 8px; border: 1px dashed {border}; border-radius: var(--r-lg);
@@ -837,7 +837,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   </header>
   <div class="actions" id="preview-actions">{actions_html}</div>
   <div class="keyword-note-zone{note_open_class}" id="keyword-note-zone">
-    <input type="text" id="keyword-note-input" value="{note_value_attr}" placeholder="키워드 a, 키워드 b, 키워드 c..." onkeydown="keywordNoteKey(event)"{note_input_disabled_attr}>
+    <input type="text" id="keyword-note-input" value="{note_value_attr}" placeholder="물가 동향, 공공기관 이전, 인사청문회 등" onkeydown="keywordNoteKey(event)"{note_input_disabled_attr}>
     <button type="button" onclick="toggleKeywordEditMode(this)">{note_save_btn_label}</button>
     <button class="clear-btn" type="button" onclick="{note_clear_btn_onclick}">{note_clear_btn_label}</button>
     {note_history_html}
@@ -3272,7 +3272,7 @@ def _actions_html(
     keyword_note_btn_html = (
         ""
         if load_manual_keyword_note()
-        else '<button class="create-group-btn" type="button" onclick="toggleKeywordNote(this)">+ 키워드 직접 작성</button>'
+        else '<button class="create-group-btn" type="button" onclick="toggleKeywordNote(this)">+ 한 줄 메모</button>'
     )
     # [수정: 2026-08-12] "🤖 미분류 기사 분류"(증분 배정)는 📂 소제목 미분류 칸의 헤더로
     # 옮겼다(_render_preview_groups 참고) — 미분류를 발견하는 자리에서 바로 누르도록,

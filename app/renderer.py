@@ -814,7 +814,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      baseline 정렬로는 버튼이 글자 밑선에 매달려 보여 이 묶음만 center로 맞춘다. */
   .manual-zone-left {{ display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }}
   .manual-zone .article:first-child {{ margin-top: 10px; }}
-  /* [추가: 2026-08-05] "+ 직접 키워드 작성하기" — AI 키워드 블록과 별개로, 이용자가
+  /* [추가: 2026-08-05] "+ 한 줄 메모" — AI 키워드 블록과 별개로, 이용자가
      자유 서식으로 적어두는 메모 한 줄. 저장된 메모가 있으면 처음부터 열려서 보이고,
      없으면 버튼을 눌러야 나타난다(is-open 토글). */
   /* [수정: 2026-08-07] 스크롤해서 기사를 읽다가 메모를 적으려면 위로 되돌아가야 했던
@@ -892,7 +892,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     </div>
   </header>
   <div class="keyword-note-zone{note_open_class}" id="keyword-note-zone" data-run-slot="{run_slot_raw}">
-    <input type="text" id="keyword-note-input" value="{note_value_attr}" placeholder="키워드 a, 키워드 b, 키워드 c..." onkeydown="keywordNoteKey(event)"{note_input_disabled_attr}>
+    <input type="text" id="keyword-note-input" value="{note_value_attr}" placeholder="물가 동향, 공공기관 이전, 인사청문회 등" onkeydown="keywordNoteKey(event)"{note_input_disabled_attr}>
     <button type="button" onclick="toggleKeywordEditMode(this)">{note_save_btn_label}</button>
     <button class="clear-btn" type="button" onclick="{note_clear_btn_onclick}">{note_clear_btn_label}</button>
     {note_history_html}
@@ -1879,7 +1879,7 @@ function _createCustomGroupSubmit(name) {{
     alert("소제목 만들기에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
   }});
 }}
-// [추가: 2026-08-05] "+ 직접 키워드 작성하기" — AI 키워드 블록과 별개로 자유 서식 메모를
+// [추가: 2026-08-05] "+ 한 줄 메모" — AI 키워드 블록과 별개로 자유 서식 메모를
 // 적어두는 칸. 열기/닫기는 화면에서만 토글하고(저장 안 함), 저장·삭제는 새로고침해서
 // 복사/txt/텔레그램 텍스트에도 바로 반영되게 한다(그 텍스트들은 페이지 로드 시점에
 // 이미 다 만들어져 있어서 새로고침 없이는 갱신할 방법이 없다).
@@ -1935,7 +1935,7 @@ function clearKeywordNote() {{
 }}
 // [추가: 2026-08-10] 저장된 메모가 없는 채로 처음 여는 중이면 "삭제"가 아니라 "취소"다 —
 // 아직 서버에 아무것도 저장된 게 없으니 지울 것도 없다. 서버 호출 없이 그냥 새로고침만
-// 하면(아무것도 안 바뀐 상태라) 패널이 닫히고 "+ 키워드 직접 작성" 버튼이 원래대로
+// 하면(아무것도 안 바뀐 상태라) 패널이 닫히고 "+ 한 줄 메모" 버튼이 원래대로
 // 돌아온다.
 function cancelKeywordNote() {{
   location.reload();
@@ -3405,7 +3405,7 @@ def keyword_note_template_vars(run_key=None) -> dict:
         "keyword_note_btn_html": (
             ""
             if text
-            else '<button class="create-group-btn" type="button" onclick="toggleKeywordNote(this)">+ 키워드 직접 작성</button>'
+            else '<button class="create-group-btn" type="button" onclick="toggleKeywordNote(this)">+ 한 줄 메모</button>'
         ),
     }
 
@@ -3433,7 +3433,7 @@ def _build_plain_text(
     lines = []
     if header:
         lines.append(f"언론 모니터링 {format_slot_time_kr(run_slot)} 기준")
-        # [추가: 2026-08-05] "+ 직접 키워드 작성하기"로 적어둔 메모가 있으면 헤더 바로 아래
+        # [추가: 2026-08-05] "+ 한 줄 메모"로 적어둔 메모가 있으면 헤더 바로 아래
         # "- {메모}" 한 줄로 끼워 넣는다 — AI 키워드 블록(하단)과 달리 이건 화면 맨 위에 있고,
         # 내보내기 텍스트에서도 항상 헤더 다음 줄에 온다.
         # [수정: 2026-08-26] 기준 날짜는 "오늘"이 아니라 **그 회차의 날짜**다 — 자정을 넘겨

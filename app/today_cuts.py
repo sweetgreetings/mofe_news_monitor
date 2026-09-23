@@ -160,7 +160,7 @@ def copy_round_records(date_str: str, src_end: str, dst_end: str, move_seen: boo
         ("AI 분류 캐시", lambda: llm_classifier.copy_round_cache(src, dst)),
         ("소제목 이름표", lambda: _copy_bucket(curation.GROUP_LABELS_FILE, src_key, dst_key)),
         ("소제목 순서", lambda: _copy_bucket(group_order.GROUP_ORDER_FILE, src_key, dst_key)),
-        ("키워드 메모", lambda: manual_keyword_note.copy_note(src, dst)),
+        ("한 줄 메모", lambda: manual_keyword_note.copy_note(src, dst)),
         ("자동 분류 기록", lambda: auto_classify_turn.copy_turn(src_end, dst_end)),
         ("재분류 실패 횟수", lambda: reclassify_attempts.copy_attempts(src, dst)),
     ]
