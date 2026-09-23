@@ -551,7 +551,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   details.date-block > summary::before {{ content: "▸"; color: {muted}; font-size: 0.78rem; }}
   details.date-block[open] > summary::before {{ content: "▾"; }}
   details.date-block > summary:hover {{ background: {hover}; }}
-  .date-block > summary .dt {{ font-weight: 600; color: {header}; font-size: var(--fs-base); font-variant-numeric: tabular-nums; }}
+  .date-block > summary .dt {{ font-weight: 600; color: {header}; font-size: var(--fs-lg); font-variant-numeric: tabular-nums; }}
   .date-block > summary .chip-today {{ font-size: var(--fs-xs); background: {adhoc_bg}; color: {adhoc_text};
     border: 1px solid {adhoc_border_soft}; border-radius: var(--r-pill); padding: 1px 8px; font-weight: 600; }}
   .date-block > summary .dcnt {{ margin-left: auto; }}
@@ -562,17 +562,17 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .date-block > summary .day-del {{ margin: 0 -6px 0 -4px; }}
   .date-block > .runs {{ margin: 4px 0 4px 17px; padding-left: 14px; border-left: 2px solid {border}; }}
   .date-block > .runs > .run-line {{ padding-left: 8px; }}
-  .dcnt {{ font-size: var(--fs-xs); color: {text_faint}; font-variant-numeric: tabular-nums; }}
-  .run-row .iss {{ font-weight: 600; color: {text}; font-size: var(--fs-md); white-space: nowrap; overflow: hidden;
+  .dcnt {{ font-size: var(--fs-sm); color: {text_faint}; font-variant-numeric: tabular-nums; }}
+  .run-row .iss {{ font-weight: 600; color: {text}; font-size: var(--fs-base); white-space: nowrap; overflow: hidden;
     text-overflow: ellipsis; min-width: 0; }}
   .run-row .iss.noname {{ font-style: italic; font-weight: 500; color: {muted}; }}
   .run-row .kwv {{ flex: 1; min-width: 0; color: {text_faint}; font-size: var(--fs-sm); white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; }}
   .run-row .kwv + .n {{ margin-left: 0; }}
   @media (max-width: 640px) {{ .run-row .kwv {{ visibility: hidden; }} }}
-  .run-row .win {{ flex: none; color: {muted}; font-size: var(--fs-sm); min-width: 72px; font-variant-numeric: tabular-nums; }}
+  .run-row .win {{ flex: none; color: {muted}; font-size: var(--fs-base); min-width: 90px; font-variant-numeric: tabular-nums; }}
   /* 사안별 보기 — 머리줄이 사안명(+검색어), 회차 줄 앞칸은 「9/17(목) 15:05 기준」이라 더 넓다. */
-  .run-row .win.wd {{ min-width: 146px; }}
+  .run-row .win.wd {{ min-width: 182px; }}
   .date-block > summary .dcnt {{ flex: none; white-space: nowrap; }}  /* 「57건」이 두 줄로 쪼개지지 않게 */
   /* 사안명은 날짜와 달리 길다 — 좁은 화면에서 글자 단위로 쪼개지지 않게 한 줄로 두고 말줄임. */
   .issue-block > summary .dt {{ font-variant-numeric: normal; min-width: 0;
@@ -588,6 +588,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     .date-block > summary .exp {{ display: none; }}
     .date-block > summary .dt {{ min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
     .run-row .n, .run-row .go {{ white-space: nowrap; }}
+    /* 좁은 화면에선 기준 시각 칸의 최소폭을 푼다 — 안 그러면 그 칸이 자리를
+       차지해 사안명이 「꽃…」처럼 한 글자만 남는다(실측). */
+    .run-row .win, .run-row .win.wd {{ min-width: 0; }}
   }}
   .run-row .go {{ color: {accent}; font-size: var(--fs-sm); }}
   /* ADHOC_DESIGN.md §6.13 — 수시 보관함에서 모음 카드를 가리키는 유일한 표시.
@@ -1147,7 +1150,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .fab-pop .row .tx {{ flex: 1; color: {muted}; }}
   /* [수정: 2026-09-11] 회차 줄이 <a> 하나에서 「체크박스 · 링크 · 🗑」 세 칸(.run-line)이
      됐다 — 여백·밑줄·hover는 바깥 줄이 맡고, 링크(.run-row)는 남은 폭을 채운다. */
-  .run-line {{ display: flex; align-items: center; gap: 10px; padding: 0 4px 0 26px; font-size: var(--fs-sm);
+  .run-line {{ display: flex; align-items: center; gap: 10px; padding: 0 4px 0 26px; font-size: var(--fs-base);
     min-height: 34px; border-radius: var(--r-md); }}
   .run-line:hover {{ background: {row_hover}; }}
   .run-row {{ flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 7px 0;
@@ -1155,7 +1158,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .st {{ font-size: var(--fs-xs); border-radius: var(--r-pill); padding: 1px 9px; border: 1px solid; flex: none; }}
   .st.done {{ background: {hover}; color: {accent}; border-color: {accent_border}; }}  /* [수정: 2026-08-21] 초록→파랑 */
   .st.wip {{ background: {warn_bg}; color: {warn_accent}; border-color: {warn_border}; }}
-  .run-row .n {{ margin-left: auto; color: {text_faint}; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }}
+  .run-row .n {{ margin-left: auto; color: {text_faint}; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }}
   .run-row:hover .go {{ text-decoration: underline; text-underline-offset: 3px; }}
   /* [추가: 2026-09-11] 수시 보관함 삭제 — 줄 끝 🗑(하나, 확인창 없음)와 [선택 삭제](여러 개,
      확인창 한 번). 🗑는 확정본 기사 행의 🗑와 같은 무게: 평소 회색, hover만 빨강. */
@@ -1175,9 +1178,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .run-line.just-restored {{ background: {row_moved}; }}
   /* 선택 삭제 모드 — body.arch-tidy일 때만 체크박스가 나오고, 꺼내는 동작(복사·txt·xlsx·
      열기)과 줄 끝 🗑는 숨는다. 고른 줄은 확정본에서 체크한 기사 행과 같은 옅은 파랑. */
-  input.pick {{ display: none; width: var(--chk-sm); height: var(--chk-sm); margin: 0; flex: none;
+  input.pick {{ display: none; width: var(--chk-md); height: var(--chk-md); margin: 0; flex: none;
     accent-color: {accent}; cursor: pointer; }}
-  .pick-sp {{ display: none; width: var(--chk-sm); flex: none; }}
+  .pick-sp {{ display: none; width: var(--chk-md); flex: none; }}
   body.arch-tidy input.pick {{ display: inline-block; }}
   body.arch-tidy .pick-sp {{ display: inline-block; }}
   body.arch-tidy .row-del, body.arch-tidy .exp, body.arch-tidy .run-row .go, body.arch-tidy .normal-only {{ display: none; }}
