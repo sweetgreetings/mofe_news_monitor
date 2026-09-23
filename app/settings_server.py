@@ -1,4 +1,4 @@
-# Design Ref: DESIGN.md §1 설정 화면 목업(메뉴+하위 6페이지), §3 "최소 로컬 서버" (PRD 규칙 17)
+# Design Ref: archive/DESIGN.md §1 설정 화면 목업(메뉴+하위 6페이지), §3 "최소 로컬 서버" (PRD 규칙 17)
 import html
 import json
 import logging
@@ -8,6 +8,8 @@ from typing import Optional
 from urllib.parse import parse_qs, quote, urlsplit
 
 from app.config import (
+    BURST_MIN_OUTLETS_CHOICES,
+    BURST_WINDOW_CHOICES,
     DEFAULT_ARTICLE_LINE_TEMPLATE,
     DEFAULT_AUTO_SEND_GRACE_MIN,
     DEFAULT_SUBHEADING_FORMAT_TEMPLATE,
@@ -19,8 +21,8 @@ from app.config import (
     LOGO_PATH,
     MAX_AUTO_SEND_GRACE_MIN,
     LANDING_KEYWORD_COUNT,
+    EMAIL_SERVICES,
     MAX_EMAIL_RECIPIENTS,
-    MAX_HIGHLIGHT_KEYWORDS,
     MAX_KEYWORDS_PER_GROUP,
     MAX_KEYWORD_GROUPS,
     MAX_SCHEDULE_GROUPS,
@@ -38,6 +40,7 @@ from app.config import (
     WEEKDAY_KEYS,
     WEEKDAY_LABELS_KO,
 )
+from app.breaking_burst import burst_history
 from app.breaking_alert import (
     BreakingAlertSettingsError,
     load_breaking_alert_settings,
@@ -67,6 +70,9 @@ from app.llm_classifier import last_classification_was_rule_based as llm_last_cl
 from app.reclassify_attempts import record_attempt as record_reclassify_attempt
 from app.confirm_send import send_confirmed_run
 from app.icons import icon
+from app import send_log
+from app.config import SEND_LOG_RETENTION_DAYS
+from app.topnav import plain_nav, regular_nav, topnav_style
 from app.curation import (
     active_hidden_dates,
     bulk_move_articles,
@@ -74,9 +80,9 @@ from app.curation import (
     clear_group_overrides_for,
     display_group_name,
     display_name_in_use,
-    rounds_using_display_name,
     filter_hidden,
-    hide_article,
+    hide_articles,
+    is_hidden,
     load_group_labels,
     load_group_overrides,
     load_hidden_batches,
@@ -90,6 +96,7 @@ from app.custom_groups import add_custom_group, load_custom_groups, remove_custo
 from app.email_recipients import active_recipient_emails, load_email_recipients, save_email_recipients
 from app.email_sender import is_configured as email_is_configured
 from app.email_sender import send_text as email_send_text
+from app.email_sender import check_sender_address as check_email_sender_address, send_test_mail
 from app.group_order import apply_group_order, is_order_locked, save_group_order
 from app.draft_articles import add_draft_pending_article
 from app.excel_export import build_workbook_bytes, format_pub_datetime, sanitize_filename_part
@@ -108,11 +115,28 @@ from app.landing_renderer import generate_landing_page, wordcloud_candidates
 from app.live_renderer import generate_live_page_or_wait
 from app.manual_articles import add_manual_article, load_manual_articles, pop_manual_article
 from app.manual_keyword_note import save_manual_keyword_note
-from app.naver_api import OUTLET_CATEGORIES, fetch_full_title_and_summary, outlet_display_label
+from app.naver_api import (
+    OUTLET_CATEGORIES,
+    fetch_article_by_url,
+    is_non_news_url,
+    normalize_article_url,
+    original_url_keys,
+    fetch_full_title_and_summary,
+    outlet_display_label,
+)
 from app.naver_api import test_naver_credentials
 from app.llm_classifier import test_llm_credentials
 from app.credentials import (
+    delete_email_credentials,
     delete_llm_credentials,
+    email_saved_at,
+    email_saved_password,
+    email_sender_address,
+    email_sender_name,
+    email_sender_password,
+    email_service,
+    email_source,
+    save_email_credentials,
     delete_naver_credentials,
     llm_api_key,
     llm_model,
@@ -126,17 +150,25 @@ from app.credentials import (
     naver_saved_client_secret,
     naver_source,
     save_llm_credentials,
+    delete_telegram_token,
+    save_telegram_token,
+    telegram_bot_token,
+    telegram_saved_at,
+    telegram_saved_token,
+    telegram_source,
     save_naver_credentials,
 )
 from app.summary_overrides import load_summary_overrides, set_summary_override
 from app.scheduler import next_pending_slot
 from app.preview_renderer import (
     _compute_preview_articles,
+    current_draft_urls,
     generate_preview_page,
     preview_bulk_move_articles,
     preview_move_article,
 )
 from app.renderer import (
+    range_select_script,
     apply_line_template,
     apply_subheading_format,
     build_group_copy_texts,
@@ -146,7 +178,6 @@ from app.renderer import (
 from app.settings import (
     SettingsError,
     active_search_groups,
-    add_highlight_keyword,
     all_search_keywords,
     cycle_highlight_color,
     group_in_live,
@@ -156,10 +187,10 @@ from app.settings import (
     pick_active_group_index,
     save_article_line_template,
     save_subheading_format_template,
-    save_highlight_keywords,
     save_keyword_groups,
     save_outlet_selection,
-    save_scrap_page_settings,
+    save_adhoc_article_line_template,
+    save_adhoc_subheading_format_template,
     save_schedule_groups,
     save_auto_send_settings,
     is_auto_send_enabled,
@@ -168,11 +199,27 @@ from app.settings import (
 )
 from app.telegram_bot import is_configured as telegram_is_configured
 from app.telegram_bot import send_text as telegram_send_text
+from app.telegram_bot import check_bot_token
+from app.telegram_bot_name import (
+    MAX_BOT_NAME_LEN,
+    apply_default_bot_name_once,
+    fetch_bot_name,
+    normalize_bot_name,
+    set_bot_name,
+)
+from app.config import DEFAULT_TELEGRAM_BOT_NAME
 from app.telegram_recipients import (
+    LEGACY_NOTIFY,
+    NEW_RECIPIENT_NOTIFY,
+    RECEIVE_FIELDS,
     active_recipient_chat_ids as telegram_active_recipient_chat_ids,
     load_telegram_recipients,
+    normalize_notify,
+    notify_label,
+    notify_sentence,
     save_telegram_recipients,
 )
+from app.scraper import _already_published_urls
 from app.storage import list_run_meta, load_latest_run, update_run_articles
 from app.storage import load_run_file
 from app.storage import RunLockedError, delete_run, restore_run
@@ -208,7 +255,7 @@ _BASE_STYLE = """
      각자 템플릿에서 여러 칸 배치를 함께 쓴다(각 템플릿의 "[추가: 2026-09-11]" 참고). */
   .container {{
     max-width: 800px; margin: 24px auto; padding: 24px; background: {card};
-    border: 1px solid {border}; border-radius: 8px;
+    border: 1px solid {border}; border-radius: var(--r-lg);
   }}
   /* [수정: 2026-07-26] 모든 설정 세부 페이지에 상단(뒤로/HOME)·하단(저장) 고정 바를
      적용하면서, 내용이 그 바에 가리지 않도록 컨테이너 위쪽에 여백을 더했다. 하단
@@ -218,20 +265,11 @@ _BASE_STYLE = """
      일곱 화면이 같은 값을 써야 화면을 오갈 때 제목이 들썩이지 않는다(수시·추이는 84→68px 형태).
      시안 SUBHEAD_SPACING_MOCKUP.html B안. */
   .container {{ padding-top: 44px; }}
-  h1 {{ font-size: 1.3rem; color: {header}; }}
-  .hint {{ color: {muted}; font-size: 0.85rem; margin-bottom: 16px; }}
-  .caption {{ color: {muted}; font-size: 0.78rem; margin: 0 0 12px; }}
+  h1 {{ font-size: var(--fs-xl); color: {header}; }}
+  .hint {{ color: {muted}; font-size: var(--fs-md); margin-bottom: 16px; }}
+  .caption {{ color: {muted}; font-size: var(--fs-sm); margin: 0 0 12px; }}
   .error {{ color: {error}; margin: 12px 0; }}
-  .topbar {{
-    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
-    background: {card}; border-bottom: 1px solid {border}; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  }}
-  .topbar-inner {{
-    max-width: 800px; margin: 0 auto; padding: 12px 24px;
-    display: flex; justify-content: space-between; align-items: center;
-  }}
-  .topbar a {{ color: {accent}; text-decoration: none; font-size: 0.92rem; font-weight: 600; padding: 6px 10px; border-radius: 6px; }}
-  .topbar a:hover {{ background: {hover}; }}
+{topnav_style}
   .save-bar {{
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
     background: {card}; border-top: 1px solid {border}; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
@@ -243,20 +281,20 @@ _BASE_STYLE = """
      완전히 똑같이 안 보인다. 크롬이 button 텍스트만 내부적으로 수직 중앙 정렬해주는
      것까지 발견해 align-items: center를 직접 지정했다. */
   button, a.btn {{
-    background: {accent}; color: {on_fill}; border: none; border-radius: 4px;
-    padding: 8px 16px; font-size: 1rem; font-family: inherit; cursor: pointer; text-decoration: none;
+    background: {accent}; color: {on_fill}; border: none; border-radius: var(--r-md);
+    padding: 8px 16px; font-size: var(--fs-base); font-family: inherit; cursor: pointer; text-decoration: none;
     appearance: none; -webkit-appearance: none;
     display: inline-flex; align-items: center; justify-content: center;
   }}
   button:hover, a.btn:hover {{ background: {header}; }}
   button:disabled {{ background: {border}; color: {muted}; cursor: not-allowed; }}
   input[type=text], input[type=number] {{
-    background: {bg}; color: {text}; border: 1px solid {border}; border-radius: 4px;
-    padding: 6px 10px; font-size: 1rem;
+    background: {bg}; color: {text}; border: 1px solid {border}; border-radius: var(--r-md);
+    padding: 6px 10px; font-size: var(--fs-base);
   }}
   .del-btn {{
-    background: transparent; color: {muted}; border: 1px solid {border}; border-radius: 4px;
-    padding: 4px 10px; font-size: 0.8rem; margin-left: 6px; cursor: pointer;
+    background: transparent; color: {muted}; border: 1px solid {border}; border-radius: var(--r-md);
+    padding: 4px 10px; font-size: var(--fs-sm); margin-left: 6px; cursor: pointer;
   }}
   .del-btn:hover {{ background: {hover}; color: {error}; border-color: {error}; }}
   /* [추가: 2026-08-13] 이모지 대신 쓰는 단색 SVG 아이콘(app.icons) 공통 크기·색 —
@@ -265,35 +303,12 @@ _BASE_STYLE = """
     stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }}
 """
 
-# [수정: 2026-07-26] 페이지 맨 아래 있던 settings/home 링크를 상단 고정 바로 옮겼다 —
-# 긴 페이지에서 스크롤 없이 바로 나갈 수 있게 하려는 목적(저장 버튼을 하단 고정으로
-# 옮긴 것과 같은 이유). [수정: 2026-07-26] HOME을 왼쪽, 설정을 오른쪽으로 —
-# 모바일 앱의 "왼쪽=뒤로가기"보다, 다음/네이버 같은 웹사이트의 "왼쪽=홈(로고)"
-# 관습이 이 앱(브라우저 화면)에 더 맞는다는 판단. "HOME"은 진입 화면으로,
-# "설정"은 설정 메뉴(/)로 이동한다.
-_TOP_BAR_HTML = (
-    '<div class="topbar"><div class="topbar-inner">'
-    '<a href="{index_href}">홈</a>'
-    '<a href="/">설정</a>'
-    "</div></div>"
-)
-
-# [수정: 2026-07-27] 숨긴 기사 관리 화면은 설정으로 갈 일이 없다 — 여기서 되돌리기(↩️)를
-# 누른 뒤에는 바로 스크랩 결과 화면으로 돌아가는 게 자연스러워서 오른쪽 링크를
-# "스크랩 보기"(index.html)로 바꿨다.
-# [수정: 2026-08-05] 왼쪽도 "홈"(home.html)이 아니라 "📝 스크랩 초안"(preview.html)으로
-# 바꿨다 — 숨긴 기사 관리에서 되돌리기 후 주로 가는 곳은 초안 아니면 완성본이지, 로고만
-# 있는 진입 화면(홈)으로 갈 일은 거의 없다는 피드백.
-# [수정: 2026-09-16] 맨 왼쪽에 "홈"을 다시 넣었다(사용자 요청) — 2026-08-05에 "여기서
-# 홈으로 갈 일은 거의 없다"고 뺐는데, 그 결과 이 화면만 앱에서 유일하게 홈으로 가는 길이
-# 없는 막다른 화면이 됐다. 확정본 상단바(홈 / 실시간 / 초안)와 같은 「맨 왼쪽은 홈」 관례다.
-_HIDDEN_TOP_BAR_HTML = (
-    '<div class="topbar"><div class="topbar-inner">'
-    '<a href="{home_href}">홈</a>'
-    '<a href="{preview_href}">초안</a>'
-    '<a href="{scrap_href}">확정본</a>'
-    "</div></div>"
-)
+# 상단바는 app/topnav.py 한 곳에서 만든다(시안 mockups/TOPBAR_NAV_MOCKUP.html).
+# 설정 하위 화면: 홈 │ ← 설정. 휴지통: 정기 묶음(켜진 칸 없음 — 초안·확정본에서 들어오는 곳).
+_TOP_BAR_HTML = plain_nav("설정", f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/")
+_LABELS_TOP_BAR_HTML = plain_nav()
+_LABEL_MANAGE_TOP_BAR_HTML = plain_nav("라벨 보관함", f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/labels")
+_HIDDEN_TOP_BAR_HTML = regular_nav(None)
 
 _MENU_TEMPLATE = (
     """<!DOCTYPE html>
@@ -312,21 +327,15 @@ _MENU_TEMPLATE = (
      "알록달록해서" 이니셜 배지로 바꿨던 문제가 재발할 수 있어 그 방향은 배제). */
   .menu a {{
     display: flex; align-items: center; gap: 11px; margin: 6px 0; padding: 12px 12px;
-    font-size: 0.95rem; font-weight: 500; color: {text}; text-decoration: none;
-    border-radius: 8px; background: {bg};
+    font-size: var(--fs-base); font-weight: 500; color: {text}; text-decoration: none;
+    border-radius: var(--r-md); background: {bg};
   }}
   .menu a:hover {{ background: {hover}; }}
-  .menu-chev {{ margin-left: auto; color: {border}; font-size: 0.9rem; }}
-  /* [수정: 2026-07-26] 메뉴를 기능별 소제목으로 재편했다 — 검색 키워드/형광펜 긋기는
-     소제목 없이 맨 위(점선 구분선만), 나머지는 "실시간 기사 현황"/"뉴스 스크랩"/"기타"
-     소제목 아래로 묶는다. /outlets 페이지의 카테고리 이름과 같은 스타일이되, 굵게는
-     하지 않는다(사용자 요청). 숨긴 기사 관리는 스크랩 화면 상단의 🗑️로 바로 갈 수
-     있어 메뉴에서는 없앴다. */
-  .ungrouped {{ margin-bottom: 22px; padding-bottom: 14px; border-bottom: 1px dashed {border}; }}
+  .menu-chev {{ margin-left: auto; color: {border}; font-size: var(--fs-md); }}
   .category {{ margin: 22px 0 0; }}
   .category:first-of-type {{ margin-top: 0; }}
   .category-name {{
-    color: {header}; font-size: 0.95rem; margin-bottom: 8px;
+    color: {header}; font-size: var(--fs-base); margin-bottom: 8px;
     padding-bottom: 4px; border-bottom: 1px solid {border};
   }}
   /* [추가: 2026-08-20] "연동"(네이버·AI 키) 항목의 상태 배지 — 미등록은 눈에 띄어야
@@ -334,16 +343,20 @@ _MENU_TEMPLATE = (
      정보라 회색으로 낮춘다. 제대로 저장돼 있을 때는 배지를 아예 안 그린다(설정
      화면 전체가 "고칠 게 있을 때만 표시가 붙는다"는 관례를 따른다). */
   .badge-warn, .badge-env {{
-    margin-left: auto; font-size: 0.74rem; font-weight: 700; border-radius: 10px; padding: 2px 8px;
+    margin-left: auto; font-size: var(--fs-xs); font-weight: 700; border-radius: var(--r-pill); padding: 2px 8px;
   }}
   .badge-warn {{ color: {warn_text}; background: {warn_chip_bg}; }}
   .badge-env {{ color: {muted}; background: {bg}; border: 1px solid {border}; }}
   .badge-warn + .menu-chev, .badge-env + .menu-chev {{ margin-left: 8px; }}
-  /* [추가: 2026-08-20] "발송 · 알림" 카테고리 안, 정기 자동발송(3항목)과 [단독]·[속보]
-     알림을 시각적으로만 나눈다 — 같은 서랍(텔레그램 설정) 안이라 나란히 있어야
-     "텔레그램 관련은 여기"가 성립하지만, 동작은 완전히 별개(CLAUDE.md 참고)라 카테고리를
-     새로 쪼개지 않고 옅은 점선 하나로만 구분한다. */
-  .menu-divider {{ border-top: 1px dashed {border}; margin: 10px 4px 4px; }}
+  /* [추가: 2026-09-18] 정기·수시 묶음 이름 — 홈 흐름도 줄 이름표와 같은 왼쪽 3px 띠. */
+  .flow .category-name {{ border-left: 3px solid; padding-left: 8px; font-weight: 700; }}
+  .flow.reg .category-name {{ border-left-color: {flow_row_reg_bar}; }}
+  .flow.adhoc .category-name {{ border-left-color: {flow_row_adhoc_bar}; }}
+  /* 한 묶음 안의 작은 제목(텍스트 표출 형식 · 발송 · 알림) */
+  .menu-sub {{ color: {muted}; font-size: var(--fs-sm); margin: 14px 4px 2px; }}
+  .menu-sub.first {{ margin-top: 2px; }}
+  /* 항목 이름 옆 회색 한정어(이메일 = 정기 확정본만) */
+  .menu-note {{ color: {muted}; font-size: var(--fs-sm); font-weight: 400; }}
   /* [추가: 2026-09-11] 폭이 800px이 되면서 메뉴 묶음을 두 단으로 흘린다(CSS 다단 —
      위에서 아래로 읽는 순서가 그대로 유지된다). 묶음 하나가 두 단에 걸쳐 잘리지 않게
      break-inside를 막고, 단 맨 위에서 묶음의 위 여백이 튀지 않게 여백을 아래로 옮긴다.
@@ -356,42 +369,49 @@ _MENU_TEMPLATE = (
 </style>
 </head>
 <body>
-<div class="topbar"><div class="topbar-inner">
-  <a href="{index_href}">홈</a>
-</div></div>
+{topnav_html}
 <div class="container">
   <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M19.1 14.4a1.5 1.5 0 0 0 .3 1.7l.1.1a1.9 1.9 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-1.7-.3 1.5 1.5 0 0 0-.9 1.4v.2a1.9 1.9 0 1 1-3.8 0v-.1a1.5 1.5 0 0 0-1-1.4 1.5 1.5 0 0 0-1.7.3l-.1.1a1.9 1.9 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0 .3-1.7 1.5 1.5 0 0 0-1.4-.9h-.2a1.9 1.9 0 1 1 0-3.8h.1a1.5 1.5 0 0 0 1.4-1 1.5 1.5 0 0 0-.3-1.7l-.1-.1a1.9 1.9 0 1 1 2.6-2.6l.1.1a1.5 1.5 0 0 0 1.7.3h.1a1.5 1.5 0 0 0 .9-1.4v-.2a1.9 1.9 0 1 1 3.8 0v.1a1.5 1.5 0 0 0 .9 1.4 1.5 1.5 0 0 0 1.7-.3l.1-.1a1.9 1.9 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0-.3 1.7v.1a1.5 1.5 0 0 0 1.4.9h.2a1.9 1.9 0 1 1 0 3.8h-.1a1.5 1.5 0 0 0-1.4.9Z"/></svg> 설정</h1>
-  <div class="menu ungrouped">
-    <a href="/keywords">검색어<span class="menu-chev">›</span></a>
-    <a href="/highlight">형광펜 긋기<span class="menu-chev">›</span></a>
-  </div>
-  <div class="category">
-    <div class="category-name">뉴스 스크랩</div>
+  <!-- [수정: 2026-09-18] 정기 / 수시 / 공통 · 수집 / 받는 사람 / 홈 / 연동으로 다시 묶었다.
+       정기·수시가 한 화면에 나란히 서므로 두 묶음엔 흐름 이름과 홈 흐름도와 같은 색 띠를 붙인다.
+       시안 mockups/SETTINGS_MENU_REORG_MOCKUP.html. -->
+  <div class="category flow reg">
+    <div class="category-name">정기</div>
     <div class="menu">
-      <a href="/schedule">수집 시간<span class="menu-chev">›</span></a>
-      <a href="/outlets">언론사 선택 · 순서 지정<span class="menu-chev">›</span></a>
-      <a href="/scrap-page">수집 범위<span class="menu-chev">›</span></a>
+      <a href="/keywords">검색어<span class="menu-chev">›</span></a>
+      <a href="/schedule">수집시간대<span class="menu-chev">›</span></a>
+      <div class="menu-sub">텍스트 표출 형식</div>
+      <a href="/format">기사 제목<span class="menu-chev">›</span></a>
+      <a href="/subheading-format">소제목<span class="menu-chev">›</span></a>
+      <div class="menu-sub">발송 · 알림</div>
+      <a href="/auto-send">자동발송 대기시간 및 ON/OFF<span class="menu-chev">›</span></a>
+      <a href="/breaking-alert">[단독]·[속보] 기사 알림<span class="menu-chev">›</span></a>
+    </div>
+  </div>
+  <div class="category flow adhoc">
+    <div class="category-name">수시</div>
+    <div class="menu">
+      <div class="menu-sub first">텍스트 표출 형식</div>
+      <a href="/format-adhoc">기사 제목<span class="menu-chev">›</span></a>
+      <a href="/subheading-format-adhoc">소제목<span class="menu-chev">›</span></a>
     </div>
   </div>
   <div class="category">
-    <div class="category-name">메일머지</div>
+    <div class="category-name">정기, 수시 공통</div>
     <div class="menu">
-      <a href="/format"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8.5 13.5h7M8.5 17h7"/></svg> 기사 제목 형식<span class="menu-chev">›</span></a>
-      <a href="/subheading-format"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8.5 13.5h7M8.5 17h7"/></svg> 소제목 형식<span class="menu-chev">›</span></a>
+      <a href="/outlets">언론사 선택 및 순서 지정<span class="menu-chev">›</span></a>
     </div>
   </div>
   <div class="category">
-    <div class="category-name">발송 · 알림</div>
+    <div class="category-name">받는 사람 지정</div>
     <div class="menu">
-      <a href="/auto-send">자동발송 설정<span class="menu-chev">›</span></a>
-      <a href="/telegram">텔레그램 수신 대상자 지정<span class="menu-chev">›</span></a>
-      <a href="/email">이메일 수신 대상자 지정<span class="menu-chev">›</span></a>
-      <div class="menu-divider"></div>
-      <a href="/breaking-alert">🚨 [단독]·[속보] 기사 알림<span class="menu-chev">›</span></a>
+      <a href="/telegram">텔레그램<span class="menu-chev">›</span></a>
+      <a href="/email">이메일<span class="menu-note">정기 확정본만</span><span class="menu-chev">›</span></a>
+      <a href="/send-log">발송 기록<span class="menu-note">누가 받았는지</span><span class="menu-chev">›</span></a>
     </div>
   </div>
   <div class="category">
-    <div class="category-name">기타</div>
+    <div class="category-name">홈</div>
     <div class="menu">
       <a href="/wordcloud-exclude">워드클라우드 제외어<span class="menu-chev">›</span></a>
     </div>
@@ -404,8 +424,10 @@ _MENU_TEMPLATE = (
   <div class="category">
     <div class="category-name">연동</div>
     <div class="menu">
-      <a href="/naver">네이버 검색 API{naver_badge}<span class="menu-chev">›</span></a>
-      <a href="/llm">AI 연동 (Claude){llm_badge}<span class="menu-chev">›</span></a>
+      <a href="/naver">네이버 뉴스 API 설정{naver_badge}<span class="menu-chev">›</span></a>
+      <a href="/llm">LLM(AI) 연동{llm_badge}<span class="menu-chev">›</span></a>
+      <a href="/telegram-sender">텔레그램 발송 계정{telegram_badge}<span class="menu-chev">›</span></a>
+      <a href="/email-sender">이메일 발송 계정{email_badge}<span class="menu-chev">›</span></a>
     </div>
   </div>
 </div>
@@ -445,7 +467,7 @@ _KEYWORD_GROUPS_SCRIPT = "<script>\n" + r"""(function () {
     (g.disabled_keywords || []).forEach(function (w) { disabled[w] = true; });
     return {
       name: g.name || "",
-      live: g.include_in_live !== false,   // 「실시간」
+      live: g.include_in_live !== false,   // 「실시간 현황」
       scrap: !!g.include_in_scrap,          // 「초안·확정본」
       mode: g.mode === "AND" ? "AND" : "OR",
       kws: (g.keywords || []).map(function (w) { return { w: w, on: !disabled[w] }; })
@@ -524,7 +546,7 @@ _KEYWORD_GROUPS_SCRIPT = "<script>\n" + r"""(function () {
         // [수정: 2026-09-15] "정기 스크랩엔 다음 회차부터"는 초안까지 뭉뚱그렸다 — 초안은
         // 요청마다 다시 그려져 새 검색어로 곧바로 다시 모으고(_preview_keywords_signature),
         // 확정본만 이번 회차 마감 때 모인다.
-        txt.innerHTML = "<b>아직 저장하지 않았습니다.</b> 저장하면 실시간·초안엔 바로, 확정본엔 이번 회차 마감부터 반영됩니다.";
+        txt.innerHTML = "<b>아직 저장하지 않았습니다.</b> 저장하면 전체 기사·초안엔 바로, 확정본엔 이번 회차 마감부터 반영됩니다.";
       }
       return;
     }
@@ -542,9 +564,25 @@ _KEYWORD_GROUPS_SCRIPT = "<script>\n" + r"""(function () {
     root.innerHTML = "";
     var dups = crossGroupDups();
     state.forEach(function (g, gi) { root.appendChild(groupEl(g, gi, dups)); });
+    root.querySelectorAll(".group-name-input").forEach(fitNameWidth);
     var addBtn = document.getElementById("kwAddGroupBtn");
     addBtn.disabled = state.length >= MAX_GROUPS;
     refreshSaveBar();
+  }
+
+  // [수정: 2026-09-17] 그룹명 칸의 최소 폭 = 글자 폭. 예전엔 5em에서 멈춰 스위치 묶음이
+  // 같은 줄에 남고 「공공기관 통폐합」의 끝 글자가 잘렸다. 이름이 다 안 들어가면
+  // 스위치 묶음이 아랫줄로 내려간다(.group-head flex-wrap). 입력칸은 글자에 맞춰
+  // 스스로 늘지 않으므로 캔버스로 재서 min-width에 넣는다(카드 폭이 상한).
+  var _nameCanvas = document.createElement("canvas").getContext("2d");
+  function fitNameWidth(input) {
+    var cs = getComputedStyle(input);
+    _nameCanvas.font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
+    var text = input.value || input.placeholder;
+    var extra = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) +
+      parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth) + 4;
+    var px = Math.ceil(_nameCanvas.measureText(text).width + extra);
+    input.style.minWidth = "min(100%, max(5em, " + px + "px))";
   }
 
   function groupBlocks() { return document.querySelectorAll(".group-block"); }
@@ -561,8 +599,8 @@ _KEYWORD_GROUPS_SCRIPT = "<script>\n" + r"""(function () {
     // 둘 다 끄면 그룹 꺼짐 — 따로 끄는 스위치가 없다.
     var dest = document.createElement("span");
     dest.className = "dest-pair";
-    dest.appendChild(destSwitch(g, "live", "실시간", box,
-      "실시간 현황에서 이 그룹을 검색합니다.\n언론사 선택·중복 제거 없이 걸린 기사를 전부 보여줍니다."));
+    dest.appendChild(destSwitch(g, "live", "전체 기사", box,
+      "전체 기사 화면에서 이 그룹을 검색합니다.\n언론사 선택·중복 제거 없이 걸린 기사를 전부 보여줍니다."));
     dest.appendChild(destSwitch(g, "scrap", "초안·확정본", box,
       "초안과 확정본(정기 회차)에 이 그룹을 넣습니다.\n저장하면 초안엔 바로, 확정본엔 이번 회차 마감부터 반영됩니다."));
 
@@ -572,6 +610,7 @@ _KEYWORD_GROUPS_SCRIPT = "<script>\n" + r"""(function () {
     nameIn.value = g.name; nameIn.placeholder = "그룹명을 입력하세요";
     nameIn.oninput = function () {
       g.name = nameIn.value; markDirty();
+      fitNameWidth(nameIn);
       nameIn.classList.toggle("missing", !g.name.trim() && g.kws.length > 0);
       refreshSaveBar();
     };
@@ -879,7 +918,7 @@ _KEYWORD_GROUPS_TEMPLATE = (
      카드 아래 세 줄 → 한 줄(.kw-foot). 실측(그룹 6개): 화면 높이 1,228 → 662px.
      시안은 KEYWORDS_COMPACT_MOCKUP.html 시안 A. */
   .group-block {{
-    border: 1px solid {border}; border-radius: 10px; padding: 10px 12px; margin: 14px 0;
+    border: 1px solid {border}; border-radius: var(--r-lg); padding: 10px 12px; margin: 14px 0;
     background: {card};
   }}
   .group-block.off {{ background: {surface_off}; }}
@@ -893,7 +932,7 @@ _KEYWORD_GROUPS_TEMPLATE = (
      이제 이름이 입력칸이 아니라 카드 제목처럼 읽힌다. */
   .group-head .group-name-input {{
     font-weight: 700; flex: 1 1 5em; min-width: 5em; background: transparent; color: {header};
-    border: 1px solid transparent; border-radius: 6px; padding: 3px 6px; font-size: .98rem;
+    border: 1px solid transparent; border-radius: var(--r-md); padding: 3px 6px; font-size: var(--fs-base);
     font-family: inherit;
   }}
   .group-head .group-name-input:hover {{ border-color: {border}; }}
@@ -906,10 +945,10 @@ _KEYWORD_GROUPS_TEMPLATE = (
      [수정: 2026-09-15] 남아 있던 첫 줄("켜 둔 그룹은 모두 실시간…그중 ☑정기 스크랩을
      체크한 그룹만…")도 뺐다 — 검색어 계층(실시간 ⊇ 정기)을 풀어 쓰려던 문장인데, 카드
      스위치 이름이 곧 목적지(실시간 / 초안·확정본)가 되면서 풀어 쓸 계층 자체가 없어졌다. */
-  .kw-lead {{ color: {muted}; font-size: .84rem; line-height: 1.7; margin: 0 0 14px; }}
+  .kw-lead {{ color: {muted}; font-size: var(--fs-md); line-height: 1.7; margin: 0 0 14px; }}
   .group-off-tag {{
-    display: none; font-size: .74rem; color: {muted}; background: {bg};
-    border-radius: 999px; padding: 2px 9px;
+    display: none; font-size: var(--fs-xs); color: {muted}; background: {bg};
+    border-radius: var(--r-pill); padding: 2px 9px;
   }}
   .group-block.off .group-off-tag {{ display: inline-block; }}
   .group-body {{ margin-top: 0; }}
@@ -924,22 +963,22 @@ _KEYWORD_GROUPS_TEMPLATE = (
   .head-ctrl {{ display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; }}
   .dest-pair {{ display: inline-flex; align-items: center; gap: 11px; flex-shrink: 0; }}
   .dest-sw {{ position: relative; display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
-    cursor: pointer; white-space: nowrap; font-size: .76rem; color: {muted}; }}
+    cursor: pointer; white-space: nowrap; font-size: var(--fs-sm); color: {muted}; }}
   .dest-sw.on {{ color: {header}; font-weight: 600; }}
   .dest-sw input {{ position: absolute; opacity: 0; width: 0; height: 0; }}
-  .pill {{ position: relative; width: 30px; height: 18px; border-radius: 999px; background: {toggle_off}; transition: background .16s; flex-shrink: 0; }}
+  .pill {{ position: relative; width: 30px; height: 18px; border-radius: var(--r-pill); background: {toggle_off}; transition: background .16s; flex-shrink: 0; }}
   .pill::after {{
     content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px;
-    border-radius: 50%; background: {on_fill}; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .16s;
+    border-radius: var(--r-circle); background: {on_fill}; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .16s;
   }}
   .dest-sw input:checked ~ .pill {{ background: {accent}; }}
   .dest-sw input:checked ~ .pill::after {{ transform: translateX(12px); }}
   .dest-sw input:focus-visible ~ .pill {{ outline: 2px solid {accent}; outline-offset: 2px; }}
 
-  /* 그룹 삭제 = 쓰레기통, 키워드 삭제 = ×. 크기·무게가 다르면 모양도 다르다(소제목엔
+  /* 그룹 삭제 = 휴지통, 키워드 삭제 = ×. 크기·무게가 다르면 모양도 다르다(소제목엔
      ▲▼, 기사엔 ↑↓를 쓰는 이 앱의 기존 관례와 같은 논리). */
   .group-trash {{
-    background: transparent; border: 1px solid transparent; border-radius: 7px;
+    background: transparent; border: 1px solid transparent; border-radius: var(--r-md);
     width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
     color: {muted}; cursor: pointer; flex-shrink: 0; padding: 0;
   }}
@@ -952,19 +991,19 @@ _KEYWORD_GROUPS_TEMPLATE = (
      양쪽에서 같아야 토글할 때 뒤 칩들이 줄을 넘나들며 재배치되지 않는다(글자 라벨
      대신 머리줄 개수 옆 "N개 뺌" 집계로 상태를 알린다). */
   .chips {{ display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }}
-  .chip {{ display: inline-flex; align-items: center; border-radius: 999px; font-size: .86rem; line-height: 1; max-width: 100%; position: relative; }}
+  .chip {{ display: inline-flex; align-items: center; border-radius: var(--r-pill); font-size: var(--fs-md); line-height: 1; max-width: 100%; position: relative; }}
   /* .chip-body/.chip-x는 이제 <button>이다(탭 이동·스크린리더가 인식하도록) — UA
      기본 버튼 껍데기(appearance)와 가운데 정렬 텍스트를 지워 예전 <span> 모양 그대로
      보이게 한다(app.renderer의 button 리셋과 같은 이유, _BASE_STYLE 참고). */
   .chip-body {{
     border: none; background: transparent; color: inherit; font: inherit;
-    padding: 4px 2px 4px 10px; cursor: pointer; border-radius: 999px 0 0 999px;
+    padding: 4px 2px 4px 10px; cursor: pointer; border-radius: var(--r-pill) 0 0 var(--r-pill);
     max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     text-align: left; appearance: none; -webkit-appearance: none;
   }}
   .chip-x {{
     border: none; background: transparent; color: inherit; font-size: .95rem; line-height: 1;
-    padding: 4px 8px 4px 4px; cursor: pointer; opacity: .55; border-radius: 0 999px 999px 0;
+    padding: 4px 8px 4px 4px; cursor: pointer; opacity: .55; border-radius: 0 var(--r-pill) var(--r-pill) 0;
     appearance: none; -webkit-appearance: none;
   }}
   .chip-x:hover {{ opacity: 1; color: {error}; background: rgba(220,38,38,.08); }}
@@ -979,24 +1018,24 @@ _KEYWORD_GROUPS_TEMPLATE = (
   .chip.dup {{ outline: 2px solid {warn_dot}; outline-offset: 1px; }}
   .chip.just-added {{ animation: kwpop .55s ease-out; }}
   @keyframes kwpop {{ 0% {{ transform: scale(.85); background: {kwpop_flash}; }} 100% {{ transform: scale(1); }} }}
-  .chip-edit {{ border: 1px solid {accent}; background: {card}; border-radius: 999px; padding: 3px 10px; font: inherit; font-size: .86rem; width: 130px; outline: none; }}
-  .chip-add {{ display: inline-flex; align-items: center; gap: 4px; border: 1px dashed {dash_border}; background: {card}; border-radius: 999px; padding: 3px 10px; color: {muted}; }}
+  .chip-edit {{ border: 1px solid {accent}; background: {card}; border-radius: var(--r-pill); padding: 3px 10px; font: inherit; font-size: var(--fs-md); width: 130px; outline: none; }}
+  .chip-add {{ display: inline-flex; align-items: center; gap: 4px; border: 1px dashed {dash_border}; background: {card}; border-radius: var(--r-pill); padding: 3px 10px; color: {muted}; }}
   .chip-add:focus-within {{ border-color: {accent}; border-style: solid; background: {hover}; }}
-  .chip-add input {{ border: none; outline: none; background: transparent; font: inherit; font-size: .86rem; width: 72px; color: {text}; padding: 0; }}
+  .chip-add input {{ border: none; outline: none; background: transparent; font: inherit; font-size: var(--fs-md); width: 72px; color: {text}; padding: 0; }}
   .chip-add input::placeholder {{ color: {placeholder}; }}
   .chip-add .plus {{ font-size: .95rem; color: {accent}; font-weight: 700; }}
 
-  .empty-kw {{ font-size: .82rem; color: {error}; background: {error_bg}; border: 1px dashed {error_border}; border-radius: 8px; padding: 8px 12px; margin-bottom: 8px; }}
+  .empty-kw {{ font-size: var(--fs-sm); color: {error}; background: {error_bg}; border: 1px dashed {error_border}; border-radius: var(--r-lg); padding: 8px 12px; margin-bottom: 8px; }}
 
-  .kw-count {{ font-size: .76rem; color: {muted}; font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }}
+  .kw-count {{ font-size: var(--fs-sm); color: {muted}; font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }}
   .kw-count.full {{ color: {error}; font-weight: 600; }}
 
   .kw-foot {{ display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
     margin-top: 10px; padding-top: 8px; border-top: 1px solid {border}; }}
   /* 검색 방식 — 라디오 두 개 대신 작은 두 칸 버튼. _BASE_STYLE의 파란 button을 덮는다 */
-  .kw-mode {{ display: inline-flex; border: 1px solid {border}; border-radius: 6px; overflow: hidden; }}
+  .kw-mode {{ display: inline-flex; border: 1px solid {border}; border-radius: var(--r-md); overflow: hidden; }}
   .kw-mode button {{ background: {card}; color: {muted}; border: 0; border-radius: 0;
-    font-size: .76rem; padding: 3px 9px; line-height: 1.4; }}
+    font-size: var(--fs-sm); padding: 3px 9px; line-height: 1.4; }}
   .kw-mode button + button {{ border-left: 1px solid {border}; }}
   .kw-mode button:hover {{ background: {hover}; color: {header}; }}
   .kw-mode button.on {{ background: {accent_tonal}; color: {header}; font-weight: 600; }}
@@ -1004,7 +1043,7 @@ _KEYWORD_GROUPS_TEMPLATE = (
 
   .add-group-btn {{
     width: 100%; background: {card}; color: {accent}; border: 1px dashed {accent};
-    border-radius: 8px; padding: 9px; font-size: .9rem; font-weight: 600; cursor: pointer;
+    border-radius: var(--r-lg); padding: 9px; font-size: var(--fs-md); font-weight: 600; cursor: pointer;
     font-family: inherit; margin-top: 6px;
   }}
   .add-group-btn:hover {{ background: {hover}; }}
@@ -1014,9 +1053,9 @@ _KEYWORD_GROUPS_TEMPLATE = (
      좁힌다("깜빡 + 맨 위로"가 저장이든 아니든 똑같이 보이던 문제의 해법). 안내가
      저장 버튼 바로 위에 있어 읽는 자리와 누르는 자리가 같다. 3단계: 저장할 수
      없음(빨강, 버튼 잠김) / 저장 안 함(노랑) / 저장됨(초록). */
-  .save-msg {{ display: none; align-items: flex-start; gap: 8px; font-size: .82rem; line-height: 1.5; border-radius: 7px; padding: 9px 11px; margin-bottom: 10px; text-align: left; }}
+  .save-msg {{ display: none; align-items: flex-start; gap: 8px; font-size: var(--fs-sm); line-height: 1.5; border-radius: var(--r-md); padding: 9px 11px; margin-bottom: 10px; text-align: left; }}
   .save-msg.show {{ display: flex; }}
-  .save-msg .dot {{ width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }}
+  .save-msg .dot {{ width: 8px; height: 8px; border-radius: var(--r-circle); flex-shrink: 0; margin-top: 5px; }}
   .save-msg.dirty {{ background: {warn_bg}; border: 1px solid {warn_border}; color: {warn_text}; }}
   .save-msg.dirty .dot {{ background: {warn_dot}; }}
   .save-msg.blocked {{ background: {error_bg}; border: 1px solid {error_border}; color: {error}; }}
@@ -1093,10 +1132,6 @@ def _group_to_chip_dict(group: dict) -> dict:
     }
 
 
-_DEFAULT_VISIBLE_SCHEDULE_SLOTS = 4  # PRD 규칙20 — 처음엔 4개만 보이고, 그 이상은 "+"로 늘린다
-# [추가: 2026-07-25] 키워드 그룹 — 저장된 그룹이 없으면 처음엔 그룹 블록을 하나도 안 보여주고
-# "+ 키워드 그룹 추가"만 보여준다 (그룹당 키워드 5개는 슬롯을 늘릴 필요 없이 처음부터 다 보여준다).
-_DEFAULT_VISIBLE_GROUP_SLOTS = 0
 
 
 def _split_hhmm(value: str) -> tuple:
@@ -1110,83 +1145,78 @@ def _split_hhmm(value: str) -> tuple:
         return "", ""
 
 
-def _minute_select_options(minute_str: str) -> str:
-    """분 <select> 옵션(00/30)을 만든다. minute_str은 _split_hhmm이 돌려주는 "0"/"30"
-    같은 비-zero-padded 문자열이거나 빈 문자열(새 칸)이다.
+def _hm_options(value_str: str, values: list) -> str:
+    """시·분 <select> 옵션을 만든다. value_str은 _split_hhmm이 돌려주는 "9"/"30" 같은
+    비-zero-padded 문자열이거나 빈 문자열(새 그룹의 빈 칸)이다.
 
-    맨 앞에 값이 빈 옵션("--")을 둔다 — <select>는 number input과 달리 아무 옵션도
-    "selected"가 아니면 브라우저가 자동으로 첫 옵션을 선택된 것처럼 제출해버린다.
-    그러면 "+ 시간대 추가"로 만든, 아직 아무것도 안 채운 새 칸이 시(hour)는 빈 채로
-    분(minute)만 "00"으로 제출돼 `_combine_hhmm`의 "둘 다 비어 있으면 그 칸은
-    삭제하려는 것"이라는 판단이 깨지고 저장 시 형식 오류가 난다. 빈 옵션을 두면 새
-    칸은 분도 진짜로 빈 문자열을 제출해 기존 동작(둘 다 빈 칸 = 그 시간대 삭제)이
-    그대로 유지된다.
+    맨 앞에 값이 빈 옵션("--")을 둔다 — 아무 옵션도 selected가 아니면 브라우저가 첫
+    옵션을 제출해 버려서, 빈 칸이 "0:00"으로 저장된다. 빈 옵션이 있으면 시·분 둘 다
+    빈 문자열이 제출되고 `_combine_hhmm`이 "지우려는 칸"으로 읽는다.
+    분은 00·30 둘뿐이다 — 회차 사이가 30분은 돼야 자동발송 유예(최대 30분)와 안 겹친다.
     """
     try:
-        selected_min = int(minute_str) if minute_str else None
+        selected = int(value_str) if value_str else None
     except ValueError:
-        selected_min = None
-    options = [f'<option value=""{" selected" if selected_min is None else ""}>--</option>']
+        selected = None
+    options = [f'<option value=""{" selected" if selected is None else ""}>--</option>']
     options += [
-        f'<option value="{v}"{" selected" if selected_min == int(v) else ""}>{v}</option>' for v in ("00", "30")
+        f'<option value="{v}"{" selected" if selected == int(v) else ""}>{label}</option>' for v, label in values
     ]
     return "".join(options)
 
 
+_HOUR_VALUES = [(str(h), str(h)) for h in range(24)]
+_MINUTE_VALUES = [("00", "00"), ("30", "30")]
+
+
+def _hm_pair_html(name_prefix: str, value: str) -> str:
+    """시 ▾ : 분 ▾ 한 쌍. 이름은 {name_prefix}_h / {name_prefix}_m(서버 `_combine_hhmm`)."""
+    h, m = _split_hhmm(value)
+    return (
+        f'<span class="time-pair">'
+        f'<select class="hm-h" name="{name_prefix}_h" aria-label="시">{_hm_options(h, _HOUR_VALUES)}</select>'
+        f'<span class="colon">:</span>'
+        f'<select class="hm-m" name="{name_prefix}_m" aria-label="분">{_hm_options(m, _MINUTE_VALUES)}</select>'
+        f"</span>"
+    )
+
+
 def _render_time_inputs(group_index: int, schedule_times: list, slots: int) -> str:
-    # [수정: 2026-07-24] ":"까지 직접 타이핑해야 해서 불편하다는 피드백으로, 시/분을
-    # 숫자 입력칸 2개로 나누고 ":"는 화면에 고정 문구로만 보여준다 — 이용자는 숫자만
-    # 입력하면 된다. 종료 시각이 화면 헤더·저장 파일명의 기준(run_slot)이고, 시작
-    # 시각은 이 회차가 모을 시간창의 하한이다 (PRD 규칙 2 — 회차별 시간창 수집).
-    # [수정: 2026-07-30] 시간대 그룹 도입 — 입력칸 이름을 group{group_index}_...로
-    # 묶어서, 같은 화면 안에 여러 그룹의 시간대 칸이 섞여도 폼에서 서로 안 겹친다.
+    """그룹 안 시간대 줄들 — `번호 [시 ▾ : 분 ▾] ~ [시 ▾ : 분 ▾] ×`.
+
+    종료 시각이 회차의 정체성(파일명·머리줄)이고 시작 시각은 수집 하한이다. 시간대마다
+    켜고 끄는 체크박스는 없다 — 안 쓰는 시간대는 ×로 지운다(저장 시 enabled는 늘 참).
+    """
     rows = []
     for i in range(slots):
         window = schedule_times[i] if i < len(schedule_times) else {}
-        start_h, start_m = _split_hhmm(window.get("start", ""))
-        end_h, end_m = _split_hhmm(window.get("end", ""))
-        # [추가: 2026-07-29] 시간대 개별 on/off — 평일/휴일처럼 상황에 따라 켜고 끌 시간대를
-        # 지우지 않고 남겨둘 수 있다(다시 켤 때 시작~종료를 다시 입력할 필요가 없음).
-        # 새로 만드는 빈 칸(window가 {})은 기본 켜짐으로 보여준다.
-        checked = "" if window.get("enabled", True) is False else " checked"
-        # [수정: 2026-08-12] 분 입력을 자유 숫자 칸에서 00/30 두 값만 고를 수 있는
-        # <select>로 바꿨다 — 자동발송 유예 시간(최대 MAX_AUTO_SEND_GRACE_MIN=30분)과
-        # 겹치지 않으려면 회차 사이 최소 간격이 30분은 되어야 하는데, 분을 자유롭게
-        # 입력하게 두면 9:00~9:10처럼 30분보다 짧은 창도 만들 수 있었다(사용자 요청).
-        # 두 값이 다 30분 단위면 시작~종료 차이는 항상 30분 이상이 된다.
-        start_m_opts = _minute_select_options(start_m)
-        end_m_opts = _minute_select_options(end_m)
+        prefix = f"group{group_index}"
         rows.append(
             f'<div class="time-row">'
-            f'<label class="enabled-toggle" title="이 시간대 켜기/끄기">'
-            f'<input type="checkbox" name="group{group_index}_enabled{i + 1}"{checked}></label>'
-            f'<span class="time-pair">'
-            f'<input type="number" min="0" max="23" placeholder="07" name="group{group_index}_start{i + 1}_h" value="{start_h}">'
-            f':<select name="group{group_index}_start{i + 1}_m">{start_m_opts}</select>'
-            f'</span> ~ '
-            f'<span class="time-pair">'
-            f'<input type="number" min="0" max="23" placeholder="09" name="group{group_index}_end{i + 1}_h" value="{end_h}">'
-            f':<select name="group{group_index}_end{i + 1}_m">{end_m_opts}</select>'
-            f'</span>'
-            f'<button type="button" class="del-btn" onclick="removeRow(this)" title="이 시간대 지우기">del</button>'
+            f'<span class="slot-num">{i + 1}</span>'
+            f'{_hm_pair_html(f"{prefix}_start{i + 1}", window.get("start", ""))}'
+            f'<span class="tilde">~</span>'
+            f'{_hm_pair_html(f"{prefix}_end{i + 1}", window.get("end", ""))}'
+            f'<button type="button" class="slot-x" onclick="removeTimeRow(this)" '
+            f'title="이 시간대 지우기" aria-label="이 시간대 지우기">{icon("x")}</button>'
             f"</div>"
         )
-    return "\n".join(rows)
+    return f'<div class="time-rows">{"".join(rows)}</div>'
 
 
 def _render_schedule_day_checkboxes(group_index: int, days: list) -> str:
-    """그룹 하나의 요일(월~일) 체크박스 줄 — 같은 name을 반복해 체크된 값들이 폼에서
-    리스트로 온다(app.naver_api 언론사 체크박스와 같은 패턴, `form.get(..., [])`)."""
+    """그룹 하나의 요일 칩 줄(켜고 끄는 알약) — 속은 체크박스라 같은 name이 반복돼
+    체크된 값들이 폼에서 리스트로 온다(`form.get(..., [])`)."""
     day_set = set(days or [])
-    boxes = []
+    chips = []
     for key in WEEKDAY_KEYS:
         checked = " checked" if key in day_set else ""
         label = WEEKDAY_LABELS_KO[key]
-        boxes.append(
-            f'<label class="day-checkbox"><input type="checkbox" name="group{group_index}_days" '
-            f'value="{key}"{checked}>{label}</label>'
+        chips.append(
+            f'<label class="day-chip"><input type="checkbox" name="group{group_index}_days" '
+            f'value="{key}"{checked}><span>{label}</span></label>'
         )
-    return f'<div class="day-checkbox-row">{"".join(boxes)}</div>'
+    return f'<div class="day-chips">{"".join(chips)}</div>'
 
 
 def _render_schedule_group_block(
@@ -1232,41 +1262,6 @@ def _render_schedule_group_block(
     )
 
 
-def _render_highlight_row(index: int, item: dict) -> str:
-    """형광펜 단어 한 줄 — 단어는 읽기 전용(수정은 검색 키워드 화면에서), 색은 접이식
-    팔레트(<details>/<summary>, 자바스크립트 없이도 펼침/접힘)로 고르고, del로 뺀다."""
-    word = html.escape(item["word"])
-    current_color = item.get("color", 0)
-    swatches = []
-    for color_index, hex_value in enumerate(HIGHLIGHT_COLORS):
-        selected = " selected" if color_index == current_color else ""
-        swatches.append(
-            f'<span class="swatch{selected}" style="background:{hex_value};" '
-            f'onclick="pickHighlightColor(this, {color_index})"></span>'
-        )
-    return (
-        '<div class="word-row">'
-        f'<input type="hidden" name="highlight{index}_word" value="{word}">'
-        f'<span class="word-text">{word}</span>'
-        '<details class="color-picker">'
-        f'<summary style="background:{HIGHLIGHT_COLORS[current_color]};"></summary>'
-        f'<div class="palette-popover">{"".join(swatches)}</div>'
-        f'<input type="hidden" name="highlight{index}_color" value="{current_color}">'
-        "</details>"
-        f'<button type="button" class="del-btn" onclick="removeRow(this)" title="형광펜에서 빼기">del</button>'
-        "</div>"
-    )
-
-
-def _render_highlight_rows(items: list) -> str:
-    if not items:
-        return f'<p class="empty-hint">아직 등록된 형광펜 단어가 없습니다. 검색어 화면에서 {icon("marker")}로 추가해보세요.</p>'
-    # 저장하면 같은 색끼리 모여 보이도록 색 인덱스 기준으로 정렬한다(리스트 자체의
-    # 저장 순서는 안 바꾼다 — 표시할 때만 이 순서로 보여준다).
-    ordered = sorted(items, key=lambda item: item.get("color", 0))
-    return "\n".join(_render_highlight_row(i + 1, item) for i, item in enumerate(ordered))
-
-
 def _render_outlet_categories(selected: list) -> str:
     """카테고리별 언론사 체크박스를 렌더링한다 (PRD.md 기능1 규칙 16).
 
@@ -1289,7 +1284,7 @@ def _render_outlet_categories(selected: list) -> str:
 
 
 def _render_outlet_order(order: list) -> str:
-    """현재 선택된 언론사를 순서대로, ↑/↓·5개 ↑/5개 ↓ 버튼과 함께 보여준다 (드래그
+    """현재 선택된 언론사를 순서대로, ↑/↓·5↑/5↓ 버튼(SVG 화살표)과 함께 보여준다 (드래그
     앤 드롭 대신 가벼운 방식 — 드래그 정렬은 검토 후 폐기).
 
     [수정: 2026-07-24] 버튼을 <form> 제출이 아니라 자바스크립트(moveOutlet, 같은 파일의
@@ -1312,21 +1307,19 @@ def _render_outlet_order(order: list) -> str:
         at_top = i == 0
         at_bottom = i == last_index
 
-        def _move_button(direction: str, label: str, title: str, disabled: bool, jump: bool = False) -> str:
-            cls = "order-btn jump" if jump else "order-btn"
+        def _move_button(direction: str, label: str, title: str, disabled: bool, cls: str = "") -> str:
             return (
-                f'<button type="button" class="{cls}" data-outlet="{escaped}" '
-                f'data-direction="{direction}" onclick="moveOutlet(this)" title="{title}"'
-                f'{" disabled" if disabled else ""}>{label}</button>'
+                f'<button type="button" class="order-btn{cls}" data-outlet="{escaped}" '
+                f'data-direction="{direction}" onclick="moveOutlet(this)" title="{title}" '
+                f'aria-label="{escaped} {title}"{" disabled" if disabled else ""}>{label}</button>'
             )
 
+        step = OUTLET_ORDER_JUMP_STEP
         buttons = (
-            _move_button("jumpup", f"{OUTLET_ORDER_JUMP_STEP}개 ↑", f"{OUTLET_ORDER_JUMP_STEP}개 위로", at_top, jump=True)
-            + _move_button("up", "↑", "한 칸 위로", at_top)
-            + _move_button("down", "↓", "한 칸 아래로", at_bottom)
-            + _move_button(
-                "jumpdown", f"{OUTLET_ORDER_JUMP_STEP}개 ↓", f"{OUTLET_ORDER_JUMP_STEP}개 아래로", at_bottom, jump=True
-            )
+            _move_button("jumpup", f"{step}{icon('up')}", f"{step}개 위로", at_top, " jump jump-up")
+            + _move_button("up", icon("up"), "한 칸 위로", at_top)
+            + _move_button("down", icon("down"), "한 칸 아래로", at_bottom)
+            + _move_button("jumpdown", f"{step}{icon('down')}", f"{step}개 아래로", at_bottom, " jump jump-down")
         )
         rows.append(
             f'<div class="order-row"><span class="order-num">{i + 1}.</span>'
@@ -1462,6 +1455,7 @@ def _theme() -> dict:
         # 🖍️ 형광펜 추가 버튼의 활성 상태 음영 — 파란 accent 대신 형광펜 팔레트 1번을
         # 그대로 써서 "이 버튼 = 형광펜에 들어감"이 색으로 바로 연결되게 한다.
         "highlight_active": HIGHLIGHT_COLORS[0],
+        "topnav_style": topnav_style(),
     }
 
 
@@ -1508,7 +1502,7 @@ def _credential_badge(source: str) -> str:
     고칠 게 없으므로 배지를 아예 안 그린다. "키가 있지만 인증에 실패하는 중"이라는
     세 번째 상태는 이 메뉴 화면에서는 안 보여준다 — 매번 열 때마다 실제로 API를
     호출해 확인하는 비용을 치를 만한 화면이 아니고(설정 메뉴는 즉시 떠야 한다),
-    이미 각 연동 화면 안의 [연결 테스트]와 실시간현황/초안 상단 배너가 그 신호를
+    이미 각 연동 화면 안의 [연결 테스트]와 실시간 현황/초안 상단 배너가 그 신호를
     담당한다."""
     if source == "none":
         return '<span class="badge-warn">미등록</span>'
@@ -1521,9 +1515,11 @@ def render_menu_page() -> str:
     """설정 메뉴 화면을 렌더링한다 (PRD.md 기능1 규칙 17)."""
     return _MENU_TEMPLATE.format(
         **_theme(),
-        index_href=_home_href(),
+        topnav_html=plain_nav(),
         naver_badge=_credential_badge(naver_source()),
         llm_badge=_credential_badge(llm_source()),
+        telegram_badge=_credential_badge(telegram_source()),
+        email_badge=_credential_badge(email_source()),
     )
 
 
@@ -1559,7 +1555,7 @@ _OUTLETS_TEMPLATE = (
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>언론사 선택 · 순서 지정</title>
+<title>언론사 선택 및 순서 지정</title>
 <style>"""
     + _BASE_STYLE
     + """
@@ -1571,16 +1567,16 @@ _OUTLETS_TEMPLATE = (
   .filter-bar {{ display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }}
   .filter-bar input[type=text] {{ flex: 1; min-width: 140px; }}
   .filter-bar button {{
-    padding: 6px 12px; font-size: 0.85rem; background: {card}; color: {accent}; border: 1px solid {accent};
+    padding: 6px 12px; font-size: var(--fs-md); background: {card}; color: {accent}; border: 1px solid {accent};
   }}
   .filter-bar button:hover {{ background: {hover}; }}
   .filter-bar label {{
-    font-size: 0.85rem; color: {muted}; display: flex; align-items: center; gap: 4px; white-space: nowrap;
+    font-size: var(--fs-md); color: {muted}; display: flex; align-items: center; gap: 4px; white-space: nowrap;
   }}
   .category {{ margin: 18px 0; }}
   .category.is-hidden {{ display: none; }}
   .category-name {{
-    color: {header}; font-size: 0.95rem; font-weight: 700; margin-bottom: 8px;
+    color: {header}; font-size: var(--fs-base); font-weight: 700; margin-bottom: 8px;
     padding-bottom: 4px; border-bottom: 1px solid {border};
   }}
   .category-grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 12px; }}
@@ -1590,20 +1586,22 @@ _OUTLETS_TEMPLATE = (
   .order-row {{ display: flex; align-items: center; gap: 6px; margin: 4px 0; flex-wrap: wrap; }}
   .order-row .order-num {{ width: 28px; color: {muted}; }}
   .order-row .name {{ width: 140px; }}
-  /* [수정: 2026-08-13] ↑/↓와 "5개 ↑"/"5개 ↓"는 걸음 폭만 다른 같은 종류의 동작이라
-     색을 나누지 않는다({muted} 하나). 점프 쌍만 테두리로 구분한다(ghost_border —
-     확정본/초안 툴바가 이미 쓰는 값 재사용). */
+  /* ↑↓와 5↑5↓는 걸음 폭만 다른 같은 종류의 동작이라 색·모양을 나누지 않는다. 박스 없이
+     SVG 화살표(app.icons up/down)만 두고, 5칸 쪽은 앞의 숫자로 가른다. 두 쌍 사이만 조금 띄운다.
+     시안 mockups/OUTLET_ORDER_ARROWS_MOCKUP.html A안. */
+  .order-row {{ gap: 2px; }}
   .order-row .order-btn {{
-    padding: 2px 10px; font-size: 0.85rem; white-space: nowrap;
-    background: transparent; color: {muted}; border: 1px solid transparent;
+    height: 22px; min-width: 26px; padding: 0 5px; gap: 1px;
+    background: transparent; color: {text_soft}; border: none; border-radius: var(--r-md);
+    font-size: 0.8rem; font-weight: 600; font-variant-numeric: tabular-nums;
   }}
+  .order-row .order-btn .ic {{ width: 17px; height: 17px; stroke-width: 2.2; vertical-align: 0; }}
   .order-row .order-btn:hover {{ background: {hover}; color: {header}; }}
-  .order-row .order-btn.jump {{ border-color: {ghost_border}; }}
-  .order-row .order-btn.jump:hover {{ border-color: {ghost_border_hover}; }}
-  .order-row .order-btn:disabled {{ background: transparent; color: {border}; cursor: not-allowed; }}
-  .order-row .order-btn.jump:disabled {{ border-color: {border}; }}
+  .order-row .order-btn:disabled {{ background: transparent; color: {order_btn_disabled}; cursor: not-allowed; }}
+  .order-row .order-btn.jump-up {{ margin-right: 4px; }}
+  .order-row .order-btn.jump-down {{ margin-left: 4px; }}
   /* 옮긴 줄 음영 — 기사 순서 변경(.just-moved)과 같은 색. */
-  .order-row.just-moved {{ background: {row_moved}; border-radius: 4px; }}
+  .order-row.just-moved {{ background: {row_moved}; border-radius: var(--r-sm); }}
   /* [추가: 2026-09-11] 800px 폭에 맞춘 배치 — 체크박스는 두 칸 → 네 칸, 아래 순서
      목록은 두 단(CSS 다단이라 1번부터 위→아래로 읽고, 왼쪽 단이 끝나면 오른쪽 단 맨
      위로 이어진다). 좁은 화면에선 예전 두 칸·한 단으로 돌아간다. */
@@ -1622,7 +1620,7 @@ _OUTLETS_TEMPLATE = (
     + _TOP_BAR_HTML
     + """
 <div class="container">
-  <h1>📰 언론사 선택 · 순서 지정</h1>
+  <h1>📰 언론사 선택 및 순서 지정</h1>
   {error_html}
   <form method="POST" action="/save-outlets">
     <div class="filter-bar">
@@ -1659,114 +1657,6 @@ def render_outlets_page(settings: dict, error: str = "") -> str:
     )
 
 
-_HIGHLIGHT_TEMPLATE = (
-    """<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>형광펜 긋기</title>
-<style>"""
-    + _BASE_STYLE
-    + """
-  /* [추가: 2026-07-26] 검색어에 없는 단어도 직접 등록할 수 있는 입력창 — 아래 단어
-     목록(색 변경·del)과는 별개 <form>이다(즉시 저장되므로 "저장"을 기다릴 필요 없음). */
-  .add-word-form {{ display: flex; gap: 8px; margin-bottom: 18px; }}
-  .add-word-form input[type=text] {{ flex: 1; }}
-  .add-word-form button {{ background: {card}; color: {accent}; border: 1px solid {accent}; white-space: nowrap; }}
-  .add-word-form button:hover {{ background: {hover}; }}
-  .word-row {{ display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid {border}; }}
-  .word-row:first-of-type {{ border-top: none; }}
-  .word-text {{ flex: 1; font-size: 0.92rem; }}
-  .color-picker {{ position: relative; flex-shrink: 0; }}
-  .color-picker summary {{
-    list-style: none; width: 20px; height: 20px; border-radius: 4px; cursor: pointer;
-    border: 1px solid {border};
-  }}
-  .color-picker summary::-webkit-details-marker {{ display: none; }}
-  .palette-popover {{
-    position: absolute; top: 26px; right: 0; z-index: 5;
-    display: flex; gap: 5px; padding: 7px; background: {card};
-    border: 1px solid {border}; border-radius: 6px;
-  }}
-  .palette-popover .swatch {{
-    width: 18px; height: 18px; border-radius: 4px; cursor: pointer;
-    border: 2px solid transparent; display: inline-block;
-  }}
-  .palette-popover .swatch.selected {{ border-color: {text}; }}
-  .empty-hint {{ text-align: center; color: {muted}; font-size: 0.85rem; padding: 24px 0; }}
-  .container {{ padding-bottom: 88px; }}
-  /* [추가: 2026-09-11] 800px 폭에 맞춰 단어를 한 줄에 세 개씩 — 한 줄에 하나면 단어
-     옆이 통째로 비었다. 칸마다 구분선이 따로 서도록 윗줄 대신 밑줄을 긋는다. 좁은
-     화면에선 한 줄에 하나로 돌아간다. */
-  .save-highlight-form {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 28px; }}
-  .save-highlight-form .word-row, .save-highlight-form .word-row:first-of-type {{
-    border-top: none; border-bottom: 1px solid {border};
-  }}
-  .save-highlight-form .empty-hint {{ grid-column: 1 / -1; }}
-  @media (max-width: 640px) {{ .save-highlight-form {{ grid-template-columns: minmax(0, 1fr); }} }}
-</style>
-</head>
-<body>
-"""
-    + _TOP_BAR_HTML
-    + """
-<div class="container">
-  <h1>🖍️ 형광펜 긋기</h1>
-  <p class="caption">최대 {max_highlight}개까지 추가할 수 있습니다. 검색어에 없는 단어도 직접 추가할 수 있습니다.</p>
-  {error_html}
-  <form method="POST" action="/highlight/add-word" class="add-word-form">
-    <input type="text" name="new_word" value="{new_word_value}" placeholder="추가할 단어 입력">
-    <button type="submit">추가</button>
-  </form>
-  <form method="POST" action="/save-highlight" class="save-highlight-form">
-    {word_rows}
-    <div class="save-bar"><div class="save-bar-inner"><button type="submit">저장</button></div></div>
-  </form>
-</div>
-{clear_script}
-<script>
-function pickHighlightColor(el, colorIndex) {{
-  var picker = el.closest(".color-picker");
-  picker.querySelectorAll(".swatch").forEach(function (s) {{ s.classList.remove("selected"); }});
-  el.classList.add("selected");
-  picker.querySelector("summary").style.background = el.style.background;
-  picker.querySelector('input[type=hidden][name$="_color"]').value = colorIndex;
-  picker.removeAttribute("open");
-}}
-</script>
-</body>
-</html>
-"""
-)
-
-
-def render_highlight_page(
-    settings: dict, error: str = "", items: Optional[list] = None, new_word: str = ""
-) -> str:
-    """형광펜 단어 설정 화면을 렌더링한다 (PRD.md 기능1 규칙 6).
-
-    [수정: 2026-07-25] 단어 목록의 색 변경·제거는 이 화면에서, 새 단어는 검색 키워드
-    화면의 🖍️로만 들어왔었다. [수정: 2026-07-26] 검색 키워드에 없는 단어도 형광펜만
-    치고 싶은 경우가 있어, 이 화면 상단에 직접 추가 입력창을 다시 추가했다(다만 이번엔
-    "+ 추가" 슬롯 방식이 아니라 즉시 저장되는 별도 폼 — add_highlight_keyword 참고).
-    items를 생략하면 저장된 값을 그대로 보여준다(저장 실패 시에만 호출자가 지금 입력하던
-    값을 넘긴다). new_word는 추가 입력창에서 에러가 났을 때 방금 입력했던 값을 그대로
-    보여주기 위한 것이다.
-    """
-    display_items = items if items is not None else settings.get("highlight_keywords", [])
-    error_html = f'<p class="error">{html.escape(error)}</p>' if error else ""
-    return _HIGHLIGHT_TEMPLATE.format(
-        **_theme(),
-        max_highlight=MAX_HIGHLIGHT_KEYWORDS,
-        error_html=error_html,
-        new_word_value=html.escape(new_word),
-        word_rows=_render_highlight_rows(display_items),
-        clear_script=_CLEAR_FIELD_SCRIPT,
-        index_href=_home_href(),
-    )
-
-
 # [수정: 2026-09-11] 입력칸 + del 버튼 줄 목록 → 칩 한 상자 + 「오늘 워드클라우드에 뜬
 # 단어」에서 눌러 빼기(사용자 결정, 시안 WORDCLOUD_EXCLUDE_MOCKUP.html의 B안). 칩 모양·×·
 # 점선 입력칩은 검색어 화면(`/keywords`)과 같고 색만 중립 회색이다 — 그 화면 칩의 파랑은
@@ -1786,17 +1676,17 @@ _WORDCLOUD_EXCLUDE_TEMPLATE = (
     + _BASE_STYLE
     + """
   .container {{ padding-bottom: 120px; }}
-  .wc-box {{ border: 1px solid {border}; border-radius: 8px; padding: 14px; background: {card}; }}
+  .wc-box {{ border: 1px solid {border}; border-radius: var(--r-lg); padding: 14px; background: {card}; }}
   .chips {{ display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }}
   .chip {{
-    display: inline-flex; align-items: center; border-radius: 999px; font-size: .9rem; line-height: 1;
+    display: inline-flex; align-items: center; border-radius: var(--r-pill); font-size: var(--fs-md); line-height: 1;
     max-width: 100%; background: {bg}; border: 1px solid {wc_exclude_chip_border}; color: {text};
   }}
   .chip-body {{ padding: 7px 3px 7px 12px; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
   /* _BASE_STYLE의 button 기본값(파란 배경·패딩)을 지운다 — 검색어 화면 .chip-x와 같은 값. */
   .chip-x {{
     border: none; background: transparent; color: inherit; font-size: 1rem; line-height: 1;
-    padding: 7px 10px 7px 6px; cursor: pointer; opacity: .55; border-radius: 0 999px 999px 0;
+    padding: 7px 10px 7px 6px; cursor: pointer; opacity: .55; border-radius: 0 var(--r-pill) var(--r-pill) 0;
   }}
   .chip-x:hover {{ opacity: 1; color: {error}; background: rgba(220,38,38,.08); }}
   .chip.just-added {{ animation: kwpop .55s ease-out; }}
@@ -1807,32 +1697,31 @@ _WORDCLOUD_EXCLUDE_TEMPLATE = (
     20% {{ transform: translateX(-3px); background: {kwpop_flash}; }}
     60% {{ transform: translateX(3px); background: {kwpop_flash}; }}
   }}
-  .chip-add {{ display: inline-flex; align-items: center; gap: 4px; border: 1px dashed {dash_border}; background: {card}; border-radius: 999px; padding: 5px 12px; color: {muted}; }}
+  .chip-add {{ display: inline-flex; align-items: center; gap: 4px; border: 1px dashed {dash_border}; background: {card}; border-radius: var(--r-pill); padding: 5px 12px; color: {muted}; }}
   .chip-add:focus-within {{ border-color: {accent}; border-style: solid; background: {hover}; }}
-  .chip-add input {{ border: none; outline: none; background: transparent; font: inherit; font-size: .9rem; width: 110px; color: {text}; padding: 0; }}
+  .chip-add input {{ border: none; outline: none; background: transparent; font: inherit; font-size: var(--fs-md); width: 110px; color: {text}; padding: 0; }}
   .chip-add input::placeholder {{ color: {placeholder}; }}
   .chip-add .plus {{ font-size: .95rem; color: {accent}; font-weight: 700; }}
-  .wc-meta {{ display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; font-size: .78rem; color: {muted}; }}
+  .wc-meta {{ display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; font-size: var(--fs-sm); color: {muted}; }}
   .wc-count {{ font-variant-numeric: tabular-nums; }}
   .wc-count.full {{ color: {error}; font-weight: 600; }}
 
-  .wc-sect {{ font-size: .8rem; font-weight: 700; color: {muted}; margin: 22px 0 9px; }}
+  .wc-sect {{ font-size: var(--fs-sm); font-weight: 700; color: {muted}; margin: 22px 0 9px; }}
   .wc-sect span {{ font-weight: 500; }}
   .sugglist {{ display: flex; flex-wrap: wrap; gap: 6px; }}
   .sugg {{
-    background: {card}; color: {text}; border: 1px solid {border}; border-radius: 20px;
-    padding: 5px 11px; font-size: .82rem;
+    background: {card}; color: {text}; border: 1px solid {border}; border-radius: var(--r-pill);
+    padding: 5px 11px; font-size: var(--fs-sm);
   }}
   .sugg:hover {{ background: {error_bg}; border-color: {error_border}; color: {error}; }}
   .sugg:hover::before {{ content: "− "; }}
-  .sugg i {{ font-style: normal; font-size: .72rem; color: {placeholder}; margin-left: 3px; }}
   .sugg.kw {{ color: {muted}; }}
   .sugg:disabled {{ opacity: .4; cursor: not-allowed; background: {card}; border-color: {border}; color: {text}; }}
   .sugg:disabled:hover::before {{ content: ""; }}
 
-  .save-msg {{ display: none; align-items: flex-start; gap: 8px; font-size: .82rem; line-height: 1.5; border-radius: 7px; padding: 9px 11px; margin-bottom: 10px; text-align: left; }}
+  .save-msg {{ display: none; align-items: flex-start; gap: 8px; font-size: var(--fs-sm); line-height: 1.5; border-radius: var(--r-md); padding: 9px 11px; margin-bottom: 10px; text-align: left; }}
   .save-msg.show {{ display: flex; }}
-  .save-msg .dot {{ width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }}
+  .save-msg .dot {{ width: 8px; height: 8px; border-radius: var(--r-circle); flex-shrink: 0; margin-top: 5px; }}
   .save-msg.dirty {{ background: {warn_bg}; border: 1px solid {warn_border}; color: {warn_text}; }}
   .save-msg.dirty .dot {{ background: {warn_dot}; }}
   .save-bar button.idle {{ background: {toggle_off}; color: {toggle_off_text}; cursor: default; }}
@@ -1958,8 +1847,8 @@ _WORDCLOUD_EXCLUDE_SCRIPT = "<script>\n" + r"""(function () {
     var shown = CANDS.filter(function (c) { return !excludedByChips(c[0]); }).slice(0, SHOW);
     suggEl.innerHTML = shown.map(function (c) {
       return '<button type="button" class="sugg' + (c[2] ? " kw" : "") + '" data-word="' + esc(c[0]) + '"' +
-        (full ? " disabled" : "") + ' title="' + (c[2] ? "등록 검색어 · " : "") + c[1] + '회 언급">' +
-        esc(c[0]) + ' <i>' + c[1] + '</i></button>';
+        (full ? " disabled" : "") + (c[2] ? ' title="등록 검색어"' : "") + '>' +
+        esc(c[0]) + '</button>';
     }).join("");
     suggEl.querySelectorAll(".sugg").forEach(function (b) {
       b.onclick = function () { add(b.getAttribute("data-word"), false); };
@@ -2027,7 +1916,7 @@ def _render_wordcloud_suggest_html(candidates: list) -> str:
         return ""
     return (
         '<div class="wc-sect">오늘 워드클라우드에 뜬 단어 '
-        "<span>— 누르면 위로 올라가요 · 숫자는 언급 횟수</span></div>"
+        "<span>— 누르면 위로 올라가요</span></div>"
         '<div class="sugglist" id="wcSugg"></div>'
     )
 
@@ -2067,35 +1956,50 @@ _SCHEDULE_TEMPLATE = (
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>수집 시간</title>
+<title>수집시간대</title>
 <style>"""
     + _BASE_STYLE
     + """
-  .time-row {{ margin: 8px 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }}
-  .time-row input[type=number] {{ width: 46px; text-align: center; }}
+  /* 시간대 줄 = 번호 [시 ▾ : 분 ▾] ~ [시 ▾ : 분 ▾] ×. 드롭다운은 기본 껍데기를 벗기고
+     화살표를 배경으로 그려 사파리에서도 높이(36px)가 맞게 한다. */
+  .time-rows {{ display: flex; flex-direction: column; gap: 6px; }}
+  .time-row {{ display: flex; align-items: center; gap: 6px; }}
+  .slot-num {{ width: 18px; flex: none; text-align: right; font-size: var(--fs-sm); color: {text_faint};
+    font-variant-numeric: tabular-nums; }}
+  .time-pair {{ display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }}
+  .time-pair .colon {{ color: {muted}; margin: 0 -2px; }}
+  .time-row .tilde {{ color: {text_faint}; }}
   .time-row select {{
-    background: {bg}; color: {text}; border: 1px solid {border}; border-radius: 4px;
-    padding: 6px 4px; font-size: 1rem; font-family: inherit;
+    appearance: none; -webkit-appearance: none; width: 64px; height: var(--h-lg);
+    padding: 0 24px 0 12px; font-size: var(--fs-base); font-family: inherit; font-variant-numeric: tabular-nums;
+    color: {text}; background-color: {bg}; border: 1px solid {border}; border-radius: var(--r-md); cursor: pointer;
+    background-image: {select_chevron}; background-repeat: no-repeat; background-position: right 8px center;
+    background-size: 14px;
   }}
-  .time-pair {{ white-space: nowrap; }}
-  /* [추가: 2026-07-29] 꺼둔 시간대는 흐리게 — 지운 게 아니라 잠깐 안 쓰는 것뿐이라는 걸
-     시각적으로 드러낸다. 체크박스 상태만으로 즉시 반응하도록 :has()를 쓴다. */
-  .time-row:has(.enabled-toggle input:not(:checked)) {{ opacity: 0.5; }}
-  .enabled-toggle {{ display: flex; align-items: center; cursor: pointer; }}
-  .enabled-toggle input {{ width: auto; }}
+  .time-row select:hover {{ border-color: {accent_border}; }}
+  .time-row select:focus {{ outline: none; border-color: {accent}; box-shadow: 0 0 0 3px {accent_border}; }}
+  .slot-x {{
+    margin-left: auto; width: 28px; height: 28px; padding: 0; flex: none;
+    background: transparent; color: {text_faint}; border: none; border-radius: var(--r-sm); font-size: var(--fs-base);
+  }}
+  .slot-x:hover {{ background: {error_bg}; color: {error}; }}
+  /* 줄이 하나뿐이면 지울 수 없다(그룹당 최소 1개) — 자리는 지킨다. */
+  .time-rows:has(> .time-row:only-child) .slot-x {{ visibility: hidden; }}
+  @media (max-width: 400px) {{ .time-row select {{ width: 58px; padding-left: 9px; }} }}
   /* [추가: 2026-07-30] 스크랩 시간대 "그룹"(주중/주말 등) — 검색어 그룹 화면과 같은
      생김새(그룹 카드 안에 여러 줄). group-block류는 그 화면의 로컬 스타일이라 여기
      다시 정의한다. */
-  .group-block {{ border: 1px solid {border}; border-radius: 6px; padding: 14px; margin: 14px 0; }}
+  .group-block {{ border: 1px solid {border}; border-radius: var(--r-md); padding: 14px; margin: 14px 0; }}
   .group-head {{ display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }}
-  .group-name-input {{ font-weight: 600; flex: 1; min-width: 90px; }}
+  .group-name-input {{ font-weight: 600; flex: 1; min-width: 70px; }}
+  .group-head .del-btn {{ flex: none; white-space: nowrap; }}
   /* [추가: 2026-08-10] 그룹을 켜고 끄는 ON/OFF 토글 — 텔레그램·이메일 받는 사람 줄과
      같은 모양(같은 뜻: 지우지 않고 잠깐 빼둔다). */
   .toggle {{ position: relative; display: inline-flex; align-items: center; flex-shrink: 0; cursor: pointer; }}
   .toggle input {{ position: absolute; opacity: 0; width: 0; height: 0; }}
   .toggle .track {{
     display: inline-flex; align-items: center; justify-content: center;
-    width: 36px; height: 24px; background: {border}; border-radius: 4px; transition: background 0.15s;
+    width: 36px; height: 24px; background: {border}; border-radius: var(--r-sm); transition: background 0.15s;
   }}
   .toggle input:checked ~ .track {{ background: {accent}; }}
   .toggle-text {{ font-size: 0.68rem; font-weight: 700; }}
@@ -2103,21 +2007,26 @@ _SCHEDULE_TEMPLATE = (
   .toggle-text.off {{ display: inline; color: {muted}; }}
   .toggle input:checked ~ .track .toggle-text.on {{ display: inline; }}
   .toggle input:checked ~ .track .toggle-text.off {{ display: none; }}
-  /* [추가: 2026-08-10] 요일 체크박스 줄 — 어느 그룹이 오늘 실제로 쓰이는지는
-     app.settings.pick_active_group_index가 정하고, 그 결과를 배지로만 알려준다. */
-  .day-checkbox-row {{ display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 0 0 10px; }}
-  .day-checkbox {{
-    display: inline-flex; align-items: center; gap: 3px;
-    font-size: 0.85rem; color: {text}; white-space: nowrap; cursor: pointer;
+  /* 요일 = 켜고 끄는 알약 칩(속은 체크박스). 켜짐 파란 실선, 꺼짐 회색 점선. 어느 그룹이
+     오늘 쓰이는지는 app.settings.pick_active_group_index가 정하고 배지로만 알린다. */
+  .day-chips {{ display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 12px; }}
+  .day-chip {{ position: relative; cursor: pointer; }}
+  .day-chip input {{ position: absolute; opacity: 0; width: 0; height: 0; }}
+  .day-chip span {{
+    display: inline-flex; align-items: center; justify-content: center; width: 34px; height: var(--h-md);
+    border: 1px dashed {chip_off_border}; border-radius: var(--r-pill); background: {card}; color: {text_faint};
+    font-size: var(--fs-md); font-weight: 600; user-select: none;
   }}
+  .day-chip input:checked + span {{ border: 1px solid {accent}; background: {hover}; color: {accent}; }}
+  .day-chip input:focus-visible + span {{ outline: 2px solid {accent_border}; outline-offset: 1px; }}
   .today-active-badge {{
-    flex-shrink: 0; font-size: 0.74rem; font-weight: 700; color: {accent};
-    background: {hover}; border-radius: 10px; padding: 3px 9px; white-space: nowrap;
+    flex-shrink: 0; font-size: var(--fs-xs); font-weight: 700; color: {accent};
+    background: {hover}; border-radius: var(--r-pill); padding: 3px 9px; white-space: nowrap;
   }}
   .add-row button {{ background: {card}; color: {accent}; border: 1px solid {accent}; }}
   .add-row button:hover {{ background: {hover}; }}
   .add-row button:disabled {{ background: {border}; color: {muted}; border-color: {border}; }}
-  .add-time-row {{ margin: 4px 0 0; }}
+  .add-time-row {{ margin: 10px 0 0; }}
   .container {{ padding-bottom: 88px; }}
   /* [추가: 2026-09-11] 800px 폭에 맞춰 "주중"/"주말" 같은 그룹 카드를 나란히 두 장씩
      — 한 장이 한 줄을 다 쓰면 시간대 줄 오른쪽이 통째로 비었다. "+ 그룹 추가"는 두 칸을
@@ -2134,20 +2043,13 @@ _SCHEDULE_TEMPLATE = (
     + _TOP_BAR_HTML
     + """
 <div class="container">
-  <h1>⏰ 수집 시간</h1>
+  <h1>⏰ 수집시간대</h1>
   <p class="hint">
-    스크랩할 회차마다 시작~종료 시간대를 24시간제로 등록하세요 (예: 07:30 ~ 09:30).
-    그 시간대에 게시된 기사만 그 회차에 모입니다. 그룹당 등록한 개수만큼 하루에 자동
-    실행됩니다 (그룹당 최소 {min_times}개, 최대 {max_times}개). 분은 00·30만 고를 수
-    있습니다. del 버튼으로 바로 비우거나, 시작·종료 둘 다 빈 칸으로 둬도 그 자리는
-    삭제됩니다.<br>
-    시간대 왼쪽 체크박스는 개별 on/off, 그룹 왼쪽 ON/OFF는 그룹째 켜고 끕니다.
-    "주중"/"주말"처럼 그룹을 나눠두고 요일을 체크해두면, 오늘 요일이 들어 있는 그룹이
-    자동으로 쓰입니다(그룹은 최대 {max_groups}개). 켜둔 그룹이 하나뿐이면 요일과
-    무관하게 그 그룹이 쓰입니다 — 연휴처럼 예외인 날 그룹 하나만 켜두는 용도입니다.
-    지금 쓰이는 그룹에는 "오늘 적용 중" 배지가 붙습니다.<br>
-    화면 상단 "언론 모니터링 [종료시각] 기준" 제목도 지금 적용 중인 그룹의 종료 시각을
-    그대로 따라갑니다.
+    회차마다 시작~종료 시각을 고르세요. 그 사이에 게시된 기사가 그 회차에 모이고, 종료
+    시각이 확정본 머리줄 「언론 모니터링 N시 기준」이 됩니다. 그룹당 {min_times}~{max_times}개,
+    안 쓰는 시간대는 ×로 지웁니다.<br>
+    요일을 켜 둔 그룹이 그날 쓰이고(그룹은 최대 {max_groups}개), 켜 둔 그룹이 하나뿐이면
+    요일과 상관없이 그 그룹이 쓰입니다 — 연휴처럼 예외인 날 그룹 하나만 켜 두는 용도입니다.
   </p>
   {error_html}
   <form method="POST" action="/save-schedule" class="schedule-form">
@@ -2157,6 +2059,7 @@ _SCHEDULE_TEMPLATE = (
   </form>
 </div>
 {clear_script}
+{schedule_script}
 </body>
 </html>
 """
@@ -2181,13 +2084,12 @@ def render_schedule_page(
     저장 실패 시에는 호출하는 쪽이 지금까지 입력하던(아직 저장 전인) groups·
     slots_by_group을 직접 넘긴다(검색 키워드 그룹 화면과 같은 패턴).
 
-    [수정: 2026-07-30] 시간대 그룹(주중/주말 등, 그 중 1개만 활성) 도입 — 그룹마다
-    처음엔 _DEFAULT_VISIBLE_SCHEDULE_SLOTS개만큼만 시간대 칸을 보여준다.
+    그룹마다 저장된 시간대 수만큼만 줄을 그린다(빈 줄을 미리 깔아 두지 않는다).
     """
     display_groups = groups if groups is not None else settings.get("schedule_groups", [])
     if slots_by_group is None:
         slots_by_group = {
-            i + 1: max(len(g.get("times", [])), _DEFAULT_VISIBLE_SCHEDULE_SLOTS)
+            i + 1: max(len(g.get("times", [])), 1)
             for i, g in enumerate(display_groups)
         }
     error_html = f'<p class="error">{html.escape(error)}</p>' if error else ""
@@ -2200,8 +2102,33 @@ def render_schedule_page(
         group_blocks=_render_schedule_group_blocks(display_groups, slots_by_group),
         add_group_disabled=" disabled" if len(display_groups) >= MAX_SCHEDULE_GROUPS else "",
         clear_script=_CLEAR_FIELD_SCRIPT,
+        schedule_script=_SCHEDULE_SCRIPT,
+        select_chevron=_select_chevron_css(),
         index_href=_home_href(),
     )
+
+
+def _select_chevron_css() -> str:
+    """드롭다운 오른쪽 ▾를 배경 그림으로(색은 PALETTE의 muted)."""
+    color = PALETTE["muted"].replace("#", "%23")
+    svg = (
+        "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' "
+        f"stroke='{color}' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E"
+        "%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"
+    )
+    return f'url("data:image/svg+xml,{svg}")'
+
+
+# 시간대 줄 × — 줄을 지우고 남은 줄 번호를 1부터 다시 매긴다(저장은 「저장」에서만).
+_SCHEDULE_SCRIPT = """<script>
+function removeTimeRow(btn) {
+  var list = btn.closest(".time-rows");
+  var row = btn.closest(".time-row");
+  if (!list || !row || list.children.length <= 1) return;
+  row.remove();
+  list.querySelectorAll(".slot-num").forEach(function (el, i) { el.textContent = i + 1; });
+}
+</script>"""
 
 
 _FORMAT_TEMPLATE = (
@@ -2210,14 +2137,14 @@ _FORMAT_TEMPLATE = (
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>기사 제목 형식</title>
+<title>{flow_name} 기사 제목 형식</title>
 <style>"""
     + _BASE_STYLE
     + """
   input[type=text] {{ width: 100%; max-width: 360px; box-sizing: border-box; }}
   .preview {{ margin-top: 12px; color: {muted}; }}
   .preview code {{ display: inline-block; margin: 2px 0; }}
-  code {{ background: {bg}; border: 1px solid {border}; padding: 2px 6px; border-radius: 4px; color: {text}; }}
+  code {{ background: {bg}; border: 1px solid {border}; padding: 2px 6px; border-radius: var(--r-sm); color: {text}; }}
   .container {{ padding-bottom: 88px; }}
 </style>
 </head>
@@ -2226,15 +2153,15 @@ _FORMAT_TEMPLATE = (
     + _TOP_BAR_HTML
     + """
 <div class="container">
-  <h1>📃 기사 제목 형식</h1>
+  <h1>📃 {flow_name} · 기사 제목 형식</h1>
   <p class="hint">
-    기사 목록 첫 줄의 형식을 바꿀 수 있습니다.<br>
+    {flow_scope}의 복사·txt·발송 텍스트에서 기사 첫 줄의 형식을 바꿀 수 있습니다.<br>
     <code>{{outlet}}</code>은 언론사명, <code>{{title}}</code>은 기사 제목으로 바뀝니다.<br>
     ※ 두 자리표시자를 각각 정확히 1번씩 포함해야 합니다. 아래 URL 줄과 "발행일 미표시"는
     이 설정과 무관하게 항상 고정입니다.
   </p>
   {error_html}
-  <form method="POST" action="/save-format">
+  <form method="POST" action="{save_path}">
     <input type="text" name="line_template" value="{template_value}">
     <p class="preview">미리보기:<br><code>{preview}</code><br><code>{preview_url}</code></p>
     <div class="save-bar"><div class="save-bar-inner"><button type="submit">저장</button></div></div>
@@ -2246,10 +2173,29 @@ _FORMAT_TEMPLATE = (
 )
 
 
-def render_format_page(settings: dict, error: str = "") -> str:
-    """출력 형식 설정 화면을 렌더링한다 (PRD.md 기능1 규칙 5)."""
+# [추가: 2026-09-18] 보고서 형식(기사 제목·소제목)은 정기·수시가 따로 가진다. 두 화면은
+# 같은 템플릿을 쓰고 저장 키·주소·안내 문구만 이 표로 가른다.
+_FORMAT_FLOWS = {
+    "regular": {
+        "name": "정기", "scope": "정기 초안·확정본·보관함",
+        "sub_where": "화면·복사·내보내기",
+        "line_key": "article_line_template", "sub_key": "subheading_format_template",
+        "line_path": "/format", "sub_path": "/subheading-format",
+    },
+    "adhoc": {
+        "name": "수시", "scope": "수시 확정본·보관함",
+        "sub_where": "복사·txt·발송 텍스트",
+        "line_key": "adhoc_article_line_template", "sub_key": "adhoc_subheading_format_template",
+        "line_path": "/format-adhoc", "sub_path": "/subheading-format-adhoc",
+    },
+}
+
+
+def render_format_page(settings: dict, error: str = "", flow: str = "regular") -> str:
+    """기사 제목 형식 설정 화면을 렌더링한다 (PRD.md 기능1 규칙 5). flow는 "regular"/"adhoc"."""
+    spec = _FORMAT_FLOWS[flow]
     error_html = f'<p class="error">{html.escape(error)}</p>' if error else ""
-    template = settings.get("article_line_template", "")
+    template = settings.get(spec["line_key"], "")
     # 미리보기는 실제로 저장하기 전에 결과를 보여주는 용도라, 저장 여부와 무관하게
     # 항상 예시 언론사/제목으로 렌더링해본다 (템플릿이 잘못돼 있어도 여기선 안전한
     # apply_line_template의 단순 치환이라 오류가 날 일이 없다).
@@ -2259,6 +2205,9 @@ def render_format_page(settings: dict, error: str = "") -> str:
     preview_url = "https://n.news.naver.com/mnews/article/000/0000000000"
     return _FORMAT_TEMPLATE.format(
         **_theme(),
+        flow_name=spec["name"],
+        flow_scope=spec["scope"],
+        save_path="/save-" + spec["line_path"].lstrip("/"),
         error_html=error_html,
         template_value=html.escape(template),
         preview=preview,
@@ -2276,13 +2225,13 @@ _SUBHEADING_FORMAT_TEMPLATE = (
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>소제목 형식</title>
+<title>{flow_name} 소제목 형식</title>
 <style>"""
     + _BASE_STYLE
     + """
   input[type=text] {{ width: 100%; max-width: 360px; box-sizing: border-box; }}
   .preview {{ margin-top: 12px; color: {muted}; }}
-  code {{ background: {bg}; border: 1px solid {border}; padding: 2px 6px; border-radius: 4px; color: {text}; }}
+  code {{ background: {bg}; border: 1px solid {border}; padding: 2px 6px; border-radius: var(--r-sm); color: {text}; }}
   .container {{ padding-bottom: 88px; }}
 </style>
 </head>
@@ -2291,15 +2240,15 @@ _SUBHEADING_FORMAT_TEMPLATE = (
     + _TOP_BAR_HTML
     + """
 <div class="container">
-  <h1>📃 소제목 형식</h1>
+  <h1>📃 {flow_name} · 소제목 형식</h1>
   <p class="hint">
-    소제목을 화면·복사·내보내기에 보여줄 형식을 바꿀 수 있습니다.<br>
+    {flow_scope}의 소제목을 {sub_where}에 보여줄 형식을 바꿀 수 있습니다.<br>
     <code>{{section}}</code>이 소제목 이름으로 바뀝니다 (기본값 <code>&lt;{{section}}&gt;</code>).<br>
     ※ <code>{{section}}</code>을 정확히 1번 포함해야 합니다. 직접 고친 소제목 이름에는
     앱이 괄호를 덧붙이지 않고 쓴 그대로를 씁니다.
   </p>
   {error_html}
-  <form method="POST" action="/save-subheading-format">
+  <form method="POST" action="{save_path}">
     <input type="text" name="subheading_format" value="{template_value}">
     <p class="preview">미리보기: <code>{preview}</code></p>
     <div class="save-bar"><div class="save-bar-inner"><button type="submit">저장</button></div></div>
@@ -2311,79 +2260,22 @@ _SUBHEADING_FORMAT_TEMPLATE = (
 )
 
 
-def render_subheading_format_page(settings: dict, error: str = "") -> str:
-    """소제목 형식 설정 화면을 렌더링한다 (메일머지 두 번째 항목, render_format_page와 동일 방식)."""
+def render_subheading_format_page(settings: dict, error: str = "", flow: str = "regular") -> str:
+    """소제목 형식 설정 화면을 렌더링한다 (보고서 형식 두 번째 항목, render_format_page와 동일 방식)."""
+    spec = _FORMAT_FLOWS[flow]
     error_html = f'<p class="error">{html.escape(error)}</p>' if error else ""
-    template = settings.get("subheading_format_template", "")
+    template = settings.get(spec["sub_key"], "")
     preview = apply_subheading_format(html.escape(template), "부동산 세제 개편 관련")
     return _SUBHEADING_FORMAT_TEMPLATE.format(
         **_theme(),
+        flow_name=spec["name"],
+        flow_scope=spec["scope"],
+        sub_where=spec["sub_where"],
+        save_path="/save-" + spec["sub_path"].lstrip("/"),
         error_html=error_html,
         template_value=html.escape(template),
         preview=preview,
         index_href=_home_href(),
-    )
-
-
-# [수정: 2026-08-11] "포함할지"에서 "제외할지"로 의미를 뒤집었다(app.config 참고) —
-# 기본은 다 수집되고, 빼고 싶은 것만 체크한다. 제목 중복 제거는 이 설정과 무관하게
-# 항상 적용된다.
-_SCRAP_PAGE_SETTINGS_TEMPLATE = (
-    """<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>수집 범위</title>
-<style>"""
-    + _BASE_STYLE
-    + """
-  .checkbox-row {{ margin: 16px 0; display: flex; align-items: center; gap: 8px; }}
-  .checkbox-row label {{ font-size: 1rem; }}
-  .container {{ padding-bottom: 88px; }}
-</style>
-</head>
-<body>
-"""
-    + _TOP_BAR_HTML
-    + """
-<div class="container">
-  <h1>📄 수집 범위</h1>
-  <p class="hint">
-    예정된 회차와 초안에서 <b>빼고 싶은</b> 기사 종류를 고릅니다.
-    기본은 둘 다 꺼짐 — 아무것도 안 빼고 다 모읍니다. 체크하면 그 종류는 아예 수집되지
-    않아 소제목 분류·AI 요약에도 안 들어갑니다. <code>[속보]</code>가 붙은 기사는 어느
-    쪽을 켜도 항상 남습니다.<br>
-    실시간 현황 화면은 이 설정과 무관하게 늘 걸러내지 않고 그대로 보여줍니다.
-  </p>
-  <form method="POST" action="/save-scrap-page">
-    <div class="checkbox-row">
-      <input type="checkbox" id="exclude_photo" name="exclude_photo_in_scrap" value="1"{photo_checked}>
-      <label for="exclude_photo">포토/현장 기사 제외</label>
-    </div>
-    <div class="checkbox-row">
-      <input type="checkbox" id="exclude_personnel" name="exclude_personnel_in_scrap" value="1"{personnel_checked}>
-      <label for="exclude_personnel">인사 발령 기사 제외</label>
-    </div>
-    <div class="save-bar"><div class="save-bar-inner"><button type="submit">저장</button></div></div>
-  </form>
-</div>
-</body>
-</html>
-"""
-)
-
-
-def render_scrap_page_settings(settings: dict) -> str:
-    """스크랩 페이지 설정 화면을 렌더링한다 — 자동선별 시 [인사]/[포토] 기사 제외 여부를 다룬다.
-
-    [수정: 2026-08-11] "포함할지"에서 "제외할지"로 의미를 뒤집었다(app.config 참고) —
-    기본은 다 수집되고, 빼고 싶은 것만 체크하는 방식이다.
-    """
-    photo_checked = " checked" if settings.get("exclude_photo_in_scrap", False) else ""
-    personnel_checked = " checked" if settings.get("exclude_personnel_in_scrap", False) else ""
-    return _SCRAP_PAGE_SETTINGS_TEMPLATE.format(
-        **_theme(), photo_checked=photo_checked, personnel_checked=personnel_checked, index_href=_home_href()
     )
 
 
@@ -2397,15 +2289,15 @@ _AUTO_SEND_SETTINGS_TEMPLATE = (
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>자동발송 설정</title>
+<title>자동발송 대기시간 및 ON/OFF</title>
 <style>"""
     + _BASE_STYLE
     + """
   .checkbox-row {{ margin: 16px 0; display: flex; align-items: center; gap: 8px; }}
-  .checkbox-row label {{ font-size: 1rem; }}
+  .checkbox-row label {{ font-size: var(--fs-base); }}
   .grace-row {{ margin: 16px 0 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }}
   .grace-row input[type=number] {{ width: 70px; text-align: center; }}
-  .grace-row label {{ font-size: 1rem; }}
+  .grace-row label {{ font-size: var(--fs-base); }}
   .container {{ padding-bottom: 88px; }}
 </style>
 </head>
@@ -2414,7 +2306,7 @@ _AUTO_SEND_SETTINGS_TEMPLATE = (
     + _TOP_BAR_HTML
     + """
 <div class="container">
-  <h1>⏱️ 자동발송 설정</h1>
+  <h1>⏱️ 자동발송 대기시간 및 ON/OFF</h1>
   <p class="hint">
     회차 수집이 끝난 뒤 아래 시간 안에 확정본에서 <b>(발송)</b>을 누르지 않으면, 앱이
     대신 발송합니다(텔레그램·이메일 중 설정된 채널로). 탭을 닫아둬도 실행됩니다.<br>
@@ -2449,7 +2341,7 @@ def render_auto_send_settings(settings: dict, error: str = "", grace_min: Option
     [추가: 2026-08-11] 예전엔 `/telegram`·`/email`에 채널별 "정기 스크랩 완료 시 자동 전송"
     체크박스가 따로 있었는데, 발송 경로가 그 값을 읽지 않아 **꺼놔도 그냥 나가는** 고아
     설정이었다. 확정본의 개별 Telegram/Email 버튼을 (발송) 하나로 합친 것과 같은 이유로
-    자동 발송도 채널별로 쪼개지 않고 여기 하나로 통합했다.
+    자동발송도 채널별로 쪼개지 않고 여기 하나로 통합했다.
     """
     # 검증 실패 시엔 저장된 값이 아니라 담당자가 방금 입력한 값을 그대로 다시 보여준다
     # (다른 설정 화면과 같은 방식) — 안 그러면 무엇을 잘못 썼는지 화면에서 사라진다.
@@ -2469,69 +2361,230 @@ def render_auto_send_settings(settings: dict, error: str = "", grace_min: Option
 # [추가: 2026-08-03] 텔레그램 전송 설정 화면. .env에 봇 토큰이 없으면 켜도 조용히
 # 건너뛰므로(app.telegram_bot.send_text), 그 상태를 status로 미리 알려줘 "보냈는데 왜
 # 안 오지"를 막는다.
-# [수정: 2026-08-07] 챗 아이디 1개(.env) 고정 방식에서 이메일과 같은 "여러 받는 사람 +
-# 켜고 끄기" 방식으로 바꿨다(app.telegram_recipients). 새로 chat id를 발급받는 법을
-# 몰라 헤맬 수 있어 안내 박스를 뒀다.
-# [수정: 2026-08-11] 채널별 "자동 전송" 체크박스는 통합 설정(/auto-send)으로 옮겨
-# 여기서 빠졌다 — 발송 경로가 그 값을 읽지 않아 꺼놔도 그냥 나가는 고아 설정이었다.
+# [수정: 2026-09-17] 받는 사람 한 줄 = 이름 · chat id · [단독] · [속보] · 정기(기사|요약) ·
+# 수시(기사|요약) · 알림(울리는 시간). 꺼짐은 점선, 켜짐은 실선 칩이고 누르면 바로 바뀐다.
+# 시안 mockups/TELEGRAM_RECIPIENTS_MOCKUP.html.
+
+# 화면 설명글 — 머리글·칸 말풍선과 알림 창 안 문구. 문구를 고칠 땐 여기만 고친다.
+_TELEGRAM_TIPS = {
+    "h_alert": (
+        "[단독]·[속보] 즉시 알림",
+        "제목에 말머리가 붙은 기사를 감지되는 대로 바로 보냅니다. 회차와 상관없이 해당 기사 1~3건만 갑니다.",
+        "감시 시간대·주기·검색어 그룹은 「[단독]·[속보] 기사 알림」에서 정합니다.",
+    ),
+    "h_reg": (
+        "정기 보고서",
+        "회차가 마감되면 만들어지는 정기 확정본입니다. 소제목별로 묶인 그 회차 전체가 나갑니다.",
+        "직접 (발송)을 누르지 않아도 유예 시간이 지나면 자동으로 나갑니다 — 시간은 「자동발송 대기시간 및 ON/OFF」에서.",
+    ),
+    "h_adh": (
+        "수시 보고서",
+        "수시 확정본에서 (발송)을 누르면 나갑니다. 사안 하나를 따로 모아 만든 보고서입니다.",
+        "수시엔 자동발송이 없습니다. 누를 때 이 명단이 확인창에 뜨고, 그 한 번만 뺄 수 있습니다.",
+    ),
+    "h_notify": (
+        "알림이 울리는 시간",
+        "고른 시간에만 소리·진동으로 알립니다. 그 밖의 시간엔 메시지가 알림 없이 조용히 옵니다 — 내용은 그대로 받습니다.",
+        "[단독]·[속보]·정기·수시 모두에 적용됩니다. 텔레그램에만 해당합니다.",
+    ),
+    "c_scoop": ("[단독] 알림 받기", "제목이 [단독]으로 시작하는 기사를 이 사람에게 즉시 보냅니다.", ""),
+    "c_flash": ("[속보] 알림 받기", "제목이 [속보]로 시작하는 기사를 이 사람에게 즉시 보냅니다.", ""),
+    "reg_a": ("정기 — 기사 목록", "그 회차의 기사 목록 전체를 보냅니다. 소제목·언론사·제목·링크가 화면 그대로 들어갑니다.", ""),
+    "reg_s": (
+        "정기 — 요약",
+        "소제목마다 3문장 이내로 AI가 쓴 요약만 보냅니다. 기사 목록은 들어가지 않습니다.",
+        "「기사」와 같이 켜면 한 통에 기사 목록 + 그 아래 요약이 갑니다. AI 분류가 실패한 회차는 기사 목록도 같이 갑니다.",
+    ),
+    "adh_a": ("수시 — 기사 목록", "그 수시 확정본의 기사 목록 전체를 보냅니다. 사안명이 보고서 첫 줄에 들어갑니다.", ""),
+    "adh_s": (
+        "수시 — 요약",
+        "소제목마다 3문장 이내로 AI가 쓴 요약만 보냅니다. 기사 목록은 들어가지 않습니다.",
+        "「기사」와 같이 켜면 한 통에 기사 목록 + 그 아래 요약이 갑니다. 요약이 없는 확정본은 기사 목록이 갑니다.",
+    ),
+    "c_notify_foot": "그 밖의 시간엔 조용히 옵니다. 누르면 바꿀 수 있습니다.",
+    # 알림 창 안
+    "p_title": "{name} — 알림 받는 시간",
+    "p_sub": "고른 시간에만 알림이 울리고, 나머지 시간엔 조용히 옵니다.",
+    "p_always": "하루 종일",
+    "p_always_sub": "언제 보내든 알림이 울립니다.",
+    "p_work": "업무 시간",
+    "p_work_sub": "월~금 09:00 ~ 18:00",
+    "p_custom": "직접 설정",
+    "p_custom_sub": "요일과 시간을 고릅니다.",
+    "p_daily": "매일",
+    "p_weekday": "월~금",
+    "p_foot": "평일인 공휴일에도 울립니다.",
+    "p_apply": "적용",
+}
+
+
+def _tip_html(key: str, right: bool = False, body: Optional[str] = None) -> str:
+    """말풍선 한 개. body를 주면 그 글자로 본문을 갈아 끼운다(알림 칸처럼 값에 따라 바뀌는 곳)."""
+    title, default_body, foot = _TELEGRAM_TIPS[key]
+    return (
+        f'<span class="tip{" r" if right else ""}"><b>{html.escape(title)}</b>'
+        f'{html.escape(default_body if body is None else body)}'
+        f'{f"<em>{html.escape(foot)}</em>" if foot else ""}</span>'
+    )
+
+
+def _notify_tip_html(notify: dict) -> str:
+    foot = "" if notify.get("mode") == "always" else _TELEGRAM_TIPS["c_notify_foot"]
+    return (
+        f'<span class="tip r"><b>알림이 울리는 시간</b>{html.escape(notify_sentence(notify))}'
+        f'{f"<em>{html.escape(foot)}</em>" if foot else ""}</span>'
+    )
+
+
 _TELEGRAM_SETTINGS_TEMPLATE = (
     """<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>텔레그램 수신 대상자 지정</title>
+<title>텔레그램 받는 사람</title>
 <style>"""
     + _BASE_STYLE
     + """
-  .status {{ margin: 4px 0 20px; padding: 10px 14px; border-radius: 6px; font-size: 0.88rem; }}
+  .status {{ margin: 4px 0 20px; padding: 10px 14px; border-radius: var(--r-md); font-size: var(--fs-md); }}
   .status-ok {{ background: {hover}; color: {accent}; }}
   .status-warn {{ background: {error_bg}; color: {error}; }}
-  .help-box {{ background: {hover}; border-radius: 6px; padding: 10px 14px; margin: 0 0 20px; font-size: 0.85rem; color: {text}; }}
+  .help-box {{ background: {hover}; border-radius: var(--r-md); padding: 10px 14px; margin: 0 0 20px; font-size: var(--fs-md); color: {text}; }}
   .help-box p {{ margin: 0 0 6px; font-weight: 600; }}
   .help-box ol {{ margin: 0; padding-left: 18px; }}
   .help-box li {{ margin: 4px 0; }}
-  .help-box code {{ background: {card}; padding: 1px 5px; border-radius: 4px; font-size: 0.82rem; word-break: break-all; }}
-  .keyword-row {{ margin: 8px 0; display: flex; align-items: center; gap: 8px; }}
-  .recipient-row input[type=text] {{ width: 130px; }}
-  .add-row {{ margin: 4px 0 0; }}
+  .help-box code {{ background: {card}; padding: 1px 5px; border-radius: var(--r-sm); font-size: var(--fs-sm); word-break: break-all; }}
+  .container {{ padding-bottom: 120px; }}
+  .add-row {{ margin: 10px 0 0; }}
   .add-row button {{ background: {card}; color: {accent}; border: 1px solid {accent}; }}
   .add-row button:hover {{ background: {hover}; }}
   .add-row button:disabled {{ background: {border}; color: {muted}; border-color: {border}; }}
-  .toggle {{ position: relative; display: inline-flex; align-items: center; flex-shrink: 0; cursor: pointer; }}
-  .toggle input {{ position: absolute; opacity: 0; width: 0; height: 0; }}
-  .toggle .track {{
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 36px; height: 24px; background: {border}; border-radius: 4px; transition: background 0.15s;
-  }}
-  .toggle input:checked ~ .track {{ background: {accent}; }}
-  .toggle-text {{ font-size: 0.68rem; font-weight: 700; }}
-  .toggle-text.on {{ display: none; color: {on_fill}; }}
-  .toggle-text.off {{ display: inline; color: {muted}; }}
-  .toggle input:checked ~ .track .toggle-text.on {{ display: inline; }}
-  .toggle input:checked ~ .track .toggle-text.off {{ display: none; }}
-  .container {{ padding-bottom: 88px; }}
-  /* [추가: 2026-08-20] [단독]/[속보] 즉시 알림 체크박스 — 기존 정기 전송용 ON/OFF
-     토글(.toggle)과는 다른 축이라 일부러 다른 생김새(작은 체크박스 + 짧은 글자
-     라벨)를 썼다 — 토글 스위치를 셋으로 늘리면 "이 셋이 서로 다른 의미"라는 걸
-     모양만으로 알아채기 어렵다(CLAUDE.md "[단독]·[속보] 기사 알림" 참고). */
-  .alert-chk {{
-    display: inline-flex; align-items: center; gap: 3px; font-size: 0.76rem; color: {muted};
-    white-space: nowrap; cursor: pointer;
-  }}
-  .alert-chk input {{ width: 15px; height: 15px; accent-color: {accent}; margin: 0; }}
-  .recipient-head {{
-    display: flex; align-items: center; gap: 8px; margin: 0 0 4px; padding: 0 0 4px;
-    font-size: 0.7rem; font-weight: 700; color: {muted}; border-bottom: 1px solid {border};
-  }}
-  .recipient-head span {{ display: block; }}
-  .rh-toggle {{ width: 36px; flex-shrink: 0; }}
-  .rh-name {{ width: 130px; flex-shrink: 0; }}
-  .rh-id {{ flex: 1; }}
-  .rh-alert {{ width: 34px; flex-shrink: 0; text-align: center; }}
   .note {{
-    background: {bg}; border-left: 3px solid {accent}; border-radius: 0 6px 6px 0;
-    padding: 10px 12px; font-size: 0.8rem; color: {text}; line-height: 1.65; margin: 14px 0 4px;
+    background: {bg}; border-left: 3px solid {accent}; border-radius: 0 var(--r-md) var(--r-md) 0;
+    padding: 10px 12px; font-size: var(--fs-sm); color: {text}; line-height: 1.65; margin: 14px 0 4px;
+  }}
+
+  /* 한 줄 격자 — 머리글과 칸이 같은 열을 쓴다(예전 flex는 머리글과 입력칸 폭이 어긋났다). */
+  .rcp-head, .rcp-row {{
+    display: grid; align-items: center; column-gap: 7px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) 52px 52px 96px 96px 92px 24px;
+  }}
+  .rcp-head {{ font-size: var(--fs-xs); font-weight: 700; color: {muted}; padding: 0 0 5px; border-bottom: 1px solid {border}; margin: 0 0 3px; }}
+  .rcp-head > span {{ text-align: center; }}
+  .rcp-head > .l {{ text-align: left; }}
+  .rcp-head .span2 {{ grid-column: span 2; }}
+  .rcp-row {{ padding: 4px 0; }}
+  .rcp-row:hover {{ position: relative; z-index: 3; }}
+  .rcp-row input[type=text] {{ width: 100%; min-width: 0; box-sizing: border-box; }}
+  .rcp-del {{ background: none; border: 0; padding: 4px; color: {muted}; cursor: pointer; width: auto; display: flex; justify-content: center; }}
+  .rcp-del:hover {{ background: none; color: {error}; }}
+  .rcp-del svg {{ width: 16px; height: 16px; }}
+
+  /* 말풍선 — 홈 흐름도 말풍선(.tip)과 같은 모양 */
+  .tw {{ position: relative; }}
+  .rcp-head .tw {{ display: block; cursor: help; text-decoration: underline dotted {border}; text-underline-offset: 3px; }}
+  .tip {{
+    position: absolute; left: 50%; top: calc(100% + 7px); z-index: 30; width: 250px; max-width: calc(100vw - 40px);
+    background: {card}; border: 1px solid {border}; border-radius: var(--r-lg); box-shadow: var(--sh-pop);
+    padding: 10px 12px; font-size: var(--fs-sm); font-weight: 500; line-height: 1.6; color: {muted};
+    text-align: left; white-space: normal; text-decoration: none; transform: translateX(-50%); pointer-events: none;
+    /* 안 보일 땐 아예 그리지 않는다 — 숨긴 말풍선도 자리를 차지하면 오른쪽 칸의 말풍선이 창 밖으로
+       나가 가로 스크롤이 생긴다. 0.15초 뒤에 떠서 스치듯 지나갈 땐 안 뜬다. */
+    display: none;
+  }}
+  .tip b {{ display: block; margin: 0 0 3px; color: {header}; font-size: var(--fs-sm); }}
+  .tip em {{ display: block; margin: 5px 0 0; font-style: normal; color: {text_faint}; font-size: var(--fs-xs); }}
+  .tip.r {{ left: auto; right: 0; transform: none; }}
+  .tw:hover > .tip {{ display: block; animation: tipIn .12s ease-out .15s both; }}
+  @keyframes tipIn {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
+  body.pop-open .tip {{ display: none; }}
+
+  /* 받는 것 칩 — 꺼짐 점선 · 켜짐 실선 */
+  .rchip {{
+    position: relative; display: inline-flex; align-items: center; justify-content: center; width: 100%; height: 30px;
+    box-sizing: border-box; border: 1px dashed {border}; border-radius: var(--r-md); background: {card}; color: {text_faint};
+    font-size: var(--fs-sm); font-weight: 600; cursor: pointer; user-select: none; white-space: nowrap;
+  }}
+  .rchip input {{ position: absolute; opacity: 0; width: 0; height: 0; }}
+  .rchip:has(input:focus-visible) {{ outline: 2px solid {accent}; outline-offset: 1px; }}
+  .rchip:has(input:checked) {{ border: 1px solid {scoop_chip_border}; background: {scoop_bg}; color: {scoop_text}; }}
+  /* 정기·수시 「기사 | 요약」 — 둘 중 하나를 고르는 칸이 아니라 각각 켜고 끄는 칸이라 4px 띄우고
+     칸마다 제 테두리를 준다. 켜짐은 기사·요약 같은 모양(옅은 흐름 색 + 실선 + ✓), 꺼짐은 점선.
+     시안 mockups/TELEGRAM_PAIR_CHIP_MOCKUP.html B안. */
+  .rpair {{ display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }}
+  .rpair label {{
+    position: relative; display: inline-flex; align-items: center; justify-content: center; height: 30px;
+    box-sizing: border-box; border: 1px dashed {border}; border-radius: var(--r-md);
+    font-size: var(--fs-xs); font-weight: 600; color: {text_faint}; background: {card}; cursor: pointer; user-select: none;
+    white-space: nowrap;
+  }}
+  .rpair input {{ position: absolute; opacity: 0; width: 0; height: 0; }}
+  .rpair label:has(input:focus-visible) {{ outline: 2px solid {accent}; outline-offset: 1px; }}
+  .rpair.reg label:has(input:checked) {{ background: {hover}; color: {accent}; border: 1px solid {accent_border}; }}
+  .rpair.adh label:has(input:checked) {{ background: {adhoc_bg}; color: {adhoc_text}; border: 1px solid {adhoc_border_strong}; }}
+  .rpair label:has(input:checked)::before, .rchip:has(input:checked)::before {{ content: "✓"; margin-right: 3px; font-weight: 800; }}
+
+  /* 알림 칩 — 늘 값이 있어 점선/실선 규칙 밖 */
+  .nchip {{
+    position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 100%; height: 30px;
+    box-sizing: border-box; border: 1px solid {notify_chip_border}; border-radius: var(--r-md); background: {notify_chip_bg};
+    color: {notify_chip_text}; font-size: var(--fs-xs); font-weight: 600; cursor: pointer; white-space: nowrap; padding: 0 4px;
+    font-variant-numeric: tabular-nums;
+  }}
+  .nchip:hover {{ background: {notify_chip_bg}; border-color: {muted}; }}
+  .nchip svg {{ width: 12px; height: 12px; flex-shrink: 0; }}
+
+  /* 알림 창 */
+  .npop {{
+    position: absolute; z-index: 40; width: 280px; background: {card}; border: 1px solid {border}; border-radius: var(--r-lg);
+    box-shadow: var(--sh-pop); padding: 13px 14px 12px; font-size: var(--fs-sm); display: none;
+  }}
+  .npop.show {{ display: block; }}
+  .npop h3 {{ margin: 0 0 3px; font-size: var(--fs-md); color: {header}; }}
+  .npop .sub {{ margin: 0 0 10px; color: {muted}; font-size: var(--fs-xs); line-height: 1.6; }}
+  .npop .opt {{ display: flex; align-items: flex-start; gap: 7px; padding: 7px 8px; margin: 0 0 3px; border-radius: var(--r-md); cursor: pointer; line-height: 1.45; }}
+  .npop .opt:hover {{ background: {bg}; }}
+  .npop .opt:has(input:checked) {{ background: {hover}; }}
+  .npop .opt input {{ margin: 2px 0 0; accent-color: {accent}; }}
+  .npop .opt b {{ display: block; font-weight: 600; color: {text}; }}
+  .npop .opt small {{ display: block; color: {muted}; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }}
+  .npop .custom {{ margin: 4px 0 0 29px; display: none; }}
+  .npop .custom.show {{ display: block; }}
+  .npop .days {{ display: inline-flex; border: 1px solid {border}; border-radius: var(--r-md); overflow: hidden; margin: 0 0 7px; }}
+  .npop .days label {{ padding: 4px 11px; font-size: var(--fs-sm); cursor: pointer; color: {muted}; position: relative; }}
+  .npop .days label + label {{ border-left: 1px solid {border}; }}
+  .npop .days input {{ position: absolute; opacity: 0; width: 0; height: 0; }}
+  .npop .days label:has(input:checked) {{ background: {accent}; color: {on_fill}; }}
+  .npop .times {{ display: flex; align-items: center; gap: 5px; color: {muted}; font-size: var(--fs-sm); }}
+  .npop select {{ font: inherit; font-size: var(--fs-sm); padding: 4px 5px; border: 1px solid {border}; border-radius: var(--r-md); background: {card}; width: auto; font-variant-numeric: tabular-nums; }}
+  .npop .foot {{ margin: 10px 0 0; color: {muted}; font-size: var(--fs-xs); }}
+  .npop .btns {{ display: flex; justify-content: flex-end; margin: 10px 0 0; padding: 10px 0 0; border-top: 1px solid {border}; }}
+  .npop .btns button {{ width: auto; padding: 6px 16px; font-size: var(--fs-sm); }}
+
+  .save-msg {{ display: none; align-items: flex-start; gap: 8px; font-size: var(--fs-sm); line-height: 1.5; border-radius: var(--r-md); padding: 9px 11px; margin-bottom: 10px; text-align: left; }}
+  .save-msg.show {{ display: flex; }}
+  .save-msg .dot {{ width: 8px; height: 8px; border-radius: var(--r-circle); flex-shrink: 0; margin-top: 5px; }}
+  .save-msg.dirty {{ background: {warn_bg}; border: 1px solid {warn_border}; color: {warn_text}; }}
+  .save-msg.dirty .dot {{ background: {warn_dot}; }}
+
+  /* 좁은 화면 — 이름·chat id가 한 줄, 받는 것·알림이 그 아래 줄. 칩마다 이름이 적혀 있어 머리글은 숨긴다. */
+  @media (max-width: 640px) {{
+    .rcp-head {{ display: none; }}
+    .tip {{ display: none !important; }}
+    .rcp-row {{
+      grid-template-columns: repeat(4, minmax(0, 1fr)) 24px; row-gap: 6px;
+      padding: 10px 0; border-bottom: 1px solid {border};
+    }}
+    .rcp-row > .c-name {{ grid-column: 1 / 3; grid-row: 1; }}
+    .rcp-row > .c-id {{ grid-column: 3 / 5; grid-row: 1; }}
+    .rcp-row > .rcp-del {{ grid-column: 5; grid-row: 1; }}
+    .rcp-row > .rchip {{ grid-row: 2; }}
+    .rcp-row > .nchip {{ grid-column: 3 / 5; grid-row: 2; }}
+    /* 머리글이 없으니 두 「기사 | 요약」이 어느 흐름인지 칸 위에 적는다 */
+    .rcp-row > .rpair {{ grid-column: span 2; grid-row: 3; position: relative; margin-top: 14px; }}
+    .rcp-row > .rpair::before {{ position: absolute; left: 2px; top: -15px; font-size: var(--fs-xs); font-weight: 700; color: {muted}; }}
+    .rcp-row > .rpair.reg::before {{ content: "정기"; }}
+    .rcp-row > .rpair.adh::before {{ content: "수시"; }}
   }}
 </style>
 </head>
@@ -2540,88 +2593,329 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
     + _TOP_BAR_HTML
     + """
 <div class="container">
-  <h1>📤 텔레그램 수신 대상자 지정</h1>
+  <h1>📤 텔레그램 받는 사람</h1>
   <p class="hint">
-    받는 사람을 한 번만 등록해 두고, 무엇을 받을지(정기 확정본 / 🚨 [단독]·[속보] 즉시
-    알림)는 사람마다 체크합니다. 정기 확정본이 언제 나가는지(직접 (발송) 누를 때 /
-    자동발송)는 <a href="/auto-send">자동발송 설정</a>, 알림 조건(감시 시간대·그룹)은
-    <a href="/breaking-alert">[단독]·[속보] 기사 알림</a>에서 정합니다.
+    받는 사람을 한 번만 등록해 두고, 무엇을 받을지와 알림이 울리는 시간을 사람마다 정합니다.
+    정기 확정본이 언제 나가는지는 <a href="/auto-send">자동발송 대기시간 및 ON/OFF</a>, [단독]·[속보] 알림
+    조건(감시 시간대·그룹)은 <a href="/breaking-alert">[단독]·[속보] 기사 알림</a>에서 정합니다.
   </p>
   <div class="status {status_class}">{status_text}</div>
   <div class="help-box">
     <p>받는 사람의 chat id 확인하는 법</p>
     <ol>
       <li>받을 사람이 텔레그램에서 이 봇을 찾아 대화를 시작합니다(아무 메시지나 1개 이상 전송).</li>
-      <li>브라우저에서 <code>https://api.telegram.org/bot&lt;.env의 봇 토큰&gt;/getUpdates</code>를 열어 방금 보낸 메시지의 <code>chat.id</code> 값을 확인합니다.</li>
+      <li>브라우저에서 <code>https://api.telegram.org/bot&lt;봇 토큰&gt;/getUpdates</code>를 열어 방금 보낸 메시지의 <code>chat.id</code> 값을 확인합니다.</li>
       <li>확인한 숫자를 아래 "받는 사람"에 등록합니다.</li>
     </ol>
   </div>
-  <form method="POST" action="/save-telegram">
-    <p class="caption">받는 사람 (최대 {max_recipients}명) — 체크를 풀면 지우지 않고도 잠깐 대상에서 뺄 수 있습니다.</p>
-    <div class="recipient-head">
-      <span class="rh-toggle">확정본</span><span class="rh-name">이름</span><span class="rh-id">chat id</span>
-      <span class="rh-alert">단독</span><span class="rh-alert">속보</span><span style="width:34px"></span>
+  <form method="POST" action="/save-telegram" id="tgForm">
+    <p class="caption">받는 사람 (최대 {max_recipients}명) — 칸을 눌러 끄면 지우지 않고도 잠깐 대상에서 뺄 수 있습니다.</p>
+    <div class="rcp-head">
+      <span class="l">이름</span><span class="l">chat id</span>
+      <span class="span2"><span class="tw">단독/속보{tip_alert}</span></span>
+      <span><span class="tw">정기{tip_reg}</span></span>
+      <span><span class="tw">수시{tip_adh}</span></span>
+      <span><span class="tw">알림{tip_notify}</span></span><span></span>
     </div>
+    <div id="rcpRows">
     {recipient_rows}
+    </div>
     <p class="add-row">
       <button type="submit" formaction="/telegram/add-recipient-slot"{add_disabled}>+ 받는 사람 추가</button>
     </p>
     <div class="note">
-      "나"처럼 정기(확정본)는 끄고 [단독]·[속보] 알림만 받을 수 있습니다 — 두 발송은
-      서로 독립적입니다(정기는 회차 확정 후 전체 목록, 알림은 해당 기사 1~3건만 즉시).
+      "나"처럼 정기·수시는 다 끄고 [단독]·[속보]만 받을 수 있습니다 — 두 발송은 서로 독립적입니다
+      (정기·수시는 보고서 전체, 알림은 해당 기사 1~3건만 즉시).
     </div>
-    <div class="save-bar"><div class="save-bar-inner"><button type="submit">저장</button></div></div>
+    <div class="save-bar"><div class="save-bar-inner">
+      <div class="save-msg dirty{dirty_class}" id="tgSaveMsg"><span class="dot"></span><span>아직 저장하지 않았습니다.</span></div>
+      <button type="submit">저장</button>
+    </div></div>
   </form>
 </div>
-{clear_script}
+
+<div class="npop" id="npop">
+  <h3 id="np-title"></h3>
+  <p class="sub">{p_sub}</p>
+  <label class="opt"><input type="radio" name="np_mode" value="always"><span><b>{p_always}</b><small>{p_always_sub}</small></span></label>
+  <label class="opt"><input type="radio" name="np_mode" value="work"><span><b>{p_work}</b><small>{p_work_sub}</small></span></label>
+  <label class="opt"><input type="radio" name="np_mode" value="custom"><span><b>{p_custom}</b><small>{p_custom_sub}</small></span></label>
+  <div class="custom" id="np-custom">
+    <div class="days">
+      <label><input type="radio" name="np_days" value="daily">{p_daily}</label>
+      <label><input type="radio" name="np_days" value="weekday">{p_weekday}</label>
+    </div>
+    <div class="times"><select id="np-start">{time_options}</select>부터 <select id="np-end">{time_options}</select>까지</div>
+  </div>
+  <p class="foot">{p_foot}</p>
+  <div class="btns"><button type="button" id="np-apply">{p_apply}</button></div>
+</div>
+{recipient_script}
 </body>
 </html>
 """
 )
 
+# 창 제목의 {name}은 JS가 채운다 — .format()을 안 거치는 별도 상수라 중괄호를 그대로 쓴다.
+_TELEGRAM_RECIPIENT_SCRIPT = """<script>
+(function () {
+  var TITLE = __TITLE__;
+  var FOOT = __FOOT__;
+  var WORK = {days: "weekday", start: "09:00", end: "18:00"};
+  var form = document.getElementById("tgForm");
+  var pop = document.getElementById("npop");
+  var current = null;
+
+  function markDirty() { document.getElementById("tgSaveMsg").classList.add("show"); }
+  form.addEventListener("change", function (e) {
+    if (e.target.closest("#npop")) return;
+    markDirty();
+  });
+  form.addEventListener("input", markDirty);
+
+  // 🗑 — 저장 전까지 화면에서만 지운다(예전 del 버튼과 같은 흐름).
+  document.getElementById("rcpRows").addEventListener("click", function (e) {
+    var del = e.target.closest(".rcp-del");
+    if (del) { del.closest(".rcp-row").remove(); markDirty(); return; }
+    var chip = e.target.closest(".nchip");
+    if (chip) { e.stopPropagation(); openPop(chip); }
+  });
+
+  function field(row, name) { return row.querySelector('input[data-n="' + name + '"]'); }
+  function hh(t) { var p = t.split(":"); return String(+p[0]) + (p[1] === "00" ? "" : ":" + p[1]); }
+  function label(mode, days, start, end) {
+    if (mode === "always") return "하루 종일";
+    if (mode === "work") return "업무 시간";
+    return (days === "daily" ? "매일" : "평일") + " " + hh(start) + "–" + hh(end);
+  }
+  function sentence(mode, days, start, end) {
+    if (mode === "always") return "하루 종일 울립니다.";
+    if (mode === "work") { days = WORK.days; start = WORK.start; end = WORK.end; }
+    return (days === "daily" ? "매일" : "월~금") + " " + start + " ~ " + end + (start > end ? " (다음 날)" : "") + "에 울립니다.";
+  }
+  function checked(name) { var el = pop.querySelector('input[name="' + name + '"]:checked'); return el ? el.value : null; }
+  function setRadio(name, value) { var el = pop.querySelector('input[name="' + name + '"][value="' + value + '"]'); if (el) el.checked = true; }
+  function syncCustom() { document.getElementById("np-custom").classList.toggle("show", checked("np_mode") === "custom"); }
+  pop.addEventListener("change", syncCustom);
+
+  function openPop(chip) {
+    var row = chip.closest(".rcp-row");
+    current = row;
+    var name = row.querySelector(".c-name").value.trim() || "새 받는 사람";
+    document.getElementById("np-title").textContent = TITLE.replace("{name}", name);
+    setRadio("np_mode", field(row, "mode").value);
+    setRadio("np_days", field(row, "days").value || "weekday");
+    document.getElementById("np-start").value = field(row, "start").value || "09:00";
+    document.getElementById("np-end").value = field(row, "end").value || "18:00";
+    syncCustom();
+    var rect = chip.getBoundingClientRect();
+    var left = window.scrollX + rect.right - 280;
+    pop.style.left = Math.max(window.scrollX + 8, left) + "px";
+    pop.style.top = (window.scrollY + rect.bottom + 6) + "px";
+    pop.classList.add("show");
+    document.body.classList.add("pop-open");
+  }
+  function closePop() { pop.classList.remove("show"); document.body.classList.remove("pop-open"); current = null; }
+  document.addEventListener("click", function (e) { if (current && !pop.contains(e.target)) closePop(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && current) closePop(); });
+
+  document.getElementById("np-apply").addEventListener("click", function () {
+    if (!current) return;
+    var mode = checked("np_mode") || "always";
+    var days = checked("np_days") || "weekday";
+    var start = document.getElementById("np-start").value;
+    var end = document.getElementById("np-end").value;
+    if (mode === "custom" && start === end) {
+      alert("시작과 끝 시간이 같아요 — 다르게 골라주세요.");
+      return;
+    }
+    field(current, "mode").value = mode;
+    field(current, "days").value = mode === "custom" ? days : "";
+    field(current, "start").value = mode === "custom" ? start : "";
+    field(current, "end").value = mode === "custom" ? end : "";
+    var chip = current.querySelector(".nchip");
+    chip.querySelector(".n-label").textContent = label(mode, days, start, end);
+    var tip = chip.querySelector(".tip");
+    tip.childNodes[1].textContent = sentence(mode, days, start, end);
+    var em = tip.querySelector("em");
+    if (!em) { em = document.createElement("em"); em.textContent = FOOT; tip.appendChild(em); }
+    em.style.display = mode === "always" ? "none" : "";
+    markDirty();
+    closePop();
+  });
+})();
+</script>"""
+
 
 def _render_telegram_recipient_rows(recipients: list, slots: int) -> str:
-    """받는 사람 입력칸을 렌더링한다 — app.settings_server._render_email_recipient_rows와
-    기본 구조는 같고, [단독]/[속보] 즉시 알림 체크박스 2개가 더 붙는다(app.
-    telegram_recipients의 alert_scoop/alert_flash — 정기 전송(enabled)과 독립적인 축)."""
+    """받는 사람 줄을 렌더링한다. 폼 필드 이름은 tg_recipient{번호}_{항목} — 저장 핸들러
+    (_parse_telegram_recipient_form)가 같은 이름으로 읽는다. 빈 칸(새로 추가한 줄)은
+    받는 것 전부 꺼짐 + 알림 「업무 시간」으로 시작한다."""
     rows = []
+    bell = icon("bell")
     for i in range(slots):
-        recipient = recipients[i] if i < len(recipients) else {}
-        name = html.escape(recipient.get("name", ""))
-        chat_id = html.escape(recipient.get("chat_id", ""))
-        enabled_checked = " checked" if recipient.get("enabled", True) else ""
-        scoop_checked = " checked" if recipient.get("alert_scoop") else ""
-        flash_checked = " checked" if recipient.get("alert_flash") else ""
+        n = i + 1
+        if i < len(recipients):
+            r = recipients[i]
+            notify = normalize_notify(r.get("notify")) if "notify" in r else dict(LEGACY_NOTIFY)
+        else:
+            r = {}
+            notify = dict(NEW_RECIPIENT_NOTIFY)
+
+        def ck(field: str) -> str:
+            return " checked" if r.get(field) else ""
+
+        prefix = f"tg_recipient{n}"
         rows.append(
-            '<div class="keyword-row recipient-row">'
-            '<label class="toggle" title="확정본을 받을지(켜고 끄기, 삭제 아님)">'
-            f'<input type="checkbox" name="tg_recipient{i + 1}_enabled" value="1"{enabled_checked}>'
-            '<span class="track"><span class="toggle-text on">ON</span><span class="toggle-text off">OFF</span></span>'
-            "</label>"
-            f'<input type="text" name="tg_recipient{i + 1}_name" value="{name}" placeholder="이름">'
-            f'<input type="text" name="tg_recipient{i + 1}_chat_id" value="{chat_id}" placeholder="chat id">'
-            f'<label class="alert-chk" title="[단독] 즉시 알림"><input type="checkbox" name="tg_recipient{i + 1}_alert_scoop" value="1"{scoop_checked}></label>'
-            f'<label class="alert-chk" title="[속보] 즉시 알림"><input type="checkbox" name="tg_recipient{i + 1}_alert_flash" value="1"{flash_checked}></label>'
-            f'<button type="button" class="del-btn" onclick="removeRow(this)" title="이 칸 지우기">del</button>'
+            '<div class="rcp-row">'
+            f'<input type="text" class="c-name" name="{prefix}_name" value="{html.escape(r.get("name", ""))}" placeholder="이름">'
+            f'<input type="text" class="c-id" name="{prefix}_chat_id" value="{html.escape(r.get("chat_id", ""))}" placeholder="chat id">'
+            f'<label class="rchip tw"><input type="checkbox" name="{prefix}_alert_scoop" value="1"{ck("alert_scoop")}>[단독]{_tip_html("c_scoop")}</label>'
+            f'<label class="rchip tw"><input type="checkbox" name="{prefix}_alert_flash" value="1"{ck("alert_flash")}>[속보]{_tip_html("c_flash")}</label>'
+            '<div class="rpair reg">'
+            f'<label class="a tw"><input type="checkbox" name="{prefix}_regular_articles" value="1"{ck("regular_articles")}>기사{_tip_html("reg_a")}</label>'
+            f'<label class="s tw"><input type="checkbox" name="{prefix}_regular_summary" value="1"{ck("regular_summary")}>요약{_tip_html("reg_s")}</label>'
+            "</div>"
+            '<div class="rpair adh">'
+            f'<label class="a tw"><input type="checkbox" name="{prefix}_adhoc_articles" value="1"{ck("adhoc_articles")}>기사{_tip_html("adh_a", right=True)}</label>'
+            f'<label class="s tw"><input type="checkbox" name="{prefix}_adhoc_summary" value="1"{ck("adhoc_summary")}>요약{_tip_html("adh_s", right=True)}</label>'
+            "</div>"
+            f'<button type="button" class="nchip tw">{bell}<span class="n-label">{html.escape(notify_label(notify))}</span>'
+            f"{_notify_tip_html(notify)}</button>"
+            f'<input type="hidden" data-n="mode" name="{prefix}_notify_mode" value="{notify["mode"]}">'
+            f'<input type="hidden" data-n="days" name="{prefix}_notify_days" value="{notify.get("days", "")}">'
+            f'<input type="hidden" data-n="start" name="{prefix}_notify_start" value="{notify.get("start", "")}">'
+            f'<input type="hidden" data-n="end" name="{prefix}_notify_end" value="{notify.get("end", "")}">'
+            f'<button type="button" class="rcp-del" title="이 사람 지우기 (저장해야 반영)" aria-label="지우기">{icon("trash")}</button>'
             "</div>"
         )
     return "\n".join(rows)
 
 
-def render_telegram_settings(settings: dict, slots: Optional[int] = None, recipients: Optional[list] = None) -> str:
-    """텔레그램 자동 전송·받는 사람 설정 화면을 렌더링한다(app.settings_server.render_email_settings와 동일한 패턴)."""
+def _parse_telegram_recipient_form(form: dict) -> list:
+    """받는 사람 화면의 폼(tg_recipient{번호}_{항목})을 목록으로 읽는다. 저장과 「+ 받는 사람
+    추가」가 같이 쓴다 — 둘이 따로 읽으면 한쪽에만 새 칸이 빠진다."""
+    recipients = []
+    for i in range(1, MAX_TELEGRAM_RECIPIENTS + 1):
+        prefix = f"tg_recipient{i}"
+        if f"{prefix}_chat_id" not in form:
+            continue
+        row = {
+            "name": form.get(f"{prefix}_name", [""])[0],
+            "chat_id": form.get(f"{prefix}_chat_id", [""])[0],
+            "notify": {
+                "mode": form.get(f"{prefix}_notify_mode", ["always"])[0],
+                "days": form.get(f"{prefix}_notify_days", [""])[0],
+                "start": form.get(f"{prefix}_notify_start", [""])[0],
+                "end": form.get(f"{prefix}_notify_end", [""])[0],
+            },
+        }
+        for field in RECEIVE_FIELDS:
+            row[field] = f"{prefix}_{field}" in form
+        recipients.append(row)
+    return recipients
+
+
+_BOT_NAME_SCRIPT = """<script>
+(function () {
+  var inp = document.getElementById("botName");
+  if (!inp || inp.disabled) return;
+  var before = document.getElementById("botNameBefore").value;
+  var fallback = inp.getAttribute("placeholder");
+  function firstChar(s) {
+    var t = s.replace(/^[\\s\\p{Extended_Pictographic}\\uFE0F\\u200D]+/u, "");
+    return (t || "?").charAt(0);
+  }
+  function sync() {
+    var shown = inp.value.trim() || fallback;
+    document.getElementById("bnCount").textContent = Array.from(inp.value).length + "/" + inp.maxLength;
+    document.getElementById("bnShow").textContent = shown;
+    document.getElementById("bnAvatar").textContent = firstChar(shown);
+    var changed = shown !== before;
+    inp.classList.toggle("changed", changed);
+    document.getElementById("bnWas").classList.toggle("show", changed);
+    return changed;
+  }
+  inp.addEventListener("input", function () {
+    document.querySelectorAll(".bot-name .status").forEach(function (el) { el.remove(); });
+    sync();
+  });
+  sync();
+})();
+</script>"""
+
+
+def _render_bot_name_block(draft: Optional[str], before: Optional[str], notice: Optional[tuple]) -> str:
+    """봇 이름 칸. 값은 화면을 열 때 텔레그램에서 불러온다(앱에 따로 저장하지 않는다).
+    draft/before는 저장이 거절돼 입력하던 값을 다시 그릴 때, notice는 저장 결과
+    (("ok"|"err", 문구)). 연동 › 텔레그램 발송 계정 화면에 있다."""
+    if not telegram_is_configured():
+        return (
+            '<div class="bot-name"><label class="bn-label" for="botName">봇 이름</label>'
+            f'<div class="bn-row"><input type="text" id="botName" value="{html.escape(DEFAULT_TELEGRAM_BOT_NAME)}" disabled></div>'
+            '<p class="bn-hint">봇 토큰을 먼저 넣고 저장하면 이름을 바꿀 수 있습니다.</p></div>'
+        )
+    load_error = None
+    if before is None:
+        current, load_error = fetch_bot_name()
+        before = current or DEFAULT_TELEGRAM_BOT_NAME
+    value = before if draft is None else draft
+    shown = value.strip() or DEFAULT_TELEGRAM_BOT_NAME
+    status = ""
+    if notice and notice[0] == "ok":
+        status = f'<div class="status status-ok">{icon("check")} {html.escape(notice[1])}</div>'
+    elif notice:
+        status = f'<div class="status status-warn">{icon("alert")} {html.escape(notice[1])}</div>'
+    elif load_error:
+        status = (
+            f'<div class="status status-warn">{icon("alert")} 텔레그램에서 지금 이름을 불러오지 못했어요 — '
+            f'{html.escape(load_error)} 아래 칸은 기본 이름입니다.</div>'
+        )
+    esc = html.escape
+    return f"""<div class="bot-name">
+    <label class="bn-label" for="botName">봇 이름</label>
+    <div class="bn-row">
+      <input type="text" id="botName" name="bot_name" maxlength="{MAX_BOT_NAME_LEN}" value="{esc(value)}" placeholder="{esc(DEFAULT_TELEGRAM_BOT_NAME)}">
+      <span class="bn-count" id="bnCount"></span>
+    </div>
+    <input type="hidden" id="botNameBefore" name="bot_name_before" value="{esc(before)}">
+    <p class="bn-was" id="bnWas">지금 이름: <s>{esc(before)}</s> — 저장하면 바뀝니다.</p>
+    <p class="bn-hint">받는 사람의 텔레그램 대화방 맨 위에 보이는 이름입니다. 한 봇을 쓰므로 <b>모든 받는 사람에게 같이 바뀝니다.</b> 비워 두고 저장하면 기본 이름으로 돌아갑니다.</p>
+    <div class="bn-preview">
+      <span class="cap">받는 사람 화면</span>
+      <span class="bn-avatar" id="bnAvatar">{esc(shown[:1])}</span>
+      <span class="bn-who"><b id="bnShow">{esc(shown)}</b><small>봇</small></span>
+    </div>
+    {status}
+  </div>
+  {_BOT_NAME_SCRIPT}"""
+
+
+def render_telegram_settings(
+    settings: dict, slots: Optional[int] = None, recipients: Optional[list] = None, dirty: bool = False,
+) -> str:
+    """텔레그램 받는 사람 설정 화면. dirty는 「+ 받는 사람 추가」로 저장 전 값을 다시 그릴 때."""
     if recipients is None:
         recipients = load_telegram_recipients()
     if slots is None:
         slots = max(len(recipients), 1)
     slots = min(max(slots, len(recipients)), MAX_TELEGRAM_RECIPIENTS)
+    # 봇(토큰·이름)은 연동 › 텔레그램 발송 계정에서 정한다 — 여기선 어느 봇으로 나가는지만 알린다.
+    sender_link = '<a href="/telegram-sender">설정 › 연동 › 텔레그램 발송 계정</a>'
     if telegram_is_configured():
-        status_class, status_text = "status-ok", f'{icon("check")} .env에 봇 토큰이 설정돼 있습니다.'
+        bot_name, _ = fetch_bot_name()
+        who = f"<b>{html.escape(bot_name)}</b>" if bot_name else "등록됨"
+        status_class, status_text = (
+            "status-ok",
+            f'{icon("check")} 보내는 봇: {who} — 바꾸려면 {sender_link} · <a href="/send-log">발송 기록 →</a>',
+        )
     else:
         status_class, status_text = (
             "status-warn",
-            f'{icon("alert")} .env에 TELEGRAM_BOT_TOKEN이 없습니다 — 켜도 전송되지 않습니다.',
+            f'{icon("alert")} 보내는 봇이 없어 아무것도 나가지 않습니다 — {sender_link}에서 넣어주세요.',
         )
+    times = [f"{h:02d}:{m}" for h in range(24) for m in ("00", "30")]
+    plain = {k: html.escape(v) for k, v in _TELEGRAM_TIPS.items() if isinstance(v, str)}
     return _TELEGRAM_SETTINGS_TEMPLATE.format(
         **_theme(),
         status_class=status_class,
@@ -2629,8 +2923,17 @@ def render_telegram_settings(settings: dict, slots: Optional[int] = None, recipi
         max_recipients=MAX_TELEGRAM_RECIPIENTS,
         recipient_rows=_render_telegram_recipient_rows(recipients, slots),
         add_disabled=" disabled" if slots >= MAX_TELEGRAM_RECIPIENTS else "",
-        clear_script=_CLEAR_FIELD_SCRIPT,
+        dirty_class=" show" if dirty else "",
+        tip_alert=_tip_html("h_alert"),
+        tip_reg=_tip_html("h_reg"),
+        tip_adh=_tip_html("h_adh"),
+        tip_notify=_tip_html("h_notify", right=True),
+        time_options="".join(f"<option>{t}</option>" for t in times),
+        recipient_script=_TELEGRAM_RECIPIENT_SCRIPT.replace("__TITLE__", json.dumps(_TELEGRAM_TIPS["p_title"])).replace(
+            "__FOOT__", json.dumps(_TELEGRAM_TIPS["c_notify_foot"])
+        ),
         index_href=_home_href(),
+        **{k: v for k, v in plain.items() if k.startswith("p_")},
     )
 
 
@@ -2650,15 +2953,15 @@ _BREAKING_ALERT_SETTINGS_TEMPLATE = (
     + """
   .master {{
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    background: {warn_bg}; border: 1px solid {warn_border}; border-radius: 6px; padding: 12px 14px; margin: 0 0 18px;
+    background: {warn_bg}; border: 1px solid {warn_border}; border-radius: var(--r-md); padding: 12px 14px; margin: 0 0 18px;
   }}
-  .master-t {{ font-size: 0.92rem; font-weight: 700; color: {warn_text}; }}
-  .master-s {{ font-size: 0.78rem; color: {warn_sub}; margin-top: 2px; }}
+  .master-t {{ font-size: var(--fs-md); font-weight: 700; color: {warn_text}; }}
+  .master-s {{ font-size: var(--fs-sm); color: {warn_sub}; margin-top: 2px; }}
   .toggle {{ position: relative; display: inline-flex; align-items: center; flex-shrink: 0; cursor: pointer; }}
   .toggle input {{ position: absolute; opacity: 0; width: 0; height: 0; }}
   .toggle .track {{
     display: inline-flex; align-items: center; justify-content: center;
-    width: 36px; height: 24px; background: {border}; border-radius: 4px; transition: background 0.15s;
+    width: 36px; height: 24px; background: {border}; border-radius: var(--r-sm); transition: background 0.15s;
   }}
   .toggle input:checked ~ .track {{ background: {accent}; }}
   .toggle-text {{ font-size: 0.68rem; font-weight: 700; }}
@@ -2668,33 +2971,38 @@ _BREAKING_ALERT_SETTINGS_TEMPLATE = (
   .toggle input:checked ~ .track .toggle-text.off {{ display: none; }}
   .sec {{ border-top: 1px solid {border}; padding: 16px 0 4px; }}
   .sec:first-of-type {{ border-top: none; }}
-  .sec-t {{ font-size: 0.88rem; font-weight: 700; color: {header}; margin: 0 0 4px; }}
-  .sec-d {{ font-size: 0.78rem; color: {muted}; margin: 0 0 10px; line-height: 1.55; }}
-  .grp {{ display: flex; align-items: center; gap: 8px; padding: 7px 0; font-size: 0.9rem; }}
+  .sec-t {{ font-size: var(--fs-md); font-weight: 700; color: {header}; margin: 0 0 4px; }}
+  .sec-d {{ font-size: var(--fs-sm); color: {muted}; margin: 0 0 10px; line-height: 1.55; }}
+  .grp {{ display: flex; align-items: center; gap: 8px; padding: 7px 0; font-size: var(--fs-md); }}
   .grp input[type=checkbox] {{ width: 16px; height: 16px; accent-color: {accent}; flex-shrink: 0; margin: 0; }}
-  .grp .cnt {{ color: {muted}; font-size: 0.78rem; }}
+  .grp .cnt {{ color: {muted}; font-size: var(--fs-sm); }}
   .grp .warn {{
-    margin-left: auto; font-size: 0.74rem; color: {warn_accent}; background: {warn_bg};
-    border: 1px solid {warn_border}; border-radius: 999px; padding: 1px 8px;
+    margin-left: auto; font-size: var(--fs-xs); color: {warn_accent}; background: {warn_bg};
+    border: 1px solid {warn_border}; border-radius: var(--r-pill); padding: 1px 8px;
   }}
   .row {{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 8px; }}
-  .row label.k {{ font-size: 0.85rem; color: {text}; }}
+  .row label.k {{ font-size: var(--fs-md); color: {text}; }}
   .row select {{
-    background: {bg}; color: {text}; border: 1px solid {border}; border-radius: 4px;
-    padding: 6px 8px; font-size: 0.95rem; font-family: inherit;
+    background: {bg}; color: {text}; border: 1px solid {border}; border-radius: var(--r-md);
+    padding: 6px 8px; font-size: var(--fs-base); font-family: inherit;
   }}
-  .est {{ background: {hover}; border-radius: 6px; padding: 9px 12px; font-size: 0.8rem; color: {header}; line-height: 1.6; margin: 8px 0 4px; }}
+  .est {{ background: {hover}; border-radius: var(--r-md); padding: 9px 12px; font-size: var(--fs-sm); color: {header}; line-height: 1.6; margin: 8px 0 4px; }}
   .est.hot {{ background: {error_bg}; color: {error_strong}; }}
-  .sub {{ font-size: 0.8rem; color: {muted}; display: flex; align-items: center; gap: 7px; padding: 7px 0; }}
+  .sub {{ font-size: var(--fs-sm); color: {muted}; display: flex; align-items: center; gap: 7px; padding: 7px 0; }}
   .sub input[type=checkbox] {{ width: 15px; height: 15px; accent-color: {accent}; margin: 0; }}
   .who {{
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    background: {bg}; border: 1px solid {border}; border-radius: 6px; padding: 10px 12px;
+    background: {bg}; border: 1px solid {border}; border-radius: var(--r-md); padding: 10px 12px;
   }}
-  .who .names {{ font-size: 0.86rem; line-height: 1.6; }}
-  .who a.btn {{ font-size: 0.82rem; padding: 6px 10px; white-space: nowrap; }}
-  .foot {{ border-top: 1px dashed {border}; margin-top: 14px; padding: 12px 0 4px; font-size: 0.78rem; color: {muted}; line-height: 1.65; }}
+  .who .names {{ font-size: var(--fs-md); line-height: 1.6; }}
+  .who a.btn {{ font-size: var(--fs-sm); padding: 6px 10px; white-space: nowrap; }}
+  .foot {{ border-top: 1px dashed {border}; margin-top: 14px; padding: 12px 0 4px; font-size: var(--fs-sm); color: {muted}; line-height: 1.65; }}
   .foot b {{ color: {header}; }}
+  .sub.sub-main {{ color: {text}; font-size: var(--fs-md); }}
+  .burst-hist {{ margin: 4px 0 0; }}
+  .burst-hist .dd {{ color: {muted}; display: inline-block; min-width: 3.2em; }}
+  .burst-hist .n {{ font-weight: 700; color: {error_strong}; display: inline-block; min-width: 3.2em; }}
+  .burst-hist .miss, .burst-hist .miss .n {{ color: {muted}; font-weight: 400; }}
   .container {{ padding-bottom: 88px; }}
   /* [추가: 2026-09-11] 800px 폭에 맞춰 감시 대상 그룹 체크를 한 줄에 세 개씩. 그룹이
      없을 때의 안내 문장은 세 칸을 다 쓴다. 좁은 화면에선 한 줄에 하나로 돌아간다. */
@@ -2708,7 +3016,7 @@ _BREAKING_ALERT_SETTINGS_TEMPLATE = (
     + _TOP_BAR_HTML
     + """
 <div class="container">
-  <h1>🚨 [단독]·[속보] 기사 알림</h1>
+  <h1>[단독]·[속보] 기사 알림</h1>
   <p class="hint">
     회차를 기다리지 않고, [단독]·[속보] 말머리가 붙은 기사가 올라오면 바로
     텔레그램으로 알려줍니다. 자동발송(<a href="/auto-send">/auto-send</a>)과는
@@ -2747,11 +3055,25 @@ _BREAKING_ALERT_SETTINGS_TEMPLATE = (
     </div>
 
     <div class="sec">
+      <p class="sec-t">[속보] 몰림 알림</p>
+      <p class="sec-d">[속보]가 짧은 시간에 여러 언론사에서 한꺼번에 나오면 한 번 더 알려 줍니다. 네이버 호출은 늘지 않아요.</p>
+      <label class="sub sub-main"><input type="checkbox" id="bu-on" name="burst_enabled"{burst_checked} onchange="buCalc()">
+        [속보] 몰림 알림 받기</label>
+      <div class="row" id="bu-row">
+        <select id="bu-win" name="burst_window_min" onchange="buCalc()">{burst_window_options}</select>
+        <label class="k">안에</label>
+        <select id="bu-n" name="burst_min_outlets" onchange="buCalc()">{burst_outlet_options}</select>
+        <label class="k">개 언론사 이상이 [속보]를 내면</label>
+      </div>
+      <div class="est" id="bu-est"></div>
+    </div>
+
+    <div class="sec">
       <p class="sec-t">받는 사람</p>
-      <p class="sec-d">말머리별로 누가 받을지는 수신 대상자 화면에서 사람마다 지정합니다.</p>
+      <p class="sec-d">말머리별로 누가 받을지는 텔레그램 받는 사람 화면에서 사람마다 지정합니다.</p>
       <div class="who">
         <div class="names">{recipient_summary}</div>
-        <a class="btn" href="/telegram">수신 대상자 관리 →</a>
+        <a class="btn" href="/telegram">받는 사람 관리 →</a>
       </div>
     </div>
 
@@ -2791,9 +3113,39 @@ _BREAKING_ALERT_SETTINGS_TEMPLATE = (
       calls.toLocaleString() + '회/일</b> (일일 한도 {daily_limit_fmt}의 <b>' + pct.toFixed(1) + '%</b>)' +
       (pct >= 70
         ? '<br>⚠️ 한도에 가깝습니다 — 확인 주기를 늘리거나 감시 그룹을 줄여주세요.'
-        : '<br>정기 스크랩·실시간 화면이 쓰는 호출은 여기에 포함되지 않습니다.');
+        : '<br>정기 스크랩·전체 기사가 쓰는 호출은 여기에 포함되지 않습니다.');
   }}
   baCalc();
+
+  // [속보] 몰림 알림 — 저장된 정기 회차에서 날마다 가장 많이 몰린 구간(서버가 계산)을
+  // 고른 기준에 대 보여 준다. 기준에 한 곳 모자란 날은 "안 울림"으로 같이 적는다.
+  var BU_HIST = {burst_history_js};
+  function buEsc(s) {{ return String(s).replace(/[&<>"]/g, function (c) {{
+    return {{'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}}[c]; }}); }}
+  function buCalc() {{
+    var on = document.getElementById('bu-on').checked;
+    document.getElementById('bu-row').style.opacity = on ? 1 : 0.45;
+    var box = document.getElementById('bu-est');
+    if (!on || !BU_HIST.first) {{ box.style.display = 'none'; return; }}
+    box.style.display = '';
+    var rows = BU_HIST.win[document.getElementById('bu-win').value] || [];
+    var n = +document.getElementById('bu-n').value;
+    var hit = rows.filter(function (r) {{ return r.n >= n; }});
+    var near = rows.filter(function (r) {{ return r.n === n - 1; }});
+    var h = '정기 회차에 저장된 [속보](' + BU_HIST.first + '~' + BU_HIST.last +
+      ')에 이 기준을 대 보면 <b>' + hit.length + '일</b> 울렸어요' + (hit.length ? ':' : '.');
+    h += '<div class="burst-hist">';
+    hit.forEach(function (r) {{
+      h += '<div><span class="dd">' + r.d + '</span><span class="n">' + r.n + '곳</span>' +
+        r.s + '~' + r.e + ' · ' + buEsc(r.t) + '</div>';
+    }});
+    near.forEach(function (r) {{
+      h += '<div class="miss"><span class="dd">' + r.d + '</span><span class="n">' + r.n +
+        '곳</span>안 울림 · ' + buEsc(r.t) + '</div>';
+    }});
+    box.innerHTML = h + '</div>';
+  }}
+  buCalc();
 </script>
 </body>
 </html>
@@ -2841,7 +3193,7 @@ def render_breaking_alert_settings(error: Optional[str] = None) -> str:
     scoop_names = [r.get("name") or r.get("chat_id", "") for r in recipients if r.get("alert_scoop")]
     flash_names = [r.get("name") or r.get("chat_id", "") for r in recipients if r.get("alert_flash")]
     if not scoop_names and not flash_names:
-        recipient_summary = "받는 사람이 없습니다 — 수신 대상자 화면에서 [단독]/[속보] 열을 체크해주세요."
+        recipient_summary = "받는 사람이 없습니다 — 텔레그램 받는 사람 화면에서 [단독]/[속보] 열을 체크해주세요."
     else:
         parts = []
         if scoop_names:
@@ -2854,6 +3206,16 @@ def render_breaking_alert_settings(error: Optional[str] = None) -> str:
         error_html=f'<p class="error">{html.escape(error)}</p>' if error else "",
         enabled_checked=" checked" if config["enabled"] else "",
         catch_up_checked=" checked" if config["catch_up_enabled"] else "",
+        burst_checked=" checked" if config["burst_enabled"] else "",
+        burst_window_options="".join(
+            f'<option value="{m}"{" selected" if m == config["burst_window_min"] else ""}>{m}분</option>'
+            for m in BURST_WINDOW_CHOICES
+        ),
+        burst_outlet_options="".join(
+            f'<option value="{n}"{" selected" if n == config["burst_min_outlets"] else ""}>{n}</option>'
+            for n in BURST_MIN_OUTLETS_CHOICES
+        ),
+        burst_history_js=json.dumps(burst_history(), ensure_ascii=False).replace("</", "<\\/"),
         group_rows=group_rows,
         group_js=group_js,
         start=html.escape(config["start"]),
@@ -2874,11 +3236,11 @@ _EMAIL_SETTINGS_TEMPLATE = (
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>이메일 수신 대상자 지정</title>
+<title>이메일 받는 사람</title>
 <style>"""
     + _BASE_STYLE
     + """
-  .status {{ margin: 4px 0 20px; padding: 10px 14px; border-radius: 6px; font-size: 0.88rem; }}
+  .status {{ margin: 4px 0 20px; padding: 10px 14px; border-radius: var(--r-md); font-size: var(--fs-md); }}
   .status-ok {{ background: {hover}; color: {accent}; }}
   .status-warn {{ background: {error_bg}; color: {error}; }}
   .keyword-row {{ margin: 8px 0; display: flex; align-items: center; gap: 8px; }}
@@ -2891,7 +3253,7 @@ _EMAIL_SETTINGS_TEMPLATE = (
   .toggle input {{ position: absolute; opacity: 0; width: 0; height: 0; }}
   .toggle .track {{
     display: inline-flex; align-items: center; justify-content: center;
-    width: 36px; height: 24px; background: {border}; border-radius: 4px; transition: background 0.15s;
+    width: 36px; height: 24px; background: {border}; border-radius: var(--r-sm); transition: background 0.15s;
   }}
   .toggle input:checked ~ .track {{ background: {accent}; }}
   .toggle-text {{ font-size: 0.68rem; font-weight: 700; }}
@@ -2907,10 +3269,10 @@ _EMAIL_SETTINGS_TEMPLATE = (
     + _TOP_BAR_HTML
     + """
 <div class="container">
-  <h1>📧 이메일 수신 대상자 지정</h1>
+  <h1>📧 이메일 받는 사람</h1>
   <p class="hint">
     확정본을 이메일로 받을 사람을 등록합니다. 언제 나가는지(직접 (발송) 누를 때 /
-    자동발송)는 <a href="/auto-send">자동발송 설정</a>에서 정합니다. 받는 사람 각자에게
+    자동발송)는 <a href="/auto-send">자동발송 대기시간 및 ON/OFF</a>에서 정합니다. 받는 사람 각자에게
     따로 발송되며, 서로의 주소는 보이지 않습니다.
   </p>
   <div class="status {status_class}">{status_text}</div>
@@ -2965,11 +3327,16 @@ def render_email_settings(settings: dict, slots: Optional[int] = None, recipient
         slots = max(len(recipients), 1)
     slots = min(max(slots, len(recipients)), MAX_EMAIL_RECIPIENTS)
     if email_is_configured():
-        status_class, status_text = "status-ok", f'{icon("check")} .env에 SMTP 서버·보내는 사람 주소가 설정돼 있습니다.'
+        status_class, status_text = (
+            "status-ok",
+            f'{icon("check")} 보내는 계정: {html.escape(email_sender_address() or "")} '
+            '— 바꾸려면 <a href="/email-sender">설정 › 연동 › 이메일 발송 계정</a>',
+        )
     else:
         status_class, status_text = (
             "status-warn",
-            f'{icon("alert")} .env에 EMAIL_SMTP_HOST / EMAIL_SENDER_ADDRESS / EMAIL_SENDER_PASSWORD가 없습니다 — 켜도 전송되지 않습니다.',
+            f'{icon("alert")} 보내는 계정이 없어 켜도 전송되지 않습니다 — '
+            '<a href="/email-sender">설정 › 연동 › 이메일 발송 계정</a>에서 넣어주세요.',
         )
     return _EMAIL_SETTINGS_TEMPLATE.format(
         **_theme(),
@@ -2989,14 +3356,14 @@ def render_email_settings(settings: dict, slots: Optional[int] = None, recipient
 # (아직 .format()을 거치기 전 — 각 페이지 템플릿에 문자열로 이어붙인 뒤 페이지
 # 전체를 한 번에 .format()한다).
 _CREDENTIAL_PAGE_STYLE = """
-  label.field {{ display: block; font-size: 0.88rem; font-weight: 600; color: {header}; margin: 18px 0 6px; }}
+  label.field {{ display: block; font-size: var(--fs-md); font-weight: 600; color: {header}; margin: 18px 0 6px; }}
   input[type=password] {{
-    background: {bg}; color: {text}; border: 1px solid {border}; border-radius: 4px;
-    padding: 8px 10px; font-size: 1rem; font-family: inherit; width: 100%; box-sizing: border-box;
+    background: {bg}; color: {text}; border: 1px solid {border}; border-radius: var(--r-md);
+    padding: 8px 10px; font-size: var(--fs-base); font-family: inherit; width: 100%; box-sizing: border-box;
   }}
   .status {{
-    display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: 6px;
-    font-size: 0.86rem; line-height: 1.5; margin-bottom: 4px;
+    display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: var(--r-md);
+    font-size: var(--fs-md); line-height: 1.5; margin-bottom: 4px;
   }}
   .status-ok {{ background: {ok_bg}; color: {ok_text}; border: 1px solid {ok_border}; }}
   .status-warn {{ background: {warn_bg}; color: {warn_text}; border: 1px solid {warn_border}; }}
@@ -3005,25 +3372,25 @@ _CREDENTIAL_PAGE_STYLE = """
   .key-row input {{ flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }}
   .eye {{
     flex: 0 0 auto; background: transparent; color: {muted}; border: 1px solid {border};
-    font-size: 0.8rem; padding: 8px 10px;
+    font-size: var(--fs-sm); padding: 8px 10px;
   }}
   .eye:hover {{ background: {hover}; color: {header}; }}
   .saved-key {{
     display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: {bg};
-    border: 1px solid {border}; border-radius: 4px; font-family: ui-monospace, Menlo, monospace;
-    font-size: 0.9rem; color: {text}; margin-top: 8px;
+    border: 1px solid {border}; border-radius: var(--r-md); font-family: ui-monospace, Menlo, monospace;
+    font-size: var(--fs-md); color: {text}; margin-top: 8px;
   }}
-  .saved-key .tag {{ margin-left: auto; font-family: {font_stack}; font-size: 0.74rem; color: {muted}; }}
+  .saved-key .tag {{ margin-left: auto; font-family: {font_stack}; font-size: var(--fs-xs); color: {muted}; }}
   .test-row {{ display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }}
-  .test-result {{ font-size: 0.84rem; color: {muted}; }}
+  .test-result {{ font-size: var(--fs-md); color: {muted}; }}
   .test-result.ok {{ color: {ok_text}; }}
   .test-result.err {{ color: {error}; }}
-  details.howto {{ margin-top: 22px; border: 1px solid {border}; border-radius: 6px; padding: 10px 12px; background: {bg}; }}
-  details.howto summary {{ cursor: pointer; font-size: 0.88rem; font-weight: 600; color: {header}; }}
-  details.howto ol {{ margin: 10px 0 0; padding-left: 18px; font-size: 0.84rem; line-height: 1.75; }}
-  details.howto code {{ background: {card}; border: 1px solid {border}; border-radius: 3px; padding: 1px 5px; font-size: 0.82rem; }}
-  .note {{ margin-top: 20px; font-size: 0.8rem; color: {muted}; line-height: 1.65; border-top: 1px dashed {border}; padding-top: 14px; }}
-  .note code {{ background: {bg}; border: 1px solid {border}; border-radius: 3px; padding: 1px 5px; font-size: 0.78rem; }}
+  details.howto {{ margin-top: 22px; border: 1px solid {border}; border-radius: var(--r-md); padding: 10px 12px; background: {bg}; }}
+  details.howto summary {{ cursor: pointer; font-size: var(--fs-md); font-weight: 600; color: {header}; }}
+  details.howto ol {{ margin: 10px 0 0; padding-left: 18px; font-size: var(--fs-md); line-height: 1.75; }}
+  details.howto code {{ background: {card}; border: 1px solid {border}; border-radius: var(--r-sm); padding: 1px 5px; font-size: var(--fs-sm); }}
+  .note {{ margin-top: 20px; font-size: var(--fs-sm); color: {muted}; line-height: 1.65; border-top: 1px dashed {border}; padding-top: 14px; }}
+  .note code {{ background: {bg}; border: 1px solid {border}; border-radius: var(--r-sm); padding: 1px 5px; font-size: var(--fs-sm); }}
   .container {{ padding-bottom: 88px; }}
 """
 
@@ -3043,14 +3410,14 @@ _NAVER_SETTINGS_TEMPLATE = (
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>네이버 검색 API</title>
+<title>네이버 뉴스 API 설정</title>
 <style>"""
     + _BASE_STYLE
     + _CREDENTIAL_PAGE_STYLE
     + """
   button.ghost {{ background: transparent; color: {accent}; border: 1px solid {ghost_border}; }}
   button.ghost:hover {{ background: {hover}; color: {header}; border-color: {ghost_border_hover}; }}
-  button.danger {{ background: transparent; color: {muted}; border: 1px solid {border}; font-size: 0.82rem; padding: 6px 12px; }}
+  button.danger {{ background: transparent; color: {muted}; border: 1px solid {border}; font-size: var(--fs-sm); padding: 6px 12px; }}
   button.danger:hover {{ background: {error_bg}; color: {error}; border-color: {error}; }}
 </style>
 </head>
@@ -3059,9 +3426,9 @@ _NAVER_SETTINGS_TEMPLATE = (
     + _TOP_BAR_HTML
     + """
 <div class="container">
-  <h1>🔑 네이버 검색 API</h1>
+  <h1>🔑 네이버 뉴스 API 설정</h1>
   <p class="hint">
-    기사를 가져오는 데 쓰는 키입니다. <b>이 키가 없으면 수집·실시간현황이 전부 멈춥니다</b>
+    기사를 가져오는 데 쓰는 키입니다. <b>이 키가 없으면 수집·전체 기사가 전부 멈춥니다</b>
     (AI 연동과 달리 이 키에는 대체 동작이 없습니다).
   </p>
   <div class="status {status_class}">{status_text}</div>
@@ -3147,14 +3514,14 @@ _LLM_SETTINGS_TEMPLATE = (
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>AI 연동</title>
+<title>LLM(AI) 연동</title>
 <style>"""
     + _BASE_STYLE
     + _CREDENTIAL_PAGE_STYLE
     + """
   button.ghost {{ background: transparent; color: {accent}; border: 1px solid {ghost_border}; }}
   button.ghost:hover {{ background: {hover}; color: {header}; border-color: {ghost_border_hover}; }}
-  button.danger {{ background: transparent; color: {muted}; border: 1px solid {border}; font-size: 0.82rem; padding: 6px 12px; }}
+  button.danger {{ background: transparent; color: {muted}; border: 1px solid {border}; font-size: var(--fs-sm); padding: 6px 12px; }}
   button.danger:hover {{ background: {error_bg}; color: {error}; border-color: {error}; }}
 </style>
 </head>
@@ -3163,7 +3530,7 @@ _LLM_SETTINGS_TEMPLATE = (
     + _TOP_BAR_HTML
     + """
 <div class="container">
-  <h1>🤖 AI 연동</h1>
+  <h1>🤖 LLM(AI) 연동</h1>
   <p class="hint">
     소제목 자동 분류·요약에 쓰는 Claude API 키입니다. <b>없어도 앱은 그대로 돌아갑니다</b> —
     규칙 기반(단어 빈도) 소제목으로 조용히 되돌아갑니다.
@@ -3243,7 +3610,7 @@ def render_naver_settings_page() -> str:
     [추가: 2026-08-20] 이 화면 하나로 앱이 켜지느냐 마느냐가 갈린다(app.config가 더
     이상 키 없음을 RuntimeError로 막지 않으므로) — 그래서 상태 문구도 "아직 키가
     없다" 하나만으로 끝내지 않고, 이 키가 없으면 정확히 뭐가 멈추는지(수집·
-    실시간현황)까지 h1 아래 hint에서 먼저 밝힌다.
+    실시간 현황)까지 h1 아래 hint에서 먼저 밝힌다.
     """
     source = naver_source()
     if source == "none":
@@ -3355,6 +3722,383 @@ def render_llm_settings_page(error: str = "") -> str:
     )
 
 
+# 연동 › 텔레그램 발송 계정 — 봇 토큰(설정 화면 값 > .env)과 봇 이름. 「이메일 발송 계정」과
+# 같은 틀이고, 봇은 자기 자신에게 메시지를 보낼 수 없어 시험 발송 대신 [연결 확인](getMe)이다.
+# 시안 mockups/TELEGRAM_SENDER_MOCKUP.html.
+_TELEGRAM_SENDER_TEMPLATE = (
+    """<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>텔레그램 발송 계정</title>
+<style>"""
+    + _BASE_STYLE
+    + _CREDENTIAL_PAGE_STYLE
+    + """
+  button.ghost {{ background: transparent; color: {accent}; border: 1px solid {ghost_border}; }}
+  button.ghost:hover {{ background: {hover}; color: {header}; border-color: {ghost_border_hover}; }}
+  button.danger {{ background: transparent; color: {muted}; border: 1px solid {border}; font-size: var(--fs-sm); padding: 6px 12px; }}
+  button.danger:hover {{ background: {error_bg}; color: {error}; border-color: {error}; }}
+  .caption {{ margin: 6px 0 0; }}
+  /* 봇 이름 — 받는 사람 대화방 맨 위에 보이는 이름. 시안 mockups/BOT_NAME_MOCKUP.html */
+  .bot-name {{ margin: 22px 0 0; padding: 14px 16px; border: 1px solid {border}; border-radius: var(--r-lg); }}
+  .bn-label {{ display: block; font-size: var(--fs-md); font-weight: 700; color: {header}; margin: 0 0 8px; }}
+  .bn-row {{ display: flex; align-items: center; gap: 8px; }}
+  .bn-row input[type=text] {{ flex: 1 1 auto; min-width: 0; box-sizing: border-box; }}
+  .bn-row input.changed {{ border-color: {accent}; background: {card}; }}
+  .bn-row input:disabled {{ color: {muted}; }}
+  .bn-count {{ flex-shrink: 0; color: {text_faint}; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }}
+  .bn-hint {{ margin: 7px 0 0; color: {muted}; font-size: var(--fs-sm); line-height: 1.6; }}
+  .bn-was {{ margin: 4px 0 0; color: {muted}; font-size: var(--fs-sm); display: none; }}
+  .bn-was.show {{ display: block; }}
+  .bn-was s {{ color: {text_faint}; }}
+  .bn-preview {{ margin: 12px 0 0; display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: {bg}; border-radius: var(--r-lg); }}
+  .bn-preview .cap {{ font-size: var(--fs-xs); color: {text_faint}; font-weight: 600; margin-right: 2px; white-space: nowrap; }}
+  .bn-avatar {{
+    width: 34px; height: 34px; border-radius: var(--r-circle); background: {header}; color: {on_fill}; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: var(--fs-md);
+  }}
+  .bn-who {{ min-width: 0; }}
+  .bn-who b {{ display: block; font-size: var(--fs-md); color: {text}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+  .bn-who small {{ color: {muted}; font-size: var(--fs-xs); }}
+  .bot-name .status {{ margin: 10px 0 0; }}
+</style>
+</head>
+<body>
+"""
+    + _TOP_BAR_HTML
+    + """
+<div class="container">
+  <h1>📨 텔레그램 발송 계정</h1>
+  <p class="hint">
+    정기·수시 보고서와 [단독]·[속보] 알림을 텔레그램으로 보내는 <b>봇</b>입니다. <b>없어도 앱은 그대로 돌아갑니다</b> —
+    텔레그램만 건너뛰고 이메일은 평소대로 나갑니다. 누구에게 보낼지는 <a href="/telegram">받는 사람 지정 › 텔레그램</a>에서 정합니다.
+  </p>
+  <div class="status {status_class}">{status_text}</div>
+  <p class="caption">{status_caption}</p>
+
+  <form method="POST" action="/save-telegram-sender">
+    <label class="field" for="tg-token">봇 토큰</label>
+    {saved_token_html}
+    <div class="key-row" style="margin-top:8px">
+      <input type="password" id="tg-token" name="bot_token" placeholder="{token_placeholder}" autocomplete="off" spellcheck="false">
+      <button type="button" class="eye" onclick="toggleKey('tg-token', this)">보기</button>
+    </div>
+    <p class="caption">BotFather가 봇을 만들 때 준 값입니다. 숫자 + 콜론(:) + 긴 글자 모양입니다.</p>
+
+    <div class="test-row">
+      <button type="button" class="ghost" onclick="testTelegramSender()">연결 확인</button>
+      {delete_button}
+      <span class="test-result" id="tg-test"></span>
+    </div>
+    <p class="caption">메시지는 보내지 않고, 이 토큰이 어느 봇인지만 텔레그램에 물어봅니다.</p>
+
+    {bot_name_block}
+
+    <details class="howto">
+      <summary>봇 토큰은 어디서 받나요?</summary>
+      <ol>
+        <li>텔레그램에서 <b>@BotFather</b>를 찾아 대화를 엽니다.</li>
+        <li><code>/newbot</code>을 보내고, 안내대로 봇 이름과 아이디(끝이 <code>bot</code>)를 정합니다.</li>
+        <li>BotFather가 돌려준 <b>토큰</b>을 위 칸에 붙여 넣고 [연결 확인] → [저장].</li>
+        <li>받는 사람마다 새 봇을 찾아 <b>시작(/start)</b>을 한 번 눌러야 메시지를 받을 수 있습니다.</li>
+      </ol>
+    </details>
+
+    <p class="note">
+      <b>토큰은 이 컴퓨터 밖으로 나가지 않습니다.</b> <code>data/credentials.json</code>에만
+      저장되고, 화면·복사·내보내기·발송 어디에도 실리지 않으며 로그에도 남기지 않습니다.<br><br>
+      <b>토큰을 다른 봇 것으로 바꾸면</b> 받는 사람들은 그 새 봇에서 시작(/start)을 다시 눌러야 합니다 —
+      누르기 전엔 그 사람에게 가는 메시지가 실패로 기록됩니다(정기 보관함의 빨간 링).<br><br>
+      <b>틀린 값을 넣어도 앱은 안 멈춥니다</b> — 텔레그램 발송만 실패로 기록되고 이메일은 그대로 나갑니다.
+    </p>
+    <div class="save-bar"><div class="save-bar-inner"><button type="submit">저장</button></div></div>
+  </form>
+</div>
+{toggle_script}
+{page_script}
+</body>
+</html>
+"""
+)
+
+_TELEGRAM_SENDER_PAGE_SCRIPT = """<script>
+function testTelegramSender() {
+  var result = document.getElementById("tg-test");
+  result.className = "test-result";
+  result.textContent = "확인 중…";
+  var params = new URLSearchParams({bot_token: document.getElementById("tg-token").value});
+  fetch("/test-telegram-sender", {
+    method: "POST",
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: params.toString()
+  }).then(function (res) { return res.json(); }).then(function (data) {
+    result.className = "test-result " + (data.ok ? "ok" : "err");
+    result.textContent = (data.ok ? "✔ " : "✕ ") + data.message;
+  }).catch(function () {
+    result.className = "test-result err";
+    result.textContent = "✕ 확인 요청에 실패했습니다 — 앱이 실행 중인지 확인해주세요.";
+  });
+}
+function deleteTelegramSender() {
+  if (!confirm("저장된 봇 토큰을 삭제할까요? .env에 값이 있으면 그쪽으로 자동 전환되고, 둘 다 없으면 텔레그램은 보내지 않습니다.")) return;
+  fetch("/delete-telegram-sender", {method: "POST"}).then(function () { location.reload(); });
+}
+</script>"""
+
+
+def render_telegram_sender_page(bot_name_notice: Optional[tuple] = None) -> str:
+    """연동 › 텔레그램 발송 계정 화면."""
+    source = telegram_source()
+    if source == "none":
+        status_class = "status-warn"
+        status_text = f'{icon("alert")} 봇 토큰이 없습니다 — 텔레그램으로는 아무것도 나가지 않습니다.'
+        status_caption = "텔레그램을 안 쓰기로 한 상태로도 정상입니다."
+    elif source == "env":
+        status_class = "status-info"
+        status_text = f'{icon("check")} .env의 봇 토큰을 쓰고 있습니다 — 여기에 저장하면 그 값이 우선합니다.'
+        status_caption = "설정에 저장된 값이 없어 .env로 넘어간 상태입니다. 그대로 둬도 됩니다."
+    else:
+        status_class = "status-ok"
+        status_text = f'{icon("check")} 설정에 저장된 봇 토큰을 쓰고 있습니다.'
+        status_caption = "문제가 있어 보이면 아래 [연결 확인]으로 확인해보세요."
+    saved_token = telegram_saved_token()
+    if saved_token:
+        saved_token_html = (
+            f'<div class="saved-key"><span>{html.escape(mask_credential(saved_token, keep_prefix=saved_token.find(":") + 1))}</span>'
+            f'<span class="tag">{html.escape(telegram_saved_at() or "")} 저장</span></div>'
+        )
+        token_placeholder = "새 토큰으로 바꿀 때만 입력"
+    else:
+        saved_token_html = ""
+        token_placeholder = "123456789:AAH…"
+    delete_button = (
+        '<button type="button" class="danger" onclick="deleteTelegramSender()">저장된 토큰 삭제</button>'
+        if source == "saved"
+        else ""
+    )
+    return _TELEGRAM_SENDER_TEMPLATE.format(
+        **_theme(),
+        status_class=status_class,
+        status_text=status_text,
+        status_caption=status_caption,
+        saved_token_html=saved_token_html,
+        token_placeholder=token_placeholder,
+        delete_button=delete_button,
+        bot_name_block=_render_bot_name_block(None, None, bot_name_notice),
+        toggle_script=_CREDENTIAL_TOGGLE_SCRIPT,
+        page_script=_TELEGRAM_SENDER_PAGE_SCRIPT,
+        index_href=_home_href(),
+    )
+
+
+# [추가: 2026-09-18] 연동 › 이메일 보내는 계정 — 「AI 연동」 화면과 같은 틀. 메일 서비스는
+# 네이버·Gmail 칩 둘뿐이고 서버·포트는 고른 서비스가 정한다(app.config.EMAIL_SERVICES).
+# 시안 mockups/EMAIL_SENDER_MOCKUP.html.
+_EMAIL_SENDER_TEMPLATE = (
+    """<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>이메일 발송 계정</title>
+<style>"""
+    + _BASE_STYLE
+    + _CREDENTIAL_PAGE_STYLE
+    + """
+  button.ghost {{ background: transparent; color: {accent}; border: 1px solid {ghost_border}; }}
+  button.ghost:hover {{ background: {hover}; color: {header}; border-color: {ghost_border_hover}; }}
+  button.danger {{ background: transparent; color: {muted}; border: 1px solid {border}; font-size: var(--fs-sm); padding: 6px 12px; }}
+  button.danger:hover {{ background: {error_bg}; color: {error}; border-color: {error}; }}
+  .svc {{ display: flex; gap: 6px; flex-wrap: wrap; }}
+  .svc input {{ position: absolute; opacity: 0; pointer-events: none; }}
+  .svc label {{
+    background: {card}; color: {text}; border: 1px solid {border}; border-radius: var(--r-pill);
+    padding: 5px 14px; font-size: var(--fs-md); cursor: pointer;
+  }}
+  .svc label:hover {{ background: {hover}; }}
+  .svc input:checked + label {{ background: {hover}; color: {accent}; border-color: {accent}; font-weight: 600; }}
+  .svc input:focus-visible + label {{ outline: 2px solid {accent_border}; outline-offset: 1px; }}
+  .server {{ margin: 8px 0 0; font-size: var(--fs-sm); color: {muted}; }}
+  input.wide {{ width: 100%; max-width: 420px; box-sizing: border-box; }}
+  .opt {{ color: {muted}; font-weight: 400; font-size: var(--fs-sm); }}
+  .caption {{ margin: 6px 0 0; }}
+</style>
+</head>
+<body>
+"""
+    + _TOP_BAR_HTML
+    + """
+<div class="container">
+  <h1>✉️ 이메일 발송 계정</h1>
+  <p class="hint">
+    정기 확정본을 이메일로 보낼 때 쓰는 계정입니다. <b>없어도 앱은 그대로 돌아갑니다</b> —
+    이메일만 건너뛰고 텔레그램은 평소대로 나갑니다.
+  </p>
+  {error_html}
+  <div class="status {status_class}">{status_text}</div>
+  <p class="caption">{status_caption}</p>
+
+  <form method="POST" action="/save-email-sender">
+    <label class="field">메일 서비스</label>
+    <div class="svc">{service_chips}</div>
+    <p class="server" id="svc-server">{server_text}</p>
+
+    <label class="field" for="em-addr">보내는 사람 주소</label>
+    <input type="text" id="em-addr" name="address" class="wide" value="{address}" placeholder="sweetgreetings@naver.com" autocomplete="off" spellcheck="false">
+    <p class="caption">위에서 고른 서비스의 주소여야 합니다(네이버면 @naver.com). 다른 주소면 메일 서버가 발송을 거절합니다.</p>
+
+    <label class="field" for="em-name">보내는 사람 이름 <span class="opt">(선택)</span></label>
+    <input type="text" id="em-name" name="name" class="wide" value="{name}" placeholder="예: 재경부 디소팀" maxlength="40">
+    <p class="caption">받는 사람 메일함에 주소 대신 보이는 이름입니다. 비우면 주소가 그대로 보입니다.</p>
+
+    <label class="field" for="em-pw">앱 비밀번호</label>
+    {saved_pw_html}
+    <div class="key-row" style="margin-top:8px">
+      <input type="password" id="em-pw" name="password" placeholder="{pw_placeholder}" autocomplete="off" spellcheck="false">
+      <button type="button" class="eye" onclick="toggleKey('em-pw', this)">보기</button>
+    </div>
+    <p class="caption">계정 로그인 비밀번호가 아니라, 메일 서비스에서 따로 발급하는 「앱 비밀번호」입니다.</p>
+
+    <div class="test-row">
+      <button type="button" class="ghost" onclick="testEmailSender()">시험 메일 보내기</button>
+      {delete_button}
+      <span class="test-result" id="em-test"></span>
+    </div>
+    <p class="caption">시험 메일은 받는 사람 명단이 아니라 <b>보내는 사람 주소 자신</b>에게 한 통 갑니다.</p>
+
+    <details class="howto">
+      <summary>앱 비밀번호는 어디서 받나요?</summary>
+      <ol>
+        <li><b>네이버</b>: 메일 환경설정 → POP3/IMAP 설정에서 <b>SMTP 사용</b>을 켜고, 2단계 인증을 쓰면 네이버 보안 설정에서 <b>애플리케이션 비밀번호</b>를 만듭니다.</li>
+        <li><b>Gmail</b>: Google 계정 → 보안 → 2단계 인증을 켠 뒤 → <b>앱 비밀번호</b>에서 16자리를 만듭니다.</li>
+        <li>korea.kr 같은 기관 메일은 외부 앱 발송을 막는 경우가 많아 보내는 계정으로는 고를 수 없습니다 — 받는 사람으로는 그대로 쓸 수 있습니다.</li>
+      </ol>
+    </details>
+
+    <p class="note">
+      <b>비밀번호는 이 컴퓨터 밖으로 나가지 않습니다.</b> <code>data/credentials.json</code>에만
+      저장되고, 화면·복사·내보내기·발송 어디에도 실리지 않으며 로그에도 남기지 않습니다.<br><br>
+      <b>틀린 값을 넣어도 앱은 안 멈춥니다</b> — 이메일 발송만 실패로 기록되고(정기 보관함의
+      빨간 링), 텔레그램은 그대로 나갑니다. 그래서 저장 전 [시험 메일 보내기]가 중요합니다.
+    </p>
+    <div class="save-bar"><div class="save-bar-inner"><button type="submit">저장</button></div></div>
+  </form>
+</div>
+{toggle_script}
+{page_script}
+</body>
+</html>
+"""
+)
+
+_EMAIL_SENDER_PAGE_SCRIPT = """<script>
+function _emailService() {
+  var c = document.querySelector('input[name="service"]:checked');
+  return c ? c.value : "";
+}
+document.querySelectorAll('input[name="service"]').forEach(function (r) {
+  r.addEventListener("change", function () {
+    document.getElementById("svc-server").textContent = "보내는 서버 " + r.dataset.server;
+  });
+});
+function testEmailSender() {
+  var result = document.getElementById("em-test");
+  result.className = "test-result";
+  result.textContent = "보내는 중…";
+  var params = new URLSearchParams({
+    service: _emailService(),
+    address: document.getElementById("em-addr").value,
+    name: document.getElementById("em-name").value,
+    password: document.getElementById("em-pw").value
+  });
+  fetch("/test-email-sender", {
+    method: "POST",
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: params.toString()
+  }).then(function (res) { return res.json(); }).then(function (data) {
+    result.className = "test-result " + (data.ok ? "ok" : "err");
+    result.textContent = (data.ok ? "✔ " : "✕ ") + data.message;
+  }).catch(function () {
+    result.className = "test-result err";
+    result.textContent = "✕ 확인 요청에 실패했습니다 — 앱이 실행 중인지 확인해주세요.";
+  });
+}
+function deleteEmailSender() {
+  if (!confirm("저장된 보내는 계정을 삭제할까요? .env에 값이 있으면 그쪽으로 자동 전환되고, 둘 다 없으면 이메일은 보내지 않습니다.")) return;
+  fetch("/delete-email-sender", {method: "POST"}).then(function () { location.reload(); });
+}
+</script>"""
+
+
+def render_email_sender_page(error: str = "", attempted: Optional[dict] = None) -> str:
+    """연동 › 이메일 보내는 계정 화면. attempted는 저장이 거절됐을 때 입력하던 값(비밀번호 제외)."""
+    source = email_source()
+    if source == "none":
+        status_class = "status-warn"
+        status_text = f'{icon("alert")} 아직 보내는 계정이 없습니다 — 이메일은 보내지 않습니다.'
+        status_caption = "이메일을 안 쓰기로 한 상태로도 정상입니다."
+    elif source == "env":
+        status_class = "status-info"
+        status_text = f'{icon("check")} .env의 계정을 쓰고 있습니다 — 여기에 저장하면 그 값이 우선합니다.'
+        status_caption = "설정에 저장된 값이 없어 .env로 넘어간 상태입니다. 그대로 둬도 됩니다."
+    else:
+        status_class = "status-ok"
+        status_text = f'{icon("check")} 설정에 저장된 계정을 쓰고 있습니다.'
+        saved_at = email_saved_at()
+        status_caption = (
+            f"저장 시각: {saved_at}. 문제가 있어 보이면 아래 [시험 메일 보내기]로 확인해보세요."
+            if saved_at
+            else "문제가 있어 보이면 아래 [시험 메일 보내기]로 확인해보세요."
+        )
+    attempted = attempted or {}
+    service = attempted.get("service") or email_service() or "naver"
+    chips = []
+    for key, spec in EMAIL_SERVICES.items():
+        checked = " checked" if key == service else ""
+        chips.append(
+            f'<input type="radio" id="svc-{key}" name="service" value="{key}"'
+            f' data-server="{spec["host"]} · 포트 {spec["port"]}"{checked}>'
+            f'<label for="svc-{key}">{spec["label"]}</label>'
+        )
+    spec = EMAIL_SERVICES[service]
+    server_text = f'보내는 서버 {spec["host"]} · 포트 {spec["port"]}'
+
+    saved_pw = email_saved_password()
+    if saved_pw:
+        saved_pw_html = (
+            f'<div class="saved-key"><span>{html.escape(mask_credential(saved_pw, keep_suffix=2))}</span>'
+            f'<span class="tag">{html.escape(email_saved_at() or "")} 저장</span></div>'
+        )
+        pw_placeholder = "새 비밀번호로 바꿀 때만 입력"
+    else:
+        saved_pw_html = ""
+        pw_placeholder = "앱 비밀번호"
+    delete_button = (
+        '<button type="button" class="danger" onclick="deleteEmailSender()">계정 삭제</button>'
+        if source == "saved"
+        else ""
+    )
+    return _EMAIL_SENDER_TEMPLATE.format(
+        **_theme(),
+        error_html=f'<p class="error">{html.escape(error)}</p>' if error else "",
+        status_class=status_class,
+        status_text=status_text,
+        status_caption=status_caption,
+        service_chips="".join(chips),
+        server_text=html.escape(server_text),
+        address=html.escape(attempted.get("address", email_sender_address() or "")),
+        name=html.escape(attempted.get("name", email_sender_name())),
+        saved_pw_html=saved_pw_html,
+        pw_placeholder=pw_placeholder,
+        delete_button=delete_button,
+        toggle_script=_CREDENTIAL_TOGGLE_SCRIPT,
+        page_script=_EMAIL_SENDER_PAGE_SCRIPT,
+        index_href=_home_href(),
+    )
+
+
 def _known_articles_by_url(wanted_urls: set) -> dict:
     """숨긴 기사의 언론사·제목을 보여주려고, 보관 중인 회차에서 URL로 원본 정보를 찾는다
     (숨긴 목록 자체는 URL만 저장하므로).
@@ -3382,27 +4126,26 @@ def _known_articles_by_url(wanted_urls: set) -> dict:
     return lookup
 
 
-def _hide_meta_fallback(url: str) -> dict:
-    """숨기려는 기사의 언론사·제목·발행시각을 서버가 직접 찾아본다 (_handle_hide_article용).
+def _hide_meta_fallbacks(urls: set) -> dict:
+    """숨기려는 기사들의 언론사·제목·발행시각·소제목을 서버가 직접 찾아본다(_handle_hide_article용).
 
-    [추가: 2026-08-20] **진행 중인 초안 캐시를 먼저** 보고, 없을 때만 저장된 회차를
-    뒤진다. 순서가 중요하다 — 이 폴백이 걸리는 상황은 대부분 초안에서 숨긴 기사인데
-    (오늘 사고가 난 11건이 전부 그랬다), 초안 기사는 아직 회차로 저장된 적이 없어
-    회차 역조회로는 **절대 못 찾고**, 못 찾을 때 _known_articles_by_url은 보관 기간
-    전체(RETENTION_DAYS=365일)의 회차 파일을 끝까지 다 읽는다. 초안 캐시는 파일 하나라
-    싸고 적중률도 높으므로 이쪽이 먼저다(CODING_CONVENTIONS.md §1).
-    못 찾으면 빈 dict — 예전과 똑같이 URL만으로 저장된다(막지 않는다).
+    **진행 중인 초안 캐시를 먼저** 보고, 없을 때만 저장된 회차를 뒤진다 — 이 폴백이 걸리는 건
+    대부분 초안에서 숨긴 기사인데, 초안 기사는 아직 회차로 저장된 적이 없어 회차 역조회로는
+    못 찾고, 못 찾으면 보관 기간 전체의 회차 파일을 끝까지 읽는다. 초안 캐시와 회차 역조회는
+    **한 번씩만** 한다.
 
-    [추가: 2026-09-02] 찾아낸 기사 dict에는 소제목(group)도 들어 있어, 화면이 안 실어
-    보낸 경우 쓰레기통 묶음 이름이 여기서 채워진다.
-    """
+    소제목 통째 숨기기가 한 요청에 기사를 모아 보내므로, 기사마다 초안 캐시를 다시 읽고
+    회차 파일을 다시 뒤지면 모아 보낸 보람이 없다. 못 찾은 URL은 결과에 없다."""
     from app.preview_cache import load_preview_cache
 
+    if not urls:
+        return {}
     cache = load_preview_cache() or {}
-    found = next((a for a in cache.get("articles", []) if a.get("url") == url), None)
-    if found is None:
-        found = _known_articles_by_url({url}).get(url)
-    return found or {}
+    found = {a["url"]: a for a in cache.get("articles", []) if a.get("url") in urls}
+    missing = set(urls) - set(found)
+    if missing:
+        found.update(_known_articles_by_url(missing))
+    return found
 
 
 def _format_pub_hhmm(pub_date: Optional[str]) -> str:
@@ -3431,14 +4174,14 @@ _HIDDEN_TEMPLATE = (
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>숨긴 기사 관리</title>
+<title>휴지통</title>
 <style>"""
     + _BASE_STYLE
     + """
   /* [수정: 2026-09-02] 평평한 목록 → "한 번에 숨긴 덩어리"(app.curation.load_hidden_batches)
      묶음 카드. 정기는 소제목 통째 숨기기·체크박스 일괄 숨기기로 한 번에 수십 건이 들어와,
      한 줄씩 늘어놓으면 복구 버튼이 40개가 되고 그중 하나를 찾을 수도 없었다. */
-  .hidden-row {{ display: flex; align-items: center; gap: 9px; padding: 8px 12px; font-size: 0.9rem; border-top: 1px solid {divider_soft}; }}
+  .hidden-row {{ display: flex; align-items: center; gap: 9px; padding: 8px 12px; font-size: var(--fs-md); border-top: 1px solid {divider_soft}; }}
   .hidden-row:first-child {{ border-top: none; }}
   .hidden-row:hover {{ background: {row_hover}; }}
   .hidden-row.sel {{ background: {hover}; }}
@@ -3448,15 +4191,15 @@ _HIDDEN_TEMPLATE = (
   /* [수정: 2026-07-26] 별도 flex 칸(오른쪽 고정폭)이었던 걸 제목 옆 인라인으로 옮겼다 —
      제목이 두 줄로 넘어가면 가운데 정렬된 시각이 줄바꿈된 글자 위에 겹쳐 보이는
      문제가 있었다. 제목 텍스트 흐름 안에 작게 끼워 넣으면 그럴 일이 없다. */
-  .hidden-row .pub-time {{ color: {muted}; font-size: 0.76rem; white-space: nowrap; margin-left: 6px; }}
+  .hidden-row .pub-time {{ color: {muted}; font-size: var(--fs-sm); white-space: nowrap; margin-left: 6px; }}
   /* [수정: 2026-09-16] ↩ 아이콘을 뗐다 — 이 앱에서 ↩는 좌하단 **되돌리기**(직전 동작
      취소)의 신호이고 여기 복구는 "이 기사 되살리기"라 뜻이 다른데, 확정본 좌하단
      팝오버에선 ↩ FAB 바로 위에 「↩ 복구」가 붙어 같은 그림이 40px 거리에 두 뜻으로
      있었다. 복구는 글자만, 원문은 아이콘만 — 앱 관례대로(글자=주 동작, 아이콘=가끔 한 번). */
   .undo-btn {{
     flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
-    height: 26px; padding: 0 9px; font-size: 0.76rem; background: transparent; color: {muted};
-    border: 1px solid {border}; border-radius: 6px; cursor: pointer; white-space: nowrap;
+    height: 26px; padding: 0 9px; font-size: var(--fs-sm); background: transparent; color: {muted};
+    border: 1px solid {border}; border-radius: var(--r-md); cursor: pointer; white-space: nowrap;
     font-family: inherit;
   }}
   .undo-btn:hover {{ background: {hover}; color: {accent}; border-color: {accent}; }}
@@ -3473,9 +4216,9 @@ _HIDDEN_TEMPLATE = (
      나오지 않지만, 두 값이 갈리는 날 화면이 거짓말하지 않도록 남겨 둔다. */
   .undo-btn[aria-disabled="true"] {{ opacity: 0.38; cursor: default; }}
   .undo-btn[aria-disabled="true"]:hover {{ background: transparent; color: {muted}; border-color: {border}; }}
-  .hid-group {{ border: 1px solid {border}; border-radius: 9px; margin-bottom: 10px; background: {card}; overflow: hidden; }}
+  .hid-group {{ border: 1px solid {border}; border-radius: var(--r-lg); margin-bottom: 10px; background: {card}; overflow: hidden; }}
   .hid-group > summary {{
-    display: flex; align-items: center; gap: 9px; padding: 10px 12px; font-size: 0.88rem;
+    display: flex; align-items: center; gap: 9px; padding: 10px 12px; font-size: var(--fs-md);
     background: {bg}; cursor: pointer; list-style: none;
   }}
   .hid-group > summary::-webkit-details-marker {{ display: none; }}
@@ -3484,41 +4227,41 @@ _HIDDEN_TEMPLATE = (
   .hid-group[open] > summary::before {{ content: "▾"; }}
   .hid-group .gtitle {{ flex: 1; color: {text}; }}
   .hid-group .gtitle b {{ color: {header}; }}
-  .hid-group .gwhen {{ color: {text_faint}; font-size: 0.74rem; margin-left: 5px; }}
+  .hid-group .gwhen {{ color: {text_faint}; font-size: var(--fs-xs); margin-left: 5px; }}
   .hid-group .gcount {{
-    flex: none; font-size: 0.74rem; font-weight: 700; color: {muted};
-    background: {pill_bg}; border-radius: 9px; padding: 1px 8px;
+    flex: none; font-size: var(--fs-xs); font-weight: 700; color: {muted};
+    background: {pill_bg}; border-radius: var(--r-pill); padding: 1px 8px;
   }}
-  .hid-solo {{ border: 1px solid {border}; border-radius: 9px; margin-bottom: 10px; background: {card}; }}
-  /* [추가: 2026-09-04] 날짜 구획 — 쓰레기통이 7일치를 보여주게 되면서(HIDDEN_VIEW_DAYS),
+  .hid-solo {{ border: 1px solid {border}; border-radius: var(--r-lg); margin-bottom: 10px; background: {card}; }}
+  /* [추가: 2026-09-04] 날짜 구획 — 휴지통이 7일치를 보여주게 되면서(HIDDEN_VIEW_DAYS),
      "오늘 뺀 것"과 "지난 날 뺐던 것"이 한 목록에 섞이면 무엇을 되살릴 수 있는지가
      안 읽힌다. 오늘 구획만 펼친 채 열고(정기 보관함이 최신 날짜를 미리 펼치는 규칙과
      같다), 지난 날짜는 접어둔다. */
   .hid-day {{ margin-bottom: 14px; }}
   .hid-day > summary {{
     display: flex; align-items: center; gap: 8px; padding: 6px 2px; margin-bottom: 8px;
-    font-size: 0.92rem; font-weight: 700; color: {header}; cursor: pointer; list-style: none;
+    font-size: var(--fs-md); font-weight: 700; color: {header}; cursor: pointer; list-style: none;
     border-bottom: 1px solid {border};
   }}
   .hid-day > summary::-webkit-details-marker {{ display: none; }}
   .hid-day > summary::before {{ content: "▸"; color: {muted}; font-size: 0.72rem; width: 10px; flex: none; }}
   .hid-day[open] > summary::before {{ content: "▾"; }}
   .hid-day .chip-today {{
-    font-size: 0.72rem; font-weight: 600; background: {hover}; color: {accent};
-    border: 1px solid {accent_border}; border-radius: 20px; padding: 1px 8px;
+    font-size: var(--fs-xs); font-weight: 600; background: {hover}; color: {accent};
+    border: 1px solid {accent_border}; border-radius: var(--r-pill); padding: 1px 8px;
   }}
-  .hid-day .dn {{ font-size: 0.74rem; font-weight: 700; color: {muted}; background: {pill_bg}; border-radius: 9px; padding: 1px 8px; }}
+  .hid-day .dn {{ font-size: var(--fs-xs); font-weight: 700; color: {muted}; background: {pill_bg}; border-radius: var(--r-pill); padding: 1px 8px; }}
   /* 지난 날짜는 이미 숨김이 풀린 기록이라 되살릴 것이 없다 — 그 사실을 구획 머리에서
      한 번만 말하고, 행에는 복구 버튼 대신 원문 링크를 둔다(그 자리가 비면 왜 없는지
      설명할 곳이 사라진다). */
-  .hid-day .ro {{ margin-left: auto; font-size: 0.74rem; font-weight: 500; color: {text_faint}; }}
+  .hid-day .ro {{ margin-left: auto; font-size: var(--fs-xs); font-weight: 500; color: {text_faint}; }}
   /* 원문 열기 — 확정본의 「원문보기 ↗」와 같은 외부 링크 아이콘. 이 행엔 다른 아이콘이
      없어서 2026-08-14에 확정본에서 ↗를 뺐던 이유(↗와 복사 아이콘이 17px에선 같은
      실루엣)가 여기선 걸리지 않는다. */
   .hidden-row .src {{
     flex: none; display: inline-flex; align-items: center; justify-content: center;
     width: 30px; height: 26px; color: {muted}; text-decoration: none;
-    border: 1px solid {border}; border-radius: 6px;
+    border: 1px solid {border}; border-radius: var(--r-md);
   }}
   .hidden-row .src:hover {{ background: {hover}; color: {accent}; border-color: {accent}; }}
   .hidden-row .src svg {{ width: 13px; height: 13px; fill: none; stroke: currentColor;
@@ -3530,21 +4273,21 @@ _HIDDEN_TEMPLATE = (
      없으면 자리 자체를 안 차지한다). */
   .bulk-restore {{
     display: none; position: sticky; top: 0; z-index: 5; align-items: center; gap: 8px;
-    background: {hover}; border: 1px solid {accent_border}; border-radius: 8px;
-    padding: 8px 12px; font-size: 0.84rem; color: {header}; margin-bottom: 12px;
+    background: {hover}; border: 1px solid {accent_border}; border-radius: var(--r-lg);
+    padding: 8px 12px; font-size: var(--fs-md); color: {header}; margin-bottom: 12px;
   }}
   .bulk-restore.on {{ display: flex; }}
   .bulk-restore .n {{ font-weight: 700; }}
   .bulk-restore .sp {{ flex: 1; }}
   .bulk-restore .go {{
     display: inline-flex; align-items: center; gap: 5px; background: {accent}; color: {on_fill};
-    border: none; border-radius: 6px; padding: 5px 11px; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+    border: none; border-radius: var(--r-md); padding: 5px 11px; font-size: var(--fs-sm); font-weight: 600; cursor: pointer;
   }}
   .bulk-restore .go svg {{ width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.9;
     stroke-linecap: round; stroke-linejoin: round; }}
   .bulk-restore .clr {{
-    background: transparent; color: {muted}; border: 1px solid {border}; border-radius: 6px;
-    padding: 5px 10px; font-size: 0.8rem; cursor: pointer;
+    background: transparent; color: {muted}; border: 1px solid {border}; border-radius: var(--r-md);
+    padding: 5px 10px; font-size: var(--fs-sm); cursor: pointer;
   }}
 </style>
 </head>
@@ -3553,7 +4296,7 @@ _HIDDEN_TEMPLATE = (
     + _HIDDEN_TOP_BAR_HTML
     + """
 <div class="container">
-  <h1>🗑️ 숨긴 기사 관리{count_label}</h1>
+  <h1>🗑️ 휴지통{count_label}</h1>
   <p class="caption">🧹 숨긴 기사는 {view_days}일 동안 여기 남고, 그동안은 언제든 되살릴 수 있습니다.</p>
   <p class="hint">
     화면의 {trash_icon} 버튼으로 숨긴 기사 목록입니다. 최근에 숨긴 기사가 맨 위에 오고, 원본
@@ -3631,6 +4374,7 @@ function clearRestoreSelection() {{
   refreshRestoreSelection();
 }}
 function restoreSelected() {{ restoreUrls(selectedRestoreUrls()); }}
+{range_select_script}
 </script>
 </body>
 </html>
@@ -3668,7 +4412,7 @@ def render_hidden_page() -> str:
     날짜는 보기 전용이었다).
 
     [수정: 2026-09-16] **숨김 유지 기간도 같은 7일이 됐다**(사용자 결정, app.curation의
-    load_hidden_urls 참고) — 쓰레기통에 보이는 동안은 전부 되살릴 수 있어 "보이는데 못
+    load_hidden_urls 참고) — 휴지통에 보이는 동안은 전부 되살릴 수 있어 "보이는데 못
     되살리는 줄"이 없다. 날짜별로 나눠 그리는 것과 오늘 구획만 펼쳐 여는 것은 그대로다.
 
     [수정: 2026-09-02] **평평한 목록을 "한 번에 숨긴 덩어리"로 묶는다**
@@ -3764,7 +4508,7 @@ def render_hidden_page() -> str:
             when = _format_pub_hhmm(batch.get("hidden_at"))
             when_html = f'<span class="gwhen">{when}</span>' if when else ""
             # [수정: 2026-09-16] 소제목 이름만 쓴다(사용자 결정) — "…에서 숨김"의 뒷말은
-            # 쓰레기통이라는 화면 자체가 이미 하는 말이라 줄마다 반복될 이유가 없다.
+            # 휴지통이라는 화면 자체가 이미 하는 말이라 줄마다 반복될 이유가 없다.
             # 소제목이 섞였거나 없을 때만 "골라서 숨김"으로 그 자리를 대신한다.
             title_html = (
                 f'<b>{html.escape(batch["group"])}</b>'
@@ -3846,7 +4590,7 @@ def render_hidden_page() -> str:
     return _HIDDEN_TEMPLATE.format(
         **_theme(),
         rows_html=rows_html,
-        # 제목의 건수는 **오늘치**다 — 좌하단 쓰레기통 배지와 같은 값이어야 하고, 그 숫자가
+        # 제목의 건수는 **오늘치**다 — 좌하단 휴지통 배지와 같은 값이어야 하고, 그 숫자가
         # 뜻하는 건 "지금 내 화면에서 빠져 있는 기사"라 지난 날짜가 섞이면 거짓말이 된다.
         count_label=f" · 오늘 {total_today}건" if total_today else "",
         view_days=HIDDEN_VIEW_DAYS,
@@ -3855,6 +4599,10 @@ def render_hidden_page() -> str:
         preview_href=_preview_href(),
         scrap_href=_scrap_href(),
         trash_icon=icon("trash"),
+        range_select_script=range_select_script(
+            ".hid-check.row-check", ".hidden-row",
+            each_js='box.closest(".hidden-row").classList.toggle("sel", box.checked);',
+        ),
     )
 
 
@@ -3869,12 +4617,12 @@ _LABEL_STYLE = """
      안쪽에, 라벨 관리는 화면 왼쪽 끝에 — 삽입 위치까지 두 화면이 서로 달랐다).
      값은 app/renderer.py의 .undo-fab을 그대로 가져온다. bottom을 20px이 아니라
      88px(위 칸)으로 두는 건 확정본·초안·수시에서 ↩가 늘 그 자리이기 때문이다 —
-     이 두 화면엔 아래 칸을 쓰는 쓰레기통이 없지만, 같은 버튼이 화면마다 높이를
+     이 두 화면엔 아래 칸을 쓰는 휴지통이 없지만, 같은 버튼이 화면마다 높이를
      바꾸는 것보다 왼쪽 아래 모서리가 비는 편이 낫다. */
   .undo-fab {{
-    position: fixed; left: 20px; bottom: 88px; width: 50px; height: 50px; border-radius: 50%;
+    position: fixed; left: 20px; bottom: 88px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
     background: {card}; color: {muted}; border: 1px solid {border}; font-size: 1.3rem;
-    cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12); z-index: 200;
+    cursor: pointer; box-shadow: var(--sh-float); z-index: 200;
     display: flex; align-items: center; justify-content: center;
   }}
   .undo-fab:hover {{ background: {hover}; color: {accent}; border-color: {accent}; }}
@@ -3883,52 +4631,57 @@ _LABEL_STYLE = """
     display: flex; align-items: center; gap: 10px; padding-bottom: 12px;
     border-bottom: 1px solid {border}; margin-bottom: 16px; flex-wrap: wrap;
   }}
-  .lab-topbar h1 {{ margin: 0; font-size: 1.05rem; }}
+  .lab-topbar h1 {{ margin: 0; font-size: var(--fs-xl); }}
   .lab-topbar .spacer {{ margin-left: auto; }}
   a.btn.ghost {{ background: transparent; color: {muted}; border: 1px solid {border}; }}
   a.btn.ghost:hover {{ background: {hover}; color: {accent}; }}
   .lab-filter-chip {{
-    display: inline-flex; align-items: center; gap: 4px; font-size: 0.8rem; font-weight: 600;
-    background: {card}; border: 1px solid {border}; color: {text}; border-radius: 20px;
+    display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-sm); font-weight: 600;
+    background: {card}; border: 1px solid {border}; color: {text}; border-radius: var(--r-pill);
     padding: 5px 12px; margin: 0 6px 6px 0; text-decoration: none;
   }}
-  .lab-filter-chip .n {{ color: {muted}; font-weight: 500; font-size: 0.72rem; }}
+  .lab-filter-chip .n {{ color: {muted}; font-weight: 500; font-size: var(--fs-xs); }}
   .lab-filter-chip:hover {{ background: {label_bg}; }}
   .lab-filter-chip.on {{ background: {label_text}; border-color: {label_text}; color: {on_fill}; }}
   .lab-filter-chip.on .n {{ color: rgba(255, 255, 255, 0.75); }}
   .lab-chipbar {{ margin-bottom: 6px; }}
   .lab-listhead {{
-    display: flex; align-items: center; gap: 8px; margin: 12px 0 10px; font-size: 0.86rem; color: {header};
+    display: flex; align-items: center; gap: 8px; margin: 12px 0 10px; font-size: var(--fs-md); color: {header};
     font-weight: 700;
   }}
   /* [추가: 2026-09-15] 라벨 보관함 [복사][txt][xlsx] — 정기·수시 보관함의 .exp
      (app/history_renderer.py)와 같은 값이다. 한쪽을 바꾸면 이쪽도 같이 바꾼다.
      예전 xlsx 버튼은 class="btn ghost sm"이었지만 이 파일엔 a.btn.ghost(링크용)만
      있고 .sm은 아예 없어, 공용 button 규칙대로 큰 파란 채움 버튼으로 그려지고 있었다. */
-  .exp {{ display: inline-flex; gap: 4px; flex: none; margin-left: auto; }}
-  .exp button {{ border: 1px solid {border}; background: {card}; color: {muted}; border-radius: 6px;
-    padding: 4px 11px; font-size: 0.75rem; font-weight: 400; cursor: pointer; font-family: inherit;
-    white-space: nowrap; }}
-  .exp button:hover {{ background: {hover}; color: {accent}; border-color: {accent_border}; }}
-  .arc-row {{ border: 1px solid {border}; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }}
+  /* 모양은 확정본·초안 툴바의 가져가기 버튼(app.renderer.export_links_style)과 같다 —
+     테두리·배경 없는 글자 버튼, hover에서만 accent + 밑줄. 네 자리(정기 보관함 .exp/
+     .slot-export-actions, 수시 보관함 .exp, 라벨 보관함 .exp)가 같은 값이다. */
+  .exp {{ display: inline-flex; gap: 2px; flex: none; margin-left: auto; }}
+  .exp button {{ border: none; background: transparent; color: {text_soft}; font-weight: 500;
+    border-radius: var(--r-md); padding: 4px 8px; font-size: var(--fs-sm); cursor: pointer;
+    font-family: inherit; white-space: nowrap; }}
+  .exp button:hover {{ background: transparent; color: {accent};
+    text-decoration: underline; text-underline-offset: 3px; }}
+  .exp.lg button {{ padding: 6px 8px; }}
+  .arc-row {{ border: 1px solid {border}; border-radius: var(--r-lg); padding: 10px 12px; margin-bottom: 8px; }}
   .arc-row:hover {{ background: {hover}; }}
-  .arc-title {{ font-size: 0.9rem; color: {text}; }}
+  .arc-title {{ font-size: var(--fs-md); color: {text}; }}
   .arc-meta {{
     display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 7px;
-    font-size: 0.72rem; color: {muted};
+    font-size: var(--fs-xs); color: {muted};
   }}
-  .snap-tag {{ font-size: 0.66rem; background: {bg}; color: {text}; border: 1px solid {border}; border-radius: 4px; padding: 1px 6px; }}
+  .snap-tag {{ font-size: var(--fs-xs); background: {bg}; color: {text}; border: 1px solid {border}; border-radius: var(--r-pill); padding: 1px 6px; }}
   .snap-tag.sub {{ background: {hover}; color: {header}; }}
   .snap-tag.src-reg {{ background: {bg}; color: {muted}; }}
   .snap-tag.src-adhoc {{ background: {adhoc_bg}; color: {adhoc_text}; }}
   .snap-tag.gone {{ background: {snap_gone_bg}; color: {snap_gone_text}; border-color: {snap_gone_border}; }}
-  .hid-mark {{ font-size: 0.68rem; color: {muted}; }}
+  .hid-mark {{ font-size: var(--fs-xs); color: {muted}; }}
   .arc-meta a.origin-link {{ color: {accent}; text-decoration: none; }}
   .arc-labels {{ display: inline-flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }}
   .lab-chip {{
-    display: inline-flex; align-items: center; gap: 3px; font-size: 0.66rem; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs); font-weight: 700;
     color: {label_text}; background: {label_bg}; border: 1px solid {label_border};
-    border-radius: 20px; padding: 2px 8px; white-space: nowrap;
+    border-radius: var(--r-pill); padding: 2px 8px; white-space: nowrap;
   }}
   .lab-chip form {{ display: inline; }}
   .lab-chip .x-btn {{
@@ -3936,47 +4689,37 @@ _LABEL_STYLE = """
     cursor: pointer; font-weight: 700; font-size: 0.9rem; line-height: 1;
   }}
   .lab-chip .x-btn:hover {{ opacity: 1; background: none; }}
-  table.manage {{ width: 100%; border-collapse: collapse; font-size: 0.85rem; }}
+  table.manage {{ width: 100%; border-collapse: collapse; font-size: var(--fs-md); }}
   table.manage th {{
     text-align: left; padding: 8px; border-bottom: 1px solid {border}; color: {muted};
-    font-size: 0.72rem; font-weight: 700;
+    font-size: var(--fs-xs); font-weight: 700;
   }}
   table.manage td {{ padding: 9px 8px; border-bottom: 1px solid {border}; vertical-align: middle; }}
   table.manage tr:hover td {{ background: {hover}; }}
   table.manage td.name {{ font-weight: 700; color: {label_text}; }}
-  table.manage td.cnt, table.manage td.at {{ color: {muted}; font-size: 0.76rem; white-space: nowrap; }}
+  table.manage td.cnt, table.manage td.at {{ color: {muted}; font-size: var(--fs-sm); white-space: nowrap; }}
   table.manage td.act {{ text-align: right; white-space: nowrap; }}
   table.manage td.act form {{ display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; }}
   .mini {{
-    font-size: 0.72rem; padding: 4px 9px; border-radius: 5px; cursor: pointer;
+    font-size: var(--fs-xs); padding: 4px 9px; border-radius: var(--r-sm); cursor: pointer;
     background: {card}; border: 1px solid {border}; color: {muted};
   }}
   .mini:hover {{ background: {hover}; color: {accent}; }}
   .mini.danger:hover {{ background: {error_bg}; color: {error}; border-color: {error_border_soft}; }}
   select.merge-sel {{
-    font-size: 0.72rem; color: {muted}; border: 1px solid {border}; border-radius: 5px;
+    font-size: var(--fs-xs); color: {muted}; border: 1px solid {border}; border-radius: var(--r-sm);
     padding: 4px 5px; background: {card};
   }}
-  input[name="new_name"] {{ font-size: 0.8rem; padding: 5px 8px; width: 120px; }}
+  input[name="new_name"] {{ font-size: var(--fs-sm); padding: 5px 8px; width: 120px; }}
   .reject-box {{
-    margin: 8px 0 14px; font-size: 0.8rem; line-height: 1.8;
-    background: {error_bg}; border: 1px solid {error_border_soft}; border-radius: 6px; padding: 10px 12px;
+    margin: 8px 0 14px; font-size: var(--fs-sm); line-height: 1.8;
+    background: {error_bg}; border: 1px solid {error_border_soft}; border-radius: var(--r-md); padding: 10px 12px;
   }}
   .reject-box .goto {{
-    font-size: 0.76rem; font-weight: 700; padding: 4px 10px; border-radius: 5px; cursor: pointer;
+    font-size: var(--fs-sm); font-weight: 700; padding: 4px 10px; border-radius: var(--r-sm); cursor: pointer;
     background: {label_bg}; color: {label_text}; border: 1px solid {label_border}; margin-left: 4px;
   }}
 """
-
-
-def known_url_labels_lookup() -> dict:
-    """지금 라벨 저장소 전체를 URL 키로 — render_article이 매 기사마다 다시 파일을
-    읽지 않도록, 페이지 단위로 한 번만 읽어 넘기는 용도(현재는 archive/manage 화면
-    자체가 이 함수를 직접 쓰지 않고 label_stats/articles_for_labels_and를 쓰지만,
-    다른 화면에서 "이 URL에 라벨이 있나"를 한 번에 조회해야 할 때를 위해 남겨둔다)."""
-    from app.labels import load_labels
-
-    return load_labels()
 
 
 def _label_hidden_urls() -> set:
@@ -3986,7 +4729,7 @@ def _label_hidden_urls() -> set:
     숨김 상태다"라, 판정과 다른 창을 보면 화면이 거짓말을 한다. [수정: 2026-09-16] 숨김이
     7일 유지로 바뀌며 이 표시도 자동으로 같은 7일을 본다(그 전엔 오늘 하루였다). 그보다
     오래된 기사는 숨김이 이미 풀려 표시가 안 붙는데, 라벨은 1년을 사는 값이라 어쩔 수 없는
-    한계다 — 실시간현황 등 다른 화면도 같은 한계를 이미 가지고 있다."""
+    한계다 — 실시간 현황 등 다른 화면도 같은 한계를 이미 가지고 있다."""
     return load_hidden_urls()
 
 
@@ -4099,7 +4842,7 @@ _LABELS_TEMPLATE = (
 </head>
 <body>
 """
-    + _TOP_BAR_HTML
+    + _LABELS_TOP_BAR_HTML
     + """
 <div class="container">
   <div class="lab-topbar">
@@ -4127,6 +4870,328 @@ function copyLabelText(btn) {{
 </html>
 """
 )
+
+
+# ── 발송 기록 (/send-log) ─────────────────────────────────────────────────────
+# 시안 mockups/SEND_LOG_MOCKUP.html. 저장은 app.send_log. 휴지통처럼 날짜별 <details>, 오늘만
+# 펼치고, 발송 한 번이 한 줄(펼치면 사람마다 결과). 필터(보고서/알림 · 실패만)는 화면에서만 거른다.
+_SEND_LOG_TEMPLATE = (
+    """<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>발송 기록</title>
+<style>"""
+    + _BASE_STYLE
+    + """
+  .sl-filters {{ display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 4px; }}
+  .sl-chip {{ font-size: var(--fs-sm); padding: 3px 12px; border-radius: var(--r-pill); border: 1px solid {border};
+    background: {card}; color: {text_soft}; cursor: pointer; font-family: inherit; height: auto; }}
+  .sl-chip:hover {{ background: {row_hover}; }}
+  .sl-chip.on {{ background: {hover}; border-color: {accent_border}; color: {accent}; font-weight: 600; }}
+  .sl-chip.fail.on {{ background: {error_bg}; border-color: {error_border}; color: {error}; }}
+  .sl-sep {{ width: 1px; height: 16px; background: {border}; margin: 0 6px; }}
+  .sl-day > summary {{ display: flex; align-items: center; gap: 8px; padding: 6px 2px; margin: 18px 0 8px;
+    font-size: var(--fs-md); font-weight: 700; color: {header}; cursor: pointer; list-style: none;
+    border-bottom: 1px solid {border}; }}
+  .sl-day > summary::-webkit-details-marker {{ display: none; }}
+  .sl-day > summary::before {{ content: "▸"; color: {muted}; font-size: 0.72rem; width: 10px; flex: none; }}
+  .sl-day[open] > summary::before {{ content: "▾"; }}
+  .sl-day .chip-today {{ font-size: var(--fs-xs); font-weight: 600; background: {hover}; color: {accent};
+    border: 1px solid {accent_border}; border-radius: var(--r-pill); padding: 1px 8px; }}
+  .sl-day .dcnt {{ font-weight: 400; color: {muted}; font-size: var(--fs-sm); }}
+  .sl-day .dfail {{ font-weight: 600; color: {error}; font-size: var(--fs-sm); }}
+  .sl-send {{ border: 1px solid {border}; border-radius: var(--r-lg); margin: 0 0 8px; overflow: hidden; scroll-margin-top: 70px; }}
+  .sl-send > summary {{ display: flex; align-items: center; gap: 9px; padding: 9px 12px; font-size: var(--fs-md);
+    background: {bg}; cursor: pointer; list-style: none; }}
+  .sl-send > summary::-webkit-details-marker {{ display: none; }}
+  .sl-send > summary::before {{ content: "▸"; color: {muted}; font-size: 0.72rem; width: 10px; flex: none; }}
+  .sl-send[open] > summary::before {{ content: "▾"; }}
+  .sl-send[open] > summary {{ border-bottom: 1px solid {border}; }}
+  .sl-send > summary:hover {{ background: {row_hover}; }}
+  .sl-send.has-fail {{ border-color: {error_border}; }}
+  .sl-send.is-focus {{ box-shadow: 0 0 0 2px {accent_border}; }}
+  .sl-send .t {{ color: {muted}; font-variant-numeric: tabular-nums; flex: none; width: 3.1em; }}
+  .sl-kind {{ flex: none; font-size: var(--fs-xs); font-weight: 600; border-radius: var(--r-pill); padding: 1px 8px; border: 1px solid; }}
+  .k-regular {{ background: {hover}; color: {accent}; border-color: {accent_border}; }}
+  .k-adhoc {{ background: {adhoc_bg}; color: {adhoc_text}; border-color: {flow_entry_adhoc_border}; }}
+  .k-scoop, .k-flash, .k-burst {{ background: {error_bg}; color: {scoop_text}; border-color: {error_border}; }}
+  .k-quota {{ background: {warn_bg}; color: {warn_text}; border-color: {warn_border}; }}
+  .sl-send .what {{ flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+  .sl-send .by {{ flex: none; color: {muted}; font-size: var(--fs-sm); }}
+  .sl-send .tally {{ flex: none; font-size: var(--fs-sm); color: {muted}; font-variant-numeric: tabular-nums; }}
+  .sl-send .tally b {{ font-weight: 600; color: {text}; }}
+  .sl-send .tally .bad {{ color: {error}; font-weight: 700; }}
+  .sl-send .mark {{ flex: none; width: 18px; text-align: center; font-weight: 700; color: {muted}; }}
+  .sl-send .mark.ok {{ color: {send}; }}
+  .sl-send .mark.bad {{ color: {error}; }}
+  .sl-send.skipped > summary {{ color: {muted}; }}
+  .sl-body {{ padding: 6px 12px 10px 31px; font-size: var(--fs-md); }}
+  .sl-meta {{ color: {muted}; font-size: var(--fs-sm); margin: 4px 0 8px; line-height: 1.6; }}
+  .sl-meta a {{ color: {muted}; }}
+  .sl-meta a:hover {{ color: {accent}; }}
+  .sl-rc {{ display: grid; grid-template-columns: minmax(0, 8em) 5.2em minmax(0, 1fr); gap: 0 12px; }}
+  .sl-rc > div {{ padding: 6px 0; border-top: 1px solid {divider_soft}; line-height: 1.45; min-width: 0; overflow-wrap: anywhere; }}
+  .sl-rc .h {{ border-top: none; color: {muted}; font-size: var(--fs-xs); padding: 2px 0; }}
+  .sl-rc .ch {{ color: {muted}; font-size: var(--fs-sm); }}
+  .st-ok {{ color: {send}; }}
+  .st-bad {{ color: {error}; font-weight: 600; }}
+  .st-note {{ color: {muted}; font-size: var(--fs-sm); }}
+  .st-fix {{ display: block; color: {muted}; font-size: var(--fs-sm); font-weight: 400; margin-top: 2px; }}
+  .st-fix a {{ color: {accent}; }}
+  .sl-empty {{ color: {muted}; text-align: center; padding: 28px 0; }}
+  .sl-foot {{ margin-top: 22px; color: {muted}; font-size: var(--fs-sm); text-align: center; }}
+  .sl-hide {{ display: none !important; }}
+  @media (max-width: 640px) {{
+    .sl-send > summary {{ flex-wrap: wrap; row-gap: 2px; }}
+    .sl-send .what {{ flex-basis: calc(100% - 5em); order: 5; padding-left: 19px; }}
+    .sl-send .by {{ display: none; }}
+    .sl-rc {{ grid-template-columns: minmax(0, 1fr); }}
+    .sl-rc > .ch, .sl-rc > .h {{ display: none; }}
+    .sl-rc > .res {{ border-top: none; padding-top: 0; }}
+  }}
+</style>
+</head>
+<body>
+{topbar}
+<div class="container">
+  <h1>발송 기록</h1>
+  <p class="hint">{retention_days}일 보관 · 도착했는지까지 적고, 읽었는지는 텔레그램·메일이 알려 주지 않아 적지 않습니다.</p>
+  {filters_html}
+  {days_html}
+</div>
+<script>
+(function () {{
+  var chips = document.querySelectorAll(".sl-chip[data-group]");
+  var failChip = document.querySelector(".sl-chip.fail");
+  var group = "all", failOnly = false;
+  function apply() {{
+    document.querySelectorAll(".sl-day").forEach(function (day) {{
+      var shown = 0;
+      day.querySelectorAll(".sl-send").forEach(function (row) {{
+        var ok = (group === "all" || row.dataset.group === group) && (!failOnly || row.dataset.bad === "1");
+        row.classList.toggle("sl-hide", !ok);
+        if (ok) shown++;
+      }});
+      day.classList.toggle("sl-hide", shown === 0);
+      // 거르는 동안엔 걸린 날짜를 펼쳐 보인다 — 접힌 날짜 속 실패를 못 보고 지나치지 않게.
+      if ((group !== "all" || failOnly) && shown) day.open = true;
+    }});
+  }}
+  chips.forEach(function (chip) {{
+    chip.addEventListener("click", function () {{
+      group = chip.dataset.group;
+      chips.forEach(function (c) {{ c.classList.toggle("on", c === chip); }});
+      apply();
+    }});
+  }});
+  if (failChip) failChip.addEventListener("click", function () {{
+    failOnly = !failOnly;
+    failChip.classList.toggle("on", failOnly);
+    apply();
+  }});
+  var focus = document.querySelector(".sl-send.is-focus");
+  if (focus) focus.scrollIntoView({{ block: "start" }});
+}})();
+</script>
+</body>
+</html>
+"""
+)
+
+_SEND_LOG_KIND_LABELS = {
+    "regular": "정기", "adhoc": "수시", "scoop": "[단독]", "flash": "[속보]", "burst": "🔥 몰림", "quota": "한도 경고",
+}
+
+
+def _send_log_fix(channel: str, error: str) -> str:
+    """실패 이유 밑에 붙이는 「어떻게 고치나」 한 줄(HTML). 모르는 이유면 빈 문자열."""
+    if channel == "telegram":
+        if "차단했습니다" in error:
+            return "받는 사람이 텔레그램에서 봇 차단을 풀면 다음 발송부터 받습니다."
+        if "대화를 시작하지" in error:
+            return "받는 사람이 텔레그램에서 봇을 찾아 [시작]을 누르면 다음 발송부터 받습니다."
+        if "(403)" in error:
+            return "받는 사람이 봇을 차단했는지, 봇과 대화를 시작했는지 확인해 주세요."
+        if "chat_id" in error:
+            return '<a href="/telegram">텔레그램 받는 사람</a>에서 chat id가 맞는지 확인해 주세요.'
+        if "(401)" in error or "토큰" in error:
+            return '<a href="/telegram-sender">텔레그램 발송 계정</a>에서 봇 토큰을 확인해 주세요.'
+        if "(429)" in error:
+            return "텔레그램이 잠시 막았어요. 몇 분 뒤에 다시 보내면 됩니다."
+    if channel == "email":
+        if "인증" in error or "설정되지" in error:
+            return '<a href="/email-sender">이메일 발송 계정</a>에서 주소·앱 비밀번호를 확인해 주세요.'
+        if "거부" in error:
+            return '<a href="/email">이메일 받는 사람</a>에서 주소가 맞는지 확인해 주세요.'
+    if "연결" in error or "시간 초과" in error:
+        return "인터넷 연결을 확인해 주세요."
+    return ""
+
+
+def _send_log_delivery_html(row: dict) -> str:
+    channel = row.get("channel", "")
+    channel_label = "텔레그램" if channel == "telegram" else "이메일"
+    content = row.get("content", "")
+    if row.get("ok"):
+        notes = []
+        if content:
+            notes.append(content)
+        if row.get("silent"):
+            notes.append("🔕 알림 없이")
+        if (row.get("parts") or 1) > 1:
+            notes.append(f"{row['parts']}통으로 나눠 감")
+        note_html = f' <span class="st-note">· {html.escape(" · ".join(notes))}</span>' if notes else ""
+        result = "✓ 도착" if channel == "telegram" else "✓ 메일 서버가 받음"
+        res_html = f'<span class="st-ok">{result}</span>{note_html}'
+    else:
+        error = row.get("error", "")
+        fix = _send_log_fix(channel, error)
+        fix_html = f'<span class="st-fix">{fix}</span>' if fix else ""
+        res_html = f'<span class="st-bad">✕ {html.escape(error or "보내지 못했어요")}</span>{fix_html}'
+    return (
+        f'<div>{html.escape(row.get("name") or "")}</div>'
+        f'<div class="ch">{channel_label}</div>'
+        f'<div class="res">{res_html}</div>'
+    )
+
+
+def _send_log_entry_html(entry: dict, focus: bool) -> str:
+    kind = entry.get("kind", "")
+    status = entry.get("status", "")
+    at = entry.get("at", "")
+    hhmm = at[11:16]
+    skipped = status == "skipped"
+    bad = status in ("failed", "partial")
+    if kind in ("regular", "adhoc"):
+        by = "🤖 자동" if entry.get("auto") else "수동"
+        if entry.get("send_no", 0) >= 2:
+            by += f" · {entry['send_no']}회째"
+        by_html = f'<span class="by">{by}</span>'
+    else:
+        by_html = ""
+    if skipped:
+        tally_html = '<span class="tally">보내지 않음</span>'
+        mark_html = '<span class="mark">–</span>'
+    else:
+        parts = []
+        for label, ok, total in send_log.tally(entry):
+            ok_html = f'<span class="bad">{ok}</span>' if ok < total else f"<b>{ok}</b>"
+            parts.append(f"{label} {ok_html}/<b>{total}</b>")
+        tally_html = f'<span class="tally">{" · ".join(parts)}</span>'
+        mark_html = '<span class="mark bad">✕</span>' if bad else '<span class="mark ok">✓</span>'
+    title = entry.get("title", "")
+    if skipped and entry.get("note"):
+        title = f"{title} · {entry['note']}"
+    meta = []
+    if entry.get("repeat", 1) > 1:
+        meta.append(
+            f"자동발송이 같은 결과로 {entry['repeat']}번 시도했어요 · 마지막 {html.escape(entry.get('last_at', '')[11:16])}"
+        )
+    if entry.get("note") and not skipped:
+        meta.append(html.escape(entry["note"]))
+    articles = entry.get("articles") or []
+    if articles:
+        links = "<br>· ".join(
+            f'<a href="{html.escape(a.get("url", ""), quote=True)}" target="_blank" rel="noopener">'
+            f'{html.escape(a.get("outlet", ""))} {html.escape(a.get("title", ""))}</a>'
+            for a in articles
+        )
+        meta.append(f"보낸 기사 · {links}")
+    if kind == "regular" and skipped:
+        meta.append("확정본에서 (발송)을 누르면 이 아래에 새 줄로 남습니다.")
+    meta_html = "".join(f'<div class="sl-meta">{m}</div>' for m in meta)
+    rows = entry.get("deliveries") or []
+    grid_html = (
+        '<div class="sl-rc"><div class="h">이름</div><div class="h ch">채널</div><div class="h">결과</div>'
+        + "".join(_send_log_delivery_html(r) for r in rows)
+        + "</div>"
+        if rows else ""
+    )
+    body_html = f'<div class="sl-body">{meta_html}{grid_html}</div>' if (meta_html or grid_html) else ""
+    group = "report" if kind in send_log.REPORT_KINDS else "alert"
+    classes = "sl-send" + (" has-fail" if bad else "") + (" skipped" if skipped else "") + (" is-focus" if focus else "")
+    return (
+        f'<details class="{classes}" data-group="{group}" data-bad="{1 if bad else 0}"'
+        f'{" open" if (focus or (bad and body_html)) else ""}>'
+        "<summary>"
+        f'<span class="t">{html.escape(hhmm)}</span>'
+        f'<span class="sl-kind k-{html.escape(kind)}">{_SEND_LOG_KIND_LABELS.get(kind, html.escape(kind))}</span>'
+        f'<span class="what" title="{html.escape(title, quote=True)}">{html.escape(title)}</span>'
+        f"{by_html}{tally_html}{mark_html}"
+        "</summary>"
+        f"{body_html}"
+        "</details>"
+    )
+
+
+def render_send_log_page(query: Optional[dict] = None) -> str:
+    """발송 기록. query의 run(정기 회차 키)·card(수시 확정본 id)가 오면 그 보고서의 가장 최근
+    발송 줄을 펼치고 그 날짜를 연다 — 확정본의 「발송 완료」·정기 보관함의 발송 점이 여기로 온다."""
+    query = query or {}
+    want_run = (query.get("run") or [""])[0]
+    want_card = (query.get("card") or [""])[0]
+    days = send_log.load_days()
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    focus_id = None
+    if want_run or want_card:
+        for date_str, entries in days:
+            for i, e in enumerate(entries):
+                if (want_run and e.get("run_key") == want_run) or (want_card and e.get("card_id") == want_card):
+                    focus_id = (date_str, i)
+                    break
+            if focus_id:
+                break
+
+    blocks = []
+    fail_total = 0
+    for date_str, entries in days:
+        fails = sum(1 for e in entries if e.get("status") in ("failed", "partial"))
+        fail_total += fails
+        inner = "".join(
+            _send_log_entry_html(e, focus_id == (date_str, i)) for i, e in enumerate(entries)
+        )
+        is_today = date_str == today
+        open_day = is_today or (focus_id and focus_id[0] == date_str)
+        blocks.append(
+            f'<details class="sl-day"{" open" if open_day else ""}>'
+            "<summary>"
+            f"{_hidden_date_label(date_str)}"
+            + ('<span class="chip-today">오늘</span>' if is_today else "")
+            + f'<span class="dcnt">{len(entries)}회</span>'
+            + (f'<span class="dfail">· 실패 {fails}</span>' if fails else "")
+            + "</summary>"
+            + inner
+            + "</details>"
+        )
+    if blocks:
+        days_html = "\n".join(blocks) + (
+            f'<p class="sl-foot">{_hidden_date_label(days[-1][0])}부터 남아 있어요 · '
+            f"{SEND_LOG_RETENTION_DAYS}일이 지나면 저절로 지워집니다</p>"
+        )
+        filters_html = (
+            '<div class="sl-filters">'
+            '<button type="button" class="sl-chip on" data-group="all">전체</button>'
+            '<button type="button" class="sl-chip" data-group="report">보고서</button>'
+            '<button type="button" class="sl-chip" data-group="alert">알림</button>'
+            + (
+                f'<span class="sl-sep"></span><button type="button" class="sl-chip fail">실패만 ({fail_total})</button>'
+                if fail_total else ""
+            )
+            + "</div>"
+        )
+    else:
+        days_html = '<p class="sl-empty">아직 보낸 기록이 없어요. 확정본을 보내거나 [단독]·[속보] 알림이 나가면 여기에 쌓입니다.</p>'
+        filters_html = ""
+    return _SEND_LOG_TEMPLATE.format(
+        **_theme(),
+        topbar=_TOP_BAR_HTML,
+        retention_days=SEND_LOG_RETENTION_DAYS,
+        filters_html=filters_html,
+        days_html=days_html,
+    )
 
 
 def render_labels_page(selected: Optional[list] = None) -> str:
@@ -4218,12 +5283,12 @@ def render_labels_page(selected: Optional[list] = None) -> str:
                 '<form method="POST" action="/download-text" style="display:contents">'
                 f'<input type="hidden" name="filename" value="{html.escape(export_base)}.txt">'
                 f'<input type="hidden" name="text" value="{copy_attr}">'
-                '<button type="submit">txt</button>'
+                '<button type="submit">텍스트</button>'
                 "</form>"
                 '<form method="POST" action="/download-excel" style="display:contents">'
                 f'<input type="hidden" name="filename" value="{html.escape(export_base)}.xlsx">'
                 f'<input type="hidden" name="rows" value="{html.escape(json.dumps(excel_rows, ensure_ascii=False))}">'
-                '<button type="submit">xlsx</button>'
+                '<button type="submit">엑셀</button>'
                 "</form>"
                 "</span>"
             )
@@ -4303,13 +5368,11 @@ _LABEL_MANAGE_TEMPLATE = (
 </head>
 <body>
 """
-    + _TOP_BAR_HTML
+    + _LABEL_MANAGE_TOP_BAR_HTML
     + """
 <div class="container">
   <div class="lab-topbar">
     <h1>{icon_gear} 라벨 관리</h1>
-    <span class="spacer"></span>
-    <a class="btn ghost" href="/labels">← 라벨 보관함</a>
   </div>
   <p class="hint">
     라벨을 붙이는 곳은 기사 행이고, 라벨 자체를 손보는 곳은 여기 하나입니다.
@@ -4414,6 +5477,32 @@ def _resolve_round_id(form: dict) -> Optional[tuple]:
     return round_id_for_run(run) if run is not None else None
 
 
+def _original_url_index() -> dict:
+    """{원문 주소 키: 네이버 기사 주소} — 오늘 앱이 본 네이버 기사 전부에서 만든다.
+
+    「+ 수기로 기사 추가」가 언론사 원문 주소를 받았을 때 수집이 저장한 네이버 주소로 바꿔
+    읽는 데 쓴다. 재료: 오늘 저장된 회차 · 지금 초안에 붙잡힌 기사 · 담아둔 기사 · 전체 기사
+    캐시(숨긴 기사도 여기 있다). 원문 주소(original_url)는 수집 때 네이버 API가 준 값이라
+    그 필드가 생기기 전(2026-09-22 이전)에 모은 기사엔 없다.
+    """
+    from app.draft_seen import _read as _read_draft_seen
+    from app.live_cache import load_live_cache
+    from app.storage import load_today_runs
+
+    pool = []
+    for run in load_today_runs(datetime.now().strftime("%Y-%m-%d")):
+        pool.extend(run.get("articles") or [])
+    pool.extend((_read_draft_seen().get("articles") or {}).values())
+    pool.extend(load_manual_articles())
+    for arts in ((load_live_cache() or {}).get("keyword_articles") or {}).values():
+        pool.extend(arts)
+    index = {}
+    for a in pool:
+        if isinstance(a, dict) and a.get("original_url") and a.get("url"):
+            for key in original_url_keys(a["original_url"]):
+                index.setdefault(key, a["url"])
+    return index
+
 class _SettingsHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path in _STATIC_HTML_ROUTES:
@@ -4429,7 +5518,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         elif self.path == "/outlets":
             self._respond(render_outlets_page(load_settings()))
         elif self.path == "/highlight":
-            self._respond(render_highlight_page(load_settings()))
+            # 형광펜 설정 화면은 없앴다 — 확정본·초안·전체 기사 좌측 하단 🖍️가 같은 일을 한다.
+            self._redirect("/")
         elif self.path == "/format":
             self._respond(render_format_page(load_settings()))
         elif self.path == "/subheading-format":
@@ -4438,6 +5528,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._respond(render_schedule_page(load_settings()))
         elif self.path == "/hidden":
             self._respond(render_hidden_page())
+        elif self.path == "/send-log" or self.path.startswith("/send-log?"):
+            self._respond(render_send_log_page(parse_qs(urlsplit(self.path).query)))
         elif self.path == "/trend" or self.path.startswith("/trend?"):
             self._respond(render_trend_page(parse_qs(urlsplit(self.path).query)))
         elif self.path == "/labels" or self.path.startswith("/labels?"):
@@ -4456,10 +5548,18 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._respond(render_wordcloud_exclude_page(load_settings()))
         elif self.path == "/auto-send":
             self._respond(render_auto_send_settings(load_settings()))
-        elif self.path == "/scrap-page":
-            self._respond(render_scrap_page_settings(load_settings()))
+        elif self.path == "/format-adhoc":
+            self._respond(render_format_page(load_settings(), flow="adhoc"))
+        elif self.path == "/subheading-format-adhoc":
+            self._respond(render_subheading_format_page(load_settings(), flow="adhoc"))
         elif self.path == "/telegram":
             self._respond(render_telegram_settings(load_settings()))
+        elif self.path == "/telegram-sender" or self.path.startswith("/telegram-sender?"):
+            # 저장 직후 봇 이름 결과를 한 번 보여준다(bn=ok|err, msg=문구).
+            query = parse_qs(urlsplit(self.path).query)
+            kind = query.get("bn", [""])[0]
+            notice = (kind, query.get("msg", [""])[0]) if kind in ("ok", "err") else None
+            self._respond(render_telegram_sender_page(bot_name_notice=notice))
         elif self.path == "/breaking-alert":
             self._respond(render_breaking_alert_settings())
         elif self.path == "/email":
@@ -4468,6 +5568,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._respond(render_naver_settings_page())
         elif self.path == "/llm":
             self._respond(render_llm_settings_page())
+        elif self.path == "/email-sender":
+            self._respond(render_email_sender_page())
         elif self.path.startswith("/adhoc"):
             # [추가: 2026-08-13] 수시 모니터링(비정기 스크랩) — app/adhoc/*는 이 한 지점
             # 말고는 정기 코드를 건드리지 않는다(app/adhoc/* -> app/* 단방향 의존,
@@ -4572,10 +5674,6 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_save_outlets(form)
         elif self.path == "/move-outlet":
             self._handle_move_outlet(form)
-        elif self.path == "/save-highlight":
-            self._handle_save_highlight(form)
-        elif self.path == "/highlight/add-word":
-            self._handle_add_highlight_word(form)
         elif self.path == "/keywords/toggle-highlight":
             self._handle_toggle_highlight(form)
         elif self.path == "/keywords/cycle-highlight-color":
@@ -4602,10 +5700,14 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_save_wordcloud_exclude(form)
         elif self.path == "/save-auto-send":
             self._handle_save_auto_send_settings(form)
-        elif self.path == "/save-scrap-page":
-            self._handle_save_scrap_page_settings(form)
+        elif self.path == "/save-format-adhoc":
+            self._handle_save_format(form, flow="adhoc")
+        elif self.path == "/save-subheading-format-adhoc":
+            self._handle_save_subheading_format(form, flow="adhoc")
         elif self.path == "/add-manual-article":
             self._handle_add_manual_article(form)
+        elif self.path == "/add-article-by-url":
+            self._handle_add_article_by_url(form)
         elif self.path == "/unpin-manual-article":
             self._handle_unpin_manual_article(form)
         elif self.path == "/promote-manual-article":
@@ -4630,6 +5732,10 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_save_manual_keyword_note(form)
         elif self.path == "/assign-unclassified":
             self._handle_assign_unclassified()
+        elif self.path == "/cut-round":
+            self._handle_cut_round(form)
+        elif self.path == "/cut-round-cancel":
+            self._handle_cut_round_cancel(form)
         elif self.path == "/split-group":
             self._handle_split_group(form)
         elif self.path == "/split-group-final":
@@ -4690,6 +5796,18 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_test_llm(form)
         elif self.path == "/delete-llm":
             self._handle_delete_llm()
+        elif self.path == "/save-telegram-sender":
+            self._handle_save_telegram_sender(form)
+        elif self.path == "/test-telegram-sender":
+            self._handle_test_telegram_sender(form)
+        elif self.path == "/delete-telegram-sender":
+            self._handle_delete_telegram_sender()
+        elif self.path == "/save-email-sender":
+            self._handle_save_email_sender(form)
+        elif self.path == "/test-email-sender":
+            self._handle_test_email_sender(form)
+        elif self.path == "/delete-email-sender":
+            self._handle_delete_email_sender()
         elif self.path.startswith("/adhoc"):
             if not adhoc_routes.handle_post(self, self.path, form):
                 self.send_response(404)
@@ -4765,37 +5883,6 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         self.send_response(204)
         self.end_headers()
 
-    def _handle_save_highlight(self, form: dict) -> None:
-        """형광펜 화면의 "저장" — del로 지워진(폼에 없는) 단어는 자연히 빠지고, 남은
-        단어들의 색만 그때 고른 값으로 반영한다. 단어 자체는 이 폼에서 새로 만들 수
-        없다(검색 키워드 화면의 🖍️로만 추가됨)."""
-        items = [
-            {
-                "word": form.get(f"highlight{i}_word", [""])[0],
-                "color": form.get(f"highlight{i}_color", ["0"])[0],
-            }
-            for i in range(1, MAX_HIGHLIGHT_KEYWORDS + 1)
-            if f"highlight{i}_word" in form
-        ]
-        try:
-            save_highlight_keywords(items)
-        except SettingsError as error:
-            self._respond(render_highlight_page(load_settings(), error=str(error), items=items))
-            return
-        self._redirect("/highlight")
-
-    def _handle_add_highlight_word(self, form: dict) -> None:
-        """형광펜 화면 상단 "추가" — 검색 키워드에 없는 단어도 바로 등록한다
-        (app.settings.add_highlight_keyword). 이미 있으면(검색 키워드의 🖍️로 이미
-        들어와 있던 경우 포함) 조용히 무시하지 않고 에러 메시지를 보여준다."""
-        new_word = form.get("new_word", [""])[0]
-        try:
-            add_highlight_keyword(new_word)
-        except SettingsError as error:
-            self._respond(render_highlight_page(load_settings(), error=str(error), new_word=new_word))
-            return
-        self._redirect("/highlight")
-
     def _handle_toggle_highlight(self, form: dict) -> None:
         """검색 키워드 화면의 🖍️ 버튼과, 완성본·초안·실시간 화면 하단의 🖍️ 형광펜 팝오버가
         fetch로 호출한다 — 이미 형광펜에 있으면 빼고, 없으면 다음 순번 색으로 추가한다
@@ -4843,11 +5930,6 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             return
         self._redirect("/wordcloud-exclude")
 
-    def _handle_save_scrap_page_settings(self, form: dict) -> None:
-        """스크랩 페이지의 "정기 스크랩에도 포토/현장·인사 기사 포함" 체크박스를 저장한다."""
-        save_scrap_page_settings("exclude_photo_in_scrap" in form, "exclude_personnel_in_scrap" in form)
-        self._redirect("/scrap-page")
-
     def _handle_save_auto_send_settings(self, form: dict) -> None:
         """자동발송 설정 화면의 "저장" — 사용 여부와 유예 시간(분)을 함께 저장한다.
 
@@ -4870,41 +5952,16 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         self._redirect("/auto-send")
 
     def _handle_save_telegram_settings(self, form: dict) -> None:
-        """텔레그램 설정 화면의 "저장" — 받는 사람 목록을 저장한다
-        (app.settings_server._handle_save_email_settings와 동일한 패턴). [수정: 2026-08-11]
-        자동 전송 체크박스는 통합 설정(/auto-send)으로 옮겨가 여기서 빠졌다.
-        [수정: 2026-08-20] alert_scoop/alert_flash([단독]/[속보] 즉시 알림) 두 열을
-        더 저장한다 — enabled(정기 전송)와 독립적인 축이다(app.breaking_alert_sender)."""
-        recipients = [
-            {
-                "name": form.get(f"tg_recipient{i}_name", [""])[0],
-                "chat_id": form.get(f"tg_recipient{i}_chat_id", [""])[0],
-                "enabled": f"tg_recipient{i}_enabled" in form,
-                "alert_scoop": f"tg_recipient{i}_alert_scoop" in form,
-                "alert_flash": f"tg_recipient{i}_alert_flash" in form,
-            }
-            for i in range(1, MAX_TELEGRAM_RECIPIENTS + 1)
-            if f"tg_recipient{i}_chat_id" in form
-        ]
-        save_telegram_recipients(recipients)
+        """텔레그램 설정 화면의 「저장」 — 받는 사람 목록 전체를 저장한다.
+        🗑로 지운 줄은 폼에서 아예 빠져 목록에서도 빠진다."""
+        save_telegram_recipients(_parse_telegram_recipient_form(form))
         self._redirect("/telegram")
 
     def _handle_add_telegram_recipient_slot(self, form: dict) -> None:
-        """"+ 받는 사람 추가" 버튼 — 저장하지 않고 입력칸을 하나 더 보여준다
-        (app.settings_server._handle_add_email_recipient_slot과 동일한 패턴)."""
-        recipients = [
-            {
-                "name": form.get(f"tg_recipient{i}_name", [""])[0],
-                "chat_id": form.get(f"tg_recipient{i}_chat_id", [""])[0],
-                "enabled": f"tg_recipient{i}_enabled" in form,
-                "alert_scoop": f"tg_recipient{i}_alert_scoop" in form,
-                "alert_flash": f"tg_recipient{i}_alert_flash" in form,
-            }
-            for i in range(1, MAX_TELEGRAM_RECIPIENTS + 1)
-            if f"tg_recipient{i}_chat_id" in form
-        ]
+        """「+ 받는 사람 추가」 — 저장하지 않고 입력칸을 하나 더 보여준다(입력 중이던 값 유지)."""
+        recipients = _parse_telegram_recipient_form(form)
         slots = min(len(recipients) + 1, MAX_TELEGRAM_RECIPIENTS)
-        self._respond(render_telegram_settings(load_settings(), slots=slots, recipients=recipients))
+        self._respond(render_telegram_settings(load_settings(), slots=slots, recipients=recipients, dirty=True))
 
     def _handle_save_breaking_alert_settings(self, form: dict) -> None:
         """[단독]·[속보] 알림 설정 화면(/breaking-alert)의 "저장"."""
@@ -4916,6 +5973,9 @@ class _SettingsHandler(BaseHTTPRequestHandler):
                 form.get("end", [""])[0],
                 form.get("interval_min", [""])[0],
                 "catch_up_enabled" in form,
+                "burst_enabled" in form,
+                form.get("burst_window_min", [""])[0],
+                form.get("burst_min_outlets", [""])[0],
             )
         except BreakingAlertSettingsError as exc:
             self._respond(render_breaking_alert_settings(error=str(exc)))
@@ -5038,13 +6098,21 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self.send_response(400)
             self.end_headers()
             return
-        _, sent = send_confirmed_run(run, text_override=text)
+        updated, sent = send_confirmed_run(run, text_override=text)
+        self._regenerate_screens()
         if not sent:
-            self._regenerate_screens()
             self.send_response(502)
             self.end_headers()
             return
-        self._regenerate_screens()
+        if updated.get("send_failure"):
+            # 일부만 받음 — 화면(renderer의 sendReport)이 "누가 못 받았는지 보라"고 안내한다.
+            body = b"partial"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         self.send_response(204)
         self.end_headers()
 
@@ -5129,6 +6197,77 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         self.send_response(204)
         self.end_headers()
 
+    def _handle_save_telegram_sender(self, form: dict) -> None:
+        """텔레그램 발송 계정 저장 — 토큰 칸이 비면 저장된 값을 유지한다(_handle_save_llm과 같은
+        이유). 봇 이름은 바뀌었을 때만 텔레그램에 보낸다(자주 바꾸면 텔레그램이 막는다). 토큰만
+        새 봇으로 바꿨으면 그 봇에 기본 이름을 한 번 건다(앱을 켤 때와 같은 규칙)."""
+        new_token = form.get("bot_token", [""])[0].strip()
+        token_changed = bool(new_token) and new_token != (telegram_bot_token() or "")
+        if new_token:
+            save_telegram_token(new_token)
+        raw = form.get("bot_name", [None])[0]
+        name_changed = (
+            raw is not None and normalize_bot_name(raw) != form.get("bot_name_before", [""])[0]
+        )
+        if not telegram_is_configured() or not (name_changed or token_changed):
+            self._redirect("/telegram-sender")
+            return
+        if not name_changed:
+            apply_default_bot_name_once()
+            self._redirect("/telegram-sender")
+            return
+        name = normalize_bot_name(raw)
+        error = set_bot_name(name)
+        if error:
+            msg = f"봇 이름은 못 바꿨어요 — {error}" + (" 봇 토큰은 저장됐습니다." if new_token else "")
+            self._redirect(f"/telegram-sender?bn=err&msg={quote(msg)}")
+        else:
+            msg = f"봇 이름을 「{name}」로 바꿨습니다. 이미 열려 있던 대화방은 텔레그램을 다시 열어야 새 이름이 보일 수 있어요."
+            self._redirect(f"/telegram-sender?bn=ok&msg={quote(msg)}")
+
+    def _handle_test_telegram_sender(self, form: dict) -> None:
+        token = form.get("bot_token", [""])[0].strip() or (telegram_bot_token() or "")
+        ok, message = check_bot_token(token)
+        self._respond_json({"ok": ok, "message": message})
+
+    def _handle_delete_telegram_sender(self) -> None:
+        delete_telegram_token()
+        self.send_response(204)
+        self.end_headers()
+
+    def _handle_save_email_sender(self, form: dict) -> None:
+        """이메일 보내는 계정 저장 — 비밀번호 칸이 비면 저장된 값을 유지한다(_handle_save_llm과
+        같은 이유). 처음 저장인데 비밀번호가 비면 .env 비밀번호를 옮겨 적지 않고 거절한다."""
+        service = form.get("service", [""])[0]
+        address = form.get("address", [""])[0].strip()
+        name = form.get("name", [""])[0].strip()[:40]
+        password = form.get("password", [""])[0].strip() or email_saved_password()
+        attempted = {"service": service, "address": address, "name": name}
+        if service not in EMAIL_SERVICES:
+            error = "메일 서비스를 골라주세요."
+        else:
+            error = check_email_sender_address(service, address)
+        if not error and not password:
+            error = "앱 비밀번호를 입력해주세요."
+        if error:
+            self._respond(render_email_sender_page(error=error, attempted=attempted))
+            return
+        save_email_credentials(service, address, password, name)
+        self._redirect("/email-sender")
+
+    def _handle_test_email_sender(self, form: dict) -> None:
+        service = form.get("service", [""])[0]
+        password = form.get("password", [""])[0].strip() or (email_sender_password() or "")
+        ok, message = send_test_mail(
+            service, form.get("address", [""])[0], password, form.get("name", [""])[0]
+        )
+        self._respond_json({"ok": ok, "message": message})
+
+    def _handle_delete_email_sender(self) -> None:
+        delete_email_credentials()
+        self.send_response(204)
+        self.end_headers()
+
     def _handle_email_send_draft(self, form: dict) -> None:
         """초안 화면(preview.html)의 "Email" 버튼이 fetch로 호출한다.
 
@@ -5179,25 +6318,29 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self.send_response(400)
         self.end_headers()
 
-    def _handle_save_format(self, form: dict) -> None:
+    def _handle_save_format(self, form: dict, flow: str = "regular") -> None:
+        spec = _FORMAT_FLOWS[flow]
         template = form.get("line_template", [""])[0]
+        save = save_adhoc_article_line_template if flow == "adhoc" else save_article_line_template
         try:
-            save_article_line_template(template)
+            save(template)
         except SettingsError as error:
-            attempted = {**load_settings(), "article_line_template": template}
-            self._respond(render_format_page(attempted, error=str(error)))
+            attempted = {**load_settings(), spec["line_key"]: template}
+            self._respond(render_format_page(attempted, error=str(error), flow=flow))
             return
-        self._redirect("/format")
+        self._redirect(spec["line_path"])
 
-    def _handle_save_subheading_format(self, form: dict) -> None:
+    def _handle_save_subheading_format(self, form: dict, flow: str = "regular") -> None:
+        spec = _FORMAT_FLOWS[flow]
         template = form.get("subheading_format", [""])[0]
+        save = save_adhoc_subheading_format_template if flow == "adhoc" else save_subheading_format_template
         try:
-            save_subheading_format_template(template)
+            save(template)
         except SettingsError as error:
-            attempted = {**load_settings(), "subheading_format_template": template}
-            self._respond(render_subheading_format_page(attempted, error=str(error)))
+            attempted = {**load_settings(), spec["sub_key"]: template}
+            self._respond(render_subheading_format_page(attempted, error=str(error), flow=flow))
             return
-        self._redirect("/subheading-format")
+        self._redirect(spec["sub_path"])
 
     @staticmethod
     def _combine_hhmm(form: dict, prefix: str) -> str:
@@ -5224,13 +6367,17 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         요일 체크박스(group{n}_days, 같은 name이 반복돼 form.get(..., [])이 체크된
         값 리스트를 돌려준다 — 언론사 화이트리스트 체크박스와 같은 패턴)를 읽는다.
         """
+        # 화면에 떠 있던(×로 지우지 않은) 줄만, 화면 순서대로 모은다 — 가운데 줄을 지운 뒤
+        # 「+ 시간대 추가」를 눌러도 빈 자리 없이 이어진다. 시간대마다 켜고 끄는 칸은 없어져
+        # enabled는 늘 참이다(안 쓰는 시간대는 지운다).
         times = [
             {
                 "start": self._combine_hhmm(form, f"group{group_index}_start{i + 1}"),
                 "end": self._combine_hhmm(form, f"group{group_index}_end{i + 1}"),
-                "enabled": f"group{group_index}_enabled{i + 1}" in form,
+                "enabled": True,
             }
             for i in range(MAX_SCHEDULE_TIMES)
+            if f"group{group_index}_end{i + 1}_h" in form
         ]
         return {
             "name": form.get(f"group{group_index}_name", [""])[0],
@@ -5240,9 +6387,17 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         }
 
     @staticmethod
-    def _schedule_group_slot_count(form: dict, group_index: int) -> int:
-        """지금 화면에 실제로 떠 있던(del로 지워지지 않은) 그 그룹의 시간대 입력칸 개수."""
-        return sum(1 for i in range(MAX_SCHEDULE_TIMES) if f"group{group_index}_end{i + 1}_h" in form)
+    def _next_schedule_window(times: list) -> dict:
+        """「+ 시간대 추가」로 생기는 새 줄 — 회차는 보통 이어지므로 시작을 윗줄 종료로,
+        종료를 그 2시간 뒤로 채워 둔다(담당자가 보고 고친다, 저장 전이다). 윗줄 종료가
+        비었거나 2시간 뒤가 자정을 넘으면 그 칸은 빈 채로 둔다."""
+        prev_end = times[-1]["end"] if times else ""
+        h, m = _split_hhmm(prev_end)
+        if not h or not m:
+            return {"start": "", "end": "", "enabled": True}
+        end_min = int(h) * 60 + int(m) + 120
+        end = f"{end_min // 60:02d}:{end_min % 60:02d}" if end_min < 24 * 60 else ""
+        return {"start": prev_end, "end": end, "enabled": True}
 
     def _handle_save_schedule(self, form: dict) -> None:
         groups = [self._parse_schedule_group(form, g) for g in range(1, MAX_SCHEDULE_GROUPS + 1)]
@@ -5267,7 +6422,7 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             for g in range(1, MAX_SCHEDULE_GROUPS + 1)
             if f"group{g}_name" in form
         ]
-        slots_by_group = {i + 1: self._schedule_group_slot_count(form, i + 1) for i in range(len(groups))}
+        slots_by_group = {i + 1: max(len(g["times"]), 1) for i, g in enumerate(groups)}
         if len(groups) < MAX_SCHEDULE_GROUPS:
             groups.append({"name": "", "times": [], "enabled": False, "days": []})
             slots_by_group[len(groups)] = 1
@@ -5291,9 +6446,11 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             for g in range(1, MAX_SCHEDULE_GROUPS + 1)
             if f"group{g}_name" in form
         ]
-        slots_by_group = {i + 1: self._schedule_group_slot_count(form, i + 1) for i in range(len(groups))}
         if 1 <= group_index <= len(groups):
-            slots_by_group[group_index] = min(slots_by_group.get(group_index, 1) + 1, MAX_SCHEDULE_TIMES)
+            times = groups[group_index - 1]["times"]
+            if len(times) < MAX_SCHEDULE_TIMES:
+                times.append(self._next_schedule_window(times))
+        slots_by_group = {i + 1: max(len(g["times"]), 1) for i, g in enumerate(groups)}
         self._respond(render_schedule_page(load_settings(), groups=groups, slots_by_group=slots_by_group))
 
     def _handle_move_article(self, form: dict) -> None:
@@ -5385,31 +6542,48 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         Access-Control-Allow-Origin을 열어준다 (로컬 단일 사용자 도구라 위험 없음).
 
         [추가: 2026-08-20] 화면이 제목을 안 실어 보냈으면 **서버가 직접 찾아 채운다**
-        (_hide_meta_fallback). 제목은 숨김이 계속 먹는지를 좌우하는 값이라
+        (_hide_meta_fallbacks). 제목은 숨김이 계속 먹는지를 좌우하는 값이라
         (app.curation.filter_hidden — 네이버가 같은 기사를 새 기사 ID로 재게재하면
         URL 일치가 깨지고 제목 대조만 남는다) 호출부 하나가 빠뜨리면 그 기사는 조용히
         되살아난다. 실제로 일괄 숨기기·소제목 통째 숨기기가 url만 보내고 있었고
         (2026-08-20 제보), 그건 화면 쪽에서 고쳤지만 — 열어둔 옛 탭이나 앞으로 생길
         새 호출부가 또 빠뜨릴 수 있으므로 서버에서 한 번 더 받쳐준다."""
-        url = form.get("url", [""])[0]
-        if url:
-            outlet = form.get("outlet", [""])[0] or None
-            title = form.get("title", [""])[0] or None
-            pub_date = form.get("pubDate", [""])[0] or None
-            # [추가: 2026-09-02] group — 쓰레기통이 "한 번에 숨긴 덩어리"에 소제목 이름을
-            # 붙이는 데만 쓴다(숨김 판정에는 관여하지 않는다).
-            group = form.get("group", [""])[0] or None
-            if not title or not outlet or not group:
-                meta = _hide_meta_fallback(url)
-                outlet = outlet or meta.get("outlet")
-                title = title or meta.get("title")
-                pub_date = pub_date or meta.get("pub_date")
-                group = group or meta.get("group")
-            # [추가: 2026-09-15] batch — 일괄·소제목 통째 숨기기가 한 번의 동작을 기사 수만큼
-            # 요청으로 나눠 보내므로, 같은 동작이라는 표시를 실어 되돌린 뒤 전부 칠하게 한다.
+        # [수정: 2026-09-22] 기사 여러 건을 한 요청으로 받는다 — 소제목 통째 숨기기·선택 바
+        # 일괄 숨기기가 url·outlet·title·pubDate·group을 기사마다 같은 순서로 되풀이해 싣는다
+        # (빈 값도 자리를 지킨다 — 폼 파싱이 keep_blank_values라 줄이 어긋나지 않는다).
+        # 예전엔 기사 수만큼 요청을 나눠 보내, 요청마다 되돌리기 스택(수십 MB) 쓰기와 화면
+        # 세 개 재생성이 되풀이돼 소제목 하나 숨기는 데 몇 초가 걸렸다.
+        urls = form.get("url", [])
+
+        def field(name: str, i: int) -> Optional[str]:
+            values = form.get(name, [])
+            return (values[i] if i < len(values) else "") or None
+
+        items = [
+            {
+                "url": url,
+                "outlet": field("outlet", i),
+                "title": field("title", i),
+                "pub_date": field("pubDate", i),
+                # [추가: 2026-09-02] group — 휴지통이 "한 번에 숨긴 덩어리"에 소제목 이름을
+                # 붙이는 데만 쓴다(숨김 판정에는 관여하지 않는다).
+                "group": field("group", i),
+            }
+            for i, url in enumerate(urls)
+            if url
+        ]
+        if items:
+            need = {it["url"] for it in items if not (it["title"] and it["outlet"] and it["group"])}
+            metas = _hide_meta_fallbacks(need)
+            for it in items:
+                meta = metas.get(it["url"], {})
+                for key in ("outlet", "title", "pub_date", "group"):
+                    it[key] = it[key] or meta.get(key)
+            # [추가: 2026-09-15] batch — 옛 탭(기사마다 요청을 나눠 보내던 화면)이 보내는
+            # 요청도 같은 동작으로 알아보게 받아 둔다.
             batch = form.get("batch", [""])[0] or None
-            undo_push("기사 숨기기", touched=[url], batch=batch)
-            hide_article(url, outlet=outlet, title=title, pub_date=pub_date, group=group)
+            undo_push("기사 숨기기", touched=[it["url"] for it in items], batch=batch)
+            hide_articles(items)
             self._regenerate_screens()
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -5419,9 +6593,9 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         """숨김 해제 — 단건(url 하나)과 묶음(url 여러 개)을 같은 핸들러가 받는다.
 
         [수정: 2026-09-02] 호출하는 화면이 둘이라 응답 방식이 갈린다:
-        - 쓰레기통 화면(/hidden, 설정 서버가 직접 서빙)은 실제 <form> 제출이라
+        - 휴지통 화면(/hidden, 설정 서버가 직접 서빙)은 실제 <form> 제출이라
           redirect 필드를 함께 보내고, 예전처럼 303으로 그 화면에 되돌려 보낸다.
-        - 확정본·초안의 쓰레기통 팝오버는 file://로 열려 있을 수 있어 fetch로 부르고
+        - 확정본·초안의 휴지통 팝오버는 file://로 열려 있을 수 있어 fetch로 부르고
           204를 받은 뒤 스스로 새로고침한다(_handle_hide_article과 같은 이유로 CORS를
           열어준다). 숨김 해제는 기사 목록과 소제목 구성이 같이 바뀌는 동작이라,
           팝오버만 고쳐 그리면 화면이 거짓말을 하게 되므로 부분 갱신을 쓰지 않는다.
@@ -5460,6 +6634,140 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._regenerate_screens()
         self.send_response(204)
         self.end_headers()
+
+    def _handle_cut_round(self, form: dict) -> None:
+        """초안 머리줄의 「✂ 여기서 끊기」가 fetch로 부른다(app.cut_round.cut_round).
+
+        at(HH:MM)을 생략하면 지금. 지금·지난 시각이면 초안 기사 그대로 곧바로 확정본을 만들고
+        (mode=done), 앞 시각이면 예약만 한다(mode=pending). 거절하면 200 + ok=false + 이유 —
+        담당자가 누른 동작이 조용히 사라지면 안 된다(CODING_CONVENTIONS §3).
+        """
+        from app.cut_round import CutError, cut_round
+
+        at = form.get("at", [""])[0].strip() or None
+        try:
+            result = cut_round(at)
+        except CutError as e:
+            self._respond_json({"ok": False, "reason": str(e)})
+            return
+        except Exception:
+            logger.exception("오늘만 회차 끊기 실패")
+            self._respond_json({"ok": False, "reason": "확정본을 만들지 못했어요. 잠시 뒤 다시 눌러 주세요."})
+            return
+        self._respond_json({"ok": True, **result})
+
+    def _handle_cut_round_cancel(self, form: dict) -> None:
+        """머리줄 칩 「✂ 오늘만 16:00에 끊음 · 취소」가 부른다(app.cut_round.cancel_cut)."""
+        from app.cut_round import CutError, cancel_cut
+
+        try:
+            cancel_cut(form.get("end", [""])[0].strip())
+        except CutError as e:
+            self._respond_json({"ok": False, "reason": str(e)})
+            return
+        self._respond_json({"ok": True})
+
+    def _handle_add_article_by_url(self, form: dict) -> None:
+        """초안의 "+ 수기로 기사 추가"가 fetch로 호출한다 — 담당자가 네이버에서 직접
+        찾아온 기사를 주소만으로 📌 담아둔 기사 칸에 올린다.
+
+        네이버 검색 API를 한 번도 안 부른다. 검색어 화면(상시 조건)을 건드리지 않고
+        기사 한 건을 끌어오기 위한 입구다 — 일회용 키워드를 등록했다가 지우는 우회로는
+        그 회차 확정본의 수집 조건까지 바꾸기 때문에 쓸 수 없다.
+
+        착지점이 📌 담아둔 기사인 이유: 그 칸은 이미 "보고서 밖 임시보드"라(승격 전까지
+        복사·txt·발송 어디에도 안 나간다) 밖에서 들어온 기사가 담당자 확인을 한 번
+        거치게 된다. 승격은 기존 소제목 드롭다운을 그대로 쓴다.
+
+        **한 번에 한 건만 받는다.** 여러 건을 받으면 결과가 목록이 되고 어느 줄이 왜
+        실패했는지 대조해야 한다 — 손으로 고르는 동작이라 한 건이면 충분하다.
+
+        거부해도 200으로 내려보내고 사유를 본문에 담는다(화면이 그대로 보여준다) —
+        담당자가 누른 동작이 조용히 사라지면 안 된다(CODING_CONVENTIONS §3).
+        """
+        # 거부 문구는 둘로만 가른다. 원인(주소 형식·접속 실패·제목 없음)이 여럿이어도 담당자가
+        # 할 일이 「주소 확인」 하나면 한 문구다. 기사가 아닌 주소(블로그·카페·커뮤니티)는
+        # 할 일이 달라(다른 주소를 찾아야 한다) 따로 둔다. 화면은 reason을 굵게, detail을
+        # 그 아래에 그대로 보여준다.
+        cannot_load = {
+            "ok": False,
+            "reason": "해당 URL로 기사를 불러올 수 없습니다.",
+            "detail": "URL을 확인해 주세요.",
+        }
+        url = form.get("url", [""])[0].strip()
+        if not url.lower().startswith(("http://", "https://")):
+            self._respond_json(cannot_load)
+            return
+        # 수집이 저장하는 모양으로 맞춘다(`?sid=` 꼬리·`/article/`·`m.news` 등) — 안 맞추면
+        # 같은 기사가 아래 URL 대조를 전부 빠져나가 확정본에 두 번 실린다.
+        url = normalize_article_url(url)
+        screen = form.get("screen", ["confirmed"])[0]
+        if is_non_news_url(url):
+            self._respond_json(
+                {
+                    "ok": False,
+                    "reason": "언론사 기사가 아니라서 담을 수 없습니다.",
+                    "detail": "블로그·카페·커뮤니티 글은 담을 수 없어요. 언론사 기사 주소인지 확인해 주세요.",
+                }
+            )
+            return
+
+        # 언론사 원문 주소로 넣었으면, 오늘 모은 기사 중 원문 주소가 같은 네이버 기사로 바꿔 읽는다
+        # — 그래야 아래 대조(숨김·이 회차·앞 회차·담아둠)가 수집이 저장한 주소로 돈다. 제목으로
+        # 대조하지 않는다(중복·숨김은 URL로만).
+        url_index = _original_url_index()
+        mapped = next((url_index[k] for k in original_url_keys(url) if k in url_index), None)
+        if mapped and mapped != url:
+            logger.info("수기로 기사 추가 — 원문 주소 %s → 네이버 기사 %s로 대조", url, mapped)
+            url = mapped
+
+        # 이미 이 회차에 들어와 있는 기사는 다시 담지 않는다 — 담아둔 기사로 올려봐야
+        # 승격할 때 중복이 된다. 판정은 URL로만 한다(숨김 판정과 같은 축).
+        # 「이 회차」는 화면마다 다르다: 확정본은 저장된 최신 회차, 초안은 아직 저장 전인
+        # 지금 초안(current_draft_urls). 초안에서 load_latest_run()을 보면 앞 회차와 비교하게 된다.
+        run = load_latest_run()
+        if screen == "preview":
+            round_urls = current_draft_urls()
+        else:
+            round_urls = {a.get("url") for a in (run.get("articles") if run else []) or []}
+        if is_hidden({"url": url}, load_hidden_urls()):
+            # 담아도 📌 칸이 숨긴 기사를 걸러 성공 뒤에 아무것도 안 보인다 — 조용히 사라지지 않게 여기서 막는다.
+            self._respond_json(
+                {"ok": False, "reason": "숨긴 기사입니다.", "detail": "휴지통에서 되살려 주세요."}
+            )
+            return
+        if url in round_urls:
+            self._respond_json({"ok": False, "reason": "이미 이 회차에 있는 기사입니다."})
+            return
+        # 오늘 앞 회차에 이미 실린 기사 — 다시 담으면 보고서에 두 번 나간다.
+        if url in _already_published_urls(datetime.now().strftime("%Y-%m-%d")):
+            self._respond_json({"ok": False, "reason": "이미 앞 회차에 실린 기사입니다."})
+            return
+        if any(a.get("url") == url for a in load_manual_articles()):
+            self._respond_json({"ok": False, "reason": "이미 담아둔 기사입니다."})
+            return
+
+        article = fetch_article_by_url(url)
+        if not article:
+            self._respond_json(cannot_load)
+            return
+        # 반대 방향 — 네이버 주소로 넣었는데 같은 기사를 전에 원문 주소로 담아 둔 경우.
+        # 네이버 페이지의 「기사원문」 링크(original_url)로 담아둔 기사 주소와 대조한다.
+        if article.get("original_url"):
+            new_keys = original_url_keys(article["original_url"])
+            if any(original_url_keys(a.get("url") or "") & new_keys for a in load_manual_articles()):
+                self._respond_json({"ok": False, "reason": "이미 담아둔 기사입니다."})
+                return
+        if not add_manual_article(article, at_top=True):
+            # 다른 탭에서 방금 담았을 때만 여기 온다(위에서 이미 걸렀다).
+            self._respond_json({"ok": False, "reason": "이미 담아둔 기사입니다."})
+            return
+
+        self._regenerate_screens()
+        logger.info("수기로 기사 추가 — %s (%s)", article["outlet"], url)
+        # 확인 단계 없이 곧바로 담는다 — 화면은 새로고침해 📌 칸 맨 위(입력칸 바로 밑)에 붙은 그 기사 행을
+        # 결과로 보여준다(url로 세이지를 칠한다).
+        self._respond_json({"ok": True, "url": url})
 
     def _handle_unpin_manual_article(self, form: dict) -> None:
         """live.html의 "📌 담아둠" 버튼 재클릭(unpinFromLive)이 fetch로 호출한다.
@@ -5822,7 +7130,23 @@ class _SettingsHandler(BaseHTTPRequestHandler):
                 groups, custom_names, load_group_labels(round_id), priority_urls
             )
             if not candidates:
-                self._respond_json({"assigned": [], "reason": "no_candidates"})
+                # 끼워 넣을 소제목이 하나도 없다(첫 분류의 기사를 전부 숨겨 모두 미분류가 된 회차
+                # 등) — 흐트러질 기존 소제목이 없으니 처음부터 분류한다. 담당자의 이동(override)은
+                # classify_articles가 그대로 다시 얹는다.
+                undo_push("AI 소제목 분류")
+                classify_articles(
+                    articles,
+                    all_search_keywords(settings),
+                    forced_groups=overrides,
+                    custom_group_names=forced_group_target_names(),
+                    force_llm=True,
+                    round_id=round_id,
+                )
+                if llm_last_classification_was_rule_based():
+                    self._respond_json({"assigned": [], "reason": "api_error"})
+                    return
+                self._regenerate_screens()
+                self._respond_json({"assigned": [a["url"] for a in pending]})
                 return
 
             assigned = assign_to_existing(pending, candidates)
@@ -6434,7 +7758,7 @@ class _SettingsHandler(BaseHTTPRequestHandler):
     def _respond_download(self, text: str, filename: str) -> None:
         """텍스트를 파일 다운로드로 응답한다(data: URI 대신 — _handle_download_text 참고).
 
-        filename에 한글이 흔하므로(예: "언론모니터링_2026-08-12_17-00.txt") RFC 5987
+        filename에 한글이 흔하므로(예: "2026-08-12_언론모니터링_17-00기준.txt") RFC 5987
         filename*=UTF-8''... 형태를 filename=(ASCII 폴백)과 함께 보낸다 — 최신 브라우저는
         filename*=를 우선 쓰고, 혹시 못 알아듣는 환경만 ASCII 폴백으로 받는다.
         """
@@ -6477,26 +7801,13 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         pass  # 로컬 단일 사용자 도구라 매 요청을 콘솔에 찍지 않는다.
 
 
-def run_settings_server(port: int = SETTINGS_SERVER_PORT) -> None:
-    """설정 저장용 최소 로컬 서버를 실행한다 (블로킹). 기본은 127.0.0.1에서만 연다.
-
-    [수정: 2026-07-25] 단일 스레드 HTTPServer 대신 ThreadingHTTPServer를 쓴다 — 실시간
-    기사 현황(live.html)이 요청마다 여러 키워드를 순차적으로 라이브 검색해 수십 초씩
-    걸릴 수 있는데, 단일 스레드였다면 그동안 설정 화면 등 다른 모든 요청이 함께 멈춘다.
-
-    [수정: 2026-07-31] app.config.SETTINGS_SERVER_HOST(.env의 SERVER_HOST)가 기본값
-    "127.0.0.1"이 아니면(다른 컴퓨터에서도 접속하도록 의도적으로 설정한 경우) "0.0.0.0"
-    으로 리스닝해 실제로 외부 요청을 받아들인다. 기본값 그대로면 예전처럼 127.0.0.1에만
-    묶여 이 컴퓨터 자신만 접속 가능한 상태를 그대로 유지한다 — 설정을 안 건드리면
-    동작이 하나도 안 바뀌는 게 이 변경의 핵심 전제다.
-    """
-    create_settings_server(port).serve_forever()
-
-
 def create_settings_server(port: int = SETTINGS_SERVER_PORT) -> ThreadingHTTPServer:
     """설정 서버 소켓을 **지금 이 자리에서** 열어 돌려준다(serve_forever는 아직 안 부른다).
 
-    [추가: 2026-09-02] run_settings_server를 쪼갠 이유는 하나다 — main.py가 이 bind를
+    ThreadingHTTPServer인 건 전체 기사(live.html)처럼 수십 초 걸리는 요청이 다른 화면을
+    막지 않게 하려고서다. SERVER_HOST(.env)가 기본값 127.0.0.1이 아닐 때만 0.0.0.0으로 연다.
+
+    bind를 serve_forever와 떼어 둔 이유는 하나다 — main.py가 이 bind를
     **앱 중복 실행 자물쇠**로 쓰기 때문이다. 예전엔 bind가 데몬 스레드 안에서 일어나서,
     두 번째로 켠 앱은 "Address already in use"로 그 스레드만 조용히 죽고 **스케줄러
     스레드는 멀쩡히 계속 돌았다** — 회차를 두 번 수집·저장하고, 서로의 LLM 분류 캐시를

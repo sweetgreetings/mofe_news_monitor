@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>설정 메뉴 개편 시안</title>
+<style>
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  
+  .container {
+    max-width: 800px; margin: 24px auto; padding: 24px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: 8px;
+  }
+  
+  
+  .container { padding-top: 44px; }
+  h1 { font-size: 1.3rem; color: #1E3A5F; }
+  .hint { color: #6B7280; font-size: 0.85rem; margin-bottom: 16px; }
+  .caption { color: #6B7280; font-size: 0.78rem; margin: 0 0 12px; }
+  .error { color: #DC2626; margin: 12px 0; }
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    background: #FFFFFF; border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .topbar-inner {
+    max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .topbar a { color: #2563EB; text-decoration: none; font-size: 0.92rem; font-weight: 600; padding: 6px 10px; border-radius: 6px; }
+  .topbar a:hover { background: #EFF6FF; }
+  .save-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    background: #FFFFFF; border-top: 1px solid #E5E7EB; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  }
+  .save-bar-inner { max-width: 800px; margin: 0 auto; padding: 12px 24px; }
+  .save-bar button { width: 100%; }
+  
+  button, a.btn {
+    background: #2563EB; color: #FFFFFF; border: none; border-radius: 4px;
+    padding: 8px 16px; font-size: 1rem; font-family: inherit; cursor: pointer; text-decoration: none;
+    appearance: none; -webkit-appearance: none;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  button:hover, a.btn:hover { background: #1E3A5F; }
+  button:disabled { background: #E5E7EB; color: #6B7280; cursor: not-allowed; }
+  input[type=text], input[type=number] {
+    background: #F8FAFC; color: #1F2937; border: 1px solid #E5E7EB; border-radius: 4px;
+    padding: 6px 10px; font-size: 1rem;
+  }
+  .del-btn {
+    background: transparent; color: #6B7280; border: 1px solid #E5E7EB; border-radius: 4px;
+    padding: 4px 10px; font-size: 0.8rem; margin-left: 6px; cursor: pointer;
+  }
+  .del-btn:hover { background: #EFF6FF; color: #DC2626; border-color: #DC2626; }
+  
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+
+  
+  .menu a {
+    display: flex; align-items: center; gap: 11px; margin: 6px 0; padding: 12px 12px;
+    font-size: 0.95rem; font-weight: 500; color: #1F2937; text-decoration: none;
+    border-radius: 8px; background: #F8FAFC;
+  }
+  .menu a:hover { background: #EFF6FF; }
+  .menu-chev { margin-left: auto; color: #E5E7EB; font-size: 0.9rem; }
+  
+  .ungrouped { margin-bottom: 22px; padding-bottom: 14px; border-bottom: 1px dashed #E5E7EB; }
+  .category { margin: 22px 0 0; }
+  .category:first-of-type { margin-top: 0; }
+  .category-name {
+    color: #1E3A5F; font-size: 0.95rem; margin-bottom: 8px;
+    padding-bottom: 4px; border-bottom: 1px solid #E5E7EB;
+  }
+  
+  .badge-warn, .badge-env {
+    margin-left: auto; font-size: 0.74rem; font-weight: 700; border-radius: 10px; padding: 2px 8px;
+  }
+  .badge-warn { color: #92400E; background: #FEF3C7; }
+  .badge-env { color: #6B7280; background: #F8FAFC; border: 1px solid #E5E7EB; }
+  .badge-warn + .menu-chev, .badge-env + .menu-chev { margin-left: 8px; }
+  
+  .menu-divider { border-top: 1px dashed #E5E7EB; margin: 10px 4px 4px; }
+  
+  .container { column-count: 2; column-gap: 32px; }
+  .container > h1 { column-span: all; }
+  .container > .menu, .container > .category { break-inside: avoid; }
+  .container > .category { margin: 0 0 22px; }
+  @media (max-width: 640px) { .container { column-count: 1; } }
+
+  body { padding: 24px 16px 60px; }
+  .wrap { max-width: 800px; margin: 0 auto; }
+  .mk-title { font-size: 1.15rem; color: #1E3A5F; margin: 0 0 4px; }
+  .mk-sub { color: #6B7280; font-size: 0.88rem; margin: 0 0 20px; line-height: 1.6; }
+  .pair { display: flex; flex-direction: column-reverse; gap: 28px; }
+  @media (max-width: 900px) { .pair { grid-template-columns: minmax(0,1fr); } }
+  .pane-label { font-size: 0.8rem; font-weight: 700; color: #6B7280; margin: 0 0 8px; letter-spacing: .02em; }
+  .pane-label.new { color: #2563EB; }
+  .container { margin: 0; max-width: none; padding-top: 24px; }
+  #cur { opacity: .8; }
+  /* 정기·수시 묶음 이름 — 홈 흐름도 줄 이름표와 같은 왼쪽 3px 띠 */
+  .flow .category-name { border-left: 3px solid; padding-left: 8px; font-weight: 700; }
+  .flow.reg .category-name { border-left-color: #93C5FD; }
+  .flow.adhoc .category-name { border-left-color: rgba(20, 107, 94, 0.45); }
+  .menu-sub { color: #6B7280; font-size: 0.78rem; margin: 14px 4px 2px; }
+  .menu-sub.first { margin-top: 2px; }
+  .menu-note { margin-left: 8px; color: #6B7280; font-size: 0.78rem; font-weight: 400; }
+  .menu a.is-new { outline: 2px dashed #93C5FD; outline-offset: -2px; }
+  .notes { margin: 28px 0 0; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 18px 22px; }
+  .notes h2 { font-size: 1rem; color: #1E3A5F; margin: 0 0 10px; }
+  .notes ul { margin: 0; padding-left: 18px; font-size: 0.88rem; line-height: 1.75; }
+  .notes .q { color: #92400E; background: #FEF3C7; border-radius: 4px; padding: 1px 6px; font-size: 0.78rem; font-weight: 700; }
+  #acct { column-count: 1; max-width: 520px; }
+  .env-note { font-size: 0.82rem; color: #6B7280; background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: 6px; padding: 8px 12px; margin: 0 0 14px; }
+  label.f { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: #1F2937; margin: 0 0 12px; }
+  label.f input { width: 100%; box-sizing: border-box; }
+  label.f .caption { margin: 2px 0 0; }
+  .row2 { display: grid; grid-template-columns: minmax(0,1fr) 110px; gap: 12px; }
+  .acts { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+  button.ghost { background: transparent; color: #2563EB; border: 1px solid #E5E7EB; }
+  button.ghost:hover { background: #EFF6FF; }
+</style></head>
+<body><div class="wrap">
+<p class="mk-title">설정 메뉴 개편 시안</p>
+<p class="mk-sub">위는 이번 대화에서 정한 안, 아래는 지금 실행 중인 앱의 설정 화면 그대로입니다(폭은 실제와 같은 800px). 점선 테두리 칸은 새로 생기는 화면입니다.</p>
+<div class="pair">
+  <div><p class="pane-label">지금</p><div class="container" id="cur">
+  <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M19.1 14.4a1.5 1.5 0 0 0 .3 1.7l.1.1a1.9 1.9 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-1.7-.3 1.5 1.5 0 0 0-.9 1.4v.2a1.9 1.9 0 1 1-3.8 0v-.1a1.5 1.5 0 0 0-1-1.4 1.5 1.5 0 0 0-1.7.3l-.1.1a1.9 1.9 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0 .3-1.7 1.5 1.5 0 0 0-1.4-.9h-.2a1.9 1.9 0 1 1 0-3.8h.1a1.5 1.5 0 0 0 1.4-1 1.5 1.5 0 0 0-.3-1.7l-.1-.1a1.9 1.9 0 1 1 2.6-2.6l.1.1a1.5 1.5 0 0 0 1.7.3h.1a1.5 1.5 0 0 0 .9-1.4v-.2a1.9 1.9 0 1 1 3.8 0v.1a1.5 1.5 0 0 0 .9 1.4 1.5 1.5 0 0 0 1.7-.3l.1-.1a1.9 1.9 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0-.3 1.7v.1a1.5 1.5 0 0 0 1.4.9h.2a1.9 1.9 0 1 1 0 3.8h-.1a1.5 1.5 0 0 0-1.4.9Z"/></svg> 설정</h1>
+  <div class="menu ungrouped">
+    <a href="/keywords">검색어<span class="menu-chev">›</span></a>
+    <a href="/highlight">형광펜 긋기<span class="menu-chev">›</span></a>
+  </div>
+  <div class="category">
+    <div class="category-name">뉴스 스크랩</div>
+    <div class="menu">
+      <a href="/schedule">수집 시간<span class="menu-chev">›</span></a>
+      <a href="/outlets">언론사 선택 · 순서 지정<span class="menu-chev">›</span></a>
+      <a href="/scrap-page">수집 범위<span class="menu-chev">›</span></a>
+    </div>
+  </div>
+  <div class="category">
+    <div class="category-name">메일머지</div>
+    <div class="menu">
+      <a href="/format"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8.5 13.5h7M8.5 17h7"/></svg> 기사 제목 형식<span class="menu-chev">›</span></a>
+      <a href="/subheading-format"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8.5 13.5h7M8.5 17h7"/></svg> 소제목 형식<span class="menu-chev">›</span></a>
+    </div>
+  </div>
+  <div class="category">
+    <div class="category-name">발송 · 알림</div>
+    <div class="menu">
+      <a href="/auto-send">자동발송 설정<span class="menu-chev">›</span></a>
+      <a href="/telegram">텔레그램 받는 사람<span class="menu-chev">›</span></a>
+      <a href="/email">이메일 받는 사람<span class="menu-chev">›</span></a>
+      <div class="menu-divider"></div>
+      <a href="/breaking-alert">🚨 [단독]·[속보] 기사 알림<span class="menu-chev">›</span></a>
+    </div>
+  </div>
+  <div class="category">
+    <div class="category-name">기타</div>
+    <div class="menu">
+      <a href="/wordcloud-exclude">워드클라우드 제외어<span class="menu-chev">›</span></a>
+    </div>
+  </div>
+  <!-- [추가: 2026-08-20] "연동"은 일부러 맨 아래에 둔다(사용자 지정 위치) — 검색어
+       바로 아래(맨 위)는 이 화면을 처음 여는 사람 눈에 제일 먼저 들어오는 자리라
+       배포본을 나눠 받은 사람마다 매번 마주치게 되는데, 키 등록은 설치 시 한 번
+       해두면 그 뒤로는 다시 열 일이 거의 없는 화면이다. 자주 여닫는 검색어·형광펜·
+       수집 시간 같은 항목들 아래, 가장 손이 안 가는 자리가 맞다. -->
+  <div class="category">
+    <div class="category-name">연동</div>
+    <div class="menu">
+      <a href="/naver">네이버 검색 API<span class="badge-env">.env</span><span class="menu-chev">›</span></a>
+      <a href="/llm">AI 연동 (Claude)<span class="badge-env">.env</span><span class="menu-chev">›</span></a>
+    </div>
+  </div>
+</div>
+</div>
+  <div><p class="pane-label new">바꾼 안</p><div class="container" id="new">
+  <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M19.1 14.4a1.5 1.5 0 0 0 .3 1.7l.1.1a1.9 1.9 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-1.7-.3 1.5 1.5 0 0 0-.9 1.4v.2a1.9 1.9 0 1 1-3.8 0v-.1a1.5 1.5 0 0 0-1-1.4 1.5 1.5 0 0 0-1.7.3l-.1.1a1.9 1.9 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0 .3-1.7 1.5 1.5 0 0 0-1.4-.9h-.2a1.9 1.9 0 1 1 0-3.8h.1a1.5 1.5 0 0 0 1.4-1 1.5 1.5 0 0 0-.3-1.7l-.1-.1a1.9 1.9 0 1 1 2.6-2.6l.1.1a1.5 1.5 0 0 0 1.7.3h.1a1.5 1.5 0 0 0 .9-1.4v-.2a1.9 1.9 0 1 1 3.8 0v.1a1.5 1.5 0 0 0 .9 1.4 1.5 1.5 0 0 0 1.7-.3l.1-.1a1.9 1.9 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0-.3 1.7v.1a1.5 1.5 0 0 0 1.4.9h.2a1.9 1.9 0 1 1 0 3.8h-.1a1.5 1.5 0 0 0-1.4.9Z"/></svg> 설정</h1>
+  <div class="category flow reg">
+    <div class="category-name">정기</div>
+    <div class="menu">
+      <a href="#">검색어<span class="menu-chev">›</span></a>
+      <a href="#">형광펜 긋기<span class="menu-chev">›</span></a>
+      <a href="#">수집 시간<span class="menu-chev">›</span></a>
+      <div class="menu-sub">보고서 형식</div>
+      <a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8.5 13.5h7M8.5 17h7"/></svg> 기사 제목 형식<span class="menu-chev">›</span></a>
+      <a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8.5 13.5h7M8.5 17h7"/></svg> 소제목 형식<span class="menu-chev">›</span></a>
+      <div class="menu-sub">발송 · 알림</div>
+      <a href="#">자동발송 설정<span class="menu-chev">›</span></a>
+      <a href="#">🚨 [단독]·[속보] 기사 알림<span class="menu-chev">›</span></a>
+    </div>
+  </div>
+  <div class="category flow adhoc">
+    <div class="category-name">수시</div>
+    <div class="menu">
+      <div class="menu-sub first">보고서 형식</div>
+      <a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8.5 13.5h7M8.5 17h7"/></svg> 기사 제목 형식<span class="menu-chev">›</span></a>
+      <a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8.5 13.5h7M8.5 17h7"/></svg> 소제목 형식<span class="menu-chev">›</span></a>
+    </div>
+  </div>
+  <div class="category">
+    <div class="category-name">공통 · 수집</div>
+    <div class="menu">
+      <a href="#">언론사 선택 · 순서 지정<span class="menu-chev">›</span></a>
+    </div>
+  </div>
+  <div class="category">
+    <div class="category-name">받는 사람</div>
+    <div class="menu">
+      <a href="#">텔레그램 받는 사람<span class="menu-chev">›</span></a>
+      <a href="#">이메일 받는 사람<span class="menu-note">정기 확정본만</span><span class="menu-chev">›</span></a>
+    </div>
+  </div>
+  <div class="category">
+    <div class="category-name">홈</div>
+    <div class="menu">
+      <a href="#">워드클라우드 제외어<span class="menu-chev">›</span></a>
+    </div>
+  </div>
+  <div class="category">
+    <div class="category-name">연동</div>
+    <div class="menu">
+      <a href="#">네이버 검색 API<span class="menu-chev">›</span></a>
+      <a href="#">AI 연동 (Claude)<span class="menu-chev">›</span></a>
+      <a href="#" class="is-new">이메일 보내는 계정<span class="badge-env">.env</span><span class="menu-chev">›</span></a>
+    </div>
+  </div>
+</div></div>
+</div>
+<div class="notes">
+  <h2>바뀌는 것</h2>
+  <ul>
+    <li>맨 위 묶음 없는 두 칸(검색어·형광펜)과 「뉴스 스크랩」은 <b>정기</b> 하나로 합칩니다. 안에서 「보고서 형식」·「발송 · 알림」 작은 제목으로 나눕니다.</li>
+    <li><b>수집 범위(포토·인사 제외) 메뉴는 없앱니다</b> — 지금도 둘 다 꺼져 있습니다. 사진 판정은 📷 배지·「사진 추정 모아 보기」에만 씁니다. <span class="q">확인</span></li>
+    <li>「메일머지」 → <b>보고서 형식</b>. 정기·수시가 각자 기사 제목 형식·소제목 형식을 가집니다. 수시 값은 처음에 지금 정기 값을 복사해 시작합니다.</li>
+    <li><b>형광펜은 정기에만</b> 둡니다. 수시 원본·확정본은 형광펜을 칠하지 않습니다. <span class="q">확인</span></li>
+    <li>「기타」 → <b>홈</b>. 「공통」은 「공통 · 수집」과 「받는 사람」으로 이름을 가릅니다.</li>
+    <li>이메일은 남기고 「정기 확정본만」이라고 적습니다. 보내는 계정은 <code>.env</code>에서 <b>연동 › 이메일 보내는 계정</b>으로 옮깁니다(네이버·AI 키와 같은 방식 — 화면 값이 <code>.env</code>보다 우선). 아래가 그 화면입니다.</li>
+  </ul>
+</div>
+<p class="pane-label new" style="margin-top:28px">새 화면: 연동 › 이메일 보내는 계정</p>
+<div class="container" id="acct">
+  <h1>이메일 보내는 계정</h1>
+  <p class="hint">정기 확정본을 이메일로 보낼 때 쓰는 계정입니다. 한 번 넣어두면 다시 열 일이 거의 없습니다.</p>
+  <div class="env-note">지금은 <code>.env</code> 파일의 값을 쓰고 있어요. 여기서 저장하면 이 화면 값이 우선합니다.</div>
+  <label class="f">보내는 사람 주소<input type="text" value="press.monitor@gmail.com"></label>
+  <label class="f">앱 비밀번호<input type="text" value="••••••••••••••••"><span class="caption">Gmail은 계정 비밀번호가 아니라 「앱 비밀번호」 16자리를 넣습니다.</span></label>
+  <div class="row2">
+    <label class="f">SMTP 서버<input type="text" value="smtp.gmail.com"></label>
+    <label class="f">포트<input type="number" value="587"></label>
+  </div>
+  <div class="acts"><button class="ghost">시험 메일 보내기</button><button>저장</button></div>
+</div>
+</div></body></html>

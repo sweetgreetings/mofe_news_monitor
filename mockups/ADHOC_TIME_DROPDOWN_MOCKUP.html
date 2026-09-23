@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>수시 새 수집 — 시간 드롭다운 시안</title>
+<style>
+  /* 실행 중인 앱 /adhoc/new 에서 그대로 떠온 값들 */
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+  .container { max-width: 800px; margin: 0 auto; padding: 40px 24px 80px; }
+  .card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 22px 24px; margin-bottom: 14px; }
+  h1.page-title { color: #1E3A5F; font-size: 1.2rem; margin: 0 0 4px; }
+  .page-sub { color: #6B7280; font-size: 0.82rem; margin: 0 0 16px; }
+  .field { display: flex; align-items: center; gap: 10px; margin: 14px 0; flex-wrap: wrap; }
+  .field > label { width: 78px; flex: none; font-size: 0.86rem; color: #6B7280; font-weight: 600; }
+  input[type=text], select {
+    font: inherit; font-size: 0.9rem; padding: 7px 11px; border: 1px solid #E5E7EB;
+    border-radius: 8px; background: #FFFFFF; color: #1F2937;
+  }
+  input[type=text] { flex: 1; min-width: 120px; }
+  input.hm { flex: none; width: 68px; text-align: center; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; min-width: 0; }
+  .now-btn { font: inherit; font-size: 0.8rem; font-weight: 600; padding: 6px 11px; border-radius: 8px; cursor: pointer;
+    border: 1px solid #BFDBFE; background: #EFF6FF; color: #2563EB; flex: none; }
+  .quick { display: flex; gap: 6px; flex-wrap: wrap; margin: -4px 0 0 88px; }
+  .qchip { font-size: 0.78rem; padding: 4px 11px; border-radius: 20px; border: 1px dashed #E5E7EB;
+    background: #FFFFFF; color: #4B5563; cursor: pointer; font-family: inherit; }
+  .qchip:hover { border-color: #2563EB; color: #2563EB; border-style: solid; }
+  .tilde { color: #6B7280; }
+  .btn { font: inherit; font-size: 0.88rem; padding: 7px 16px; border-radius: 8px; cursor: pointer;
+    border: 1px solid #2563EB; background: #2563EB; color: #FFFFFF; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+
+  /* 시간 select — 숫자가 흔들리지 않게 tabular-nums, 폭은 내용만큼 */
+  select.hm-sel { flex: none; font-variant-numeric: tabular-nums; padding: 7px 8px 7px 11px; cursor: pointer; }
+  select.hm-h { width: 74px; }
+  select.hm-m { width: 74px; }
+  select.hm-one { width: 116px; }
+  select.hm-one.end { width: 146px; }
+  .colon { color: #6B7280; margin: 0 -6px; }
+
+  /* --- 시안 설명용 (앱에는 안 들어가는 부분) --- */
+  .mk-head { max-width: 800px; margin: 0 auto; padding: 28px 24px 0; }
+  .mk-head h2 { color: #1E3A5F; font-size: 1.35rem; margin: 0 0 6px; }
+  .mk-head p { color: #6B7280; font-size: 0.88rem; margin: 0 0 4px; line-height: 1.6; }
+  .mk-head code, .mk-note code, .mk-try code { background: #F3F4F6; border-radius: 4px; padding: 1px 6px;
+    font-family: ui-monospace, Menlo, monospace; font-size: 0.9em; color: #1F2937; }
+  .mk-tag { display: inline-block; font-size: 0.72rem; font-weight: 700; padding: 3px 10px;
+    border-radius: 20px; margin-bottom: 10px; }
+  .mk-tag.a { background: #EFF6FF; color: #2563EB; }
+  .mk-tag.b { background: #E3F1EE; color: #146B5E; }
+  .mk-tag.c { background: #F3F4F6; color: #6B7280; }
+  .mk-try { margin: 14px 0 0 88px; font-size: 0.79rem; color: #6B7280; line-height: 1.8; }
+  .mk-try b { color: #1F2937; }
+  .mk-note { margin: 12px 0 0 88px; font-size: 0.79rem; line-height: 1.7;
+    border-left: 3px solid #E5E7EB; padding-left: 12px; color: #6B7280; }
+  .mk-note.good { border-left-color: #2563EB; color: #1E3A5F; }
+  .mk-note.warn { border-left-color: #D97706; color: #92400E; }
+  .mk-out { margin: 10px 0 0 88px; font-size: 0.82rem; color: #6B7280; min-height: 1.4em; }
+  .mk-out b { font-variant-numeric: tabular-nums; }
+  .mk-out.ok b { color: #146B5E; }
+  .mk-out.err b { color: #DC2626; }
+  .mk-sep { max-width: 800px; margin: 26px auto 0; padding: 0 24px; }
+  .mk-sep hr { border: none; border-top: 1px dashed #E5E7EB; }
+  .mk-cnt { margin: 10px 0 0 88px; font-size: 0.76rem; color: #9CA3AF; }
+  .mk-cnt b { color: #2563EB; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+
+<div class="mk-head">
+  <h2>수시 · 새 수집 — 시간 드롭다운 시안</h2>
+  <p>「텍스트 치는 게 귀찮다」에 대한 두 가지 답. 둘 다 실제로 눌러볼 수 있습니다.</p>
+  <p><b>제약 하나:</b> 시작은 하한이라 30분 단위로 내려도 안전하지만,
+     <b>끝을 내리면 그만큼 기사를 놓칩니다</b>(지금 <span id="now-lbl">--:--</span>인데 끝을 내리면 그 사이 기사가 사라짐).
+     그래서 두 안 모두 끝은 「지금」의 정확한 분을 담을 수 있게 했습니다.</p>
+</div>
+
+<div class="container">
+
+  <!-- ─────────── A안: 시 + 분 두 개 ─────────── -->
+  <div class="card">
+    <span class="mk-tag a">A안 · 시 ▾ 분 ▾ 두 개</span>
+    <h1 class="page-title">새 수집</h1>
+    <p class="page-sub">오늘 안에서 시간대를 정해 한 번에 모읍니다 · 검색어는 최대 5개</p>
+
+    <div class="field">
+      <label>수집시간</label>
+      <select class="hm-sel hm-h" id="a-sh"></select>
+      <span class="colon">:</span>
+      <select class="hm-sel hm-m" id="a-sm"></select>
+      <span class="tilde">~</span>
+      <select class="hm-sel hm-h" id="a-eh"></select>
+      <span class="colon">:</span>
+      <select class="hm-sel hm-m" id="a-em"></select>
+      <button type="button" class="now-btn" onclick="aNow()">지금</button>
+      <span style="flex:1"></span>
+      <button type="button" class="btn" onclick="aSubmit()">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg> 수집</button>
+    </div>
+    <div class="quick">
+      <button type="button" class="qchip" onclick="aQuick('midnight')">0시 ~ 지금</button>
+      <button type="button" class="qchip" onclick="aQuick('1h')">최근 1시간</button>
+      <button type="button" class="qchip" onclick="aQuick('3h')">최근 3시간</button>
+    </div>
+
+    <div class="mk-try"><b>해보기</b> — 「9시 30분부터」를 만들어 보세요. 시 목록에서 <code>09</code>, 분 목록에서 <code>30</code>.</div>
+    <div class="mk-out" id="a-out"></div>
+    <div class="mk-cnt">이 패널에서 조작한 횟수: <b id="a-n">0</b></div>
+    <div class="mk-note good">
+      분은 <code>00 · 10 · 20 · 30 · 40 · 50</code> 여섯 개 — <b><code>10:20</code>에 시작한 청문회도 그대로 잡힙니다.</b><br>
+      「지금」을 누르면 분 목록에 <b>그 순간의 분(예: 56)이 임시로 끼어듭니다</b> — 목록에 없는 값이라도 끝 시각은 정확해야 하므로.<br>
+      시 목록은 <b>오늘 지난 시각까지만</b> 나옵니다(미래는 어차피 차단되므로 고를 이유가 없음).
+    </div>
+    <div class="mk-note warn">
+      걸리는 점: <b>한 번에 두 군데를 만져야 합니다.</b> 분이 이미 <code>00</code>이면 한 번으로 끝나지만,
+      「9시 30분」처럼 분이 있으면 목록을 두 번 엽니다.
+    </div>
+  </div>
+
+  <div class="mk-sep"><hr></div>
+
+  <!-- ─────────── B안: 시각 하나 ─────────── -->
+  <div class="card">
+    <span class="mk-tag b">B안 · 시각 ▾ 하나 (30분 단위)</span>
+    <h1 class="page-title">새 수집</h1>
+    <p class="page-sub">오늘 안에서 시간대를 정해 한 번에 모읍니다 · 검색어는 최대 5개</p>
+
+    <div class="field">
+      <label>수집시간</label>
+      <select class="hm-sel hm-one" id="b-start"></select>
+      <span class="tilde">~</span>
+      <select class="hm-sel hm-one end" id="b-end"></select>
+      <span style="flex:1"></span>
+      <button type="button" class="btn" onclick="bSubmit()">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg> 수집</button>
+    </div>
+    <div class="quick">
+      <button type="button" class="qchip" onclick="bQuick('midnight')">0시 ~ 지금</button>
+      <button type="button" class="qchip" onclick="bQuick('1h')">최근 1시간</button>
+      <button type="button" class="qchip" onclick="bQuick('3h')">최근 3시간</button>
+    </div>
+
+    <div class="mk-try"><b>해보기</b> — 같은 「9시 30분부터」를 만들어 보세요. 목록 한 번이면 끝납니다.</div>
+    <div class="mk-out" id="b-out"></div>
+    <div class="mk-cnt">이 패널에서 조작한 횟수: <b id="b-n">0</b></div>
+    <div class="mk-note good">
+      <b>목록 한 번 = 끝.</b> 「지금」 버튼이 사라진 자리를 끝 목록 <b>맨 위의 <code>지금 (<span class="now-i">--:--</span>)</code></b> 항목이 대신합니다 — 기본값이기도 합니다.<br>
+      목록은 <b>오늘 지난 30분 단위 시각만</b>. 아침엔 몇 줄뿐이고, 늦은 밤에도 최대 48줄입니다.<br>
+      시작 목록은 <b>이른 시각부터</b>, 끝 목록은 <b>최근부터</b> — 끝은 거의 항상 최근을 고르니까요.
+    </div>
+    <div class="mk-note warn">
+      걸리는 점: <b><code>10:20</code> 같은 값을 못 씁니다.</b> 시작이라면 <code>10:00</code>으로 넉넉하게 잡으면 그만이지만,
+      「그 20분은 빼고 싶다」가 실제로 있는 업무라면 A안이어야 합니다.
+    </div>
+  </div>
+
+  <div class="mk-sep"><hr></div>
+
+  <!-- ─────────── 참고: 지금 ─────────── -->
+  <div class="card">
+    <span class="mk-tag c">참고 · 지금 (텍스트)</span>
+    <div class="field">
+      <label>수집시간</label>
+      <input type="text" class="hm" id="c-start" inputmode="numeric" maxlength="5" placeholder="00:00" value="00:00">
+      <span class="tilde">~</span>
+      <input type="text" class="hm" id="c-end" inputmode="numeric" maxlength="5" placeholder="00:00" value="">
+      <button type="button" class="now-btn" onclick="cNow()">지금</button>
+    </div>
+    <div class="mk-note">「9시 30분부터」 = <code>0930</code> 네 자리. <code>930</code>이나 <code>10</code>으로 치면 지금은 거절당합니다.</div>
+  </div>
+
+</div>
+
+<script>
+var HM_RE = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+function nowHM() {
+  var d = new Date();
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+var NOW = nowHM();
+document.getElementById('now-lbl').textContent = NOW;
+Array.prototype.forEach.call(document.querySelectorAll('.now-i'), function (el) { el.textContent = NOW; });
+
+function toMin(hm) { var p = hm.split(':'); return +p[0] * 60 + +p[1]; }
+function fromMin(t) { if (t < 0) t = 0; return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'); }
+function opt(v, label) { var o = document.createElement('option'); o.value = v; o.textContent = label || v; return o; }
+
+var counts = { a: 0, b: 0 };
+function bump(k) { counts[k]++; document.getElementById(k + '-n').textContent = counts[k]; }
+function say(id, msg, cls) {
+  var el = document.getElementById(id);
+  el.className = 'mk-out' + (cls ? ' ' + cls : '');
+  el.innerHTML = msg;
+}
+
+/* ── A안: 시 select + 분 select ──────────────────────────────────────── */
+var NOW_H = +NOW.split(':')[0], NOW_M = +NOW.split(':')[1];
+var A_MINS = ['00', '10', '20', '30', '40', '50'];
+
+function fillHours(sel) {
+  for (var h = 0; h <= NOW_H; h++) sel.appendChild(opt(String(h).padStart(2, '0')));
+}
+function fillMins(sel) {
+  A_MINS.forEach(function (m) { sel.appendChild(opt(m)); });
+}
+['a-sh', 'a-eh'].forEach(function (id) { fillHours(document.getElementById(id)); });
+['a-sm', 'a-em'].forEach(function (id) { fillMins(document.getElementById(id)); });
+
+// 「지금」의 분이 목록에 없으면 임시 옵션으로 끼워 넣는다 — 끝 시각은 정확해야 하므로.
+function aSetEnd(hm) {
+  var h = hm.split(':')[0], m = hm.split(':')[1];
+  var em = document.getElementById('a-em');
+  var extra = em.querySelector('option[data-extra]');
+  if (extra) extra.remove();
+  if (A_MINS.indexOf(m) === -1) {
+    var o = opt(m, m + ' (지금)');
+    o.setAttribute('data-extra', '1');
+    em.insertBefore(o, em.firstChild);
+  }
+  document.getElementById('a-eh').value = h;
+  em.value = m;
+}
+function aVal(hId, mId) { return document.getElementById(hId).value + ':' + document.getElementById(mId).value; }
+function aNow() { bump('a'); aSetEnd(NOW); say('a-out', '↳ 끝을 <b>' + NOW + '</b> 으로 — 목록에 없는 분은 임시로 끼워 넣습니다', 'ok'); }
+function aQuick(kind) {
+  bump('a'); aSetEnd(NOW);
+  var start = kind === 'midnight' ? '00:00' : fromMin(Math.floor((toMin(NOW) - (kind === '1h' ? 60 : 180)) / 30) * 30);
+  document.getElementById('a-sh').value = start.split(':')[0];
+  document.getElementById('a-sm').value = start.split(':')[1];
+  say('a-out', '↳ <b>' + start + ' ~ ' + NOW + '</b>', 'ok');
+}
+function aSubmit() {
+  var s = aVal('a-sh', 'a-sm'), e = aVal('a-eh', 'a-em');
+  if (toMin(s) >= toMin(e)) { say('a-out', '⛔ 끝나는 시각이 시작 시각보다 빠릅니다. <b>(' + s + ' ~ ' + e + ')</b>', 'err'); return; }
+  if (toMin(e) > toMin(NOW)) { say('a-out', '⛔ 아직 ' + e + '이 안 됐어요 (지금 ' + NOW + ').', 'err'); return; }
+  say('a-out', '✔ 수집 <b>' + s + ' ~ ' + e + '</b>', 'ok');
+}
+['a-sh', 'a-sm', 'a-eh', 'a-em'].forEach(function (id) {
+  document.getElementById(id).addEventListener('change', function () { bump('a'); });
+});
+aSetEnd(NOW);
+
+/* ── B안: 시각 하나의 select (30분 단위, 오늘 지난 시각만) ───────────── */
+function slotsUntilNow() {
+  var out = [], t = 0, limit = toMin(NOW);
+  while (t <= limit) { out.push(fromMin(t)); t += 30; }
+  return out;                                  // ['00:00','00:30',...]
+}
+var SLOTS = slotsUntilNow();
+var bStart = document.getElementById('b-start'), bEnd = document.getElementById('b-end');
+SLOTS.forEach(function (hm) { bStart.appendChild(opt(hm)); });          // 이른 시각부터
+bEnd.appendChild(opt(NOW, '지금 (' + NOW + ')'));                        // 맨 위 = 기본값
+SLOTS.slice().reverse().forEach(function (hm) {                          // 최근부터
+  if (hm !== NOW) bEnd.appendChild(opt(hm));
+});
+bStart.value = '00:00';
+bEnd.value = NOW;
+[bStart, bEnd].forEach(function (el) { el.addEventListener('change', function () { bump('b'); }); });
+
+function bQuick(kind) {
+  bump('b');
+  bEnd.value = NOW;
+  var start = kind === 'midnight' ? '00:00' : fromMin(Math.floor((toMin(NOW) - (kind === '1h' ? 60 : 180)) / 30) * 30);
+  bStart.value = start;
+  say('b-out', '↳ <b>' + start + ' ~ ' + NOW + '</b>', 'ok');
+}
+function bSubmit() {
+  var s = bStart.value, e = bEnd.value;
+  if (toMin(s) >= toMin(e)) { say('b-out', '⛔ 끝나는 시각이 시작 시각보다 빠릅니다. <b>(' + s + ' ~ ' + e + ')</b>', 'err'); return; }
+  say('b-out', '✔ 수집 <b>' + s + ' ~ ' + e + '</b>', 'ok');
+}
+
+/* ── 참고: 지금 동작 ─────────────────────────────────────────────────── */
+function padHM(v) {
+  v = v.replace(/[^0-9]/g, '').slice(0, 4);
+  if (v.length >= 3) return v.slice(0, v.length - 2) + ':' + v.slice(-2);
+  return v;
+}
+['c-start', 'c-end'].forEach(function (id) {
+  var el = document.getElementById(id);
+  el.addEventListener('input', function () {
+    this.value = padHM(this.value);
+    this.setSelectionRange(this.value.length, this.value.length);
+  });
+});
+document.getElementById('c-end').value = NOW;
+function cNow() { document.getElementById('c-end').value = NOW; }
+</script>
+</body>
+</html>

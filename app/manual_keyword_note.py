@@ -110,6 +110,40 @@ def load_manual_keyword_note(run_key: Optional[RoundKey] = None) -> str:
     return notes.get(_key_str(target), "")
 
 
+def past_notes(run_key: Optional[RoundKey] = None, prev_days: int = 1) -> list:
+    """메모 칸 아래 「지난 회차 메모」 참고 목록 — 이 회차보다 **앞** 회차들의 저장된 메모.
+
+    범위는 **오늘 앞 회차 전부 + 메모가 있는 직전 `prev_days`개 날짜**다. 오늘은 날짜
+    수로 세지 않는다 — 14시 회차를 쓸 때 가장 가까운 참고는 오늘 9:30·11시 메모라서
+    아침 첫 회차든 오후든 「오늘 + 하루」가 같은 뜻이어야 한다. **달력상 어제로 세지
+    않는 것**도 같은 이유다: 월요일·연휴 다음 날은 어제 메모가 없어 칸이 빈다(메모가
+    있는 가장 최근 하루를 가져온다).
+
+    최신 회차부터, 같은 날 이어진 회차가 같은 문구면 한 줄로 합친다.
+    돌려주는 값: [(날짜, [회차…(이른 것부터)], 문구)].
+    **칸을 채우는 재료가 아니다** — 화면은 읽기만 한다(2026-08-27 이어받기 되돌림과 같은 원칙).
+    """
+    notes = _read_notes()
+    target = _key_str(run_key if run_key is not None else _current_round_key())
+    today = target.partition("|")[0]
+    past = sorted((k for k in notes if k and (not target or k < target)), reverse=True)
+    prev_dates: list = []
+    rows: list = []
+    for key in past:
+        date, _, slot = key.partition("|")
+        if date != today:
+            if date not in prev_dates:
+                if len(prev_dates) >= prev_days:
+                    break
+                prev_dates.append(date)
+        text = notes[key]
+        if rows and rows[-1][0] == date and rows[-1][2] == text:
+            rows[-1][1].insert(0, slot)
+        else:
+            rows.append((date, [slot], text))
+    return rows
+
+
 def save_manual_keyword_note(text: str, run_key: Optional[RoundKey] = None) -> None:
     """메모 텍스트를 그 회차 자리에 저장한다. run_key를 생략하면 "지금 진행 중인/방금
     끝난 회차"에 붙여 저장한다. 빈 문자열로 저장하면 그 회차 메모만 지운다("작성 전"
@@ -131,3 +165,13 @@ def save_manual_keyword_note(text: str, run_key: Optional[RoundKey] = None) -> N
         MANUAL_KEYWORD_NOTE_FILE,
         json.dumps({"notes": notes}, ensure_ascii=False),
     )
+
+
+def copy_note(src_key: RoundKey, dst_key: RoundKey) -> None:
+    """「✂ 오늘만 여기서 끊기」 — 원래 회차에 쓴 메모를 끊은 회차에도 복사한다(app.today_cuts).
+    원래 한 회차에 쓴 메모라 나뉜 두 회차 모두에 싣는다(사용자 결정, 2026-09-21)."""
+    notes = _read_notes()
+    text = notes.get(_key_str(src_key), "")
+    if not text:
+        return
+    save_manual_keyword_note(text, dst_key)

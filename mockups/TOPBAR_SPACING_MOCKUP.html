@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>상단바 간격 시안</title>
+<style>
+  :root {
+    --bg: #F8FAFC; --card: #FFFFFF; --accent: #2563EB; --text: #1F2937; --muted: #6B7280;
+    --soft: #4B5563; --border: #E5E7EB; --hover: #EFF6FF; --accent-border: #BFDBFE;
+    --adhoc-bg: #E3F1EE; --adhoc-text: #146B5E; --adhoc-border: rgba(20, 107, 94, 0.45);
+  }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .page { max-width: 900px; margin: 0 auto; padding: 32px 16px 60px; }
+  h1 { font-size: 1.3rem; color: #1E3A5F; margin: 0 0 6px; }
+  .lead { color: var(--muted); font-size: .9rem; margin: 0 0 28px; line-height: 1.6; }
+  .opt { margin-bottom: 36px; }
+  .opt h2 { font-size: 1rem; margin: 0 0 4px; color: #1E3A5F; }
+  .opt .spec { font-size: .8rem; color: var(--muted); margin: 0 0 10px; font-family: ui-monospace, Menlo, monospace; }
+  .frame { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--bg); }
+  .frame + .frame { margin-top: 8px; }
+  .narrow { max-width: 375px; }
+  .cap { font-size: .75rem; color: var(--muted); margin: 10px 0 4px; }
+
+  /* ── 지금 app/topnav.py 값 그대로 ── */
+  .topbar { background: var(--card); border-bottom: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .topbar-inner { max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: flex-start; align-items: center; gap: var(--gap, 2px); flex-wrap: wrap; }
+  .topbar-inner > .tn { color: var(--accent); text-decoration: none; font-size: 0.92rem; font-weight: 600;
+    padding: 5px var(--px, 11px); border: 1px solid transparent; border-radius: 14px; white-space: nowrap; }
+  .topbar-inner > a.tn:hover { background: var(--hover); }
+  .topbar-inner > .tn-sep { width: 1px; height: 18px; background: var(--border); margin: 0 var(--sep, 8px); }
+  .topbar-inner > .tn.is-current { cursor: default; background: var(--hover); border-color: var(--accent-border); }
+  .topbar.adhoc .topbar-inner > .tn.is-current { background: var(--adhoc-bg); border-color: var(--adhoc-border); color: var(--adhoc-text); }
+  .narrow .topbar-inner { padding: 12px 12px; gap: var(--gap-m, 2px); }
+  .narrow .topbar-inner > .tn { padding: 5px var(--px-m, 7px); }
+  .narrow .topbar-inner > .tn-sep { margin: 0 var(--sep-m, 4px); }
+
+  .v0 { --gap: 2px;  --px: 11px; --sep: 8px;  --px-m: 7px;  --sep-m: 4px; }
+  .vA { --gap: 6px;  --px: 13px; --sep: 12px; --px-m: 8px;  --sep-m: 6px; --gap-m: 2px; }
+  .vB { --gap: 10px; --px: 14px; --sep: 16px; --px-m: 8px;  --sep-m: 8px; --gap-m: 2px; }
+  .vC { --gap: 16px; --px: 15px; --sep: 22px; --px-m: 8px;  --sep-m: 8px; --gap-m: 2px; }
+  .rec { display: inline-block; font-size: .72rem; font-weight: 600; color: var(--accent);
+    background: var(--hover); border: 1px solid var(--accent-border); border-radius: 10px; padding: 1px 8px; margin-left: 6px; vertical-align: 2px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>상단바 간격 시안</h1>
+  <p class="lead">위치·높이(54px)·글자 크기·칩 모양은 그대로 두고, <b>링크 사이 간격</b>과 <b>홈 옆 세로선 양쪽 여백</b>만 넓혔습니다.<br>
+  각 안마다 정기(초안 켜짐) · 수시(원본 켜짐) · 폰 폭(375px)을 같이 보여 드려요. 마우스를 올리면 hover 모양도 볼 수 있습니다.</p>
+
+  <!-- 지금 -->
+  <div class="opt v0">
+    <h2>지금</h2>
+    <p class="spec">간격 2px · 링크 좌우 11px · 세로선 양옆 8px</p>
+    <div class="frame"><div class="topbar reg"><div class="topbar-inner">
+      <a class="tn" href="#">홈</a><span class="tn-sep"></span>
+      <a class="tn" href="#">전체 기사</a><span class="tn is-current">초안</span><a class="tn" href="#">확정본</a><a class="tn" href="#">보관함</a>
+    </div></div></div>
+  </div>
+
+  <!-- A -->
+  <div class="opt vA">
+    <h2>A안 · 조금 넓게</h2>
+    <p class="spec">간격 6px · 링크 좌우 13px · 세로선 양옆 12px</p>
+    <div class="frame"><div class="topbar reg"><div class="topbar-inner">
+      <a class="tn" href="#">홈</a><span class="tn-sep"></span>
+      <a class="tn" href="#">전체 기사</a><span class="tn is-current">초안</span><a class="tn" href="#">확정본</a><a class="tn" href="#">보관함</a>
+    </div></div></div>
+    <div class="frame"><div class="topbar adhoc"><div class="topbar-inner">
+      <a class="tn" href="#">홈</a><span class="tn-sep"></span>
+      <a class="tn" href="#">새 수집</a><span class="tn is-current">원본</span><a class="tn" href="#">확정본</a><a class="tn" href="#">보관함</a>
+    </div></div></div>
+    <p class="cap">폰 폭 375px</p>
+    <div class="frame narrow"><div class="topbar reg"><div class="topbar-inner">
+      <a class="tn" href="#">홈</a><span class="tn-sep"></span>
+      <a class="tn" href="#">전체 기사</a><span class="tn is-current">초안</span><a class="tn" href="#">확정본</a><a class="tn" href="#">보관함</a>
+    </div></div></div>
+  </div>
+
+  <!-- B -->
+  <div class="opt vB">
+    <h2>B안 · 넓게 <span class="rec">추천</span></h2>
+    <p class="spec">간격 10px · 링크 좌우 14px · 세로선 양옆 16px</p>
+    <div class="frame"><div class="topbar reg"><div class="topbar-inner">
+      <a class="tn" href="#">홈</a><span class="tn-sep"></span>
+      <a class="tn" href="#">전체 기사</a><span class="tn is-current">초안</span><a class="tn" href="#">확정본</a><a class="tn" href="#">보관함</a>
+    </div></div></div>
+    <div class="frame"><div class="topbar adhoc"><div class="topbar-inner">
+      <a class="tn" href="#">홈</a><span class="tn-sep"></span>
+      <a class="tn" href="#">새 수집</a><span class="tn is-current">원본</span><a class="tn" href="#">확정본</a><a class="tn" href="#">보관함</a>
+    </div></div></div>
+    <p class="cap">폰 폭 375px</p>
+    <div class="frame narrow"><div class="topbar reg"><div class="topbar-inner">
+      <a class="tn" href="#">홈</a><span class="tn-sep"></span>
+      <a class="tn" href="#">전체 기사</a><span class="tn is-current">초안</span><a class="tn" href="#">확정본</a><a class="tn" href="#">보관함</a>
+    </div></div></div>
+  </div>
+
+  <!-- C -->
+  <div class="opt vC">
+    <h2>C안 · 아주 넓게</h2>
+    <p class="spec">간격 16px · 링크 좌우 15px · 세로선 양옆 22px</p>
+    <div class="frame"><div class="topbar reg"><div class="topbar-inner">
+      <a class="tn" href="#">홈</a><span class="tn-sep"></span>
+      <a class="tn" href="#">전체 기사</a><span class="tn is-current">초안</span><a class="tn" href="#">확정본</a><a class="tn" href="#">보관함</a>
+    </div></div></div>
+    <div class="frame"><div class="topbar adhoc"><div class="topbar-inner">
+      <a class="tn" href="#">홈</a><span class="tn-sep"></span>
+      <a class="tn" href="#">새 수집</a><span class="tn is-current">원본</span><a class="tn" href="#">확정본</a><a class="tn" href="#">보관함</a>
+    </div></div></div>
+    <p class="cap">폰 폭 375px</p>
+    <div class="frame narrow"><div class="topbar reg"><div class="topbar-inner">
+      <a class="tn" href="#">홈</a><span class="tn-sep"></span>
+      <a class="tn" href="#">전체 기사</a><span class="tn is-current">초안</span><a class="tn" href="#">확정본</a><a class="tn" href="#">보관함</a>
+    </div></div></div>
+  </div>
+</div>
+</body>
+</html>

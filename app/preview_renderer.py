@@ -17,6 +17,7 @@ from typing import Optional
 
 import requests
 
+from app.topnav import regular_nav, topnav_style
 from app.auto_classify_turn import take_turn as take_auto_classify_turn
 from app.classifier import classify_articles, forced_group_target_names
 from app.llm_classifier import (
@@ -74,8 +75,6 @@ from app.preview_cache import load_preview_cache, save_preview_cache
 from app.preview_order import apply_preview_order, load_preview_order, save_preview_order
 from app.filters import (
     deduplicate_by_title,
-    exclude_personnel_articles,
-    exclude_photo_articles,
     filter_by_outlet_whitelist,
     looks_like_photo_caption,
     sort_scoop_first,
@@ -86,6 +85,8 @@ from app.manual_articles import load_manual_articles
 from app.naver_api import incremental_search_after, kst_today_at, search_articles_by_groups
 from app.renderer import (
     AI_SUMMARY_HEADING,
+    build_export_rows,
+    export_links_style,
     _format_summary_title,
     _group_option_label,
     _promotable_group_names,
@@ -105,6 +106,17 @@ from app.renderer import (
     hidden_trash_html,
     hidden_trash_script,
     hidden_trash_style,
+    scroll_top_html,
+    scroll_top_script,
+    scroll_top_style,
+    hide_batch_script,
+    hide_batch_style,
+    range_select_script,
+    pinned_jump_badge_html,
+    URL_ADD_BUTTON_HTML,
+    URL_ADD_PANEL_HTML,
+    url_add_script,
+    url_add_style,
     label_popover_script,
     label_popover_style,
     name_picker_html,
@@ -113,6 +125,7 @@ from app.renderer import (
     split_button_html,
     split_button_script,
     split_button_style,
+    screen_tag_style,
 )
 from app.scheduler import next_pending_slot
 from app.scraper import _already_published_urls, _slot_end_for_pub_date
@@ -127,23 +140,14 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>초안</title>
+<title>{page_title}</title>
 <style>
   body {{ margin: 0; background: {bg}; color: {text}; font-family: {font_stack}; }}
   .container {{
     max-width: 800px; margin: 24px auto; padding: 24px; background: {card};
-    border: 1px solid {border}; border-radius: 8px; padding-top: 44px; padding-bottom: 56px;  /* [수정: 2026-09-16] 60→44px, app/renderer.py 같은 자리 참고 */
+    border: 1px solid {border}; border-radius: var(--r-lg); padding-top: 44px; padding-bottom: 56px;  /* [수정: 2026-09-16] 60→44px, app/renderer.py 같은 자리 참고 */
   }}
-  .topbar {{
-    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
-    background: {card}; border-bottom: 1px solid {border}; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  }}
-  .topbar-inner {{
-    max-width: 800px; margin: 0 auto; padding: 12px 24px;
-    display: flex; justify-content: space-between; align-items: center;
-  }}
-  .topbar a {{ color: {accent}; text-decoration: none; font-size: 0.92rem; font-weight: 600; padding: 6px 10px; border-radius: 6px; }}
-  .topbar a:hover {{ background: {hover}; }}
+{topnav_style}
   /* [추가: 2026-08-18] 회차 종료(카운트다운 0) 안내 띠 — round-countdown이 0에 닿아도
      예전엔 화면이 아무 말도 안 해서, 담당자가 마감된 초안인 줄 모르고 계속 고치다
      그 작업이 어디에도 반영 안 되는 사고가 있었다(HISTORY.md 2026-08-18). topbar처럼
@@ -159,16 +163,16 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     max-width: 800px; margin: 0 auto; padding: 11px 24px;
     display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   }}
-  .round-over-banner .msg {{ flex: 1; min-width: 200px; font-size: 0.86rem; color: {round_over_text}; }}
+  .round-over-banner .msg {{ flex: 1; min-width: 200px; font-size: var(--fs-md); color: {round_over_text}; }}
   .round-over-banner .msg b {{ color: {round_over_text_strong}; }}
   .round-over-banner .go {{
-    background: {header}; color: {on_fill}; border: none; border-radius: 6px;
-    padding: 8px 14px; font-size: 0.84rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+    background: {header}; color: {on_fill}; border: none; border-radius: var(--r-md);
+    padding: 8px 14px; font-size: var(--fs-md); font-weight: 700; cursor: pointer; white-space: nowrap;
     text-decoration: none; display: inline-block;
   }}
   .round-over-banner .go:hover {{ background: {header_pressed}; }}
   .round-over-banner .dismiss {{
-    background: transparent; border: none; color: {round_over_dismiss}; font-size: 0.82rem;
+    background: transparent; border: none; color: {round_over_dismiss}; font-size: var(--fs-sm);
     cursor: pointer; text-decoration: underline; padding: 4px;
   }}
   /* [추가: 2026-08-20] AI 소제목 분류가 규칙 기반(단어 빈도)으로 떨어졌을 때의 경고.
@@ -183,23 +187,23 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      .btn-ref로 툴바 버튼을 가리킨다. */
   .classify-degraded {{
     background: {degraded_bg}; border: 1px solid {degraded_border}; border-left: 4px solid {error};
-    border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;
+    border-radius: var(--r-lg); padding: 12px 14px; margin-bottom: 14px;
   }}
-  .classify-degraded .msg {{ font-size: 0.86rem; color: {degraded_text}; line-height: 1.6; }}
+  .classify-degraded .msg {{ font-size: var(--fs-md); color: {degraded_text}; line-height: 1.6; }}
   .classify-degraded .msg b {{ color: {error}; }}
   /* [추가: 2026-08-20] 문구 안에서 툴바 버튼을 가리키는 인라인 칩 — 실제 그 버튼과
      같은 색·같은 아이콘(app/icons.py "bot")을 써서 "이게 그 버튼이다"가 바로
      읽히게 한다(app.preview_renderer._actions_html의 .reclassify-btn과 배색 통일). */
   .classify-degraded .btn-ref {{
     display: inline-flex; align-items: center; gap: 4px; background: {ai_bg};
-    border: 1px solid {ai_border}; border-radius: 5px; padding: 1px 8px 1px 6px;
+    border: 1px solid {ai_border}; border-radius: var(--r-sm); padding: 1px 8px 1px 6px;
     font-weight: 700; color: {ai_text}; white-space: nowrap;
   }}
   .classify-degraded .btn-ref .ic {{ width: 0.95em; height: 0.95em; }}
   /* [추가: 2026-08-20] 연속 재분류 실패 이력 — "재분류마저 실패" 문구에서만 붙는다. */
   .classify-degraded .retry-log {{
     display: block; margin-top: 8px; padding-top: 7px; border-top: 1px dashed {degraded_rule};
-    color: {degraded_sub}; font-size: 0.78rem; font-variant-numeric: tabular-nums;
+    color: {degraded_sub}; font-size: var(--fs-sm); font-variant-numeric: tabular-nums;
   }}
   /* 배너가 뜨면 그만큼 topbar를 아래로 밀어 겹치지 않게 한다(높이는 JS가 실측).
      [수정: 2026-08-20] topbar만 밀고 .container는 그대로 뒀더니, .container의
@@ -216,56 +220,58 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     max-width: 800px; margin: 0 auto; padding: 10px 24px;
     display: flex; justify-content: space-between; align-items: center; gap: 10px;
   }}
-  .bottombar a {{ color: {accent}; text-decoration: none; font-size: 1.1rem; padding: 6px 10px; border-radius: 6px; }}
+  .bottombar a {{ color: {accent}; text-decoration: none; font-size: 1.1rem; padding: 6px 10px; border-radius: var(--r-md); }}
   .bottombar a:hover {{ background: {hover}; }}
   /* [추가: 2026-08-03] app.renderer와 동일한 이유 — 하단바 🖍️ 형광펜 편집 팝오버. */
   .highlight-wrap {{ position: relative; }}
   .highlight-toggle {{
     background: transparent; border: none; color: {muted}; font-size: 1.1rem; cursor: pointer;
-    padding: 6px 10px; border-radius: 6px;
+    padding: 6px 10px; border-radius: var(--r-md);
   }}
   .highlight-toggle:hover {{ background: {hover}; }}
   .highlight-popover {{
     display: none; position: absolute; bottom: 100%; right: 0; margin-bottom: 8px;
-    background: {card}; border: 1px solid {border}; border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); padding: 12px; width: 220px; z-index: 30;
+    background: {card}; border: 1px solid {border}; border-radius: var(--r-lg);
+    box-shadow: var(--sh-pop); padding: 12px; width: 220px; z-index: 30;
   }}
   .highlight-popover.is-open {{ display: block; }}
   .highlight-chips {{ display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }}
   .highlight-chip {{
-    display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 14px;
-    font-size: 0.82rem; color: {text}; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--r-pill);
+    font-size: var(--fs-sm); color: {text}; cursor: pointer;
   }}
   .highlight-chip button {{
-    background: transparent; border: none; padding: 0; font-size: 0.8rem; cursor: pointer;
+    background: transparent; border: none; padding: 0; font-size: var(--fs-sm); cursor: pointer;
     color: inherit; line-height: 1;
   }}
-  .highlight-empty {{ color: {muted}; font-size: 0.8rem; margin: 0 0 8px; }}
+  .highlight-empty {{ color: {muted}; font-size: var(--fs-sm); margin: 0 0 8px; }}
   .highlight-add-form {{ display: flex; gap: 6px; }}
-  .highlight-add-form input {{ flex: 1; font-size: 0.85rem; padding: 5px 8px; min-width: 0; }}
-  .highlight-add-form button {{ font-size: 0.82rem; padding: 5px 10px; white-space: nowrap; }}
+  .highlight-add-form input {{ flex: 1; font-size: var(--fs-md); padding: 5px 8px; min-width: 0; }}
+  .highlight-add-form button {{ font-size: var(--fs-sm); padding: 5px 10px; white-space: nowrap; }}
   /* [추가: 2026-08-05] app.renderer와 동일한 소제목 미니 목차(펼침형). */
   /* [수정: 2026-08-10] app.renderer와 동일한 이유 — (확정)/(전송) 버튼과 색이 겹치지
      않도록 중립색으로 톤다운. */
   /* [추가: 2026-08-11] ↩ 되돌리기 — 오른쪽 플로팅 버튼들(발송·목차)과 성격이
      반대인 "취소" 계열이라 사용자 요청대로 화면 왼쪽 아래에 따로 뒀다. 되돌릴 게 있을
      때만 렌더링한다(항상 떠 있으면 "뭘 되돌리는지" 알 수 없어 오히려 불안하다). */
-  /* [수정: 2026-09-02] 왼쪽 아래는 두 칸짜리 스택 — 아래가 쓰레기통, 위가 ↩ 되돌리기
-     (확정본·수시 화면과 같은 배치). 쓰레기통이 0건이라 안 그려질 때도 ↩는 제자리에 둔다. */
+  /* [수정: 2026-09-02] 왼쪽 아래는 두 칸짜리 스택 — 아래가 휴지통, 위가 ↩ 되돌리기
+     (확정본·수시 화면과 같은 배치). 휴지통이 0건이라 안 그려질 때도 ↩는 제자리에 둔다. */
   .undo-fab {{
-    position: fixed; left: 20px; bottom: 88px; width: 50px; height: 50px; border-radius: 50%;
+    position: fixed; left: 20px; bottom: 88px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
     background: {card}; color: {muted}; border: 1px solid {border}; font-size: 1.4rem;
-    cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12); z-index: 200;
+    cursor: pointer; box-shadow: var(--sh-float); z-index: 200;
     display: flex; align-items: center; justify-content: center;
   }}
   .undo-fab:hover {{ background: {hover}; color: {accent}; border-color: {accent}; }}
   .undo-fab:disabled {{ opacity: 0.5; cursor: progress; }}
 {hidden_trash_style}
+{scroll_top_style}
+{hide_batch_style}
 {name_picker_style}
   .toc-toggle-btn {{
-    position: fixed; right: 20px; bottom: 20px; width: 46px; height: 46px; border-radius: 50%;
+    position: fixed; right: 20px; bottom: 20px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
     background: {card}; color: {muted}; border: 1px solid {border}; font-size: 1.2rem; cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12); z-index: 200;
+    box-shadow: var(--sh-float); z-index: 200;
     display: flex; align-items: center; justify-content: center;
   }}
   .toc-toggle-btn:hover {{ background: {hover}; }}
@@ -275,7 +281,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      고정한다 — 안 그러면 문구 전체가 초마다 미세하게 흔들려 시선을 뺏는다. */
   .round-countdown {{
     position: fixed; right: 20px; bottom: 74px; text-align: right;
-    font-size: 0.78rem; font-weight: 700; color: {muted}; z-index: 199; white-space: nowrap;
+    font-size: var(--fs-sm); font-weight: 700; color: {muted}; z-index: 199; white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }}
   /* [추가: 2026-08-13] 회차 종료 10분 이내 — 초는 늘 보이되 "지금 급한가"는 색이 말한다
@@ -287,30 +293,30 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .toc-popover {{
     display: none; position: fixed; right: 20px; bottom: 74px; width: 200px;
     background: {card}; border: 1px solid {border};
-    border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15); z-index: 200;
+    border-radius: var(--r-lg); box-shadow: var(--sh-pop); z-index: 200;
   }}
   .toc-popover.is-open {{ display: block; }}
   .toc-scroll {{ max-height: 320px; overflow-y: auto; padding: 8px; }}
   /* [추가: 2026-08-05] app.renderer와 동일 — 목차 안에서 소제목 순서까지 바꿀 수 있게
      항목마다 작은 ▲▼를 붙였다(이름 클릭=이동, 화살표 클릭=순서 변경으로 분리). */
-  .toc-row {{ display: flex; align-items: center; justify-content: space-between; border-radius: 4px; }}
+  .toc-row {{ display: flex; align-items: center; justify-content: space-between; border-radius: var(--r-sm); }}
   .toc-row a {{
-    flex: 1; min-width: 0; padding: 6px 8px; font-size: 0.85rem; color: {text};
-    text-decoration: none; border-radius: 4px; white-space: nowrap; overflow: hidden;
+    flex: 1; min-width: 0; padding: 6px 8px; font-size: var(--fs-md); color: {text};
+    text-decoration: none; border-radius: var(--r-sm); white-space: nowrap; overflow: hidden;
     text-overflow: ellipsis;
   }}
   .toc-row a:hover {{ background: {hover}; }}
   .toc-row-btns {{ display: flex; gap: 1px; flex-shrink: 0; padding-right: 4px; }}
   .toc-order-btn {{
     background: transparent; border: none; color: {muted}; font-size: 0.72rem; cursor: pointer;
-    padding: 2px 4px; border-radius: 4px;
+    padding: 2px 4px; border-radius: var(--r-sm);
   }}
   .toc-order-btn:hover {{ background: {hover}; }}
   .toc-order-btn:disabled {{ opacity: 0.3; cursor: default; }}
   /* [수정: 2026-08-18] ▲▼가 더는 새로고침을 일으키지 않으므로, 이 표시는 (적용)을
      누를 때까지 남아 "이번에 뭘 옮겼는지"를 누적해서 보여준다. */
   .toc-row.toc-row-moved {{ background: {row_moved}; }}
-  .toc-empty {{ color: {muted}; font-size: 0.82rem; padding: 6px 8px; }}
+  .toc-empty {{ color: {muted}; font-size: var(--fs-sm); padding: 6px 8px; }}
   /* [추가: 2026-08-18] app.renderer와 동일한 팝오버 하단 확정 바 — 담당자가 "(적용)을
      누르기 전까지는 아무것도 바뀌지 않았다"고 믿을 수 있어야 하므로 서버로 나가는 길은
      (적용) 하나뿐이다. 구조는 .edit-summary-form을 따랐다(취소 왼쪽·커밋 오른쪽).
@@ -318,12 +324,12 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .toc-foot {{
     display: none; flex-direction: column; gap: 6px;
     padding: 8px; border-top: 1px solid {border};
-    background: {card}; border-radius: 0 0 8px 8px;
+    background: {card}; border-radius: 0 0 var(--r-lg) var(--r-lg);
   }}
   .toc-foot.is-dirty {{ display: flex; }}
-  .toc-dirty-count {{ font-size: 0.76rem; color: {muted}; }}
+  .toc-dirty-count {{ font-size: var(--fs-sm); color: {muted}; }}
   .toc-foot-actions {{ display: flex; justify-content: flex-end; gap: 8px; }}
-  .toc-foot-actions button {{ font-size: 0.78rem; padding: 5px 12px; border-radius: 5px; cursor: pointer; }}
+  .toc-foot-actions button {{ font-size: var(--fs-sm); padding: 5px 12px; border-radius: var(--r-sm); cursor: pointer; }}
   .toc-cancel-btn {{ background: transparent; color: {muted}; border: 1px solid {border}; }}
   .toc-cancel-btn:hover {{ background: {hover}; }}
   .toc-apply-btn {{ background: {accent}; color: {on_fill}; border: none; font-weight: 700; }}
@@ -334,14 +340,14 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [추가: 2026-07-30] 체크박스로 기사를 선택했을 때만 나타나는 "일괄 이동" 바 —
      장바구니처럼 화면 하단에 붙어있다가, 선택이 하나도 없으면 숨어서 원래 있던
      🗑️(숨긴 기사 관리)만 오른쪽에 그대로 남는다. */
-  .bulk-move-bar {{ display: none; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.85rem; }}
+  .bulk-move-bar {{ display: none; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--fs-md); }}
   .bulk-move-bar.is-active {{ display: flex; }}
   .bulk-move-bar .bulk-move-count {{ font-weight: 600; color: {header}; white-space: nowrap; }}
   #bulk-move-select {{
-    border: 1px solid {accent}; border-radius: 4px; padding: 5px 8px; font-size: 0.85rem;
+    border: 1px solid {accent}; border-radius: var(--r-md); padding: 5px 8px; font-size: var(--fs-md);
     color: {text}; background: {card};
   }}
-  .bulk-move-bar button {{ padding: 5px 12px; font-size: 0.85rem; }}
+  .bulk-move-bar button {{ padding: 5px 12px; font-size: var(--fs-md); }}
   /* [추가: 2026-08-04] app.renderer와 동일 — 일괄 위/아래 이동 버튼. */
   #bulk-move-up, #bulk-move-down {{ padding: 5px 10px; }}
   #bulk-move-up:disabled, #bulk-move-down:disabled {{ opacity: 0.35; cursor: not-allowed; }}
@@ -349,9 +355,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .bulk-move-bar .clear-btn:hover {{ background: {hover}; }}
   /* [추가: 2026-09-15] 「AI 기사 나누기」 — 확정본과 같은 값(app.renderer.split_button_style). */
 {split_button_style}
+{screen_tag_style}
   .actions .create-group-btn {{
     background: transparent; color: {accent}; border: 1px solid {ghost_border};
-    border-radius: 6px; font-weight: 400;
+    border-radius: var(--r-md); font-weight: 400;
   }}
   .actions .create-group-btn:hover {{ background: {hover}; border-color: {ghost_border_hover}; }}
   /* [수정: 2026-08-12] 초안 툴바에 있던 "🤖 미분류 배정"을 📂 소제목 미분류 칸의
@@ -362,8 +369,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      색 언어를 따른 것(CLAUDE.md "Design direction"). 채운 배경으로 둔다 — 이 버튼은
      안전하고(기존 소제목을 안 건드림) 자주 눌러도 되는 쪽이라 눈에 잘 띄어야 한다. */
   .assign-unclassified-btn {{
-    background: {ai_bg}; color: {ai_text}; border: 1px solid {ai_border}; border-radius: 6px;
-    font-size: 0.82rem; font-weight: 600; padding: 4px 10px; cursor: pointer;
+    background: {ai_bg}; color: {ai_text}; border: 1px solid {ai_border}; border-radius: var(--r-md);
+    font-size: var(--fs-sm); font-weight: 600; padding: 4px 10px; cursor: pointer;
   }}
   .assign-unclassified-btn:hover {{ background: {ai_bg_hover}; border-color: {ai_border_hover}; }}
   .assign-unclassified-btn:disabled {{ opacity: 0.5; cursor: progress; }}
@@ -382,8 +389,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .actions .reclassify-btn:disabled {{ opacity: 0.5; cursor: progress; }}
   .regen-badge {{
     display: inline-block; margin-left: 6px; min-width: 17px; padding: 0 5px;
-    background: {error}; color: {on_fill}; border-radius: 999px;
-    font-size: 0.72rem; font-weight: 700; line-height: 17px; text-align: center;
+    background: {error}; color: {on_fill}; border-radius: var(--r-pill);
+    font-size: var(--fs-xs); font-weight: 700; line-height: 17px; text-align: center;
   }}
   /* "📂 소제목 미분류" 묶음 — 임시 상태라는 게 보이게 구분한다.
      [수정: 2026-08-21] 빨간 2px 점선 → 앰버 왼쪽 띠 + 옅은 앰버 바탕. 빨강({error})은
@@ -394,19 +401,71 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      낡아 보인다는 지적 때문. 바탕이 생겨 글자가 테두리에 붙지 않도록 padding을 준다. */
   .subheading.subheading-unclassified {{
     border-left: 4px solid {warn_dot}; background: {warn_bg};
-    border-radius: 0 10px 10px 0; padding: 10px 16px 12px;
+    border-radius: 0 var(--r-lg) var(--r-lg) 0; padding: 10px 16px 12px;
   }}
   /* [추가: 2026-08-11] AI가 만든 소제목 표식. 화면 전용이며, 소제목 이름 문자열과
      완전히 분리된 별도 span이라 복사/다운로드/발송 텍스트에는 절대 따라가지 않는다. */
-  .ai-badge {{ margin-left: 6px; font-size: 0.8rem; opacity: 0.75; vertical-align: middle; }}
+  .ai-badge {{ margin-left: 6px; font-size: var(--fs-sm); opacity: 0.75; vertical-align: middle; }}
   /* [추가: 2026-08-20] 소제목별 기사 건수 칩 — app.renderer._render_groups와 동일. */
   .subheading-count {{
-    margin-left: 6px; font-size: 0.75rem; font-weight: 700; color: {muted};
-    background: {pill_bg}; border-radius: 999px; padding: 1px 8px;
+    margin-left: 6px; font-size: var(--fs-sm); font-weight: 700; color: {muted};
+    background: {pill_bg}; border-radius: var(--r-pill); padding: 1px 8px;
   }}
+  /* 「✂ 오늘만 여기서 끊기」(app.cut_round, 시안 SLOT_CUT_MOCKUP.html) — 평소엔 회색 시각 글자와
+     같은 색의 흐린 ✂ 하나, 마우스를 올리면 파랑 + 「여기서 끊기」 글자. 평소엔 안 쓰는 기능이라
+     자리만 기억할 수 있게 둔다. 끊기 창은 머리줄 아래에 뜬다(h1이 기준 상자). */
+  .preview-head h1 {{ position: relative; }}
+  .cut-btn {{ display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; vertical-align: middle;
+    border: 1px solid transparent; background: transparent; color: {muted}; border-radius: var(--r-md);
+    font-family: inherit; font-size: var(--fs-sm); font-weight: 600; padding: 1px 5px; cursor: pointer;
+    opacity: 0.45; transition: opacity .12s, background .12s; }}
+  .cut-btn .lbl {{ display: none; font-size: var(--fs-xs); }}
+  .cut-btn:hover, .cut-btn.is-open {{ opacity: 1; color: {accent}; border-color: {accent_border}; background: {hover}; }}
+  .cut-btn:hover .lbl, .cut-btn.is-open .lbl {{ display: inline; }}
+  /* 끊은 상태 칩 — 오늘에만 해당하는 상태라 중립 회색, 취소 글자만 파랑(담당자의 동작) */
+  .cut-chip {{ display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; vertical-align: middle;
+    font-size: var(--fs-xs); font-weight: 700; color: {text_soft}; background: {pill_bg}; border: 1px solid {border};
+    border-radius: var(--r-pill); padding: 2px 4px 2px 10px; }}
+  .cut-chip.done {{ padding-right: 10px; }}
+  .cut-chip button {{ border: none; background: {card}; color: {accent}; border-radius: var(--r-pill); font-family: inherit;
+    font-size: var(--fs-xs); font-weight: 600; padding: 1px 9px; cursor: pointer; }}
+  .cut-chip button:hover {{ background: {hover}; }}
+  .cut-pop {{ position: absolute; left: 0; top: calc(100% + 8px); z-index: 30; width: 380px; max-width: calc(100vw - 48px);
+    background: {card}; border: 1px solid {border}; border-radius: var(--r-lg); box-shadow: var(--sh-pop);
+    padding: 14px 16px 12px; font-size: var(--fs-md); font-weight: 400; color: {text}; box-sizing: border-box; }}
+  .cut-pop[hidden] {{ display: none; }}
+  .cut-pop h4 {{ margin: 0 0 3px; color: {header}; font-size: var(--fs-base); }}
+  .cut-pop .sub {{ color: {muted}; font-size: var(--fs-sm); margin: 0 0 12px; line-height: 1.55; }}
+  .cut-row {{ display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }}
+  .cut-tchip {{ border: 1px solid {border}; background: {card}; color: {text_soft}; border-radius: var(--r-md); font-family: inherit;
+    font-size: var(--fs-sm); padding: 4px 10px; cursor: pointer; font-variant-numeric: tabular-nums; }}
+  .cut-tchip:hover {{ background: {hover}; }}
+  .cut-tchip.on {{ background: {accent}; border-color: {accent}; color: {card}; font-weight: 600; }}
+  .cut-tchip small {{ opacity: .75; margin-left: 3px; }}
+  .cut-time {{ font-family: inherit; font-size: var(--fs-md); border: 1px solid {float_input_border}; border-radius: var(--r-md);
+    padding: 3px 8px; font-variant-numeric: tabular-nums; }}
+  .cut-split {{ margin: 12px 0 0; border: 1px solid {border}; border-radius: var(--r-lg); overflow: hidden; }}
+  .cut-split > div {{ display: flex; align-items: baseline; gap: 8px; padding: 7px 11px; font-size: var(--fs-sm); }}
+  .cut-split > div + div {{ border-top: 1px solid {border}; }}
+  .cut-split .k {{ color: {muted}; min-width: 92px; font-variant-numeric: tabular-nums; }}
+  .cut-split .v b {{ color: {accent}; }}
+  .cut-split .top {{ background: {hover}; }}
+  .cut-when {{ margin: 10px 0 0; font-size: var(--fs-sm); color: {muted}; line-height: 1.55; }}
+  .cut-when.warn {{ color: {warn_text}; }}
+  .cut-when.err {{ color: {error}; }}
+  .cut-foot {{ display: flex; justify-content: flex-end; gap: 6px; margin-top: 12px; }}
+  .cut-foot button {{ font-family: inherit; font-size: var(--fs-md); border-radius: var(--r-md); padding: 6px 13px; cursor: pointer; }}
+  .cut-foot .no {{ border: 1px solid {border}; background: {card}; color: {muted}; }}
+  .cut-foot .ok {{ border: 1px solid {accent}; background: {accent}; color: {card}; font-weight: 600; }}
+  .cut-foot .ok:disabled {{ opacity: .45; cursor: not-allowed; }}
+  /* 끊은 직후 안내 — 흐름 안 한 줄(파랑 = 담당자의 동작) */
+  .cut-done-line {{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: {hover};
+    border: 1px solid {accent_border}; color: {header}; border-radius: var(--r-lg); padding: 9px 12px;
+    font-size: var(--fs-md); margin: 0 0 14px; }}
+  .cut-done-line a {{ margin-left: auto; color: {accent}; font-weight: 600; text-decoration: none; }}
   .total-count-badge {{
-    margin-left: 8px; font-size: 0.78rem; font-weight: 700; color: {muted};
-    background: {pill_bg}; border-radius: 999px; padding: 2px 10px; vertical-align: middle;
+    margin-left: 8px; font-size: var(--fs-sm); font-weight: 700; color: {muted};
+    background: {pill_bg}; border-radius: var(--r-pill); padding: 2px 10px; vertical-align: middle;
   }}
   /* [추가: 2026-08-21] 제목 옆 "미분류 N건" — 📂 소제목 미분류 칸은 언제나 화면 맨
      아래라, 기사가 쌓이면 스크롤을 끝까지 내리기 전엔 있는 줄도 모른다(사용자 지적).
@@ -417,11 +476,14 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      앰버로 바꾸면서 이 배지만 빨강으로 남으면 박스 위에서 붕 뜨고, [단독]/[속보]
      빨강과도 계속 겹친다 — 박스·건수 배지·이 배지 셋을 한 번에 맞춘다. */
   .pending-count-badge {{
-    margin-left: 6px; font-size: 0.78rem; font-weight: 700; vertical-align: middle;
+    margin-left: 6px; font-size: var(--fs-sm); font-weight: 700; vertical-align: middle;
     color: {warn_text}; background: {warn_chip_bg}; border: 1px solid {warn_border};
-    border-radius: 999px; padding: 2px 10px; cursor: pointer; font-family: inherit;
+    border-radius: var(--r-pill); padding: 2px 9px; cursor: pointer; font-family: inherit;
+    display: inline-flex; align-items: center; gap: 4px;
   }}
   .pending-count-badge:hover {{ background: {card}; }}
+  /* 글자 대신 아래 칸 제목과 같은 열린 폴더 + 숫자(뜻은 툴팁) — 📌 뱃지와 같은 모양. */
+  .pending-count-badge .ic {{ width: 1.05em; height: 1.05em; }}
   /* 임시 보관함(아직 분류 안 된 기사) 제목 — 소제목이 아니라 대기실이라는 게 읽히도록
      꺾쇠 없이 회색 기울임꼴로, 확정된 소제목들과 시각적으로 확실히 구분한다. */
   /* [수정: 2026-08-26] font-style: italic 제거 — 옆의 건수 칩·배정 버튼과 밑줄이
@@ -431,27 +493,37 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     display: inline-flex; align-items: center; gap: 5px; }}
   /* [수정: 2026-08-21] 빨강 → 앰버, 위 .pending-count-badge와 같은 이유·같은 배색. */
   .unclassified-count {{
-    margin-left: 4px; font-style: normal; font-weight: 700; font-size: 0.8rem;
-    color: {warn_text}; background: {warn_chip_bg}; border-radius: 999px; padding: 1px 8px;
+    margin-left: 4px; font-style: normal; font-weight: 700; font-size: var(--fs-sm);
+    color: {warn_text}; background: {warn_chip_bg}; border-radius: var(--r-pill); padding: 1px 8px;
   }}
-  .article-select {{ margin-top: 3px; flex-shrink: 0; }}
+  /* [수정: 2026-09-18] 체크박스가 작아 누르기 어렵다는 지적 — 브라우저 기본 13px → 16px
+     (시안 mockups/CHECKBOX_SIZE_MOCKUP.html B안). 소제목 머리 체크박스도 같은 크기,
+     체크 색은 앱 파랑. 기사 체크박스는 커진 만큼 2px 내려 제목 첫 줄 가운데에 맞춘다. */
+  .article-select, .group-select-all {{ width: 16px; height: 16px; margin: 3px 3px 0 4px;
+    accent-color: {accent}; cursor: pointer; }}
+  .article-select {{ flex-shrink: 0; position: relative; top: 2px; }}
+  .group-select-all {{ vertical-align: -3px; }}
   .group-move-select {{
-    flex-shrink: 0; width: 100px; border: 1px solid {border}; border-radius: 4px;
-    padding: 2px 4px; font-size: 0.78rem; color: {muted}; background: {card};
+    flex-shrink: 0; width: 100px; height: var(--h-sm); box-sizing: border-box; border: 1px solid {border}; border-radius: var(--r-sm);
+    padding: 0 4px; font-size: var(--fs-sm); color: {muted}; background: {card};
   }}
+  /* app.renderer와 동일 — 📌 담아둔 기사의 승격 드롭다운만 조금 넓다 — 「확정본에 넣기…」가 100px에선 잘린다
+     (실측: 글자 81px + 안쪽 여백 8 + 테두리 2 + 화살표 자리 ≈ 111px). 나머지 규격은
+     「다른 소제목」과 같다. */
+  .group-move-select.promote-select {{ width: 114px; }}
   /* [추가: 2026-08-04] app.renderer와 동일 — 소제목별/시간순/언론사순 보기 전환 select. */
   .view-mode-select {{
-    border: 1px solid {accent}; border-radius: 6px; padding: 6px 10px; font-size: 0.85rem;
+    border: 1px solid {accent}; border-radius: var(--r-md); padding: 6px 10px; font-size: var(--fs-md);
     color: {text}; background: {card};
   }}
   /* [수정: 2026-08-04] app.renderer와 동일 — 사용자가 직접 만든 소제목은 기사가
      차 있어도 점선 테두리를 유지해 자동 분류 소제목과 구분되게 한다. */
-  .subheading-custom {{ border: 2px dashed {custom_group_border}; border-radius: 8px; padding: 8px 16px; }}
-  .empty-group-hint {{ color: {muted}; font-size: 0.85rem; margin: 6px 0 0; }}
-  header h1 {{ font-size: 1.3rem; margin-bottom: 6px; color: {header}; }}
+  .subheading-custom {{ border: 2px dashed {custom_group_border}; border-radius: var(--r-lg); padding: 8px 16px; }}
+  .empty-group-hint {{ color: {muted}; font-size: var(--fs-md); margin: 6px 0 0; }}
+  header h1 {{ font-size: var(--fs-xl); margin-bottom: 6px; color: {header}; }}
   .preview-head {{ display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }}
   .preview-hint {{
-    font-size: 0.85rem; color: {muted}; background: {hover}; border-radius: 8px;
+    font-size: var(--fs-md); color: {muted}; background: {hover}; border-radius: var(--r-lg);
     padding: 10px 14px; margin-bottom: 20px; line-height: 1.6;
   }}
   /* [추가: 2026-08-11] hint가 빈 문자열이면(위 round-countdown 중복 안내문 삭제) 박스
@@ -472,8 +544,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      완전히 똑같이 안 보인다. 크롬이 button 텍스트만 내부적으로 수직 중앙 정렬해주는
      것까지 발견해 align-items: center를 직접 지정했다. */
   button, a.btn {{
-    background: {accent}; color: {on_fill}; border: none; border-radius: 4px;
-    padding: 6px 14px; font-size: 0.9rem; font-family: inherit; cursor: pointer; text-decoration: none;
+    background: {accent}; color: {on_fill}; border: none; border-radius: var(--r-md);
+    padding: 6px 14px; font-size: var(--fs-md); font-family: inherit; cursor: pointer; text-decoration: none;
     appearance: none; -webkit-appearance: none;
     display: inline-flex; align-items: center; justify-content: center;
     user-select: none; -webkit-user-select: none;
@@ -481,7 +553,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   button:hover, a.btn:hover {{ background: {header}; }}
   /* [수정: 2026-08-03] app.renderer와 동일한 이유로 액션 툴바만 소프트 필로(시안 B) */
   .actions button, .actions a.btn {{
-    background: {hover}; color: {accent}; font-weight: 600; border-radius: 8px;
+    background: {hover}; color: {accent}; font-weight: 600; border-radius: var(--r-md);
+    height: var(--h-md); padding-top: 0; padding-bottom: 0; box-sizing: border-box;
   }}
   .actions button:hover, .actions a.btn:hover {{ background: {accent_tonal}; }}
   /* scroll-margin-top — .topbar가 position:fixed라, 목차·"미분류 N건"으로 뛰어오면
@@ -493,7 +566,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [수정: 2026-08-05] app.renderer와 동일 — h2 기본 margin 제거 + 아이콘 오른쪽 정렬. */
   .subheading h2 {{
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    font-size: 1.1rem; color: {header}; border-bottom: 1px solid {border};
+    font-size: var(--fs-lg); color: {header}; border-bottom: 1px solid {border};
     margin: 0 0 6px; padding-bottom: 6px;
   }}
   .subheading-title {{ display: flex; align-items: center; gap: 4px; min-width: 0; }}
@@ -516,7 +589,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [수정: 2026-09-16] 행 여백 한 단계씩 축소 — padding 6→4px, 제목·메타 줄 사이 4→2px,
      행 사이 10→6px. 글자·버튼 크기는 그대로다(한 건 74 → 64px). 확정본·초안·정기 보관함·
      수시 네 파일에 같은 값이 복제돼 있으니 한쪽만 고치지 않는다. 시안 ARTICLE_ROW_DENSITY_MOCKUP.html B안. */
-  .article {{ margin: 6px 0; line-height: 1.5; padding: 4px 8px; border-radius: 8px; }}
+  .article {{ margin: 6px 0; line-height: 1.5; padding: 4px 8px; border-radius: var(--r-md); }}
   /* [추가: 2026-08-20] app.renderer와 동일 — [단독] 카드 강조 + 말머리 글자색.
      우선순위 원칙도 동일(다른 상태 배경보다 먼저 선언해 가장 낮은 우선순위). */
   .article.art-scoop {{ background: {scoop_bg}; border-left: 3px solid {scoop_bar}; padding-left: 9px; }}
@@ -566,15 +639,13 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
   /* [추가: 2026-08-21] app.renderer와 동일 — 사진 추정 배지(아이콘+문구 칩). */
   .photo-badge {{
-    flex-shrink: 0; padding: 1px 7px; border-radius: 999px; font-size: 0.72rem;
+    flex-shrink: 0; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
     color: {photo_badge_text}; background: {photo_badge_bg}; border: 1px solid {photo_badge_border}; white-space: nowrap;
     position: relative; top: -0.15em;  /* [수정: 2026-08-21] 제목보다 글자가 작은 알약이라 baseline 정렬만으론 약간 아래로 보인다(실측: 위 여백 +1px, 아래 -2.3px) — 반 칸(0.15em) 올려 제목 글자 높이 한가운데에 맞춘다. */
   }}
 {late_badge_style}
-  .article-summary {{ margin: 6px 0 4px 20px; color: {text}; font-size: 0.95rem; }}
-  /* [수정: 2026-08-13] app.renderer와 동일 — URL 밑줄 텍스트를 없애며(.url 폐기,
-     "원문보기" 아이콘으로 대체) footer엔 extra_buttons_html만 남는다. */
-  .article-footer {{ display: flex; align-items: center; gap: 8px; }}
+{export_links_style}
+  .article-summary {{ margin: 6px 0 4px 20px; color: {text}; font-size: var(--fs-md); }}
   /* [수정: 2026-07-30] "이미 확인함"을 영구 기억(localStorage)하지 않고 "지금 펼쳐서
      보고 있는 기사"에만 실시간 적용 — app.renderer와 같은 이유·같은 방식(:has()). */
   /* [수정: 2026-08-21] 색(남색) 대신 opacity로 — 화면에 남는 파랑이 전부 "누를 수
@@ -583,7 +654,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [추가: 2026-07-29] 지난번 이 화면을 봤을 때는 없다가 이번에 새로 들어온 기사 —
      초안은 새로고침할 때마다 다시 검색하므로 뭐가 새로 섞였는지 표시해준다
      (app.preview_renderer._compute_preview_articles가 매번 새로 검색·병합한 결과). */
-  .article.is-new-arrival {{ background: {row_new}; border-radius: 6px; padding: 8px 10px; }}
+  .article.is-new-arrival {{ background: {row_new}; border-radius: var(--r-md); padding: 8px 10px; }}
   /* [추가: 2026-08-12] "🤖 미분류 기사 분류"가 방금 자리를 정해준 기사 — 어디에 배정됐는지
      담당자가 바로 찾을 수 있게 한 번만 표시하고 다음 새로고침에 사라진다(.just-moved와 같은 방식).
      색은 🤖 버튼과 같은 연보라 — "저 버튼을 눌렀더니 이것들이 생겼다"가 그대로 이어진다.
@@ -593,7 +664,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [수정: 2026-08-03] app.renderer와 동일한 이유 — 화면에서 직접 드래그해 복사할 때
      게시 시각이 같이 딸려오지 않도록 이 부분만 선택 자체를 막는다. */
   .pub-time {{
-    flex-shrink: 0; color: {muted}; font-size: 0.8rem; white-space: nowrap;
+    flex-shrink: 0; color: {muted}; font-size: var(--fs-sm); white-space: nowrap;
     user-select: none; -webkit-user-select: none;
   }}
   .move-btn, .hide-btn, .copy-btn {{
@@ -604,9 +675,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .hide-btn:hover {{ color: {error}; }}
   /* [수정: 2026-08-14] app.renderer와 동일 — 원문보기가 아이콘에서 게시시각 옆 텍스트
      링크로 바뀌었다(복사 아이콘과 실루엣이 겹쳐 구분이 안 된다는 지적). */
-  .time-sep {{ color: {muted}; font-size: 0.8rem; margin: 0 2px; user-select: none; -webkit-user-select: none; }}
+  .time-sep {{ color: {muted}; font-size: var(--fs-sm); margin: 0 2px; user-select: none; -webkit-user-select: none; }}
   .origin-link-text {{
-    flex-shrink: 0; color: {accent}; font-size: 0.8rem; text-decoration: none;
+    flex-shrink: 0; color: {accent}; font-size: var(--fs-sm); text-decoration: none;
     display: inline-flex; align-items: center; gap: 2px; white-space: nowrap;
   }}
   .origin-link-text:hover {{ text-decoration: underline; }}
@@ -615,7 +686,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 {photo_gather_style}
   /* [추가: 2026-08-14] app.renderer와 동일 — title-line 렌더 좌표 실측(28px)만큼
      action-row를 들여써 게시시각·원문보기가 제목 글자 시작점과 같은 줄에서 시작하게 한다. */
-  .article:has(.article-select) .action-row {{ padding-left: 28px; }}
+  /* 체크박스 16px 기준: 왼쪽 여백 4 + 16 + 오른쪽 여백 3 + gap 8 = 31px (13px일 땐 28px). */
+  .article:has(.article-select) .action-row {{ padding-left: 31px; }}
   /* [추가: 2026-09-01] app.renderer와 동일 — 소제목 헤더의 📋(.group-copy-btn)도
      같은 아이콘 전환을 쓴다(색·크기는 옆 ✏️🗑️와 같은 .rename-btn에서 물려받는다). */
   .copy-btn, .group-copy-btn {{ display: inline-flex; align-items: center; }}
@@ -624,7 +696,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .copy-btn.is-copied .icon-done, .group-copy-btn.is-copied .icon-done {{ display: inline-flex; }}
   /* [추가: 2026-08-05] app.renderer와 동일 — 원문 다시 가져오기 버튼, 평소 숨김. */
   .refetch-btn {{
-    flex-shrink: 0; background: transparent; border: none; color: {muted}; font-size: 1rem;
+    flex-shrink: 0; background: transparent; border: none; color: {muted}; font-size: var(--fs-base);
     cursor: pointer; padding: 2px 6px; user-select: none; -webkit-user-select: none;
     opacity: 0; transition: opacity 0.15s;
   }}
@@ -640,19 +712,24 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .more-wrap {{ position: relative; display: inline-flex; flex-shrink: 0; }}
   .more-btn {{
     background: transparent; border: none; color: {muted}; font-size: 1.05rem; line-height: 1;
-    cursor: pointer; padding: 3px 7px; border-radius: 4px;
+    cursor: pointer; padding: 3px 7px; border-radius: var(--r-sm);
     user-select: none; -webkit-user-select: none;
   }}
   .more-btn:hover {{ background: {hover}; color: {accent}; }}
   .more-menu {{
     display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 60;
-    min-width: 172px; background: {card}; border: 1px solid {border}; border-radius: 8px;
-    padding: 4px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.13);
+    min-width: 172px; background: {card}; border: 1px solid {border}; border-radius: var(--r-lg);
+    padding: 4px; box-shadow: var(--sh-pop);
   }}
   .more-wrap.is-open .more-menu {{ display: block; }}
+  /* ⋯ 버튼 — 메뉴의 「복사하기」를 누르면 1초간 ✓로 바뀐다(copyArticleIcon). */
+  .more-btn .icon-default {{ display: inline-flex; }}
+  .more-btn .icon-done {{ display: none; }}
+  .more-btn.is-copied .icon-default {{ display: none; }}
+  .more-btn.is-copied .icon-done {{ display: inline-flex; }}
   .more-menu button {{
     display: block; width: 100%; text-align: left; background: transparent; border: none;
-    padding: 8px 10px; border-radius: 5px; font-size: 0.85rem; color: {text};
+    padding: 8px 10px; border-radius: var(--r-sm); font-size: var(--fs-md); color: {text};
     cursor: pointer; white-space: nowrap;
   }}
   .more-menu button:hover {{ background: {hover}; }}
@@ -661,38 +738,48 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 {label_popover_style}
   /* [추가: 2026-08-05] app.renderer와 동일 — ✏️ 직접 수정 인라인 편집 칸. */
   .edit-summary-form {{
-    margin: 8px 0 4px 20px; padding: 10px 12px; border: 1px solid {accent}; border-radius: 8px;
+    margin: 8px 0 4px 20px; padding: 10px 12px; border: 1px solid {accent}; border-radius: var(--r-lg);
     display: flex; flex-direction: column; gap: 8px;
   }}
   .edit-summary-form input, .edit-summary-form textarea {{
-    width: 100%; box-sizing: border-box; padding: 6px 10px; border: 1px solid {border}; border-radius: 6px;
-    font-size: 0.88rem; color: {text}; background: {card}; font-family: inherit;
+    width: 100%; box-sizing: border-box; padding: 6px 10px; border: 1px solid {border}; border-radius: var(--r-md);
+    font-size: var(--fs-md); color: {text}; background: {card}; font-family: inherit;
   }}
   .edit-summary-form .edit-summary-actions {{ display: flex; justify-content: flex-end; gap: 8px; }}
-  .edit-summary-form button {{ font-size: 0.82rem; padding: 5px 12px; }}
-  .empty {{ text-align: center; margin-top: 60px; font-size: 1.1rem; color: {muted}; }}
-  .bottom {{ margin-top: 40px; background: {bg}; border: 1px solid {border}; border-radius: 8px; padding: 16px 18px; }}
-  .bottom h3 {{ margin: 0 0 8px; font-size: 1rem; color: {header}; }}
+  .edit-summary-form button {{ font-size: var(--fs-sm); padding: 5px 12px; }}
+  .empty {{ text-align: center; margin-top: 60px; font-size: var(--fs-lg); color: {muted}; }}
+  .bottom {{ margin-top: 40px; background: {bg}; border: 1px solid {border}; border-radius: var(--r-lg); padding: 16px 18px; }}
+  .bottom h3 {{ margin: 0 0 8px; font-size: var(--fs-base); color: {header}; }}
   .bottom-summary {{ padding-top: 2px; }}
   .bottom-header-row {{ display: flex; align-items: center; justify-content: space-between; gap: 8px; }}
   .bottom-header-row h3 {{ margin: 0; }}
   .bottom-summary-copy {{
-    font-size: 0.78rem; color: {accent}; background: transparent; border: 1px solid {border};
-    border-radius: 6px; padding: 3px 10px; cursor: pointer; font-family: inherit;
+    font-size: var(--fs-sm); color: {accent}; background: transparent; border: 1px solid {border};
+    border-radius: var(--r-md); padding: 3px 10px; cursor: pointer; font-family: inherit;
   }}
   .bottom-summary-item {{ padding: 8px 0; border-bottom: 1px solid {border}; }}
   .bottom-summary-item:last-child {{ border-bottom: none; padding-bottom: 0; }}
   .bottom-summary-item strong {{ display: block; color: {header}; margin-bottom: 3px; }}
-  .bottom-summary-item p {{ margin: 0; }}
+  .bottom-summary-item p {{ margin: 0; white-space: pre-line; }}
   .manual-divider {{
     display: flex; align-items: center; gap: 10px; margin: 32px 0 4px;
-    color: {muted}; font-size: 0.75rem;
+    color: {muted}; font-size: var(--fs-sm);
   }}
   .manual-divider::before, .manual-divider::after {{ content: ""; flex: 1; border-top: 1px dashed {border}; }}
-  .manual-zone {{ border: 1px dashed {border}; border-radius: 8px; padding: 14px 18px; margin-top: 10px; }}
+  /* app.renderer와 동일 — "📂 소제목 미분류" 칸과 같은 문법(왼쪽 4px 띠 + 옅은 바탕 +
+     오른쪽만 둥근 모서리)을 쓰고 색만 캐러멜로 가른다. 이유는 app.renderer의 같은 자리. */
+  .manual-zone {{
+    border-left: 4px solid {pinned_bar}; background: {pinned_bg};
+    border-radius: 0 var(--r-lg) var(--r-lg) 0; padding: 10px 16px 12px; margin-top: 10px;
+  }}
   .manual-zone-head {{ display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }}
-  .manual-zone-title {{ font-weight: 600; color: {text}; font-size: 0.95rem; }}
-  .manual-zone-hint {{ font-size: 0.75rem; color: {muted}; }}
+  .manual-zone-title {{ font-weight: 600; color: {text}; font-size: var(--fs-base); }}
+  .manual-zone-hint {{ font-size: var(--fs-sm); color: {muted}; }}
+  /* app.renderer와 동일 — 건수 칩은 칸 색(캐러멜)을 따른다. */
+  .manual-zone-count {{
+    margin-left: 4px; font-weight: 700; font-size: var(--fs-sm); color: {pinned_text};
+    background: {pinned_chip_bg}; border: 1px solid {pinned_border}; border-radius: var(--r-pill); padding: 1px 8px;
+  }}
   /* [추가: 2026-08-26] app/renderer.py의 같은 자리와 동일 — 제목·건수·"AI 기사 배정"을
      한 묶음으로 왼쪽에 붙여, 📂 소제목 미분류 칸 헤더와 같은 구성으로 읽히게 한다. */
   .manual-zone-left {{ display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }}
@@ -700,7 +787,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [추가: 2026-08-05] app.renderer와 동일 — 직접 키워드 작성 메모 칸. */
   /* [수정: 2026-08-07] app.renderer와 동일 — 스크롤 중에도 계속 보이도록 sticky 고정. */
   .keyword-note-zone {{
-    display: none; align-items: center; gap: 8px; border: 1px dashed {border}; border-radius: 8px;
+    display: none; align-items: center; gap: 8px; border: 1px dashed {border}; border-radius: var(--r-lg);
     padding: 10px 14px; margin: 10px 0 4px; flex-wrap: wrap;
     position: sticky; top: 60px; z-index: 15; background: {card};
   }}
@@ -709,12 +796,26 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      높이만큼 내려가므로(body.round-over .topbar) 이 sticky의 top도 같이 따라간다. */
   body.round-over .keyword-note-zone {{ top: calc(60px + var(--round-banner-h, 0px)); }}
   .keyword-note-zone input {{
-    flex: 1; min-width: 220px; padding: 6px 10px; border: 1px solid {border}; border-radius: 6px;
-    font-size: 0.88rem; color: {text}; background: {card};
+    flex: 1; min-width: 220px; height: var(--h-md); box-sizing: border-box; padding: 0 10px; border: 1px solid {border}; border-radius: var(--r-md);
+    font-size: var(--fs-md); color: {text}; background: {card};
   }}
   /* [추가: 2026-08-10] app.renderer와 동일 — 저장된 메모는 (수정)을 눌러야 편집 가능. */
   .keyword-note-zone input:disabled {{ background: {bg}; color: {muted}; }}
-  .keyword-note-zone button {{ font-size: 0.82rem; padding: 5px 10px; white-space: nowrap; }}
+  .keyword-note-zone button {{ font-size: var(--fs-sm); height: var(--h-md); padding: 0 12px; box-sizing: border-box;
+    border-radius: var(--r-md); white-space: nowrap; }}
+  /* 모양 규칙: 지우기(삭제·취소)는 채움 파랑으로 두지 않는다 — 글자 버튼, 올리면 빨강. */
+  .keyword-note-zone .clear-btn {{ background: transparent; color: {muted}; }}
+  .keyword-note-zone .clear-btn:hover {{ background: transparent; color: {error}; }}
+  /* [추가: 2026-09-21] "+ URL로 추가" — 네이버에서 직접 찾아온 기사를 URL만으로
+     📌 담아둔 기사 칸에 올리는 입구. 검색어 화면(상시 조건)을 안 거치는 게 요점이라
+     모양은 키워드 메모 칸과 같은 점선 패널로 맞췄다. 여러 줄 붙여넣기를 받으므로
+     input이 아니라 textarea다. */
+  /* 테두리는 파랑(accent) 실선 — 색 계열 규칙상 파랑이 "담당자의 동작"이다(연보라는
+     AI 전용, 청록은 수시 정체성). 점선을 안 쓰는 건 이 화면에 점선 상자가 이미 둘
+     있어서다: 회색 점선 = 키워드 메모 칸, 하늘색 굵은 점선 = 직접 만든 소제목.
+     셋이 한 화면에 서므로 실선으로 갈라야 서로 안 헷갈린다. */
+{url_add_style}
+{note_history_style}
   /* [추가: 2026-08-26] app.renderer와 동일 — 직전 회차 메모를 미리 채워둔 상태 표시. */
   /* [추가: 2026-08-13] app.renderer와 동일 — 단색 SVG 아이콘(app.icons) 공통 크기·색. */
   .ic {{ width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
@@ -729,20 +830,17 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     <button type="button" class="dismiss" onclick="dismissRoundOverBanner()">나중에</button>
   </div>
 </div>
-<div class="topbar"><div class="topbar-inner">
-  <a href="{home_href}">홈</a>
-  <a href="{live_href}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color:{error}"><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><path d="M6.4 6.4a8 8 0 0 0 0 11.2M17.6 17.6a8 8 0 0 0 0-11.2"/></svg> 실시간</a>
-  <a href="{scrap_href}">확정본</a>
-</div></div>
+{topnav_html}
 <div class="container">
   <header class="preview-head">
-    <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h6"/><path d="M14 2v6h6v3"/><path d="M20.5 13.5a1.6 1.6 0 0 1 2.2 2.2L18 20.5l-3 .8.8-3Z"/></svg> 초안 {run_slot_html}{total_count_html}</h1>
+    <h1><span class="screen-tag work">초안</span>{run_slot_html}{total_count_html}</h1>
   </header>
   <div class="actions" id="preview-actions">{actions_html}</div>
   <div class="keyword-note-zone{note_open_class}" id="keyword-note-zone">
     <input type="text" id="keyword-note-input" value="{note_value_attr}" placeholder="키워드 a, 키워드 b, 키워드 c..." onkeydown="keywordNoteKey(event)"{note_input_disabled_attr}>
     <button type="button" onclick="toggleKeywordEditMode(this)">{note_save_btn_label}</button>
     <button class="clear-btn" type="button" onclick="{note_clear_btn_onclick}">{note_clear_btn_label}</button>
+    {note_history_html}
   </div>
   <div class="preview-hint" id="preview-hint">{hint}</div>
   <div id="preview-body">{body}</div>
@@ -751,6 +849,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 {hidden_trash_html}
 {name_picker_html}
 <span class="round-countdown" id="round-countdown"></span>
+{scroll_top_html}
 <button type="button" class="toc-toggle-btn" onclick="toggleTocPopover()" title="소제목 목차"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
 <div class="toc-popover" id="toc-popover"></div>
 <div class="bottombar"><div class="bottombar-inner">
@@ -760,7 +859,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     <button type="button" onclick="bulkMoveSelected()">옮기기</button>
     <button type="button" id="bulk-move-up" onclick="bulkMoveOrder('up')" title="선택한 기사들을 통째로 위로 이동(같은 소제목 안에서만)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
     <button type="button" id="bulk-move-down" onclick="bulkMoveOrder('down')" title="선택한 기사들을 통째로 아래로 이동(같은 소제목 안에서만)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
-    <button type="button" onclick="bulkHideSelected()" title="선택한 기사 전부 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+    <button type="button" onclick="bulkHideSelected(this)" title="선택한 기사 전부 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
     {split_button_html}
     <button class="clear-btn" type="button" onclick="clearSelection()">선택 해제</button>
   </div>
@@ -776,7 +875,122 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   </div>
 </div></div>
 <script>
+// 「✂ 오늘만 여기서 끊기」 — 창은 여는 순간 그린다(지금 시각·기사 게시시각이 그때 기준이어야 한다).
+// 서버 동작·저장 규칙은 app.cut_round, 시간표 끼우기는 app.today_cuts.
+var CUT_NOTICE_KEY = "cutRoundNotice";
+var _cutSel = null, _cutIsNow = true;
+function _cutPad(n) {{ return String(n).padStart(2, "0"); }}
+function _cutNow() {{ var d = new Date(); return _cutPad(d.getHours()) + ":" + _cutPad(d.getMinutes()); }}
+function _cutMin(t) {{ var p = t.split(":"); return (+p[0]) * 60 + (+p[1]); }}
+function _cutKr(t) {{ var p = t.split(":").map(Number); return p[1] ? p[0] + "시 " + p[1] + "분" : p[0] + "시"; }}
+function _cutEsc(t) {{ var d = document.createElement("div"); d.textContent = t; return d.innerHTML; }}
+function _cutPubTimes() {{
+  // 보고서에 들어가는 기사만(📌 담아둔 기사 칸은 소제목 section 밖이라 안 센다). 숨긴 기사는 화면에 없다.
+  return Array.prototype.map.call(
+    document.querySelectorAll("#preview-body section.subheading .article .pub-time-relative[data-pub-date]"),
+    function (el) {{ return el.getAttribute("data-pub-date").slice(11, 16); }});
+}}
+function openCutPop(e) {{
+  if (e) e.stopPropagation();
+  var pop = document.getElementById("cut-pop");
+  if (!pop) return;
+  if (!pop.hidden) {{ closeCutPop(); return; }}
+  _cutSel = _cutNow(); _cutIsNow = true;
+  pop.hidden = false;
+  var btn = document.querySelector(".cut-btn"); if (btn) btn.classList.add("is-open");
+  renderCutPop();
+}}
+function closeCutPop() {{
+  var pop = document.getElementById("cut-pop");
+  if (pop) pop.hidden = true;
+  var btn = document.querySelector(".cut-btn"); if (btn) btn.classList.remove("is-open");
+}}
+function pickCut(t, isNow) {{ if (!t) return; _cutSel = t; _cutIsNow = !!isNow; renderCutPop(); }}
+function renderCutPop(errText) {{
+  var pop = document.getElementById("cut-pop");
+  var start = pop.dataset.start, end = pop.dataset.end, now = _cutNow();
+  if (_cutIsNow) _cutSel = now;
+  var sel = _cutSel;
+  var valid = start < sel && sel < end;
+  var future = sel > now;
+  var chips = ['<button type="button" class="cut-tchip' + (_cutIsNow ? " on" : "") + '" data-t="' + now + '" onclick="pickCut(this.dataset.t, true)">지금 ' + now + '</button>'];
+  for (var m = Math.floor(_cutMin(start) / 30) * 30 + 30; m < _cutMin(end); m += 30) {{
+    var t = _cutPad(Math.floor(m / 60)) + ":" + _cutPad(m % 60);
+    if (t === now) continue;
+    chips.push('<button type="button" class="cut-tchip' + (!_cutIsNow && t === sel ? " on" : "") + '" data-t="' + t + '" onclick="pickCut(this.dataset.t, false)">'
+      + t + (t > now ? "<small>예약</small>" : "") + '</button>');
+  }}
+  var pubs = _cutPubTimes();
+  var upto = sel < now ? sel : now;
+  var before = pubs.filter(function (t) {{ return t <= upto; }}).length;
+  var after = pubs.filter(function (t) {{ return t > sel; }}).length;
+  var top = future
+    ? '<b>' + _cutKr(sel) + ' 확정본</b> — 지금까지 ' + before + '건 + ' + sel + '까지 더 들어올 기사'
+    : '<b>' + _cutKr(sel) + ' 확정본</b> — ' + before + '건';
+  var bottom = _cutKr(end) + ' 회차가 이어서 모아요' + (!future && after ? ' — 지금 ' + after + '건' : '');
+  var when = errText ? '<p class="cut-when err">' + _cutEsc(errText) + '</p>'
+    : !valid ? '<p class="cut-when err">' + start + ' 뒤, ' + end + ' 전 시각만 고를 수 있어요.</p>'
+    : future ? '<p class="cut-when">' + sel + '이 되면 확정본이 만들어져요. 그 전엔 제목 옆 칩에서 취소할 수 있어요.</p>'
+    : '<p class="cut-when warn">바로 확정본이 만들어져요. 오늘 회차라 지울 수 없어요.</p>';
+  pop.innerHTML =
+    '<h4>✂ 오늘만 이 시간까지 확정본으로</h4>'
+    + '<p class="sub">' + _cutKr(end) + ' 회차를 둘로 나눠요. 수집 시간 설정은 그대로이고, 자정이 지나면 원래대로 돌아가요.</p>'
+    + '<div class="cut-row">' + chips.join("")
+    + '<input class="cut-time" type="time" value="' + sel + '" onchange="pickCut(this.value, false)" title="분 단위로 직접 고르기"></div>'
+    + '<div class="cut-split"><div class="top"><span class="k">~ ' + sel + '</span><span class="v">' + top + '</span></div>'
+    + '<div><span class="k">' + sel + ' ~ ' + end + '</span><span class="v">' + bottom + '</span></div></div>'
+    + when
+    + '<div class="cut-foot"><button type="button" class="no" onclick="closeCutPop()">닫기</button>'
+    + '<button type="button" class="ok" id="cut-ok"' + (valid ? '' : ' disabled') + ' onclick="submitCut(this)">✂ ' + sel + '까지 확정본으로</button></div>';
+}}
+function submitCut(btn) {{
+  var at = _cutIsNow ? "" : _cutSel;
+  btn.disabled = true;
+  btn.textContent = "만드는 중…";
+  fetch("http://{settings_host}:{settings_port}/cut-round", {{
+    method: "POST",
+    headers: {{ "Content-Type": "application/x-www-form-urlencoded" }},
+    body: "at=" + encodeURIComponent(at),
+  }}).then(function (r) {{ return r.json(); }}).then(function (res) {{
+    if (!res.ok) {{ renderCutPop(res.reason || "끊지 못했어요."); return; }}
+    try {{ sessionStorage.setItem(CUT_NOTICE_KEY, JSON.stringify({{ mode: res.mode, end: res.end, t: Date.now() }})); }} catch (e) {{}}
+    location.reload();
+  }}).catch(function () {{ renderCutPop("앱에 연결하지 못했어요. 잠시 뒤 다시 눌러 주세요."); }});
+}}
+function cancelCut(btn) {{
+  btn.disabled = true;
+  fetch("http://{settings_host}:{settings_port}/cut-round-cancel", {{
+    method: "POST",
+    headers: {{ "Content-Type": "application/x-www-form-urlencoded" }},
+    body: "end=" + encodeURIComponent(btn.getAttribute("data-end")),
+  }}).then(function (r) {{ return r.json(); }}).then(function (res) {{
+    if (!res.ok) {{ alert(res.reason || "취소하지 못했어요."); btn.disabled = false; return; }}
+    location.reload();
+  }}).catch(function () {{ alert("앱에 연결하지 못했어요."); btn.disabled = false; }});
+}}
+document.addEventListener("click", function (e) {{
+  var pop = document.getElementById("cut-pop");
+  if (pop && !pop.hidden && !e.target.closest(".cut-pop") && !e.target.closest(".cut-btn")) closeCutPop();
+}});
+document.addEventListener("keydown", function (e) {{ if (e.key === "Escape") closeCutPop(); }});
+(function showCutNotice() {{
+  var raw = null;
+  try {{ raw = sessionStorage.getItem(CUT_NOTICE_KEY); sessionStorage.removeItem(CUT_NOTICE_KEY); }} catch (e) {{}}
+  if (!raw) return;
+  var n; try {{ n = JSON.parse(raw); }} catch (e) {{ return; }}
+  if (!n || !n.end || Date.now() - (n.t || 0) > 30000) return;
+  var line = document.createElement("div");
+  line.className = "cut-done-line";
+  line.innerHTML = n.mode === "done"
+    ? "✂ " + _cutKr(n.end) + " 확정본을 만들었어요. 이어지는 회차는 " + n.end + " 뒤 기사부터 모아요.<a href='{scrap_href}'>확정본 열기 →</a>"
+    : "✂ " + n.end + "에 끊도록 걸어 뒀어요. 그때 확정본이 만들어지고, 그 전엔 제목 옆 칩에서 취소할 수 있어요.";
+  var head = document.querySelector(".preview-head");
+  if (head && head.parentNode) head.parentNode.insertBefore(line, head.nextSibling);
+}})();
 {hidden_trash_script}
+{scroll_top_script}
+{hide_batch_script}
+{range_select_script}
 {name_picker_script}
 {kw_inline_script}
 {photo_gather_script}
@@ -1258,10 +1472,10 @@ function cycleChipColor(chip) {{
 // 못 받았다. 실제로 2026-08-20 09:30 회차에서 일괄로 숨긴 뉴스1 기사가 같은 제목·같은
 // 언론사로 기사 ID만 바뀌어 다시 들어왔다. 세 경로가 같은 본문을 쓰게 해서 원천 차단한다.
 // (dataset 값이 없으면 "undefined" 문자열이 그대로 실려 가짜 언론사명이 저장되므로 || "".)
-// [추가: 2026-09-02] group — 쓰레기통이 "한 번에 숨긴 덩어리"에 소제목 이름을 붙이는 데
+// [추가: 2026-09-02] group — 휴지통이 "한 번에 숨긴 덩어리"에 소제목 이름을 붙이는 데
 // 쓴다(숨김 판정에는 관여하지 않는다). 확정본과 같은 본문이어야 두 화면이 같은 값을 남긴다.
-// [추가: 2026-09-15] batch — 일괄·소제목 통째 숨기기는 한 번의 동작을 기사 수만큼 요청으로
-// 나눠 보낸다. 같은 값을 실어 보내 서버(app.undo.push)가 "한 동작"으로 알아보게 하고,
+// [추가: 2026-09-15] batch — 일괄·소제목 통째 숨기기가 한 번의 동작임을 서버에 알린다(지금은
+// postHideBatch 한 요청으로 보내지만, 되돌린 뒤 전부 칠하는 표시로 계속 쓴다). 같은 값을 실어 보내 서버(app.undo.push)가 "한 동작"으로 알아보게 하고,
 // 되돌린 뒤 그때 숨긴 기사를 전부 칠한다. 단건 🗑️는 안 붙인다 — 3초 안에 따로따로 누른
 // 숨기기는 되돌리기는 한 번에 되지만 칠하는 건 마지막으로 누른 기사뿐이다.
 function hideArticleBody(btn, batch) {{
@@ -1517,26 +1731,22 @@ function bulkMoveOrder(direction) {{
   }});
 }}
 // [추가: 2026-08-05] app.renderer와 동일 — 선택한 기사 여러 개를 한꺼번에 숨긴다.
-function bulkHideSelected() {{
+function bulkHideSelected(trigger) {{
   // [수정: 2026-08-20] 체크박스(url만 있음)가 아니라 그 행의 🗑️ 버튼을 모은다 —
   // 언론사·제목·발행시각까지 함께 보내려면 그 값들을 들고 있는 쪽이 필요하다(hideArticleBody).
   var btns = Array.prototype.map.call(document.querySelectorAll(".article-select:checked"), function(cb) {{
     var article = cb.closest(".article");
     return article ? article.querySelector(".hide-btn[data-url]") : null;
   }}).filter(function(btn) {{ return btn; }});
-  if (!btns.length) {{ return; }}
-  if (!confirm(btns.length + "개 기사를 숨길까요? (숨긴 기사 관리에서 하나씩 되돌릴 수 있어요)")) return;
-  var batch = newHideBatchId();
-  Promise.all(btns.map(function(btn) {{
-    return fetch("http://{settings_host}:{settings_port}/hide-article", {{
-      method: "POST", keepalive: true,
-      headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
-      body: hideArticleBody(btn, batch)
-    }});
-  }})).then(function(responses) {{
-    if (responses.every(function(res) {{ return res.ok; }})) {{ location.reload(); }}
-    else {{ alert("일부 기사를 숨기지 못했습니다. 다시 시도해주세요."); }}
+  if (!btns.length || document.querySelector(".hiding-note")) {{ return; }}
+  // [수정: 2026-09-22] 기사 수만큼 요청을 나눠 보내던 것을 한 요청으로(postHideBatch), 누르는
+  // 순간 고른 기사를 흐리게 하고 「N건 숨기는 중…」을 띄운다(hide_batch_script).
+  var restore = showHiding(btns.map(function(btn) {{ return btn.closest(".article"); }}), trigger, btns.length);
+  postHideBatch(btns, newHideBatchId()).then(function(res) {{
+    if (res.ok) {{ location.reload(); }}
+    else {{ restore(); alert("숨기지 못했습니다. 다시 시도해주세요."); }}
   }}).catch(function() {{
+    restore();
     alert("숨기기에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
   }});
 }}
@@ -1782,6 +1992,8 @@ function toggleKeywordNote(btn) {{
   document.getElementById("keyword-note-zone").classList.add("is-open");
   btn.style.display = "none";
 }}
+{url_add_script}
+{note_history_script}
 // [추가: 2026-08-10] app.renderer와 동일 — 저장/수정 버튼 통합.
 function toggleKeywordEditMode(btn) {{
   var input = document.getElementById("keyword-note-input");
@@ -1936,25 +2148,25 @@ function _renameGroupSubmit(name, newLabel) {{
 function hideGroup(btn) {{
   var section = btn.closest(".subheading");
   // [수정: 2026-09-16] 확인창을 없앴다 — 보관함 줄 끝 🗑(확인창 없음)와 같은 근거다:
-  // 되돌릴 자리가 곧바로 화면에 남는다(좌하단 ↩ 한 번이면 통째로 되살아나고, 쓰레기통
+  // 되돌릴 자리가 곧바로 화면에 남는다(좌하단 ↩ 한 번이면 통째로 되살아나고, 휴지통
   // 팝오버엔 「소제목명 N건 · ↩ 모두 복구」 한 줄이 남는다). 소제목 하나가 통째로
   // 사라지는 건 화면에서 즉시 보이므로 "모르고 지나치는" 실수도 안 생긴다.
-  // 하단바 일괄 🗑(bulkHideSelected)는 확인창을 그대로 둔다 — 체크가 여러 소제목에
-  // 흩어져 있을 수 있어 무엇이 사라지는지 누르기 전에 한눈에 안 보이기 때문.
+  // 하단바 일괄 🗑(bulkHideSelected)도 확인창이 없다.
   // [수정: 2026-08-20] url만 뽑아 보내던 것을, 버튼 자체를 넘겨 언론사·제목·발행시각까지
   // 함께 보내도록 바꿨다(hideArticleBody 주석 참고).
+  if (section.querySelector(".hiding-note")) {{ return; }}
   var btns = Array.prototype.slice.call(section.querySelectorAll(".hide-btn[data-url]"));
-  var batch = newHideBatchId();
-  Promise.all(btns.map(function (btn) {{
-    return fetch("http://{settings_host}:{settings_port}/hide-article", {{
-      method: "POST", keepalive: true,
-      headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
-      body: hideArticleBody(btn, batch)
-    }});
-  }})).then(function (responses) {{
-    if (responses.every(function (res) {{ return res.ok; }})) {{ location.reload(); }}
-    else {{ alert("일부 기사를 숨기지 못했습니다. 다시 시도해주세요."); }}
+  if (!btns.length) {{ return; }}
+  // [수정: 2026-09-22] 기사 수만큼 요청을 나눠 보내던 것을 한 요청으로 — 요청마다 되돌리기
+  // 기록 쓰기와 화면 재생성이 되풀이돼 기사가 많을수록 몇 초씩 걸렸다. 누르는 순간 그 소제목의
+  // 기사 줄을 흐리게 하고 🗑 자리 앞에 「N건 숨기는 중…」을 띄운다(hide_batch_script) — 머리줄은
+  // 흐리지 않는다(안내 글자까지 흐려져 안 읽힌다).
+  var restore = showHiding(btns.map(function (b) {{ return b.closest(".article"); }}), btn, btns.length);
+  postHideBatch(btns, newHideBatchId()).then(function (res) {{
+    if (res.ok) {{ location.reload(); }}
+    else {{ restore(); alert("숨기지 못했습니다. 다시 시도해주세요."); }}
   }}).catch(function () {{
+    restore();
     alert("숨기기에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
   }});
 }}
@@ -2108,6 +2320,62 @@ renderRelativeTimes();
 """
 
 
+def _draft_heading(slot_end, now=None, slot: Optional[dict] = None) -> dict:
+    """초안 제목·탭 제목 — 확정본과 같은 머리줄 「언론 모니터링 N시 기준」 + 뒤에 회색
+    「(예정, 지금 N시 N분 기준)」. 어느 화면인지는 제목 앞 (초안) 칩이 말한다(NAME_CHIP_MOCKUP.html).
+    탭 제목은 좁아지면 뒤가 잘리므로 화면 이름을 맨 앞에 둔다.
+
+    slot을 넘기면(기사가 그려지는 초안) 회색 시각 바로 뒤에 「✂ 오늘만 여기서 끊기」 입구를
+    붙인다(_cut_heading_html)."""
+    if not slot_end:
+        return {"run_slot_html": "", "page_title": "초안"}
+    base = f"언론 모니터링 {format_slot_time_kr(slot_end)} 기준"
+    sub = f"예정, 지금 {format_slot_time_kr(now)} 기준" if now else "예정"
+    return {
+        "run_slot_html": f'{html.escape(base)}<span class="head-sub">({html.escape(sub)})</span>'
+        + (_cut_heading_html(slot) if slot else ""),
+        "page_title": html.escape(f"초안 · {base}"),
+    }
+
+
+def _cut_heading_html(slot: dict) -> str:
+    """머리줄의 「✂ 오늘만 여기서 끊기」 — 평소엔 흐린 ✂ 하나, 마우스를 올리면 글자가 붙는다.
+
+    평소엔 쓸 일이 없는 기능이라 자리만 기억할 수 있게 흐리게 둔다(시안 SLOT_CUT_MOCKUP.html).
+    누르면 끊기 창(#cut-pop)이 열리고, 창 안에서 한 번 더 눌러야 끊긴다. 끊은 상태는 옆 칩:
+    예약이면 「✂ 오늘만 16:00에 끊음 · 취소」, 이미 확정본이 됐으면 「✂ 오늘 15:57에 끊음」.
+    창의 내용(시각 칩·몇 건씩 갈리는지)은 JS가 여는 순간 그린다(openCutPop).
+    """
+    try:
+        from app.cut_round import cut_state
+
+        state = cut_state()
+    except Exception:
+        logger.exception("오늘만 끊기 상태를 읽지 못했습니다 — 머리줄 ✂를 그리지 않습니다")
+        return ""
+    chip = ""
+    if state["pending"]:
+        end = html.escape(state["pending"])
+        chip = (
+            f'<span class="cut-chip" title="오늘만 — {end}이 되면 확정본이 만들어집니다">'
+            f'✂ 오늘만 {end}에 끊음<button type="button" data-end="{end}" onclick="cancelCut(this)">취소</button></span>'
+        )
+    elif state["done"]:
+        ends = " · ".join(html.escape(e) for e in state["done"])
+        chip = (
+            f'<span class="cut-chip done" title="오늘만 — 자정이 지나면 원래 수집 시간으로 돌아갑니다">'
+            f'✂ 오늘 {ends}에 끊음</span>'
+        )
+    return (
+        '<button type="button" class="cut-btn" onclick="openCutPop(event)" '
+        'title="오늘만 — 이 시간까지 확정본으로 넣고, 뒤 기사는 원래 회차가 이어서 모읍니다" '
+        'aria-label="여기서 끊기">✂<span class="lbl">여기서 끊기</span></button>'
+        + chip
+        + f'<div class="cut-pop" id="cut-pop" hidden data-start="{html.escape(slot["start"])}" '
+        f'data-end="{html.escape(slot["end"])}" onclick="event.stopPropagation()"></div>'
+    )
+
+
 def _theme() -> dict:
     # [수정: 2026-08-21] 색 값은 전부 app.config.PALETTE 하나에서 온다 — 예전엔
     # seen_color/new_arrival_bg/tonal_hover 같은 값이 여기 직접 적혀 있었고, 같은 색을
@@ -2115,20 +2383,24 @@ def _theme() -> dict:
     return {
         **PALETTE,
         "font_stack": FONT_STACK,
+        "topnav_style": topnav_style(),
+        "topnav_html": regular_nav("preview"),
         # [추가: 2026-09-01] 색은 아니지만 같은 이유로 여기 싣는다 — 「AI 모든 기사
         # 재분류」 확인창의 안심 문구를 확정본과 글자 하나까지 공유하기 위해서고,
         # _theme()을 거치면 이 파일의 format 자리 네 곳에 따로 등록할 필요가 없다
         # (str.format은 안 쓰는 키를 그냥 무시한다).
         "reclassify_safe_note": RECLASSIFY_SAFE_NOTE,
         # [추가: 2026-09-15] 「AI 기사 나누기」 — CSS·마크업·JS 모두 확정본(app.renderer)과 한 곳에서
-        # 만든 값(쓰레기통과 같은 이유). 초안은 /split-group, 확정본은 /split-group-final로 보낸다.
+        # 만든 값(휴지통과 같은 이유). 초안은 /split-group, 확정본은 /split-group-final로 보낸다.
         "split_button_style": split_button_style(),
+        "screen_tag_style": screen_tag_style(),
         "split_button_html": split_button_html(),
         "split_button_script": split_button_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT, "/split-group"),
         # [추가: 2026-09-04] "앞 회차 기사" 칩 CSS — 확정본(app.renderer)과 한 곳에서
         # 만든 값을 그대로 받는다. 초안도 확정본과 같은 창을 보게 되면서 이 칩이 여기에도
         # 붙기 때문이고, .photo-badge처럼 복붙해 두면 한쪽만 고쳤을 때 어긋난다.
         "late_badge_style": late_badge_style(),
+        "export_links_style": export_links_style(),
         # [추가: 2026-09-14] 🔍 검색어 CSS·툴팁 — 확정본과 한 곳에서 만든 값(같은 이유).
         "kw_inline_style": kw_inline_style(),
         "kw_inline_script": kw_inline_script(),
@@ -2136,12 +2408,20 @@ def _theme() -> dict:
         # 키는 회차 마감 시각(ROUND_DEADLINE_MS)이라 다음 회차 초안은 평소 화면으로 열린다.
         "photo_gather_style": photo_gather_style(),
         "photo_gather_script": photo_gather_script('"photoGather:preview:" + ROUND_DEADLINE_MS'),
-        # [추가: 2026-09-02] 좌하단 쓰레기통 — CSS·마크업·JS 모두 확정본(app.renderer)의
+        # [추가: 2026-09-02] 좌하단 휴지통 — CSS·마크업·JS 모두 확정본(app.renderer)의
         # 것을 그대로 쓴다. 두 화면이 같은 자리에 같은 것을 보여줘야 하는데 코드가 갈리면
         # 한쪽만 고쳐져 어긋난다(이 파일이 render_article을 import해 쓰는 것과 같은 이유).
         "hidden_trash_style": hidden_trash_style(),
         "hidden_trash_html": hidden_trash_html(_hidden_href()),
         "hidden_trash_script": hidden_trash_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
+        "scroll_top_style": scroll_top_style(),
+        "scroll_top_html": scroll_top_html(),
+        "scroll_top_script": scroll_top_script(),
+        "hide_batch_style": hide_batch_style(),
+        "hide_batch_script": hide_batch_script(),
+        "range_select_script": range_select_script(".article-select", ".article"),
+        "url_add_style": url_add_style(),
+        "url_add_script": url_add_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT, "preview"),
         "label_popover_style": label_popover_style(),
         "label_popover_script": label_popover_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
         "name_picker_style": name_picker_style(),
@@ -2180,6 +2460,9 @@ def _preview_keywords_signature(groups: list, slot: dict) -> dict:
     return {
         "keywords": search_condition(groups),
         "slot_end": slot["end"],
+        # 「✂ 오늘만 여기서 끊기」로 회차를 끊으면 끝은 그대로(17:00)인데 시작이 끊은 시각으로
+        # 당겨진다 — 시작도 서명에 넣어야 끊기 전 넓은 창에서 모은 캐시를 이어 쓰지 않는다.
+        "slot_start": slot.get("start"),
         # [추가: 2026-09-04] 검색 하한 규칙이 바뀌면 그 전에 쌓인 캐시는 더 좁은 창에서
         # 모은 것이라 그대로 이어 쓰면 안 된다 — 값을 서명에 넣어두면 규칙이 바뀌는
         # 순간 캐시가 자동으로 무효화돼 회차 시작−lookback부터 다시 한 번 훑는다.
@@ -2336,10 +2619,6 @@ def _compute_preview_articles(settings: dict, slot: dict) -> list:
         articles = sort_by_outlet_priority(articles, priority_outlets=outlet_order)
     else:
         articles = sort_by_outlet_priority(articles)
-    if settings.get("exclude_photo_in_scrap", False):
-        articles = _track(articles, exclude_photo_articles(articles), "사진기사 제외 설정")
-    if settings.get("exclude_personnel_in_scrap", False):
-        articles = _track(articles, exclude_personnel_articles(articles), "인사 기사 제외 설정")
     articles = _track(articles, deduplicate_by_title(articles, prefer=seen["seen_order"]), "같은 제목 기사에 대표를 넘김")
     # [추가: 2026-08-20] [단독] 기사를 소제목 내 최상단으로 올리기 위한 첫 단계 —
     # app.filters.sort_scoop_first 참고, app.scraper.collect_run과 같은 자리(같은
@@ -2363,6 +2642,27 @@ def _compute_preview_articles(settings: dict, slot: dict) -> list:
     _log_draft_drops(slot, seen["last_visible"], visible_urls, dropped_at, pool_by_url)
     record_draft_seen(round_id, condition, [pool_by_url[a["url"]] for a in articles if a["url"] in pool_by_url])
     return articles
+
+
+def current_draft_urls() -> set:
+    """지금 회차 초안에 **보이는** 기사 URL — 「+ 수기로 기사 추가」의 "이미 이 회차에 있다" 판정용.
+
+    초안은 저장된 회차가 없어 `load_latest_run()`으로 보면 앞 회차와 비교하게 된다. 다시
+    검색하지 않고 마지막으로 그린 초안의 목록(app.draft_seen의 last_visible)과 "위로"
+    예약 기사(pending)를 합쳐 쓴다 — 담당자가 보고 있는 그 화면과 같은 집합이다. 숨긴
+    기사는 둘 다 빠진다(보이지 않는 기사를 "이미 있다"고 막으면 찾을 길이 없다).
+    """
+    settings = load_settings()
+    slot = next_pending_slot(datetime.now(), active_schedule_times(settings))
+    if slot is None:
+        return set()
+    groups = active_search_groups(
+        settings, [g for g in settings.get("keyword_groups", []) if group_in_scrap(g)]
+    )
+    seen = load_draft_seen(round_id_for_slot(slot), search_condition(groups))
+    urls = set(seen["last_visible"])
+    urls |= {a["url"] for a in filter_hidden(load_draft_pending_articles()) if a.get("url")}
+    return urls
 
 
 def _log_draft_drops(slot: dict, last_visible: list, visible_urls: set, dropped_at: dict, pool_by_url: dict) -> None:
@@ -2471,7 +2771,11 @@ def _render_preview_groups(
                     line_template,
                     # [수정: 2026-08-14] app.renderer._render_groups와 같은 이유 —
                     # ↑/↓는 소제목 안 전용이라 그 소제목의 끝에서 바로 비활성화한다.
-                    move={"disable_up": i == 0, "disable_down": i == last_index},
+                    move={
+                        "disable_up": i == 0,
+                        "disable_down": i == last_index,
+                        "hidden": group["name"] == UNCLASSIFIED_GROUP_NAME,
+                    },
                     move_handler="previewMoveArticle",
                     checkbox=True,
                     group_select_html=group_select,
@@ -2695,6 +2999,8 @@ def _manual_section_html(
         show_label_control=True,
         scrap_date=scrap_date,
         scrap_end=scrap_end,
+        add_button_html=URL_ADD_BUTTON_HTML,
+        add_panel_html=URL_ADD_PANEL_HTML,
     )
 
 
@@ -2913,7 +3219,7 @@ def _classify_degraded_html(degraded: bool, article_count: int, round_id: Option
         return (
             '<div class="classify-degraded"><div class="msg">'
             f"{intro}<br>"
-            "<b>AI 사용 크레딧이 부족합니다.</b> 설정 → AI 연동 (Claude)에서 결제 수단·"
+            "<b>AI 사용 크레딧이 부족합니다.</b> 설정 → LLM(AI) 연동에서 결제 수단·"
             "남은 크레딧을 확인해주세요. 충전 전까지는 다시 눌러도 같은 결과라, "
             "이번 회차는 소제목 이름을 직접 수기로 고쳐주세요."
             "</div></div>"
@@ -2952,10 +3258,14 @@ def _take_auto_classify_turn(slot: dict, article_count: int) -> bool:
 
 
 def _actions_html(
-    plain_text: str, slot_end: str, generated_at: str, pending_count: int = 0, manual_edits: int = 0,
+    plain_text: str, slot_end: str, pending_count: int = 0, manual_edits: int = 0,
     degraded: bool = False, photo_suspect_count: int = 0,
+    export_rows: Optional[list] = None, export_date: str = "",
 ) -> str:
-    export_filename = f"스크랩초안_{slot_end.replace(':', '-')}_{generated_at.replace(':', '-')}.txt"
+    # 파일명은 확정본(`날짜_언론모니터링_14-00기준`)과 같은 모양에 끝만 `_초안`을 붙여 구별한다.
+    export_base = f"{export_date}_언론모니터링_{slot_end.replace(':', '-')}기준_초안"
+    export_filename = f"{export_base}.txt"
+    export_excel_filename = f"{export_base}.xlsx"
     # [수정: 2026-08-10] app.renderer와 동일 — 메모가 있으면 패널이 이미 열려있고 그 안에
     # 자체 (수정) 버튼이 있어, 툴바 버튼은 메모가 없을 때(패널을 열 방법이 필요한 경우)만
     # 보여준다.
@@ -2982,31 +3292,45 @@ def _actions_html(
         'onclick="regenerateSubheadings(this)" '
         f'title="전체 기사를 처음부터 다시 분류합니다">{icon("refresh")} AI 모든 기사 재분류</button>'
     )
-    # [수정: 2026-09-15] 「사진 추정 모아 보기」 — app.renderer와 같은 함수(0건이면 안 그린다).
+    # 「📷 사진 추정 (N)」 — app.renderer와 같은 함수(0건이면 안 그린다). 화면만 바꾸는
+    # 보기라 왼쪽(내용을 바꾸는 네모)이 아니라 오른쪽 묶음에 알약으로 선다.
     photo_select_btn_html = photo_gather_button_html(photo_suspect_count)
+    # 툴바 규칙: 왼쪽 = 초안을 바꾸는 박스 버튼, 오른쪽 = 가져가거나 보기만 바꾸는 것
+    # (글자 복사·텍스트·엑셀 + 보기 선택). 확정본(app.renderer)과 같은 모양이고 CSS는
+    # export_links_style() 공용. 시안 mockups/TOOLBAR_GROUPING_MOCKUP.html A안.
+    # 폴백 상태면 복사·텍스트·엑셀 모두 제출 전에 한 번 더 묻는다 — false를 돌려주면
+    # <form> 제출 자체가 취소된다.
     return (
-        '<button onclick="copyPlainText()">복사</button>'
-        # [수정: 2026-08-20] 폴백 상태면 제출 전에 한 번 더 묻는다(copyPlainText과 같은
-        # 이유) — false를 돌려주면 <form> 제출 자체가 취소된다.
+        '<button class="create-group-btn" type="button" onclick="createCustomGroup()">+ 새 소제목</button>'
+        f'{keyword_note_btn_html}'
+        '<span class="actions-divider"></span>'
+        f"{reclassify_btn_html}"
+        '<span class="actions-right">'
+        f'{photo_select_btn_html}'
+        '<span class="export-links">'
+        '<button type="button" onclick="copyPlainText()" title="보고서 텍스트를 클립보드에 복사">복사</button>'
         '<form method="POST" action="/download-text" style="display:contents" '
         'onsubmit="if (CLASSIFY_DEGRADED && !confirm(classifyDegradedConfirmMsg(\'내려받을까요\'))) return false; '
         'this.text.value=PLAIN_TEXT;">'
         f'<input type="hidden" name="filename" value="{html.escape(export_filename)}">'
         '<input type="hidden" name="text" value="">'
-        '<button type="submit" class="btn">txt</button>'
+        '<button type="submit" title="txt 파일로 받기">텍스트</button>'
         '</form>'
-        '<button class="create-group-btn" type="button" onclick="createCustomGroup()">+ 새 소제목</button>'
-        f'{keyword_note_btn_html}'
-        f'{photo_select_btn_html}'
-        '<span class="actions-divider"></span>'
-        f"{reclassify_btn_html}"
+        '<form method="POST" action="/download-excel" style="display:contents" '
+        'onsubmit="if (CLASSIFY_DEGRADED && !confirm(classifyDegradedConfirmMsg(\'내려받을까요\'))) return false;">'
+        f'<input type="hidden" name="filename" value="{html.escape(export_excel_filename)}">'
+        f'<input type="hidden" name="rows" value="{html.escape(json.dumps(export_rows or [], ensure_ascii=False))}">'
+        '<button type="submit" title="엑셀 파일로 받기">엑셀</button>'
+        '</form>'
+        '</span>'
         '<select class="view-mode-select" onchange="applyViewMode(this.value)" '
         'title="소제목 구성은 그대로 두고 화면에 나열하는 순서만 바꿉니다">'
-        '<option value="subheading" selected>소제목별</option>'
+        '<option value="subheading" selected>소제목 내 언론사순</option>'
         '<option value="group-time">소제목 내 시간순</option>'
         '<option value="time">시간순</option>'
         '<option value="outlet">언론사순</option>'
         "</select>"
+        "</span>"
     )
 
 
@@ -3157,8 +3481,10 @@ def _compute_preview_content(
         "hint": hint,
         "plain_text": plain_text,
         "actions_html": _actions_html(
-            plain_text, slot["end"], generated_at, pending_count, manual_edits, classify_degraded,
+            plain_text, slot["end"], pending_count, manual_edits, classify_degraded,
             photo_suspect_count,
+            export_rows=build_export_rows(groups, label_scrap_date, label_scrap_end),
+            export_date=label_scrap_date,
         ),
         # [추가: 2026-08-20] previewMoveArticle(JS)이 DOM 조각과 함께 이 값도 받아
         # CLASSIFY_DEGRADED/CLASSIFY_DEGRADED_NAMES를 갱신한다 — ↑/↓ 이동 한 번마다
@@ -3167,7 +3493,7 @@ def _compute_preview_content(
         # 같은 값을 들고 있어야 한다.
         "classify_degraded": classify_degraded,
         "classify_degraded_names": degraded_names,
-        # [추가: 2026-08-21] "전체 N건" 옆에 "미분류 N건"을 같이 띄운다 — 📂 소제목
+        # [추가: 2026-08-21] 건수 배지 옆에 "미분류 N건"을 같이 띄운다 — 📂 소제목
         # 미분류 칸은 늘 화면 맨 아래라 스크롤을 끝까지 내리기 전엔 있는 줄도 모른다는
         # 사용자 지적. 숫자만 알려주면 결국 또 내려가야 하므로 눌러서 그 칸으로 바로
         # 뛰는 버튼으로 만들었다. 0건이면 안 그린다.
@@ -3178,18 +3504,20 @@ def _compute_preview_content(
         # 이동·재분류)은 전부 location.reload()라 새로 렌더링된다.
         "total_count_html": (
             (
-                f'<span class="total-count-badge">전체 {total_article_count}건</span>'
+                f'<span class="total-count-badge" title="이 회차 기사 {total_article_count}건 — 📂 소제목 미분류 포함, 📌 담아둔 기사 제외">{total_article_count}건</span>'
                 if total_article_count
                 else ""
             )
             + (
                 '<button type="button" class="pending-count-badge" '
                 'onclick="scrollToUnclassified()" '
-                'title="아직 소제목에 배정되지 않은 기사 — 눌러서 그 칸으로 이동합니다">'
-                f'미분류 {pending_count}건</button>'
+                f'title="소제목 미분류 {pending_count}건 — 눌러서 그 칸으로 이동합니다" '
+                f'aria-label="소제목 미분류 {pending_count}건">'
+                f'{icon(UNCLASSIFIED_ICON)}{pending_count}</button>'
                 if pending_count
                 else ""
             )
+            + pinned_jump_badge_html(len(filter_hidden(load_manual_articles())))
         ),
     }
 
@@ -3205,10 +3533,7 @@ def render_preview_page(
         **_theme(),
         undo_fab_html=_undo_fab_html(),
         round_deadline_ms=_round_deadline_ms(slot["end"]),
-        run_slot_html=(
-            f"({html.escape(format_slot_time_kr(slot['end']))} 예정 · "
-            f"지금 {html.escape(format_slot_time_kr(generated_at))} 기준)"
-        ),
+        **_draft_heading(slot["end"], generated_at, slot),
         total_count_html=content["total_count_html"],
         hint=content["hint"],
         body=content["body"],
@@ -3237,7 +3562,7 @@ def render_preview_done_page() -> str:
         **_theme(),
         undo_fab_html=_undo_fab_html(),
         round_deadline_ms=0,
-        run_slot_html="",
+        **_draft_heading(None),
         total_count_html="",
         hint="⏰ 오늘 예정된 회차가 모두 끝났어요.",
         body=body,
@@ -3266,7 +3591,7 @@ def render_preview_error_page(slot: dict) -> str:
         **_theme(),
         undo_fab_html=_undo_fab_html(),
         round_deadline_ms=_round_deadline_ms(slot["end"]),
-        run_slot_html=f"({html.escape(format_slot_time_kr(slot['end']))} 예정)",
+        **_draft_heading(slot["end"]),
         total_count_html="",
         hint="⏰ 네이버 검색 중 오류가 발생했습니다.",
         body=body,
@@ -3390,10 +3715,7 @@ def preview_move_article(url: str, direction: str) -> Optional[dict]:
         **_theme(),
         undo_fab_html=_undo_fab_html(),
         round_deadline_ms=_round_deadline_ms(slot["end"]),
-        run_slot_html=(
-            f"({html.escape(format_slot_time_kr(slot['end']))} 예정 · "
-            f"지금 {html.escape(format_slot_time_kr(generated_at))} 기준)"
-        ),
+        **_draft_heading(slot["end"], generated_at, slot),
         total_count_html=content["total_count_html"],
         hint=content["hint"],
         body=content["body"],

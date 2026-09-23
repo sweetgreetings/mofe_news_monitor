@@ -17,6 +17,7 @@ import json
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
+from app.topnav import plain_nav, topnav_style
 from app.config import FONT_STACK, MAX_TREND_WORDS, PALETTE
 from app.excel_export import date_range_label
 from app.home_trend import load_trend_words
@@ -218,80 +219,72 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      일곱 화면이 같은 값을 써야 화면을 오갈 때 제목이 들썩이지 않는다(수시·추이는 84→68px 형태).
      시안 SUBHEAD_SPACING_MOCKUP.html B안. */
   .container {{ max-width: 900px; margin: 0 auto; padding: 68px 24px 60px; }}
-  h1 {{ font-size: 1.35rem; color: {header}; margin: 0 0 4px; }}
-  .page-sub {{ color: {muted}; font-size: 0.85rem; margin: 0 0 20px; }}
-  .card {{ background: {card}; border: 1px solid {border}; border-radius: 8px;
+  h1 {{ font-size: var(--fs-xl); color: {header}; margin: 0 0 4px; }}
+  .page-sub {{ color: {muted}; font-size: var(--fs-md); margin: 0 0 20px; }}
+  .card {{ background: {card}; border: 1px solid {border}; border-radius: var(--r-lg);
     padding: 18px 20px; margin-bottom: 16px; }}
-  .card h2 {{ font-size: 1rem; color: {header}; margin: 0 0 12px;
+  .card h2 {{ font-size: var(--fs-base); color: {header}; margin: 0 0 12px;
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }}
-  .card h2 .right {{ margin-left: auto; font-weight: 400; font-size: 0.82rem; color: {muted}; }}
+  .card h2 .right {{ margin-left: auto; font-weight: 400; font-size: var(--fs-sm); color: {muted}; }}
 
-  .topbar {{ position: fixed; top: 0; left: 0; right: 0; z-index: 20; background: {card};
-    border-bottom: 1px solid {border}; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }}
-  .topbar-inner {{ max-width: 900px; margin: 0 auto; padding: 12px 24px;
-    display: flex; justify-content: space-between; align-items: center; }}
-  .topbar a {{ color: {accent}; text-decoration: none; font-size: 0.92rem; font-weight: 600;
-    padding: 6px 10px; border-radius: 6px; }}
-  .topbar a:hover {{ background: {hover}; }}
+{topnav_style}
 
-  button, a.btn {{ background: {accent}; color: #fff; border: none; border-radius: 4px;
-    padding: 8px 16px; font-size: 0.92rem; font-family: inherit; cursor: pointer;
+  button, a.btn {{ background: {accent}; color: #fff; border: none; border-radius: var(--r-md);
+    padding: 8px 16px; font-size: var(--fs-md); font-family: inherit; cursor: pointer;
     text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }}
   button:hover, a.btn:hover {{ background: {header}; }}
   button.ghost {{ background: transparent; color: {accent}; border: 1px solid {accent_border}; }}
   button.ghost:hover {{ background: {hover}; color: {header}; }}
   input[type=text], input[type=date] {{ background: {bg}; color: {text}; border: 1px solid {border};
-    border-radius: 4px; padding: 7px 10px; font-size: 0.92rem; font-family: inherit; }}
+    border-radius: var(--r-md); padding: 7px 10px; font-size: var(--fs-md); font-family: inherit; }}
   .ic {{ width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
     stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }}
 
   .word-chips {{ display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }}
   .wchip {{ display: inline-flex; align-items: center; gap: 7px; padding: 6px 8px 6px 10px;
-    border: 1px solid {border}; border-radius: 999px; background: {card}; font-size: 0.88rem; }}
-  .wchip .dot {{ width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }}
-  .wchip .cnt {{ color: {muted}; font-size: 0.78rem; font-variant-numeric: tabular-nums; }}
+    border: 1px solid {border}; border-radius: var(--r-pill); background: {card}; font-size: var(--fs-md); }}
+  .wchip .dot {{ width: 10px; height: 10px; border-radius: var(--r-circle); flex-shrink: 0; }}
+  .wchip .cnt {{ color: {muted}; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }}
   .wchip .x {{ border: none; background: transparent; color: {muted}; cursor: pointer;
     padding: 0 2px; font-size: 0.95rem; line-height: 1; }}
   .wchip .x:hover {{ background: transparent; color: {error}; }}
   .wchip.slot-empty {{ border-style: dashed; color: #9CA3AF; background: #FCFCFD; }}
   .add-row {{ display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }}
   .quick {{ margin-top: 12px; padding-top: 12px; border-top: 1px dashed {border}; }}
-  .quick .qlabel {{ font-size: 0.8rem; color: {muted}; margin-bottom: 7px; }}
+  .quick .qlabel {{ font-size: var(--fs-sm); color: {muted}; margin-bottom: 7px; }}
   .qchip {{ display: inline-block; border: 1px solid {border}; background: {bg}; color: {text};
-    border-radius: 999px; padding: 4px 11px; font-size: 0.82rem; margin: 0 6px 6px 0; cursor: pointer; }}
+    border-radius: var(--r-pill); padding: 4px 11px; font-size: var(--fs-sm); margin: 0 6px 6px 0; cursor: pointer; }}
   .qchip:hover {{ background: {hover}; border-color: {accent}; color: {header}; }}
 
   .period-bar {{ display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
     padding-bottom: 14px; margin-bottom: 6px; border-bottom: 1px solid {border}; }}
-  .seg {{ display: inline-flex; border: 1px solid {border}; border-radius: 6px; overflow: hidden; }}
+  .seg {{ display: inline-flex; border: 1px solid {border}; border-radius: var(--r-md); overflow: hidden; }}
   .seg a {{ background: {card}; color: {text}; text-decoration: none; padding: 7px 14px;
-    font-size: 0.86rem; border-right: 1px solid {border}; }}
+    font-size: var(--fs-md); border-right: 1px solid {border}; }}
   .seg a:last-child {{ border-right: none; }}
   .seg a:hover {{ background: {hover}; }}
   .seg a.on {{ background: {accent}; color: #fff; }}
-  .unit-badge {{ font-size: 0.78rem; color: {header}; background: {hover}; border: 1px solid {accent_border};
-    border-radius: 999px; padding: 3px 10px; }}
+  .unit-badge {{ font-size: var(--fs-sm); color: {header}; background: {hover}; border: 1px solid {accent_border};
+    border-radius: var(--r-pill); padding: 3px 10px; }}
   .period-bar .sep {{ color: #D1D5DB; }}
   .range-form {{ display: inline-flex; align-items: center; gap: 8px; }}
 
   .table-scroll {{ overflow-x: auto; }}
-  table {{ border-collapse: collapse; font-size: 0.84rem; width: 100%; }}
+  table {{ border-collapse: collapse; font-size: var(--fs-md); width: 100%; }}
   th, td {{ border-bottom: 1px solid {border}; padding: 7px 10px; text-align: right;
     white-space: nowrap; font-variant-numeric: tabular-nums; }}
   th:first-child, td:first-child {{ text-align: left; position: sticky; left: 0; background: {card}; z-index: 1; }}
-  thead th {{ color: {muted}; font-weight: 600; font-size: 0.79rem; background: {card}; }}
+  thead th {{ color: {muted}; font-weight: 600; font-size: var(--fs-sm); background: {card}; }}
   td.sum {{ font-weight: 700; color: {header}; }}
   td.na {{ color: #C7CBD1; }}
-  .wdot {{ display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; }}
-  .caption {{ color: {muted}; font-size: 0.78rem; margin-top: 10px; }}
-  .empty {{ text-align: center; padding: 26px 10px 24px; color: {muted}; font-size: 0.86rem; }}
+  .wdot {{ display: inline-block; width: 9px; height: 9px; border-radius: var(--r-circle); margin-right: 7px; }}
+  .caption {{ color: {muted}; font-size: var(--fs-sm); margin-top: 10px; }}
+  .empty {{ text-align: center; padding: 26px 10px 24px; color: {muted}; font-size: var(--fs-lg); }}
   {trend_chart_css}
 </style>
 </head>
 <body>
-<div class="topbar"><div class="topbar-inner">
-  <a href="home.html">← 홈</a>
-</div></div>
+{topnav_html}
 <div class="container">
   <h1>📈 정책 단어 추이</h1>
   <p class="page-sub">정기 수집 기사의 제목·요약에 그 단어가 몇 번 등장했는지 · 최대 {max_words}개 단어 비교 · 숨긴 기사 포함</p>
@@ -364,5 +357,7 @@ def render_trend_page(query: dict) -> str:
         table_html=table_html,
         trend_chart_css=chart_css(),
         trend_hover_js=HOVER_JS,
+        topnav_style=topnav_style(),
+        topnav_html=plain_nav(),
         **PALETTE,
     )

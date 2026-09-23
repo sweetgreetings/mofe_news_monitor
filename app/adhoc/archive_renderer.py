@@ -1,11 +1,8 @@
-# Design Ref: ADHOC_DESIGN.md §5.4 "지난 사안 더보기" — 정기의 지난 기사 더보기가
-# 「날짜 → 시간대」인 것과 축이 다르다. 여긴 「사안 → 날짜 → 회차」다: 담당자가 같은
-# 사안을 여러 날 추적하며 쌓아온 카드들을 한데 모아 보여준다.
-#
-# [수정: 2026-08-20] 사안명 검색 + 기간 조회(1일/7일/1개월/전체 빠른 설정 + 시작일~종료일
-# 직접 입력)를 추가하면서 "사안 → 회차" 2단이 "사안 → 날짜 → 회차" 3단이 됐다 — 같은
-# 사안을 하루에 여러 번 재수집한 경우를 날짜로 한 번 더 묶어야 조회 결과가 읽기 편하다.
-# 복사/txt/엑셀은 결과 전체·사안·날짜 세 층 모두에 같은 모양으로 붙는다.
+# 수시 보관함 — 정기 보관함처럼 「날짜 → 회차」다. 회차 줄은 `HH:MM 기준 · 사안명 · 검색어`,
+# 날짜 안은 기준 시각 최신순. 사안명 검색 + 기간 조회는 AND.
+# 「보기」 스위치로 묶는 축만 「사안 → 회차」로 바꿀 수 있다(_group_by_issue). 두 보기 모두
+# 2단이고 층이 늘지 않는다 — 예전 「사안 → 날짜 → 회차」 3단은 기각이다(_group_by_date 참고).
+# 복사/txt/엑셀은 결과 전체·날짜 두 층에 같은 모양으로 붙는다.
 #
 # 카드 수가 정기처럼 하루 4회씩 쌓이는 게 아니라 필요할 때만 만들어지므로, 정기
 # history.html의 EAGER_HISTORY_DAYS + 지연 로딩(fetch) 같은 최적화는 아직 필요 없다 —
@@ -24,11 +21,10 @@ from urllib.parse import quote, urlencode
 
 from app.adhoc import card
 from app.adhoc.renderer import (
-    NAV_HOME,
     base_page,
     build_adhoc_excel_rows,
     build_adhoc_plain_text,
-    nav_html,
+    page_nav,
 )
 from app.config import COLOR_ERROR
 from app.excel_export import date_range_label, sanitize_filename_part
@@ -37,6 +33,12 @@ from app.icons import icon
 _WEEKDAY_KR = ["월", "화", "수", "목", "금", "토", "일"]
 _PRESET_UNITS = {"day", "week", "month", "all"}
 _PRESET_LABELS = (("day", "1일"), ("week", "7일"), ("month", "1개월"), ("all", "전체"))
+# 묶는 축과 사안 줄 정렬 — 주소(?view=·?sort=)로만 오간다. **기억하지 않는다**: 화면을
+# 열 때는 언제나 날짜별이고, 사안별은 그때그때 눌러서 본다(사용자 결정).
+_VIEW_LABELS = (("date", "날짜별"), ("issue", "사안별"))
+_SORT_LABELS = (("name", "가나다순"), ("recent", "최근순"))
+_VIEWS = {u for u, _ in _VIEW_LABELS}
+_ISSUE_SORTS = {u for u, _ in _SORT_LABELS}
 
 
 def _retention_label() -> str:
@@ -60,6 +62,14 @@ def _format_date_kr_full(date_str: str) -> str:
     쌓였을 때 "무슨 요일에 몰아 모았는지"를 바로 못 읽는 문제가 있었다."""
     d = datetime.strptime(date_str, "%Y-%m-%d")
     return f"{d.month}월 {d.day}일 ({_WEEKDAY_KR[d.weekday()]})"
+
+
+def _format_date_kr_short(date_str: str) -> str:
+    """"2026-09-17" -> "9/17(목)" — 사안별 보기의 회차 줄 앞칸용. 날짜별 보기에선 날짜가
+    머리줄에 있어 시각만 적지만, 사안 아래에선 줄마다 날짜가 다르다. 세로로 훑는 자리라
+    날짜 층 헤더(_format_date_kr_full)보다 짧게 적어 시각 자리가 들쭉날쭉하지 않게 한다."""
+    d = datetime.strptime(date_str, "%Y-%m-%d")
+    return f"{d.month}/{d.day}({_WEEKDAY_KR[d.weekday()]})"
 
 
 def _today_str() -> str:
@@ -105,7 +115,7 @@ def _condition_text(q: str, start: str, end: str) -> str:
     return f"{label} · 사안명 '{q}'" if q else label
 
 
-def _archive_url(q: str, start: str, end: str) -> str:
+def _archive_url(q: str, start: str, end: str, view: str = "", sort: str = "") -> str:
     params = {}
     if q:
         params["q"] = q
@@ -113,6 +123,10 @@ def _archive_url(q: str, start: str, end: str) -> str:
         params["start"] = start
     if end:
         params["end"] = end
+    if view == "issue":  # 날짜별은 기본값이라 주소에 안 싣는다(공유한 주소가 짧게 남는다).
+        params["view"] = view
+        if sort == "recent":
+            params["sort"] = sort
     query = urlencode(params)
     return f"/adhoc?{query}" if query else "/adhoc"
 
@@ -146,37 +160,84 @@ def _filter_cards(all_cards: list[dict], all_issues: list[dict], q: str, start: 
     return cards
 
 
-def _group_by_issue_and_date(
-    cards: list[dict], known_issue_ids: Optional[set] = None
-) -> "OrderedDict[str, OrderedDict[str, list[dict]]]":
-    """카드 목록을 사안 → 날짜로 묶는다(만든 시각 최신순).
+def _run_time(c: dict) -> str:
+    """회차 줄의 기준 시각(HH:MM) — 확정본은 머리줄과 같은 `bundle_time`, 옛 원본은 수집 창의
+    끝 시각. 모르면 빈 문자열(지어내지 않는다)."""
+    if card.is_bundle(c):
+        return card.bundle_time(c) or ""
+    window = card.window_of(c)
+    return (window or {}).get("end", "")
 
-    [수정: 2026-09-11] 방금 지운 카드(제자리 「삭제함」 줄)가 살아 있는 카드 사이에 섞여
-    들어오므로, 입력 순서를 믿지 않고 여기서 한 번 정렬한다.
 
-    known_issue_ids: 사안 정보(issues.json)가 있는 사안 id. 여기 없는 카드는 전부 한
-    묶음(_ORPHAN_KEY, 화면의 「이름 없는 사안」)으로 모아 **맨 뒤**에 둔다 — 예전엔
-    통째로 건너뛰어 보관함 어디에도 안 보이면서 상단 합계에는 들어가 숫자가 안 맞았고,
-    보이지 않으니 지울 방법도 없었다(실측 2026-09-11: 8/21 시험 카드 6개).
+def _group_by_date(cards: list[dict]) -> "OrderedDict[str, list[dict]]":
+    """카드 목록을 날짜로 묶는다 — 날짜 최신순, 날짜 안은 기준 시각 최신순(같으면 만든 시각).
+
+    사안으로 먼저 묶지 않는다: 실측(2026-09-22, 사안 16개)에서 여러 날에 걸친 사안은 하나뿐이라
+    사안 층은 한 겹 더 펼치게만 했고, 담당자가 예전 이름과 맞추려 사안명에 날짜를 적어 넣었다.
+    이어지는 사안은 사안명 검색이 모아 준다. → HISTORY.md 「수시 보관함 — 사안별 묶기」
+    방금 지운 카드(제자리 「삭제함」 줄)도 섞여 들어오므로 입력 순서를 믿지 않고 여기서 정렬한다.
     """
-    by_issue: "OrderedDict[str, OrderedDict[str, list[dict]]]" = OrderedDict()
-    orphans: "OrderedDict[str, list[dict]]" = OrderedDict()
-    for c in sorted(cards, key=lambda c: c.get("created_at", ""), reverse=True):
-        issue_id = c.get("issue_id")
-        if known_issue_ids is not None and issue_id not in known_issue_ids:
-            orphans.setdefault(c.get("collect_date", ""), []).append(c)
-            continue
-        by_date = by_issue.setdefault(issue_id, OrderedDict())
+    by_date: "OrderedDict[str, list[dict]]" = OrderedDict()
+    for c in sorted(cards, key=lambda c: c.get("collect_date", ""), reverse=True):
         by_date.setdefault(c.get("collect_date", ""), []).append(c)
-    if orphans:
-        by_issue[_ORPHAN_KEY] = orphans
-    return by_issue
+    for d in by_date:
+        by_date[d].sort(key=lambda c: (_run_time(c), c.get("created_at", "")), reverse=True)
+    return by_date
 
 
-# 사안 정보가 없는 카드들의 묶음 — 이름 칸에 「이름 없는 사안」을 그린다.
-_ORPHAN_KEY = "__orphan__"
-_ORPHAN_ISSUE = {"id": _ORPHAN_KEY, "name": "", "last_keywords": []}
+# 사안 정보(issues.json)가 없는 카드의 사안명 칸 — 숨기지 않고 이 이름으로 그려야 지울 수 있다.
 _ORPHAN_LABEL = "이름 없는 사안"
+# 처음 열 때 펼쳐 두는 최근 날짜 수(검색 중이 아닐 때).
+_OPEN_DATES = 2
+
+
+def _name_sort_key(name: str) -> tuple:
+    """가나다순 — 한글을 먼저, 그 뒤에 영문·숫자. 파이썬 기본 정렬은 ASCII가 한글보다
+    앞서서, 그냥 정렬하면 한글 사안 사이에 영문·숫자 사안이 위로 끼어든다."""
+    first = name[:1]
+    return (0 if "가" <= first <= "힣" else 1, name)
+
+
+def _group_by_issue(cards: list[dict], issues_by_id: dict, sort: str) -> list[tuple]:
+    """카드를 사안으로 묶는다 — 「사안 → 회차」 2단. 사안 안은 날짜·기준 시각 최신순.
+
+    사안 줄 정렬은 화면 칩이 정한다: `name`=가나다순, `recent`=그 사안의 가장 최근 회차가
+    늦은 순. 사안 정보가 없는 카드(_ORPHAN_LABEL)는 어느 정렬에서도 맨 뒤다 — 이름이 없어
+    가나다순에 낄 자리가 없고, 지우려고 남겨 두는 묶음이라 위로 올라오면 안 된다.
+    돌려주는 것은 (사안 id, 사안명, 검색어, 카드들) 줄 목록이다.
+    """
+    groups: dict = OrderedDict()
+    for c in cards:
+        issue = issues_by_id.get(c.get("issue_id"))
+        key = c["issue_id"] if issue else ""
+        groups.setdefault(key, []).append(c)
+    for key in groups:
+        groups[key].sort(
+            key=lambda c: (c.get("collect_date", ""), _run_time(c), c.get("created_at", "")),
+            reverse=True,
+        )
+    keys = list(groups)
+    if sort == "name":
+        keys.sort(key=lambda k: _name_sort_key(issues_by_id[k]["name"]) if k else (2, ""))
+    else:
+        keys.sort(
+            # 사안 안이 이미 최신순이라 맨 앞 카드가 그 사안의 가장 최근 회차다. 기준 시각까지
+            # 같은 사안이 있을 수 있어 만든 시각까지 본다(같은 값이면 줄 순서가 요청마다 흔들린다).
+            key=lambda k: (
+                groups[k][0].get("collect_date", ""),
+                _run_time(groups[k][0]),
+                groups[k][0].get("created_at", ""),
+            ),
+            reverse=True,
+        )
+        keys.sort(key=lambda k: 0 if k else 1)  # 이름 없는 사안만 맨 뒤(안정 정렬이라 나머지는 그대로)
+    rows = []
+    for k in keys:
+        issue = issues_by_id.get(k)
+        name = issue["name"] if issue else _ORPHAN_LABEL
+        keywords = " · ".join(issue.get("last_keywords", [])) if issue else ""
+        rows.append((k, name, keywords, groups[k]))
+    return rows
 
 
 def _is_gone(c: dict) -> bool:
@@ -192,11 +253,10 @@ def _visible_count(c: dict) -> int:
     return sum(1 for a in c["articles"] if not a.get("hidden"))
 
 
-def _issue_label(issue: dict) -> str:
-    return issue.get("name") or _ORPHAN_LABEL
-
-
-def _empty_suggestion(all_cards: list[dict], all_issues: list[dict], q: str, start: str, end: str) -> str:
+def _empty_suggestion(
+    all_cards: list[dict], all_issues: list[dict], q: str, start: str, end: str,
+    view: str = "date", sort: str = "name",
+) -> str:
     """조건에 맞는 결과가 0건일 때 "왜 없는지"와 "한 번에 고치는 길"을 같이 보여준다 —
     그냥 "없습니다"만 보여주면 사안명이 기간 밖에 있는 건지 아예 없는 건지 알 수 없다."""
     if not q:
@@ -207,15 +267,24 @@ def _empty_suggestion(all_cards: list[dict], all_issues: list[dict], q: str, sta
         return (
             f"'{html.escape(q)}'는 이 기간엔 없고 {dates[0]} ~ {dates[-1]}에 "
             f"{len(by_name_only)}건 있습니다. "
-            f'<a href="{html.escape(_archive_url(q, "", ""))}">전체 기간에서 보기 →</a>'
+            f'<a href="{html.escape(_archive_url(q, "", "", view, sort))}">전체 기간에서 보기 →</a>'
         )
     return (
         f"'{html.escape(q)}'가 든 사안이 없습니다. "
-        f'<a href="{html.escape(_archive_url("", start, end))}">사안명 조건 지우기 →</a>'
+        f'<a href="{html.escape(_archive_url("", start, end, view, sort))}">사안명 조건 지우기 →</a>'
     )
 
 
-def _render_filter_bar(q: str, start: str, end: str, today: str) -> str:
+def _seg_links_html(options, current: str, url_fn) -> str:
+    """세그먼트 버튼을 링크로 — 기간 빠른 설정(폼 제출)과 같은 모양이지만, 보기·정렬은
+    조건을 바꾸는 게 아니라 같은 결과를 다르게 묶는 것이라 GET 링크 하나면 된다."""
+    return "".join(
+        f'<a class="seg-btn{" on" if key == current else ""}" href="{html.escape(url_fn(key))}">{label}</a>'
+        for key, label in options
+    )
+
+
+def _render_filter_bar(q: str, start: str, end: str, today: str, view: str, sort: str) -> str:
     current = _current_preset(start, end, today)
     seg_html = "".join(
         f'<button type="submit" name="preset" value="{unit}" class="seg-btn{" on" if unit == current else ""}">{label}</button>'
@@ -227,12 +296,23 @@ def _render_filter_bar(q: str, start: str, end: str, today: str) -> str:
         else ""
     )
     clear_q_html = (
-        f'<a class="clr" href="{html.escape(_archive_url("", start, end))}">지우기</a>' if q else ""
+        f'<a class="clr" href="{html.escape(_archive_url("", start, end, view, sort))}">지우기</a>'
+        if q
+        else ""
+    )
+    view_seg = _seg_links_html(_VIEW_LABELS, view, lambda k: _archive_url(q, start, end, k, sort))
+    sort_html = (
+        '<span class="pdiv" aria-hidden="true"></span><span class="jhint">사안 순서</span>'
+        f'<div class="seg">{_seg_links_html(_SORT_LABELS, sort, lambda k: _archive_url(q, start, end, "issue", k))}</div>'
+        if view == "issue"
+        else '<span class="jhint">날짜별은 회차가 언제 쌓였는지, 사안별은 같은 사안이 몇 번인지 봅니다</span>'
     )
     return f"""<div class="period-bar">
   <form method="GET" action="/adhoc">
     <input type="hidden" name="start" value="{html.escape(start)}">
     <input type="hidden" name="end" value="{html.escape(end)}">
+    <input type="hidden" name="view" value="{html.escape(view)}">
+    <input type="hidden" name="sort" value="{html.escape(sort)}">
     <div class="prow">
       <b class="jlab">사안명</b>
       <input type="search" name="q" value="{html.escape(q)}" placeholder="사안 이름 일부만 넣어도 됩니다 (예: 세수)">
@@ -250,12 +330,20 @@ def _render_filter_bar(q: str, start: str, end: str, today: str) -> str:
       <input type="date" name="end" value="{html.escape(end)}" form="adhoc-range-form">
       <button type="submit" class="go" form="adhoc-range-form">조회</button>
     </div>
+    <!-- 묶는 축 — 조건이 아니라 「어떻게 묶어 볼까」라서 링크다. 기억하지 않는다(늘 날짜별로 시작). -->
+    <div class="prow">
+      <b class="jlab">보기</b>
+      <div class="seg">{view_seg}</div>
+      {sort_html}
+    </div>
   </form>
   <!-- [수정: 2026-09-16] 직접 입력은 기간 줄로 옮기고, 제출은 이 (보이지 않는) 폼이 맡는다 —
        날짜 칸·조회 버튼의 form= 속성이 이 폼을 가리킨다. 위 폼과 나눠 둔 이유는 예전 그대로:
        빠른 설정은 숨은 start/end를, 직접 입력은 입력한 start/end를 보내야 해서다. -->
   <form method="GET" action="/adhoc" id="adhoc-range-form" hidden>
     <input type="hidden" name="q" value="{html.escape(q)}">
+    <input type="hidden" name="view" value="{html.escape(view)}">
+    <input type="hidden" name="sort" value="{html.escape(sort)}">
   </form>
 </div>"""
 
@@ -268,15 +356,17 @@ def build_plain_text_for_cards(cards: list[dict], get_text: Callable[[dict], str
     return "\n\n".join(get_text(c).rstrip("\n") for c in cards) + "\n"
 
 
-def _scope_filename(cards: list[dict], scope_name: str, ext: str) -> str:
+def _scope_filename(cards: list[dict], scope_name: Optional[str], ext: str) -> str:
     dates = [c["collect_date"] for c in cards]
     label = date_range_label(dates) if dates else _today_str()
+    if scope_name is None:  # 날짜 줄 — 정기 보관함 날짜 파일처럼 구분 자리 없이
+        return f"{label}_수시모니터링.{ext}"
     safe = sanitize_filename_part(scope_name) if scope_name else "전체"
     return f"{label}_수시모니터링_{safe}.{ext}"
 
 
 def _export_buttons_html(
-    cards: list[dict], scope_name: str, get_text: Callable[[dict], str], size_cls: str = ""
+    cards: list[dict], scope_name: Optional[str], get_text: Callable[[dict], str], size_cls: str = ""
 ) -> str:
     """복사/txt/엑셀 — 결과 전체·사안·날짜 세 층에서 이 함수 하나를 그대로 재사용한다.
     렌더링 시점에 이미 계산해둔 텍스트/rows를 hidden input에 심어 기존 공용
@@ -301,52 +391,67 @@ def _export_buttons_html(
         f'<form method="POST" action="/download-text" style="display:contents" onclick="event.stopPropagation();">'
         f'<input type="hidden" name="filename" value="{txt_filename}">'
         f'<input type="hidden" name="text" value="{copy_attr}">'
-        f'<button type="submit">txt</button>'
+        f'<button type="submit">텍스트</button>'
         f"</form>"
         f'<form method="POST" action="/download-excel" style="display:contents" onclick="event.stopPropagation();">'
         f'<input type="hidden" name="filename" value="{xlsx_filename}">'
         f'<input type="hidden" name="rows" value="{rows_json}">'
-        f'<button type="submit" class="xls">xlsx</button>'
+        f'<button type="submit" class="xls">엑셀</button>'
         f"</form>"
         f"</span>"
     )
 
 
-def _window_html(c: dict) -> str:
-    # 모음 카드는 수집 시간창이 없다(ADHOC_DESIGN.md §6.13) — 그 자리에 "~"만
-    # 남기면 값이 빠진 것처럼 보이므로, 같은 폭의 청록 「모음」 칩으로 대신한다.
-    # [수정: 2026-09-15] 확정본이 「지금까지 불러오기」마다 새로 생기면서 같은 날 같은 사안에
-    # 여러 개가 선다 — 정기 보관함의 회차 줄처럼 「HH:MM 기준」으로 가른다. 시각이 없는 옛
-    # 확정본만 예전 칩 그대로.
-    if card.is_bundle(c):
-        t = card.bundle_time(c)
-        if t:
-            return f'<span class="win">{html.escape(t)} 기준</span>'
-        return '<span class="win"><span class="bundle-mark">확정본</span></span>'
-    window = card.window_of(c)
-    return f'<span class="win">{html.escape(window["start"])}~{html.escape(window["end"])}</span>'
+def _time_html(c: dict) -> str:
+    # 확정본이든 옛 원본이든 기준 시각 하나로 적는다 — 보고서 머리줄(`… N시 M분 기준`)과
+    # 같은 축이다. 시각이 없는 옛 확정본만 예전 청록 「확정본」 칩.
+    t = _run_time(c)
+    if t:
+        return f'<span class="win">{html.escape(t)} 기준</span>'
+    return '<span class="win"><span class="bundle-mark">확정본</span></span>'
 
 
-def _render_run_row(c: dict, today: str) -> str:
-    """회차(카드) 한 줄.
+def _issue_cells_html(issue: Optional[dict], q: str) -> str:
+    """회차 줄의 「사안명 · 검색어」 — 사안 정보가 없으면 「이름 없는 사안」, 검색어는 비운다."""
+    if issue is None:
+        return f'<span class="iss noname">{_ORPHAN_LABEL}</span><span class="kwv"></span>'
+    keywords = " · ".join(issue.get("last_keywords", []))
+    return (
+        f'<span class="iss">{_mark_name(issue["name"], q)}</span>'
+        f'<span class="kwv">{html.escape(keywords)}</span>'
+    )
 
-    [수정: 2026-08-25] "보관됨"/"정리 중" 상태 뱃지는 없앴다 — "보관" 버튼이 사라지면서
-    카드 status가 언제나 "editing"이라 이 뱃지는 항상 같은 값만 보여주고 있었다
-    (CLAUDE.md "사안 목록에서 삭제 vs 보관" 항목 참고).
 
-    [수정: 2026-09-11] 줄이 <a> 하나에서 「체크박스 · 링크 · 🗑」 세 칸이 됐다. 체크박스와
-    🗑를 링크 **밖에** 두는 건 링크 안의 버튼·입력칸은 누르는 순간 링크 이동과 엉키기
-    때문이다. 🗑는 확인창 없이 바로 지운다 — 지운 자리에 「삭제함 · 되살리기」가 곧바로
-    남아 실수를 그 자리에서 되돌린다(확정본의 기사 🗑가 확인창 없이 숨기는 것과 같은 무게).
-    방금 지운 카드(_is_gone)는 링크 대신 그 「삭제함」 줄로 그린다.
+def _date_time_html(c: dict) -> str:
+    """사안별 보기의 회차 줄 앞칸 — 「9/17(목) 15:05 기준」. 사안 아래에선 줄마다 날짜가
+    다르므로 날짜를 같은 칸에 붙여 적는다(시각 규칙은 _time_html과 같다)."""
+    date_str = c.get("collect_date") or ""
+    date_label = f"{_format_date_kr_short(date_str)} " if date_str else ""
+    t = _run_time(c)
+    inner = f"{html.escape(t)} 기준" if t else '<span class="bundle-mark">확정본</span>'
+    return f'<span class="win wd">{html.escape(date_label)}{inner}</span>'
+
+
+def _render_run_row(c: dict, today: str, issue: Optional[dict], q: str = "", view: str = "date") -> str:
+    """회차(카드) 한 줄 — 「체크박스 · [시각 기준 · 사안명 · 검색어 · N건 · 열기] · 🗑」.
+
+    체크박스와 🗑를 링크 **밖에** 두는 건 링크 안의 버튼·입력칸은 누르는 순간 링크 이동과
+    엉키기 때문이다. 🗑는 확인창 없이 바로 지운다 — 지운 자리에 「삭제함 · 되살리기」가 곧바로
+    남는다. 방금 지운 카드(_is_gone)는 링크 대신 그 「삭제함」 줄로 그린다.
     """
     cid = html.escape(c["id"])
     count = _visible_count(c)
+    if view == "issue":
+        # 사안명·검색어는 머리줄이 이미 말한다 — 그 자리에 날짜를 적는다. 빈 .kwv는 남은
+        # 폭을 채워 건수·열기가 날짜별 보기와 같은 자리에 서게 한다.
+        cells = _date_time_html(c) + '<span class="kwv"></span>'
+    else:
+        cells = _time_html(c) + _issue_cells_html(issue, q)
     if _is_gone(c):
         return (
             f'<div class="run-line gone" data-card-id="{cid}">'
             '<span class="pick-sp"></span>'
-            f'<span class="run-row">{_window_html(c)}<span class="n">{count}건</span></span>'
+            f'<span class="run-row">{cells}<span class="n">{count}건</span></span>'
             '<span class="gone-tag">삭제함</span>'
             f'<button type="button" class="restore-btn" data-trash="{html.escape(c["_trash_name"])}" '
             'onclick="restoreCards([this.dataset.trash])">되살리기</button>'
@@ -359,7 +464,7 @@ def _render_run_row(c: dict, today: str) -> str:
         f'data-count="{count}"{bundle_attr}>'
         f'<input type="checkbox" class="pick" data-id="{cid}" aria-label="이 회차 고르기" onchange="onPickChange()">'
         f'<a class="run-row" href="/adhoc/card?id={quote(c["id"])}">'
-        f'{_window_html(c)}<span class="n">{count}건</span><span class="go">열기 →</span></a>'
+        f'{cells}<span class="n">{count}건</span><span class="go">열기</span></a>'
         f'<button type="button" class="row-del" data-id="{cid}" title="이 회차 삭제" '
         f'onclick="deleteCards([this.dataset.id])">{icon("trash")}</button>'
         "</div>"
@@ -377,68 +482,43 @@ def _group_pick_html(live_cards: list[dict]) -> str:
     )
 
 
-def _render_day_block(
-    issue: dict, date_str: str, cards: list[dict], get_text: Callable[[dict], str], today: str, focus_ids: set
-) -> str:
-    live = _live(cards)
-    rows_html = "".join(_render_run_row(c, today) for c in cards)
-    if live:
-        total_articles = sum(_visible_count(c) for c in live)
-        meta_html = f'<span class="dcnt">회차 {len(live)} · {total_articles}건</span>'
-        meta_html += _export_buttons_html(live, _issue_label(issue), get_text)
-    else:
-        meta_html = '<span class="gone-tag">삭제함</span>'
-    open_attr = " open" if any(c["id"] in focus_ids for c in cards) else ""
-    return f"""<details class="day-block"{open_attr}>
-  <summary>{_group_pick_html(live)}<span class="d">{_format_date_kr_full(date_str)}</span>
-    {meta_html}</summary>
-  {rows_html}
-</details>"""
-
-
-def _render_issue_block(
-    issue: dict,
-    by_date: "OrderedDict[str, list[dict]]",
+def _render_group_block(
+    label: str,
+    title_html: str,
+    cards: list[dict],
+    issues_by_id: dict,
     q: str,
     get_text: Callable[[dict], str],
-    open_first: bool,
     today: str,
-    focus_ids: set,
-    outside: int = 0,
+    is_open: bool,
+    view: str = "date",
+    unit: str = "날짜",
+    scope_name: Optional[str] = None,
+    block_cls: str = "",
+    mid_html: str = "",
+    chip_html: str = "",
 ) -> str:
-    """사안 한 줄 + 그 아래 날짜·회차.
+    """머리줄 한 줄(카드) + 그 아래 회차 줄들 — 날짜별 보기는 날짜가, 사안별 보기는 사안명이
+    머리줄이다(두 보기가 같은 마크업·같은 CSS를 쓴다).
 
-    [추가: 2026-09-15] 줄 끝 🗑 = 「이 사안에 쌓인 회차 모두 삭제」. 회차 줄 🗑(하나, 확인창
-    없음)와 달리 **확인창을 한 번 거친다** — 카드 화면에서 기사 🗑는 바로 숨기고 소제목 헤더
-    🗑(통째 숨기기)는 이름·건수를 묻는 것과 같은 짝이다. 지우는 건 **지금 화면에 보이는 회차만**
-    (기간 필터 밖 회차는 그대로 남는다 — 소제목 통째 숨기기가 보이는 기사만 숨기는 것과 같은
-    규칙)이고, 그렇게 남는 회차 수(outside)를 확인창에 적는다. 사안이 통째로 「삭제함」이
-    되면 그 줄에 「모두 되살리기」를 둔다(회차 줄마다 되살리기를 누르게 하지 않으려고).
+    줄 끝 🗑 = 「이 {unit}의 회차 모두 삭제」, 확인창 한 번(회차 줄 🗑는 확인창 없음). 지우는 건
+    지금 화면에 보이는 회차만이다(사안명 검색 중이면 걸린 회차만). 묶음이 통째로 「삭제함」이
+    되면 그 줄에 「모두 되살리기」를 둔다.
     """
-    issue_cards = [c for cards in by_date.values() for c in cards]
-    live = _live(issue_cards)
-    days_html = "".join(
-        _render_day_block(issue, d, cards, get_text, today, focus_ids) for d, cards in by_date.items()
+    live = _live(cards)
+    rows_html = "".join(
+        _render_run_row(c, today, issues_by_id.get(c.get("issue_id")), q, view) for c in cards
     )
-    if issue["id"] == _ORPHAN_KEY:
-        # 사안 정보가 없으니 검색어도 모른다 — 지어내지 않고 사실만 적는다.
-        name_html = f'<span class="nm noname">{_ORPHAN_LABEL}</span>'
-        keywords_str = "사안 정보 없음"
-    else:
-        name_html = f'<span class="nm">{_mark_name(issue["name"], q)}</span>'
-        keywords_str = " · ".join(issue.get("last_keywords", [])) or "-"
     if live:
         total_articles = sum(_visible_count(c) for c in live)
-        live_dates = {c.get("collect_date") for c in live}
-        meta_html = f'<span class="n">날짜 {len(live_dates)} · 회차 {len(live)} · {total_articles}건</span>'
-        meta_html += _export_buttons_html(live, _issue_label(issue), get_text)
+        meta_html = f'<span class="dcnt">{total_articles}건</span>'
+        meta_html += _export_buttons_html(live, scope_name, get_text)
         meta_html += (
-            f'<button type="button" class="row-del issue-del" title="이 사안의 회차 모두 삭제" '
-            f'data-outside="{outside}" '
-            f'onclick="event.preventDefault(); event.stopPropagation(); deleteIssue(this);">{icon("trash")}</button>'
+            f'<button type="button" class="row-del day-del" title="이 {unit}의 회차 모두 삭제" '
+            f'onclick="event.preventDefault(); event.stopPropagation(); deleteDay(this);">{icon("trash")}</button>'
         )
     else:
-        gone = [c for c in issue_cards if _is_gone(c)]
+        gone = [c for c in cards if _is_gone(c)]
         restore_all = (
             '<button type="button" class="restore-btn" '
             f'data-trash="{html.escape(json.dumps([c["_trash_name"] for c in gone]))}" '
@@ -448,13 +528,75 @@ def _render_issue_block(
             else ""
         )
         meta_html = f'<span class="n"><span class="gone-tag">삭제함</span>{restore_all}</span>'
-    is_open = open_first or any(c["id"] in focus_ids for c in issue_cards)
-    return f"""<details class="issue-block"{' open' if is_open else ''} data-issue-name="{html.escape(_issue_label(issue))}">
-  <summary>{_group_pick_html(live)}{name_html}
-    <span class="kw">{html.escape(keywords_str)}</span>
+    return f"""<details class="date-block{block_cls}"{' open' if is_open else ''} data-day-label="{html.escape(label)}" data-unit="{unit}">
+  <summary>{_group_pick_html(live)}{title_html}{chip_html}{mid_html}
     {meta_html}</summary>
-  {days_html}
+  <div class="runs">{rows_html}</div>
 </details>"""
+
+
+def _render_date_block(
+    date_str: str,
+    cards: list[dict],
+    issues_by_id: dict,
+    q: str,
+    get_text: Callable[[dict], str],
+    today: str,
+    is_open: bool,
+) -> str:
+    """날짜 한 줄 — 「8월 13일 (목) · N건 · 복사/txt/xlsx · 🗑」."""
+    date_label = _format_date_kr_full(date_str)
+    return _render_group_block(
+        label=date_label,
+        title_html=f'<span class="dt">{date_label}</span>',
+        cards=cards,
+        issues_by_id=issues_by_id,
+        q=q,
+        get_text=get_text,
+        today=today,
+        is_open=is_open,
+        chip_html='<span class="chip-today">오늘</span>' if date_str == today else "",
+    )
+
+
+def _render_issue_block(
+    name: str,
+    keywords: str,
+    is_orphan: bool,
+    cards: list[dict],
+    issues_by_id: dict,
+    q: str,
+    get_text: Callable[[dict], str],
+    today: str,
+    is_open: bool,
+) -> str:
+    """사안 한 줄 — 「사안명 · 검색어 · N건 · 복사/txt/xlsx · 🗑」. 오늘 회차가 하나라도
+    들어 있으면 날짜 줄과 같은 「오늘」 칩을 단다(최근순 정렬에서 맨 위를 알아보기 쉽게)."""
+    name_html = (
+        f'<span class="dt noname">{_ORPHAN_LABEL}</span>'
+        if is_orphan
+        else f'<span class="dt">{_mark_name(name, q)}</span>'
+    )
+    return _render_group_block(
+        label=name,
+        title_html=name_html,
+        cards=cards,
+        issues_by_id=issues_by_id,
+        q=q,
+        get_text=get_text,
+        today=today,
+        is_open=is_open,
+        view="issue",
+        unit="사안",
+        scope_name=name,
+        block_cls=" issue-block",
+        mid_html=f'<span class="ikw">{html.escape(keywords)}</span>',
+        chip_html=(
+            '<span class="chip-today">오늘</span>'
+            if any(c.get("collect_date") == today for c in _live(cards))
+            else ""
+        ),
+    )
 
 
 def _deleted_when_label(deleted_at: datetime, today: str) -> str:
@@ -545,9 +687,15 @@ def render_archive_page(
     preset: str = "",
     deleted_ids: Optional[list] = None,
     restored_id: str = "",
+    view: str = "",
+    sort: str = "",
 ) -> str:
-    """지난 사안 더보기 — 사안 → 날짜 → 회차 3단(2026-08-20 이전엔 사안 → 회차 2단).
-    카드가 하나도 없는 사안은 목록에서 뺀다(사안 자체는 issues.json에 계속 남아
+    """수시 보관함 — 날짜 → 회차 2단(회차 줄에 사안명).
+
+    view="issue"면 같은 결과를 사안 → 회차로 묶어 보여준다(회차 줄 앞칸이 날짜+시각).
+    sort는 사안별 보기에서만 쓰는 사안 줄 정렬(name=가나다순 / recent=최근순).
+    기본은 언제나 날짜별이다 — 고른 보기를 기억하지 않는다(사용자 결정).
+    카드가 하나도 없는 사안은 어디에도 안 보인다(사안 자체는 issues.json에 계속 남아
     "원본" 화면의 검색어 자동완성용으로 쓰인다 — ADHOC_DESIGN.md §3.5, 여기 안
     보인다고 사안이 삭제된 게 아니다).
 
@@ -559,6 +707,8 @@ def render_archive_page(
     q = q.strip()
     today = _today_str()
     deleted_ids = set(deleted_ids or [])
+    view = view if view in _VIEWS else "date"
+    sort = sort if sort in _ISSUE_SORTS else "name"
 
     if preset in _PRESET_UNITS:
         start, end = _preset_range(preset, today)
@@ -599,9 +749,10 @@ def render_archive_page(
   <a class="btn" href="/adhoc/new">{icon("search")} 새 수집 시작</a>
   {recent_html}
 </div>"""
-        return base_page("수시 모니터링 — 수시 보관함", body, script=page_script, nav=nav_html([NAV_HOME]))
+        return base_page("수시 모니터링 — 수시 보관함", body, script=page_script, nav=page_nav("archive"))
 
-    filter_bar_html = _render_filter_bar(q, start, end, today)
+    sub_label = "사안별로 묶어 본 확정본" if view == "issue" else "날짜별로 쌓인 확정본"
+    filter_bar_html = _render_filter_bar(q, start, end, today, view, sort)
     error_html = (
         f'<p class="fixhint" style="color:{COLOR_ERROR}">{html.escape(range_error)}</p>' if range_error else ""
     )
@@ -609,11 +760,11 @@ def render_archive_page(
     gone_filtered = _filter_cards(gone_cards, all_issues, q, start, end)
 
     if not filtered and not gone_filtered:
-        suggestion = _empty_suggestion(all_cards, all_issues, q, start, end)
+        suggestion = _empty_suggestion(all_cards, all_issues, q, start, end, view, sort)
         body = f"""
 <div class="card">
   <h1 class="page-title">수시 보관함</h1>
-  <p class="page-sub">사안별로 쌓인 확정본 · {_retention_label()} 보관됩니다</p>
+  <p class="page-sub">{sub_label} · {_retention_label()} 보관됩니다</p>
   {filter_bar_html}
   {error_html}
   <p class="result-line">{html.escape(_condition_text(q, start, end))} · <b>결과 없음</b></p>
@@ -622,13 +773,13 @@ def render_archive_page(
   {recent_html}
 </div>"""
         return base_page(
-            "수시 모니터링 — 수시 보관함", body, script=page_script, nav=nav_html([NAV_HOME])
+            "수시 모니터링 — 수시 보관함", body, script=page_script, nav=page_nav("archive")
         )
 
-    grouped = _group_by_issue_and_date(filtered + gone_filtered, set(issues_by_id))
+    shown_cards = filtered + gone_filtered
 
-    # build_adhoc_plain_text(카드)는 결과 전체(top) → 사안 → 날짜 세 층에서 카드별로
-    # 최대 3번 재사용되므로, 카드 1건당 한 번만 계산해 세 층이 나눠 쓰게 한다.
+    # build_adhoc_plain_text(카드)는 결과 전체(top) → 날짜 두 층에서 카드별로 두 번 쓰이므로,
+    # 카드 1건당 한 번만 계산해 나눠 쓴다.
     text_cache: dict[str, str] = {}
 
     def cached_text(c: dict) -> str:
@@ -638,49 +789,54 @@ def render_archive_page(
         return text_cache[cid]
 
     focus_ids = deleted_ids | ({restored_id} if restored_id else set())
-    # 사안 줄 🗑 확인창의 「이 기간 밖의 회차 N개는 그대로 남아요」 — 사안명 검색은 사안을
-    # 통째로 거르므로, 한 사안 안에서 갈리는 건 기간 필터뿐이다.
-    total_by_issue: dict[str, int] = {}
-    for c in all_cards:
-        key = c.get("issue_id") if c.get("issue_id") in issues_by_id else _ORPHAN_KEY
-        total_by_issue[key] = total_by_issue.get(key, 0) + 1
-    issue_sections = []
-    issue_count = 0
-    for issue_id, by_date in grouped.items():
-        issue = _ORPHAN_ISSUE if issue_id == _ORPHAN_KEY else issues_by_id[issue_id]
-        shown = len(_live([c for cards in by_date.values() for c in cards]))
-        issue_sections.append(
+    # 펼침: 사안명으로 검색했으면 걸린 묶음 전부, 방금 지우거나 되살린 카드가 든 묶음도 전부.
+    # 그 밖에는 날짜별만 최근 두 날짜(_OPEN_DATES)를 펼친다 — 사안별은 이름을 훑는 화면이라
+    # 처음엔 모두 접어 둔다(가나다순에서 "앞 두 개"는 최근이라는 뜻이 아니다).
+    if view == "issue":
+        sections = [
             _render_issue_block(
-                issue,
-                by_date,
+                name,
+                keywords,
+                not key,
+                cards,
+                issues_by_id,
                 q,
                 cached_text,
-                open_first=(not issue_sections),
                 today=today,
-                focus_ids=focus_ids,
-                outside=max(0, total_by_issue.get(issue_id, 0) - shown),
+                is_open=bool(q) or any(c["id"] in focus_ids for c in cards),
             )
-        )
-        if _live([c for cards in by_date.values() for c in cards]):
-            issue_count += 1
+            for key, name, keywords, cards in _group_by_issue(shown_cards, issues_by_id, sort)
+        ]
+    else:
+        sections = [
+            _render_date_block(
+                d,
+                cards,
+                issues_by_id,
+                q,
+                cached_text,
+                today=today,
+                is_open=bool(q) or i < _OPEN_DATES or any(c["id"] in focus_ids for c in cards),
+            )
+            for i, (d, cards) in enumerate(_group_by_date(shown_cards).items())
+        ]
 
-    total_articles = sum(_visible_count(c) for c in filtered)
     top_export = _export_buttons_html(filtered, q or "전체", cached_text, size_cls=" lg")
     empty_count = sum(1 for c in filtered if _visible_count(c) == 0 and c.get("collect_date") != today)
 
     body = f"""
 <div class="card">
   <h1 class="page-title">수시 보관함</h1>
-  <p class="page-sub">사안별로 쌓인 확정본 · {_retention_label()} 보관됩니다</p>
+  <p class="page-sub">{sub_label} · {_retention_label()} 보관됩니다</p>
   {filter_bar_html}
   {error_html}
   <div class="result-bar">
-    <p class="result-line">{html.escape(_condition_text(q, start, end))} · 사안 <b>{issue_count}개</b> · 회차 <b>{len(filtered)}건</b> · 기사 <b>{total_articles}건</b></p>
+    <p class="result-line">{html.escape(_condition_text(q, start, end))}</p>
     {_tidy_controls_html(empty_count)}
     {top_export}
   </div>
   {_SEL_BAR_HTML}
-  {"".join(issue_sections)}
+  {"".join(sections)}
   {recent_html}
 </div>"""
 
@@ -690,7 +846,7 @@ def render_archive_page(
         "수시 모니터링 — 수시 보관함",
         body,
         script=page_script,
-        nav=nav_html([NAV_HOME]),
+        nav=page_nav("archive"),
     )
 
 
@@ -743,7 +899,7 @@ function onPickChange() {
   document.getElementById('arch-sel-a').textContent = articles.toLocaleString();
   document.getElementById('arch-selbar').classList.toggle('on', lines.length > 0);
 }
-// 사안·날짜 줄 체크 = 그 아래 회차 전부(/hidden 묶음 체크와 같은 한 방향 — 개별 해제로 머리가 안 풀린다)
+// 날짜 줄 체크 = 그 아래 회차 전부(/hidden 묶음 체크와 같은 한 방향 — 개별 해제로 머리가 안 풀린다)
 function pickGroup(box) {
   var block = box.closest('details');
   block.querySelectorAll('input.pick').forEach(function (cb) { if (cb !== box) { cb.checked = box.checked; } });
@@ -757,8 +913,7 @@ function clearPicks() {
 function pickEmptyCards() {
   document.querySelectorAll('.run-line[data-count="0"]:not(.is-today) input.pick').forEach(function (cb) {
     cb.checked = true;
-    var d = cb.closest('details.day-block'); if (d) { d.open = true; }
-    var i = cb.closest('details.issue-block'); if (i) { i.open = true; }
+    var d = cb.closest('details.date-block'); if (d) { d.open = true; }
   });
   onPickChange();
 }
@@ -767,12 +922,14 @@ function deletePicked() {
   if (!lines.length) { return; }
   var articles = lines.reduce(function (sum, l) { return sum + Number(l.dataset.count || 0); }, 0);
   var picked = new Set(lines);
-  var goneIssues = Array.prototype.filter.call(document.querySelectorAll('details.issue-block'), function (block) {
+  var blocks = document.querySelectorAll('details.date-block');
+  var unit = blocks.length ? (blocks[0].dataset.unit || '날짜') : '날짜';
+  var goneDays = Array.prototype.filter.call(blocks, function (block) {
     var live = block.querySelectorAll('.run-line:not(.gone)');
     return live.length && Array.prototype.every.call(live, function (l) { return picked.has(l); });
-  }).map(function (block) { return block.dataset.issueName; });
+  }).map(function (block) { return block.dataset.dayLabel; });
   var msg = '회차 ' + lines.length + '개를 삭제할까요?\\n기사 ' + articles.toLocaleString() + '건';
-  if (goneIssues.length) { msg += ' · 사안 ' + goneIssues.length + '개가 목록에서 사라져요\\n(' + goneIssues.join(', ') + ')'; }
+  if (goneDays.length) { msg += ' · ' + unit + ' ' + goneDays.length + '개가 목록에서 사라져요\\n(' + goneDays.join(', ') + ')'; }
   if (lines.some(function (l) { return l.dataset.bundle; })) {
     msg += '\\n확정본을 지우면 원본의 「✓ …로 보냄」 표시도 함께 풀려요.';
   }
@@ -780,20 +937,14 @@ function deletePicked() {
   if (!confirm(msg)) { return; }
   deleteCards(lines.map(function (l) { return l.dataset.cardId; }));
 }
-// 사안 줄 🗑 — 그 사안 아래 지금 보이는 회차 전부. 여러 개라 확인창을 한 번 거친다
-// (카드 화면의 소제목 헤더 🗑처럼 이름·건수를 박는다). 기간 밖 회차는 서버가 센 값(data-outside).
-function deleteIssue(btn) {
-  var block = btn.closest('details.issue-block');
+// 머리줄 🗑 — 그 날짜(사안별 보기에선 그 사안) 아래 지금 보이는 회차 전부. 확인창 한 번.
+function deleteDay(btn) {
+  var block = btn.closest('details.date-block');
   var lines = Array.prototype.slice.call(block.querySelectorAll('.run-line:not(.gone)'));
   if (!lines.length) { return; }
   var articles = lines.reduce(function (sum, l) { return sum + Number(l.dataset.count || 0); }, 0);
-  var days = Array.prototype.filter.call(block.querySelectorAll('details.day-block'), function (d) {
-    return d.querySelector('.run-line:not(.gone)');
-  }).length;
-  var msg = '「' + block.dataset.issueName + '」에 쌓인 회차를 모두 지울까요?\\n날짜 ' + days
-    + ' · 회차 ' + lines.length + ' · 기사 ' + articles.toLocaleString() + '건';
-  var outside = Number(btn.dataset.outside || 0);
-  if (outside) { msg += '\\n이 기간 밖의 회차 ' + outside + '개는 그대로 남아요.'; }
+  var msg = '「' + block.dataset.dayLabel + '」의 회차 ' + lines.length + '개(기사 '
+    + articles.toLocaleString() + '건)를 지울까요?';
   if (lines.some(function (l) { return l.dataset.bundle; })) {
     msg += '\\n확정본을 지우면 원본의 「✓ …로 보냄」 표시도 함께 풀려요.';
   }

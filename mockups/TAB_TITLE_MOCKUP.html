@@ -1,0 +1,224 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>탭 제목 시안</title>
+<style>
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  /* [수정: 2026-09-11] 폭은 확정본·초안과 같은 800px 하나다 — 본문 카드·상단바·하단
+     저장 바 세 자리가 같은 값이어야 한다(하나만 넓히면 상단 링크·저장 버튼이 본문과
+     어긋난다). 예전엔 설정 폼용 480px이 기본이고 기사 목록 화면 셋만 body.wide로
+     800px을 썼는데, 목록이 길어지는 설정 화면(검색어·언론사 등)까지 좁아져 스크롤만
+     길어졌다. 폭만 넓히면 한 줄에 하나씩 쌓는 화면은 오른쪽만 비므로, 긴 화면 여섯은
+     각자 템플릿에서 여러 칸 배치를 함께 쓴다(각 템플릿의 "[추가: 2026-09-11]" 참고). */
+  .container {
+    max-width: 800px; margin: 24px auto; padding: 24px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: 8px;
+  }
+  /* [수정: 2026-07-26] 모든 설정 세부 페이지에 상단(뒤로/HOME)·하단(저장) 고정 바를
+     적용하면서, 내용이 그 바에 가리지 않도록 컨테이너 위쪽에 여백을 더했다. 하단
+     여백(저장 버튼 있는 페이지만 필요)은 페이지마다 필요할 때만 덧붙인다. */
+  /* [수정: 2026-09-16] 카드 위 여백 60→44px — 60px은 상단 고정바(54px)를 피하려는 값인데 글자 위로
+     30px이 비었다. 44px이면 16px 남는다. 확정본·초안·실시간·정기 보관함·설정·수시·정책 단어 추이
+     일곱 화면이 같은 값을 써야 화면을 오갈 때 제목이 들썩이지 않는다(수시·추이는 84→68px 형태).
+     시안 SUBHEAD_SPACING_MOCKUP.html B안. */
+  .container { padding-top: 44px; }
+  h1 { font-size: 1.3rem; color: #1E3A5F; }
+  .hint { color: #6B7280; font-size: 0.85rem; margin-bottom: 16px; }
+  .caption { color: #6B7280; font-size: 0.78rem; margin: 0 0 12px; }
+  .error { color: #DC2626; margin: 12px 0; }
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    background: #FFFFFF; border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .topbar-inner {
+    max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .topbar a { color: #2563EB; text-decoration: none; font-size: 0.92rem; font-weight: 600; padding: 6px 10px; border-radius: 6px; }
+  .topbar a:hover { background: #EFF6FF; }
+  .save-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    background: #FFFFFF; border-top: 1px solid #E5E7EB; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  }
+  .save-bar-inner { max-width: 800px; margin: 0 auto; padding: 12px 24px; }
+  .save-bar button { width: 100%; }
+  /* [수정: 2026-08-03] app.renderer와 동일한 이유 — button은 a와 달리 font-family를
+     상속받지 않고, appearance:auto(네이티브 OS 버튼 껍데기)까지 남아있어 폰트만 맞춰선
+     완전히 똑같이 안 보인다. 크롬이 button 텍스트만 내부적으로 수직 중앙 정렬해주는
+     것까지 발견해 align-items: center를 직접 지정했다. */
+  button, a.btn {
+    background: #2563EB; color: #FFFFFF; border: none; border-radius: 4px;
+    padding: 8px 16px; font-size: 1rem; font-family: inherit; cursor: pointer; text-decoration: none;
+    appearance: none; -webkit-appearance: none;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  button:hover, a.btn:hover { background: #1E3A5F; }
+  button:disabled { background: #E5E7EB; color: #6B7280; cursor: not-allowed; }
+  input[type=text], input[type=number] {
+    background: #F8FAFC; color: #1F2937; border: 1px solid #E5E7EB; border-radius: 4px;
+    padding: 6px 10px; font-size: 1rem;
+  }
+  .del-btn {
+    background: transparent; color: #6B7280; border: 1px solid #E5E7EB; border-radius: 4px;
+    padding: 4px 10px; font-size: 0.8rem; margin-left: 6px; cursor: pointer;
+  }
+  .del-btn:hover { background: #EFF6FF; color: #DC2626; border-color: #DC2626; }
+  /* [추가: 2026-08-13] 이모지 대신 쓰는 단색 SVG 아이콘(app.icons) 공통 크기·색 —
+     currentColor라 부모의 글자색(회색/파랑 호버/헤더 남색 등)을 그대로 물려받는다. */
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+
+  /* [수정: 2026-09-02] 평평한 목록 → "한 번에 숨긴 덩어리"(app.curation.load_hidden_batches)
+     묶음 카드. 정기는 소제목 통째 숨기기·체크박스 일괄 숨기기로 한 번에 수십 건이 들어와,
+     한 줄씩 늘어놓으면 복구 버튼이 40개가 되고 그중 하나를 찾을 수도 없었다. */
+  .hidden-row { display: flex; align-items: center; gap: 9px; padding: 8px 12px; font-size: 0.9rem; border-top: 1px solid #F1F5F9; }
+  .hidden-row:first-child { border-top: none; }
+  .hidden-row:hover { background: #F3F4F6; }
+  .hidden-row.sel { background: #EFF6FF; }
+  .hidden-row .name { flex: 1; line-height: 1.45; }
+  /* [추가: 2026-09-11] 확정본·초안 기사 줄(.title-outlet)과 같은 값 — 괄호 없이 회색·조금 작은 언론사. */
+  .hidden-row .title-outlet { color: #6B7280; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  /* [수정: 2026-07-26] 별도 flex 칸(오른쪽 고정폭)이었던 걸 제목 옆 인라인으로 옮겼다 —
+     제목이 두 줄로 넘어가면 가운데 정렬된 시각이 줄바꿈된 글자 위에 겹쳐 보이는
+     문제가 있었다. 제목 텍스트 흐름 안에 작게 끼워 넣으면 그럴 일이 없다. */
+  .hidden-row .pub-time { color: #6B7280; font-size: 0.76rem; white-space: nowrap; margin-left: 6px; }
+  /* [수정: 2026-09-16] ↩ 아이콘을 뗐다 — 이 앱에서 ↩는 좌하단 **되돌리기**(직전 동작
+     취소)의 신호이고 여기 복구는 "이 기사 되살리기"라 뜻이 다른데, 확정본 좌하단
+     팝오버에선 ↩ FAB 바로 위에 「↩ 복구」가 붙어 같은 그림이 40px 거리에 두 뜻으로
+     있었다. 복구는 글자만, 원문은 아이콘만 — 앱 관례대로(글자=주 동작, 아이콘=가끔 한 번). */
+  .undo-btn {
+    flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    height: 26px; padding: 0 9px; font-size: 0.76rem; background: transparent; color: #6B7280;
+    border: 1px solid #E5E7EB; border-radius: 6px; cursor: pointer; white-space: nowrap;
+    font-family: inherit;
+  }
+  .undo-btn:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  /* [수정: 2026-09-16, 2차] 행의 복구는 글자 없이 ↩ 아이콘만이다(사용자 결정) — 원문(↗)과
+     나란히 같은 크기·같은 상자로 서서 오른쪽 묶음이 한 덩어리로 읽힌다. 글자를 남기는 건
+     **한 번에 여러 건**을 되살리는 자리(묶음 헤더·선택 바·팝오버의 묶음 줄)뿐이다 —
+     거기선 "모두"·"선택한"이 실제 정보라서다. */
+  .undo-btn.ico { width: 30px; padding: 0; }
+  .undo-btn svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; }
+  /* 잠긴 복구 — disabled 속성이 아니라 aria-disabled + 흐림이다. disabled 버튼은 브라우저가
+     마우스 이벤트를 안 줘서 정작 "왜 못 누르는지"를 말할 title 툴팁이 안 뜬다(확정본
+     「AI 기사 나누기」 잠김과 같은 방식). 숨김 유지 기간과 열람 기간이 같은 지금은 이 줄이
+     나오지 않지만, 두 값이 갈리는 날 화면이 거짓말하지 않도록 남겨 둔다. */
+  .undo-btn[aria-disabled="true"] { opacity: 0.38; cursor: default; }
+  .undo-btn[aria-disabled="true"]:hover { background: transparent; color: #6B7280; border-color: #E5E7EB; }
+  .hid-group { border: 1px solid #E5E7EB; border-radius: 9px; margin-bottom: 10px; background: #FFFFFF; overflow: hidden; }
+  .hid-group > summary {
+    display: flex; align-items: center; gap: 9px; padding: 10px 12px; font-size: 0.88rem;
+    background: #F8FAFC; cursor: pointer; list-style: none;
+  }
+  .hid-group > summary::-webkit-details-marker { display: none; }
+  .hid-group[open] > summary { border-bottom: 1px solid #E5E7EB; }
+  .hid-group > summary::before { content: "▸"; color: #6B7280; font-size: 0.72rem; width: 10px; flex: none; }
+  .hid-group[open] > summary::before { content: "▾"; }
+  .hid-group .gtitle { flex: 1; color: #1F2937; }
+  .hid-group .gtitle b { color: #1E3A5F; }
+  .hid-group .gwhen { color: #9CA3AF; font-size: 0.74rem; margin-left: 5px; }
+  .hid-group .gcount {
+    flex: none; font-size: 0.74rem; font-weight: 700; color: #6B7280;
+    background: #F3F4F6; border-radius: 9px; padding: 1px 8px;
+  }
+  .hid-solo { border: 1px solid #E5E7EB; border-radius: 9px; margin-bottom: 10px; background: #FFFFFF; }
+  /* [추가: 2026-09-04] 날짜 구획 — 쓰레기통이 7일치를 보여주게 되면서(HIDDEN_VIEW_DAYS),
+     "오늘 뺀 것"과 "지난 날 뺐던 것"이 한 목록에 섞이면 무엇을 되살릴 수 있는지가
+     안 읽힌다. 오늘 구획만 펼친 채 열고(정기 보관함이 최신 날짜를 미리 펼치는 규칙과
+     같다), 지난 날짜는 접어둔다. */
+  .hid-day { margin-bottom: 14px; }
+  .hid-day > summary {
+    display: flex; align-items: center; gap: 8px; padding: 6px 2px; margin-bottom: 8px;
+    font-size: 0.92rem; font-weight: 700; color: #1E3A5F; cursor: pointer; list-style: none;
+    border-bottom: 1px solid #E5E7EB;
+  }
+  .hid-day > summary::-webkit-details-marker { display: none; }
+  .hid-day > summary::before { content: "▸"; color: #6B7280; font-size: 0.72rem; width: 10px; flex: none; }
+  .hid-day[open] > summary::before { content: "▾"; }
+  .hid-day .chip-today {
+    font-size: 0.72rem; font-weight: 600; background: #EFF6FF; color: #2563EB;
+    border: 1px solid #BFDBFE; border-radius: 20px; padding: 1px 8px;
+  }
+  .hid-day .dn { font-size: 0.74rem; font-weight: 700; color: #6B7280; background: #F3F4F6; border-radius: 9px; padding: 1px 8px; }
+  /* 지난 날짜는 이미 숨김이 풀린 기록이라 되살릴 것이 없다 — 그 사실을 구획 머리에서
+     한 번만 말하고, 행에는 복구 버튼 대신 원문 링크를 둔다(그 자리가 비면 왜 없는지
+     설명할 곳이 사라진다). */
+  .hid-day .ro { margin-left: auto; font-size: 0.74rem; font-weight: 500; color: #9CA3AF; }
+  /* 원문 열기 — 확정본의 「원문보기 ↗」와 같은 외부 링크 아이콘. 이 행엔 다른 아이콘이
+     없어서 2026-08-14에 확정본에서 ↗를 뺐던 이유(↗와 복사 아이콘이 17px에선 같은
+     실루엣)가 여기선 걸리지 않는다. */
+  .hidden-row .src {
+    flex: none; display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 26px; color: #6B7280; text-decoration: none;
+    border: 1px solid #E5E7EB; border-radius: 6px;
+  }
+  .hidden-row .src:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .hidden-row .src svg { width: 13px; height: 13px; fill: none; stroke: currentColor;
+    stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  /* 원문·복구 두 칸 묶음 — 행마다 같은 자리에 같은 것이 오도록 한 덩어리로 둔다. */
+  .hidden-row .acts { flex: none; display: flex; align-items: center; gap: 6px; }
+  .hid-check { flex: none; width: 14px; height: 14px; margin: 0; cursor: pointer; }
+  /* 선택했을 때만 뜨는 일괄 복구 바 — 확정본·초안의 일괄이동 바와 같은 규칙(선택이
+     없으면 자리 자체를 안 차지한다). */
+  .bulk-restore {
+    display: none; position: sticky; top: 0; z-index: 5; align-items: center; gap: 8px;
+    background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px;
+    padding: 8px 12px; font-size: 0.84rem; color: #1E3A5F; margin-bottom: 12px;
+  }
+  .bulk-restore.on { display: flex; }
+  .bulk-restore .n { font-weight: 700; }
+  .bulk-restore .sp { flex: 1; }
+  .bulk-restore .go {
+    display: inline-flex; align-items: center; gap: 5px; background: #2563EB; color: #FFFFFF;
+    border: none; border-radius: 6px; padding: 5px 11px; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+  }
+  .bulk-restore .go svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; }
+  .bulk-restore .clr {
+    background: transparent; color: #6B7280; border: 1px solid #E5E7EB; border-radius: 6px;
+    padding: 5px 10px; font-size: 0.8rem; cursor: pointer;
+  }
+
+  .report-head { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; font-size: 1.1rem; font-weight: 700; color: #1E3A5F; }
+  .issue-input { font: inherit; font-size: 1.02rem; font-weight: 700; color: #1E3A5F; border: none; border-bottom: 2px dashed #2563EB; background: #EFF6FF; padding: 2px 8px; border-radius: 4px 4px 0 0; width: 180px; }
+  .chip { background: #F1F5F9; border: 1px solid #E5E7EB; border-radius: 14px; padding: 3px 11px; color: #6B7280; }
+  .chip.bundle-tag { background: #E3F1EE; border-color: rgba(20, 107, 94, 0.24); color: #146B5E;
+    font-weight: 700; font-size: 0.78rem; margin-left: 8px; }
+
+body{background:#F8FAFC;margin:0;font-family:'Pretendard','Noto Sans KR',sans-serif;color:#1F2937}
+.mock-head{max-width:800px;margin:0 auto;padding:24px 20px 0}
+.mock-head h1{font-size:1.2rem;color:#1E3A5F;margin:0 0 6px}
+.mock-head p{font-size:.82rem;color:#6B7280;margin:0;line-height:1.7}
+.opt{max-width:800px;margin:28px auto 0;padding:0 20px}
+.opt-t{font-size:1rem;font-weight:800;color:#1E3A5F}
+.opt-n{font-size:.8rem;color:#6B7280;margin:4px 0 10px;line-height:1.6}
+.opt-n b{color:#1E3A5F}
+.shot{background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:0 0 10px;margin-bottom:12px;overflow:hidden}
+.shot-l{font-size:.72rem;color:#9CA3AF;padding:8px 14px 6px}
+.bstrip{display:flex;gap:2px;background:#E5E7EB;padding:6px 8px 0;margin:0 14px;border-radius:8px 8px 0 0}
+.btab{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:7px 7px 0 0;font-size:.74rem;color:#374151;background:#F3F4F6}
+.btab.on{background:#fff;color:#111827;font-weight:600}
+.btab .bt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btab .fav{flex-shrink:0;font-size:.8rem}
+.narrow .bstrip{max-width:560px}
+.shot .report-head{padding:6px 20px 4px}
+.chip-name{display:inline-flex;align-items:center;font-size:.78rem;font-weight:700;padding:3px 11px;border-radius:14px;border:1px solid;margin-right:10px;line-height:1.3}
+.chip-name.raw{background:#F1F5F9;border-color:#E5E7EB;color:#6B7280}
+.chip.bundle-tag.front{margin-left:0;margin-right:10px}
+.hwrap{padding:0 20px}
+</style></head><body>
+<div class="mock-head"><h1>시안 · 탭 제목 · 수시 머리줄 칩 · 쓰레기통</h1><p>머리줄과 쓰레기통 제목은 지금 앱의 HTML·CSS를 그대로 가져왔습니다. 탭 줄은 브라우저 탭을 흉내 낸 그림입니다.</p></div>
+
+<section class="opt"><div class="opt-t">1. 브라우저 탭 제목</div>
+<p class="opt-n">탭을 여러 개 열어 둔 모습. 탭이 좁아지면 뒤가 잘리므로 <b>화면 이름을 맨 앞에</b> 둔다. 지금은 같은 사안의 원본·확정본이 「수시 모니터링 — 청문회」로 똑같아 탭만 봐선 구별이 안 된다. 확정본은 목록에서 쓰는 이름(`청문회 11:10`)을 그대로 써서, 같은 사안 확정본이 여럿이어도 갈린다. 탭 앞 그림은 브라우저가 붙이는 아이콘 자리를 흐름도 이모지로 표시한 것(실제 아이콘은 그대로).</p>
+<div class="shot "><div class="shot-l">지금</div><div class="bstrip"><div class="btab" title="재정경제부 언론 모니터링"><span class="fav">🏠</span><span class="bt">재정경제부 언론 모니터링</span></div><div class="btab" title="초안"><span class="fav">⛏️</span><span class="bt">초안</span></div><div class="btab" title="언론 모니터링"><span class="fav">💎</span><span class="bt">언론 모니터링</span></div><div class="btab" title="수시 모니터링 — 청문회"><span class="fav">🍅</span><span class="bt">수시 모니터링 — 청문회</span></div><div class="btab on" title="수시 모니터링 — 청문회"><span class="fav">🥗</span><span class="bt">수시 모니터링 — 청문회</span></div><div class="btab" title="숨긴 기사 관리"><span class="fav">🗑️</span><span class="bt">숨긴 기사 관리</span></div></div></div>
+<div class="shot "><div class="shot-l">제안</div><div class="bstrip"><div class="btab" title="재정경제부 언론 모니터링"><span class="fav">🏠</span><span class="bt">재정경제부 언론 모니터링</span></div><div class="btab" title="초안 · 언론 모니터링 14시 기준"><span class="fav">⛏️</span><span class="bt">초안 · 언론 모니터링 14시 기준</span></div><div class="btab" title="확정본 · 언론 모니터링 11시 기준"><span class="fav">💎</span><span class="bt">확정본 · 언론 모니터링 11시 기준</span></div><div class="btab" title="원본 · 청문회"><span class="fav">🍅</span><span class="bt">원본 · 청문회</span></div><div class="btab on" title="확정본 · 청문회 11:10"><span class="fav">🥗</span><span class="bt">확정본 · 청문회 11:10</span></div><div class="btab" title="쓰레기통"><span class="fav">🗑️</span><span class="bt">쓰레기통</span></div></div></div>
+<div class="shot narrow"><div class="shot-l">제안 · 창이 좁을 때</div><div class="bstrip"><div class="btab" title="재정경제부 언론 모니터링"><span class="fav">🏠</span><span class="bt">재정경제부 언론 모니터링</span></div><div class="btab" title="초안 · 언론 모니터링 14시 기준"><span class="fav">⛏️</span><span class="bt">초안 · 언론 모니터링 14시 기준</span></div><div class="btab" title="확정본 · 언론 모니터링 11시 기준"><span class="fav">💎</span><span class="bt">확정본 · 언론 모니터링 11시 기준</span></div><div class="btab" title="원본 · 청문회"><span class="fav">🍅</span><span class="bt">원본 · 청문회</span></div><div class="btab on" title="확정본 · 청문회 11:10"><span class="fav">🥗</span><span class="bt">확정본 · 청문회 11:10</span></div><div class="btab" title="쓰레기통"><span class="fav">🗑️</span><span class="bt">쓰레기통</span></div></div></div>
+</section>
+<section class="opt"><div class="opt-t">2. 수시 화면 머리줄 칩 (정기와 같은 규칙)</div>
+<p class="opt-n">정기 <b>(초안)</b> 회색 · <b>(확정본)</b> 파랑과 짝을 맞춰, 수시는 <b>(원본)</b> 회색 · <b>(확정본)</b> 청록을 머리줄 <b>앞</b>에. 칩은 화면 전용(복사·txt·발송엔 안 나감).</p>
+<div class="shot "><div class="shot-l">수시 원본 · 지금</div><div class="report-head">수시 모니터링 11시 10분 기준(<input class="issue-input" value="청문회">)</div></div><div class="shot "><div class="shot-l">수시 원본 · 제안</div><div class="report-head"><span class="chip-name raw">원본</span>수시 모니터링 11시 10분 기준(<input class="issue-input" value="청문회">)</div></div>
+<div class="shot "><div class="shot-l">수시 확정본 · 지금</div><div class="report-head">수시 모니터링 <span>11시 10분 기준</span>(<input class="issue-input" value="청문회">)<span class="chip bundle-tag">확정본</span></div></div><div class="shot "><div class="shot-l">수시 확정본 · 제안</div><div class="report-head"><span class="chip bundle-tag front">확정본</span>수시 모니터링 <span>11시 10분 기준</span>(<input class="issue-input" value="청문회">)</div></div>
+</section>
+<section class="opt"><div class="opt-t">3. 쓰레기통 화면 이름</div>
+<p class="opt-n">화면 제목·탭을 「쓰레기통」으로. 확정본·초안 좌하단 팝오버의 링크(「쓰레기통 열기 →」)와 🗑 아이콘이 이미 이 이름이라 셋이 맞는다.</p>
+<div class="shot "><div class="shot-l">지금</div><div class="hwrap"><h1>🗑️ 숨긴 기사 관리 · 오늘 95건</h1></div></div><div class="shot "><div class="shot-l">제안</div><div class="hwrap"><h1>🗑️ 쓰레기통 · 오늘 95건</h1></div></div>
+</section><div style="height:40px"></div></body></html>

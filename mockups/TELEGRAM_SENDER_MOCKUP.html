@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>시안 · 텔레그램 발송 계정</title>
+<style>
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  /* [수정: 2026-09-11] 폭은 확정본·초안과 같은 800px 하나다 — 본문 카드·상단바·하단
+     저장 바 세 자리가 같은 값이어야 한다(하나만 넓히면 상단 링크·저장 버튼이 본문과
+     어긋난다). 예전엔 설정 폼용 480px이 기본이고 기사 목록 화면 셋만 body.wide로
+     800px을 썼는데, 목록이 길어지는 설정 화면(검색어·언론사 등)까지 좁아져 스크롤만
+     길어졌다. 폭만 넓히면 한 줄에 하나씩 쌓는 화면은 오른쪽만 비므로, 긴 화면 여섯은
+     각자 템플릿에서 여러 칸 배치를 함께 쓴다(각 템플릿의 "[추가: 2026-09-11]" 참고). */
+  .container {
+    max-width: 800px; margin: 24px auto; padding: 24px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+  }
+  /* [수정: 2026-07-26] 모든 설정 세부 페이지에 상단(뒤로/HOME)·하단(저장) 고정 바를
+     적용하면서, 내용이 그 바에 가리지 않도록 컨테이너 위쪽에 여백을 더했다. 하단
+     여백(저장 버튼 있는 페이지만 필요)은 페이지마다 필요할 때만 덧붙인다. */
+  /* [수정: 2026-09-16] 카드 위 여백 60→44px — 60px은 상단 고정바(54px)를 피하려는 값인데 글자 위로
+     30px이 비었다. 44px이면 16px 남는다. 확정본·초안·실시간·정기 보관함·설정·수시·정책 단어 추이
+     일곱 화면이 같은 값을 써야 화면을 오갈 때 제목이 들썩이지 않는다(수시·추이는 84→68px 형태).
+     시안 SUBHEAD_SPACING_MOCKUP.html B안. */
+  .container { padding-top: 44px; }
+  h1 { font-size: var(--fs-xl); color: #1E3A5F; }
+  .hint { color: #6B7280; font-size: var(--fs-md); margin-bottom: 16px; }
+  .caption { color: #6B7280; font-size: var(--fs-sm); margin: 0 0 12px; }
+  .error { color: #DC2626; margin: 12px 0; }
+
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem; --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%; --h-sm: 24px; --h-md: 30px; --h-lg: 36px; --fab-lg: 56px; --fab-sm: 48px; --sh-float: 0 4px 12px rgba(15, 23, 42, 0.12); --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14); --sh-modal: 0 16px 40px rgba(15, 23, 42, 0.22); }
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    background: #FFFFFF; border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .topbar-inner {
+    max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: flex-start; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .topbar-inner > .tn { color: #2563EB; text-decoration: none; font-size: var(--fs-md); font-weight: 600;
+    padding: 5px 14px; border: 1px solid transparent; border-radius: var(--r-pill); white-space: nowrap; }
+  .topbar-inner > a.tn:hover { background: #EFF6FF; }
+  .topbar-inner > .tn-sep { width: 1px; height: 18px; background: #E5E7EB; margin: 0 16px; }
+  .topbar-inner > .tn.is-current { cursor: default; background: #EFF6FF;
+    border-color: #BFDBFE; color: #2563EB; }
+  .topbar.adhoc .topbar-inner > .tn.is-current { background: #E3F1EE;
+    border-color: rgba(20, 107, 94, 0.45); color: #146B5E; }
+  .topbar-inner > .tn.is-empty { color: #6B7280; opacity: 0.55; cursor: not-allowed; }
+  .topbar-inner > a.tn.back { color: #4B5563; }
+  .topbar-inner > a.tn.back:hover { color: #2563EB; }
+  @media (max-width: 480px) {
+    .topbar-inner { padding: 12px 12px; gap: 2px; }
+    .topbar-inner > .tn { padding: 5px 8px; }
+    .topbar-inner > .tn-sep { margin: 0 8px; }
+  }
+
+  .save-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    background: #FFFFFF; border-top: 1px solid #E5E7EB; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  }
+  .save-bar-inner { max-width: 800px; margin: 0 auto; padding: 12px 24px; }
+  .save-bar button { width: 100%; }
+  /* [수정: 2026-08-03] app.renderer와 동일한 이유 — button은 a와 달리 font-family를
+     상속받지 않고, appearance:auto(네이티브 OS 버튼 껍데기)까지 남아있어 폰트만 맞춰선
+     완전히 똑같이 안 보인다. 크롬이 button 텍스트만 내부적으로 수직 중앙 정렬해주는
+     것까지 발견해 align-items: center를 직접 지정했다. */
+  button, a.btn {
+    background: #2563EB; color: #FFFFFF; border: none; border-radius: var(--r-md);
+    padding: 8px 16px; font-size: var(--fs-base); font-family: inherit; cursor: pointer; text-decoration: none;
+    appearance: none; -webkit-appearance: none;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  button:hover, a.btn:hover { background: #1E3A5F; }
+  button:disabled { background: #E5E7EB; color: #6B7280; cursor: not-allowed; }
+  input[type=text], input[type=number] {
+    background: #F8FAFC; color: #1F2937; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    padding: 6px 10px; font-size: var(--fs-base);
+  }
+  .del-btn {
+    background: transparent; color: #6B7280; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    padding: 4px 10px; font-size: var(--fs-sm); margin-left: 6px; cursor: pointer;
+  }
+  .del-btn:hover { background: #EFF6FF; color: #DC2626; border-color: #DC2626; }
+  /* [추가: 2026-08-13] 이모지 대신 쓰는 단색 SVG 아이콘(app.icons) 공통 크기·색 —
+     currentColor라 부모의 글자색(회색/파랑 호버/헤더 남색 등)을 그대로 물려받는다. */
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+
+  label.field { display: block; font-size: var(--fs-md); font-weight: 600; color: #1E3A5F; margin: 18px 0 6px; }
+  input[type=password] {
+    background: #F8FAFC; color: #1F2937; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    padding: 8px 10px; font-size: var(--fs-base); font-family: inherit; width: 100%; box-sizing: border-box;
+  }
+  .status {
+    display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: var(--r-md);
+    font-size: var(--fs-md); line-height: 1.5; margin-bottom: 4px;
+  }
+  .status-ok { background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; }
+  .status-warn { background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; }
+  .status-info { background: #EFF6FF; color: #1E3A5F; border: 1px solid #BFDBFE; }
+  .key-row { display: flex; gap: 6px; align-items: center; }
+  .key-row input { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .eye {
+    flex: 0 0 auto; background: transparent; color: #6B7280; border: 1px solid #E5E7EB;
+    font-size: var(--fs-sm); padding: 8px 10px;
+  }
+  .eye:hover { background: #EFF6FF; color: #1E3A5F; }
+  .saved-key {
+    display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: #F8FAFC;
+    border: 1px solid #E5E7EB; border-radius: var(--r-md); font-family: ui-monospace, Menlo, monospace;
+    font-size: var(--fs-md); color: #1F2937; margin-top: 8px;
+  }
+  .saved-key .tag { margin-left: auto; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; font-size: var(--fs-xs); color: #6B7280; }
+  .test-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  .test-result { font-size: var(--fs-md); color: #6B7280; }
+  .test-result.ok { color: #166534; }
+  .test-result.err { color: #DC2626; }
+  details.howto { margin-top: 22px; border: 1px solid #E5E7EB; border-radius: var(--r-md); padding: 10px 12px; background: #F8FAFC; }
+  details.howto summary { cursor: pointer; font-size: var(--fs-md); font-weight: 600; color: #1E3A5F; }
+  details.howto ol { margin: 10px 0 0; padding-left: 18px; font-size: var(--fs-md); line-height: 1.75; }
+  details.howto code { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-sm); padding: 1px 5px; font-size: var(--fs-sm); }
+  .note { margin-top: 20px; font-size: var(--fs-sm); color: #6B7280; line-height: 1.65; border-top: 1px dashed #E5E7EB; padding-top: 14px; }
+  .note code { background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: var(--r-sm); padding: 1px 5px; font-size: var(--fs-sm); }
+  .container { padding-bottom: 88px; }
+
+  button.ghost { background: transparent; color: #2563EB; border: 1px solid #BFDBFE; }
+  button.ghost:hover { background: #EFF6FF; color: #1E3A5F; border-color: #A9C6F5; }
+  button.danger { background: transparent; color: #6B7280; border: 1px solid #E5E7EB; font-size: var(--fs-sm); padding: 6px 12px; }
+  button.danger:hover { background: #FEF2F2; color: #DC2626; border-color: #DC2626; }
+  .svc { display: flex; gap: 6px; flex-wrap: wrap; }
+  .svc input { position: absolute; opacity: 0; pointer-events: none; }
+  .svc label {
+    background: #FFFFFF; color: #1F2937; border: 1px solid #E5E7EB; border-radius: var(--r-pill);
+    padding: 5px 14px; font-size: var(--fs-md); cursor: pointer;
+  }
+  .svc label:hover { background: #EFF6FF; }
+  .svc input:checked + label { background: #EFF6FF; color: #2563EB; border-color: #2563EB; font-weight: 600; }
+  .svc input:focus-visible + label { outline: 2px solid #BFDBFE; outline-offset: 1px; }
+  .server { margin: 8px 0 0; font-size: var(--fs-sm); color: #6B7280; }
+  input.wide { width: 100%; max-width: 420px; box-sizing: border-box; }
+  .opt { color: #6B7280; font-weight: 400; font-size: var(--fs-sm); }
+  .caption { margin: 6px 0 0; }
+
+  .bot-name { margin: 0 0 20px; padding: 14px 16px; border: 1px solid #E5E7EB; border-radius: var(--r-lg); }
+  .bn-label { display: block; font-size: var(--fs-md); font-weight: 700; color: #1E3A5F; margin: 0 0 8px; }
+  .bn-row { display: flex; align-items: center; gap: 8px; }
+  .bn-row input[type=text] { flex: 1 1 auto; min-width: 0; box-sizing: border-box; }
+  .bn-row input.changed { border-color: #2563EB; background: #FFFFFF; }
+  .bn-row input:disabled { color: #6B7280; }
+  .bn-count { flex-shrink: 0; color: #9CA3AF; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+  .bn-hint { margin: 7px 0 0; color: #6B7280; font-size: var(--fs-sm); line-height: 1.6; }
+  .bn-was { margin: 4px 0 0; color: #6B7280; font-size: var(--fs-sm); display: none; }
+  .bn-was.show { display: block; }
+  .bn-was s { color: #9CA3AF; }
+  .bn-preview { margin: 12px 0 0; display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: #F8FAFC; border-radius: var(--r-lg); }
+  .bn-preview .cap { font-size: var(--fs-xs); color: #9CA3AF; font-weight: 600; margin-right: 2px; white-space: nowrap; }
+  .bn-avatar {
+    width: 34px; height: 34px; border-radius: var(--r-circle); background: #1E3A5F; color: #FFFFFF; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: var(--fs-md);
+  }
+  .bn-who { min-width: 0; }
+  .bn-who b { display: block; font-size: var(--fs-md); color: #1F2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bn-who small { color: #6B7280; font-size: var(--fs-xs); }
+  .bot-name .status { margin: 10px 0 0; }
+
+  /* ── 시안 전용(실제 화면엔 없음) ── */
+  .mk-bar { position: relative; z-index: 50; background: #1E3A5F; color: #fff; font-size: 13px; padding: 8px 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .mk-bar b { margin-right: 6px; }
+  .mk-bar button { background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.3); border-radius: var(--r-md); padding: 4px 10px; font-size: 12px; cursor: pointer; }
+  .mk-bar button.on { background: #fff; color: #1E3A5F; }
+  .mk-note { max-width: 800px; margin: 18px auto 0; padding: 0 16px; font-size: 13px; color: #6B7280; line-height: 1.7; }
+  .mk-note h3 { color: #1E3A5F; font-size: 14px; margin: 0 0 4px; }
+  .mk-sec { max-width: 800px; margin: 40px auto 120px; padding: 0 16px; }
+  .mk-sec h2 { font-size: 14px; color: #1E3A5F; border-bottom: 1px dashed #E5E7EB; padding-bottom: 6px; }
+  .mk-frame { border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 16px; background: #fff; }
+  .mk-frame h1 { margin-top: 0; }
+  [data-st] { display: none; }
+  body.st-none [data-st~=none], body.st-env [data-st~=env], body.st-saved [data-st~=saved] { display: block; }
+  span[data-st], button[data-st] { display: none; }
+  body.st-none span[data-st~=none], body.st-env span[data-st~=env], body.st-saved span[data-st~=saved] { display: inline; }
+  body.st-none button[data-st~=none], body.st-env button[data-st~=env], body.st-saved button[data-st~=saved] { display: inline-block; }
+  .bot-name.locked { opacity: .55; }
+  .bot-name.locked .bn-hint.lock { opacity: 1; }
+  .menu-mini a { display: flex; align-items: center; gap: 11px; margin: 6px 0; padding: 10px 12px; font-weight: 500; color: #1F2937; text-decoration: none; border-radius: var(--r-md); background: #F8FAFC; }
+  .menu-mini a.new { outline: 2px solid #2563EB; outline-offset: -2px; background: #EFF6FF; }
+  .menu-mini .menu-chev { margin-left: auto; color: #E5E7EB; }
+  .badge-warn { margin-left: auto; font-size: var(--fs-xs); font-weight: 700; border-radius: var(--r-pill); padding: 2px 8px; color: #92400E; background: #FEF3C7; }
+  .badge-env { margin-left: auto; font-size: var(--fs-xs); font-weight: 700; border-radius: var(--r-pill); padding: 2px 8px; color: #6B7280; background: #F8FAFC; border: 1px solid #E5E7EB; }
+  .badge-warn + .menu-chev, .badge-env + .menu-chev { margin-left: 8px; }
+
+</style>
+</head>
+<body class="st-env">
+<div class="mk-bar"><b>시안 · 텔레그램 발송 계정</b>상태 보기:
+  <button data-set="none">미등록</button><button data-set="env" class="on">.env 사용 중</button><button data-set="saved">설정에 저장됨</button>
+</div>
+<div class="topbar"><div class="topbar-inner">
+  <a class="tn" href="http://127.0.0.1:8765/home.html">홈</a>
+  <span class="tn-sep" aria-hidden="true"></span>
+  <a class="tn back" href="http://127.0.0.1:8765/">← 설정</a>
+</div></div>
+<div class="container">
+  <h1>📨 텔레그램 발송 계정</h1>
+  <p class="hint">
+    정기·수시 보고서와 [단독]·[속보] 알림을 텔레그램으로 보내는 <b>봇</b>입니다. <b>없어도 앱은 그대로 돌아갑니다</b> —
+    텔레그램만 건너뛰고 이메일은 평소대로 나갑니다. 누구에게 보낼지는 <a href="/telegram">받는 사람 지정 › 텔레그램</a>에서 정합니다.
+  </p>
+
+  <div data-st="none"><div class="status status-warn">⚠️ 봇 토큰이 없습니다 — 텔레그램으로는 아무것도 나가지 않습니다.</div></div>
+  <div data-st="env"><div class="status status-info"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg> .env의 봇 토큰을 쓰고 있습니다 — 여기에 저장하면 그 값이 우선합니다.</div>
+    <p class="caption">설정에 저장된 값이 없어 .env로 넘어간 상태입니다. 그대로 둬도 됩니다.</p></div>
+  <div data-st="saved"><div class="status status-ok"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg> 설정에 저장된 봇 토큰을 쓰고 있습니다 · 9월 22일 14:05 저장</div></div>
+
+  <form onsubmit="return false">
+    <label class="field" for="tg-token">봇 토큰</label>
+    <p class="caption" data-st="saved" style="margin:0 0 6px">저장된 토큰: <code>123456789:AA••••••••••wXyZ</code> — 바꿀 때만 새로 넣으세요. 비워 두면 그대로입니다.</p>
+    <div class="key-row">
+      <input type="password" id="tg-token" name="token" placeholder="123456789:AAH…" autocomplete="off" spellcheck="false">
+      <button type="button" class="eye" onclick="toggleKey('tg-token', this)">보기</button>
+    </div>
+    <p class="caption">BotFather가 봇을 만들 때 준 값입니다. 숫자 + 콜론(:) + 긴 글자 모양입니다.</p>
+
+    <div class="test-row">
+      <button type="button" class="ghost" onclick="testBot()">연결 확인</button>
+      <button type="button" class="danger" data-st="saved" onclick="alert('시안: 저장된 토큰을 지웁니다. .env에 값이 있으면 그쪽으로 넘어가고, 둘 다 없으면 텔레그램은 보내지 않습니다.')">저장된 토큰 삭제</button>
+      <span class="test-result" id="tg-test"></span>
+    </div>
+    <p class="caption">메시지는 보내지 않고, 이 토큰이 어느 봇인지만 텔레그램에 물어봅니다. 실제로 받는지 보려면 받는 사람 화면에서 보내 보세요.</p>
+
+    <div class="bot-name" id="botBox" style="margin-top:22px">
+      <label class="bn-label" for="botName">봇 이름</label>
+      <div class="bn-row">
+        <input type="text" id="botName" maxlength="64" value="🤖 재경부 AI 뉴스 알림(디지털소통팀)" placeholder="🤖 재경부 AI 뉴스 알림(디지털소통팀)">
+        <span class="bn-count" id="bnCount"></span>
+      </div>
+      <p class="bn-was" id="bnWas">지금 이름: <s>🤖 재경부 AI 뉴스 알림(디지털소통팀)</s> — 저장하면 바뀝니다.</p>
+      <p class="bn-hint">받는 사람의 텔레그램 대화방 맨 위에 보이는 이름입니다. 한 봇을 쓰므로 <b>모든 받는 사람에게 같이 바뀝니다.</b> 비워 두고 저장하면 기본 이름으로 돌아갑니다.</p>
+      <p class="bn-hint lock" data-st="none">봇 토큰을 먼저 넣고 저장하면 이름을 바꿀 수 있습니다.</p>
+      <div class="bn-preview">
+        <span class="cap">받는 사람 화면</span>
+        <span class="bn-avatar" id="bnAvatar">재</span>
+        <span class="bn-who"><b id="bnShow">🤖 재경부 AI 뉴스 알림(디지털소통팀)</b><small>봇</small></span>
+      </div>
+    </div>
+
+    <details class="howto">
+      <summary>봇 토큰은 어디서 받나요?</summary>
+      <ol>
+        <li>텔레그램에서 <b>@BotFather</b>를 찾아 대화를 엽니다.</li>
+        <li><code>/newbot</code>을 보내고, 안내대로 봇 이름과 아이디(끝이 <code>bot</code>)를 정합니다.</li>
+        <li>BotFather가 돌려준 <b>토큰</b>을 위 칸에 붙여 넣고 [연결 확인] → [저장].</li>
+        <li>받는 사람마다 새 봇을 찾아 <b>시작(/start)</b>을 한 번 눌러야 메시지를 받을 수 있습니다.</li>
+      </ol>
+    </details>
+
+    <p class="note">
+      <b>토큰은 이 컴퓨터 밖으로 나가지 않습니다.</b> <code>data/credentials.json</code>에만
+      저장되고, 화면·복사·내보내기·발송 어디에도 실리지 않으며 로그에도 남기지 않습니다.<br><br>
+      <b>토큰을 다른 봇 것으로 바꾸면</b> 받는 사람들은 그 새 봇에서 시작(/start)을 다시 눌러야 합니다 —
+      누르기 전엔 그 사람에게 가는 메시지가 실패로 기록됩니다(정기 보관함의 빨간 링).<br><br>
+      <b>틀린 값을 넣어도 앱은 안 멈춥니다</b> — 텔레그램 발송만 실패로 기록되고 이메일은 그대로 나갑니다.
+    </p>
+    <div class="save-bar"><div class="save-bar-inner"><button type="submit" onclick="alert('시안: 저장')">저장</button></div></div>
+  </form>
+</div>
+
+<div class="mk-note">
+  <h3>바뀌는 점</h3>
+  ① 봇 토큰을 <code>.env</code>를 열지 않고 여기서 넣습니다(네이버·LLM·이메일과 같은 모양, 설정 화면 값 &gt; .env).<br>
+  ② 「텔레그램 받는 사람」 맨 위에 있던 <b>봇 이름</b> 칸을 이리로 옮깁니다 — 보내는 쪽 설정이라서.<br>
+  ③ 이메일의 「시험 메일 보내기」 대신 <b>연결 확인</b>입니다 — 봇은 자기 자신에게 메시지를 보낼 수 없어 받는 사람 없이 시험 발송을 할 곳이 없습니다.
+</div>
+
+<div class="mk-sec">
+  <h2>설정 메뉴 · 연동 묶음 (바뀐 뒤)</h2>
+  <div class="mk-frame menu-mini">
+    <a href="#">네이버 뉴스 API 설정<span class="menu-chev">›</span></a>
+    <a href="#">LLM(AI) 연동<span class="menu-chev">›</span></a>
+    <a href="#" class="new">텔레그램 발송 계정<span class="badge-warn" data-st="none">미등록</span><span class="badge-env" data-st="env">.env</span><span class="menu-chev">›</span></a>
+    <a href="#">이메일 발송 계정<span class="menu-chev">›</span></a>
+  </div>
+
+  <h2 style="margin-top:28px">텔레그램 받는 사람 화면 맨 위 (바뀐 뒤)</h2>
+  <div class="mk-frame">
+    <h1>📤 텔레그램 받는 사람</h1>
+    <p class="hint">받는 사람을 한 번만 등록해 두고, 무엇을 받을지와 알림이 울리는 시간을 사람마다 정합니다. …</p>
+    <div data-st="env saved"><div class="status status-ok"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg> 보내는 봇: <b>🤖 재경부 AI 뉴스 알림(디지털소통팀)</b> — 바꾸려면 <a href="#">설정 › 연동 › 텔레그램 발송 계정</a></div></div>
+    <div data-st="none"><div class="status status-warn">⚠️ 보내는 봇이 없어 아무것도 나가지 않습니다 — <a href="#">설정 › 연동 › 텔레그램 발송 계정</a>에서 넣어주세요.</div></div>
+    <p class="caption" style="margin-top:10px">(봇 이름 칸은 여기서 빠지고, 곧바로 chat id 확인법·받는 사람 명단이 이어집니다.)</p>
+  </div>
+</div>
+
+<script>
+function toggleKey(id, btn) {
+  var i = document.getElementById(id);
+  var show = i.type === "password";
+  i.type = show ? "text" : "password";
+  btn.textContent = show ? "가리기" : "보기";
+}
+function setState(st) {
+  document.body.className = "st-" + st;
+  document.querySelectorAll(".mk-bar button").forEach(function (b) { b.classList.toggle("on", b.dataset.set === st); });
+  var box = document.getElementById("botBox"), inp = document.getElementById("botName");
+  box.classList.toggle("locked", st === "none"); inp.disabled = st === "none";
+  document.getElementById("tg-test").textContent = "";
+}
+document.querySelectorAll(".mk-bar button").forEach(function (b) { b.onclick = function () { setState(b.dataset.set); }; });
+function testBot() {
+  var r = document.getElementById("tg-test");
+  var v = document.getElementById("tg-token").value.trim();
+  r.className = "test-result"; r.textContent = "확인 중…";
+  setTimeout(function () {
+    if (!v && document.body.className === "st-none") { r.className = "test-result err"; r.textContent = "✕ 토큰을 넣어 주세요."; return; }
+    if (v && !/^\d+:[\w-]{20,}$/.test(v)) { r.className = "test-result err"; r.textContent = "✕ 텔레그램이 이 토큰을 받지 않았습니다 — 복사할 때 앞뒤가 잘리지 않았는지 확인해 주세요."; return; }
+    r.className = "test-result ok"; r.textContent = "✔ @mof_news_alert_bot (🤖 재경부 AI 뉴스 알림(디지털소통팀)) 에 연결됩니다.";
+  }, 500);
+}
+(function () {
+  var inp = document.getElementById("botName"), before = inp.value, fallback = inp.placeholder;
+  function firstChar(s) { var t = s.replace(/^[\s\p{Extended_Pictographic}\uFE0F\u200D]+/u, ""); return (t || "?").charAt(0); }
+  function sync() {
+    var shown = inp.value.trim() || fallback;
+    document.getElementById("bnCount").textContent = Array.from(inp.value).length + "/" + inp.maxLength;
+    document.getElementById("bnShow").textContent = shown;
+    document.getElementById("bnAvatar").textContent = firstChar(shown);
+    var changed = shown !== before;
+    inp.classList.toggle("changed", changed);
+    document.getElementById("bnWas").classList.toggle("show", changed);
+  }
+  inp.addEventListener("input", sync); sync();
+})();
+</script>
+</body>
+</html>

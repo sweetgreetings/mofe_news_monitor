@@ -16,7 +16,19 @@ from datetime import datetime
 from typing import Optional
 
 from app.atomic_write import atomic_write_text
-from app.config import ANTHROPIC_API_KEY, CREDENTIALS_FILE, LLM_MODEL, NAVER_CLIENT_ID, NAVER_CLIENT_SECRET
+from app.config import (
+    ANTHROPIC_API_KEY,
+    CREDENTIALS_FILE,
+    EMAIL_SENDER_ADDRESS,
+    EMAIL_SENDER_PASSWORD,
+    EMAIL_SERVICES,
+    EMAIL_SMTP_HOST,
+    EMAIL_SMTP_PORT,
+    LLM_MODEL,
+    NAVER_CLIENT_ID,
+    NAVER_CLIENT_SECRET,
+    TELEGRAM_BOT_TOKEN,
+)
 
 
 def _load() -> dict:
@@ -162,4 +174,140 @@ def save_llm_credentials(api_key: str) -> None:
 def delete_llm_credentials() -> None:
     data = _load()
     data.pop("llm", None)
+    _save(data)
+
+
+# ── 이메일 보내는 계정 ───────────────────────────────────────────────────
+# [추가: 2026-09-18] 네이버·AI 키와 같은 규칙 — 설정 화면에 저장한 값 > .env. 저장값은
+# 서비스(naver/gmail)·주소·앱 비밀번호·보내는 사람 이름(선택)이고, 서버·포트는 서비스에서
+# 정해진다(EMAIL_SERVICES). 보내는 사람 이름은 .env에 없던 값이라 저장값에서만 읽는다.
+
+def _email_saved() -> dict:
+    return _load().get("email", {}) or {}
+
+
+def email_service() -> Optional[str]:
+    """지금 쓰는 메일 서비스 키 — 저장값, 없으면 .env 서버 이름으로 짐작. 모르는 서버면 None."""
+    saved = _email_saved().get("service")
+    if saved in EMAIL_SERVICES:
+        return saved
+    host = (EMAIL_SMTP_HOST or "").lower()
+    for key, spec in EMAIL_SERVICES.items():
+        if host == spec["host"]:
+            return key
+    return None
+
+
+def email_smtp_host() -> Optional[str]:
+    saved = _email_saved().get("service")
+    if saved in EMAIL_SERVICES:
+        return EMAIL_SERVICES[saved]["host"]
+    return EMAIL_SMTP_HOST or None
+
+
+def email_smtp_port() -> int:
+    saved = _email_saved().get("service")
+    if saved in EMAIL_SERVICES:
+        return EMAIL_SERVICES[saved]["port"]
+    return EMAIL_SMTP_PORT
+
+
+def email_sender_address() -> Optional[str]:
+    if _email_saved().get("service"):
+        return (_email_saved().get("address") or "").strip() or None
+    return EMAIL_SENDER_ADDRESS or None
+
+
+def email_sender_password() -> Optional[str]:
+    if _email_saved().get("service"):
+        return (_email_saved().get("password") or "").strip() or None
+    return EMAIL_SENDER_PASSWORD or None
+
+
+def email_sender_name() -> str:
+    return (_email_saved().get("name") or "").strip()
+
+
+def email_is_configured() -> bool:
+    return bool(email_smtp_host() and email_sender_address() and email_sender_password())
+
+
+def email_source() -> str:
+    """"saved"(설정 화면) / "env"(.env) / "none" — naver_source와 같은 뜻."""
+    if _email_saved().get("service"):
+        return "saved"
+    if EMAIL_SMTP_HOST or EMAIL_SENDER_ADDRESS or EMAIL_SENDER_PASSWORD:
+        return "env"
+    return "none"
+
+
+def email_saved_at() -> Optional[str]:
+    return _email_saved().get("saved_at")
+
+
+def email_saved_password() -> str:
+    """naver_saved_client_secret과 같은 이유 — .env 폴백 없이 저장소 원본만."""
+    return (_email_saved().get("password") or "").strip()
+
+
+def save_email_credentials(service: str, address: str, password: str, name: str) -> None:
+    data = _load()
+    data["email"] = {
+        "service": service,
+        "address": (address or "").strip(),
+        "password": (password or "").strip(),
+        "name": (name or "").strip(),
+        "saved_at": datetime.now().isoformat(timespec="seconds"),
+    }
+    _save(data)
+
+
+def delete_email_credentials() -> None:
+    data = _load()
+    data.pop("email", None)
+    _save(data)
+
+
+# ── 텔레그램 발송 계정(봇 토큰) ──────────────────────────────────────────
+# 네이버·AI 키와 같은 규칙 — 설정 화면에 저장한 값 > .env. 토큰을 읽는 곳(app.telegram_bot,
+# app.telegram_bot_name)은 모듈 상수가 아니라 이 함수를 부를 때마다 읽는다(저장 즉시 반영).
+
+def _telegram_saved() -> dict:
+    return _load().get("telegram", {}) or {}
+
+
+def telegram_bot_token() -> Optional[str]:
+    return (_telegram_saved().get("bot_token") or "").strip() or TELEGRAM_BOT_TOKEN or None
+
+
+def telegram_source() -> str:
+    """"saved"(설정 화면) / "env"(.env) / "none" — naver_source와 같은 뜻."""
+    if _telegram_saved().get("bot_token"):
+        return "saved"
+    if TELEGRAM_BOT_TOKEN:
+        return "env"
+    return "none"
+
+
+def telegram_saved_at() -> Optional[str]:
+    return _telegram_saved().get("saved_at")
+
+
+def telegram_saved_token() -> str:
+    """naver_saved_client_secret과 같은 이유 — .env 폴백 없이 저장소 원본만."""
+    return (_telegram_saved().get("bot_token") or "").strip()
+
+
+def save_telegram_token(bot_token: str) -> None:
+    data = _load()
+    data["telegram"] = {
+        "bot_token": (bot_token or "").strip(),
+        "saved_at": datetime.now().isoformat(timespec="seconds"),
+    }
+    _save(data)
+
+
+def delete_telegram_token() -> None:
+    data = _load()
+    data.pop("telegram", None)
     _save(data)

@@ -1,0 +1,400 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>시안 · 실시간 현황 숨김 되살리기</title>
+<style>
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .container {
+    max-width: 800px; margin: 24px auto; padding: 24px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: 8px;
+  }
+  /* [수정: 2026-07-27] 상단 고정 바 — HOME + 다른 두 화면(초안/완성본)으로 바로 이동.
+     하단 고정 바는 🗑️(숨긴 기사 관리) 전용 — 상단이 3개 내비게이션으로 꽉 차서 자리를
+     따로 뺐다. */
+  /* [수정: 2026-09-16] 카드 위 여백 60→44px — 60px은 상단 고정바(54px)를 피하려는 값인데 글자 위로
+     30px이 비었다. 44px이면 16px 남는다. 확정본·초안·실시간·정기 보관함·설정·수시·정책 단어 추이
+     일곱 화면이 같은 값을 써야 화면을 오갈 때 제목이 들썩이지 않는다(수시·추이는 84→68px 형태).
+     시안 SUBHEAD_SPACING_MOCKUP.html B안. */
+  .container { padding-top: 44px; padding-bottom: 56px; }
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    background: #FFFFFF; border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .topbar-inner {
+    max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .topbar a { color: #2563EB; text-decoration: none; font-size: 0.92rem; font-weight: 600; padding: 6px 10px; border-radius: 6px; }
+  .topbar a:hover { background: #FEF2F2; }
+  .bottombar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    background: #FFFFFF; border-top: 1px solid #E5E7EB; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  }
+  .bottombar-inner {
+    max-width: 800px; margin: 0 auto; padding: 10px 24px;
+    display: flex; justify-content: flex-end;
+  }
+  .bottombar a { color: #2563EB; text-decoration: none; font-size: 1.1rem; padding: 6px 10px; border-radius: 6px; }
+  .bottombar a:hover { background: #FEF2F2; }
+  /* [추가: 2026-08-03, 정리: 2026-08-21] 하단바 🖍️ 형광펜 편집 팝오버 — 다른 화면과
+     같은 파란 hover(COLOR_HOVER)를 쓴다. 이 화면 고유의 붉은 톤은 COLOR_LIVE_BG로
+     이름이 따로 있으므로, 예전처럼 색 값을 직접 적을 이유가 없다. */
+  .highlight-wrap { position: relative; }
+  .highlight-toggle {
+    background: transparent; border: none; color: #6B7280; font-size: 1.1rem; cursor: pointer;
+    padding: 6px 10px; border-radius: 6px;
+  }
+  .highlight-toggle:hover { background: #EFF6FF; }
+  .highlight-popover {
+    display: none; position: absolute; bottom: 100%; right: 0; margin-bottom: 8px;
+    background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); padding: 12px; width: 220px; z-index: 30;
+  }
+  .highlight-popover.is-open { display: block; }
+  .highlight-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .highlight-chip {
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 14px;
+    font-size: 0.82rem; color: #1F2937; cursor: pointer;
+  }
+  .highlight-chip button {
+    background: transparent; border: none; padding: 0; font-size: 0.8rem; cursor: pointer;
+    color: inherit; line-height: 1;
+  }
+  .highlight-empty { color: #6B7280; font-size: 0.8rem; margin: 0 0 8px; }
+  .highlight-add-form { display: flex; gap: 6px; }
+  .highlight-add-form input { flex: 1; font-size: 0.85rem; padding: 5px 8px; min-width: 0; }
+  .highlight-add-form button { font-size: 0.82rem; padding: 5px 10px; white-space: nowrap; }
+  .live-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .live-badge { display: inline-flex; align-items: center; gap: 6px; color: #DC2626; font-size: 1.25rem; font-weight: 600; }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: #DC2626; }
+  .refresh-btn {
+    background: #FFFFFF; color: #2563EB; border: 1px solid #2563EB; border-radius: 6px;
+    padding: 7px 14px; font-size: 0.9rem; font-weight: 500; text-decoration: none; white-space: nowrap;
+  }
+  .refresh-btn:hover { background: #FEF2F2; }
+  /* [추가: 2026-08-13] 최초 검색(콜드 캐시) 중엔 새로고침을 <a href>가 아니라 <span>으로
+     그려 아예 눌리지 않게 한다 — app.live_renderer.render_live_loading_page 참고.
+     문구로 "누르지 마세요"라고 안내하는 대신 버튼 자체를 못 누르게 만드는 쪽을
+     택했다(안내는 무시될 수 있지만 비활성 버튼은 무시될 수 없다). */
+  .refresh-btn.is-disabled {
+    background: #FFFFFF; color: #6B7280; border: 1px solid #6B7280; cursor: default;
+  }
+  .loading-spin { animation: live-spin 1s linear infinite; }
+  @keyframes live-spin { to { transform: rotate(360deg); } }
+  /* [추가: 2026-07-26] '스크랩 언론사만 보기' — 서버 재검색 없이 이미 불러온 기사
+     중에서 /outlets에 등록된 언론사만 화면에서 걸러 보여준다(노이즈 완화 목적).
+     실시간 현황 자체의 "전체 언론사 라이브 미러" 성격은 그대로 유지된다. */
+  /* [수정: 2026-09-16] 체크박스 줄(.filter-row)과 검색·그룹 칩 줄(.live-filter-bar)이 각자 테두리를
+     두른 두 상자였다(41 + 93px + 사이 여백 35px) — 둘 다 "목록을 좁히는" 같은 일이라 한 상자
+     두 줄로 합쳤다. 1행 = 제목 검색 + 체크박스, 2행 = 그룹 칩 + 키워드별 건수. 등록된 검색어
+     그룹이 없으면 예전처럼 제목 검색·2행은 안 그리고 체크박스만 남는다. 시안
+     LIVE_TOP_COMPACT_MOCKUP.html B안. */
+  .filter-box {
+    margin: 14px 0 4px; padding: 10px 14px; background: #F8FAFC; border: 1px solid #E5E7EB;
+    border-radius: 8px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .fb-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .fb-row label { font-size: 0.92rem; display: flex; align-items: center; gap: 8px; cursor: pointer; white-space: nowrap; }
+  .fb-row label:has(input:disabled) { color: #6B7280; cursor: not-allowed; }
+  .live-row.is-hidden-by-filter { display: none; }
+  /* [추가: 2026-08-13] 실시간 현황 그룹 필터 바 — 제목 검색, 그룹 칩(OR), "아직 안
+     담은 것만", 키워드별 건수 펼침. 전부 이미 렌더링된 목록을 클라이언트에서만
+     거른다(서버 재검색 없음, applyLiveFilters). */
+  .filter-search-input { flex: 1 1 190px; min-width: 150px; box-sizing: border-box; font-size: 0.9rem; padding: 7px 10px; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .group-chip {
+    display: inline-flex; align-items: center; gap: 5px; max-width: 160px;
+    background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 999px;
+    padding: 5px 11px; font-size: 0.82rem; color: #1F2937; cursor: pointer;
+  }
+  /* 그룹명이 길어도 칩 폭은 고정 — 자르는 건 화면 표시뿐, 저장된 이름은 그대로다. */
+  .group-chip .chip-label {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 110px;
+  }
+  .group-chip .chip-count { color: #6B7280; }
+  .group-chip.is-active { background: #FEF2F2; border-color: #2563EB; color: #2563EB; }
+  .group-chip.is-active .chip-count { color: #2563EB; }
+  .group-chip.status-chip { font-style: italic; }
+  .kw-breakdown-toggle {
+    background: transparent; border: none; color: #6B7280; font-size: 0.8rem;
+    cursor: pointer; padding: 5px 4px; margin-left: auto;
+  }
+  .kw-breakdown-toggle:hover { color: #2563EB; }
+  .keyword-breakdown {
+    display: none; flex-direction: column; gap: 3px; padding: 8px 10px;
+    background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; font-size: 0.82rem;
+  }
+  .keyword-breakdown.is-open { display: flex; }
+  .kw-row { display: flex; justify-content: space-between; color: #1F2937; }
+  .kw-row span:last-child { color: #6B7280; }
+  /* 기사 행 안의 그룹 태그(칩보다 작음) — 언론사 옆에 나란히 붙는다. */
+  .row-group-tag {
+    display: inline-block; margin-left: 6px; max-width: 90px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; vertical-align: -2px;
+    padding: 1px 7px; border-radius: 999px; font-size: 0.69rem;
+    color: #2563EB; background: #FEF2F2; border: 1px solid #E5E7EB;
+  }
+  /* [추가: 2026-08-13] app.renderer와 동일한 "⋯ 더보기" 메뉴 — 🔄/✏️를 접어 그룹 칩에
+     자리를 내준다(사용자 요청, 이유는 _render_row 주석 참고). */
+  .more-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+  .more-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 1.05rem; line-height: 1;
+    cursor: pointer; padding: 3px 7px; border-radius: 4px;
+  }
+  .more-btn:hover { background: #EFF6FF; color: #2563EB; }
+  .more-menu {
+    display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 60;
+    min-width: 172px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px;
+    padding: 4px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.13);
+  }
+  .more-wrap.is-open .more-menu { display: block; }
+  .more-menu button {
+    display: block; width: 100%; text-align: left; background: transparent; border: none;
+    padding: 8px 10px; border-radius: 5px; font-size: 0.85rem; color: #1F2937;
+    cursor: pointer; white-space: nowrap;
+  }
+  .more-menu button:hover { background: #FEF2F2; }
+  .live-warning {
+    background: #FEF2F2; border: 1px solid #DC2626; border-radius: 8px; padding: 10px 14px;
+    margin: 12px 0; font-size: 0.85rem; color: #DC2626; line-height: 1.5;
+  }
+  /* [추가: 2026-08-24] 오류가 아니라 "참고해 두면 좋을 안내"라 .live-warning(빨강)이
+     아니라 앰버(주의) 계열을 쓴다 — CLAUDE.md 색 규칙: 빨강은 오류, 앰버는 주의. */
+  .live-heavy-kw-warning {
+    background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 10px 14px;
+    margin: 12px 0; font-size: 0.85rem; color: #92400E; line-height: 1.5;
+  }
+  /* [수정: 2026-09-16] 건수 카드(.stat-card, 59px + 여백 20px)를 없애고 그 문장을 「● 실시간」
+     바로 옆에 붙였다 — 숫자 하나와 한 줄 설명에 카드 한 장을 쓰던 자리. 문장·id(stat-count·
+     stat-scope)는 그대로라 applyLiveFilters가 예전처럼 건수를 고쳐 쓴다. */
+  .head-stat { font-size: 0.82rem; font-weight: 400; color: #6B7280; margin-left: 4px; }
+  .head-stat #stat-count { color: #1E3A5F; font-weight: 600; }
+  .live-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px 12px 12px 14px; border-top: 1px solid #E5E7EB; border-left: 3px solid transparent;
+  }
+  /* [추가: 2026-08-05] app.renderer와 동일 — 마우스 오버 시 연한 회색 표시. 아래 상태별
+     배경색(스크랩됨/숨김/담아둠 등) 규칙보다 먼저 둬서, 상태가 있는 줄은 마우스를
+     올려도 그 상태 색이 그대로 우선한다(평범한 줄만 회색이 보인다). */
+  .live-row:hover { background: #F3F4F6; }
+  /* [수정: 2026-07-27] 오늘 이미 스크랩된(자동+수동) 기사는 왼쪽 색띠 + 옅은 배경으로
+     "이미 잘 담겼다"는 완료 느낌을 준다 — 회색 음영만으로는 존재감이 약했다. 색띠는
+     형광펜(제목 안쪽 텍스트 배경색)과 자리가 겹치지 않아 서로 안 부딪친다.
+     [수정: 2026-08-21] 초록→파랑 — "스크랩됨"은 담당자가 확정한 결과라, 초록을
+     발송 하나에만 남기기로 하면서 다른 "담당자가 확정한 것"과 같은 파랑으로 옮겼다. */
+  .live-row.is-scrapped {
+    border-left-color: #2563EB; background: #EFF6FF; opacity: 0.86;
+  }
+  /* [추가: 2026-07-27] 스크랩 초안/완성본에 있다가 🗑️로 숨겨진 기사는 "이미 스크랩됨"과는
+     다른 상태다(살아있는 초안이 아니라 휴지통에 있음) — 취소선으로 "제외됨"을 조용히
+     알려준다. 스크랩됨처럼 색띠까지는 필요 없다는 판단으로 회색 음영만 유지한다. */
+  .live-row.is-hidden { opacity: 0.5; text-decoration: line-through; }
+  /* [수정: 2026-07-27] "직접 추가한 기사"(임시보드)에만 담겨 있고 아직 정식 스크랩에
+     안 들어간 기사는 회색 계열 색띠로 보여준다 — 처음엔 호박색을 썼는데, "아직 임시로
+     담아둔 것"이 "이미 확정된 스크랩됨"(초록)보다 더 튀어 보이는 게 어색하다는 피드백에
+     따라 차분한 회색(= "아직 결정 안 됨")으로 바꿨다. */
+  .live-row.is-pinned {
+    border-left-color: #9AA4B2; background: #F3F5F7; opacity: 0.86;
+  }
+  /* [추가: 2026-07-29] 컴퓨터가 알아서 [초안]에 담았을 것으로 추정되는 기사 — 사용자가
+     직접 담아둔 게 아니라 시스템이 검색 조건에 맞춰 자동으로 골랐다는 뜻이라 담아둠(회색)과
+     다른 색으로 구분한다. [수정: 2026-08-21] 청록→연보라 — 이건 정확히 "AI가 하는 일"이라,
+     앱의 연보라(🤖 재분류 버튼과 같은 축)를 그대로 쓴다. 새 색을 안 만든다. */
+  .live-row.is-auto-drafted {
+    border-left-color: #4A3F8F; background: #F0EAFB; opacity: 0.86;
+  }
+  /* [추가: 2026-08-14] pubDate 파싱 실패 기사(하단 별도 구역) — "검증 안 된 덤"이라는
+     뜻으로 사진 추정 배지와 같은 채도 낮은 호박색 계열을 왼쪽 색띠에 쓴다. */
+  .live-row.is-undated { border-left-color: #EF9F27; }
+  .pub-time-unknown { color: #6B7280; }
+  .live-undated-section { margin-top: 22px; padding-top: 14px; border-top: 1px solid #E5E7EB; }
+  .live-undated-heading { font-size: 1rem; color: #1E3A5F; margin: 0 0 4px; }
+  .live-undated-desc { font-size: 0.82rem; color: #6B7280; line-height: 1.6; margin: 0 0 8px; }
+  .live-row-text { min-width: 0; }
+  /* [수정: 2026-07-29] 버그 수정 — 📌 버튼 옆에 🗑️ 아이콘을 추가하면서 .live-row의
+     자식이 2개(텍스트+버튼)에서 3개(텍스트+버튼+아이콘)로 늘었는데, justify-content:
+     space-between이 자식 "사이사이"에 남는 공간을 나눠 넣다 보니 버튼과 아이콘 사이가
+     텅 비면서 핀이 화면 한가운데로 떠밀려 보였다. 두 버튼을 이 래퍼 하나로 묶어 다시
+     "텍스트 vs 버튼 묶음" 2개짜리 레이아웃으로 되돌린다. */
+  .live-row-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .outlet-tag { color: #6B7280; font-size: 0.8rem; }
+  /* [추가: 2026-08-11] 표식 없는 사진기사 추정 배지 — 기존 상태색(노랑=새 기사, 초록=이동,
+     파랑=선택)과 겹치지 않게, 채도 낮은 모래색 테두리 알약으로 "행 강조"가 아니라 "작은
+     라벨"로 읽히게 했다. */
+  .photo-badge {
+    display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px;
+    font-size: 0.69rem; color: #6B7280; background: #F3F4F6; border: 1px solid #E5E7EB;
+    white-space: nowrap; vertical-align: 1px;
+  }
+  .pub-time { color: #6B7280; font-size: 0.78rem; margin-left: 6px; }
+  /* [추가: 2026-08-25] 🔍 검색어 — 확정본·초안(app.renderer의 .kw-inline)과 같은 모양·같은
+     뜻이다. 그룹 칩(.row-group-tag)이 "어느 그룹"이라면 이건 "그 안의 어느 검색어"라, 칩과
+     달리 테두리를 두르지 않고 회색 글자로만 둔다(참고용 메타 정보). 간격은 이 화면 관례대로
+     구분점(·) 대신 margin-left: 6px. */
+  .kw-inline {
+    display: inline-flex; align-items: center; gap: 4px; margin-left: 6px;
+    font-size: 0.78rem; color: #6B7280; vertical-align: -1px;
+  }
+  .kw-inline .kw-ic { width: 0.75em; height: 0.75em; color: #9CA3AF; flex-shrink: 0; }
+  /* [수정: 2026-08-25] 그룹 칩(.row-group-tag)과 같은 말줄임 패턴 — 실측(431건 전수, 렌더
+     폭 기준) 210px에서 4.6%(20건)만 잘린다. 그룹명(90px)보다 넓게 잡은 이유는 검색어가
+     쉼표로 여러 개 이어붙는 값이라 그룹명보다 원래 더 길기 때문. 안 잘리면 지금처럼 다음
+     줄로 접혔는데, 사용자 실측(6개 표본)에서 줄바꿈이 카드 높이를 키우고 담아두기 버튼을
+     줄여도(대안 검토함) 그 폭을 못 만회해 — 잘라서 한 줄에 고정하는 쪽을 택했다. */
+  .kw-inline .kw-v {
+    display: inline-block; max-width: 210px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; vertical-align: -3px; color: #4B5563;
+  }
+  .live-title { font-size: 0.95rem; margin: 2px 0 2px; overflow-wrap: anywhere; color: #1F2937; }
+  .live-title summary { cursor: pointer; -webkit-tap-highlight-color: transparent; color: #1F2937; }
+  .live-title summary::marker { color: #6B7280; }
+  /* [추가: 2026-08-19] 제목 맨 앞 말머리([단독]/[속보])는 배지로 감싸지 않고 글자색만
+     바꾼다 — 제목 문자열 자체는 그대로 두므로 복사/내보내기 텍스트에 영향이 없다
+     (CODING_CONVENTIONS.md §4, 화면 전용 표시가 보고서로 새면 안 된다).
+     [수정: 2026-08-20] 확정본·초안 화면과 같은 팔레트로 통일 — [단독]이 담당자가
+     "가장 중요하다"고 지목한 쪽이라 굵기(800)까지 더 준다. 예전엔 [단독]=분홍
+     (#9D174D)/[속보]=빨강(error)이었는데, 확정본·초안에 [단독]=빨강 카드 강조를
+     새로 넣으면서 화면마다 말머리 색이 다른 뜻을 가리키게 되는 걸 막기 위해
+     세 화면 전부 이 값으로 맞췄다. */
+  .t-scoop { color: #B91C1C; font-weight: 800; }
+  .t-flash { color: #B91C1C; font-weight: 600; }
+  .live-summary { margin: 6px 0 4px 20px; color: #1F2937; font-size: 0.9rem; }
+  .live-url { font-size: 0.78rem; overflow-wrap: anywhere; }
+  .live-url a { color: #2563EB; text-decoration: underline; }
+  /* [수정: 2026-07-29] 상태별 라벨 길이가 다 달라서(📌/📌 담아둠/✓ 스크랩됨/🤖 자동 선별/
+     🗑️ 숨김) 버튼 너비가 들쭉날쭉했고, 그 옆에 붙는 휴지통 아이콘 위치까지 같이
+     흔들려 지저분해 보였다 — min-width+가운데 정렬로 버튼 너비를 통일해 휴지통이
+     항상 같은 자리에 오게 한다.
+     [수정: 2026-09-01] 오른쪽에 "복사" 버튼이 새로 붙으면서 자리를 내주려고 폭을
+     92 -> 84px, 좌우 여백을 12 -> 9px로 줄였다(라벨 글자는 그대로 둔다 — "담기"로
+     줄이면 다른 화면의 📌 담아두기와 말이 갈린다). **84px은 가장 긴 라벨("자동 선별")의
+     실제 렌더 폭이라 다섯 상태가 여전히 같은 폭으로 맞는다** — 그보다 더 줄이면(74px로
+     재봤을 때 74~84px) 위 "휴지통이 항상 같은 자리에" 규칙이 그대로 깨진다. */
+  .add-btn {
+    flex-shrink: 0; background: #FFFFFF; color: #1F2937; border: 1px solid #E5E7EB;
+    border-radius: 6px; padding: 6px 9px; font-size: 0.8rem; cursor: pointer; white-space: nowrap;
+    min-width: 84px; text-align: center;
+  }
+  .add-btn:disabled { color: #6B7280; cursor: not-allowed; }
+  .add-btn.added { color: #2563EB; border-color: #2563EB; }
+  .add-btn.is-scrapped-btn { color: #2563EB; border-color: #2563EB; background: #EFF6FF; }
+  .add-btn.is-pinned-btn { color: #9AA4B2; border-color: #9AA4B2; background: #F3F5F7; }
+  .add-btn.is-auto-drafted-btn { color: #4A3F8F; border-color: #4A3F8F; background: #F0EAFB; }
+  /* [추가: 2026-09-01] 복사 — "⋯ 더보기" 메뉴 안에 있던 "복사하기"를 담아두기 바로
+     오른쪽으로 꺼냈다(사용자 요청). 아이콘만 두지 않고 글자 라벨을 붙이는 건, 이
+     화면의 오른쪽 묶음에서 글자 버튼은 상태(담아두기/담아둠/…)를 말하는 자리이고
+     아이콘은 ⋯·🗑처럼 "가끔 한 번"인 자리라, 자주 쓰는 복사를 아이콘 쪽에 두면
+     무게가 실제 사용 빈도와 어긋나기 때문이다. 누르면 확정본·초안과 같은 규칙으로
+     아이콘만 1초간 check로 바뀐다(copyArticleIcon, .is-copied) — 라벨은 그대로 둬
+     버튼 폭이 흔들리지 않는다. */
+  .copy-btn {
+    flex-shrink: 0; display: inline-flex; align-items: center; gap: 3px;
+    background: #FFFFFF; color: #1F2937; border: 1px solid #E5E7EB;
+    border-radius: 6px; padding: 6px 10px; font-size: 0.8rem; cursor: pointer; white-space: nowrap;
+  }
+  .copy-btn:hover { color: #2563EB; border-color: #2563EB; background: #EFF6FF; }
+  .copy-btn .icon-done { display: none; }
+  .copy-btn.is-copied .icon-default { display: none; }
+  .copy-btn.is-copied .icon-done { display: inline-flex; }
+  /* [추가: 2026-07-29] "📌 담아둠" 옆의 작은 숨기기 아이콘 — 초안까지 안 가고 바로
+     실시간 현황에서 필요없는 기사를 숨길 수 있게 한다(사용자 요청). 숨기면 스크랩
+     화면(index/history)에서도 똑같이 안 보인다(app.curation.hide_article, 전역
+     숨김) — live.html 전용 임시 숨김이 아니다(의도된 동작, 사용자 확인됨).*/
+  .hide-from-live-btn {
+    flex-shrink: 0; background: transparent; border: none; color: #6B7280; font-size: 1rem;
+    cursor: pointer; padding: 4px 6px;
+  }
+  .hide-from-live-btn:hover { color: #DC2626; }
+  /* [추가: 2026-08-05] 원문 다시 가져오기 버튼 — app.renderer.render_article과 동일한
+     이유·동작(평소 숨김, 그 행에 마우스를 올리면 나타남). */
+  .refetch-btn {
+    flex-shrink: 0; background: transparent; border: none; color: #6B7280; font-size: 1rem;
+    cursor: pointer; padding: 4px 6px; opacity: 0; transition: opacity 0.15s;
+  }
+  .live-row:hover .refetch-btn { opacity: 1; }
+  .refetch-btn:disabled { opacity: 0.35 !important; cursor: not-allowed; }
+  /* [추가: 2026-08-05] app.renderer와 동일 — ✏️ 직접 수정 인라인 편집 칸. */
+  .edit-summary-form {
+    margin: 8px 0 4px 20px; padding: 10px 12px; border: 1px solid #2563EB; border-radius: 8px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .edit-summary-form input, .edit-summary-form textarea {
+    width: 100%; box-sizing: border-box; padding: 6px 10px; border: 1px solid #E5E7EB; border-radius: 6px;
+    font-size: 0.88rem; color: #1F2937; background: #FFFFFF; font-family: inherit;
+  }
+  .edit-summary-form .edit-summary-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .edit-summary-form button { font-size: 0.82rem; padding: 5px 12px; }
+  .empty { text-align: center; margin: 60px 0; font-size: 1.2rem; color: #6B7280; }
+  .error-box { text-align: center; margin: 60px 0; color: #6B7280; font-size: 0.95rem; line-height: 1.7; }
+  /* [추가: 2026-08-13] 콜드 캐시 대기 화면(render_live_loading_page) — 스피너·안내
+     문구·안심 문구 3단 구성. .loading-spin-icon은 위 .refresh-btn과 별개로 이 화면
+     한가운데에 크게 도는 아이콘용(같은 회전 애니메이션을 재사용). */
+  .loading-box { text-align: center; padding: 28px 16px 32px; }
+  .loading-spin-icon { font-size: 2.1rem; color: #2563EB; margin-bottom: 18px; }
+  .loading-title { margin: 0 0 10px; font-size: 1.05rem; font-weight: 600; color: #1E3A5F; }
+  .loading-desc { margin: 0 0 22px; font-size: 0.85rem; color: #6B7280; line-height: 1.65; }
+  /* [추가: 2026-08-13, 정리: 2026-08-21] 안심시키는 문구라 붉은 톤(COLOR_LIVE_BG)이
+     아니라 다른 화면과 같은 차분한 파란색(COLOR_HOVER)을 쓴다. */
+  .loading-reassure {
+    display: inline-flex; align-items: center; gap: 7px; background: #EFF6FF;
+    border-radius: 6px; padding: 9px 15px; font-size: 0.8rem; color: #1E3A5F;
+  }
+  /* [추가: 2026-08-13] app.renderer와 동일 — 단색 SVG 아이콘(app.icons) 공통 크기·색. */
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+
+
+  /* ── 시안에서 새로 더하는 규칙 ── */
+  .live-row.is-hidden.v2 { opacity: 1; text-decoration: none; }
+  .live-row.is-hidden.v2 .live-row-text { opacity: 0.5; text-decoration: line-through; }
+  .unhide-btn .lab-hover { display: none; }
+  .unhide-btn:hover, .unhide-btn.force-hover { background: #EFF6FF; }
+  .unhide-btn:hover .lab-rest, .unhide-btn.force-hover .lab-rest { display: none; }
+  .unhide-btn:hover .lab-hover, .unhide-btn.force-hover .lab-hover { display: inline; }
+
+  .mk-wrap { max-width: 800px; margin: 0 auto; padding: 28px 16px 60px; }
+  .mk-h1 { font-size: 1.2rem; color: #1E3A5F; margin: 0 0 6px; }
+  .mk-lead { font-size: 0.88rem; color: #6B7280; line-height: 1.6; margin: 0 0 22px; }
+  .mk-sec { margin: 0 0 26px; }
+  .mk-label { display:flex; align-items:baseline; gap:8px; margin: 0 0 6px; }
+  .mk-tag { font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background:#F3F4F6; color:#6B7280; }
+  .mk-tag.new { background:#EFF6FF; color:#2563EB; }
+  .mk-title { font-size: 0.95rem; font-weight: 600; color:#1F2937; }
+  .mk-card { background:#FFFFFF; border:1px solid #E5E7EB; border-radius:10px; overflow:hidden; }
+  .mk-card .live-row:first-child { border-top: none; }
+  .mk-note { font-size: 0.82rem; color:#6B7280; line-height:1.6; margin: 8px 2px 0; }
+  .mk-note b { color:#1F2937; }
+  .mk-toast { display:none; font-size:0.8rem; color:#6B7280; margin:8px 2px 0; }
+</style></head><body><div class="mk-wrap">
+<h1 class="mk-h1">실시간 현황 — 숨긴 기사 되살리기</h1>
+<p class="mk-lead">지금도 숨긴 행의 「숨김」 버튼을 누르면 되살아나지만, 버튼까지 흐리고 취소선이 그어져 있어 누를 수 있는 버튼으로 안 보입니다. 바꾸는 건 두 가지뿐이에요: <b>① 흐림·취소선은 기사 글자에만</b>, <b>② 마우스를 올리면 「↩ 되살리기」로 바뀜</b>.</p>
+
+<section class="mk-sec"><div class="mk-label"><span class="mk-tag">지금</span><span class="mk-title">숨긴 행</span></div>
+<div class="mk-card"><div class="live-row is-hidden" data-outlet="헤럴드경제" data-status="hidden" data-groups="재정경제부" data-headline="" data-editorial=""><div class="live-row-text"><span class="outlet-tag">헤럴드경제</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">16:47 · <span class="pub-time-relative">1시간 전</span></span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><details class="live-title"><summary>“가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”</summary><p class="live-summary">이 의원은 “<span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>의 기획예산처와 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 책임을 떠넘기다 국무조정실 조정까지 거쳤지만, 기획예산처가 가덕도신공항 특별법을 개정했다”며 “<span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>의 무책임함이 가덕도신공항 발목을 잡은 상황”이라고... </p></details><div class="live-url"><a href="https://n.news.naver.com/mnews/article/016/0002699506" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/016/0002699506</a></div></div><div class="live-row-actions"><button class="add-btn added" type="button" data-outlet="헤럴드경제" data-title="“가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”" data-url="https://n.news.naver.com/mnews/article/016/0002699506" data-summary="이 의원은 “정부의 기획예산처와 재정경제부는 책임을 떠넘기다 국무조정실 조정까지 거쳤지만, 기획예산처가 가덕도신공항 특별법을 개정했다”며 “정부의 무책임함이 가덕도신공항 발목을 잡은 상황”이라고... " data-pub-date="2026-09-18T16:47:00+09:00" title="숨긴 기사입니다 — 눌러서 되돌릴 수 있어요(휴지통에서도 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg> 숨김</button><button class="copy-btn" type="button" data-copy-text="ㅇ (헤럴드경제) “가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”
+https://n.news.naver.com/mnews/article/016/0002699506" title="복사하기" aria-label="복사하기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span>복사</button><span class="more-wrap"><button class="more-btn" type="button" title="더보기" aria-label="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button><span class="more-menu"><button type="button" data-url="https://n.news.naver.com/mnews/article/016/0002699506">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/016/0002699506" data-title="“가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”" data-summary="이 의원은 “정부의 기획예산처와 재정경제부는 책임을 떠넘기다 국무조정실 조정까지 거쳤지만, 기획예산처가 가덕도신공항 특별법을 개정했다”며 “정부의 무책임함이 가덕도신공항 발목을 잡은 상황”이라고... ">제목·요약 직접 수정</button></span></span></div></div></div>
+<p class="mk-note">버튼도 행과 함께 흐려지고 취소선이 그어져 「이미 끝난 상태 표시」처럼 보여요. 누르면 확인창 없이 바로 되살아나는데, 누르기 전에는 그걸 알 수 없어요(툴팁뿐).</p></section>
+
+<section class="mk-sec"><div class="mk-label"><span class="mk-tag new">바꾼 뒤</span><span class="mk-title">평소</span></div>
+<div class="mk-card"><div class="live-row is-hidden v2" data-outlet="헤럴드경제" data-status="hidden" data-groups="재정경제부" data-headline="" data-editorial=""><div class="live-row-text"><span class="outlet-tag">헤럴드경제</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">16:47 · <span class="pub-time-relative">1시간 전</span></span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><details class="live-title"><summary>“가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”</summary><p class="live-summary">이 의원은 “<span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>의 기획예산처와 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 책임을 떠넘기다 국무조정실 조정까지 거쳤지만, 기획예산처가 가덕도신공항 특별법을 개정했다”며 “<span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>의 무책임함이 가덕도신공항 발목을 잡은 상황”이라고... </p></details><div class="live-url"><a href="https://n.news.naver.com/mnews/article/016/0002699506" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/016/0002699506</a></div></div><div class="live-row-actions"><button class="add-btn added unhide-btn" type="button" title="숨김을 풀어 원래 자리로 되돌려요 (초안·확정본에도 다시 보여요)"><span class="lab-rest"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg> 숨김</span><span class="lab-hover"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg> 되살리기</span></button><button class="copy-btn" type="button" data-copy-text="ㅇ (헤럴드경제) “가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”
+https://n.news.naver.com/mnews/article/016/0002699506" title="복사하기" aria-label="복사하기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span>복사</button><span class="more-wrap"><button class="more-btn" type="button" title="더보기" aria-label="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button><span class="more-menu"><button type="button" data-url="https://n.news.naver.com/mnews/article/016/0002699506">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/016/0002699506" data-title="“가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”" data-summary="이 의원은 “정부의 기획예산처와 재정경제부는 책임을 떠넘기다 국무조정실 조정까지 거쳤지만, 기획예산처가 가덕도신공항 특별법을 개정했다”며 “정부의 무책임함이 가덕도신공항 발목을 잡은 상황”이라고... ">제목·요약 직접 수정</button></span></span></div></div></div>
+<p class="mk-note">기사 글자만 흐리고 취소선. 버튼은 또렷하게 남아 누를 수 있는 버튼으로 보여요. 글자는 그대로 「숨김」이라 목록을 훑을 때는 상태 표시로 읽혀요.</p></section>
+
+<section class="mk-sec"><div class="mk-label"><span class="mk-tag new">바꾼 뒤</span><span class="mk-title">마우스를 올렸을 때</span></div>
+<div class="mk-card"><div class="live-row is-hidden v2" data-outlet="헤럴드경제" data-status="hidden" data-groups="재정경제부" data-headline="" data-editorial=""><div class="live-row-text"><span class="outlet-tag">헤럴드경제</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">16:47 · <span class="pub-time-relative">1시간 전</span></span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><details class="live-title"><summary>“가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”</summary><p class="live-summary">이 의원은 “<span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>의 기획예산처와 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 책임을 떠넘기다 국무조정실 조정까지 거쳤지만, 기획예산처가 가덕도신공항 특별법을 개정했다”며 “<span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>의 무책임함이 가덕도신공항 발목을 잡은 상황”이라고... </p></details><div class="live-url"><a href="https://n.news.naver.com/mnews/article/016/0002699506" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/016/0002699506</a></div></div><div class="live-row-actions"><button class="add-btn added unhide-btn force-hover" type="button" title="숨김을 풀어 원래 자리로 되돌려요 (초안·확정본에도 다시 보여요)"><span class="lab-rest"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg> 숨김</span><span class="lab-hover"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg> 되살리기</span></button><button class="copy-btn" type="button" data-copy-text="ㅇ (헤럴드경제) “가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”
+https://n.news.naver.com/mnews/article/016/0002699506" title="복사하기" aria-label="복사하기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span>복사</button><span class="more-wrap"><button class="more-btn" type="button" title="더보기" aria-label="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button><span class="more-menu"><button type="button" data-url="https://n.news.naver.com/mnews/article/016/0002699506">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/016/0002699506" data-title="“가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”" data-summary="이 의원은 “정부의 기획예산처와 재정경제부는 책임을 떠넘기다 국무조정실 조정까지 거쳤지만, 기획예산처가 가덕도신공항 특별법을 개정했다”며 “정부의 무책임함이 가덕도신공항 발목을 잡은 상황”이라고... ">제목·요약 직접 수정</button></span></span></div></div></div>
+<p class="mk-note">버튼 글자가 <b>「↩ 되살리기」</b>로 바뀌고 옅은 파랑 바탕이 깔려요. 누르기 전에 무슨 일이 일어날지 보여서, 모르고 누르는 일이 줄어요. 버튼 폭(84px)은 그대로라 옆 버튼이 흔들리지 않아요.</p></section>
+
+<section class="mk-sec"><div class="mk-label"><span class="mk-tag new">바꾼 뒤</span><span class="mk-title">누른 뒤</span></div>
+<div class="mk-card"><div class="live-row" data-outlet="헤럴드경제" data-status="hidden" data-groups="재정경제부" data-headline="" data-editorial=""><div class="live-row-text"><span class="outlet-tag">헤럴드경제</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">16:47 · <span class="pub-time-relative">1시간 전</span></span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><details class="live-title"><summary>“가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”</summary><p class="live-summary">이 의원은 “<span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>의 기획예산처와 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 책임을 떠넘기다 국무조정실 조정까지 거쳤지만, 기획예산처가 가덕도신공항 특별법을 개정했다”며 “<span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>의 무책임함이 가덕도신공항 발목을 잡은 상황”이라고... </p></details><div class="live-url"><a href="https://n.news.naver.com/mnews/article/016/0002699506" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/016/0002699506</a></div></div><div class="live-row-actions"><button class="add-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg> 담아두기</button><button class="copy-btn" type="button" data-copy-text="ㅇ (헤럴드경제) “가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”
+https://n.news.naver.com/mnews/article/016/0002699506" title="복사하기" aria-label="복사하기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span>복사</button><span class="more-wrap"><button class="more-btn" type="button" title="더보기" aria-label="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button><span class="more-menu"><button type="button" data-url="https://n.news.naver.com/mnews/article/016/0002699506">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/016/0002699506" data-title="“가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”" data-summary="이 의원은 “정부의 기획예산처와 재정경제부는 책임을 떠넘기다 국무조정실 조정까지 거쳤지만, 기획예산처가 가덕도신공항 특별법을 개정했다”며 “정부의 무책임함이 가덕도신공항 발목을 잡은 상황”이라고... ">제목·요약 직접 수정</button></span></span><button class="hide-from-live-btn" type="button" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button></div></div></div>
+<p class="mk-note">숨김이 풀리면 원래 상태(여기선 「담아두기」)로 돌아오고, 초안·확정본에서도 원래 소제목·원래 자리에 다시 보여요. 되돌리기(↩)로 다시 숨길 수도 있어요.</p></section>
+
+<section class="mk-sec"><div class="mk-label"><span class="mk-tag new">직접 해보기</span><span class="mk-title">버튼에 마우스를 올려 보고 눌러 보세요</span></div>
+<div class="mk-card" id="demo-card"><div class="live-row is-hidden v2" id="demo-row" data-outlet="헤럴드경제" data-status="hidden" data-groups="재정경제부" data-headline="" data-editorial=""><div class="live-row-text"><span class="outlet-tag">헤럴드경제</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">16:47 · <span class="pub-time-relative">1시간 전</span></span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><details class="live-title"><summary>“가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”</summary><p class="live-summary">이 의원은 “<span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>의 기획예산처와 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 책임을 떠넘기다 국무조정실 조정까지 거쳤지만, 기획예산처가 가덕도신공항 특별법을 개정했다”며 “<span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>의 무책임함이 가덕도신공항 발목을 잡은 상황”이라고... </p></details><div class="live-url"><a href="https://n.news.naver.com/mnews/article/016/0002699506" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/016/0002699506</a></div></div><div class="live-row-actions"><button class="add-btn added unhide-btn" type="button" title="숨김을 풀어 원래 자리로 되돌려요 (초안·확정본에도 다시 보여요)"><span class="lab-rest"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg> 숨김</span><span class="lab-hover"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg> 되살리기</span></button><button class="copy-btn" type="button" data-copy-text="ㅇ (헤럴드경제) “가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”
+https://n.news.naver.com/mnews/article/016/0002699506" title="복사하기" aria-label="복사하기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span>복사</button><span class="more-wrap"><button class="more-btn" type="button" title="더보기" aria-label="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button><span class="more-menu"><button type="button" data-url="https://n.news.naver.com/mnews/article/016/0002699506">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/016/0002699506" data-title="“가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”" data-summary="이 의원은 “정부의 기획예산처와 재정경제부는 책임을 떠넘기다 국무조정실 조정까지 거쳤지만, 기획예산처가 가덕도신공항 특별법을 개정했다”며 “정부의 무책임함이 가덕도신공항 발목을 잡은 상황”이라고... ">제목·요약 직접 수정</button></span></span></div></div></div>
+<p class="mk-toast" id="demo-toast">되살렸어요 · <a href="#" id="demo-reset">다시 숨긴 상태로</a></p></section>
+</div>
+<script>
+var card=document.getElementById("demo-card"), orig=card.innerHTML, restored='<div class="live-row" data-outlet="헤럴드경제" data-status="hidden" data-groups="재정경제부" data-headline="" data-editorial=""><div class="live-row-text"><span class="outlet-tag">헤럴드경제</span><span class="row-group-tag" title="재정경제부">재정경제부</span><span class="pub-time">16:47 · <span class="pub-time-relative">1시간 전</span></span><span class="kw-inline" title="이 기사가 걸린 검색어"><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><details class="live-title"><summary>“가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”</summary><p class="live-summary">이 의원은 “<span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>의 기획예산처와 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 책임을 떠넘기다 국무조정실 조정까지 거쳤지만, 기획예산처가 가덕도신공항 특별법을 개정했다”며 “<span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>의 무책임함이 가덕도신공항 발목을 잡은 상황”이라고... </p></details><div class="live-url"><a href="https://n.news.naver.com/mnews/article/016/0002699506" target="_blank" rel="noopener noreferrer">https://n.news.naver.com/mnews/article/016/0002699506</a></div></div><div class="live-row-actions"><button class="add-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg> 담아두기</button><button class="copy-btn" type="button" data-copy-text="ㅇ (헤럴드경제) “가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”\nhttps://n.news.naver.com/mnews/article/016/0002699506" title="복사하기" aria-label="복사하기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span>복사</button><span class="more-wrap"><button class="more-btn" type="button" title="더보기" aria-label="더보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button><span class="more-menu"><button type="button" data-url="https://n.news.naver.com/mnews/article/016/0002699506">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/016/0002699506" data-title="“가덕도신공항 공사비 현실화, 李대통령이 결단해야…중동전쟁에 물가 올라”" data-summary="이 의원은 “정부의 기획예산처와 재정경제부는 책임을 떠넘기다 국무조정실 조정까지 거쳤지만, 기획예산처가 가덕도신공항 특별법을 개정했다”며 “정부의 무책임함이 가덕도신공항 발목을 잡은 상황”이라고... ">제목·요약 직접 수정</button></span></span><button class="hide-from-live-btn" type="button" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button></div></div>';
+function bind(){ var b=card.querySelector(".unhide-btn"); if(b) b.onclick=function(){ card.innerHTML=restored; document.getElementById("demo-toast").style.display="block"; }; }
+bind();
+document.getElementById("demo-reset").onclick=function(e){ e.preventDefault(); card.innerHTML=orig; this.parentNode.style.display="none"; bind(); };
+</script></body></html>

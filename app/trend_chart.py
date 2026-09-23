@@ -20,7 +20,8 @@ from app.config import PALETTE
 
 
 def render_chart(chart_id: str, buckets: list, series: list, unit: str,
-                  *, width: int = 760, height: int = 190, hover: bool = True) -> str:
+                  *, width: int = 760, height: int = 190, hover: bool = True,
+                  today: dict = None, label_today: bool = True) -> str:
     """buckets: build_buckets()가 만든 목록에 record/partial/yesterday(bool)가 채워진 것
     (fill_bucket_status).
     series: [{"word", "color", "values"}] — values는 buckets와 길이가 같고,
@@ -29,16 +30,37 @@ def render_chart(chart_id: str, buckets: list, series: list, unit: str,
     hover=False면 크로스헤어 툴팁에 필요한 자리(hover-layer/trend-tip/data 속성)를
     아예 안 그린다 — 홈 카드는 그래프 전체가 /trend로 가는 링크 하나라 툴팁을 안 쓴다
     (안 쓰는 화면에 빈 껍데기만 남겨두면 다음 사람이 "왜 안 뜨지"를 먼저 의심한다).
+
+    today: {"label", "sub", "weekend", "values": {word: n}} — 주면 어제 칸 오른쪽에 점선으로
+    떼어 「오늘」 칸을 하나 더 그린다. 오늘 값은 하루치의 일부라 선에 잇지 않고 빈 원만 찍는다
+    (선으로 이으면 오전마다 급락처럼 보였다 — HISTORY.md "정책 단어 추이 — 오늘 대신 어제까지").
+    label_today면 오른쪽 끝 라벨이 오늘 값을, 아니면 어제 값을 보인다.
     """
     n = len(buckets)
+    tcol = n if today else None  # 오늘 칸의 인덱스(선 계열 밖)
     # [추가: 2026-09-14] 일별이고 마지막 칸이 어제면 그 날짜 밑에 「어제」 한 줄을 더 쓴다 —
     # 오른쪽 끝 값(`이형일 30`)이 오늘 값처럼 읽혀서다. 그만큼 아래 여백을 늘리고(그래프
     # 전체 높이는 그대로라 본체가 11px 낮아진다), 주말 띠는 원래 바닥까지 내려오므로 따라온다.
     # 주별·월별은 마지막 칸이 하루가 아니라 안 붙인다(yesterday가 늘 False).
     yday_last = unit == "day" and n > 0 and buckets[-1].get("yesterday", False)
-    PL, PT, PB = 34, 12, 26 + (11 if yday_last else 0)
-    PR = 118 if series else 16
-    step = (width - PL - PR) / max(1, n - 1)
+    two_line = yday_last or bool(today)  # 날짜 밑에 「어제」/「오늘 N/M회차」 한 줄을 더 쓴다
+    PL, PT, PB = 34, 12, 26 + (11 if two_line else 0)
+    # [수정: 2026-09-17] 오른쪽 여백은 끝 라벨의 실제 길이로 정한다 — 고정 138px은 짧은 단어뿐일 때
+    # 카드 오른쪽이 텅 비었다(사용자 지적). 글자 폭은 어림값(한글 10.5px, 숫자·공백 6px).
+    def _label_w(s):
+        nm = s["word"] if len(s["word"]) <= 7 else s["word"][:6] + "…"
+        last = next((v for v in reversed(s["values"]) if v is not None), None)
+        if last is None:
+            return 0
+        txt = f"{nm} {last}"
+        return sum(6 if (c.isdigit() or c.isspace() or c.isascii()) else 10.5 for c in txt)
+    if today and label_today:
+        series_for_w = [dict(s, values=[today["values"].get(s["word"], 0)]) for s in series]
+    else:
+        series_for_w = series
+    lab_off = 4 if today else 0  # 오늘 칸의 빈 원이 라벨 막대에 겹치지 않게 조금 띄운다
+    PR = (22 + lab_off + max(_label_w(s) for s in series_for_w) + 4) if series else 16
+    step = (width - PL - PR) / max(1, (n if today else n - 1))
 
     def x_at(i):
         return PL + i * step
@@ -48,6 +70,8 @@ def render_chart(chart_id: str, buckets: list, series: list, unit: str,
     # 45%가 비었다(HISTORY.md "정책 단어 추이 축 맞춤"). 한 칸을 1·2·5 계열에서 고르면
     # 54 → 60, 120 → 150처럼 데이터에 붙고 눈금 글자도 늘 정수다.
     numeric = [v for s in series for v in s["values"] if v is not None]
+    if today:
+        numeric += list(today["values"].values())
     peak = max(1, max(numeric) if numeric else 1)
     ticks = (1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000)
     tick = next((t for t in ticks if t * 3 >= peak), -(-peak // 3000) * 1000)
@@ -64,6 +88,15 @@ def render_chart(chart_id: str, buckets: list, series: list, unit: str,
             if b["weekend"]:
                 out.append(f'<rect x="{x_at(i)-step/2:.1f}" y="{PT}" width="{step:.1f}" '
                            f'height="{height-PT-4}" fill="#EDF0F3"/>')
+
+    if today:
+        tx = x_at(tcol)
+        if today.get("weekend") and unit == "day":
+            out.append(f'<rect x="{tx-step/2:.1f}" y="{PT}" width="{step/2:.1f}" '
+                       f'height="{height-PT-4}" fill="#EDF0F3"/>')
+        sx = tx - step / 2
+        out.append(f'<line x1="{sx:.1f}" y1="{PT}" x2="{sx:.1f}" y2="{height-PB}" '
+                   f'stroke="#C7CDD4" stroke-width="1" stroke-dasharray="3 3"/>')
 
     # "기록 없음" 연속 구간 — 0으로 안 잇고 배경 + 라벨, 선은 끊는다.
     i = 0
@@ -95,7 +128,7 @@ def render_chart(chart_id: str, buckets: list, series: list, unit: str,
     # 바뀌어도 `31일 → 1일`로 숫자가 되돌아가 저절로 보인다. 긴 기간은 달이 여러 번
     # 바뀌므로 `9/7` 그대로다. 시안은 YESTERDAY_LABEL_MOCKUP.html.
     skip = max(1, -(-n // 10))
-    label_y = height - 20 if yday_last else height - 9
+    label_y = height - 20 if two_line else height - 9
     for i, b in enumerate(buckets):
         if unit == "day":
             show = n <= 10 or b["is_monday"] or i == n - 1
@@ -112,6 +145,13 @@ def render_chart(chart_id: str, buckets: list, series: list, unit: str,
         if yday_last and i == n - 1:
             out.append(f'<text x="{x_at(i):.1f}" y="{height-7}" text-anchor="middle" font-size="9" '
                        f'fill="{PALETTE["muted"]}">어제</text>')
+
+    if today:
+        tx = x_at(tcol)
+        out.append(f'<text x="{tx:.1f}" y="{label_y}" text-anchor="middle" font-size="9.5" '
+                   f'fill="#4B5563" font-weight="600">{html.escape(today["label"])}</text>')
+        out.append(f'<text x="{tx:.1f}" y="{height-7}" text-anchor="middle" font-size="9" '
+                   f'fill="{PALETTE["muted"]}">{html.escape(today["sub"])}</text>')
 
     # 계열별 선 — record 없는 구간에서 끊고, 마지막(집계 중) 구간만 점선 + 빈 원.
     end_labels = []
@@ -147,9 +187,16 @@ def render_chart(chart_id: str, buckets: list, series: list, unit: str,
                 _, x, y = seg[-1]
                 out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="#FFFFFF" '
                            f'stroke="{s["color"]}" stroke-width="2"/>')
+        if today:
+            tv = today["values"].get(s["word"], 0)
+            out.append(f'<circle cx="{x_at(tcol):.1f}" cy="{y_at(tv):.1f}" r="3.5" fill="#FFFFFF" '
+                       f'stroke="{s["color"]}" stroke-width="2"/>')
+            if label_today:
+                end_labels.append({"word": s["word"], "color": s["color"], "y": y_at(tv), "v": tv})
+                continue
         last_i = next((i for i in range(n - 1, -1, -1) if vals[i] is not None), None)
-        if last_i is not None and PR > 60:
-            end_labels.append({"word": s["word"], "color": s["color"], "y": y_at(vals[last_i]), "v": vals[last_i]})
+        if last_i is not None:
+            end_labels.append({"word": s["word"], "color": s["color"], "y": y_at(vals[last_i]), "x0": x_at(last_i), "y0": y_at(vals[last_i]), "v": vals[last_i]})
 
     # 직접 라벨(오른쪽 여백) — 겹치면 위아래로 밀어내고, 축을 넘으면 통째로 위로 민다.
     end_labels.sort(key=lambda e: e["y"])
@@ -161,9 +208,16 @@ def render_chart(chart_id: str, buckets: list, series: list, unit: str,
         if over > 0:
             for e in end_labels:
                 e["y"] -= over
+        # [수정: 2026-09-17] 라벨이 검은 글자뿐이라 어느 선의 이름인지 알 수 없었다(사용자 지적).
+        # 라벨 앞에 그 선 색의 짧은 막대를 둔다. 선 끝→라벨 연결선은 색으로 충분해 뺐다.
+        # 글자는 본문색 유지(노랑 계열 글자는 흰 바탕에서 안 읽힌다).
+        lx = width - PR + lab_off
         for e in end_labels:
             nm = e["word"] if len(e["word"]) <= 7 else e["word"][:6] + "…"
-            out.append(f'<text x="{width-PR+9}" y="{e["y"]+3.5:.1f}" font-size="10.5" '
+            ly = e["y"]
+            out.append(f'<line x1="{lx+6:.1f}" y1="{ly:.1f}" x2="{lx+17:.1f}" y2="{ly:.1f}" '
+                       f'stroke="{e["color"]}" stroke-width="3.5" stroke-linecap="round"/>')
+            out.append(f'<text x="{lx+22:.1f}" y="{ly+3.5:.1f}" font-size="10.5" '
                        f'fill="#1F2937">{html.escape(nm)} <tspan fill="#6B7280">{e["v"]}</tspan></text>')
 
     if hover:
@@ -243,16 +297,16 @@ def chart_css() -> str:
         ".trend-chart-wrap { position: relative; }"
         ".trend-chart { display: block; width: 100%; height: auto; }"
         f".trend-tip {{ position: absolute; pointer-events: none; background: {PALETTE['card']}; "
-        f"border: 1px solid {PALETTE['border']}; border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.10); "
-        "padding: 8px 10px; font-size: 0.79rem; display: none; z-index: 5; min-width: 128px; }"
+        f"border: 1px solid {PALETTE['border']}; border-radius: var(--r-md); box-shadow: var(--sh-pop); "
+        "padding: 8px 10px; font-size: var(--fs-sm); display: none; z-index: 5; min-width: 128px; }"
         f".trend-tip .th {{ font-weight: 700; color: {PALETTE['header']}; margin-bottom: 5px; }}"
         f".trend-tip .tip-empty {{ color: {PALETTE['muted']}; }}"
         ".trend-tip .tr { display: flex; align-items: center; gap: 6px; margin-top: 2px; }"
-        ".trend-tip .tr .dot { width: 8px; height: 8px; border-radius: 50%; }"
+        ".trend-tip .tr .dot { width: 8px; height: 8px; border-radius: var(--r-circle); }"
         ".trend-tip .tr .v { margin-left: auto; font-variant-numeric: tabular-nums; }"
         ".trend-legend { display: flex; flex-wrap: wrap; gap: 5px 16px; margin-top: 9px; }"
-        ".trend-legend .li { display: inline-flex; align-items: center; gap: 6px; font-size: 0.81rem; }"
-        ".trend-legend .li .dot { width: 11px; height: 3px; border-radius: 2px; }"
-        f".trend-legend .li .n {{ color: {PALETTE['muted']}; font-size: 0.76rem; "
+        ".trend-legend .li { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); }"
+        ".trend-legend .li .dot { width: 11px; height: 3px; border-radius: var(--r-sm); }"
+        f".trend-legend .li .n {{ color: {PALETTE['muted']}; font-size: var(--fs-sm); "
         "font-variant-numeric: tabular-nums; }"
     )

@@ -32,7 +32,7 @@ class AdhocKeywordCapError(AdhocCollectError):
 # --- 키워드별 검색 캐시 (ADHOC_DESIGN.md §6.4c) ---------------------------------
 # 교체 모델이라 조건을 바꿀 때마다 재검색이 필요한데, 매번 전부 돌리면 조건 하나 고칠
 # 때마다 몇 초씩 기다리게 된다. 같은 (날짜, 키워드, 시간창)이면 결과가 같으므로 캐시한다
-# — app/live_cache.py가 실시간현황에서 쓰는 것과 같은 발상이다.
+# — app/live_cache.py가 실시간 현황에서 쓰는 것과 같은 발상이다.
 #
 # **디스크가 아니라 메모리에 둔다.** 키워드 하나의 원시 결과가 최대 1,000건(약 300KB)이라
 # 카드마다 파일로 남기면 보관 기간 1년 × 카드 수만큼 쌓인다. 반면 이 캐시가 쓸모 있는
@@ -45,13 +45,6 @@ _SEARCH_CACHE_MAX = 40  # 키워드 5 × 카드 8개 정도. 넘으면 오래된
 
 def _cache_key(collect_date: str, keyword: str, window: dict) -> tuple:
     return (collect_date, keyword, window["start"], window["end"])
-
-
-def clear_search_cache() -> None:
-    """테스트·수동 초기화용. 평상시에는 부를 일이 없다(캐시가 틀릴 수 있는 경로가 없다 —
-    키에 날짜·시간창이 다 들어 있어서 조건이 바뀌면 키 자체가 달라진다)."""
-    with _search_cache_lock:
-        _search_cache.clear()
 
 
 def _search_with_cache(
@@ -357,13 +350,3 @@ def run_collect(card_id: str, now: Optional[datetime] = None, log: bool = True) 
         added=len(candidates),
         now=now,
     )
-
-
-def recompute_condition(card_id: str, now: Optional[datetime] = None) -> dict:
-    """검색어를 고친 뒤 목록을 지금 조건에 맞춘다 — run_collect의 얇은 별칭.
-
-    편집 핸들러(app/adhoc/routes.py)가 "무슨 일을 하는지" 이름으로 읽히게 하려고 따로
-    둔다. 실제로 하는 일은 같다: 캐시에 있는 키워드는 검색하지 않으므로(§6.4c) 검색어를
-    지우기만 한 경우에는 네이버 호출이 0회다.
-    """
-    return run_collect(card_id, now=now, log=False)

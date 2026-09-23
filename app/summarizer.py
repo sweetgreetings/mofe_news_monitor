@@ -137,6 +137,21 @@ def _summarize_group_from_first_article(group: dict) -> str:
     return _trim_summary(articles[0]["title"]) if articles else ""
 
 
+ETC_GROUP_NAME = "기타"
+ETC_SUMMARY_MAX_TITLES = 5
+
+
+def etc_titles_summary(articles: list) -> str:
+    """「기타」 칸의 요약 — 서로 관계없는 기사를 모은 칸이라 한 문단으로 쓰면 문장이 뒤섞인다.
+    그래서 요약 대신 기사 제목을 한 줄씩(앞 5건 + `외 N건`) 적는다. AI를 부르지 않는다."""
+    titles = [(a.get("title") or "").strip() for a in articles]
+    titles = [t for t in titles if t]
+    lines = [f"- {t}" for t in titles[:ETC_SUMMARY_MAX_TITLES]]
+    if len(titles) > ETC_SUMMARY_MAX_TITLES:
+        lines.append(f"외 {len(titles) - ETC_SUMMARY_MAX_TITLES}건")
+    return "\n".join(lines)
+
+
 def summarize_group(group: dict) -> str:
     """소제목 그룹 하나의 대표 요약문을 만든다.
 
@@ -152,6 +167,8 @@ def summarize_group(group: dict) -> str:
     [제거: 2026-08-20] use_llm_summary 파라미터가 있었다 — 규칙 기반 요약을 강제하던
     유일한 호출부가 없어지면서 함께 지웠다(경위는 HISTORY.md 참고).
     """
+    if group.get("name") == ETC_GROUP_NAME:
+        return etc_titles_summary(group.get("articles") or [])
     llm_summary = (group.get("summary") or "").strip()
     if llm_summary:
         return _trim_summary(llm_summary)

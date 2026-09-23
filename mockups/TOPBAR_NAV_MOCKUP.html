@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>상단바 정리 시안</title>
+<!-- 상단바 정리 시안 — 흐름마다 고정 묶음 + 지금 화면은 켜진 칩으로 남긴다.
+     색·글자 값은 지금 앱(app/config.py PALETTE, app/renderer.py .topbar·.screen-tag)에서 그대로 가져왔다. -->
+<style>
+  :root {
+    --bg: #F8FAFC; --card: #FFFFFF; --header: #1E3A5F; --accent: #2563EB; --text: #1F2937;
+    --muted: #6B7280; --soft: #4B5563; --border: #E5E7EB; --hover: #EFF6FF; --accent-border: #BFDBFE;
+    --divider-soft: #F1F5F9; --error: #DC2626;
+    --adhoc-bg: #E3F1EE; --adhoc-text: #146B5E; --adhoc-border: rgba(20, 107, 94, 0.45);
+    --warn-bg: #FFFBEB; --warn-border: #FDE68A; --warn-text: #92400E;
+    --ok-bg: #F0FDF4; --ok-border: #BBF7D0; --ok-text: #166534;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'Pretendard', 'Noto Sans KR', sans-serif; line-height: 1.55; }
+  .page { max-width: 1760px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1.doc { color: var(--header); font-size: 1.45rem; margin: 0 0 6px; }
+  .lede { color: var(--soft); margin: 0 0 22px; max-width: 900px; }
+  .rules { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 20px; margin: 0 0 32px; max-width: 900px; }
+  .rules h2 { font-size: 1rem; margin: 0 0 8px; color: var(--header); }
+  .rules ol { margin: 0; padding-left: 20px; }
+  .rules li { margin: 3px 0; }
+  .rules code { background: var(--divider-soft); padding: 1px 5px; border-radius: 4px; font-size: 0.88em; }
+
+  h2.sec { color: var(--header); font-size: 1.15rem; margin: 40px 0 6px; }
+  p.sec-sub { color: var(--muted); margin: 0 0 16px; font-size: 0.92rem; }
+
+  /* 전후 두 칸 */
+  .pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+  @media (max-width: 1100px) { .pair { grid-template-columns: minmax(0, 1fr); } }
+  .col-label { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.02em; margin: 0 0 6px; }
+  .col-label.before { color: var(--muted); }
+  .col-label.after { color: var(--accent); }
+
+  /* 화면 한 장(상단바 + 본문 첫머리) */
+  .screen { background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; margin: 0 0 18px; }
+  .screen-name { font-size: 0.78rem; color: var(--muted); padding: 6px 12px; background: var(--divider-soft);
+    border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
+  .screen-name b { color: var(--text); font-weight: 600; }
+  .screen-name .note { margin-left: auto; color: var(--muted); }
+  .screen-name .note.bad { color: var(--error); }
+  .screen-name .note.good { color: var(--ok-text); }
+
+  /* ── 지금 앱의 상단바 그대로(space-between) ─────────────────────── */
+  .topbar { background: var(--card); border-bottom: 1px solid var(--border);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); }
+  .topbar-inner { max-width: 800px; margin: 0 auto; padding: 12px 24px; display: flex;
+    justify-content: space-between; align-items: center; min-height: 55px; }
+  .topbar a { color: var(--accent); text-decoration: none; font-size: 0.92rem; font-weight: 600;
+    padding: 6px 10px; border-radius: 6px; white-space: nowrap; }
+  .topbar a:hover { background: var(--hover); }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+
+  /* ── 바꾼 상단바: 왼쪽 붙임 + 고정 묶음 + 켜진 칩 ──────────────────── */
+  .topbar.v2 .topbar-inner { justify-content: flex-start; gap: 2px; flex-wrap: wrap; }
+  .topbar.v2 .nav-sep { width: 1px; height: 18px; background: var(--border); margin: 0 8px; }
+  /* 모든 링크가 같은 상자(투명 테두리 1px)라 켜진 칩이 옮겨 다녀도 옆 링크가 1px도 안 밀린다. */
+  .topbar.v2 a { border: 1px solid transparent; padding: 5px 11px; border-radius: 14px; }
+  .topbar.v2 a.is-current { cursor: default; pointer-events: none; }
+  .topbar.v2.reg a.is-current { background: var(--hover); border-color: var(--accent-border); color: var(--accent); }
+  .topbar.v2.adhoc a.is-current { background: var(--adhoc-bg); border-color: var(--adhoc-border); color: var(--adhoc-text); }
+  .topbar.v2 a.is-empty { color: var(--muted); opacity: 0.55; cursor: not-allowed; }
+  .topbar.v2 a.is-empty:hover { background: none; }
+  .topbar.v2 a.back { color: var(--soft); }
+  .topbar.v2 a.back:hover { color: var(--accent); }
+
+  .body { max-width: 800px; margin: 0 auto; padding: 18px 24px 20px; }
+  .body h3 { margin: 0; color: var(--header); font-size: 1.2rem; }
+  .screen-tag { display: inline-flex; align-items: center; font-size: 0.78rem; font-weight: 700;
+    padding: 3px 11px; border-radius: 14px; border: 1px solid; margin-right: 10px;
+    vertical-align: 0.18em; line-height: 1.3; }
+  .screen-tag.work { background: var(--divider-soft); border-color: var(--border); color: var(--muted); }
+  .screen-tag.final { background: var(--hover); border-color: var(--accent-border); color: var(--accent); }
+  .screen-tag.adhoc { background: var(--adhoc-bg); border-color: var(--adhoc-border); color: var(--adhoc-text); }
+  .body .sub { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+  .ghost-lines { margin-top: 12px; }
+  .ghost-lines span { display: block; height: 10px; background: var(--divider-soft); border-radius: 5px; margin: 7px 0; }
+  .ghost-lines span:nth-child(2) { width: 82%; } .ghost-lines span:nth-child(3) { width: 64%; }
+  .inline-btn { display: inline-block; margin-top: 10px; font-size: 0.85rem; font-weight: 600; color: var(--accent);
+    border: 1px solid var(--accent-border); background: var(--card); border-radius: 8px; padding: 5px 12px; }
+
+  /* 한눈에 보기: 여러 화면의 상단바만 겹쳐 쌓기 */
+  .stack .topbar { border-radius: 0; }
+  .stack .row { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: stretch;
+    border-bottom: 1px dashed var(--border); }
+  .stack .row:last-child { border-bottom: 0; }
+  .stack .row-name { font-size: 0.8rem; color: var(--muted); display: flex; align-items: center;
+    padding: 0 10px; background: var(--divider-soft); }
+  .stack .topbar { box-shadow: none; border-bottom: 0; }
+  .guide-col { position: relative; }
+
+  .decide { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text);
+    border-radius: 10px; padding: 12px 16px; margin: 36px 0 0; max-width: 900px; font-size: 0.92rem; }
+  .decide b { color: var(--warn-text); }
+  .decide ul { margin: 6px 0 0; padding-left: 20px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1 class="doc">상단바 정리 시안</h1>
+  <p class="lede">
+    지금은 링크를 양 끝으로 벌려 놓고 지금 화면을 목록에서 빼기 때문에, 화면을 옮길 때마다 같은 링크가 다른 자리에 옵니다.
+    바꾼 안은 <b>흐름마다 같은 묶음을 같은 순서로 왼쪽에 붙이고, 지금 화면은 빼지 않고 켜진 칩으로 남깁니다.</b>
+    링크를 눌러도 이동하지 않습니다(시안).
+  </p>
+
+  <div class="rules">
+    <h2>바꾼 규칙</h2>
+    <ol>
+      <li><b>정기 화면</b>: <code>홈 │ 전체 기사 · 초안 · 확정본 · 보관함</code> — 홈 흐름도 정기 줄과 같은 순서(검색어는 설정이라 뺌).</li>
+      <li><b>수시 화면</b>: <code>홈 │ 새 수집 · 원본 · 확정본 · 보관함</code> — 흐름도 수시 줄과 같은 순서. 정기를 가리키는 링크는 여전히 없음.</li>
+      <li><b>지금 화면</b>은 목록에서 빼지 않고 흐름 색 칩(정기 파랑 · 수시 청록)으로 켜 두고, 누를 수 없음. 화면 이름 칩과 같은 모양.</li>
+      <li><b>흐름 밖 화면</b>(설정 하위·라벨 관리 등)은 <code>홈 │ ← 돌아갈 곳</code> 하나. 돌아갈 곳이 홈뿐이면 홈만.</li>
+      <li>모두 <b>왼쪽 붙임</b>(<code>space-between</code> 폐지). 링크 수가 달라도 앞 링크 자리가 흔들리지 않음.</li>
+      <li>상단바엔 <b>가는 곳만</b> 둠. 「새로고침」 같은 동작은 본문으로.</li>
+    </ol>
+  </div>
+
+  <!-- ─────────────────────────── 한눈에 ─────────────────────────── -->
+  <h2 class="sec">한눈에 — 정기 화면 네 장의 상단바를 겹쳐 쌓으면</h2>
+  <p class="sec-sub">왼쪽(지금)은 「초안」「확정본」이 줄마다 다른 자리에 옵니다. 오른쪽(바꾼 안)은 세로로 한 줄에 맞습니다.</p>
+  <div class="pair">
+    <div>
+      <div class="col-label before">지금</div>
+      <div class="screen stack">
+        <div class="row"><div class="row-name">전체 기사</div>
+          <div class="topbar"><div class="topbar-inner"><a>홈</a><a>초안</a><a>확정본</a></div></div></div>
+        <div class="row"><div class="row-name">초안</div>
+          <div class="topbar"><div class="topbar-inner"><a>홈</a><a><svg class="ic" viewBox="0 0 24 24" style="color:var(--error)"><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><path d="M6.4 6.4a8 8 0 0 0 0 11.2M17.6 17.6a8 8 0 0 0 0-11.2"/></svg> 전체 기사</a><a>확정본</a></div></div></div>
+        <div class="row"><div class="row-name">확정본</div>
+          <div class="topbar"><div class="topbar-inner"><a>홈</a><a><svg class="ic" viewBox="0 0 24 24" style="color:var(--error)"><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><path d="M6.4 6.4a8 8 0 0 0 0 11.2M17.6 17.6a8 8 0 0 0 0-11.2"/></svg> 전체 기사</a><a>초안</a></div></div></div>
+        <div class="row"><div class="row-name">정기 보관함</div>
+          <div class="topbar"><div class="topbar-inner"><a>홈</a><a><svg class="ic" viewBox="0 0 24 24" style="color:var(--error)"><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><path d="M6.4 6.4a8 8 0 0 0 0 11.2M17.6 17.6a8 8 0 0 0 0-11.2"/></svg> 전체 기사</a><a>초안</a></div></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="col-label after">바꾼 안</div>
+      <div class="screen stack">
+        <div class="row"><div class="row-name">전체 기사</div>
+          <div class="topbar v2 reg"><div class="topbar-inner"><a>홈</a><span class="nav-sep"></span><a class="is-current">전체 기사</a><a>초안</a><a>확정본</a><a>보관함</a></div></div></div>
+        <div class="row"><div class="row-name">초안</div>
+          <div class="topbar v2 reg"><div class="topbar-inner"><a>홈</a><span class="nav-sep"></span><a>전체 기사</a><a class="is-current">초안</a><a>확정본</a><a>보관함</a></div></div></div>
+        <div class="row"><div class="row-name">확정본</div>
+          <div class="topbar v2 reg"><div class="topbar-inner"><a>홈</a><span class="nav-sep"></span><a>전체 기사</a><a>초안</a><a class="is-current">확정본</a><a>보관함</a></div></div></div>
+        <div class="row"><div class="row-name">정기 보관함</div>
+          <div class="topbar v2 reg"><div class="topbar-inner"><a>홈</a><span class="nav-sep"></span><a>전체 기사</a><a>초안</a><a>확정본</a><a class="is-current">보관함</a></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────── 정기 ─────────────────────────── -->
+  <h2 class="sec">정기 — 확정본</h2>
+  <p class="sec-sub">지금은 세 링크가 왼쪽·가운데·오른쪽 끝으로 흩어지고, 보관함으로 가는 길이 없습니다.</p>
+  <div class="pair">
+    <div>
+      <div class="col-label before">지금</div>
+      <div class="screen">
+        <div class="screen-name"><b>확정본</b> index.html</div>
+        <div class="topbar"><div class="topbar-inner"><a>홈</a><a><svg class="ic" viewBox="0 0 24 24" style="color:var(--error)"><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><path d="M6.4 6.4a8 8 0 0 0 0 11.2M17.6 17.6a8 8 0 0 0 0-11.2"/></svg> 전체 기사</a><a>초안</a></div></div>
+        <div class="body"><h3><span class="screen-tag final">확정본</span>언론 모니터링 14시 기준</h3><div class="ghost-lines"><span></span><span></span><span></span></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="col-label after">바꾼 안</div>
+      <div class="screen">
+        <div class="screen-name"><b>확정본</b> index.html</div>
+        <div class="topbar v2 reg"><div class="topbar-inner"><a>홈</a><span class="nav-sep"></span><a>전체 기사</a><a>초안</a><a class="is-current">확정본</a><a>보관함</a></div></div>
+        <div class="body"><h3><span class="screen-tag final">확정본</span>언론 모니터링 14시 기준</h3><div class="ghost-lines"><span></span><span></span><span></span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="sec">정기 — 확정본 대기 화면 (오늘 회차 전)</h2>
+  <p class="sec-sub">「새로고침」은 가는 곳이 아니라 동작이라 본문 버튼으로 내립니다. 상단바는 확정본과 같습니다.</p>
+  <div class="pair">
+    <div>
+      <div class="col-label before">지금</div>
+      <div class="screen">
+        <div class="screen-name"><b>대기 화면</b> generate_waiting_page</div>
+        <div class="topbar"><div class="topbar-inner"><a>홈</a><a>정기 보관함</a><a>새로고침</a></div></div>
+        <div class="body" style="text-align:center"><div style="font-size:1.6rem">🐰⏱️</div><div>아직 스크랩 시간 전입니다</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="col-label after">바꾼 안</div>
+      <div class="screen">
+        <div class="screen-name"><b>대기 화면</b> generate_waiting_page</div>
+        <div class="topbar v2 reg"><div class="topbar-inner"><a>홈</a><span class="nav-sep"></span><a>전체 기사</a><a>초안</a><a class="is-current">확정본</a><a>보관함</a></div></div>
+        <div class="body" style="text-align:center"><div style="font-size:1.6rem">🐰⏱️</div><div>아직 스크랩 시간 전입니다</div><span class="inline-btn">새로고침</span></div>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="sec">정기 — 휴지통</h2>
+  <p class="sec-sub">휴지통은 초안·확정본에서 들어오는 곳이라 정기 묶음을 그대로 쓰고, 켜진 칩은 없습니다.</p>
+  <div class="pair">
+    <div>
+      <div class="col-label before">지금</div>
+      <div class="screen">
+        <div class="screen-name"><b>휴지통</b> /hidden</div>
+        <div class="topbar"><div class="topbar-inner"><a>홈</a><a>초안</a><a>확정본</a></div></div>
+        <div class="body"><h3>🗑 휴지통</h3><div class="sub">숨긴 기사 7일 보관</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="col-label after">바꾼 안</div>
+      <div class="screen">
+        <div class="screen-name"><b>휴지통</b> /hidden</div>
+        <div class="topbar v2 reg"><div class="topbar-inner"><a>홈</a><span class="nav-sep"></span><a>전체 기사</a><a>초안</a><a>확정본</a><a>보관함</a></div></div>
+        <div class="body"><h3>🗑 휴지통</h3><div class="sub">숨긴 기사 7일 보관</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────── 수시 ─────────────────────────── -->
+  <h2 class="sec">수시 — 원본</h2>
+  <p class="sec-sub">지금은 네 칸으로 고르게 퍼지고, 원본·확정본을 오갈 때 「확정본」↔「원본」이 같은 자리에서 서로 바뀝니다.</p>
+  <div class="pair">
+    <div>
+      <div class="col-label before">지금</div>
+      <div class="screen">
+        <div class="screen-name"><b>수시 원본</b> /adhoc/card</div>
+        <div class="topbar"><div class="topbar-inner"><a>홈</a><a>새 수집</a><a>확정본</a><a>수시 보관함</a></div></div>
+        <div class="body"><h3><span class="screen-tag work">원본</span>인사청문회</h3><div class="ghost-lines"><span></span><span></span><span></span></div></div>
+      </div>
+      <div class="screen">
+        <div class="screen-name"><b>수시 확정본</b> /adhoc/card</div>
+        <div class="topbar"><div class="topbar-inner"><a>홈</a><a>새 수집</a><a>원본</a><a>수시 보관함</a></div></div>
+        <div class="body"><h3><span class="screen-tag adhoc">확정본</span>수시 모니터링 15시 05분 기준(인사청문회)</h3></div>
+      </div>
+    </div>
+    <div>
+      <div class="col-label after">바꾼 안</div>
+      <div class="screen">
+        <div class="screen-name"><b>수시 원본</b> /adhoc/card</div>
+        <div class="topbar v2 adhoc"><div class="topbar-inner"><a>홈</a><span class="nav-sep"></span><a>새 수집</a><a class="is-current">원본</a><a>확정본</a><a>보관함</a></div></div>
+        <div class="body"><h3><span class="screen-tag work">원본</span>인사청문회</h3><div class="ghost-lines"><span></span><span></span><span></span></div></div>
+      </div>
+      <div class="screen">
+        <div class="screen-name"><b>수시 확정본</b> /adhoc/card</div>
+        <div class="topbar v2 adhoc"><div class="topbar-inner"><a>홈</a><span class="nav-sep"></span><a>새 수집</a><a>원본</a><a class="is-current">확정본</a><a>보관함</a></div></div>
+        <div class="body"><h3><span class="screen-tag adhoc">확정본</span>수시 모니터링 15시 05분 기준(인사청문회)</h3></div>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="sec">수시 — 새 수집 (오늘 확정본이 아직 없을 때)</h2>
+  <p class="sec-sub">지금은 갈 곳이 없는 링크를 통째로 빼서 칸 수가 바뀝니다. 바꾼 안은 자리를 지키고 흐리게 둡니다(툴팁 「아직 확정본이 없어요」).</p>
+  <div class="pair">
+    <div>
+      <div class="col-label before">지금</div>
+      <div class="screen">
+        <div class="screen-name"><b>새 수집</b> /adhoc/new</div>
+        <div class="topbar"><div class="topbar-inner"><a>홈</a><a>원본</a><a>수시 보관함</a></div></div>
+        <div class="body"><h3>새 수집</h3><div class="sub">오늘 안에서 시간대를 정해 한 번에 모읍니다</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="col-label after">바꾼 안</div>
+      <div class="screen">
+        <div class="screen-name"><b>새 수집</b> /adhoc/new</div>
+        <div class="topbar v2 adhoc"><div class="topbar-inner"><a>홈</a><span class="nav-sep"></span><a class="is-current">새 수집</a><a>원본</a><a class="is-empty" title="아직 확정본이 없어요">확정본</a><a>보관함</a></div></div>
+        <div class="body"><h3>새 수집</h3><div class="sub">오늘 안에서 시간대를 정해 한 번에 모읍니다</div></div>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="sec">수시 — 보관함</h2>
+  <p class="sec-sub">지금은 홈 말고 갈 곳이 없습니다.</p>
+  <div class="pair">
+    <div>
+      <div class="col-label before">지금</div>
+      <div class="screen">
+        <div class="screen-name"><b>수시 보관함</b> /adhoc</div>
+        <div class="topbar"><div class="topbar-inner"><a>홈</a></div></div>
+        <div class="body"><h3>수시 보관함</h3><div class="sub">사안별로 쌓인 확정본 · 1년간 보관됩니다</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="col-label after">바꾼 안</div>
+      <div class="screen">
+        <div class="screen-name"><b>수시 보관함</b> /adhoc</div>
+        <div class="topbar v2 adhoc"><div class="topbar-inner"><a>홈</a><span class="nav-sep"></span><a>새 수집</a><a>원본</a><a>확정본</a><a class="is-current">보관함</a></div></div>
+        <div class="body"><h3>수시 보관함</h3><div class="sub">사안별로 쌓인 확정본 · 1년간 보관됩니다</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────── 흐름 밖 ─────────────────────────── -->
+  <h2 class="sec">흐름 밖 — 설정 하위 화면 · 라벨 · 추이</h2>
+  <p class="sec-sub">지금은 「설정」이 오른쪽 끝에 붙고, 라벨 보관함에도 붙어 있습니다. 바꾼 안은 <code>홈 │ ← 돌아갈 곳</code>이고, 돌아갈 곳이 홈뿐이면 홈만 둡니다.</p>
+  <div class="pair">
+    <div>
+      <div class="col-label before">지금</div>
+      <div class="screen">
+        <div class="screen-name"><b>설정 하위</b> /keywords 등 14개</div>
+        <div class="topbar"><div class="topbar-inner"><a>홈</a><a>설정</a></div></div>
+        <div class="body"><h3>검색어</h3></div>
+      </div>
+      <div class="screen">
+        <div class="screen-name"><b>라벨 보관함</b> /labels</div>
+        <div class="topbar"><div class="topbar-inner"><a>홈</a><a>설정</a></div></div>
+        <div class="body"><h3>🏷 라벨 보관함</h3></div>
+      </div>
+      <div class="screen">
+        <div class="screen-name"><b>라벨 관리</b> /label-manage</div>
+        <div class="topbar"><div class="topbar-inner"><a>홈</a><a>설정</a></div></div>
+        <div class="body"><h3>⚙ 라벨 관리 <span class="inline-btn" style="margin:0 0 0 10px">← 라벨 보관함</span></h3></div>
+      </div>
+      <div class="screen">
+        <div class="screen-name"><b>정책 단어 추이</b> /trend</div>
+        <div class="topbar"><div class="topbar-inner"><a>← 홈</a></div></div>
+        <div class="body"><h3>📈 정책 단어 추이</h3></div>
+      </div>
+    </div>
+    <div>
+      <div class="col-label after">바꾼 안</div>
+      <div class="screen">
+        <div class="screen-name"><b>설정 하위</b> /keywords 등 14개</div>
+        <div class="topbar v2"><div class="topbar-inner"><a>홈</a><span class="nav-sep"></span><a class="back">← 설정</a></div></div>
+        <div class="body"><h3>검색어</h3></div>
+      </div>
+      <div class="screen">
+        <div class="screen-name"><b>라벨 보관함</b> /labels <span class="note">홈에서 들어오는 곳 → 홈만</span></div>
+        <div class="topbar v2"><div class="topbar-inner"><a>홈</a></div></div>
+        <div class="body"><h3>🏷 라벨 보관함</h3></div>
+      </div>
+      <div class="screen">
+        <div class="screen-name"><b>라벨 관리</b> /label-manage <span class="note">본문의 같은 버튼은 뺌</span></div>
+        <div class="topbar v2"><div class="topbar-inner"><a>홈</a><span class="nav-sep"></span><a class="back">← 라벨 보관함</a></div></div>
+        <div class="body"><h3>⚙ 라벨 관리</h3></div>
+      </div>
+      <div class="screen">
+        <div class="screen-name"><b>정책 단어 추이</b> /trend <span class="note">화살표 뗌</span></div>
+        <div class="topbar v2"><div class="topbar-inner"><a>홈</a></div></div>
+        <div class="body"><h3>📈 정책 단어 추이</h3></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="decide">
+    <b>정해야 할 것</b>
+    <ul>
+      <li><b>「지금 화면은 목록에서 뺀다」 규칙을 「켜진 칩으로 남긴다」로 바꾼다</b> — CLAUDE.md 수시 상단바 규칙과 정기 쪽 관례가 같이 바뀝니다.</li>
+      <li><b>갈 곳이 없는 링크를 흐리게 남긴다</b>(수시 확정본·원본이 아직 없을 때) — 지금은 빼는 게 규칙입니다. 자리를 지키려면 흐리게 남겨야 합니다.</li>
+      <li><b>「전체 기사」 앞 🔴 아이콘</b>은 바꾼 안에서 뺐습니다(켜진 칩과 겹쳐 시끄러움). 전체 기사 화면 안의 「● 실시간」 배지는 그대로.</li>
+      <li><b>이름은 「보관함」</b>으로 줄였습니다 — 한 흐름 묶음 안이라 흐름 이름이 필요 없음(흐름도 칸과 같은 판단).</li>
+      <li>홈은 지금처럼 상단바 없이 둡니다(모든 흐름의 출발점).</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

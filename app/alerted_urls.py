@@ -64,7 +64,12 @@ def mark_alerted(urls: list, now: Optional[datetime] = None, items: Optional[lis
     data["urls"] = list(existing)
     if items:
         known = {it.get("url") for it in data["items"]}
-        data["items"].extend(it for it in items if it.get("url") not in known)
+        for it in items:
+            # 넘어온 items 안의 중복도 거른다 — known을 갱신하지 않으면 한 번에 온 같은 URL이
+            # 모두 들어간다(2026-09-18 실측: 같은 속보가 기록에 3번).
+            if it.get("url") not in known:
+                known.add(it.get("url"))
+                data["items"].append(it)
     atomic_write_text(ALERTED_URLS_FILE, json.dumps(data, ensure_ascii=False))
 
 
@@ -75,4 +80,8 @@ def alerted_items(now: Optional[datetime] = None) -> list:
     알림과 숫자가 어긋난다(모듈 맨 위 주석 참고). 옛 형식(items 없음)이면 빈 목록이
     나오는데, 그때는 화면이 건수만(len(already_alerted_urls())) 보여주면 된다.
     """
-    return sorted(_load(now)["items"], key=lambda it: it.get("pub_date") or "")
+    # 중복 방어 — 고치기 전(2026-09-18)에 쌓인 기록엔 같은 URL이 여러 번 있다. 먼저 온 것 하나만.
+    unique: dict = {}
+    for it in _load(now)["items"]:
+        unique.setdefault(it.get("url"), it)
+    return sorted(unique.values(), key=lambda it: it.get("pub_date") or "")

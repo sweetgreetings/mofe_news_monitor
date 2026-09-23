@@ -1,4 +1,4 @@
-# Design Ref: DESIGN.md §3 기술 선택 — SQLite 대신 로컬 JSON 파일로 회차별 기사 데이터를 저장/조회하는 모듈
+# Design Ref: archive/DESIGN.md §3 기술 선택 — SQLite 대신 로컬 JSON 파일로 회차별 기사 데이터를 저장/조회하는 모듈
 import json
 import logging
 import re
@@ -175,26 +175,6 @@ def is_today(run: dict, now: Optional[datetime] = None) -> bool:
     return run["run_at"][:10] == now.strftime("%Y-%m-%d")
 
 
-def list_all_runs() -> list[dict]:
-    """저장된 모든 회차를 최신순(run_at 내림차순)으로 돌려준다 (PRD.md 기능2 규칙 6, 지난 기사 조회용).
-
-    RETENTION_DAYS(현재 1년)치까지만 남아있다 — delete_expired_runs가 그보다 오래된 파일을 지운다.
-    깨진 JSON이거나 run_at·run_slot·articles 중 하나라도 없는 파일은 건너뛴다 (화면을
-    그리는 쪽에서 이 3개 키를 그대로 쓰므로, 여기서 미리 검증해 손상 파일 하나 때문에
-    전체 조회가 멈추지 않도록 한다 — delete_expired_runs와 같은 방어 철학).
-    """
-    # [수정: 2026-08-18] 유효성 검증과 정렬은 app.run_index가 이미 해둔다 — 여기선
-    # 그 목록대로 파일을 읽기만 한다. 다만 **모든 회차의 기사를 다 읽는 함수라는 점은
-    # 그대로**다(보관 1년이면 22.8MB). 회차 전체의 기사가 정말로 필요한 게 아니라면
-    # list_run_meta()/list_runs_for_date()를 쓴다.
-    runs = []
-    for meta in list_run_meta():
-        run = load_run_file(meta["path"])
-        if run is not None:
-            runs.append(run)
-    return runs
-
-
 def list_run_dates(metas: Optional[list] = None) -> list[str]:
     """저장된 회차의 날짜(run_at 기준 "YYYY-MM-DD")를 최신순·중복 없이 돌려준다.
 
@@ -327,7 +307,7 @@ def record_send_failure(run: dict, channels: list, auto: bool = False) -> Option
     시도의 실패 기록을 지운다 — 재시도 끝에 결국 성공했는데 지난 실패 흔적(빨간 점)이
     화면에 남아있으면 안 되니까.
 
-    자동 발송은 실패할 때마다 매 tick(10초)마다 재호출되는데, 원인이 지난번과 완전히
+    자동발송은 실패할 때마다 매 tick(10초)마다 재호출되는데, 원인이 지난번과 완전히
     같으면(채널·대상·이유까지) 다시 쓰지 않는다 — 시각만 갱신하자고 회차 파일 전체를
     계속 다시 쓰는 낭비를 피한다(회차 하나가 커지면 수십~수백 KB라, 원인이 안 바뀐 채
     몇 시간씩 재시도되면 그만큼 디스크에 반복해서 쓰게 된다).
@@ -457,9 +437,9 @@ def run_lock_reason(date_str: str, run_slot: str, metas: Optional[list] = None,
 
     - "today": 오늘 회차. 파일이 없어지면 스케줄러가 run_exists로 "아직 안 돈 회차"라고
       보고 곧바로 다시 수집한다 — 지우는 게 아니라 다시 모으기가 된다.
-    - "latest": 저장된 회차 중 가장 최근 것. 확정본 화면과 자동 발송이 load_latest_run()
+    - "latest": 저장된 회차 중 가장 최근 것. 확정본 화면과 자동발송이 load_latest_run()
       하나만 보는데, 이걸 지우면 그 앞 회차가 "가장 최근"이 된다 — 오늘 첫 회차가 오기 전
-      새벽이라면 **어제 발송 안 된 회차가 자동 발송 대상**이 될 수 있다(되돌릴 수 없는 외부
+      새벽이라면 **어제 발송 안 된 회차가 자동발송 대상**이 될 수 있다(되돌릴 수 없는 외부
       발송이라 여기서 원천 차단한다).
     """
     now = now or datetime.now()

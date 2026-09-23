@@ -1,4 +1,4 @@
-# Design Ref: DESIGN.md §3 기술 선택 — 서버 프레임워크 없이 .env에서 네이버 API 키를 불러오는 설정 모듈
+# Design Ref: archive/DESIGN.md §3 기술 선택 — 서버 프레임워크 없이 .env에서 네이버 API 키를 불러오는 설정 모듈
 import logging
 import os
 from pathlib import Path
@@ -31,6 +31,14 @@ EMAIL_SMTP_HOST = os.getenv("EMAIL_SMTP_HOST")
 EMAIL_SMTP_PORT = int(os.getenv("EMAIL_SMTP_PORT", "587"))
 EMAIL_SENDER_ADDRESS = os.getenv("EMAIL_SENDER_ADDRESS")
 EMAIL_SENDER_PASSWORD = os.getenv("EMAIL_SENDER_PASSWORD")
+# [추가: 2026-09-18] 설정 화면(연동 › 이메일 보내는 계정)에서 고를 수 있는 메일 서비스.
+# 「직접 입력」은 두지 않는다 — 기관 메일(korea.kr 등)은 외부 앱의 SMTP 발송을 막는 경우가
+# 많다(사용자 결정). .env에 다른 서버를 적어 둔 경우만 그 값을 그대로 쓴다.
+# domain이 있으면 보내는 사람 주소가 그 도메인이어야 한다(Gmail은 회사 도메인 계정도 있어 비움).
+EMAIL_SERVICES = {
+    "naver": {"label": "네이버", "host": "smtp.naver.com", "port": 587, "domain": "naver.com"},
+    "gmail": {"label": "Gmail", "host": "smtp.gmail.com", "port": 587, "domain": ""},
+}
 
 # PRD.md 기능1 규칙 2 — [수정: 2026-07-25] 키워드 그룹 기능 도입. [수정: 2026-07-25]
 # 처음엔 "기관 정보" 그룹을 삭제·수정 불가로 고정했었는데, "이용자 소속 기관이 바뀔 수도
@@ -46,7 +54,7 @@ DEFAULT_KEYWORD_GROUP_NAME = "키워드 그룹"
 # 6개(예전 상한 그대로 유지)라, 그룹당 키워드 상한도 기존 기관 정보 그룹의 키워드
 # 개수(7개)를 그대로 수용하도록 5 -> 7로 올렸다(잘라내는 손실 없이 마이그레이션되도록).
 # [수정: 2026-08-13] 그룹/키워드 상한을 늘리고 싶다는 요청으로 재검토했다. 예전엔
-# "늘리면 실시간현황이 버거워진다"는 감으로 6·7에 묶어뒀는데, 실측해보니 진짜
+# "늘리면 실시간 현황이 버거워진다"는 감으로 6·7에 묶어뒀는데, 실측해보니 진짜
 # 병목은 개수가 아니라 동시성이었다(app.naver_api._MAX_CONCURRENT_KEYWORD_SEARCHES
 # 참고 — 100키워드·동시성 8에서 429 0%를 2회 재확인). 게다가 캐시가 키워드 단위
 # 증분으로 바뀌고(app.live_cache) 콜드 스타트도 백그라운드+대기화면으로 가려져서
@@ -145,14 +153,14 @@ RETRY_INTERVAL_SEC = 300
 # 확정→전송이 각각 5분씩 두 번 늘어지지 않게(총 5분) 한 것.
 CONFIRM_SEND_GRACE_SEC = 300
 
-# [추가: 2026-08-11] 자동 발송 사용 여부와 유예 시간(분)을 설정 화면(/auto-send)에서 바꾼다.
+# [추가: 2026-08-11] 자동발송 사용 여부와 유예 시간(분)을 설정 화면(/auto-send)에서 바꾼다.
 # 위 CONFIRM_SEND_GRACE_SEC는 이제 "설정이 아직 없을 때의 기본값"으로만 쓰인다.
 #
 # 배경: `/telegram`·`/email` 화면에 "정기 스크랩 완료 시 자동 전송" 체크박스가 각각 있었는데,
 # 오늘 확정 단계를 걷어내며 발송 경로가 바뀌면서 **아무도 그 값을 읽지 않는 고아 설정**이
 # 됐다(체크를 풀어놔도 유예가 지나면 그냥 나갔다). 실제로 2026-08-11 17시 회차가 소제목이
-# 망가진 채로 자동 발송된 뒤에 발견됐다. 개별 Telegram/Email 발송 버튼을 (발송) 하나로 합친
-# 것과 같은 이유로, 자동 발송도 채널별로 쪼개지 않고 하나로 통합해 되살린다.
+# 망가진 채로 자동발송된 뒤에 발견됐다. 개별 Telegram/Email 발송 버튼을 (발송) 하나로 합친
+# 것과 같은 이유로, 자동발송도 채널별로 쪼개지 않고 하나로 통합해 되살린다.
 #
 # 유예 상한 이유: app.confirm_send.check_pending_confirm_and_send가 load_latest_run()
 # 하나만 검사하므로, 유예가 회차 간격보다 길면 다음 회차가 수집되는 순간 이전 회차가
@@ -268,13 +276,20 @@ COLOR_UNDATED_BAR = "#EF9F27"           # 발행시각을 못 읽은 기사 왼�
 # 관공서 톤에 맞는 진한 그린(신뢰감·중후함)으로 교체.
 COLOR_SEND = "#15803D"
 
-# ── 실시간현황 행 배지 ────────────────────────────────────────────────
+# ── 실시간 현황 행 배지 ────────────────────────────────────────────────
 # [수정: 2026-08-21] ✔️ 스크랩됨은 파랑(accent)으로, 🤖 자동 선별은 연보라(ai_*)로
 # 옮겨서 이 절에서 빠졌다 — 둘 다 이 화면 전용 색이 아니라 앱 전체가 쓰는 팔레트를
 # 그대로 참조한다(스크랩됨=담당자가 확정한 결과, 자동 선별=AI가 한 일). 남은 건
 # "아직 결정 안 됨"이라는, 정말 이 화면에만 있는 상태 하나뿐이다.
 COLOR_PIN_GRAY = "#9AA4B2"              # 📌 담아둠 ("아직 결정 안 됨")
 COLOR_PIN_GRAY_BG = "#F3F5F7"
+# 초안·확정본의 📌 담아둔 기사 칸 (캐러멜). 미분류 앰버(= 담당자가 아직 모르는 것)를 한 단계
+# 눌러 어둡게 한 색 — 같은 계열 안에서 "한 번은 보고 골라둔 것"이라는 다음 단계로 읽힌다.
+COLOR_PINNED_BAR = "#B7803F"            # 칸 왼쪽 띠
+COLOR_PINNED_BG = "#FAF3EA"             # 칸 바탕
+COLOR_PINNED_TEXT = "#7A4E1C"           # 건수 칩·제목 옆 뱃지 글자, 칸 안 버튼 글자
+COLOR_PINNED_CHIP_BG = "#F1E3D0"        # 건수 칩·뱃지 바탕
+COLOR_PINNED_BORDER = "#DFC5A3"         # 건수 칩·뱃지·칸 안 버튼 테두리
 
 # ── 어느 흐름의 화면인가 (홈 메뉴 카드) ───────────────────────────────────
 # 보관함은 같은 색을 한 단계 흐리게 해서 "같은 흐름의 과거"임을 표시한다.
@@ -395,6 +410,8 @@ COLOR_TOGGLE_OFF = "#CBD5E1"            # 꺼진 토글 track — 스위치 부�
 COLOR_TOGGLE_OFF_TEXT = "#64748B"
 COLOR_TEXT_SOFT = "#4B5563"             # 본문보다 한 단계 연한 글자
 COLOR_TEXT_FAINT = "#9CA3AF"            # 안내·빈 값 글자
+COLOR_ORDER_BTN_DISABLED = "#D1D5DB"    # 언론사 순서 화살표 — 목록 끝이라 못 누름
+COLOR_FLOAT_INPUT_BORDER = "#D1D5DB"    # 색 칸 위에 얹힌 흰 입력칸의 테두리(초안 📌 칸의 「+ 수기로 기사 추가」)
 # [수정: 2026-08-21] 중립 회색 13종을 값 기준 이 8~10개로 모았다. 아래 6개는 전부 위
 # 회색들과 같은 값을 가리키는 별칭이다 — 이름(쓰임)은 그대로 두되 색만 합쳤다.
 COLOR_SURFACE_SOFT = COLOR_DIVIDER_SOFT  # 접힌 날짜 블록 바탕
@@ -404,10 +421,38 @@ COLOR_SEP_FAINT = COLOR_TEXT_FAINT      # 값 사이 구분 기호(·, +)
 COLOR_DASH_BORDER = COLOR_BORDER        # 점선 입력칸 테두리
 COLOR_PLACEHOLDER = COLOR_TEXT_FAINT
 COLOR_CHIP_OFF_BORDER = COLOR_TOGGLE_OFF  # 꺼진 키워드 칩 테두리 — "꺼짐" 표시는 토글과 같은 톤
+# [추가: 2026-09-17] 텔레그램 받는 사람 화면 — 받는 것 칩(꺼짐 점선·켜짐 실선)과 「알림」 칩.
+# 새 색은 없다: 켜진 [단독]·[속보]는 말머리 빨강, 정기는 파랑, 수시는 청록 계열 값을 그대로 쓴다.
+COLOR_SCOOP_CHIP_BORDER = COLOR_ERROR_BORDER_MID   # 켜진 [단독]·[속보] 칩 테두리
+COLOR_ADHOC_BORDER_STRONG = COLOR_FLOW_ENTRY_ADHOC_BORDER  # 켜진 수시 칩 테두리(청록 알파)
+COLOR_NOTIFY_CHIP_BG = COLOR_PILL_BG               # 「알림」 칩 — 늘 값이 있어 켜짐/꺼짐이 없는 중립 회색
+COLOR_NOTIFY_CHIP_BORDER = COLOR_TOGGLE_OFF
+# 화면 이름 칩 — 초안·확정본·수시 원본·수시 확정본 제목 맨 앞의 (초안)/(확정본)/(원본) 칩.
+# 새 색은 없다: 다듬기 전 화면(초안·원본)은 중립 회색, 보고서 화면은 흐름의 색(정기 파랑·수시 청록).
+COLOR_SCREEN_TAG_WORK_BG = COLOR_DIVIDER_SOFT      # (초안)·(원본)
+COLOR_SCREEN_TAG_WORK_BORDER = COLOR_BORDER
+COLOR_SCREEN_TAG_WORK_TEXT = COLOR_TEXT_MUTED
+COLOR_SCREEN_TAG_REG_BG = COLOR_HOVER              # 정기 (확정본)
+COLOR_SCREEN_TAG_REG_BORDER = COLOR_ACCENT_BORDER
+COLOR_SCREEN_TAG_REG_TEXT = COLOR_ACCENT
+COLOR_NOTIFY_CHIP_TEXT = COLOR_TEXT_SOFT
 COLOR_KWPOP_FLASH = COLOR_ROW_NEW       # 키워드 칩 추가 순간 반짝임 — "방금 바뀜" 노랑 재사용
 # [추가: 2026-09-11] 워드클라우드 제외어 칩 테두리 — 값은 꺼진 키워드 칩과 같지만 뜻이
 # 다르다(제외어엔 ON/OFF가 없다 — 검색어 칩의 파랑 "검색 ON"을 안 빌리려고 중립 회색).
 COLOR_WC_EXCLUDE_CHIP_BORDER = COLOR_TOGGLE_OFF
+
+# ── 홈 남색 카드(「부정 추정 기사」 + [단독]/[속보], app.landing_renderer) ──
+# 홈에서 유일하게 짙은 바탕을 쓰는 카드(시안 mockups/HOME_NEGATIVE_GUESS_MOCKUP.html).
+# 바탕 위 글자는 전부 이 카드 전용 색이다.
+COLOR_BOARD_BG = COLOR_HEADER               # 남색 바탕(제목색과 같은 값, 뜻이 달라 따로 둔다)
+COLOR_BOARD_TEXT = "#CBD5E1"                # 바탕 위 보통 글자(「HH:MM 회차까지」)
+COLOR_BOARD_NEW = "#FDE68A"                 # 「+N」(가장 최근 회차에서 더해진 수)
+COLOR_BOARD_RULE = "rgba(255,255,255,.18)"  # [단독]/[속보] 앞 세로선
+COLOR_BOARD_HOVER = "rgba(255,255,255,.12)" # 칩·버튼 hover
+COLOR_BOARD_NEG = "#FCA5A5"                 # 「부정 추정 기사」·[속보] 칩(바탕 위)
+COLOR_BOARD_SCOOP = "#FDA4AF"               # [단독] 칩(바탕 위)
+COLOR_BOARD_NEW_CHIP_TEXT = COLOR_WARN_TEXT # 목록의 「new」 칩 — 주의 계열 재사용
+COLOR_BOARD_NEW_CHIP_BG = "#FEF3C7"
 
 # 각 렌더러가 `.format(**PALETTE, ...)`로 통째로 받아 쓰는 표.
 # 키 이름은 CSS 템플릿 안 `{...}` 자리표시자 이름이 된다 — 위 상수 이름에서
@@ -456,11 +501,19 @@ PALETTE = {
     "send": COLOR_SEND,
     "pin_gray": COLOR_PIN_GRAY,
     "pin_gray_bg": COLOR_PIN_GRAY_BG,
+    "pinned_bar": COLOR_PINNED_BAR,
+    "pinned_bg": COLOR_PINNED_BG,
+    "pinned_text": COLOR_PINNED_TEXT,
+    "pinned_chip_bg": COLOR_PINNED_CHIP_BG,
+    "pinned_border": COLOR_PINNED_BORDER,
     "arch_reg_bg": COLOR_ARCHIVE_REG_BG,
     "arch_reg_text": COLOR_ARCHIVE_REG_TEXT,
     "adhoc_bg": COLOR_ADHOC_BG,
     "adhoc_text": COLOR_ADHOC_TEXT,
     "adhoc_border_soft": COLOR_ADHOC_BORDER_SOFT,
+    "screen_tag_work_bg": COLOR_SCREEN_TAG_WORK_BG,
+    "screen_tag_work_border": COLOR_SCREEN_TAG_WORK_BORDER,
+    "screen_tag_work_text": COLOR_SCREEN_TAG_WORK_TEXT,
     "arch_adhoc_bg": COLOR_ARCHIVE_ADHOC_BG,
     "flow_arrow": COLOR_FLOW_ARROW,
     "flow_live_side_border": COLOR_FLOW_LIVE_SIDE_BORDER,
@@ -497,6 +550,15 @@ PALETTE = {
     "warn_accent": COLOR_WARN_ACCENT,
     "warn_sub": COLOR_WARN_SUB,
     "warn_dot": COLOR_WARN_DOT,
+    "board_bg": COLOR_BOARD_BG,
+    "board_text": COLOR_BOARD_TEXT,
+    "board_new": COLOR_BOARD_NEW,
+    "board_rule": COLOR_BOARD_RULE,
+    "board_hover": COLOR_BOARD_HOVER,
+    "board_neg": COLOR_BOARD_NEG,
+    "board_scoop": COLOR_BOARD_SCOOP,
+    "board_new_chip_text": COLOR_BOARD_NEW_CHIP_TEXT,
+    "board_new_chip_bg": COLOR_BOARD_NEW_CHIP_BG,
     "error_bg": COLOR_ERROR_BG,
     "error_border": COLOR_ERROR_BORDER,
     "error_border_soft": COLOR_ERROR_BORDER_SOFT,
@@ -537,6 +599,8 @@ PALETTE = {
     "toggle_off_text": COLOR_TOGGLE_OFF_TEXT,
     "text_soft": COLOR_TEXT_SOFT,
     "text_faint": COLOR_TEXT_FAINT,
+    "order_btn_disabled": COLOR_ORDER_BTN_DISABLED,
+    "float_input_border": COLOR_FLOAT_INPUT_BORDER,
     "text_faint_alt": COLOR_TEXT_FAINT_ALT,
     "sep_faint": COLOR_SEP_FAINT,
     "dash_border": COLOR_DASH_BORDER,
@@ -544,7 +608,54 @@ PALETTE = {
     "chip_off_border": COLOR_CHIP_OFF_BORDER,
     "kwpop_flash": COLOR_KWPOP_FLASH,
     "wc_exclude_chip_border": COLOR_WC_EXCLUDE_CHIP_BORDER,
+    "scoop_chip_border": COLOR_SCOOP_CHIP_BORDER,
+    "adhoc_border_strong": COLOR_ADHOC_BORDER_STRONG,
+    "notify_chip_bg": COLOR_NOTIFY_CHIP_BG,
+    "notify_chip_border": COLOR_NOTIFY_CHIP_BORDER,
+    "notify_chip_text": COLOR_NOTIFY_CHIP_TEXT,
 }
+
+# 모양 토큰 — 색처럼 값은 여기 한 곳에만 둔다(CLAUDE.md 디자인 「모양」, 시안
+# mockups/SHAPE_RULES_MOCKUP.html). 모양이 뜻을 말한다: 네모 = 누르면 무언가를 한다,
+# 큰 네모 = 담는 틀, 알약 = 상태·건수·분류를 알려 준다, 동그라미 = 떠 있는 버튼·숫자 배지.
+# CSS엔 숫자 대신 `var(--r-md)`처럼 CSS 변수로 적는다 — 템플릿마다 `.format`·f-string·
+# 그냥 문자열이 섞여 있어 중괄호 자리표시자를 쓸 수 없는 곳이 있어서다. 변수 정의
+# (SHAPE_TOKENS_CSS)는 상단바 CSS(`app.topnav.topnav_style`)와 홈이 한 번씩 낸다.
+RADIUS_SM = "4px"        # 행 안 작은 컨트롤(「다른 소제목」 드롭다운, 행 아이콘 버튼)
+RADIUS_MD = "6px"        # 버튼 · 입력칸 · 드롭다운 · 기사 행
+RADIUS_LG = "10px"       # 카드 · 배너 · 팝오버 · 창 · 흐름도 칸
+RADIUS_PILL = "999px"    # 칩 · 건수 · 상단바 지금 화면
+RADIUS_CIRCLE = "50%"    # 떠 있는 버튼 · 점
+CONTROL_H_SM = "24px"    # 기사 행 안
+CONTROL_H_MD = "30px"    # 툴바 · 입력칸 (기본)
+CONTROL_H_LG = "36px"    # 폼의 대표 버튼(수집 · 저장 · 조회), 설정 화면 버튼
+FAB_LG = "56px"          # 발송 · 휴지통
+FAB_SM = "48px"          # ↩ 되돌리기 · 목차
+SHADOW_FLOAT = "0 4px 12px rgba(15, 23, 42, 0.12)"   # 떠 있는 버튼 · 선택 바
+SHADOW_POP = "0 8px 24px rgba(15, 23, 42, 0.14)"     # 팝오버 · 드롭다운 메뉴 · 말풍선
+SHADOW_MODAL = "0 16px 40px rgba(15, 23, 42, 0.22)"  # 확인창 · 이름 고르기 창
+
+# 글자 크기 여섯 단계(CLAUDE.md 디자인 「글자 크기」, 시안 mockups/TYPE_SCALE_MOCKUP.html).
+# CSS엔 `font-size: var(--fs-md)`처럼 적는다. 아이콘 크기를 font-size로 정하는 곳(↩·⋯·✏️·▲▼·×)과
+# 홈 머리 제목·워드클라우드·손글씨 캡션은 이 단계 밖이다.
+FONT_XS = "0.72rem"      # 숫자 배지 · 작은 칩 안 보조 글자 · 캡션
+FONT_SM = "0.8rem"       # 메타 줄 · 칩 · 행 안 컨트롤 · 작은 안내
+FONT_MD = "0.88rem"      # 버튼 · 툴바 · 입력칸 · 배너 · 안내문 · 펼친 기사 요약
+FONT_BASE = "1rem"       # 기사 제목 · 본문
+FONT_LG = "1.1rem"       # 소제목 · 카드 제목 · 날짜 줄 · 빈 화면 안내
+FONT_XL = "1.3rem"       # 화면 제목(모든 화면 같은 크기)
+
+SHAPE_TOKENS_CSS = (
+    ":root { "
+    f"--fs-xs: {FONT_XS}; --fs-sm: {FONT_SM}; --fs-md: {FONT_MD}; "
+    f"--fs-base: {FONT_BASE}; --fs-lg: {FONT_LG}; --fs-xl: {FONT_XL}; "
+    f"--r-sm: {RADIUS_SM}; --r-md: {RADIUS_MD}; --r-lg: {RADIUS_LG}; "
+    f"--r-pill: {RADIUS_PILL}; --r-circle: {RADIUS_CIRCLE}; "
+    f"--h-sm: {CONTROL_H_SM}; --h-md: {CONTROL_H_MD}; --h-lg: {CONTROL_H_LG}; "
+    f"--fab-lg: {FAB_LG}; --fab-sm: {FAB_SM}; "
+    f"--sh-float: {SHADOW_FLOAT}; --sh-pop: {SHADOW_POP}; --sh-modal: {SHADOW_MODAL}; "
+    "}"
+)
 
 # PRD.md 기능1 규칙 6 — 기사 제목·요약 내 형광펜 단어 하이라이트 색상·기본값·최대 개수.
 # [수정: 2026-07-23] 하이라이트 대상은 검색 키워드(DEFAULT_KEYWORDS)와 완전히 별개 설정이다.
@@ -574,22 +685,6 @@ HIGHLIGHT_TEXT_COLOR = COLOR_TEXT
 # 직접 고정하기 위해서(위 설명 참고).
 DEFAULT_HIGHLIGHT_KEYWORDS = [{"word": "재정경제부", "color": 0}, {"word": "재경부", "color": 1}]
 
-# [수정: 2026-08-11] "포함할지"(include_*)에서 "제외할지"(exclude_*)로 의미를 뒤집었다.
-# 기본 상태는 "수집되는 기사가 다 뜨는 것"이고, 거기서 무엇을 빼낼지를 담당자가 고르는
-# 게 커스터마이징으로 자연스럽다는 판단(사용자 요청) — 설정 화면 문구도 "제외하기"로
-# 통일했다. 기존에 저장된 include_* 값은 app.settings.load_settings가 뒤집어서 옮기므로
-# (True <-> False) 쓰던 사람의 실제 동작은 그대로 유지된다.
-#
-# 자동선별 시 [포토] 기사를 제외할지 여부. 기본은 꺼짐(= 제외 안 함 = 다 뜸).
-DEFAULT_EXCLUDE_PHOTO_IN_SCRAP = False
-# 자동선별 시 [인사] 기사를 제외할지 여부. 위 포토와 같은 규칙·같은 기본값이다.
-DEFAULT_EXCLUDE_PERSONNEL_IN_SCRAP = False
-# [추가: 2026-08-03] 정기 회차 스크랩이 끝날 때마다 결과를 텔레그램으로도 자동 전송할지
-# 여부. 기본은 꺼짐 — TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID(.env)가 없으면 켜도 전송만
-# 조용히 건너뛴다(app.telegram_bot.send_text).
-DEFAULT_TELEGRAM_AUTO_SEND = False
-# [추가: 2026-08-06] 텔레그램과 같은 이유·같은 기본값(꺼짐) — 이메일 전송판.
-DEFAULT_EMAIL_AUTO_SEND = False
 # [수정: 2026-07-25] 5 -> 20으로 확대 — 형광펜 단어를 이제 검색 키워드 화면의 🖍️ 버튼으로만
 # 추가하게 되면서(직접 입력 없음), 검색 키워드가 많아지면 형광펜도 그만큼 늘 수 있다.
 # 팔레트는 여전히 5색뿐이라 6번째 단어부터는 자연히 같은 색을 여러 단어가 나눠 쓴다.
@@ -664,7 +759,7 @@ SUMMARY_MAX_SENTENCES = 3
 # 도입되며 150자로는 문장이 자주 중간에 잘렸다.
 SUMMARY_MAX_CHARS = 250
 
-# DESIGN.md §3 — SQLite 대신 로컬 JSON 파일로 기사 데이터 저장
+# archive/DESIGN.md §3 — SQLite 대신 로컬 JSON 파일로 기사 데이터 저장
 DATA_DIR = BASE_DIR / "data"
 SETTINGS_FILE = DATA_DIR / "settings.json"
 # [추가: 2026-08-20] 설정 화면(/naver, /llm)에서 등록한 네이버·Claude 키 저장소 —
@@ -678,15 +773,15 @@ ARTICLES_DIR = DATA_DIR / "articles"
 HIDDEN_ARTICLES_FILE = DATA_DIR / "hidden_articles.json"
 # [추가: 2026-09-02] 숨긴 기사를 "한 번에 숨긴 덩어리"로 묶는 시간 창(초).
 # app.undo.push의 coalesce_sec(3.0)과 **같은 값이어야 한다** — ↩ 되돌리기가 "한 걸음"이라
-# 부르는 단위와 쓰레기통이 "한 묶음"이라 부르는 단위가 어긋나면, 담당자가 팝오버에서 본
+# 부르는 단위와 휴지통이 "한 묶음"이라 부르는 단위가 어긋나면, 담당자가 팝오버에서 본
 # 묶음 하나가 ↩ 두 번에 나뉘어 되돌아가는 일이 생긴다.
 HIDDEN_BATCH_WINDOW_SEC = 3.0
-# [추가: 2026-09-04, 뜻 확장: 2026-09-16] 숨김이 **유지되는** 기간(일) = 쓰레기통에
+# [추가: 2026-09-04, 뜻 확장: 2026-09-16] 숨김이 **유지되는** 기간(일) = 휴지통에
 # **보이는** 기간. 2026-09-04엔 이 둘이 갈려 있었다(필터는 오늘 하루, 열람만 7일) —
-# 그래서 자정이 지나면 숨김이 저절로 풀렸고, 쓰레기통의 지난 날짜 줄은 되살릴 것이 없는
+# 그래서 자정이 지나면 숨김이 저절로 풀렸고, 휴지통의 지난 날짜 줄은 되살릴 것이 없는
 # 기록이었다. 2026-09-16에 사용자 결정으로 **판정도 이 값**을 쓴다(app.curation의
 # load_hidden_urls / active_hidden_dates):
-#   - 쓰레기통에 보이면 언제든 복구된다("보이는데 못 되살리는 줄"이 없다).
+#   - 휴지통에 보이면 언제든 복구된다("보이는데 못 되살리는 줄"이 없다).
 #   - 정기 보관함이 filter_hidden을 거치므로, 어제 발송한 보고서와 오늘 보관함이 어긋나지 않는다.
 # **이 값을 더 늘리지 않는다** — app.undo가 hidden_articles.json을 통째로 20단계 복사해서,
 # 1년치(실측 환산 약 3.6만 건·11MB)면 되돌리기 스택이 200MB대가 된다(2026-08-25에
@@ -764,6 +859,10 @@ EMAIL_RECIPIENTS_FILE = DATA_DIR / "email_recipients.json"
 # app.telegram_recipients가 최초 1회, 기존 .env의 TELEGRAM_CHAT_ID를 "나"라는 이름으로
 # 자동으로 이 목록에 옮겨 담아준다(이미 쓰고 있던 받는 사람을 잃지 않도록).
 TELEGRAM_RECIPIENTS_FILE = DATA_DIR / "telegram_recipients.json"
+# 텔레그램 봇 이름(받는 사람 대화방 맨 위에 보이는 이름) — 이름 자체는 텔레그램에 저장되고,
+# 이 파일엔 「앱이 이 봇에 이름을 건 적 있는가」만 봇 id별로 적는다(app.telegram_bot_name).
+TELEGRAM_BOT_NAME_FILE = DATA_DIR / "telegram_bot_name.json"
+DEFAULT_TELEGRAM_BOT_NAME = "🤖 재경부 AI 뉴스 알림(디지털소통팀)"
 # [추가: 2026-08-20] [단독]·[속보] 기사 알림(/breaking-alert) 사용자 설정 — 감시 대상
 # 그룹·시간대·주기·몰아보내기 여부. 정기 스크랩 설정(data/settings.json)과 분리한
 # 이유는 app.telegram_recipients.json과 같다 — 이 기능 하나만의 값이라 전역 설정을
@@ -773,12 +872,23 @@ BREAKING_ALERT_FILE = DATA_DIR / "breaking_alert.json"
 # 같은 파일이면 설정 화면에서 "저장"을 누를 때마다 폴링 시각까지 덮어써 간격 계산이
 # 매번 리셋된다.
 BREAKING_ALERT_STATE_FILE = DATA_DIR / "breaking_alert_state.json"
+
+# 홈 「부정 추정 기사」(app.negative_guess) — 회차마다 판정한 결과. 자정에 새로 시작한다.
+NEGATIVE_GUESS_FILE = DATA_DIR / "negative_guess.json"
+NEGATIVE_GUESS_KEYWORDS = ("재정경제부", "재경부")   # 제목·요약에 이 단어가 나온 정기 기사만(기관 전용)
+NEGATIVE_GUESS_RETRY_MIN = 5                         # 판정이 실패한 회차는 5분 뒤 다시(회차마다 최대 3번)
+NEGATIVE_GUESS_MAX_ATTEMPTS = 3
 # [추가: 2026-08-20] 이미 알림을 보낸 기사 URL(app.alerted_urls) — 정기 회차 검사·수시
 # 폴링·밤사이 몰아보내기 세 경로가 같은 기사를 동시에 찾아도 한 번만 보내도록 막는다.
 # live_cache.json과 같은 "date 필드 불일치 = 자정 자동 리셋" 패턴.
 ALERTED_URLS_FILE = DATA_DIR / "alerted_urls.json"
+
+# 발송 기록(app.send_log, 화면 /send-log) — 앱이 보낸 모든 메시지(정기·수시 보고서, [단독]·[속보]·
+# 몰림 알림, 호출 한도 경고)가 누구에게 도착했는지. 날짜마다 파일 하나, 90일 보관.
+SEND_LOG_DIR = DATA_DIR / "send_log"
+SEND_LOG_RETENTION_DAYS = 90
 # [추가: 2026-08-20] 네이버 뉴스 검색 API 하루 호출 수(app.api_usage) — [단독]·[속보]
-# 폴링이 일일 한도를 넘기지 않도록 감시한다. 정기 스크랩·실시간현황·수시 모니터링
+# 폴링이 일일 한도를 넘기지 않도록 감시한다. 정기 스크랩·실시간 현황·수시 모니터링
 # 호출도 전부 여기 잡힌다(app.naver_api._search_one_keyword의 요청 지점 하나에서 기록).
 API_USAGE_FILE = DATA_DIR / "api_usage.json"
 
@@ -840,7 +950,11 @@ PREVIEW_CACHE_FILE = DATA_DIR / "preview_cache.json"
 # 한 회차 분만 담는다(회차가 바뀌면 새로 시작).
 DRAFT_SEEN_FILE = DATA_DIR / "draft_seen.json"
 
-# DESIGN.md §1/§3 — 스크립트가 생성하는 화면 파일
+# 「✂ 오늘만 여기서 끊기」(초안) — 날짜별로 끊은 시각을 적는다. 오늘 날짜 것만 시간표에
+# 끼워 넣고(app.today_cuts.apply_cuts), 지난 날짜 기록은 정기 보관함의 ✂ 표시에 쓴다.
+TODAY_CUTS_FILE = DATA_DIR / "today_cuts.json"
+
+# archive/DESIGN.md §1/§3 — 스크립트가 생성하는 화면 파일
 OUTPUT_HTML_PATH = BASE_DIR / "index.html"
 HISTORY_HTML_PATH = BASE_DIR / "history.html"
 LANDING_HTML_PATH = BASE_DIR / "home.html"
@@ -855,14 +969,14 @@ LIVE_HTML_PATH = BASE_DIR / "live.html"
 PREVIEW_HTML_PATH = BASE_DIR / "preview.html"
 LOGO_PATH = BASE_DIR / "logo.svg"
 
-# DESIGN.md §3 — 설정 저장을 위한 유일한 "서버" 예외. 기본은 로컬(127.0.0.1)에서만 연다.
+# archive/DESIGN.md §3 — 설정 저장을 위한 유일한 "서버" 예외. 기본은 로컬(127.0.0.1)에서만 연다.
 SETTINGS_SERVER_PORT = 8765
 # [추가: 2026-07-31] 화면에 박히는 모든 fetch/링크 주소와 서버가 실제로 붙는(bind) 주소를
 # 이 값 하나로 통일한다. 기본값 "127.0.0.1"이면 지금까지와 완전히 동일(이 컴퓨터
 # 자신만 접속 가능)하게 동작한다. 다른 네트워크(예: Tailscale)의 컴퓨터에서 접속하게
 # 하려면 .env에 SERVER_HOST=<서버의 실제 주소>(예: Tailscale이 부여한 100.x.x.x)를
 # 넣어두면 된다 — 그러면 화면에 박히는 주소도, 서버가 듣는 주소도 이 값을 따라간다
-# (app.settings_server.run_settings_server). 기본값이 아닐 때만 0.0.0.0으로 리스닝해
+# (app.settings_server.create_settings_server). 기본값이 아닐 때만 0.0.0.0으로 리스닝해
 # "설정을 안 건드리면 예전처럼 이 컴퓨터에서만 접속 가능"이라는 안전한 기본 동작이
 # 그대로 유지된다.
 SETTINGS_SERVER_HOST = os.getenv("SERVER_HOST", "127.0.0.1").strip() or "127.0.0.1"
@@ -877,19 +991,19 @@ MAX_EMAIL_RECIPIENTS = 15
 # [추가: 2026-08-07] 텔레그램도 이메일과 같은 이유·같은 상한.
 MAX_TELEGRAM_RECIPIENTS = 15
 
-# [추가: 2026-08-21] 증분 검색(초안·실시간현황)의 하한을 "지금"보다 이 분 수만큼 뒤로
+# [추가: 2026-08-21] 증분 검색(초안·실시간 현황)의 하한을 "지금"보다 이 분 수만큼 뒤로
 # 물린다 — 네이버가 기사를 발행시각 순서대로 색인하지 않기 때문이다. 두 화면 모두
 # "지금까지 본 가장 최신 pub_date"를 다음 검색의 하한(초과)으로 써왔는데, 그 뒤에
 # 색인된 기사의 발행시각이 그 값보다 과거면 검색 범위 밖에 영영 남는다(초안에서는
 # 미분류로도 안 뜨고, 확정본 마감 수집에서야 처음 나타나 "마감 후 자동 배정"이 붙는다).
 # 실측(2026-08-21, 배지 도입 이후 전체 회차): 자동 배정 9건 중 7건이 이 경우였고 색인
 # 지연은 최소 17~19분이었다 — 그 두 배 남짓을 여유로 잡은 값이다(HISTORY.md "늦게
-# 색인된 기사가 초안·실시간현황에서 통째로 빠지던 문제" 참고). 겹쳐 받은 기사는 URL
+# 색인된 기사가 초안·실시간 현황에서 통째로 빠지던 문제" 참고). 겹쳐 받은 기사는 URL
 # 중복 제거로 걸러지므로 화면·건수는 그대로다.
 SEARCH_LOOKBACK_MIN = 60
 
 # [추가: 2026-09-03] 정기 회차 수집(app.scraper.collect_run)의 하한을 그 회차 시작보다
-# 이 분 수만큼 더 앞으로 물린다 — 위 SEARCH_LOOKBACK_MIN이 초안·실시간현황에 해준 것을
+# 이 분 수만큼 더 앞으로 물린다 — 위 SEARCH_LOOKBACK_MIN이 초안·실시간 현황에 해준 것을
 # 정기 회차에도 똑같이 해주는 값이다(그때 정기 쪽엔 같은 방어를 안 넣었다).
 #
 # 왜 필요한가: 회차 창은 (시작, 마감]이고 다음 회차의 하한은 정확히 이 회차의 마감이라,
@@ -897,7 +1011,7 @@ SEARCH_LOOKBACK_MIN = 60
 # (다음 회차는 pub_date <= after로 걸러낸다). 실측(2026-09-03 11:00 회차): 마감 시각에
 # 6건이 빠졌고 3분 뒤에도 여전히 없었으며 18분 뒤에 6건 전부 나타났다.
 #
-# 값이 60인 이유: 실측 지연이 3~18분이라 여유가 크고, 초안·실시간현황이 이미 쓰는
+# 값이 60인 이유: 실측 지연이 3~18분이라 여유가 크고, 초안·실시간 현황이 이미 쓰는
 # SEARCH_LOOKBACK_MIN과 같은 값이라 앱 안에 "되돌아보는 폭"이 하나로 유지된다. 넉넉히
 # 잡아도 부작용이 없다 — 오늘 앞 회차에 이미 실린 URL은 collect_run이 제외하므로
 # 중복 게재가 원리적으로 0이기 때문이다(그래서 이 값을 키우는 쪽이 항상 안전한 방향).
@@ -911,7 +1025,7 @@ COLLECT_LOOKBACK_MIN = 60
 # 수집됐는데 아무 문제가 없었다.
 LAST_SLOT_COLLECT_DELAY_MIN = 30
 
-# [추가: 2026-08-24] 실시간현황 상단 "검색어 하나가 결과를 대부분 차지" 경고 배지의
+# [추가: 2026-08-24] 실시간 현황 상단 "검색어 하나가 결과를 대부분 차지" 경고 배지의
 # 문턱값 — 앱 버그가 아니라 담당자의 검색어 선택 문제라(HISTORY.md 같은 섹션 참고)
 # 코드가 강제로 걸러내지 않고, 담당자가 스스로 알아채고 좁힐 수 있게 안내만 한다.
 # 실측(2026-08-24, 등록 키워드 21개, 결과 1,968건): 처음엔 "코스피가 포함된 검색어
@@ -932,7 +1046,7 @@ LIVE_HEAVY_KEYWORD_MIN_COUNT = 100
 # 호출량 문구에도 그대로 노출한다(app.settings_server.render_breaking_alert_settings).
 NAVER_DAILY_CALL_LIMIT = 25000
 # [추가: 2026-08-20] 위 한도의 이 비율(%)에 닿으면 [단독]·[속보] 알림의 "폴링"만
-# 자동으로 멈춘다(app.api_usage.should_pause_polling) — 정기 스크랩·실시간현황·수시
+# 자동으로 멈춘다(app.api_usage.should_pause_polling) — 정기 스크랩·실시간 현황·수시
 # 모니터링은 절대 안 멈춘다(본업이 우선이고, 폴링은 부가 기능이라 먼저 양보한다,
 # 사용자 결정). 80%는 "정기·수시가 갑자기 몰리는 날"의 여유를 20%p 남겨두는 값 —
 # 감으로 고른 값이니 문제가 생기면 조정할 것(CODING_CONVENTIONS §1).
@@ -949,6 +1063,28 @@ DEFAULT_BREAKING_ALERT_INTERVAL_MIN = 5
 # 새벽까지 덮을 실익이 낮다(HISTORY.md "[단독]·[속보] 기사 알림" 참고).
 DEFAULT_BREAKING_ALERT_START = "09:00"
 DEFAULT_BREAKING_ALERT_END = "20:00"
+
+# [속보] 몰림 알림 — 짧은 시간에 여러 언론사가 [속보]를 내면 한 통 더 보낸다(app.breaking_burst).
+# 기본값 30분·5곳은 실측(8/11~9/22 저장 회차, [속보] 있던 16일)에서 4일 울리고 넷 다
+# 한 사건을 여러 언론사가 한꺼번에 보도한 날이었던 기준이다(HISTORY.md "[속보] 몰림 알림").
+BURST_WINDOW_CHOICES = (20, 30, 60)
+BURST_MIN_OUTLETS_CHOICES = (3, 4, 5, 6, 8, 10)
+DEFAULT_BURST_WINDOW_MIN = 30
+DEFAULT_BURST_MIN_OUTLETS = 5
+# 한 번 울린 뒤 다시 울리지 않는 시간 — 같은 사건의 뒤따르는 보도로 또 울리지 않게.
+BURST_COOLDOWN_MIN = 60
+# 메시지에 이름을 적는 언론사 수 상한(넘으면 "외 N곳").
+BURST_MAX_OUTLET_NAMES = 10
+# 설정 화면 "지난 기록에 대 보면"이 훑는 날 수.
+BURST_HISTORY_DAYS = 42
+
+# [속보] 같은 사건 묶기 (app.alert_event) — 한 사건을 여러 언론사가 동시에 [속보]로 내면
+# 알림이 그 수만큼 쏟아진다. 제목 토큰의 자카드 유사도가 이 값 이상이고 게시 시각이
+# 창 안이면 같은 사건으로 본다. 실측(2026-09-23, 저장 회차 34일 203건): 0.3/0.4/0.5로
+# 접히는 [속보]가 32·25·22건이고 [단독]끼리 걸리는 쌍은 어느 값에서도 0건이었다 —
+# 넉넉한 0.3은 다른 사건을 묶을 위험만 키우므로 가운데 값을 쓴다.
+ALERT_EVENT_SIMILARITY = 0.4
+ALERT_EVENT_WINDOW_MIN = 60
 
 # PRD.md 기능1 규칙 18 — 우선 Pretendard, 없으면 Noto Sans KR, 그래도 없으면 시스템 기본
 FONT_STACK = "'Pretendard', 'Noto Sans KR', sans-serif"

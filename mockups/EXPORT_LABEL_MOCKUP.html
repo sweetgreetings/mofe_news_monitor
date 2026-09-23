@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>copy · txt · xlsx 라벨 시안</title>
+<style>
+  :root{
+    --fs-xs:.72rem; --fs-sm:.8rem; --fs-md:.88rem; --fs-base:1rem; --fs-lg:1.1rem; --fs-xl:1.3rem;
+    --r-sm:4px; --r-md:6px; --r-lg:10px; --r-pill:999px; --h-sm:24px; --h-md:30px; --h-lg:36px;
+  }
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    background:#F8FAFC; color:#1F2937; margin:0; padding:32px 16px 64px;
+  }
+  .wrap{max-width:800px;margin:0 auto;}
+  h1{font-size:var(--fs-xl);color:#1E3A5F;margin:0 0 6px;}
+  .lead{font-size:var(--fs-md);color:#6B7280;margin:0 0 28px;line-height:1.7;}
+  .case{background:#FFFFFF;border:1px solid #E5E7EB;border-radius:var(--r-lg);padding:18px 20px 20px;margin-bottom:18px;}
+  .case > .cap{font-size:var(--fs-sm);color:#6B7280;margin:0 0 12px;}
+  .case > .cap b{color:#1F2937;font-size:var(--fs-md);margin-right:8px;}
+  .case.pick{border-color:#2563EB;box-shadow:0 0 0 3px #EFF6FF;}
+  .case.pick > .cap b::after{content:" ✓ 추천";color:#2563EB;font-size:var(--fs-sm);font-weight:600;}
+  header h1.rep{font-size:var(--fs-xl);margin:0;color:#1E3A5F;}
+  .header-top{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px;}
+  .screen-tag{display:inline-flex;align-items:center;border-radius:var(--r-pill);
+    background:#EFF6FF;color:#2563EB;font-size:var(--fs-xs);font-weight:600;padding:2px 8px;margin-right:8px;}
+  /* ── 실제 앱 툴바 CSS 그대로 ── */
+  .actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .actions button{background:#2563EB;color:#fff;border:none;border-radius:var(--r-md);
+    padding:6px 14px;font-size:var(--fs-md);font-family:inherit;cursor:pointer;
+    appearance:none;display:inline-flex;align-items:center;justify-content:center;user-select:none;}
+  .actions button{background:#EFF6FF;color:#2563EB;font-weight:600;height:var(--h-md);
+    padding-top:0;padding-bottom:0;box-sizing:border-box;}
+  .actions button:hover{background:#DBEAFE;}
+  .actions .create-group-btn{background:transparent;color:#2563EB;border:1px solid #BFDBFE;font-weight:400;}
+  .actions .create-group-btn:hover{background:#EFF6FF;border-color:#93C5FD;}
+  .actions-divider{width:1px;height:26px;background:#E5E7EB;margin:0 2px;}
+  .reclassify-btn{background:#7C6BD6 !important;color:#fff !important;font-weight:600;}
+  .actions .actions-right{margin-left:auto;display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .actions .export-links{display:inline-flex;align-items:center;}
+  .actions .export-links button{background:transparent;border:none;color:#4B5563;font-weight:500;
+    padding:6px 8px;border-radius:var(--r-md);height:var(--h-md);}
+  .actions .export-links button:hover{background:transparent;color:#2563EB;
+    text-decoration:underline;text-underline-offset:3px;}
+  .photo-pill{border:1px solid #E5E7EB;background:#fff;color:#4B5563;border-radius:var(--r-pill);
+    font-size:var(--fs-md);padding:0 12px;height:var(--h-md);display:inline-flex;align-items:center;
+    font-family:inherit;cursor:pointer;}
+  .view-mode-select{border:1px solid #2563EB;border-radius:var(--r-md);padding:6px 10px;
+    font-size:var(--fs-md);color:#1F2937;background:#fff;font-family:inherit;}
+  /* 대문자 안 */
+  .upper button{letter-spacing:.04em;}
+  .note{font-size:var(--fs-sm);color:#6B7280;margin:12px 0 0;line-height:1.7;}
+  .note b{color:#1F2937;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>가져가기 버튼 라벨 시안</h1>
+  <p class="lead">확정본 툴바 오른쪽 묶음. 나머지(왼쪽 버튼·보기 순서)는 지금 화면 그대로 두고 세 글자 버튼만 바꿔 봤습니다.</p>
+
+  <!-- A -->
+  <div class="case">
+    <p class="cap"><b>A. 지금</b>copy · txt · xlsx</p>
+    <header>
+      <div class="header-top"><h1 class="rep"><span class="screen-tag">확정본</span>언론 모니터링 14:00 기준</h1></div>
+      <div class="actions">
+        <button class="create-group-btn" type="button">+ 새 소제목</button>
+        <button type="button">+ 키워드 직접 작성</button>
+        <span class="actions-divider"></span>
+        <button class="reclassify-btn" type="button">AI 모든 기사 재분류</button>
+        <span class="actions-right">
+          <button class="photo-pill" type="button">📷 사진 추정 (3)</button>
+          <span class="export-links">
+            <button type="button">copy</button><button type="button">txt</button><button type="button">xlsx</button>
+          </span>
+          <select class="view-mode-select"><option>소제목 내 언론사순</option></select>
+        </span>
+      </div>
+    </header>
+    <p class="note">동작 하나(copy) + 확장자 둘(txt·xlsx)이 섞여 있고, 한글 화면에서 영문 소문자만 작고 흐리게 가라앉습니다.</p>
+  </div>
+
+  <!-- B -->
+  <div class="case">
+    <p class="cap"><b>B. 대문자</b>COPY · TXT · XLSX</p>
+    <header>
+      <div class="header-top"><h1 class="rep"><span class="screen-tag">확정본</span>언론 모니터링 14:00 기준</h1></div>
+      <div class="actions">
+        <button class="create-group-btn" type="button">+ 새 소제목</button>
+        <button type="button">+ 키워드 직접 작성</button>
+        <span class="actions-divider"></span>
+        <button class="reclassify-btn" type="button">AI 모든 기사 재분류</button>
+        <span class="actions-right">
+          <button class="photo-pill" type="button">📷 사진 추정 (3)</button>
+          <span class="export-links upper">
+            <button type="button">COPY</button><button type="button">TXT</button><button type="button">XLSX</button>
+          </span>
+          <select class="view-mode-select"><option>소제목 내 언론사순</option></select>
+        </span>
+      </div>
+    </header>
+    <p class="note">또렷해지긴 하는데 <b>가장 약해야 할 글자 버튼이 제일 세게 읽힙니다</b> — 대문자는 한글 옆에서 무게가 확 올라가서, 왼쪽 동작 버튼보다 눈에 먼저 들어옵니다(툴바 위계가 뒤집힘). 품사가 섞인 문제도 그대로입니다.</p>
+  </div>
+
+  <!-- C -->
+  <div class="case pick">
+    <p class="cap"><b>C. 한글</b>복사 · 텍스트 · 엑셀</p>
+    <header>
+      <div class="header-top"><h1 class="rep"><span class="screen-tag">확정본</span>언론 모니터링 14:00 기준</h1></div>
+      <div class="actions">
+        <button class="create-group-btn" type="button">+ 새 소제목</button>
+        <button type="button">+ 키워드 직접 작성</button>
+        <span class="actions-divider"></span>
+        <button class="reclassify-btn" type="button">AI 모든 기사 재분류</button>
+        <span class="actions-right">
+          <button class="photo-pill" type="button">📷 사진 추정 (3)</button>
+          <span class="export-links">
+            <button type="button">복사</button><button type="button">텍스트</button><button type="button">엑셀</button>
+          </span>
+          <select class="view-mode-select"><option>소제목 내 언론사순</option></select>
+        </span>
+      </div>
+    </header>
+    <p class="note">셋 다 <b>「무엇을 가져가는가」 한 종류의 말</b>로 맞춰집니다. 글자 높이가 옆의 「소제목 내 언론사순」·「📷 사진 추정」과 같아 줄이 평평하고, 크기·색은 그대로라 위계도 안 깨집니다. 확장자는 받은 파일 이름(<code>…_14-00기준.xlsx</code>)이 이미 말해 줍니다.</p>
+  </div>
+
+  <!-- D -->
+  <div class="case">
+    <p class="cap"><b>D. 섞기</b>복사 · txt · 엑셀</p>
+    <header>
+      <div class="header-top"><h1 class="rep"><span class="screen-tag">확정본</span>언론 모니터링 14:00 기준</h1></div>
+      <div class="actions">
+        <button class="create-group-btn" type="button">+ 새 소제목</button>
+        <button type="button">+ 키워드 직접 작성</button>
+        <span class="actions-divider"></span>
+        <button class="reclassify-btn" type="button">AI 모든 기사 재분류</button>
+        <span class="actions-right">
+          <button class="photo-pill" type="button">📷 사진 추정 (3)</button>
+          <span class="export-links">
+            <button type="button">복사</button><button type="button">txt</button><button type="button">엑셀</button>
+          </span>
+          <select class="view-mode-select"><option>소제목 내 언론사순</option></select>
+        </span>
+      </div>
+    </header>
+    <p class="note">「txt」만 확장자로 남기는 안. 담당자가 실제로 "txt로 주세요"라고 말한다면 이쪽도 말이 되지만, <b>한 묶음 안에서 글자 종류가 두 번 바뀌어</b> 지금보다 더 어수선해 보입니다.</p>
+  </div>
+
+  <p class="note" style="margin-top:24px">「메모장」은 뺐습니다 — 파일은 메모장 파일이 아니라 txt 파일이고, 맥에는 메모장이 없습니다(텍스트편집기). 화면 이름이 아니라 <b>프로그램 이름</b>을 라벨로 쓰면 그 프로그램으로 열어야 할 것 같아 보입니다.</p>
+  <p class="note">바꾸면 같이 손볼 곳: 확정본·초안·수시 원본/확정본·정기 보관함(회차·날짜·전체)·수시 보관함·라벨 보관함 — 총 7개 화면 9자리, 그리고 CLAUDE.md의 「글자는 가져가기(copy·txt·xlsx)」 문장.</p>
+</div>
+</body>
+</html>

@@ -7,10 +7,12 @@ import threading
 import time
 import webbrowser
 
+from app import photo_body
 from app.adhoc.card import delete_expired_cards
 from app.breaking_alert_sender import catch_up_on_wake
 from app.config import LANDING_HTML_PATH, SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT
 from app.confirm_send import confirm_and_promote
+from app.today_cuts import after_round_collected
 from app.curation import cleanup_group_overrides
 from app.history_renderer import generate_history_page
 from app.landing_renderer import generate_landing_page
@@ -20,6 +22,7 @@ from app.scheduler import run_due_slot, run_scheduler
 from app.scraper import collect_run_with_retry
 from app.settings_server import create_settings_server
 from app.storage import delete_expired_runs
+from app.telegram_bot_name import apply_default_bot_name_once
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +31,7 @@ def _wait_for_server(host: str, port: int, timeout: float = 5.0) -> bool:
     """설정 서버가 실제로 accept 가능해질 때까지 최대 timeout초 짧게 폴링한다.
 
     [추가: 2026-08-19] 브라우저를 file://가 아니라 설정 서버가 서빙하는 http:// 로
-    열도록 바꾸면서 생긴 경합 — 서버는 별도 데몬 스레드(run_settings_server)에서
+    열도록 바꾸면서 생긴 경합 — 서버는 별도 데몬 스레드(serve_forever)에서
     뜨는데, 스레드 시작과 bind 완료 사이엔 시간차가 있다. 그 틈에 열면 "연결 거부"가
     뜬다. 소켓 connect 성공 여부만 보는 가장 싼 방법 — HTTP 요청까지 보낼 필요 없다."""
     deadline = time.monotonic() + timeout
@@ -89,7 +92,20 @@ def _scrape_and_render(run_slot: str, window_start: str) -> dict:
     """
     result = collect_run_with_retry(run_slot, window_start)
     confirm_and_promote(result)
+    # 「✂ 오늘만 여기서 끊기」로 예약해 둔 회차였으면, 그동안 다듬은 이름표·순서·메모를
+    # 이어지는 회차 초안에도 넘긴다(app.today_cuts.after_round_collected). 실패해도 회차는 이미 저장됐다.
+    try:
+        after_round_collected(result)
+    except Exception:
+        logger.exception("끊은 회차 기록을 다음 회차로 넘기지 못했습니다 — 다음 회차 초안은 새로 시작합니다")
     return result
+
+
+def _apply_default_bot_name() -> None:
+    try:
+        apply_default_bot_name_once()
+    except Exception:
+        logger.exception("봇 기본 이름 걸기 실패 — 다음에 앱을 켤 때 다시 시도합니다")
 
 
 def main(open_browser: bool = True) -> None:
@@ -140,6 +156,10 @@ def main(open_browser: bool = True) -> None:
             _open_home_in_browser()
         return
 
+    # 원문으로 사진 기사를 가리는 뒤쪽 작업(app.photo_body) — 자물쇠 뒤에서만 켠다. 켜기 전엔
+    # looks_like_photo_caption이 원문을 받으러 가지 않아 테스트·진단 스크립트가 안전하다.
+    photo_body.start()
+
     # 며칠 꺼뒀다 켠 경우, 정리(cleanup)는 스케줄 루프 안에서만 비동기로 도는데(scheduler.py)
     # 그걸 기다리면 아래에서 만들 "정기 보관함"이 보관 기간을 넘긴 회차까지 잠깐 보여줄 수 있다.
     # 화면을 만들기 전에 한 번 먼저 정리한다.
@@ -174,6 +194,8 @@ def main(open_browser: bool = True) -> None:
     # 위에서 이미 bind해둔 서버 객체를 그대로 돌린다(여기서 다시 열지 않는다 — 자물쇠를
     # 놓쳤다 다시 잡는 틈이 생기면 그 사이 두 번째 앱이 끼어들 수 있다).
     threading.Thread(target=settings_server.serve_forever, daemon=True).start()
+    # 이 봇에 앱이 이름을 건 적이 없으면 기본 이름을 한 번 건다(네트워크라 뒤에서).
+    threading.Thread(target=_apply_default_bot_name, daemon=True).start()
 
     try:
         generate_screen()

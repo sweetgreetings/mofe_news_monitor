@@ -102,10 +102,10 @@ _TITLE_REFETCH_CONCURRENCY = 10
 
 # [추가: 2026-08-13] 키워드 하나가 429(rate limit)·타임아웃 등으로 실패해도, 예전엔
 # 그 자리에서 바로 포기하고 빈 목록으로 조용히 대체했다 — 결과 0건("오늘 기사 없음")과
-# 구분이 안 돼 화면·회차 파일 어디에도 실패 흔적이 안 남았다(정기 스크랩·실시간현황
+# 구분이 안 돼 화면·회차 파일 어디에도 실패 흔적이 안 남았다(정기 스크랩·실시간 현황
 # 둘 다). 재시도 없이 포기하기 전에 짧게 다시 시도하고, 그래도 안 되면 이번엔 "실패"라고
 # 위 계층(app.scraper/app.live_renderer)에 알린다 — 처리 방식은 호출부가 정한다
-# (정기 스크랩은 이미 있는 5분 간격 전체 재시도로 넘기고, 실시간현황은 캐시를 건드리지
+# (정기 스크랩은 이미 있는 5분 간격 전체 재시도로 넘기고, 실시간 현황은 캐시를 건드리지
 # 않고 화면에 경고를 띄운다).
 _KEYWORD_RETRY_ATTEMPTS = 3  # 최초 1회 + 재시도 2회
 
@@ -457,6 +457,26 @@ _OG_DESC_PATTERN = re.compile(
 )
 
 
+def _fetch_page_html(url: str, timeout: int) -> Optional[str]:
+    """기사 원문 페이지의 HTML을 받아온다 — 원문에서 뭔가를 읽는 함수들의 공용 입구.
+
+    본문 전체를 쓰려는 게 아니라 <head>의 메타태그를 읽으려는 것이다(PRD.md "본문
+    크롤링 없음" 원칙과는 다른 성격). 접속 오류·타임아웃은 조용히 None — 부르는 쪽이
+    전부 "못 가져오면 원래 값을 그대로 쓴다"로 돼 있어 여기서 예외를 올리면 안 된다.
+
+    언론사 사이트가 응답 헤더에 charset을 안 밝히면 requests가 기본값(ISO-8859-1)으로
+    잘못 짐작해 한글이 깨진다 — apparent_encoding(내용 기반 추정)으로 보정한다.
+    """
+    try:
+        response = requests.get(url, timeout=timeout, headers={"User-Agent": "Mozilla/5.0"})
+        response.raise_for_status()
+    except requests.exceptions.RequestException:
+        return None
+    if not response.encoding or response.encoding.lower() == "iso-8859-1":
+        response.encoding = response.apparent_encoding
+    return response.text
+
+
 def _best_title_from_html(text: str) -> Optional[str]:
     """og:title과 <title> 태그를 둘 다 확인해 더 완전해 보이는 쪽을 고른다.
 
@@ -495,16 +515,10 @@ def _fetch_full_title(url: str) -> Optional[str]:
     실패 시 원래(잘린) 제목을 그대로 쓰므로, 이 함수가 실패해도 전체 수집은 멈추지
     않는다. 짧은 타임아웃(3초)으로 느려짐을 제한한다.
     """
-    try:
-        response = requests.get(url, timeout=3, headers={"User-Agent": "Mozilla/5.0"})
-        response.raise_for_status()
-    except requests.exceptions.RequestException:
+    text = _fetch_page_html(url, timeout=3)
+    if text is None:
         return None
-    # 언론사 사이트가 응답 헤더에 charset을 안 밝히면 requests가 기본값(ISO-8859-1)으로
-    # 잘못 짐작해 한글이 깨진다 — apparent_encoding(내용 기반 추정)으로 보정한다.
-    if not response.encoding or response.encoding.lower() == "iso-8859-1":
-        response.encoding = response.apparent_encoding
-    return _best_title_from_html(response.text)
+    return _best_title_from_html(text)
 
 
 def fetch_full_title_and_summary(url: str) -> Optional[dict]:
@@ -520,14 +534,9 @@ def fetch_full_title_and_summary(url: str) -> Optional[dict]:
     없는 채로(None) 반환한다 — 호출하는 쪽(app.summary_overrides.set_summary_override)이
     있는 값만 저장한다. 원문 접속 자체가 실패하면(타임아웃 등) None을 돌려준다.
     """
-    try:
-        response = requests.get(url, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
-        response.raise_for_status()
-    except requests.exceptions.RequestException:
+    text = _fetch_page_html(url, timeout=5)
+    if text is None:
         return None
-    if not response.encoding or response.encoding.lower() == "iso-8859-1":
-        response.encoding = response.apparent_encoding
-    text = response.text
 
     # [수정: 2026-08-05] og:title을 무조건 우선하지 않는다 — _best_title_from_html
     # 참고(언론사 CMS 버그로 og:title 자체가 잘려 있던 실제 사례).
@@ -544,6 +553,204 @@ def fetch_full_title_and_summary(url: str) -> Optional[dict]:
         "title": title,
         "summary": html.unescape(summary) if summary else None,
     }
+
+
+# [추가: 2026-09-21] "+ URL로 추가"(담당자가 네이버에서 직접 찾아온 기사 한 건을
+# 붙여넣는 입구)가 쓴다. 네이버 검색 API를 거치지 않은 기사라 pubDate가 없어서
+# 원문 페이지에서 직접 읽는다.
+#
+# 실측(2026-09-21, 저장된 회차의 pub_date를 정답으로 대조 — CODING_CONVENTIONS §1):
+#   · n.news.naver.com 30건 — data-date-time 30/30 정확. 페이지당 정확히 1개라
+#     첫 매치가 곧 게시시각이다(수정시각이 함께 찍히는 경우가 없었다). 같은 표본에서
+#     article:published_time·datePublished·meta[name=date]는 0/30, 즉 부재.
+#   · 언론사 자체 도메인 14건 — data-date-time은 0건이고 article:published_time이
+#     13건 존재. 그중 7건 정확 일치, 6건은 1~14분 차이(최초게시 vs 최종수정으로 보인다),
+#     1건(동아일보 자체 도메인)은 후보가 아예 없었다.
+# 저장된 기사의 93.5%가 네이버 미러라 주 경로는 오차가 없다. 자체 도메인에 남는
+# ±15분 오차는 그대로 둔다 — 같은 언론사 안에서 정렬 자리가 조금 달라지는 정도다.
+_NAVER_DATE_TIME_PATTERN = re.compile(r'data-date-time=["\']([^"\']+)["\']')
+_ARTICLE_PUBLISHED_PATTERN = re.compile(
+    r'<meta[^>]+property=["\']article:published_time["\'][^>]+content=["\']([^"\']+)["\']'
+    r'|<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']article:published_time["\']',
+    re.IGNORECASE,
+)
+_JSONLD_PUBLISHED_PATTERN = re.compile(r'"datePublished"\s*:\s*"([^"]+)"')
+_LOOSE_DATETIME_PATTERN = re.compile(r"(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})")
+
+
+def _normalize_pub_date(raw: Optional[str]) -> Optional[str]:
+    """페이지에서 읽은 시각 문자열을 KST ISO 형식으로 통일한다(네이버 API pub_date와 같은 모양).
+
+    오프셋이 붙어 있으면(`+09:00`) 그대로 해석하고, 없으면(`2026-09-21 02:10:07`)
+    한국 기사이므로 KST로 읽는다. 어느 쪽도 파싱이 안 되면 None — 부르는 쪽이
+    "발행시각 없음"으로 처리한다(지어내지 않는다).
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        match = _LOOSE_DATETIME_PATTERN.search(raw)
+        if not match:
+            return None
+        year, month, day, hour, minute = (int(g) for g in match.groups())
+        parsed = datetime(year, month, day, hour, minute)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=_KST)
+    return parsed.astimezone(_KST).isoformat()
+
+
+def _pub_date_from_html(text: str) -> Optional[str]:
+    """원문 페이지 HTML에서 발행시각을 뽑는다 — 네이버 미러 우선, 자체 도메인 폴백.
+
+    후보 순서는 위 실측 그대로다(네이버 data-date-time → article:published_time →
+    JSON-LD datePublished). 하나도 없으면 None.
+    """
+    naver_match = _NAVER_DATE_TIME_PATTERN.search(text)
+    if naver_match:
+        normalized = _normalize_pub_date(naver_match.group(1))
+        if normalized:
+            return normalized
+    meta_match = _ARTICLE_PUBLISHED_PATTERN.search(text)
+    if meta_match:
+        normalized = _normalize_pub_date(meta_match.group(1) or meta_match.group(2))
+        if normalized:
+            return normalized
+    jsonld_match = _JSONLD_PUBLISHED_PATTERN.search(text)
+    if jsonld_match:
+        return _normalize_pub_date(jsonld_match.group(1))
+    return None
+
+
+# 네이버 미러 페이지의 og:article:author는 "{언론사} | 네이버" 형태다 — 실측(2026-09-21)
+# 에서 서로 다른 22개 매체 전부 존재했고, 이 접미사만 떼면 22/22가 NAVER_OID_OUTLETS의
+# 이름과 글자까지 같았다. oid가 표에 없는 매체의 폴백으로 쓴다.
+_OG_AUTHOR_PATTERN = re.compile(
+    r'<meta[^>]+property=["\']og:article:author["\'][^>]+content=["\']([^"\']*)["\']'
+    r'|<meta[^>]+content=["\']([^"\']*)["\'][^>]+property=["\']og:article:author["\']',
+    re.IGNORECASE,
+)
+_NAVER_AUTHOR_SUFFIX = "| 네이버"
+
+
+def _outlet_from_page(text: str) -> Optional[str]:
+    """페이지의 og:article:author로 언론사명을 읽는다. 없으면 None."""
+    match = _OG_AUTHOR_PATTERN.search(text)
+    if not match:
+        return None
+    author = html.unescape((match.group(1) or match.group(2) or "")).strip()
+    if author.endswith(_NAVER_AUTHOR_SUFFIX):
+        author = author[: -len(_NAVER_AUTHOR_SUFFIX)].strip()
+    return author or None
+
+
+# 「+ 수기로 기사 추가」가 받지 않는 주소 — 블로그·카페·커뮤니티·SNS 글은 언론사 기사가
+# 아니다. 실측(2026-09-21): 네이버 검색 API로 뽑은 블로그 40건·카페 15건이 **전부** 그대로
+# 담겼다(언론사 칸에 blog.naver.com 같은 도메인). 「언론사 이름을 못 찾으면 기사가 아니다」로
+# 거르면 블로그·카페 55/55는 걸리지만 언론사 자체 도메인 기사 74건 중 22건(이투데이·
+# 아주경제·부산일보·연합뉴스TV 등)도 같이 막혀 기각했다 — 그래서 페이지가 아니라 **주소의
+# 호스트**로 판정한다. 목록에 없는 곳은 통과한다(담아둔 기사는 보고서 밖이라 담당자가 본다).
+_NON_NEWS_HOSTS = (
+    "blog.naver.com", "cafe.naver.com", "post.naver.com", "in.naver.com", "kin.naver.com",
+    "tistory.com", "brunch.co.kr", "velog.io", "medium.com", "blog.daum.net", "cafe.daum.net",
+    "dcinside.com", "theqoo.net", "fmkorea.com", "clien.net", "ruliweb.com", "instiz.net",
+    "ppomppu.co.kr", "mlbpark.donga.com", "bobaedream.co.kr", "82cook.com", "etoland.co.kr",
+    "youtube.com", "youtu.be", "x.com", "twitter.com", "facebook.com", "instagram.com",
+    "threads.net", "threads.com",
+)
+
+
+def is_non_news_url(url: str) -> bool:
+    """블로그·카페·커뮤니티·SNS 주소면 True — 호스트가 목록의 도메인이거나 그 하위 도메인
+    (m.blog.naver.com, xxx.tistory.com, gall.dcinside.com)일 때."""
+    host = (urlparse(url).hostname or "").lower()
+    if host.startswith("m."):
+        host = host[2:]
+    return any(host == h or host.endswith("." + h) for h in _NON_NEWS_HOSTS)
+
+
+def fetch_article_by_url(url: str) -> Optional[dict]:
+    """URL 하나로 기사 dict(언론사·제목·요약·발행시각)를 만든다 — "+ URL로 추가"의 본체.
+
+    네이버 검색 API를 한 번도 안 부른다(담당자가 이미 찾아온 기사다). 페이지는 한 번만
+    받아 제목·요약·발행시각·언론사를 거기서 다 읽는다.
+
+    언론사는 resolve_outlet(네이버 oid → 도메인 추정)을 그대로 쓰되, 네이버 미러
+    링크인데 oid가 표에 없으면 도메인 추정이 "n.news.naver.com"이라는 쓸모없는 값을
+    내놓는다 — 그 경우에만 페이지의 og:article:author로 폴백한다.
+
+    제목을 못 읽으면 None — 제목 없이는 보고서 한 줄을 세울 수 없다. 접속 실패도 None.
+    """
+    text = _fetch_page_html(url, timeout=5)
+    if text is None:
+        return None
+
+    title = _best_title_from_html(text)
+    if not title:
+        return None
+
+    summary = None
+    og_desc = _OG_DESC_PATTERN.search(text)
+    if og_desc:
+        summary = (og_desc.group(1) or og_desc.group(2) or "").strip() or None
+
+    outlet = resolve_outlet(url, url)
+    if outlet == urlparse(url).netloc.removeprefix("www."):
+        # 도메인 추정이 이름을 못 찾고 도메인 문자열을 그대로 돌려준 경우다.
+        outlet = _outlet_from_page(text) or outlet
+
+    article = {
+        "outlet": outlet,
+        "title": title,
+        "url": url,
+        "summary": html.unescape(summary) if summary else "",
+    }
+    pub_date = _pub_date_from_html(text)
+    if pub_date:
+        article["pub_date"] = pub_date
+    # 네이버 미러면 「기사원문」 링크를 원문 주소로 적는다 — 실측(2026-09-22, 17건)에서
+    # 네이버 API의 originallink와 전부 같은 값이었다.
+    if urlparse(url).netloc.lower() in _NAVER_NEWS_HOSTS:
+        m = _ORIGIN_LINK_PATTERN.search(text)
+        if m:
+            article["original_url"] = html.unescape(m.group(1)).strip()
+    return article
+
+
+_ORIGIN_LINK_PATTERN = re.compile(r'href="([^"]+)"[^>]*class="media_end_head_origin_link"')
+
+
+def _url_host_key(url: str) -> str:
+    host = (urlparse(url).hostname or "").lower()
+    for prefix in ("www.", "m."):
+        if host.startswith(prefix):
+            host = host[len(prefix):]
+    return host
+
+
+def original_url_keys(url: str) -> set:
+    """언론사 원문 주소를 「같은 기사인가」 대조용 키로 — 「+ 수기로 기사 추가」의 중복 판정.
+
+    담당자가 붙여 넣는 원문 주소와 네이버가 준 originallink는 꼬리가 다를 수 있다
+    (네이버 쪽엔 `utm_*`·`ref=A`·`input=1195m`이 붙는다). 키는 둘:
+      1. 주소 전체 — `www.`·`m.`·끝 `/`·`#…`·`utm_*`만 뗀다. 나머지 쿼리는 기사 번호일
+         수 있어(`idxno=`·`ncd=`·`newsId=`) 남긴다.
+      2. 경로만 — 경로가 기사를 가리키는 모양일 때만(두 칸 이상, 마지막 칸이 6자 이상이고
+         `articleView.html`·`view.do` 같은 파일 이름이 아닐 때). 실측(2026-09-22, 원문 주소
+         1,144건): 이 모양 541건에서 서로 다른 기사가 같은 키가 된 경우 0건.
+    """
+    parsed = urlparse(url.strip())
+    if not parsed.netloc:
+        return set()
+    host = _url_host_key(url)
+    path = parsed.path.rstrip("/")
+    query = "&".join(sorted(kv for kv in parsed.query.split("&") if kv and not kv.lower().startswith("utm_")))
+    keys = {f"{host}{path}?{query}" if query else f"{host}{path}"}
+    segs = [s for s in path.split("/") if s]
+    if len(segs) >= 2 and len(segs[-1]) >= 6 and "." not in segs[-1]:
+        keys.add(f"{host}{path}#path")
+    return keys
 
 
 def _parse_pub_date(pub_date_str: str) -> Optional[datetime]:
@@ -572,7 +779,7 @@ def kst_today_at(hhmm: str) -> datetime:
 
 
 def incremental_search_after(last_seen: datetime, earliest: datetime, now: Optional[datetime] = None) -> datetime:
-    """증분 검색(초안 app.preview_renderer / 실시간현황 app.live_renderer)의 하한을 정한다.
+    """증분 검색(초안 app.preview_renderer / 실시간 현황 app.live_renderer)의 하한을 정한다.
 
     두 화면은 매번 처음부터 다시 검색하지 않고 "지금까지 본 가장 최신 pub_date"(last_seen)
     이후만 추가로 검색한다. 그런데 네이버는 기사를 **발행시각 순서대로 색인하지 않는다** —
@@ -585,7 +792,7 @@ def incremental_search_after(last_seen: datetime, earliest: datetime, now: Optio
     — 최근 한 시간 구간은 매 새로고침마다 다시 훑는다는 뜻이다. 다시 받아온 기사는 두
     호출부 모두 URL로 중복 제거하므로 화면·건수·matched_keywords는 달라지지 않는다.
 
-    earliest: 그보다 더 내려가면 안 되는 바닥(초안은 그 회차의 시작 시각, 실시간현황은
+    earliest: 그보다 더 내려가면 안 되는 바닥(초안은 그 회차의 시작 시각, 실시간 현황은
     당일 0시) — 창 밖 기사를 캐시에 섞어 넣지 않기 위한 하한이다.
     """
     now = now or datetime.now(_KST)
@@ -663,6 +870,35 @@ def _strip_naver_query(url: str) -> str:
     return urlunparse(parsed._replace(query="", fragment=""))
 
 
+_NAVER_NEWS_HOSTS = {"n.news.naver.com", "m.news.naver.com", "news.naver.com"}
+_NAVER_ARTICLE_PATH_RE = re.compile(r"^/(?:mnews/)?(?:hotissue/)?article/(\d{3})/(\d{10})/?$")
+_NAVER_OID_AID_RE = re.compile(r"(?:^|&)(oid|aid)=(\d+)")
+
+
+def normalize_article_url(url: str) -> str:
+    """담당자가 붙여 넣은 기사 주소를 수집이 저장하는 모양으로 맞춘다 — 「+ 수기로 기사 추가」용.
+
+    수집은 네이버 뉴스 기사를 `https://n.news.naver.com/mnews/article/{oid}/{aid}` 한
+    모양으로만 저장한다(_strip_naver_query). 그런데 브라우저에서 복사한 주소는
+    `?sid=101` 꼬리가 붙거나, `/article/…`(mnews 없음)·`m.news.naver.com`·옛
+    `read.naver?oid=&aid=` 모양이다 — 그대로 두면 같은 기사가 URL 대조(중복 거부·숨김·
+    이미 실림)를 전부 빠져나간다. 네이버 뉴스 기사로 확실히 읽힐 때만 바꾸고, 그 밖의
+    주소(언론사 자체 도메인 — 쿼리가 곧 기사 번호일 수 있다)는 손대지 않는다.
+    """
+    parsed = urlparse(url.strip())
+    if parsed.netloc.lower() not in _NAVER_NEWS_HOSTS:
+        return url.strip()
+    m = _NAVER_ARTICLE_PATH_RE.match(parsed.path)
+    if m:
+        oid, aid = m.groups()
+    else:
+        params = dict(_NAVER_OID_AID_RE.findall(parsed.query))
+        oid, aid = params.get("oid"), params.get("aid")
+        if not (oid and aid and len(oid) == 3 and len(aid) == 10):
+            return url.strip()
+    return f"https://n.news.naver.com/mnews/article/{oid}/{aid}"
+
+
 def _search_one_keyword(
     keyword: str,
     after: Optional[datetime] = None,
@@ -686,7 +922,7 @@ def _search_one_keyword(
     (페이지네이션 중단 신호로도 쓰지 않는다) — 시각을 모르면 당일 창인지도, after/before
     구간에 속하는지도 판단할 수 없어 회차별 시간창 수집(app.scraper.collect_run)에는
     절대 넣으면 안 된다. include_unparsed_dates=True를 넘긴 호출부(app.live_renderer,
-    실시간현황 전용)만 이 기사를 `pub_date: None`으로 담아 결과에 포함한다 — "실시간은
+    실시간 현황 전용)만 이 기사를 `pub_date: None`으로 담아 결과에 포함한다 — "실시간은
     필터 없이 날것 그대로"라는 이 화면의 원칙상, 시각을 못 읽었다는 기계적 사정으로
     기사 자체를 조용히 버리면 안 된다는 사용자 결정에 따른 것이다(담당자가 원문을
     직접 열어 발행일을 확인하도록 화면에 "발행시각 불명"으로 표시한다). 정기 스크랩·
@@ -729,7 +965,7 @@ def _search_one_keyword(
                 params={"query": keyword, "display": _MAX_DISPLAY, "start": start, "sort": "date"},
                 timeout=10,
             )
-        # [추가: 2026-08-20] 정기 스크랩·실시간현황·수시 모니터링·[단독]·[속보] 폴링
+        # [추가: 2026-08-20] 정기 스크랩·실시간 현황·수시 모니터링·[단독]·[속보] 폴링
         # 전부가 결국 여기 하나로 모이는 유일한 실제 요청 지점이다 — app.api_usage가
         # 일일 호출 한도 소진을 실측으로 감시할 수 있는 것도 이 한 곳에서만 세기
         # 때문이다. 429 등 실패 응답도 네이버에 도달한 호출이므로 raise_for_status
@@ -808,6 +1044,11 @@ def _search_one_keyword(
                     "pub_date": pub_date.isoformat() if pub_date else None,
                 }
             )
+            # 네이버 미러 기사면 언론사 원문 주소도 적어 둔다 — 담당자가 원문 주소로
+            # 「+ 수기로 기사 추가」를 했을 때 같은 기사인지 알아볼 유일한 단서다(original_url_keys).
+            original = (item.get("originallink") or "").strip()
+            if original and original != url and urlparse(url).netloc.lower() in _NAVER_NEWS_HOSTS:
+                results[-1]["original_url"] = original
 
         if reached_older_article or len(items) < _MAX_DISPLAY:
             break

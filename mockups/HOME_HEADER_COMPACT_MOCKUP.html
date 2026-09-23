@@ -1,0 +1,427 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>홈 머리·흐름도 조이기 시안</title><style>
+    * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+  }
+  /* [수정: 2026-09-11] 640 → 960. 확정본·초안·설정(800)보다 넓은 유일한 화면이다 —
+     목록이 아니라 대시보드라, 오늘의 쟁점 ∥ 정책 단어 추이를 한 줄에 두려면 두 칸
+     안쪽이 각각 410px대는 돼야 쟁점 이름·칩·막대가 한 줄에 들어온다(800이면 330px대). */
+  .page { max-width: 960px; margin: 0 auto; padding: 24px 20px 40px; }
+  /* 쟁점(왼쪽) ∥ 추이(오른쪽). 두 카드 밑선을 맞추고, 좁은 창에선 쟁점이 위로 쌓인다. */
+  .pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 13px; margin-bottom: 13px; align-items: stretch; }
+  .pair > .card { margin-bottom: 0; }
+  @media (max-width: 800px) { .pair { grid-template-columns: minmax(0, 1fr); } }
+  .logo { display: block; max-width: 120px; max-height: 120px; margin: 0 auto 14px;
+    border-radius: 50%; }
+  h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 3px; text-align: center; color: #1E3A5F; }
+  .today { text-align: center; color: #6B7280; font-size: 0.78rem; margin: 0 0 20px; }
+  .card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px;
+    padding: 17px 20px; margin-bottom: 13px; }
+  .card h2 { font-size: 0.78rem; font-weight: 700; color: #6B7280; margin: 0 0 13px;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card h2 .sub { font-weight: 500; opacity: 0.8; }
+
+  /* ── 오늘 건수 + [단독]/[속보] ── */
+  /* [수정: 2026-08-27] 큰 숫자(2rem) + 알약 테두리 칩 → 본문 크기 한 줄 스트립 +
+     테두리 없는 글자형 칩. 건수는 "정기 모니터링하는 사람만 보는 값"이라 카드에서
+     가장 무거울 이유가 없다는 사용자 판단 — 값은 남기되 무게만 덜었다. */
+  .statrow { position: relative; display: flex; align-items: center; gap: 9px;
+    flex-wrap: wrap; font-size: 0.8rem; color: #6B7280; }
+  .statrow .val { color: #1E3A5F; font-weight: 700; }
+  .scope { font-size: 0.68rem; color: #6B7280; border: 1px solid #E5E7EB;
+    border-radius: 20px; padding: 2px 8px; flex-shrink: 0; }
+  .vs b { color: #DC2626; font-weight: 700; }
+  .vs .yday { opacity: 0.62; }
+  .statdot { color: #E5E7EB; }
+  .hlset { margin-left: auto; display: flex; gap: 2px; flex-wrap: wrap; }
+  .hl { display: inline-flex; align-items: center; gap: 5px; font-size: 0.76rem;
+    font-weight: 700; line-height: 1.2; padding: 4px 7px; border-radius: 5px;
+    cursor: default; list-style: none; }
+  .hl::-webkit-details-marker { display: none; }
+  .hl .ic { margin-right: -1px; }
+  .hl .n { font-variant-numeric: tabular-nums; font-weight: 600; opacity: 0.75; }
+  .hl.scoop { color: #B91C1C; }
+  .hl.flash { color: #DC2626; }
+  .hl.legacy { color: #6B7280; }
+  .hl:hover, .hlbox[open] > .hl { background: #F3F4F6; }
+  .hlbox[open] > .hl .n { opacity: 1; }
+  .hllist { list-style: none; margin: 0; padding: 8px 4px; position: absolute;
+    right: 0; top: calc(100% + 6px); z-index: 5; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: 9px;
+    box-shadow: 0 6px 20px rgba(30,58,95,.13); max-width: 100%; }
+  /* 칩과 목록 사이 6px 틈을 지나가는 동안 닫히지 않도록 하는 투명 다리 */
+  .hllist::before { content: ""; position: absolute; left: 0; right: 0; top: -8px; height: 8px; }
+  .hllist li { display: flex; align-items: baseline; gap: 8px; padding: 6px 12px;
+    font-size: 0.78rem; border-radius: 6px; }
+  .hllist li:hover { background: #EFF6FF; }
+  .hllist .ht { color: #6B7280; font-size: 0.7rem; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  .hllist .ho { color: #6B7280; font-size: 0.7rem; min-width: 56px; flex-shrink: 0; }
+  .hllist a { color: #1F2937; text-decoration: none; }
+  .hllist a:hover { color: #2563EB; text-decoration: underline; }
+  details.hlbox { position: static; }
+
+  /* ── 정책 단어 추이 (그래프 본체는 app.trend_chart.chart_css()가 .trend-chart-wrap { position: relative; }.trend-chart { display: block; width: 100%; height: auto; }.trend-tip { position: absolute; pointer-events: none; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.10); padding: 8px 10px; font-size: 0.79rem; display: none; z-index: 5; min-width: 128px; }.trend-tip .th { font-weight: 700; color: #1E3A5F; margin-bottom: 5px; }.trend-tip .tip-empty { color: #6B7280; }.trend-tip .tr { display: flex; align-items: center; gap: 6px; margin-top: 2px; }.trend-tip .tr .dot { width: 8px; height: 8px; border-radius: 50%; }.trend-tip .tr .v { margin-left: auto; font-variant-numeric: tabular-nums; }.trend-legend { display: flex; flex-wrap: wrap; gap: 5px 16px; margin-top: 9px; }.trend-legend .li { display: inline-flex; align-items: center; gap: 6px; font-size: 0.81rem; }.trend-legend .li .dot { width: 11px; height: 3px; border-radius: 2px; }.trend-legend .li .n { color: #6B7280; font-size: 0.76rem; font-variant-numeric: tabular-nums; }로 주입) ── */
+  .trend-more { margin-left: auto; font-size: 0.76rem; color: #2563EB; font-weight: 700;
+    text-decoration: none; padding: 3px 8px; border-radius: 20px; }
+  .trend-more:hover { background: #EFF6FF; }
+  .trend-chart-link { display: block; text-decoration: none; color: inherit; }
+  .empty-trend { font-size: 0.8rem; color: #6B7280; padding: 6px 0 2px; line-height: 1.7; }
+  .empty-trend a { color: #2563EB; font-weight: 600; text-decoration: none; }
+  .empty-trend a:hover { text-decoration: underline; }
+  .trend-chart-wrap { position: relative; }.trend-chart { display: block; width: 100%; height: auto; }.trend-tip { position: absolute; pointer-events: none; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.10); padding: 8px 10px; font-size: 0.79rem; display: none; z-index: 5; min-width: 128px; }.trend-tip .th { font-weight: 700; color: #1E3A5F; margin-bottom: 5px; }.trend-tip .tip-empty { color: #6B7280; }.trend-tip .tr { display: flex; align-items: center; gap: 6px; margin-top: 2px; }.trend-tip .tr .dot { width: 8px; height: 8px; border-radius: 50%; }.trend-tip .tr .v { margin-left: auto; font-variant-numeric: tabular-nums; }.trend-legend { display: flex; flex-wrap: wrap; gap: 5px 16px; margin-top: 9px; }.trend-legend .li { display: inline-flex; align-items: center; gap: 6px; font-size: 0.81rem; }.trend-legend .li .dot { width: 11px; height: 3px; border-radius: 2px; }.trend-legend .li .n { color: #6B7280; font-size: 0.76rem; font-variant-numeric: tabular-nums; }
+
+  /* ── 오늘의 쟁점 ── */
+  .irow { border-bottom: 1px solid #E5E7EB; padding: 10px 0; }
+  .irow:last-of-type { border-bottom: none; }
+  .rowhead { display: flex; align-items: center; gap: 9px; }
+  .rank { width: 19px; height: 19px; border-radius: 50%; background: #EFF6FF; color: #2563EB;
+    font-size: 0.67rem; font-weight: 700; flex-shrink: 0; display: flex; align-items: center;
+    justify-content: center; }
+  /* [수정: 2026-09-11] 이름+칩을 한 상자로 — 반쪽 칸에서 이름이 길면 칩만 아랫줄로
+     내려가고 막대는 오른쪽 자리를 지킨다. */
+  .ibox { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 3px 8px; }
+  .iname { font-size: 0.9rem; font-weight: 600; color: #1E3A5F; }
+  .chips { display: flex; gap: 4px; flex-wrap: wrap; }
+  .gchip { font-size: 0.61rem; font-weight: 600; color: #6B7280; border: 1px solid #E5E7EB;
+    border-radius: 20px; padding: 1px 7px; white-space: nowrap; }
+  /* [수정: 2026-09-02] 건수 숫자 → 막대. 1위를 100%로 둔 상대 길이라 모수를
+     설명할 필요가 없다(그래서 부제·기타 줄을 통째로 지울 수 있었다). 정확한
+     건수는 title 툴팁으로만 남긴다. */
+  .ibar { margin-left: auto; width: 64px; height: 5px; border-radius: 3px;
+    background: #E5E7EB; flex-shrink: 0; overflow: hidden; }
+  .ibar i { display: block; height: 100%; background: #2563EB; opacity: 0.55;
+    border-radius: 3px; }
+  .empty-issues { font-size: 0.85rem; color: #6B7280; padding: 8px 0; }
+
+  /* ── 흐름도 ── */
+  /* [수정: 2026-09-15] 칸 이름만 크게 + 마우스를 올리면 말풍선(HOME_FLOW_CLEAN_MOCKUP.html
+     D안). 건수 줄·줄 제목·화살표 설명을 칸에서 빼고 말풍선으로 옮겼다 — 오늘 몇 건
+     모였는지는 바로 위 건수 줄이 이미 말한다.
+     같은 날 2차(HOME_FLOW_ALIGN_MOCKUP.html B+D): 실시간을 정기 줄 맨 앞으로 옮겨 4칸 격자
+     (실시간 → 초안 → 확정본 → 정기 보관함)로 만들고, 수시의 수집 원본은 두 칸 폭(.span2)을
+     쓴다 — 수시엔 실시간 화면이 따로 없고 원본이 실시간·초안 자리를 겸하기 때문이다(CLAUDE.md
+     정기↔수시 대응표). 실시간이 정기에만 이어진다는 걸 배치가 말한다. 칸 글자는 가운데 정렬. */
+  /* [수정: 2026-09-15, 3차] 수시 4단 흐름(HOME_FLOW_ADHOC4_MOCKUP.html D안, 사용자 결정).
+     두 줄이 4:4 — 줄 맨 앞은 조건을 정하는 좁은 「입구」 칸(🔍 검색어 / 🔎 새 수집), 그 뒤
+     정기 초안·확정본·정기 보관함 ∥ 수시 원본·확정본·수시 보관함. 실시간은 흐름의 한 단계가
+     아니라(초안은 정기 검색이 직접 채운다) 초안 위에 매단 낮은 점선 칸 + 「📌 담아두기」
+     점선으로만 잇는다. 원본이 두 칸 폭이던 .span2는 없어졌다. 격자 셋(.fl-top·.fl-conn·
+     본문)이 같은 칸 폭을 써서 위아래로 정확히 줄 선다. */
+  /* [추가: 2026-09-15, 4차] 두 줄 왼쪽에 줄 이름표 「정기」「수시」(HOME_FLOW_ROWLABEL_MOCKUP.html
+     B안, 사용자 결정 — 단어만). 그 전엔 정기·수시라는 말이 보관함 칸 이름에만 있어 두 줄이 색만
+     다른 똑같은 줄로 읽혔다. 이름표가 줄을 말하므로 보관함 칸은 둘 다 「보관함」이다. 이름표는
+     누르는 곳이 아니라 칸 모양 없이 글자 + 왼쪽 띠만 둔다. 격자 앞에 이름표 열·10px 틈 두 칸이
+     붙어 입구 칸이 3열이 됐다(.side·.conn도 5열). */
+  .fl { display: grid; grid-template-columns: 48px 10px minmax(0, .72fr) 26px minmax(0, 1fr) 26px
+    minmax(0, 1fr) 26px minmax(0, 1fr); align-items: stretch; row-gap: 12px; }
+  .fl .gap { grid-column: 1 / -1; height: 6px; }
+  .fl .side { grid-column: 5; }
+  .fl .rl { grid-column: 1; display: flex; align-items: center; padding-left: 10px;
+    border-left: 3px solid; font-size: 0.92rem; font-weight: 800; white-space: nowrap; }
+  .fl .rl.reg { border-color: #93C5FD; color: #1E3A5F; }
+  .fl .rl.ad { border-color: rgba(20, 107, 94, 0.45); color: #146B5E; }
+  .fl .tile.t-regkw, .fl .tile.t-adnew { grid-column: 3; }
+  .t-live.slim { min-height: 42px; background: #FFFFFF; border: 1px dashed #FCA5A5; }
+  .t-live.slim .nm { font-size: 0.94rem; }
+  .t-live.slim:hover { background: #FEF2F2; border-style: solid; }
+  .fl-conn .conn { grid-column: 5; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 1px; height: 30px; font-size: 0.72rem; font-weight: 600; color: #9CA3AF; }
+  .fl-conn .conn::before { content: ""; height: 9px; border-left: 2px dotted #FCA5A5; }
+  .fl-conn .conn::after { content: ""; border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-top: 5px solid #FCA5A5; }
+  /* .tile이 이 아래에서 테두리를 transparent로 다시 정하므로 두 클래스로 명시도를 올린다 */
+  .tile.t-regkw { background: #FFFFFF; border: 1px dashed #BFDBFE; color: #46586F; }
+  .tile.t-regkw:hover { background: #F8FAFC; border-style: solid; }
+  .tile.t-adnew { background: #FFFFFF; border: 1px dashed rgba(20, 107, 94, 0.45); color: #146B5E; }
+  .tile.t-adnew:hover { background: #F0F7F5; border-style: solid; }
+  .tile { position: relative; text-decoration: none; display: flex; align-items: center;
+    justify-content: center; gap: 10px; padding: 0 12px; min-height: 60px; border-radius: 12px;
+    border: 1px solid transparent;
+    transition: background .12s, border-color .12s, transform .12s, box-shadow .12s; }
+  .tile .nm { display: flex; align-items: center; gap: 10px; font-size: 1.02rem; font-weight: 700;
+    letter-spacing: -0.01em; white-space: nowrap; }
+  .tile .nm .e { font-size: 1.15rem; }
+  /* z-index: 아래 줄 칸(뒤에 그려지는 형제)이 말풍선을 덮지 않게 올린 칸을 위로 */
+  .tile:hover, .tile:focus-visible { transform: translateY(-1px); z-index: 5; outline: none;
+    box-shadow: 0 4px 12px rgba(30,58,95,.09); }
+  .fl .ar { display: flex; align-items: center; justify-content: center; color: #CBD5E1; }
+  .fl .ar .ic { width: 16px; height: 16px; stroke-width: 2; }
+  /* 지금 손대는 칸은 색을 채우고, 보관함(지난 것)은 흰 바탕 + 테두리로 한 발 물러선다 */
+  .t-live { background: #FEF2F2; color: #DC2626; }
+  .t-live:hover { border-color: #FECACA; }
+  .t-reg { background: #EFF6FF; color: #1E3A5F; }
+  .t-reg.draft { color: #2563EB; }
+  .t-reg:hover { border-color: #BFDBFE; }
+  .t-regarch { background: #FFFFFF; border-color: #E5E7EB; color: #46586F; }
+  .t-regarch:hover { background: #F8FAFC; border-color: #BFDBFE; }
+  .t-ad { background: #E3F1EE; color: #146B5E; }
+  .t-ad:hover { border-color: rgba(20, 107, 94, 0.24); }
+  .t-adarch { background: #FFFFFF; border-color: rgba(20, 107, 94, 0.24); color: #146B5E; }
+  .t-adarch:hover { background: #F0F7F5; }
+  .t-lab { grid-column: 1 / -1; background: #FBF0DA; color: #8A5A14; }
+  .t-lab:hover { border-color: rgba(138, 90, 20, 0.28); }
+  /* 라벨 칸은 이름 + 칩을 한 덩어리로 가운데에 둔다 */
+  .tagset { margin-left: 4px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag-chip { font-size: 0.74rem; font-weight: 600; color: #8A5A14;
+    background: rgba(255,255,255,0.75); border: 1px solid rgba(138,90,20,0.22);
+    border-radius: 20px; padding: 3px 10px; }
+  /* 말풍선 — 칸 가운데 아래에 뜬다. 칸 위를 스치듯 지나갈 때 툭툭 뜨지 않게 0.15초 뒤에
+     연다([단독]/[속보] 칩과 같은 이유). 안에 누를 것이 없어 pointer-events를 끈다. */
+  .tip { position: absolute; top: calc(100% + 8px); left: 50%; z-index: 10; width: 280px;
+    max-width: calc(100vw - 40px); background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(30,58,95,.15); padding: 11px 14px 12px;
+    display: flex; flex-direction: column; gap: 4px; text-align: left; white-space: normal;
+    opacity: 0; visibility: hidden; transform: translate(-50%, -4px); pointer-events: none;
+    transition: opacity .12s, transform .12s, visibility 0s linear .12s; }
+  .tip::before { content: ""; position: absolute; top: -6px; left: 50%; margin-left: -5px;
+    width: 10px; height: 10px; background: #FFFFFF; border-left: 1px solid #E5E7EB;
+    border-top: 1px solid #E5E7EB; transform: rotate(45deg); }
+  .tile:hover .tip, .tile:focus-visible .tip { opacity: 1; visibility: visible;
+    transform: translate(-50%, 0);
+    transition: opacity .12s .15s, transform .12s .15s, visibility 0s .15s; }
+  .tip b { font-size: 0.88rem; font-weight: 700; color: inherit; }
+  .tip .tb { font-size: 0.78rem; font-weight: 500; color: #6B7280; line-height: 1.6; }
+  .tip .nx { display: flex; align-items: center; gap: 6px; margin-top: 3px; padding-top: 7px;
+    border-top: 1px solid #E5E7EB; font-size: 0.74rem; font-weight: 600; color: #6B7280; }
+  .tip .nx i { font-style: normal; color: #CBD5E1; }
+  /* 창이 페이지 폭(960)보다 좁으면 칸이 줄어 맨 왼쪽·오른쪽 칸의 가운데 말풍선이 창 밖으로
+     삐져나간다(숨어 있어도 가로 스크롤이 생긴다) — 그때만 칸 끝에 맞춘다. */
+  @media (max-width: 1000px) {
+    .tip.l { left: 0; transform: translateY(-4px); }
+    .tip.r { left: auto; right: 0; transform: translateY(-4px); }
+    .tile:hover .tip.l, .tile:hover .tip.r,
+    .tile:focus-visible .tip.l, .tile:focus-visible .tip.r { transform: none; }
+    .tip.l::before { left: 28px; margin-left: 0; }
+    .tip.r::before { left: auto; right: 28px; margin-left: 0; }
+  }
+  /* [수정: 2026-09-15] 설정은 흐름도 카드 제목 줄 오른쪽 — 다른 카드의 「더보기」와 같은
+     자리다. 예전엔 실시간 칸이 한 줄을 통째로 써서 그 줄의 빈 오른쪽에 있었는데, 실시간이
+     정기 줄로 들어가며 그 자리가 없어졌다. */
+  .gearlink { margin-left: auto; font-size: 0.76rem; font-weight: 500; color: #6B7280;
+    text-decoration: none; border: 1px solid #E5E7EB; border-radius: 20px; padding: 4px 11px;
+    display: inline-flex; align-items: center; gap: 5px; }
+  .gearlink:hover { background: #EFF6FF; }
+  /* 좁은 화면에선 칸이 한 줄씩 쌓이고 이름표는 그 줄 칸들 위의 머리글로 눕는다(띠 → 밑줄).
+     실시간은 격자(.fl-top)가 맨 위라 그대로 쌓으면 「정기」 머리글보다 위에 와 어느 줄에도 안
+     속한 것처럼 읽힌다 — 격자 셋을 display: contents로 풀어 한 줄 흐름으로 만든 뒤 order로
+     「정기」 → 실시간 → 나머지 순서를 잡는다. */
+  @media (max-width: 640px) {
+    .flow { display: flex; flex-direction: column; gap: 8px; }
+    .flow > .fl { display: contents; }
+    .flow > .fl-conn, .fl .ar, .fl .blank { display: none; }
+    .fl .rl { order: 0; border-left: 0; border-bottom: 2px solid; padding: 10px 0 4px; }
+    .fl .rl.reg { order: -2; border-color: #93C5FD; }
+    .fl .rl.ad { margin-top: 8px; border-color: rgba(20, 107, 94, 0.45); }
+    .fl-top .tile { order: -1; }
+  }
+
+  /* ── 워드클라우드 ── */
+  .wordcloud { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline;
+    gap: 2px 7px; margin: 0 auto; max-width: 100%; }
+  .wc-word { white-space: nowrap; line-height: 1.3; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; display: inline-block; }
+  .wc-word:hover { animation: wc-jitter 0.35s ease-in-out; }
+  @media (prefers-reduced-motion: reduce) { .wc-word:hover { animation: none; } }
+  @keyframes wc-jitter {
+    0%   { transform: translate(0, 0) rotate(0deg); }
+    20%  { transform: translate(-1px, 0.5px) rotate(-2deg); }
+    40%  { transform: translate(1px, -0.5px) rotate(2deg); }
+    60%  { transform: translate(-1px, 0.5px) rotate(-1.5deg); }
+    80%  { transform: translate(1px, 0) rotate(1deg); }
+    100% { transform: translate(0, 0) rotate(0deg); }
+  }
+  .wc-caption { color: #6B7280; font-size: 0.7rem; margin: 10px 0 0; text-align: center; }
+  .empty { color: #6B7280; font-size: 0.9rem; text-align: center; }
+  .cute-caption-sm { font-family: 'Gaegu', sans-serif; font-size: 0.85rem;
+    color: #6B7280; margin-top: 4px; }
+
+  .contact { color: #6B7280; font-size: 0.85rem; text-align: center; margin-top: 22px; }
+  .contact a { color: #2563EB; }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+
+  /* ── 시안 틀 ── */
+  .mk-intro { max-width: 960px; margin: 28px auto 6px; padding: 0 20px; color: #1F2937; }
+  .mk-intro h1 { text-align: left; font-size: 1.15rem; margin: 0 0 6px; }
+  .mk-intro p { margin: 0; font-size: 0.85rem; color: #6B7280; line-height: 1.7; }
+  .mk { border-top: 2px dashed #CBD5E1; margin-top: 30px; }
+  .mk-label { max-width: 960px; margin: 0 auto; padding: 16px 20px 0; display: flex; gap: 10px;
+    align-items: baseline; flex-wrap: wrap; }
+  .mk-label b { font-size: 1rem; color: #1E3A5F; }
+  .mk-label span { font-size: 0.82rem; color: #6B7280; }
+  .mk-label .h { margin-left: auto; font-size: 0.78rem; font-weight: 700; color: #146B5E;
+    background: #E3F1EE; border-radius: 20px; padding: 3px 10px; }
+  .mk-label .h.base { color: #6B7280; background: #F3F4F6; }
+  .mk .page { padding-bottom: 8px; }
+  .mk-fade { height: 40px; }
+
+  /* ── B·C 공통: 머리를 왼쪽 한 줄로 ── */
+  .hd { display: flex; align-items: center; gap: 14px; margin: 0 0 14px; padding: 2px 2px 0; }
+  .hd .hlogo { height: 34px; width: auto; flex-shrink: 0; display: block; }
+  .hd .ttl { display: flex; flex-direction: column; gap: 1px; min-width: 0;
+    padding-left: 14px; border-left: 1px solid #E5E7EB; }
+  .hd-b .hd-gear { margin-left: auto; align-self: center; }
+  .hd h1 { text-align: left; font-size: 1.05rem; margin: 0; }
+  .hd .today { text-align: left; margin: 0; font-size: 0.74rem; }
+
+  /* ── C: 건수 줄이 머리 오른쪽으로 들어온다(카드 한 장이 없어짐) ── */
+  .hd-c .statrow { margin-left: auto; flex-wrap: nowrap; }
+  .hd-c .hlset { margin-left: 6px; flex-wrap: nowrap; }
+  .hd-c .hllist { width: 520px; max-width: calc(100vw - 40px); }
+  @media (max-width: 800px) {
+    .hd-c { flex-wrap: wrap; }
+    .hd-c .statrow { margin-left: 0; flex-basis: 100%; flex-wrap: wrap; padding-top: 4px; }
+    .hd-c .hlset { margin-left: auto; }
+  }
+  @media (max-width: 480px) { .hd .ttl { padding-left: 0; border-left: 0; } .hd { flex-wrap: wrap; } }
+
+  /* ── B·C 공통: 흐름도 조이기 ── */
+  .tight .tile { min-height: 46px; }
+  .tight .tile .nm { font-size: 0.97rem; }
+  .tight .t-live.slim { min-height: 34px; }
+  .tight .fl { row-gap: 8px; }
+  .tight .fl .gap { height: 0; }
+  .tight .fl-conn .conn { height: 22px; font-size: 0.68rem; line-height: 1; }
+  .tight .fl-conn .conn::before { height: 5px; }
+  .tight .card h2 { margin-bottom: 10px; }
+
+  /* ── C: 흐름도 제목·설정이 실시간 줄의 빈 양옆으로 ── */
+  .fl-top .fl-title { grid-column: 1 / 4; align-self: center; font-size: 0.78rem; font-weight: 700;
+    color: #6B7280; }
+  .fl-top .gearlink.in-grid { grid-column: 9; justify-self: end; align-self: center; margin-left: 0; }
+  @media (max-width: 640px) {
+    .fl-top .fl-title { order: -3; }
+    .fl-top .gearlink.in-grid { order: 99; align-self: flex-end; }
+  }
+</style></head><body>
+<div class="mk-intro"><h1>홈 — 머리와 「화면 바로 가기」 빈 공간 줄이기</h1>
+<p>지금 떠 있는 홈 화면(home.html)을 그대로 복사해서 머리와 흐름도만 바꿨습니다. 쟁점·추이 카드는 둘 다 같습니다. 오른쪽 초록 숫자는 화면 맨 위부터 흐름도 카드 끝까지 실제로 잰 높이예요. 칸에 마우스를 올리면 말풍선, [단독]/[속보]는 지금처럼 펼쳐집니다.</p></div>
+<section class="mk " data-variant="A"><div class="mk-label"><b>A. 지금</b><span>로고·제목 가운데, 건수 카드 따로, 흐름도 칸 높이 60px</span><span class="h base" data-h></span></div>
+<div class="page"><img class="logo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNjcyLjgyOCIgaGVpZ2h0PSI1MjkuMzI4IiB2aWV3Qm94PSIwIDAgMTY3Mi44MjggNTI5LjMyNzk3Ij48cGF0aCBmaWxsPSIjZmZmIiBkPSJNMzUwLjYyNyA1OC4wMzFjMCAxMDUuMzgyLTg1LjQzMiAxOTAuODE0LTE5MC44MTMgMTkwLjgxNC0xMDUuMzcgMC0xOTAuNzkyLTg1LjQzMi0xOTAuNzkyLTE5MC44MTQgMC0xMDUuMzggODUuNDIxLTE5MC44MDIgMTkwLjc5Mi0xOTAuODAyIDEwNS4zODEgMCAxOTAuODEzIDg1LjQyMSAxOTAuODEzIDE5MC44MDIiIHN0eWxlPSJzdHJva2Utd2lkdGg6NS4xNzg5NSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTY0LjE3NyAyMTEuOTcpIi8+PHBhdGggZmlsbD0iIzAwMzY2OCIgZD0iTTI2My4wMDggNTMuMjhjLTMxLjc4My0yMS42MS03Mi41MDgtMTIuNzk0LTkzLjg5NiAxOS43MTctMTcuODU0IDI3LjE1My00NC44MTcgMzAuNTI0LTU1LjI1NiAzMC41MjQtMzQuMDE0IDAtNTcuMjk3LTIzLjkzNC02NC4xODYtNDguNjkzaC0uMDMyYy0uMDYtLjI0NS0uMDg3LS40NS0uMTktLjY5NWE4IDggMCAwIDAtLjIwNi0uODM2Yy0yLjY5OC0xMC4zMzYtMy4zNzctMTUuMjc2LTMuMzc3LTI2LjI1MiAwLTU5LjIxOSA2MC43MzktMTI1LjE1MyAxNDguMjUtMTI1LjE1MyA4OS42MDggMCAxNDAuODk2IDY4LjIyNSAxNTQuMDk4IDEwNi4xMzctLjIxNy0uNjY4LS40MjktMS4zNC0uNjczLTIuMDI1LTI1LjQyMi03NC4xMzYtOTUuNzQ3LTEyNy40NTQtMTc4LjUyNS0xMjcuNDU0LTEwNC4xNzcgMC0xODguNjcxIDg0LjQ2MS0xODguNjcxIDE4OC42ODIgMCA5My4xNCA2Ny4xNzcgMTcyLjg4IDE2MC4zNjEgMTcyLjg4IDc0LjMyNyAwIDEyNC4yOC00MS42OCAxNDcuMjAzLTk5LjEwOCAxMi41NTYtMzEuNDE0IDMuNjctNjguMzI4LTI0LjktODcuNzIzIiBzdHlsZT0ic3Ryb2tlLXdpZHRoOjUuNDI4NDQiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDE2Mi43NTMgMjA1Ljg2OClzY2FsZSguOTU0MDQpIi8+PHBhdGggZmlsbD0iI2U2MDAyZCIgZD0iTTM0OS4zOTcgMTEuNjk3QzMzOC4zNjctMjUuMjc2IDI4Ni43MS05OC4xMSAxOTQuMTE3LTk4LjExYy04Ny41MTIgMC0xNDguMjUgNjUuOTM0LTE0OC4yNSAxMjUuMTUzIDAgMTAuOTc2LjY3MiAxNS45MTYgMy4zNzYgMjYuMjU3LTEuMTM1LTQuNTI3LTEuNzQ4LTkuMDYtMS43NDgtMTMuNDczIDAtNjEuNjY3IDYxLjc3LTEwNC40IDEyNS4yMzQtMTA0LjQgODUuOTMyIDAgMTU1LjU4NCA2OS42NTIgMTU1LjU4NCAxNTUuNTY4IDAgNjcuMzU2LTM4Ljc2NCAxMjUuNjUyLTk1LjA4NCAxNTMuNjY5bC4wMTYuMDQzYzcyLjYtMjYuMjk1IDEyNC40NDItOTUuODE3IDEyNC40NDItMTc3LjQ4MyAwLTE5LjMyNS0yLjYtMzYuMzU0LTguMjktNTUuNTI3IiBzdHlsZT0ic3Ryb2tlLXdpZHRoOjUuNDI4NDQiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDE2Mi43NTMgMjA1Ljg2OClzY2FsZSguOTU0MDQpIi8+PHBhdGggZmlsbD0iIzU5NTc1NyIgZD0iTTU4MS40NzItMzIuMjU1aDIxLjYwMVYxNDguNjRoLTIxLjYwMVY2My42OTVoLTIwLjc2OHY4My45MWgtMjAuOThWLTMyLjA0OWgyMC45OHY3NC45NzVoMjAuNzY4ek00MzguOTk5LTEuMzExdi0xOS43MzJoODguNDcyVi0xLjMxaC0zNi41NDhsNDAuNDk0IDEyMS4wNzktMTkuMTA1IDUuODItMjguMjQ2LTg2LjgxNC0yOC40NTMgODguMjctMTkuOTM0LTYuMDIzTDQ3Ni41ODgtMS4zMTF6TTc2Ni4zMTMgNjMuNjk3VjI0LjQ0NWgtMzMuNjQ4VjUuMTI4aDMzLjY0OHYtMzcuMzgyaDIyLjQyNXY5NS45NXptLTE0Ljk1MiA0Ni4zMTVjMC02Ljc4NC0yLjQ5Ni0xMi42MzctNy40NzgtMTcuNTUxcS03LjQ3OS03LjM3MS0xNy42NTUtNy4zN2MtNi43ODQgMC0xMi42MzcgMi40NTUtMTcuNTUxIDcuMzdxLTcuMzcxIDcuMzczLTcuMzcgMTcuNTUxYzAgNi43ODQgMi40NTUgMTIuNTk1IDcuMzcgMTcuNDQzIDQuOTE0IDQuODQ3IDEwLjc2NyA3LjI3MSAxNy41NTEgNy4yNzFxMTAuMTc1IDAgMTcuNjU1LTcuMjcxYzQuOTgyLTQuODQ4IDcuNDc4LTEwLjY1OSA3LjQ3OC0xNy40NDNtMjIuMDE2LjIwN2MwIDYuMDktMS4yNTMgMTEuODAzLTMuNzM5IDE3LjEzMnEtMy43NDUgNy45OTctOS45NyAxNC4wMmMtNC4yOTMgNC4wMTMtOS4zMTYgNy4xOTgtMTUuMDYgOS41NTVxLTguNjI0IDMuNTI2LTE4LjE3MyAzLjUyNy05LjU1MyAwLTE4LjI3Ni0zLjUyNy04LjcyNS0zLjUzNS0xNS4xNi05LjU1NWMtNC4xNTgtNC4wMTQtNy40NzgtOC42OS05Ljk2OS0xNC4wMi0yLjQ5Ni01LjMyOS0zLjczOS0xMS4wNDEtMy43MzktMTcuMTMyIDAtNi4wOSAxLjI0My0xMS44MzkgMy43NC0xNy4yNCAyLjQ5LTUuMzk3IDUuODEtMTAuMTA1IDkuOTY5LTE0LjEyNHE2LjQzMy02LjAyIDE1LjE1OS05LjU1YzUuODE2LTIuMzUgMTEuOTA2LTMuNTM3IDE4LjI3Ni0zLjUzNyA2LjM2NSAwIDEyLjQyNSAxLjE4NiAxOC4xNzMgMy41MzcgNS43NDQgMi4zNTIgMTAuNzY3IDUuNTM3IDE1LjA2IDkuNTVxNi4yMjUgNi4wMyA5Ljk3IDE0LjEyM2MyLjQ4NiA1LjQwMiAzLjc0IDExLjE1IDMuNzQgMTcuMjQxTTYyOS42NS03Ljc1MnYtMTkuMzEyaDEwMy44NDN2MTkuMzEyaC00NC4yMzNsNDYuMTA4IDU2LjI4NS0xNS43ODYgMTIuODgtMzYuOTY3LTQ2LjEwOC0zNi43NjUgNDkuMjItMTYuNDAyLTEzLjI4OSA0NS44OTYtNTguOTg4Wk05NTUuNzIzLTMyLjI1NWgyMi40M3Y5NS45NWgtMjIuNDNWNDEuMDU4aC0yOS43MDFWMjIuNTc0aDI5LjdWNS45NmgtMjkuN3YtMTguNDg0aDI5Ljd6bS02LjQzOCAxNDIuMjY1YzAtNi43ODQtMi40OS0xMi42MzEtNy40NzgtMTcuNTUxLTQuOTgyLTQuOTEtMTAuODctNy4zNy0xNy42NS03LjM3LTYuNzkgMC0xMi42NDIgMi40Ni0xNy41NTEgNy4zNy00LjkyIDQuOTItNy4zNzUgMTAuNzY3LTcuMzc1IDE3LjU1MSAwIDYuNzg1IDIuNDU1IDEyLjYgNy4zNzUgMTcuNDQzcTcuMzY1IDcuMjcyIDE3LjU1MSA3LjI3MWM2Ljc4IDAgMTIuNjY4LTIuNDIzIDE3LjY1LTcuMjdxNy40OC03LjI2NiA3LjQ3OC0xNy40NDRtMjIuMDE2LjIwOGMwIDYuMDk1LTEuMjQ4IDExLjgwMi0zLjc0NCAxNy4xMzEtMi40ODYgNS4zMy01LjgxMSAxMC4wMDYtOS45NjUgMTQuMDI1LTQuMjk4IDQuMDE0LTkuMzE3IDcuMTk0LTE1LjA2IDkuNTUtNS43NDMgMi4zNTEtMTEuODAzIDMuNTMyLTE4LjE3MyAzLjUzMnMtMTIuNDYtMS4xOC0xOC4yNzEtMy41MzJjLTUuODIxLTIuMzU2LTEwLjg3Ni01LjUzNi0xNS4xNjQtOS41NXEtNi4yMzItNi4wMy05Ljk3LTE0LjAyNWMtMi40OS01LjMyOS0zLjczOS0xMS4wMzYtMy43MzktMTcuMTMxIDAtNi4wOSAxLjI0OC0xMS44NCAzLjc0LTE3LjIzNnEzLjczNi04LjEwMiA5Ljk2OS0xNC4xMjggNi40MzItNi4wMTUgMTUuMTY0LTkuNTVjNS44MS0yLjM1MSAxMS45LTMuNTMyIDE4LjI3MS0zLjUzMiA2LjM3IDAgMTIuNDMgMS4xOCAxOC4xNzMgMy41MzJxOC42MTQgMy41MzUgMTUuMDYgOS41NWM0LjE1NCA0LjAxOSA3LjQ3OSA4LjcyNiA5Ljk2NSAxNC4xMjggMi40OTYgNS4zOTYgMy43NDQgMTEuMTQ1IDMuNzQ0IDE3LjIzNk05MTAuNDQ4IDU4LjkyaC0yMi40MzVWLTcuMTI3aC02NS4yMDh2LTE5LjkzOWg4Ny42NDN6TTExNDkuNy0zMi4yNTRoMjEuNjAxdjE4MC44OTZIMTE0OS43em0tMzYuOTY4LjIwMmgyMC45NzV2MTc5LjY1M2gtMjAuOTc1VjU0LjE0aC0yMy40N1YzMy43ODhoMjMuNDd6TTEwMDcuMjI3LTEuMzFWLTIxLjA0aDg4LjQ3MlYtMS4zMWgtMzYuNTQ4bDQwLjQ5NCAxMjEuMDc5LTE5LjEwNSA1LjgxNi0yOC4yNDYtODYuODEtMjguNDUzIDg4LjI2NS0xOS45MzQtNi4wMjNMMTA0NC44MjEtMS4zMXpNMTMyOS4xNCAxMy4yMjhoLTk1LjExNnYyNC45Mmg5NS4xMTZabS05NS4xMTYtMTkuNTI1aDk1LjExNnYtMjIuODQ0aDIyLjIyM1Y1Ny44OGgtMTM5LjU2OHYtODcuMDIyaDIyLjIyOXptLTM1LjUxOCA4OC40NzdoMTY2LjE0NnYxOS45MzRoLTcxLjg1OHY0Ni41MjhoLTIyLjYzN3YtNDYuNTI4aC03MS42NXoiIHN0eWxlPSJzdHJva2Utd2lkdGg6NS4xNzg5NSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTY0LjE3NyAyMTEuOTcpIi8+PC9zdmc+" alt="로고">
+  <h1>재정경제부 AI 뉴스 모니터링</h1>
+  <p class="today">2026년 09월 18일 (금) · 14:00 회차까지 수집됨</p>
+<div class="card"><div class="statrow"><span>오늘 <span class="val">166건</span></span><span class="statdot">·</span><span class="vs" title="어제 하루 전체는 289건이었습니다">어제 같은 시각 190건 대비 <b>-13%</b></span><span class="hlset"><details class="hlbox"><summary class="hl scoop"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17v-4a5 5 0 0 1 10 0v4"/><rect x="5" y="17" width="14" height="3.5" rx="1.2"/><path d="M12 4V2"/><path d="M4.6 7.6 3.2 6.2"/><path d="m19.4 7.6 1.4-1.4"/></svg>[단독] <span class="n">4</span></summary><ul class="hllist"><li><span class="ht">10:29</span><span class="ho">서울경제</span><a href="https://n.news.naver.com/mnews/article/011/0004663270" target="_blank" rel="noopener">[단독]국회의원 보좌진 월급 ‘지각 입금’…원인은 ‘국고 부족’?</a></li><li><span class="ht">06:46</span><span class="ho">SBS</span><a href="https://n.news.naver.com/mnews/article/055/0001389246" target="_blank" rel="noopener">[단독] &#x27;치사량 167배&#x27; 고농축 니코틴, 온라인 쇼핑몰에</a></li><li><span class="ht">00:51</span><span class="ho">조선일보</span><a href="https://n.news.naver.com/mnews/article/023/0003999145" target="_blank" rel="noopener">[단독]파병 논의했나… 스틸 美대사, 李 회견 하루 앞두고 靑 비공개 방문</a></li><li><span class="ht">00:27</span><span class="ho">국민일보</span><a href="https://n.news.naver.com/mnews/article/005/0001873721" target="_blank" rel="noopener">[단독] ‘한국판 IRA’ 품목 선정 착수… 배터리·태양광 의견 수렴</a></li></ul></details><details class="hlbox"><summary class="hl flash"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17v-4a5 5 0 0 1 10 0v4"/><rect x="5" y="17" width="14" height="3.5" rx="1.2"/><path d="M12 4V2"/><path d="M4.6 7.6 3.2 6.2"/><path d="m19.4 7.6 1.4-1.4"/></svg>[속보] <span class="n">20</span></summary><ul class="hllist"><li><span class="ht">14:05</span><span class="ho">한국경제TV</span><a href="https://n.news.naver.com/mnews/article/215/0001266451" target="_blank" rel="noopener">[속보] 귀향길 &#x27;가득&#x27; 주유할랬더니…업계 뿔났다 &quot;가격 경쟁 왜곡&quot;</a></li><li><span class="ht">11:29</span><span class="ho">한경비즈니스</span><a href="https://n.news.naver.com/mnews/article/050/0000111090" target="_blank" rel="noopener">[속보] 추석연휴 고속도로 기름값 리터당 100원 내린다</a></li><li><span class="ht">09:50</span><span class="ho">디지털타임스</span><a href="https://n.news.naver.com/mnews/article/029/0003048746" target="_blank" rel="noopener">[속보] 추석 연휴 기름값 깎아준다…구윤철 “고속도로 리터당 100원 인하”</a></li><li><span class="ht">09:32</span><span class="ho">YTN</span><a href="https://n.news.naver.com/mnews/article/052/0002408685" target="_blank" rel="noopener">[속보] 구윤철 &quot;추석연휴 고속도로 기름값 리터당 100원 인하&quot;</a></li><li><span class="ht">09:30</span><span class="ho">강원일보</span><a href="https://n.news.naver.com/mnews/article/087/0001219075" target="_blank" rel="noopener">[속보]구윤철 “추석연휴 전국 226개 재정 고속도로 주유소 기름값 리터당 100원 인하”</a></li><li><span class="ht">09:30</span><span class="ho">강원일보</span><a href="https://n.news.naver.com/mnews/article/087/0001219075" target="_blank" rel="noopener">[속보]구윤철 “추석연휴 전국 226개 재정 고속도로 주유소 기름값 리터당 100원 인하”</a></li><li><span class="ht">09:18</span><span class="ho">매일경제</span><a href="https://n.news.naver.com/mnews/article/009/0005737055" target="_blank" rel="noopener">[속보] 구윤철 “추석연휴 고속도로 기름값 리터당 100원 인하”</a></li><li><span class="ht">08:20</span><span class="ho">문화일보</span><a href="https://n.news.naver.com/mnews/article/021/0002819703" target="_blank" rel="noopener">[속보]호르무즈 긴장 지속에…유류세 인하 11월 말까지 연장</a></li><li><span class="ht">08:20</span><span class="ho">YTN</span><a href="https://n.news.naver.com/mnews/article/052/0002408645" target="_blank" rel="noopener">[속보] 재경부, 유류세 인하 조치 두 달 더 연장</a></li><li><span class="ht">08:14</span><span class="ho">세계일보</span><a href="https://n.news.naver.com/mnews/article/022/0004160051" target="_blank" rel="noopener">[속보] 정부, 유류세 인하 2개월 추가 연장…11월 말까지 유지</a></li><li><span class="ht">08:12</span><span class="ho">프레시안</span><a href="https://n.news.naver.com/mnews/article/002/0002457335" target="_blank" rel="noopener">[속보] 유류세 한시적 인하 조치 2개월 연장</a></li><li><span class="ht">08:05</span><span class="ho">부산일보</span><a href="https://n.news.naver.com/mnews/article/082/0001398914" target="_blank" rel="noopener">[속보] 유류세 인하 11월 말까지 두 달 연장…&quot;국민 유류비 부담 경감&quot;</a></li><li><span class="ht">08:05</span><span class="ho">부산일보</span><a href="https://n.news.naver.com/mnews/article/082/0001398914" target="_blank" rel="noopener">[속보] 유류세 인하 11월 말까지 두 달 연장…&quot;국민 유류비 부담 경감&quot;</a></li><li><span class="ht">08:05</span><span class="ho">부산일보</span><a href="https://n.news.naver.com/mnews/article/082/0001398914" target="_blank" rel="noopener">[속보] 유류세 인하 11월 말까지 두 달 연장…&quot;국민 유류비 부담 경감&quot;</a></li><li><span class="ht">08:04</span><span class="ho">매일경제</span><a href="https://n.news.naver.com/mnews/article/009/0005737022" target="_blank" rel="noopener">[속보] 유류세 인하 11월 말까지 두 달 연장…“국민 유류비 부담 경감”</a></li><li><span class="ht">08:04</span><span class="ho">매일경제</span><a href="https://n.news.naver.com/mnews/article/009/0005737022" target="_blank" rel="noopener">[속보] 유류세 인하 11월 말까지 두 달 연장…“국민 유류비 부담 경감”</a></li><li><span class="ht">08:04</span><span class="ho">매일경제</span><a href="https://n.news.naver.com/mnews/article/009/0005737022" target="_blank" rel="noopener">[속보] 유류세 인하 11월 말까지 두 달 연장…“국민 유류비 부담 경감”</a></li><li><span class="ht">08:01</span><span class="ho">경향신문</span><a href="https://n.news.naver.com/mnews/article/032/0003471260" target="_blank" rel="noopener">[속보]유류세 인하 두 달 더 연장…휘발유 15%·경유 25% 유지</a></li><li><span class="ht">08:01</span><span class="ho">경향신문</span><a href="https://n.news.naver.com/mnews/article/032/0003471260" target="_blank" rel="noopener">[속보]유류세 인하 두 달 더 연장…휘발유 15%·경유 25% 유지</a></li><li><span class="ht">08:01</span><span class="ho">경향신문</span><a href="https://n.news.naver.com/mnews/article/032/0003471260" target="_blank" rel="noopener">[속보]유류세 인하 두 달 더 연장…휘발유 15%·경유 25% 유지</a></li></ul></details></span></div></div>
+<div class="pair">
+    <div class="card"><h2>오늘의 쟁점</h2><div class="irow"><div class="rowhead"><span class="rank">1</span><span class="ibox"><span class="iname">유류세 인하 11월말까지 연장</span><span class="chips"><span class="gchip">재정경제부</span></span></span><span class="ibar" title="13건"><i style="width:100%"></i></span></div></div><div class="irow"><div class="rowhead"><span class="rank">2</span><span class="ibox"><span class="iname">추석 연휴 고속도로 기름값 할인</span><span class="chips"><span class="gchip">재정경제부</span></span></span><span class="ibar" title="12건"><i style="width:92%"></i></span></div></div><div class="irow"><div class="rowhead"><span class="rank">3</span><span class="ibox"><span class="iname">이형일·김승원 등 인사청문</span><span class="chips"><span class="gchip">재정경제부</span></span></span><span class="ibar" title="6건"><i style="width:46%"></i></span></div></div><div class="irow"><div class="rowhead"><span class="rank">4</span><span class="ibox"><span class="iname">정부 인사 및 조직</span><span class="chips"><span class="gchip">재정경제부</span></span></span><span class="ibar" title="6건"><i style="width:46%"></i></span></div></div><div class="irow"><div class="rowhead"><span class="rank">5</span><span class="ibox"><span class="iname">글로벌 금리 인상과 국내 대응</span><span class="chips"><span class="gchip">재정경제부</span></span></span><span class="ibar" title="4건"><i style="width:31%"></i></span></div></div></div>
+    <div class="card"><h2>정책 단어 추이 <span class="sub">최근 7일</span><a class="trend-more" href="http://127.0.0.1:8765/trend">더보기</a></h2><a class="trend-chart-link" href="http://127.0.0.1:8765/trend"><div class="trend-chart-wrap" id="home-trend-chart"><svg class="trend-chart" viewBox="0 0 412 190" width="100%" role="img" aria-label="정책 단어 추이 그래프"><rect x="58.7" y="12" width="49.4" height="174" fill="#EDF0F3"/><rect x="108.1" y="12" width="49.4" height="174" fill="#EDF0F3"/><line x1="34" y1="153.0" x2="330.5" y2="153.0" stroke="#EEF0F2"/><text x="27" y="156.5" text-anchor="end" font-size="9.5" fill="#9CA3AF">0</text><line x1="34" y1="106.0" x2="330.5" y2="106.0" stroke="#EEF0F2"/><text x="27" y="109.5" text-anchor="end" font-size="9.5" fill="#9CA3AF">200</text><line x1="34" y1="59.0" x2="330.5" y2="59.0" stroke="#EEF0F2"/><text x="27" y="62.5" text-anchor="end" font-size="9.5" fill="#9CA3AF">400</text><line x1="34" y1="12.0" x2="330.5" y2="12.0" stroke="#EEF0F2"/><text x="27" y="15.5" text-anchor="end" font-size="9.5" fill="#9CA3AF">600</text><text x="34.0" y="170" text-anchor="middle" font-size="9.5" fill="#9CA3AF" font-weight="400">11일(금)</text><text x="83.4" y="170" text-anchor="middle" font-size="9.5" fill="#4B5563" font-weight="600">12일(토)</text><text x="132.8" y="170" text-anchor="middle" font-size="9.5" fill="#4B5563" font-weight="600">13일(일)</text><text x="182.2" y="170" text-anchor="middle" font-size="9.5" fill="#9CA3AF" font-weight="400">14일(월)</text><text x="231.7" y="170" text-anchor="middle" font-size="9.5" fill="#9CA3AF" font-weight="400">15일(화)</text><text x="281.1" y="170" text-anchor="middle" font-size="9.5" fill="#9CA3AF" font-weight="400">16일(수)</text><text x="330.5" y="170" text-anchor="middle" font-size="9.5" fill="#9CA3AF" font-weight="400">17일(목)</text><text x="330.5" y="183" text-anchor="middle" font-size="9" fill="#6B7280">어제</text><polyline points="34.0,153.0 83.4,153.0 132.8,151.4 182.2,151.8 231.7,152.8 281.1,153.0 330.5,153.0" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><polyline points="34.0,151.1 83.4,152.3 132.8,150.9 182.2,150.4 231.7,134.0 281.1,149.5 330.5,152.3" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><polyline points="34.0,149.5 83.4,151.8 132.8,145.9 182.2,134.9 231.7,72.6 281.1,142.4 330.5,128.1" fill="none" stroke="#1baf7a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><polyline points="34.0,152.1 83.4,153.0 132.8,152.8 182.2,151.6 231.7,150.7 281.1,152.1 330.5,152.8" fill="none" stroke="#eda100" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><polyline points="34.0,152.1 83.4,152.1 132.8,147.6 182.2,141.5 231.7,94.7 281.1,144.5 330.5,146.2" fill="none" stroke="#e87ba4" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><line x1="336.5" y1="93.9" x2="347.5" y2="93.9" stroke="#1baf7a" stroke-width="3.5" stroke-linecap="round"/><text x="352.5" y="97.4" font-size="10.5" fill="#1F2937">이형일 <tspan fill="#6B7280">106</tspan></text><line x1="336.5" y1="112.0" x2="347.5" y2="112.0" stroke="#e87ba4" stroke-width="3.5" stroke-linecap="round"/><text x="352.5" y="115.5" font-size="10.5" fill="#1F2937">청문회 <tspan fill="#6B7280">29</tspan></text><line x1="336.5" y1="125.0" x2="347.5" y2="125.0" stroke="#eb6834" stroke-width="3.5" stroke-linecap="round"/><text x="352.5" y="128.5" font-size="10.5" fill="#1F2937">비거주 <tspan fill="#6B7280">3</tspan></text><line x1="336.5" y1="138.0" x2="347.5" y2="138.0" stroke="#eda100" stroke-width="3.5" stroke-linecap="round"/><text x="352.5" y="141.5" font-size="10.5" fill="#1F2937">세제개편 <tspan fill="#6B7280">1</tspan></text><line x1="336.5" y1="151.0" x2="347.5" y2="151.0" stroke="#2a78d6" stroke-width="3.5" stroke-linecap="round"/><text x="352.5" y="154.5" font-size="10.5" fill="#1F2937">종부세 <tspan fill="#6B7280">0</tspan></text></svg></div></a></div>
+  </div>
+<div class="card">
+    <h2>화면 바로 가기<a class="gearlink" href="http://127.0.0.1:8765/"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M19.1 14.4a1.5 1.5 0 0 0 .3 1.7l.1.1a1.9 1.9 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-1.7-.3 1.5 1.5 0 0 0-.9 1.4v.2a1.9 1.9 0 1 1-3.8 0v-.1a1.5 1.5 0 0 0-1-1.4 1.5 1.5 0 0 0-1.7.3l-.1.1a1.9 1.9 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0 .3-1.7 1.5 1.5 0 0 0-1.4-.9h-.2a1.9 1.9 0 1 1 0-3.8h.1a1.5 1.5 0 0 0 1.4-1 1.5 1.5 0 0 0-.3-1.7l-.1-.1a1.9 1.9 0 1 1 2.6-2.6l.1.1a1.5 1.5 0 0 0 1.7.3h.1a1.5 1.5 0 0 0 .9-1.4v-.2a1.9 1.9 0 1 1 3.8 0v.1a1.5 1.5 0 0 0 .9 1.4 1.5 1.5 0 0 0 1.7-.3l.1-.1a1.9 1.9 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0-.3 1.7v.1a1.5 1.5 0 0 0 1.4.9h.2a1.9 1.9 0 1 1 0 3.8h-.1a1.5 1.5 0 0 0-1.4.9Z"/></svg> 설정</a></h2>
+    <div class="flow">
+    <div class="fl fl-top">
+      <span class="blank"></span><span class="blank"></span>
+      <a class="tile t-live slim side" href="http://127.0.0.1:8765/live.html"><span class="nm"><span class="e">🔴</span>실시간 현황</span><span class="tip"><b>거르지 않은 오늘 기사 전부</b><span class="tb">검색어에 걸린 오늘 기사를 시간순으로 다 보여줘요. 안 봐도 초안은 알아서 모여요.</span><span class="nx">📌 담아두기 <i>→</i> 초안·확정본</span></span></a>
+    </div>
+    <div class="fl fl-conn"><span></span><span></span><span class="conn">📌 담아두기</span></div>
+    <div class="fl">
+      <span class="rl reg" title="정해진 시각마다 앱이 알아서 모아요">정기</span>
+      <a class="tile t-regkw" href="http://127.0.0.1:8765/keywords"><span class="nm"><span class="e">🔍</span>검색어</span><span class="tip l"><b>정기 스크랩 검색어</b><span class="tb">켜 둔 그룹은 실시간 현황에, 정기 스크랩을 체크한 그룹은 초안·확정본에도 들어가요.</span><span class="nx">저장 <i>→</i> 실시간 현황은 바로 · 정기는 다음 회차부터</span></span></a>
+      <span class="ar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>
+      <a class="tile t-reg draft" href="http://127.0.0.1:8765/preview.html"><span class="nm"><span class="e">⛏️</span>초안</span><span class="tip"><b>17:00 회차 진행 중</b><span class="tb">마감 전까지 모이는 기사를 미리 정리하는 곳이에요.</span><span class="nx">17:00 회차 마감 <i>→</i> 확정본</span></span></a>
+      <span class="ar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>
+      <a class="tile t-reg" href="index.html"><span class="nm"><span class="e">💎</span>확정본</span><span class="tip"><b>14:00 회차</b><span class="tb">마감된 회차의 보고서예요. 여기서 발송해요.</span><span class="nx">다음 회차 마감 <i>→</i> 정기 보관함</span></span></a>
+      <span class="ar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>
+      <a class="tile t-regarch" href="history.html"><span class="nm"><span class="e">🗄️</span>보관함</span><span class="tip r"><b>지난 회차 모아보기</b><span class="tb">날짜 › 회차별로 1년 동안 쌓여요.</span></span></a>
+      <span class="rl ad" title="사안이 생기면 직접 모아요">수시</span>
+      <a class="tile t-adnew" href="http://127.0.0.1:8765/adhoc/new"><span class="nm"><span class="e">🔎</span>새 수집</span><span class="tip l"><b>사안·검색어·시간을 정해 모아요</b><span class="tb">지난 1년 동안 한 수집이 조건째 목록으로 남아 있어, 골라서 다시 쓸 수 있어요.</span><span class="nx">수집 <i>→</i> 원본</span></span></a>
+      <span class="ar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>
+      <a class="tile t-ad" href="http://127.0.0.1:8765/adhoc/new"><span class="nm"><span class="e">🍅</span>원본</span><span class="tip"><b>오늘 만든 원본이 없어요</b><span class="tb">새 수집에서 조건을 정하면 여기에 모여요.</span><span class="nx">골라 보내기 <i>→</i> 확정본</span></span></a>
+      <span class="ar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>
+      <a class="tile t-ad" href="http://127.0.0.1:8765/adhoc/new"><span class="nm"><span class="e">🥗</span>확정본</span><span class="tip"><b>오늘 만든 확정본이 없어요</b><span class="tb">원본에서 기사를 보내면 같은 이름으로 생겨요.</span><span class="nx">자정 <i>→</i> 수시 보관함</span></span></a>
+      <span class="ar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>
+      <a class="tile t-adarch" href="http://127.0.0.1:8765/adhoc"><span class="nm"><span class="e">📚</span>보관함</span><span class="tip r"><b>지난 확정본 모아보기</b><span class="tb">사안 › 날짜별로 1년 동안 쌓여요. 원본은 새 수집에서 다시 찾아요.</span></span></a>
+      <div class="gap"></div>
+      <a class="tile t-lab" href="http://127.0.0.1:8765/labels"><span class="nm"><span class="e">🏷️</span>라벨 보관함</span><span class="tagset"><span class="tag-chip">사진 아님</span><span class="tag-chip">부정기사</span><span class="tag-chip">비상경제본부회의</span></span><span class="tip"><b>라벨 붙인 기사 모아보기</b><span class="tb">정기·수시를 가리지 않고 모여요. 원래 회차가 지워져도 남아요.</span></span></a>
+    </div>
+    </div>
+  </div></div></section><section class="mk tight" data-variant="B"><div class="mk-label"><b>B. 로고 옆 제목 + 설정 오른쪽 + 흐름도 조이기</b><span>로고 옆에 「AI 뉴스 모니터링」·날짜. ⚙ 설정은 머리 오른쪽으로. 흐름도 카드의 「화면 바로 가기」 줄은 없앰, 칸 46px</span><span class="h" data-h></span></div>
+<div class="page"><header class="hd hd-b"><img class="hlogo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNjcyLjgyOCIgaGVpZ2h0PSI1MjkuMzI4IiB2aWV3Qm94PSIwIDAgMTY3Mi44MjggNTI5LjMyNzk3Ij48cGF0aCBmaWxsPSIjZmZmIiBkPSJNMzUwLjYyNyA1OC4wMzFjMCAxMDUuMzgyLTg1LjQzMiAxOTAuODE0LTE5MC44MTMgMTkwLjgxNC0xMDUuMzcgMC0xOTAuNzkyLTg1LjQzMi0xOTAuNzkyLTE5MC44MTQgMC0xMDUuMzggODUuNDIxLTE5MC44MDIgMTkwLjc5Mi0xOTAuODAyIDEwNS4zODEgMCAxOTAuODEzIDg1LjQyMSAxOTAuODEzIDE5MC44MDIiIHN0eWxlPSJzdHJva2Utd2lkdGg6NS4xNzg5NSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTY0LjE3NyAyMTEuOTcpIi8+PHBhdGggZmlsbD0iIzAwMzY2OCIgZD0iTTI2My4wMDggNTMuMjhjLTMxLjc4My0yMS42MS03Mi41MDgtMTIuNzk0LTkzLjg5NiAxOS43MTctMTcuODU0IDI3LjE1My00NC44MTcgMzAuNTI0LTU1LjI1NiAzMC41MjQtMzQuMDE0IDAtNTcuMjk3LTIzLjkzNC02NC4xODYtNDguNjkzaC0uMDMyYy0uMDYtLjI0NS0uMDg3LS40NS0uMTktLjY5NWE4IDggMCAwIDAtLjIwNi0uODM2Yy0yLjY5OC0xMC4zMzYtMy4zNzctMTUuMjc2LTMuMzc3LTI2LjI1MiAwLTU5LjIxOSA2MC43MzktMTI1LjE1MyAxNDguMjUtMTI1LjE1MyA4OS42MDggMCAxNDAuODk2IDY4LjIyNSAxNTQuMDk4IDEwNi4xMzctLjIxNy0uNjY4LS40MjktMS4zNC0uNjczLTIuMDI1LTI1LjQyMi03NC4xMzYtOTUuNzQ3LTEyNy40NTQtMTc4LjUyNS0xMjcuNDU0LTEwNC4xNzcgMC0xODguNjcxIDg0LjQ2MS0xODguNjcxIDE4OC42ODIgMCA5My4xNCA2Ny4xNzcgMTcyLjg4IDE2MC4zNjEgMTcyLjg4IDc0LjMyNyAwIDEyNC4yOC00MS42OCAxNDcuMjAzLTk5LjEwOCAxMi41NTYtMzEuNDE0IDMuNjctNjguMzI4LTI0LjktODcuNzIzIiBzdHlsZT0ic3Ryb2tlLXdpZHRoOjUuNDI4NDQiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDE2Mi43NTMgMjA1Ljg2OClzY2FsZSguOTU0MDQpIi8+PHBhdGggZmlsbD0iI2U2MDAyZCIgZD0iTTM0OS4zOTcgMTEuNjk3QzMzOC4zNjctMjUuMjc2IDI4Ni43MS05OC4xMSAxOTQuMTE3LTk4LjExYy04Ny41MTIgMC0xNDguMjUgNjUuOTM0LTE0OC4yNSAxMjUuMTUzIDAgMTAuOTc2LjY3MiAxNS45MTYgMy4zNzYgMjYuMjU3LTEuMTM1LTQuNTI3LTEuNzQ4LTkuMDYtMS43NDgtMTMuNDczIDAtNjEuNjY3IDYxLjc3LTEwNC40IDEyNS4yMzQtMTA0LjQgODUuOTMyIDAgMTU1LjU4NCA2OS42NTIgMTU1LjU4NCAxNTUuNTY4IDAgNjcuMzU2LTM4Ljc2NCAxMjUuNjUyLTk1LjA4NCAxNTMuNjY5bC4wMTYuMDQzYzcyLjYtMjYuMjk1IDEyNC40NDItOTUuODE3IDEyNC40NDItMTc3LjQ4MyAwLTE5LjMyNS0yLjYtMzYuMzU0LTguMjktNTUuNTI3IiBzdHlsZT0ic3Ryb2tlLXdpZHRoOjUuNDI4NDQiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDE2Mi43NTMgMjA1Ljg2OClzY2FsZSguOTU0MDQpIi8+PHBhdGggZmlsbD0iIzU5NTc1NyIgZD0iTTU4MS40NzItMzIuMjU1aDIxLjYwMVYxNDguNjRoLTIxLjYwMVY2My42OTVoLTIwLjc2OHY4My45MWgtMjAuOThWLTMyLjA0OWgyMC45OHY3NC45NzVoMjAuNzY4ek00MzguOTk5LTEuMzExdi0xOS43MzJoODguNDcyVi0xLjMxaC0zNi41NDhsNDAuNDk0IDEyMS4wNzktMTkuMTA1IDUuODItMjguMjQ2LTg2LjgxNC0yOC40NTMgODguMjctMTkuOTM0LTYuMDIzTDQ3Ni41ODgtMS4zMTF6TTc2Ni4zMTMgNjMuNjk3VjI0LjQ0NWgtMzMuNjQ4VjUuMTI4aDMzLjY0OHYtMzcuMzgyaDIyLjQyNXY5NS45NXptLTE0Ljk1MiA0Ni4zMTVjMC02Ljc4NC0yLjQ5Ni0xMi42MzctNy40NzgtMTcuNTUxcS03LjQ3OS03LjM3MS0xNy42NTUtNy4zN2MtNi43ODQgMC0xMi42MzcgMi40NTUtMTcuNTUxIDcuMzdxLTcuMzcxIDcuMzczLTcuMzcgMTcuNTUxYzAgNi43ODQgMi40NTUgMTIuNTk1IDcuMzcgMTcuNDQzIDQuOTE0IDQuODQ3IDEwLjc2NyA3LjI3MSAxNy41NTEgNy4yNzFxMTAuMTc1IDAgMTcuNjU1LTcuMjcxYzQuOTgyLTQuODQ4IDcuNDc4LTEwLjY1OSA3LjQ3OC0xNy40NDNtMjIuMDE2LjIwN2MwIDYuMDktMS4yNTMgMTEuODAzLTMuNzM5IDE3LjEzMnEtMy43NDUgNy45OTctOS45NyAxNC4wMmMtNC4yOTMgNC4wMTMtOS4zMTYgNy4xOTgtMTUuMDYgOS41NTVxLTguNjI0IDMuNTI2LTE4LjE3MyAzLjUyNy05LjU1MyAwLTE4LjI3Ni0zLjUyNy04LjcyNS0zLjUzNS0xNS4xNi05LjU1NWMtNC4xNTgtNC4wMTQtNy40NzgtOC42OS05Ljk2OS0xNC4wMi0yLjQ5Ni01LjMyOS0zLjczOS0xMS4wNDEtMy43MzktMTcuMTMyIDAtNi4wOSAxLjI0My0xMS44MzkgMy43NC0xNy4yNCAyLjQ5LTUuMzk3IDUuODEtMTAuMTA1IDkuOTY5LTE0LjEyNHE2LjQzMy02LjAyIDE1LjE1OS05LjU1YzUuODE2LTIuMzUgMTEuOTA2LTMuNTM3IDE4LjI3Ni0zLjUzNyA2LjM2NSAwIDEyLjQyNSAxLjE4NiAxOC4xNzMgMy41MzcgNS43NDQgMi4zNTIgMTAuNzY3IDUuNTM3IDE1LjA2IDkuNTVxNi4yMjUgNi4wMyA5Ljk3IDE0LjEyM2MyLjQ4NiA1LjQwMiAzLjc0IDExLjE1IDMuNzQgMTcuMjQxTTYyOS42NS03Ljc1MnYtMTkuMzEyaDEwMy44NDN2MTkuMzEyaC00NC4yMzNsNDYuMTA4IDU2LjI4NS0xNS43ODYgMTIuODgtMzYuOTY3LTQ2LjEwOC0zNi43NjUgNDkuMjItMTYuNDAyLTEzLjI4OSA0NS44OTYtNTguOTg4Wk05NTUuNzIzLTMyLjI1NWgyMi40M3Y5NS45NWgtMjIuNDNWNDEuMDU4aC0yOS43MDFWMjIuNTc0aDI5LjdWNS45NmgtMjkuN3YtMTguNDg0aDI5Ljd6bS02LjQzOCAxNDIuMjY1YzAtNi43ODQtMi40OS0xMi42MzEtNy40NzgtMTcuNTUxLTQuOTgyLTQuOTEtMTAuODctNy4zNy0xNy42NS03LjM3LTYuNzkgMC0xMi42NDIgMi40Ni0xNy41NTEgNy4zNy00LjkyIDQuOTItNy4zNzUgMTAuNzY3LTcuMzc1IDE3LjU1MSAwIDYuNzg1IDIuNDU1IDEyLjYgNy4zNzUgMTcuNDQzcTcuMzY1IDcuMjcyIDE3LjU1MSA3LjI3MWM2Ljc4IDAgMTIuNjY4LTIuNDIzIDE3LjY1LTcuMjdxNy40OC03LjI2NiA3LjQ3OC0xNy40NDRtMjIuMDE2LjIwOGMwIDYuMDk1LTEuMjQ4IDExLjgwMi0zLjc0NCAxNy4xMzEtMi40ODYgNS4zMy01LjgxMSAxMC4wMDYtOS45NjUgMTQuMDI1LTQuMjk4IDQuMDE0LTkuMzE3IDcuMTk0LTE1LjA2IDkuNTUtNS43NDMgMi4zNTEtMTEuODAzIDMuNTMyLTE4LjE3MyAzLjUzMnMtMTIuNDYtMS4xOC0xOC4yNzEtMy41MzJjLTUuODIxLTIuMzU2LTEwLjg3Ni01LjUzNi0xNS4xNjQtOS41NXEtNi4yMzItNi4wMy05Ljk3LTE0LjAyNWMtMi40OS01LjMyOS0zLjczOS0xMS4wMzYtMy43MzktMTcuMTMxIDAtNi4wOSAxLjI0OC0xMS44NCAzLjc0LTE3LjIzNnEzLjczNi04LjEwMiA5Ljk2OS0xNC4xMjggNi40MzItNi4wMTUgMTUuMTY0LTkuNTVjNS44MS0yLjM1MSAxMS45LTMuNTMyIDE4LjI3MS0zLjUzMiA2LjM3IDAgMTIuNDMgMS4xOCAxOC4xNzMgMy41MzJxOC42MTQgMy41MzUgMTUuMDYgOS41NWM0LjE1NCA0LjAxOSA3LjQ3OSA4LjcyNiA5Ljk2NSAxNC4xMjggMi40OTYgNS4zOTYgMy43NDQgMTEuMTQ1IDMuNzQ0IDE3LjIzNk05MTAuNDQ4IDU4LjkyaC0yMi40MzVWLTcuMTI3aC02NS4yMDh2LTE5LjkzOWg4Ny42NDN6TTExNDkuNy0zMi4yNTRoMjEuNjAxdjE4MC44OTZIMTE0OS43em0tMzYuOTY4LjIwMmgyMC45NzV2MTc5LjY1M2gtMjAuOTc1VjU0LjE0aC0yMy40N1YzMy43ODhoMjMuNDd6TTEwMDcuMjI3LTEuMzFWLTIxLjA0aDg4LjQ3MlYtMS4zMWgtMzYuNTQ4bDQwLjQ5NCAxMjEuMDc5LTE5LjEwNSA1LjgxNi0yOC4yNDYtODYuODEtMjguNDUzIDg4LjI2NS0xOS45MzQtNi4wMjNMMTA0NC44MjEtMS4zMXpNMTMyOS4xNCAxMy4yMjhoLTk1LjExNnYyNC45Mmg5NS4xMTZabS05NS4xMTYtMTkuNTI1aDk1LjExNnYtMjIuODQ0aDIyLjIyM1Y1Ny44OGgtMTM5LjU2OHYtODcuMDIyaDIyLjIyOXptLTM1LjUxOCA4OC40NzdoMTY2LjE0NnYxOS45MzRoLTcxLjg1OHY0Ni41MjhoLTIyLjYzN3YtNDYuNTI4aC03MS42NXoiIHN0eWxlPSJzdHJva2Utd2lkdGg6NS4xNzg5NSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTY0LjE3NyAyMTEuOTcpIi8+PC9zdmc+" alt="로고"><div class="ttl"><h1>AI 뉴스 모니터링</h1><p class="today">2026년 09월 18일 (금) · 14:00 회차까지 수집됨</p></div><a class="gearlink hd-gear" href="http://127.0.0.1:8765/"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M19.1 14.4a1.5 1.5 0 0 0 .3 1.7l.1.1a1.9 1.9 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-1.7-.3 1.5 1.5 0 0 0-.9 1.4v.2a1.9 1.9 0 1 1-3.8 0v-.1a1.5 1.5 0 0 0-1-1.4 1.5 1.5 0 0 0-1.7.3l-.1.1a1.9 1.9 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0 .3-1.7 1.5 1.5 0 0 0-1.4-.9h-.2a1.9 1.9 0 1 1 0-3.8h.1a1.5 1.5 0 0 0 1.4-1 1.5 1.5 0 0 0-.3-1.7l-.1-.1a1.9 1.9 0 1 1 2.6-2.6l.1.1a1.5 1.5 0 0 0 1.7.3h.1a1.5 1.5 0 0 0 .9-1.4v-.2a1.9 1.9 0 1 1 3.8 0v.1a1.5 1.5 0 0 0 .9 1.4 1.5 1.5 0 0 0 1.7-.3l.1-.1a1.9 1.9 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0-.3 1.7v.1a1.5 1.5 0 0 0 1.4.9h.2a1.9 1.9 0 1 1 0 3.8h-.1a1.5 1.5 0 0 0-1.4.9Z"/></svg> 설정</a></header>
+<div class="card"><div class="statrow"><span>오늘 <span class="val">166건</span></span><span class="statdot">·</span><span class="vs" title="어제 하루 전체는 289건이었습니다">어제 같은 시각 190건 대비 <b>-13%</b></span><span class="hlset"><details class="hlbox"><summary class="hl scoop"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17v-4a5 5 0 0 1 10 0v4"/><rect x="5" y="17" width="14" height="3.5" rx="1.2"/><path d="M12 4V2"/><path d="M4.6 7.6 3.2 6.2"/><path d="m19.4 7.6 1.4-1.4"/></svg>[단독] <span class="n">4</span></summary><ul class="hllist"><li><span class="ht">10:29</span><span class="ho">서울경제</span><a href="https://n.news.naver.com/mnews/article/011/0004663270" target="_blank" rel="noopener">[단독]국회의원 보좌진 월급 ‘지각 입금’…원인은 ‘국고 부족’?</a></li><li><span class="ht">06:46</span><span class="ho">SBS</span><a href="https://n.news.naver.com/mnews/article/055/0001389246" target="_blank" rel="noopener">[단독] &#x27;치사량 167배&#x27; 고농축 니코틴, 온라인 쇼핑몰에</a></li><li><span class="ht">00:51</span><span class="ho">조선일보</span><a href="https://n.news.naver.com/mnews/article/023/0003999145" target="_blank" rel="noopener">[단독]파병 논의했나… 스틸 美대사, 李 회견 하루 앞두고 靑 비공개 방문</a></li><li><span class="ht">00:27</span><span class="ho">국민일보</span><a href="https://n.news.naver.com/mnews/article/005/0001873721" target="_blank" rel="noopener">[단독] ‘한국판 IRA’ 품목 선정 착수… 배터리·태양광 의견 수렴</a></li></ul></details><details class="hlbox"><summary class="hl flash"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17v-4a5 5 0 0 1 10 0v4"/><rect x="5" y="17" width="14" height="3.5" rx="1.2"/><path d="M12 4V2"/><path d="M4.6 7.6 3.2 6.2"/><path d="m19.4 7.6 1.4-1.4"/></svg>[속보] <span class="n">20</span></summary><ul class="hllist"><li><span class="ht">14:05</span><span class="ho">한국경제TV</span><a href="https://n.news.naver.com/mnews/article/215/0001266451" target="_blank" rel="noopener">[속보] 귀향길 &#x27;가득&#x27; 주유할랬더니…업계 뿔났다 &quot;가격 경쟁 왜곡&quot;</a></li><li><span class="ht">11:29</span><span class="ho">한경비즈니스</span><a href="https://n.news.naver.com/mnews/article/050/0000111090" target="_blank" rel="noopener">[속보] 추석연휴 고속도로 기름값 리터당 100원 내린다</a></li><li><span class="ht">09:50</span><span class="ho">디지털타임스</span><a href="https://n.news.naver.com/mnews/article/029/0003048746" target="_blank" rel="noopener">[속보] 추석 연휴 기름값 깎아준다…구윤철 “고속도로 리터당 100원 인하”</a></li><li><span class="ht">09:32</span><span class="ho">YTN</span><a href="https://n.news.naver.com/mnews/article/052/0002408685" target="_blank" rel="noopener">[속보] 구윤철 &quot;추석연휴 고속도로 기름값 리터당 100원 인하&quot;</a></li><li><span class="ht">09:30</span><span class="ho">강원일보</span><a href="https://n.news.naver.com/mnews/article/087/0001219075" target="_blank" rel="noopener">[속보]구윤철 “추석연휴 전국 226개 재정 고속도로 주유소 기름값 리터당 100원 인하”</a></li><li><span class="ht">09:30</span><span class="ho">강원일보</span><a href="https://n.news.naver.com/mnews/article/087/0001219075" target="_blank" rel="noopener">[속보]구윤철 “추석연휴 전국 226개 재정 고속도로 주유소 기름값 리터당 100원 인하”</a></li><li><span class="ht">09:18</span><span class="ho">매일경제</span><a href="https://n.news.naver.com/mnews/article/009/0005737055" target="_blank" rel="noopener">[속보] 구윤철 “추석연휴 고속도로 기름값 리터당 100원 인하”</a></li><li><span class="ht">08:20</span><span class="ho">문화일보</span><a href="https://n.news.naver.com/mnews/article/021/0002819703" target="_blank" rel="noopener">[속보]호르무즈 긴장 지속에…유류세 인하 11월 말까지 연장</a></li><li><span class="ht">08:20</span><span class="ho">YTN</span><a href="https://n.news.naver.com/mnews/article/052/0002408645" target="_blank" rel="noopener">[속보] 재경부, 유류세 인하 조치 두 달 더 연장</a></li><li><span class="ht">08:14</span><span class="ho">세계일보</span><a href="https://n.news.naver.com/mnews/article/022/0004160051" target="_blank" rel="noopener">[속보] 정부, 유류세 인하 2개월 추가 연장…11월 말까지 유지</a></li><li><span class="ht">08:12</span><span class="ho">프레시안</span><a href="https://n.news.naver.com/mnews/article/002/0002457335" target="_blank" rel="noopener">[속보] 유류세 한시적 인하 조치 2개월 연장</a></li><li><span class="ht">08:05</span><span class="ho">부산일보</span><a href="https://n.news.naver.com/mnews/article/082/0001398914" target="_blank" rel="noopener">[속보] 유류세 인하 11월 말까지 두 달 연장…&quot;국민 유류비 부담 경감&quot;</a></li><li><span class="ht">08:05</span><span class="ho">부산일보</span><a href="https://n.news.naver.com/mnews/article/082/0001398914" target="_blank" rel="noopener">[속보] 유류세 인하 11월 말까지 두 달 연장…&quot;국민 유류비 부담 경감&quot;</a></li><li><span class="ht">08:05</span><span class="ho">부산일보</span><a href="https://n.news.naver.com/mnews/article/082/0001398914" target="_blank" rel="noopener">[속보] 유류세 인하 11월 말까지 두 달 연장…&quot;국민 유류비 부담 경감&quot;</a></li><li><span class="ht">08:04</span><span class="ho">매일경제</span><a href="https://n.news.naver.com/mnews/article/009/0005737022" target="_blank" rel="noopener">[속보] 유류세 인하 11월 말까지 두 달 연장…“국민 유류비 부담 경감”</a></li><li><span class="ht">08:04</span><span class="ho">매일경제</span><a href="https://n.news.naver.com/mnews/article/009/0005737022" target="_blank" rel="noopener">[속보] 유류세 인하 11월 말까지 두 달 연장…“국민 유류비 부담 경감”</a></li><li><span class="ht">08:04</span><span class="ho">매일경제</span><a href="https://n.news.naver.com/mnews/article/009/0005737022" target="_blank" rel="noopener">[속보] 유류세 인하 11월 말까지 두 달 연장…“국민 유류비 부담 경감”</a></li><li><span class="ht">08:01</span><span class="ho">경향신문</span><a href="https://n.news.naver.com/mnews/article/032/0003471260" target="_blank" rel="noopener">[속보]유류세 인하 두 달 더 연장…휘발유 15%·경유 25% 유지</a></li><li><span class="ht">08:01</span><span class="ho">경향신문</span><a href="https://n.news.naver.com/mnews/article/032/0003471260" target="_blank" rel="noopener">[속보]유류세 인하 두 달 더 연장…휘발유 15%·경유 25% 유지</a></li><li><span class="ht">08:01</span><span class="ho">경향신문</span><a href="https://n.news.naver.com/mnews/article/032/0003471260" target="_blank" rel="noopener">[속보]유류세 인하 두 달 더 연장…휘발유 15%·경유 25% 유지</a></li></ul></details></span></div></div>
+<div class="pair">
+    <div class="card"><h2>오늘의 쟁점</h2><div class="irow"><div class="rowhead"><span class="rank">1</span><span class="ibox"><span class="iname">유류세 인하 11월말까지 연장</span><span class="chips"><span class="gchip">재정경제부</span></span></span><span class="ibar" title="13건"><i style="width:100%"></i></span></div></div><div class="irow"><div class="rowhead"><span class="rank">2</span><span class="ibox"><span class="iname">추석 연휴 고속도로 기름값 할인</span><span class="chips"><span class="gchip">재정경제부</span></span></span><span class="ibar" title="12건"><i style="width:92%"></i></span></div></div><div class="irow"><div class="rowhead"><span class="rank">3</span><span class="ibox"><span class="iname">이형일·김승원 등 인사청문</span><span class="chips"><span class="gchip">재정경제부</span></span></span><span class="ibar" title="6건"><i style="width:46%"></i></span></div></div><div class="irow"><div class="rowhead"><span class="rank">4</span><span class="ibox"><span class="iname">정부 인사 및 조직</span><span class="chips"><span class="gchip">재정경제부</span></span></span><span class="ibar" title="6건"><i style="width:46%"></i></span></div></div><div class="irow"><div class="rowhead"><span class="rank">5</span><span class="ibox"><span class="iname">글로벌 금리 인상과 국내 대응</span><span class="chips"><span class="gchip">재정경제부</span></span></span><span class="ibar" title="4건"><i style="width:31%"></i></span></div></div></div>
+    <div class="card"><h2>정책 단어 추이 <span class="sub">최근 7일</span><a class="trend-more" href="http://127.0.0.1:8765/trend">더보기</a></h2><a class="trend-chart-link" href="http://127.0.0.1:8765/trend"><div class="trend-chart-wrap" id="home-trend-chart"><svg class="trend-chart" viewBox="0 0 412 190" width="100%" role="img" aria-label="정책 단어 추이 그래프"><rect x="58.7" y="12" width="49.4" height="174" fill="#EDF0F3"/><rect x="108.1" y="12" width="49.4" height="174" fill="#EDF0F3"/><line x1="34" y1="153.0" x2="330.5" y2="153.0" stroke="#EEF0F2"/><text x="27" y="156.5" text-anchor="end" font-size="9.5" fill="#9CA3AF">0</text><line x1="34" y1="106.0" x2="330.5" y2="106.0" stroke="#EEF0F2"/><text x="27" y="109.5" text-anchor="end" font-size="9.5" fill="#9CA3AF">200</text><line x1="34" y1="59.0" x2="330.5" y2="59.0" stroke="#EEF0F2"/><text x="27" y="62.5" text-anchor="end" font-size="9.5" fill="#9CA3AF">400</text><line x1="34" y1="12.0" x2="330.5" y2="12.0" stroke="#EEF0F2"/><text x="27" y="15.5" text-anchor="end" font-size="9.5" fill="#9CA3AF">600</text><text x="34.0" y="170" text-anchor="middle" font-size="9.5" fill="#9CA3AF" font-weight="400">11일(금)</text><text x="83.4" y="170" text-anchor="middle" font-size="9.5" fill="#4B5563" font-weight="600">12일(토)</text><text x="132.8" y="170" text-anchor="middle" font-size="9.5" fill="#4B5563" font-weight="600">13일(일)</text><text x="182.2" y="170" text-anchor="middle" font-size="9.5" fill="#9CA3AF" font-weight="400">14일(월)</text><text x="231.7" y="170" text-anchor="middle" font-size="9.5" fill="#9CA3AF" font-weight="400">15일(화)</text><text x="281.1" y="170" text-anchor="middle" font-size="9.5" fill="#9CA3AF" font-weight="400">16일(수)</text><text x="330.5" y="170" text-anchor="middle" font-size="9.5" fill="#9CA3AF" font-weight="400">17일(목)</text><text x="330.5" y="183" text-anchor="middle" font-size="9" fill="#6B7280">어제</text><polyline points="34.0,153.0 83.4,153.0 132.8,151.4 182.2,151.8 231.7,152.8 281.1,153.0 330.5,153.0" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><polyline points="34.0,151.1 83.4,152.3 132.8,150.9 182.2,150.4 231.7,134.0 281.1,149.5 330.5,152.3" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><polyline points="34.0,149.5 83.4,151.8 132.8,145.9 182.2,134.9 231.7,72.6 281.1,142.4 330.5,128.1" fill="none" stroke="#1baf7a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><polyline points="34.0,152.1 83.4,153.0 132.8,152.8 182.2,151.6 231.7,150.7 281.1,152.1 330.5,152.8" fill="none" stroke="#eda100" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><polyline points="34.0,152.1 83.4,152.1 132.8,147.6 182.2,141.5 231.7,94.7 281.1,144.5 330.5,146.2" fill="none" stroke="#e87ba4" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><line x1="336.5" y1="93.9" x2="347.5" y2="93.9" stroke="#1baf7a" stroke-width="3.5" stroke-linecap="round"/><text x="352.5" y="97.4" font-size="10.5" fill="#1F2937">이형일 <tspan fill="#6B7280">106</tspan></text><line x1="336.5" y1="112.0" x2="347.5" y2="112.0" stroke="#e87ba4" stroke-width="3.5" stroke-linecap="round"/><text x="352.5" y="115.5" font-size="10.5" fill="#1F2937">청문회 <tspan fill="#6B7280">29</tspan></text><line x1="336.5" y1="125.0" x2="347.5" y2="125.0" stroke="#eb6834" stroke-width="3.5" stroke-linecap="round"/><text x="352.5" y="128.5" font-size="10.5" fill="#1F2937">비거주 <tspan fill="#6B7280">3</tspan></text><line x1="336.5" y1="138.0" x2="347.5" y2="138.0" stroke="#eda100" stroke-width="3.5" stroke-linecap="round"/><text x="352.5" y="141.5" font-size="10.5" fill="#1F2937">세제개편 <tspan fill="#6B7280">1</tspan></text><line x1="336.5" y1="151.0" x2="347.5" y2="151.0" stroke="#2a78d6" stroke-width="3.5" stroke-linecap="round"/><text x="352.5" y="154.5" font-size="10.5" fill="#1F2937">종부세 <tspan fill="#6B7280">0</tspan></text></svg></div></a></div>
+  </div>
+<div class="card">
+    
+    <div class="flow">
+    <div class="fl fl-top">
+      <span class="blank"></span><span class="blank"></span>
+      <a class="tile t-live slim side" href="http://127.0.0.1:8765/live.html"><span class="nm"><span class="e">🔴</span>실시간 현황</span><span class="tip"><b>거르지 않은 오늘 기사 전부</b><span class="tb">검색어에 걸린 오늘 기사를 시간순으로 다 보여줘요. 안 봐도 초안은 알아서 모여요.</span><span class="nx">📌 담아두기 <i>→</i> 초안·확정본</span></span></a>
+    </div>
+    <div class="fl fl-conn"><span></span><span></span><span class="conn">📌 담아두기</span></div>
+    <div class="fl">
+      <span class="rl reg" title="정해진 시각마다 앱이 알아서 모아요">정기</span>
+      <a class="tile t-regkw" href="http://127.0.0.1:8765/keywords"><span class="nm"><span class="e">🔍</span>검색어</span><span class="tip l"><b>정기 스크랩 검색어</b><span class="tb">켜 둔 그룹은 실시간 현황에, 정기 스크랩을 체크한 그룹은 초안·확정본에도 들어가요.</span><span class="nx">저장 <i>→</i> 실시간 현황은 바로 · 정기는 다음 회차부터</span></span></a>
+      <span class="ar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>
+      <a class="tile t-reg draft" href="http://127.0.0.1:8765/preview.html"><span class="nm"><span class="e">⛏️</span>초안</span><span class="tip"><b>17:00 회차 진행 중</b><span class="tb">마감 전까지 모이는 기사를 미리 정리하는 곳이에요.</span><span class="nx">17:00 회차 마감 <i>→</i> 확정본</span></span></a>
+      <span class="ar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>
+      <a class="tile t-reg" href="index.html"><span class="nm"><span class="e">💎</span>확정본</span><span class="tip"><b>14:00 회차</b><span class="tb">마감된 회차의 보고서예요. 여기서 발송해요.</span><span class="nx">다음 회차 마감 <i>→</i> 정기 보관함</span></span></a>
+      <span class="ar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>
+      <a class="tile t-regarch" href="history.html"><span class="nm"><span class="e">🗄️</span>보관함</span><span class="tip r"><b>지난 회차 모아보기</b><span class="tb">날짜 › 회차별로 1년 동안 쌓여요.</span></span></a>
+      <span class="rl ad" title="사안이 생기면 직접 모아요">수시</span>
+      <a class="tile t-adnew" href="http://127.0.0.1:8765/adhoc/new"><span class="nm"><span class="e">🔎</span>새 수집</span><span class="tip l"><b>사안·검색어·시간을 정해 모아요</b><span class="tb">지난 1년 동안 한 수집이 조건째 목록으로 남아 있어, 골라서 다시 쓸 수 있어요.</span><span class="nx">수집 <i>→</i> 원본</span></span></a>
+      <span class="ar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>
+      <a class="tile t-ad" href="http://127.0.0.1:8765/adhoc/new"><span class="nm"><span class="e">🍅</span>원본</span><span class="tip"><b>오늘 만든 원본이 없어요</b><span class="tb">새 수집에서 조건을 정하면 여기에 모여요.</span><span class="nx">골라 보내기 <i>→</i> 확정본</span></span></a>
+      <span class="ar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>
+      <a class="tile t-ad" href="http://127.0.0.1:8765/adhoc/new"><span class="nm"><span class="e">🥗</span>확정본</span><span class="tip"><b>오늘 만든 확정본이 없어요</b><span class="tb">원본에서 기사를 보내면 같은 이름으로 생겨요.</span><span class="nx">자정 <i>→</i> 수시 보관함</span></span></a>
+      <span class="ar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>
+      <a class="tile t-adarch" href="http://127.0.0.1:8765/adhoc"><span class="nm"><span class="e">📚</span>보관함</span><span class="tip r"><b>지난 확정본 모아보기</b><span class="tb">사안 › 날짜별로 1년 동안 쌓여요. 원본은 새 수집에서 다시 찾아요.</span></span></a>
+      <div class="gap"></div>
+      <a class="tile t-lab" href="http://127.0.0.1:8765/labels"><span class="nm"><span class="e">🏷️</span>라벨 보관함</span><span class="tagset"><span class="tag-chip">사진 아님</span><span class="tag-chip">부정기사</span><span class="tag-chip">비상경제본부회의</span></span><span class="tip"><b>라벨 붙인 기사 모아보기</b><span class="tb">정기·수시를 가리지 않고 모여요. 원래 회차가 지워져도 남아요.</span></span></a>
+    </div>
+    </div>
+  </div></div></section><div class="mk-fade"></div>
+<script>
+
+(function () {
+  var OPEN_DELAY = 120, CLOSE_DELAY = 220;
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('details.hlbox'));
+  if (!boxes.length) return;
+  var openT = null, closeT = null;
+  function clearT() { clearTimeout(openT); clearTimeout(closeT); }
+  function open(b) {
+    boxes.forEach(function (o) { if (o !== b && !o.dataset.pinned) o.open = false; });
+    b.open = true;
+  }
+  boxes.forEach(function (b) {
+    var chip = b.querySelector('.hl');
+    b.addEventListener('mouseenter', function () {
+      clearT();
+      var anyOpen = boxes.some(function (o) { return o.open; });
+      openT = setTimeout(function () { open(b); }, anyOpen ? 0 : OPEN_DELAY);
+    });
+    b.addEventListener('mouseleave', function () {
+      clearT();
+      closeT = setTimeout(function () { if (!b.dataset.pinned) b.open = false; }, CLOSE_DELAY);
+    });
+    chip.addEventListener('click', function (e) {
+      e.preventDefault();
+      clearT();
+      if (b.dataset.pinned) { delete b.dataset.pinned; b.open = false; }
+      else {
+        boxes.forEach(function (o) { delete o.dataset.pinned; });
+        b.dataset.pinned = '1';
+        open(b);
+      }
+    });
+    chip.addEventListener('focus', function () { open(b); });
+    b.addEventListener('focusout', function (e) {
+      if (!b.contains(e.relatedTarget) && !b.dataset.pinned) b.open = false;
+    });
+  });
+  document.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('.hlset')) return;
+    boxes.forEach(function (b) { delete b.dataset.pinned; b.open = false; });
+  });
+})();
+
+
+(function(){
+  var secs=[].slice.call(document.querySelectorAll('.mk'));
+  function h(sec){ var p=sec.querySelector('.page'); var cards=p.querySelectorAll('.card');
+    var last=cards[cards.length-1]; return Math.round(last.getBoundingClientRect().bottom-p.getBoundingClientRect().top); }
+  function run(){ var base=h(secs[0]); secs.forEach(function(sc,i){ var v=h(sc); var el=sc.querySelector('[data-h]');
+    el.textContent= i===0 ? ('흐름도 끝까지 '+v+'px') : ('흐름도 끝까지 '+v+'px · '+(base-v)+'px 줄어듦'); }); }
+  window.addEventListener('load',run); window.addEventListener('resize',run); run();
+})();</script></body></html>

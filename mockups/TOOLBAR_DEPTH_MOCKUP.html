@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>툴바 정보 뎁스 시안</title>
+<style>
+  @font-face { font-family: 'Gaegu'; src: url(data:font/woff2;base64,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) format('woff2'); font-display: swap; }
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .container {
+    max-width: 800px; margin: 24px auto; padding: 24px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+  }
+  /* [수정: 2026-09-16] 카드 위 여백 60→44px — 60px은 상단 고정바(54px)를 피하려는 값인데 글자 위로
+     30px이 비었다. 44px이면 16px 남는다. 확정본·초안·실시간·정기 보관함·설정·수시·정책 단어 추이
+     일곱 화면이 같은 값을 써야 화면을 오갈 때 제목이 들썩이지 않는다(수시·추이는 84→68px 형태).
+     시안 SUBHEAD_SPACING_MOCKUP.html B안. */
+  .container { padding-top: 44px; padding-bottom: 56px; }
+  /* 상단바 CSS는 app/topnav.py 한 곳 — 모든 화면이 같은 값을 쓴다. */
+
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem; --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%; --h-sm: 24px; --h-md: 30px; --h-lg: 36px; --fab-lg: 56px; --fab-sm: 48px; --sh-float: 0 4px 12px rgba(15, 23, 42, 0.12); --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14); --sh-modal: 0 16px 40px rgba(15, 23, 42, 0.22); }
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    background: #FFFFFF; border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .topbar-inner {
+    max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: flex-start; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .topbar-inner > .tn { color: #2563EB; text-decoration: none; font-size: var(--fs-md); font-weight: 600;
+    padding: 5px 14px; border: 1px solid transparent; border-radius: var(--r-pill); white-space: nowrap; }
+  .topbar-inner > a.tn:hover { background: #EFF6FF; }
+  .topbar-inner > .tn-sep { width: 1px; height: 18px; background: #E5E7EB; margin: 0 16px; }
+  .topbar-inner > .tn.is-current { cursor: default; background: #EFF6FF;
+    border-color: #BFDBFE; color: #2563EB; }
+  .topbar.adhoc .topbar-inner > .tn.is-current { background: #E3F1EE;
+    border-color: rgba(20, 107, 94, 0.45); color: #146B5E; }
+  .topbar-inner > .tn.is-empty { color: #6B7280; opacity: 0.55; cursor: not-allowed; }
+  .topbar-inner > a.tn.back { color: #4B5563; }
+  .topbar-inner > a.tn.back:hover { color: #2563EB; }
+  @media (max-width: 480px) {
+    .topbar-inner { padding: 12px 12px; gap: 2px; }
+    .topbar-inner > .tn { padding: 5px 8px; }
+    .topbar-inner > .tn-sep { margin: 0 8px; }
+  }
+
+  .bottombar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    background: #FFFFFF; border-top: 1px solid #E5E7EB; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  }
+  .bottombar-inner {
+    max-width: 800px; margin: 0 auto; padding: 10px 24px;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  }
+  .bottombar a { color: #2563EB; text-decoration: none; font-size: 1.1rem; padding: 6px 10px; border-radius: var(--r-md); }
+  .bottombar a:hover { background: #EFF6FF; }
+  /* [추가: 2026-08-03] 하단바 🖍️ — 형광펜 단어를 설정 화면까지 안 가고 이 화면에서
+     바로 추가·삭제할 수 있는 팝오버. 휴지통(숨긴 기사 관리) 바로 왼쪽에 둔다. */
+  .highlight-wrap { position: relative; }
+  .highlight-toggle {
+    background: transparent; border: none; color: #6B7280; font-size: 1.1rem; cursor: pointer;
+    padding: 6px 10px; border-radius: var(--r-md);
+  }
+  .highlight-toggle:hover { background: #EFF6FF; }
+  .highlight-popover {
+    display: none; position: absolute; bottom: 100%; right: 0; margin-bottom: 8px;
+    background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+    box-shadow: var(--sh-pop); padding: 12px; width: 220px; z-index: 30;
+  }
+  .highlight-popover.is-open { display: block; }
+  .highlight-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .highlight-chip {
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--r-pill);
+    font-size: var(--fs-sm); color: #1F2937; cursor: pointer;
+  }
+  .highlight-chip button {
+    background: transparent; border: none; padding: 0; font-size: var(--fs-sm); cursor: pointer;
+    color: inherit; line-height: 1;
+  }
+  .highlight-empty { color: #6B7280; font-size: var(--fs-sm); margin: 0 0 8px; }
+  .highlight-add-form { display: flex; gap: 6px; }
+  .highlight-add-form input { flex: 1; font-size: var(--fs-md); padding: 5px 8px; min-width: 0; }
+  .highlight-add-form button { font-size: var(--fs-sm); padding: 5px 10px; white-space: nowrap; }
+  /* [추가: 2026-08-05] 소제목 미니 목차 — 소제목 하나 안에 기사가 많아지면 원하는
+     소제목을 찾으려고 계속 스크롤해야 하는 문제가 있어, 평소엔 숨겨진 버튼(펼침형,
+     사용자가 고정형 대신 선택)을 눌러야만 목차가 나타나게 했다. 화면을 항상 가리지
+     않으면서, 필요할 때 소제목 이름을 눌러 바로 그 위치로 스크롤 이동한다. */
+  /* [수정: 2026-08-10] 원래 accent(파랑) 배경이라 (확정)/(전송) 버튼과 색이 겹쳐
+     헷갈린다는 피드백 — 눈에 안 튀는 중립색(카드 배경+테두리)으로 바꿨다. */
+  .toc-toggle-btn {
+    position: fixed; right: 20px; bottom: 20px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
+    background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; font-size: 1.2rem; cursor: pointer;
+    box-shadow: var(--sh-float); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .toc-toggle-btn:hover { background: #EFF6FF; }
+  /* [추가: 2026-08-10] 확정된 회차를 텔레그램/이메일로 보내는 플로팅 버튼 — ☰ 바로
+     위에 쌓는다. 이모지 없이 텍스트만(사용자 요청), 정원형 유지.
+     색은 app.config COLOR_SEND — 그 값을 왜 그 톤으로 골랐는지는 config 쪽 주석에 있다. */
+  /* [추가: 2026-08-11] ↩ 되돌리기 — 오른쪽 플로팅 버튼들(발송·목차)과 성격이
+     반대인 "취소" 계열이라 사용자 요청대로 화면 왼쪽 아래에 따로 뒀다. 되돌릴 게 있을
+     때만 렌더링한다(항상 떠 있으면 "뭘 되돌리는지" 알 수 없어 오히려 불안하다). */
+  /* [수정: 2026-09-02] 왼쪽 아래는 이제 두 칸짜리 스택이다 — 아래가 휴지통(숨긴 기사),
+     위가 ↩ 되돌리기. 수시 수집 결과 화면(.fab.left / .fab.left.upper)과 같은 배치라
+     두 흐름을 오갈 때 같은 자리에 같은 것이 있다. 휴지통이 0건이라 안 그려질 때도 ↩는
+     제자리(위 칸)에 둔다 — 숨기기 한 번에 버튼이 아래에서 위로 뛰면 그게 더 불안하다. */
+  .undo-fab {
+    position: fixed; left: 20px; bottom: 88px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
+    background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; font-size: 1.3rem;
+    cursor: pointer; box-shadow: var(--sh-float); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .undo-fab:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .undo-fab:disabled { opacity: 0.5; cursor: progress; }
+
+  /* 좌하단 휴지통 — 수시 화면(.fab.left)과 같은 규격. ↩ 되돌리기가 위로 올라간다. */
+  .trash-fab {
+    position: fixed; left: 20px; bottom: 20px; width: var(--fab-lg); height: var(--fab-lg); border-radius: var(--r-circle);
+    background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB;
+    box-shadow: var(--sh-float); cursor: pointer; z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .trash-fab:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .trash-fab .badge {
+    position: absolute; top: -3px; right: -3px; background: #DC2626; color: #FFFFFF;
+    font-size: var(--fs-xs); font-weight: 700; border-radius: var(--r-pill); padding: 0 5px; line-height: 1.55;
+  }
+  .trash-pop {
+    display: none; position: fixed; left: 20px; bottom: 88px; width: 336px;
+    background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+    box-shadow: var(--sh-pop); padding: 12px 14px; z-index: 210;
+  }
+  .trash-pop.is-open { display: block; }
+  .trash-pop h5 {
+    margin: 0 0 3px; font-size: var(--fs-md); color: #1E3A5F;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .trash-pop .tnote { font-size: var(--fs-xs); color: #6B7280; margin: 0 0 4px; line-height: 1.45; }
+  .trash-pop .trow {
+    display: flex; gap: 8px; align-items: center; padding: 8px 0;
+    border-top: 1px solid #F1F5F9; font-size: var(--fs-sm);
+  }
+  .trash-pop .trow .tx { flex: 1; color: #6B7280; line-height: 1.4; }
+  .trash-pop .trow .tx b { color: #1E3A5F; }
+  .trash-pop .trow .tm { color: #9CA3AF; font-size: var(--fs-xs); margin-left: 4px; }
+  .trash-pop .cnt {
+    flex: none; font-size: var(--fs-xs); font-weight: 700; color: #6B7280;
+    background: #F3F4F6; border-radius: var(--r-pill); padding: 1px 7px;
+  }
+  .trash-pop .undo-mini {
+    flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-xs);
+    color: #6B7280; background: transparent; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    padding: 3px 8px; cursor: pointer; white-space: nowrap;
+  }
+  .trash-pop .undo-mini:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .trash-pop .undo-mini svg { width: 13px; height: 13px; }
+  .trash-pop .more {
+    display: block; text-align: center; margin: 6px -14px -12px; padding: 9px 0 10px;
+    border-top: 1px solid #E5E7EB; font-size: var(--fs-sm); font-weight: 600;
+    color: #2563EB; text-decoration: none; border-radius: 0 0 var(--r-lg) var(--r-lg);
+  }
+  .trash-pop .more:hover { background: #EFF6FF; }
+
+
+  .top-fab {
+    position: fixed; right: 80px; bottom: 20px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
+    background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; font-size: 1.2rem; cursor: pointer;
+    box-shadow: var(--sh-float); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .top-fab:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .top-fab[hidden] { display: none; }
+
+
+  .is-hiding { opacity: 0.4; pointer-events: none; transition: opacity 0.15s; }
+  .hiding-note { font-size: var(--fs-sm); font-weight: 600; color: #2563EB; white-space: nowrap; }
+
+
+  /* 「+ 수기로 기사 추가」 — 입구와 입력칸이 📌 담아둔 기사 칸 안에 있다(넣는 곳 = 보이는
+     곳). 칸이 이미 색(띠 + 옅은 바탕)을 가져서 입력칸까지 같은 계열이면 한 덩어리로 묻힌다 —
+     흰 바탕 + 회색 테두리 + 옅은 그림자로 "칸 위에 얹힌 입력칸"으로 가른다(새 색 없음).
+     시안 mockups/MANUAL_ADD_PLACEMENT_MOCKUP.html 「색 비교」 가안. */
+  .manual-zone-empty { font-size: var(--fs-sm); color: #6B7280; }
+  /* 툴바의 「+ 새 소제목」과 같은 테두리 버튼 — 전역 button 규칙(채운 파랑)을 덮는다.
+     칸 바탕이 옅은 캐러멜이라 바탕만 흰색, 글자·테두리는 칸 색. */
+  .manual-zone .url-add-open-btn {
+    font-size: var(--fs-sm); padding: 3px 9px; background: #FFFFFF; color: #7A4E1C;
+    border: 1px solid #DFC5A3; border-radius: var(--r-md); font-weight: 400; cursor: pointer;
+  }
+  .manual-zone .url-add-open-btn:hover { background: #F1E3D0; }
+  .url-add-zone {
+    display: none; border: 1px solid #D1D5DB; border-radius: var(--r-lg);
+    padding: 10px 14px; margin: 10px 0 2px; background: #FFFFFF;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.10);
+  }
+  .url-add-zone.is-open { display: block; }
+  /* 한 번에 한 건만 받는다 — 여러 줄을 받으면 결과가 목록이 되고, 어느 줄이 왜
+     실패했는지 대조해야 한다. 순서 [주소칸][추가][×] — 누를 것이 입력 바로 옆, 닫기는 끝. */
+  .url-add-row { display: flex; align-items: center; gap: 8px; }
+  .url-add-row input {
+    flex: 1; min-width: 0; padding: 6px 10px; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    font-size: var(--fs-md); color: #1F2937; background: #FFFFFF;
+  }
+  .url-add-row input:disabled { background: #F8FAFC; color: #6B7280; }
+  .url-add-hint { color: #6B7280; font-size: var(--fs-sm); margin-top: 7px; }
+  .url-add-zone button { font-size: var(--fs-sm); padding: 5px 10px; white-space: nowrap; }
+  .url-add-zone .url-add-close {
+    background: none; border: none; color: #6B7280; padding: 4px 6px; font-size: 1rem;
+    line-height: 1; cursor: pointer;
+  }
+  .url-add-zone .url-add-close:hover { color: #1F2937; }
+  /* 거부 사유는 지우지 않고 남긴다 — 실패가 조용히 사라지면 안 된다(CODING_CONVENTIONS §3).
+     주의 세트(앰버) 재사용. 입력한 주소도 남겨 어디가 틀렸는지 보고 고치게 한다. */
+  .url-add-warn {
+    display: none; margin-top: 8px; padding: 8px 11px; border-radius: var(--r-md); font-size: var(--fs-sm);
+    line-height: 1.55; background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E;
+  }
+  .url-add-warn.is-on { display: block; }
+  .url-add-warn b { display: block; }
+  .url-add-warn span { color: #A16207; }
+  /* 제목 옆 「📌 N」 — 칸이 늘 맨 아래라 미분류 뱃지처럼 눌러서 내려간다. 칸과 같은 캐러멜.
+     모양(아이콘 + 숫자, 화살표 없음)은 초안의 미분류 뱃지(.pending-count-badge)와 같다. */
+  .pinned-jump-badge {
+    margin-left: 6px; font-size: var(--fs-sm); font-weight: 700; vertical-align: middle;
+    display: inline-flex; align-items: center; gap: 4px;
+    color: #7A4E1C; background: #F1E3D0; border: 1px solid #DFC5A3;
+    border-radius: var(--r-pill); padding: 2px 9px; cursor: pointer; font-family: inherit;
+  }
+  .pinned-jump-badge:hover { background: #FFFFFF; }
+  .pinned-jump-badge .ic { width: 1.05em; height: 1.05em; }
+
+
+  .kn-history { flex-basis: 100%; margin-top: 2px; padding-top: 8px; border-top: 1px dashed #E5E7EB; }
+  .keyword-note-zone:has(#keyword-note-input:disabled) .kn-history { display: none; }
+  .kn-h-head { font-size: var(--fs-xs); color: #9CA3AF; margin-bottom: 4px; }
+  .kn-h-list { max-height: 7.2em; overflow-y: auto; }
+  .kn-h-row { display: flex; gap: 10px; font-size: var(--fs-sm); line-height: 1.6; color: #4B5563; cursor: text; }
+  .kn-h-when { flex: none; min-width: 7.5em; color: #9CA3AF; font-variant-numeric: tabular-nums; }
+  .kn-h-text { min-width: 0; overflow-wrap: anywhere; }
+  .kn-w.is-same { color: #2563EB; font-weight: 600; }
+
+
+  #name-picker-back { position: fixed; inset: 0; z-index: 39; background: rgba(15,23,42,0.12); }
+  #name-picker { position: fixed; top: 13vh; left: 50%; transform: translateX(-50%); z-index: 40;
+    width: 372px; max-width: calc(100vw - 32px); background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: var(--r-lg); box-shadow: var(--sh-modal); padding: 14px 14px 10px; }
+  .np-title { font-size: var(--fs-md); font-weight: 700; color: #1E3A5F; margin: 0 0 9px; }
+  #np-input { width: 100%; font: inherit; font-size: var(--fs-base); padding: 8px 10px;
+    border: 1px solid #E5E7EB; border-radius: var(--r-md); color: #1F2937; background: #FFFFFF; }
+  #np-input:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 3px #EFF6FF; }
+  #np-input.is-bad { border-color: #DC2626; box-shadow: 0 0 0 3px #FEF2F2; }
+  .np-lead { font-size: var(--fs-sm); color: #6B7280; margin: 11px 6px 2px; }
+  .np-list { max-height: 250px; overflow-y: auto; margin: 0 -4px; }
+  .np-row { display: flex; align-items: baseline; gap: 8px; width: calc(100% - 8px);
+    margin: 0 4px; padding: 5px 8px; border: none; background: none; border-radius: var(--r-sm);
+    font: inherit; text-align: left; cursor: pointer; color: #1F2937; }
+  .np-row:hover { background: #EFF6FF; }
+  .np-row .np-nm { flex: 1; font-size: var(--fs-md); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 볼드 = 담당자가 직접 고치거나 만든 이름. 직접 만든 소제목이 「다른 소제목」 드롭다운·미니
+     목차에서 이미 볼드인 것과 같은 뜻이라 새 표시를 만들지 않고 그 관례를 그대로 이어쓴다. */
+  .np-row.np-mine .np-nm { font-weight: 700; }
+  .np-row .np-when { font-size: var(--fs-xs); color: #6B7280; white-space: nowrap; }
+  .np-row.np-used { color: #6B7280; cursor: not-allowed; }
+  .np-row.np-used:hover { background: none; }
+  .np-row.np-used .np-nm { text-decoration: line-through; text-decoration-color: #CBD5E1; font-weight: 400; }
+  .np-row .np-tag { font-size: var(--fs-xs); color: #6B7280; border: 1px solid #E5E7EB;
+    border-radius: var(--r-pill); padding: 0 6px; white-space: nowrap; }
+  /* [추가: 2026-09-10] 회차 구분선 — 기본 목록(안 쳤을 때)에만 그린다. 치면 걸린 이름이
+     대개 1~3건인데 서로 다른 회차라 구분선이 이름 수만큼 붙어(실측 '개각' 2건 → 4줄) 줄만
+     두 배가 되고, 그때 담당자가 묻는 건 "몇 회차 것인가"가 아니라 "그 글자가 든 이름이
+     있나"라서다. 줄 오른쪽 .np-when이 이미 회차를 말하므로 같은 말을 두 번 하는 셈이기도 하다. */
+  .np-sep { font-size: var(--fs-xs); color: #6B7280; margin: 9px 8px 2px; padding-top: 7px;
+    border-top: 1px dashed #E5E7EB; }
+  .np-sep:first-child { border-top: none; padding-top: 0; margin-top: 2px; }
+  .np-hint { color: #6B7280; font-size: var(--fs-sm); margin: 7px 6px 0; opacity: 0.85; }
+  .np-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    margin-top: 10px; padding-top: 9px; border-top: 1px solid #E5E7EB; }
+  .np-msg { font-size: var(--fs-sm); color: #6B7280; flex: 1; }
+  .np-msg.bad { color: #DC2626; }
+  .np-msg.new { color: #2563EB; }
+  .np-btns { display: flex; gap: 6px; }
+  .np-btns button { font: inherit; font-size: var(--fs-md); padding: 6px 13px; border-radius: var(--r-md); cursor: pointer; }
+  .np-cancel { background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; }
+  .np-ok { background: #2563EB; color: #FFFFFF; border: none; font-weight: 700; }
+  .np-ok:hover { background: #1D4ED8; }
+  .np-ok:disabled { opacity: 0.45; cursor: not-allowed; }
+  .np-key { font-size: var(--fs-xs); color: #6B7280; text-align: right; margin: 6px 2px 0; }
+
+  .confirm-send-fab {
+    position: fixed; right: 20px; bottom: 80px; width: var(--fab-lg); height: var(--fab-lg); border-radius: var(--r-circle);
+    background: #15803D; color: #FFFFFF; border: none; font-size: var(--fs-md); font-weight: 700;
+    cursor: pointer; box-shadow: var(--sh-float); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .confirm-send-fab:disabled { opacity: 0.6; cursor: not-allowed; }
+  /* 확정본 플로팅 버튼 순서(위→아래): 발송 → ☰ (56px 버튼 + 14px 간격 기준 위치 계산). */
+  /* [추가: 2026-08-10] (확정) 직후 잠깐 뜨는 안내 — 화면이 바로 새로고침되므로 애니메이션
+     없이 짧게(0.9초) 보여주기만 한다. */
+  .confirm-toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 300;
+    background: #1E3A5F; color: #FFFFFF; padding: 10px 20px; border-radius: var(--r-lg);
+    font-size: var(--fs-md); font-weight: 600; box-shadow: var(--sh-float);
+  }
+  /* 카운트다운은 (발송) 버튼(bottom:80) 바로 위 146px에 둔다. */
+  .send-countdown {
+    position: fixed; right: 20px; bottom: 146px; width: 130px; text-align: right;
+    font-size: var(--fs-sm); font-weight: 700; color: #DC2626; z-index: 200; white-space: nowrap;
+  }
+  /* [추가: 2026-08-10] 담당자가 아니라 시스템이 대신 전송한 회차 표시 — 카운트다운(빨강,
+     경고성)과 다른 맥락이라 회색으로 톤을 낮췄다.
+     [수정: 2026-08-13] 담당자가 직접 (발송)을 눌렀을 때도 같은 자리에 같은 스타일로
+     표시한다(.auto-sent -> .sent-done으로 이름 변경) — 예전엔 자동발송만 흔적이 남고
+     사람이 누른 건 토스트가 사라지면 아무것도 안 남아서, 새로고침 후 "내가 보냈나?"를
+     확인할 방법이 없었다(재발송 위험). 사람/기계 구분은 색이 아니라 앞머리 이모지
+     (✔️/🤖)가 맡는다 — 둘 다 "이미 끝난 일"이라 색까지 나눌 이유가 없다(사용자 선택).
+     width는 "(2회)" 같은 꼬리표가 붙어도 잘리지 않게 고정값 대신 내용에 맞춘다
+     (fixed 요소 + width:auto = 내용 폭, right:20px 기준으로 왼쪽으로 늘어난다). */
+  .send-countdown.sent-done { color: #6B7280; width: auto; }
+  /* 발송 완료 글자를 누르면 발송 기록(/send-log)의 그 회차 줄로 — 누가 받았는지 보는 길. */
+  a.send-countdown.sent-done, .send-countdown .send-log-link { text-decoration: none; }
+  a.send-countdown.sent-done:hover { color: #2563EB; text-decoration: underline; }
+  .send-countdown .send-log-link { color: inherit; font-weight: 600; }
+  .send-countdown .send-log-link:hover { text-decoration: underline; }
+  /* [추가: 2026-08-11] 카운트다운이 0에 닿는 순간 그 자리에서 바로 바뀌는 완료 문구 —
+     "곧 나갑니다"에 가까운 낙관적 표시라, 서버가 실제로 확인해 남기는 회색 배지
+     (.auto-sent)와는 색을 달리해 파란색으로 둔다. */
+  .send-countdown.auto-sent-just-now { color: #2563EB; width: 170px; }
+  /* [추가: 2026-08-12] 이번 회차 소제목 분류가 LLM 실패로 규칙 기반(단어 빈도)에
+     떨어졌을 때 카운트다운 자리에 대신 뜨는 경고 — 자동발송도 이 경우 보류된다
+     (app.confirm_send.check_pending_confirm_and_send). 빨강(.send-countdown 기본색)을
+     그대로 쓴다 — 경고성이라는 점에서 카운트다운과 같은 색이 맞고, width만 문구
+     길이에 맞춘다. */
+  .send-countdown.classification-warning { width: 210px; white-space: normal; line-height: 1.4; }
+  /* [추가: 2026-08-26] 발송 실패 배너 — 위 classification-warning과 같은 이유로 같은
+     빨강(.send-countdown 기본색)을 그대로 쓴다. 채널·대상 줄이 여러 줄일 수 있어
+     조금 더 넓게 잡는다. */
+  .send-countdown.send-failure { width: 260px; white-space: normal; line-height: 1.4; }
+  /* [수정: 2026-08-18] 하단 (취소)/(적용) 바가 스크롤을 따라 밀려나지 않도록,
+     스크롤 영역(.toc-scroll)과 바깥 상자(.toc-popover)를 분리했다 — max-height와
+     padding은 스크롤 영역 쪽으로 옮겼고 상자 자체의 치수는 그대로다. */
+  .toc-popover {
+    display: none; position: fixed; right: 20px; bottom: 74px; width: 200px;
+    background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: var(--r-lg); box-shadow: var(--sh-pop); z-index: 200;
+  }
+  .toc-popover.is-open { display: block; }
+  .toc-scroll { max-height: 320px; overflow-y: auto; padding: 8px; }
+  /* [추가: 2026-08-05] 목차 안에서 소제목 순서까지 바로 바꿀 수 있게 항목마다 작은
+     ▲▼를 붙였다 — 이름 클릭(이동)과 화살표 클릭(순서 변경)을 분리해서, 클릭 하나에
+     동작 하나만 대응하도록 했다(선택 후 상단 고정 화살표 방식은 이름 클릭의 기존
+     "이동" 의미와 충돌해서 채택하지 않음). */
+  .toc-row { display: flex; align-items: center; justify-content: space-between; border-radius: var(--r-sm); }
+  .toc-row a {
+    flex: 1; min-width: 0; padding: 6px 8px; font-size: var(--fs-md); color: #1F2937;
+    text-decoration: none; border-radius: var(--r-sm); white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .toc-row a:hover { background: #EFF6FF; }
+  .toc-row-btns { display: flex; gap: 1px; flex-shrink: 0; padding-right: 4px; }
+  .toc-order-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 0.72rem; cursor: pointer;
+    padding: 2px 4px; border-radius: var(--r-sm);
+  }
+  .toc-order-btn:hover { background: #EFF6FF; }
+  .toc-order-btn:disabled { opacity: 0.3; cursor: default; }
+  /* [추가: 2026-08-05] 방금 순서를 옮긴 항목을 기사의 "방금 승격" 표시와 같은 노란색으로
+     한 번 표시한다 — 팝오버가 새로고침 후 자동으로 다시 열리는 동안, 여러 개를 연달아
+     옮길 때 방금 뭘 옮겼는지 헷갈리지 않게.
+     [수정: 2026-08-18] 이제 ▲▼가 새로고침을 일으키지 않으므로, 이 표시는 (적용)을
+     누를 때까지 계속 남아 "이번에 뭘 옮겼는지"를 누적해서 보여준다. */
+  .toc-row.toc-row-moved { background: #E7EFE8; }
+  .toc-empty { color: #6B7280; font-size: var(--fs-sm); padding: 6px 8px; }
+  /* [추가: 2026-08-18] 팝오버 하단 확정 바 — 담당자가 "(적용)을 누르기 전까지는 아무것도
+     바뀌지 않았다"고 믿을 수 있어야 하므로, 서버로 나가는 길은 (적용) 하나뿐이다.
+     구조는 .edit-summary-form을 그대로 따랐다(내용 위 / 오른쪽 정렬 액션 아래, 취소가
+     왼쪽·커밋이 오른쪽) — 이 앱에서 유일하게 "즉시 저장이 아닌" 기존 화면이라 관례를
+     새로 만들 이유가 없다. 바꾼 게 없으면 아예 나타나지 않는다(.undo-fab이 되돌릴 게
+     있을 때만 뜨는 것과 같은 원칙). */
+  .toc-foot {
+    display: none; flex-direction: column; gap: 6px;
+    padding: 8px; border-top: 1px solid #E5E7EB;
+    background: #FFFFFF; border-radius: 0 0 var(--r-lg) var(--r-lg);
+  }
+  .toc-foot.is-dirty { display: flex; }
+  .toc-dirty-count { font-size: var(--fs-sm); color: #6B7280; }
+  .toc-foot-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .toc-foot-actions button { font-size: var(--fs-sm); padding: 5px 12px; border-radius: var(--r-sm); cursor: pointer; }
+  .toc-cancel-btn { background: transparent; color: #6B7280; border: 1px solid #E5E7EB; }
+  .toc-cancel-btn:hover { background: #EFF6FF; }
+  .toc-apply-btn { background: #2563EB; color: #FFFFFF; border: none; font-weight: 700; }
+  .toc-apply-btn:hover { background: #1D4ED8; }
+  .toc-foot-actions button:disabled { opacity: 0.6; cursor: progress; }
+  /* 미확정 상태에서 팝오버를 닫으려 하면 닫지 않고, 어디서 결정해야 하는지만 가리킨다.
+     경고음·모달·confirm() 없이 기존 #EFF6FF색으로 두 번 깜빡이기만 한다 — 실수가 아니라
+     아직 안 끝난 것뿐이라 겁을 줄 이유가 없다. 새 색은 만들지 않는다. */
+  @keyframes toc-nudge { 0%, 100% { background: #FFFFFF; } 25%, 75% { background: #EFF6FF; } }
+  .toc-foot.nudge { animation: toc-nudge 0.5s ease-in-out; }
+  /* [추가: 2026-07-30] app.preview_renderer와 동일한 체크박스 일괄이동 바 —
+     평소엔 숨어있다가 체크박스를 선택하면 왼쪽에 나타나고, 🗑️는 그대로 오른쪽에 남는다. */
+  .bulk-move-bar { display: none; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--fs-md); }
+  .bulk-move-bar.is-active { display: flex; }
+  .bulk-move-bar .bulk-move-count { font-weight: 600; color: #1E3A5F; white-space: nowrap; }
+  #bulk-move-select {
+    border: 1px solid #2563EB; border-radius: var(--r-md); padding: 5px 8px; font-size: var(--fs-md);
+    color: #1F2937; background: #FFFFFF;
+  }
+  .bulk-move-bar button { padding: 5px 12px; font-size: var(--fs-md); }
+  /* [추가: 2026-08-04] 일괄 위/아래 이동 버튼 — 선택한 기사가 서로 다른 소제목에
+     걸쳐 있거나 소제목의 맨 위/아래에 닿으면 비활성화된다(updateBulkMoveBar). */
+  #bulk-move-up, #bulk-move-down { padding: 5px 10px; }
+  #bulk-move-up:disabled, #bulk-move-down:disabled { opacity: 0.35; cursor: not-allowed; }
+  .bulk-move-bar .clear-btn { background: transparent; color: #6B7280; }
+  .bulk-move-bar .clear-btn:hover { background: #EFF6FF; }
+  /* [수정: 2026-09-18] 체크박스가 작아 누르기 어렵다는 지적 — 브라우저 기본 13px → 16px
+     (시안 mockups/CHECKBOX_SIZE_MOCKUP.html B안). 소제목 머리 체크박스도 같은 크기,
+     체크 색은 앱 파랑. 기사 체크박스는 커진 만큼 2px 내려 제목 첫 줄 가운데에 맞춘다. */
+  .article-select, .group-select-all { width: 16px; height: 16px; margin: 3px 3px 0 4px;
+    accent-color: #2563EB; cursor: pointer; }
+  .article-select { flex-shrink: 0; position: relative; top: 2px; }
+  .group-select-all { vertical-align: -3px; }
+  .group-move-select {
+    flex-shrink: 0; width: 100px; height: var(--h-sm); box-sizing: border-box; border: 1px solid #E5E7EB; border-radius: var(--r-sm);
+    padding: 0 4px; font-size: var(--fs-sm); color: #6B7280; background: #FFFFFF;
+  }
+  /* 📌 담아둔 기사의 승격 드롭다운만 조금 넓다 — 「확정본에 넣기…」가 100px에선 잘린다
+     (실측: 글자 81px + 안쪽 여백 8 + 테두리 2 + 화살표 자리 ≈ 111px). 나머지 규격은
+     「다른 소제목」과 같다. */
+  .group-move-select.promote-select { width: 114px; }
+  /* [추가: 2026-08-04] 소제목별/시간순/언론사순 보기 전환 — 실제 소제목 구성은 그대로
+     두고 화면에 나열하는 순서만 바꾸는 용도라, 다른 액션 버튼과 톤을 맞추되 select임을
+     알 수 있게 테두리를 살짝 강조한다. */
+  .view-mode-select {
+    border: 1px solid #2563EB; border-radius: var(--r-md); padding: 6px 10px; font-size: var(--fs-md);
+    color: #1F2937; background: #FFFFFF;
+  }
+  /* [수정: 2026-08-04] 기사가 없을 때만 걸리던 점선 테두리를, 사용자가 직접 만든
+     소제목이면 기사가 있어도 계속 유지되도록 바꿨다(.subheading-empty -> .subheading-custom)
+     — 자동 분류 소제목과 구분되도록, 아이콘 대신 색을 진한 하늘색으로 키워 눈에 더
+     잘 띄게 했다(사용자 피드백: 아이콘은 소제목이 길면 놓치기 쉽지만 테두리는 카드
+     전체를 감싸 계속 보인다). */
+  /* [수정: 2026-08-05] 빈 여백이 너무 넓어 보인다는 피드백 — 패딩을 줄였다. 사실 가장
+     큰 원인은 아래 .subheading h2 쪽 브라우저 기본 margin이었다(같이 수정). */
+  .subheading-custom { border: 2px dashed #7DD3FC; border-radius: var(--r-lg); padding: 8px 16px; }
+  .empty-group-hint { color: #6B7280; font-size: var(--fs-md); margin: 6px 0 0; }
+  header h1 { font-size: var(--fs-xl); margin: 0; color: #1E3A5F; }
+  /* [추가: 2026-08-10] "지난 기사"는 복사·다운로드 같은 이 화면의 액션이 아니라 다른
+     화면으로 이동하는 링크라 툴바에서 빼고 제목 옆(내비게이션 자리)으로 옮겼다
+     (시안 A, 사용자 선택) — 회색 톤으로 제목보다 눈에 덜 띄게 둔다. */
+  .header-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+  .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  /* [추가: 2026-08-12] app.preview_renderer.py와 동일한 이유 — 🤖 이모지가 든 버튼만
+     색이모지 글꼴의 line-height 때문에 다른 버튼보다 박스가 커 보이는 문제가 있어
+     height를 고정값으로 못박는다. */
+  .actions button, .actions a.btn { height: 32px; box-sizing: border-box; }
+  /* [추가: 2026-08-10] 정렬 보기 방식(소제목별/시간순 등)은 복사·다운로드·소제목 만들기
+     같은 액션이 아니라 표시 옵션이라, 툴바 맨 오른쪽으로 분리했다(사용자 선택 — 붙여
+     두면 그냥 버튼 하나처럼 섞여 구분이 안 된다는 피드백). margin-left: auto로 같은 줄
+     안에서만 밀어내며, select 자체는 내용만큼만 짧게 유지한다(폭 지정 없음). */
+  .actions .view-mode-select { margin-left: auto; }
+  /* [수정: 2026-08-03] button 태그는 브라우저 기본 스타일상 body의 font-family를 물려받지
+     않아(a 태그와 달리) 지금까지 Arial 등 시스템 기본체로 렌더링되고 있었고, appearance:
+     auto(네이티브 OS 버튼 껍데기)까지 남아있어 폰트를 맞춰도 렌더링이 미묘하게 달랐다 —
+     font-family: inherit·appearance: none으로 고쳤는데도 "txt로 저장"(a 태그)만 여전히
+     글자 위치가 달라 보인다는 세 번째 재지적으로, 크롬이 button 태그 텍스트는 내부적으로
+     수직 중앙 정렬해주지만 a 태그는 그런 처리가 없다는 걸 마지막으로 발견 — align-items:
+     center를 직접 지정해 브라우저 기본 동작에 기대지 않고 두 태그를 완전히 동일하게 그린다. */
+  button, a.btn {
+    background: #2563EB; color: #FFFFFF; border: none; border-radius: var(--r-md);
+    padding: 6px 14px; font-size: var(--fs-md); font-family: inherit; cursor: pointer; text-decoration: none;
+    appearance: none; -webkit-appearance: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    user-select: none; -webkit-user-select: none;
+  }
+  button:hover, a.btn:hover { background: #1E3A5F; }
+  /* [수정: 2026-08-03] 화면 상단 액션 툴바(복사·txt로 저장·Telegram 전송·지난 기사)만
+     "정직한 파란색" 원색 채움 대신 톤온톤 소프트 필로 — 디자인 시안 B안(사용자 선택).
+     .actions button 쪽이 위 전역 button 규칙보다 더 구체적이라(class+element > element)
+     이 툴바 안에서만 덮어쓰고, 🗑️/↑/↓ 등 다른 버튼은 그대로 원색 유지. */
+  .actions button, .actions a.btn {
+    background: #EFF6FF; color: #2563EB; font-weight: 600; border-radius: var(--r-md);
+    height: var(--h-md); padding-top: 0; padding-bottom: 0; box-sizing: border-box;
+  }
+  .actions button:hover, .actions a.btn:hover { background: #EFF6FF; }
+  /* [수정: 2026-08-03] "+ 새 소제목 만들기"만 나머지 툴바 버튼과 기능이 달라(내용을
+     내보내는 게 아니라 새 그릇을 만드는 것) 시안 A(고스트 아웃라인)로 유일하게 다르게
+     둔다 — .actions .create-group-btn이 위 .actions button보다 구체적이라(class 2개)
+     덮어쓴다. */
+  .actions .create-group-btn {
+    background: transparent; color: #2563EB; border: 1px solid #BFDBFE;
+    border-radius: var(--r-md); font-weight: 400;
+  }
+  .actions .create-group-btn:hover { background: #EFF6FF; border-color: #A9C6F5; }
+  /* [추가: 2026-08-11] 확정본 "🤖 전체 기사 재분류" 버튼 — 왼쪽 그룹 맨 끝(구분선 뒤)에 둔다.
+     [수정: 2026-08-12] 처음엔 채운 연보라였는데, 초안에 같은 기능의 버튼("전체 기사
+     재분류")을 고스트(테두리만)로 만들면서 화면마다 같은 버튼이 다르게 생기는 문제가
+     생겼다(사용자 지적, 스크린샷으로 비교) — **파괴적 동작은 어느 화면에서든 채우면
+     안 된다**는 원칙에 맞춰 확정본도 고스트로 통일했다. 자세한 이유는
+     app/preview_renderer.py의 같은 자리 주석 참고. */
+  .actions-divider { width: 1px; height: 26px; background: #E5E7EB; margin: 0 2px; }
+  /* [수정: 2026-08-26] 고스트(테두리만) → "AI 기사 배정"과 같은 채운 연보라. 사용자 결정 —
+     app/preview_renderer.py의 .reclassify-btn과 같은 이유·같은 배색이라 두 화면이 계속
+     같은 모양을 유지한다. 파괴적이라는 신호는 아이콘(새로고침)과 항상 뜨는 confirm()이 맡는다. */
+  .actions .regen-btn {
+    position: relative; background: #F0EAFB; color: #4A3F8F; border: 1px solid #DCD0F2;
+  }
+  .actions .regen-btn:hover { background: #E7DBFA; border-color: #CBB8ED; }
+  .actions .regen-btn:disabled { opacity: 0.5; cursor: progress; }
+  /* [추가: 2026-08-11] AI가 만든 소제목 표식. 화면 전용이며, 소제목 이름 문자열과
+     완전히 분리된 별도 span이라 복사/다운로드/발송 텍스트에는 절대 따라가지 않는다. */
+  .ai-badge { margin-left: 6px; font-size: var(--fs-sm); opacity: 0.75; vertical-align: middle; }
+  /* [추가: 2026-08-20] 소제목별 기사 건수 칩 — 이름 바깥 별도 span(복사/다운로드/발송
+     텍스트에 안 새게). 📂 미분류의 빨간 unclassified-count와 같은 모양·중립 회색이라
+     "빨강=처리할 것 / 회색=그냥 정보"로 구분된다. */
+  .subheading-count {
+    margin-left: 6px; font-size: var(--fs-sm); font-weight: 700; color: #6B7280;
+    background: #F3F4F6; border-radius: var(--r-pill); padding: 1px 8px;
+  }
+  /* 헤더의 회차 전체 기사 건수 칩 — 같은 이유로 h1 옆 별도 span. */
+  .total-count-badge {
+    margin-left: 8px; font-size: var(--fs-sm); font-weight: 700; color: #6B7280;
+    background: #F3F4F6; border-radius: var(--r-pill); padding: 2px 10px; vertical-align: middle;
+  }
+  /* 임시 보관함(아직 분류 안 된 기사) 제목 — 소제목이 아니라 대기실이라는 게 읽히도록
+     꺾쇠 없이 회색 기울임꼴로, 확정된 소제목들과 시각적으로 확실히 구분한다. */
+  /* [수정: 2026-08-26] font-style: italic 제거 — app/preview_renderer.py의 같은 자리와
+     동일한 이유(옆 건수 칩·버튼과 밑줄이 안 맞아 한 줄로 안 읽힘). */
+  .unclassified-title { color: #6B7280; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 5px; }
+  /* [수정: 2026-08-21] 빨강 → 앰버(주의 세트) — app.preview_renderer의 같은 배지와
+     동일한 이유(이 화면도 [단독]/[속보] 빨강과 겹친다)로 같이 맞춘다. */
+  .unclassified-count {
+    margin-left: 4px; font-style: normal; font-weight: 700; font-size: var(--fs-sm);
+    color: #92400E; background: #FEF3C7; border-radius: var(--r-pill); padding: 1px 8px;
+  }
+  /* [수정: 2026-09-16] 소제목 사이 28→20px — 소제목 밑줄이 이미 구분선 노릇을 한다.
+     초안(app/preview_renderer.py)에도 같은 값이 있다. */
+  .subheading { margin-top: 20px; }
+  /* [수정: 2026-08-05] h2 브라우저 기본 margin(위아래 약 15px)이 빈 소제목 카드를 실제
+     내용보다 훨씬 커 보이게 만드는 주범이었다 — margin을 직접 지정해 제거. 겸사겸사
+     ✏️/🗑️/↑↓를 제목 바로 옆이 아니라 줄 오른쪽 끝에 붙이고 싶다는 요청도 이 flex로
+     함께 해결(왼쪽 = 제목, 오른쪽 = 아이콘 묶음). 기사 한 줄(.article summary)은 반대로
+     "짧은 제목 뒤 버튼이 화면 끝까지 멀어지는" 문제 때문에 flex-start를 의도적으로 쓰고
+     있어 그대로 둔다 — 소제목 헤더와 기사 한 줄은 서로 다른 문제라 같은 답을 쓰지 않는다. */
+  .subheading h2 {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    font-size: var(--fs-lg); color: #1E3A5F; border-bottom: 1px solid #E5E7EB;
+    margin: 0 0 6px; padding-bottom: 6px;
+  }
+  .subheading-title { display: flex; align-items: center; gap: 4px; min-width: 0; }
+  .subheading-icons { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+  .rename-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 0.9rem; cursor: pointer;
+    vertical-align: middle; user-select: none; -webkit-user-select: none;
+  }
+  /* [추가: 2026-08-13] 소제목 🗑️(빈 소제목 삭제·소제목 통째로 숨기기)는 ✏️(이름
+     바꾸기)와 같은 .rename-btn을 공유해 hover 색이 없었다 — 파괴력이 다른 두 액션이
+     같은 무반응 회색이라 어색하다는 지적으로, 기사 단위 🗑️(.hide-btn:hover)와 같은
+     빨강을 이 아이콘에만 추가한다(✏️는 그대로 무채색 유지). */
+  .rename-btn.group-hide-btn:hover { color: #DC2626; }
+  /* [추가: 2026-08-03] 소제목 순서 조정 버튼 — 기사용 .move-btn과 같은 톤이되 소제목
+     헤더 안에 있어 별도 클래스로 둔다. */
+  /* [수정: 2026-08-05] 기사 ↑/↓(.move-btn)과 가로폭이 안 맞아서 나란히 보면 좁아 보였다
+     — 패딩·글자 크기를 .move-btn과 통일했다. */
+  /* [수정: 2026-08-13] 소제목 순서 버튼을 ↑↓에서 ▲▼로 바꿨다 — 기사 순서 버튼(.move-btn)과
+     글리프·색·크기까지 똑같아서 "뭘 옮기는 버튼인지"가 위치로만 구분됐고, 정작 같은 일을
+     하는 목차 팝오버 버튼(.toc-order-btn)은 이미 ▲▼여서 오히려 그쪽과 어긋나 있었다.
+     이제 삼각형=소제목 / 화살표=기사로 대상이 형태만 보고 구분된다.
+     ▲▼는 같은 크기에서 ↑↓보다 크고 무겁게 보여 font-size를 1rem에서 낮춰 균형을 맞춘다. */
+  .order-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 0.78rem; cursor: pointer;
+    vertical-align: middle; padding: 2px 6px; user-select: none; -webkit-user-select: none;
+  }
+  .order-btn:disabled { opacity: 0.35; cursor: default; }
+  /* [수정: 2026-09-16] 행 여백 한 단계씩 축소 — padding 6→4px, 제목·메타 줄 사이 4→2px,
+     행 사이 10→6px. 글자·버튼 크기는 그대로다(한 건 74 → 64px). 확정본·초안·정기 보관함·
+     수시 네 파일에 같은 값이 복제돼 있으니 한쪽만 고치지 않는다. 시안 ARTICLE_ROW_DENSITY_MOCKUP.html B안. */
+  .article { margin: 6px 0; line-height: 1.5; padding: 4px 8px; border-radius: var(--r-md); }
+  /* [추가: 2026-08-20] [단독] 기사는 카드 자체를 강조한다(빨강 좌측바 + 연빨강 배경) —
+     담당자 지목: "단독이 가장 중요"이므로 글자색 하나로는 [속보]가 여러 건 나올 때
+     묻힐 수 있다(개수와 무관하게 항상 덩어리로 먼저 보이게). 다른 상태 배경(hover·
+     체크됨·새로 왔다·AI 마감 배정·방금 이동/승격)보다 **먼저** 선언해 가장 낮은
+     우선순위를 준다 — 저 상태들은 전부 "지금 이 순간의 정보"라 "이 기사는 원래
+     중요하다"는 이 배경보다 항상 이겨야 한다(기존 우선순위 원칙과 동일한 방향).
+     app.filters.headline_kind로 판정, app.live_renderer의 .t-scoop/.t-flash와 같은
+     팔레트를 쓴다. */
+  .article.art-scoop { background: #FEF2F2; border-left: 3px solid #DC2626; padding-left: 9px; }
+  .t-scoop { color: #B91C1C; font-weight: 800; }
+  .t-flash { color: #B91C1C; font-weight: 600; }
+  /* [추가: 2026-08-05] 마우스를 올린 기사 줄을 연한 회색으로 표시해 긴 목록에서도 지금
+     어느 줄을 보고 있는지 놓치지 않게 한다. 체크 표시(#EFF6FF, 파란색)·방금 승격
+     표시(노란색)와 겹치지 않는 중립적인 회색을 골랐다 — 이 규칙을 :has(체크됨) 규칙보다
+     먼저 둬서, 체크된 채로 마우스를 올려도 "체크됨" 파란색이 우선 보이게 한다(체크는
+     능동적으로 선택한 상태라 스쳐 지나가는 마우스 오버보다 우선순위가 높아야 한다). */
+  .article:hover { background: #F3F4F6; }
+  /* [추가: 2026-08-21] 사진 추정 기사는 지우지 않고 행 전체를 흐리게 해 "훑을 때는
+     건너뛰고, 확인하고 싶으면 마우스를 올리거나 체크한다"를 표현한다. opacity는
+     background와 다른 속성이라 위/아래 배경색 규칙과 순서 다툼이 없다 — 어떤 배경이
+     깔리든 그 위에 흐림만 얹힌다. 마우스 오버·체크 상태에선 다시 또렷해져, "지금
+     내가 보고 있거나 고른 것"까지 흐려 보이지 않게 한다. */
+  .article.is-photo { opacity: 0.55; }
+  .article.is-photo:hover, .article.is-photo:has(.article-select:checked) { opacity: 1; }
+  /* [추가: 2026-08-03] 일괄 이동용 체크박스를 켠 기사는 연한 배경으로 표시해 "지금
+     뭘 골랐는지" 스크롤하면서도 바로 보이게 한다 (디자인 시안 A, 사용자 선택) —
+     자바스크립트 변경 없이 :has()만으로 동작. */
+  .article:has(.article-select:checked) { background: #EFF6FF; }
+  /* [추가: 2026-08-13] 지난번 이 회차를 봤을 때는 없다가 새로 들어온 기사 — 초안에만
+     있던 표시(app.preview_renderer .is-new-arrival)를 확정본에도 그대로 들여왔다.
+     확정본은 저장된 스냅샷이라 "새 기사가 없다"고 생각하기 쉽지만, 실제로는 📌 담아둔
+     기사 승격·초안에서 예약해둔 기사 합류로 회차 도중에도 늘어난다 — 그게 소제목 안에
+     아무 표시 없이 섞여 들어가 못 찾겠다는 피드백. 색·의미 모두 초안과 동일한 옅은
+     노랑이다(🤖가 움직인 결과인 연보라와는 다른 축 — 이건 "그냥 새로 왔다"는 정보).
+     .just-promoted/.just-moved보다 **먼저** 선언해, 겹칠 때 그쪽이 이긴다: "새로 왔다"는
+     화면을 열 때마다 판정되는 배경 정보고, 저 둘은 방금 내 조작의 결과라 더 급하다.
+     [메모: 2026-09-04] 이 기준선은 📌 담아둔 기사 구획의 행까지 담으므로(그 구획도 같은
+     render_article로 그려져 .article[data-url]이다), **승격은 이 노랑을 유발하지 않는다** —
+     노랑이 붙는 건 담아두기로 그 행이 화면에 처음 생길 때다. 승격 직후 색은 초록이다. */
+  .article.is-new-arrival { background: #FFF9C4; }
+  /* [추가: 2026-08-20] 초안 마감 시점에 방금 자동으로 소제목에 배정된 기사 — 담당자가
+     못 본 사이 AI가 대신 판단해 붙인 것이라 "새로 왔다"(노랑)보다 더 구체적이고 급한
+     정보다. is-new-arrival보다 뒤에 선언해 겹칠 때(거의 항상 겹친다 — 마감 시 새로
+     들어온 기사는 대개 이번이 처음 보는 회차라 새-도착 기준선에도 안 걸려 있다) 이
+     보라색이 이긴다. 다만 just-promoted/just-moved(내가 방금 조작한 결과)보다는
+     앞에 둬 그쪽이 최종 우선한다 — "내 조작"이 "AI가 마감 때 한 일"보다 급하다는
+     기존 원칙(.is-new-arrival 주석)을 그대로 잇는다. border-left는 배경색이 나중
+     규칙에 덮여도(같은 속성이 아니므로) 계속 남아 "이 기사는 그 배정 대상"이라는
+     표식이 사라지지 않는다 — 음영은 담당자가 손대도 계속 남아야 한다(사용자 확인). */
+  .article.finalize-added {
+    border-left: 3px solid #A78BFA; padding-left: 11px;
+  }
+  /* [수정: 2026-08-27] 배경 음영만 별도 클래스로 뗐다 — 배너의 "확인했어요"를 누르면
+     JS가 이 클래스만 걷어내고, 왼쪽 보라 선·🤖 배지는 그대로 남긴다("봤다"는 표시는
+     하되 "어떤 기사였는지"는 계속 알아볼 수 있어야 한다 — 사용자 결정). 선언 위치는
+     예전 그대로라 is-new-arrival(노랑)과의 우선순위도 그대로이고, 음영을 걷어낸
+     뒤에야 그 노랑이 드러난다. */
+  .article.finalize-added-bg { background: #F0EAFB; }
+  .article.finalize-added.is-focused { outline: 2px solid #A78BFA; outline-offset: 2px; }
+  .finalize-added-badge {
+    flex-shrink: 0; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 700;
+    background: #FFFFFF; color: #4A3F8F; border: 1px solid #DCD0F2; white-space: nowrap;
+    position: relative; top: -0.15em;  /* [수정: 2026-08-21] 제목보다 글자가 작은 알약이라 baseline 정렬만으론 약간 아래로 보인다(실측: 위 여백 +1px, 아래 -2.3px) — 반 칸(0.15em) 올려 제목 글자 높이 한가운데에 맞춘다. */
+  }
+  /* h2 옆 — 마감 시점에 이름 자체가 새로 생긴 소제목. */
+  .new-subheading-badge {
+    font-size: var(--fs-xs); font-weight: 700; padding: 2px 7px; border-radius: var(--r-pill);
+    background: #F0EAFB; color: #4A3F8F; border: 1px solid #DCD0F2; white-space: nowrap;
+    margin-left: 4px; vertical-align: middle;
+  }
+  /* [추가: 2026-08-20] 확인 배너 — 초안의 round-over-banner(마감 알림)와 같은 자리·형태,
+     색만 AI 전용 연보라로 바꿨다. 자동 배정된 기사가 있을 때만 서버가 렌더링하고,
+     JS가 이 회차에서 이미 "확인했어요"를 눌렀는지(localStorage)를 보고 보일지 정한다. */
+  .finalize-banner {
+    display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 21;
+    background: #F4EFFC; border-bottom: 1px solid #DCD0F2;
+  }
+  .finalize-banner.is-visible { display: block; }
+  .finalize-banner-inner {
+    max-width: 800px; margin: 0 auto; padding: 11px 24px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .finalize-banner .msg { flex: 1; min-width: 200px; font-size: var(--fs-md); color: #4A3F8F; }
+  .finalize-banner .msg b { color: #372C6E; }
+  .finalize-banner .go {
+    background: #1E3A5F; color: #FFFFFF; border: none; border-radius: var(--r-md);
+    padding: 8px 14px; font-size: var(--fs-md); font-weight: 700; cursor: pointer; white-space: nowrap;
+  }
+  .finalize-banner .go:hover { background: #16304D; }
+  .finalize-banner .dismiss {
+    background: transparent; border: none; color: #7C6FA8; font-size: var(--fs-sm);
+    cursor: pointer; text-decoration: underline; padding: 4px;
+  }
+  /* 배너가 뜨면 그만큼 topbar와 본문을 아래로 밀어 겹치지 않게 한다(높이는 JS가 실측). */
+  body.has-finalize-banner .topbar { top: var(--finalize-banner-h, 0px); }
+  body.has-finalize-banner .container { margin-top: calc(24px + var(--finalize-banner-h, 0px)); }
+  /* [추가: 2026-08-05, 수정: 2026-09-04] "📌 담아둔 기사"에서 승격시킨 기사가 자동분류
+     목록 어디에 들어갔는지 한눈에 안 보여서, 새로고침 직후 딱 한 번 표시한다(체크박스
+     선택 배경색#EFF6FF과는 다른 색이어야 두 상태가 헷갈리지 않는다 — 승격은 "방금 옮김",
+     체크는 "지금 선택 중"으로 의미가 다르다).
+     색은 노랑(row_new)에서 이동 색(row_moved)으로 옮겼다 — 노랑은 "이 화면에서 처음 보는
+     기사"인데 📌 구획은 승격 전부터 같은 화면 아래에 떠 있고(드롭다운이 그 구획 안에 있어
+     안 볼 수가 없다), 아래 is-new-arrival 기준선도 .article[data-url] 전부를 담아 승격된
+     기사를 이미 "새 도착 아님"으로 판정한다. 앱 자신의 판정과 어긋나는 색이었다. */
+  .article.just-promoted { background: #E7EFE8; }
+  /* [수정: 2026-08-05] 노란색은 이미 초안 화면의 "새로 도착한 기사"(.is-new-arrival)
+     표시에 쓰이고 있어 — 순서를 옮긴 기사까지 같은 노란색을 쓰면 서로 다른 의미가 한
+     색으로 겹쳐 헷갈린다는 피드백. 순서 이동 전용으로 연두색을 새로 뺐다(기존 팔레트의
+     형광펜용 라임색 #C6FF00과도 톤이 달라 헷갈리지 않는다).
+     [수정: 2026-09-04] 승격(.just-promoted)도 이 색으로 합류했다 — 둘 다 "내가 방금
+     만진 결과가 어디 갔나"라는 같은 질문에 답한다(위 주석 참고). */
+  .article.just-moved { background: #E7EFE8; }
+  /* [추가: 2026-09-15] 「AI 기사 나누기」가 방금 옮긴 기사 — 초안의 같은 클래스(「AI 기사 배정」
+     결과)와 같은 연보라. 노랑(is-new-arrival)보다 뒤에 선언해 겹치면 이쪽이 이긴다(내가 시켜서
+     AI가 옮긴 것이 "새로 왔다"보다 지금 묻는 질문에 가깝다). 다음 새로고침에 사라진다. */
+  .article.just-classified { background: #F0EAFB; }
+
+  .bulk-move-bar .bulk-split-divider { width: 1px; height: 24px; background: #E5E7EB; margin: 0 2px; }
+  .bulk-move-bar .split-btn {
+    display: inline-flex; align-items: center; gap: 5px; font-weight: 600; border-radius: var(--r-md);
+    background: #F0EAFB; color: #4A3F8F; border: 1px solid #DCD0F2;
+  }
+  .bulk-move-bar .split-btn:hover { background: #E7DBFA; border-color: #CBB8ED; }
+  .bulk-move-bar .split-btn[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
+  .bulk-move-bar .split-btn[aria-disabled="true"]:hover { background: #F0EAFB; border-color: #DCD0F2; }
+  .bulk-move-bar .split-btn:disabled { opacity: 0.7; cursor: progress; }
+  .bulk-move-bar .split-btn[hidden], .bulk-move-bar .bulk-split-divider[hidden] { display: none; }
+  /* 이 드롭다운은 가장 긴 소제목 이름만큼 넓어져서(실측 199px) 나누기 버튼이 붙자 800px 바가
+     두 줄로 넘어갔다. 닫혀 있을 땐 늘 「이동할 소제목」만 보이고, 펼친 목록은 이 폭과 무관하게
+     이름 전체를 보여준다. */
+  #bulk-move-select { max-width: 150px; }
+
+
+  .screen-tag { display: inline-flex; align-items: center; font-size: var(--fs-sm); font-weight: 700;
+    padding: 3px 11px; border-radius: var(--r-pill); border: 1px solid; margin-right: 10px;
+    vertical-align: 0.18em; line-height: 1.3; }
+  .screen-tag.work { background: #F1F5F9; border-color: #E5E7EB;
+    color: #6B7280; }
+  .screen-tag.final { background: #EFF6FF; border-color: #BFDBFE;
+    color: #2563EB; }
+  .head-sub { font-size: 0.72em; font-weight: 500; color: #6B7280; margin-left: 6px; }
+
+  /* [수정: 2026-08-13] summary를 1행(제목이 게시시각·액션 묶음과 폭을 다투던 flex 한
+     줄)에서 2행으로 나눴다 — 제목이 대부분 2~3줄로 꺾이던 문제(실측: 액션 묶음이
+     카드 폭의 약 40%를 고정 점유) 때문. 1행(.title-row)은 체크박스+제목이 카드 전체
+     폭을 쓰고, 2행(.action-row)은 게시시각(좌)+액션 묶음(우)이다. */
+  .article summary {
+    cursor: pointer; display: flex; flex-direction: column; gap: 2px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .article summary::marker { color: #6B7280; }
+  /* [수정: 2026-07-30, 유지: 2026-08-13] 🗑️를 제목 바로 옆(정확히는 같은 카드의 2행)에
+     둔다 — 예전엔 하단 footer에 있어 요약을 펼치면 제목에서 멀어져 어떤 버튼이 어떤
+     기사 것인지 헷갈렸다. */
+  .title-row { display: flex; align-items: baseline; justify-content: flex-start; gap: 8px; }
+  /* [수정: 2026-08-13] 원문보기·복사하기가 액션 묶음에 추가되며 좁은 화면(모바일)에서
+     한 줄에 다 안 들어가 옆으로 45px가량 넘치던 문제(실측) — action-row와 그 안의
+     article-actions 둘 다 wrap을 허용해, 안 들어가면 액션 묶음이 통째로 다음 줄로
+     내려가고(그래도 안 들어가면 아이콘 단위로 더 줄바꿈) 오른쪽 정렬은 유지된다. */
+  .action-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 4px; }
+  /* [추가: 2026-08-07] 모바일 사파리에서 제목(summary)을 눌러 펼치면 그 뒤로 제목 글자가
+     보라색으로 바뀌어 보인다는 제보 — 이 앱 CSS가 지정한 색이 아니라, 사파리가 탭할 때
+     보여주는 하이라이트 효과(-webkit-tap-highlight-color)가 제대로 안 지워지고 남는
+     것으로 보인다(iOS 사파리에서 종종 나타나는 현상). 색을 투명 처리해 아예 안 나타나게
+     막는다. */
+  .title-line { min-width: 0; overflow-wrap: anywhere; color: #1F2937; -webkit-tap-highlight-color: transparent; }
+  /* [추가: 2026-09-11] 제목 앞 언론사 — 괄호 대신 회색·조금 작은 글자로 제목과 가른다
+     (render_article의 line_html). 초안·정기 보관함에도 같은 규칙이 있다 — 한쪽만 고치지 않는다. */
+  .title-outlet { color: #6B7280; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  /* [수정: 2026-08-05, 2026-08-13] 다른 소제목/원문보기/복사하기/⋯/🗑️/↑↓ 묶음은
+     margin-left: auto로 2행(.action-row) 오른쪽 끝에 고정 — 표 형태처럼 항상 같은
+     자리에 있어야 여러 기사를 훑을 때 클릭 위치가 안 흔들린다. 게시시각은 왼쪽에
+     그대로 둔다. */
+  .article-actions {
+    margin-left: auto; display: flex; align-items: center; justify-content: flex-end;
+    gap: 4px; flex-shrink: 0; flex-wrap: wrap; row-gap: 4px;
+  }
+  /* [수정: 2026-08-21] 표식 없는 사진기사 추정 배지 — app.live_renderer의 실시간 현황과
+     같은 "아이콘+문구" 칩·같은 채도 낮은 모래색으로 맞췄다(전에는 제목 줄이 빡빡하다는
+     이유로 아이콘만 썼는데, 사진기사 제외 설정을 기본 끔으로 바꾸며 이 배지가 흔히
+     보이게 됐으니 문구가 바로 읽혀야 한다). */
+
+  /* [추가: 2026-09-03] "앞 회차 기사" 칩 — 회차 마감 순간 네이버 검색이 아직 안 주던
+     기사를 다음 회차가 주워 담았을 때 붙는다(app.scraper.collect_run의 late_pickup,
+     [추가: 2026-09-04] app.preview_renderer._compute_preview_articles의 같은 표식).
+     자리는 제목 줄이 아니라 메타 줄이다 — 제목 줄엔 이미 🤖 "마감 후 자동 배정" 배지가
+     붙고, 회수된 기사는 그 회차에서 처음 보는 기사라 거의 항상 그 배지도 함께 단다.
+     두 표시가 서로 다른 줄을 쓰면 border-left(연보라 띠)를 두고 다툴 일이 없다.
+     그래서 이 표시에는 왼쪽 띠를 주지 않는다 — 띠는 "훑을 때 덩어리로 보이는" 자리라
+     하나만 써야 하고, "AI가 소제목을 대신 정했다"가 담당자가 손볼 일이 더 크다.
+     색은 상단 배너와 같은 "주의"(앰버) 계열이라, 배너에서 [N건]을 눌러 내려왔을 때
+     같은 색이 눈에 들어와 "배너가 말한 게 이거"로 이어져 읽힌다. */
+  .late-badge {
+    flex-shrink: 0; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
+    color: #92400E; background: #FEF3C7; border: 1px solid #FDE68A; white-space: nowrap;
+  }
+
+
+  /* 툴바 오른쪽 「copy · txt · xlsx」 — 확정본·초안 공용. 툴바 규칙: 박스는 내용을 바꾸는
+     버튼(왼쪽), 글자는 가져가거나 보기만 바꾸는 것(오른쪽). 그래서 .actions button의 옅은
+     파란 채움을 끄고 글자만 남긴다. hover는 배경 없이 글자색 + 밑줄.
+     시안 mockups/TOOLBAR_GROUPING_MOCKUP.html A안. */
+  .actions .actions-right { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .actions .actions-right .view-mode-select { margin-left: 0; }
+  .actions .export-links { display: inline-flex; align-items: center; }
+  .actions .export-links button {
+    background: transparent; border: none; color: #4B5563; font-weight: 500;
+    padding: 6px 8px; border-radius: var(--r-md);
+  }
+  .actions .export-links button:hover {
+    background: transparent; color: #2563EB; text-decoration: underline; text-underline-offset: 3px;
+  }
+
+  /* 상단 안내 배너 — 초안의 "AI 분류 실패" 상자와 같은 자리(기사 목록 위 흐름 안).
+     회차 마감 배너처럼 화면 상단에 고정하지 않는다: 그건 "지금 하는 작업이 헛수고"라는
+     급한 경고라 그렇게 한 것이고, 이건 그 정도가 아니다. 회수가 0건이면 서버가 이
+     배너를 아예 안 그린다(0건이면 안 그린다 — 📂 미분류 배지·📷 사진 추정 버튼과 같은
+     원칙. 늘 떠 있는 안내는 곧 안 읽히는 안내가 된다). */
+  .late-banner {
+    margin: 0 0 14px; padding: 11px 16px; border-radius: var(--r-lg);
+    background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .late-banner .msg { flex: 1; min-width: 220px; font-size: var(--fs-md); line-height: 1.5; }
+  .late-banner .cnt {
+    font-family: inherit; font-weight: 800; font-size: var(--fs-md); cursor: pointer;
+    border: 1px solid #FDE68A; border-radius: var(--r-md); padding: 2px 9px;
+    background: #FEF3C7; color: #92400E;
+  }
+  .late-banner .cnt:hover { background: #FFFFFF; }
+  .late-banner .q {
+    border: 1px solid #FDE68A; background: #FFFFFF; color: #92400E;
+    border-radius: var(--r-md); padding: 2px 7px; font-size: var(--fs-sm); cursor: help; line-height: 1.4;
+  }
+  .photo-badge {
+    flex-shrink: 0; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
+    color: #6B7280; background: #F3F4F6; border: 1px solid #E5E7EB; white-space: nowrap;
+    position: relative; top: -0.15em;  /* [수정: 2026-08-21] 제목보다 글자가 작은 알약이라 baseline 정렬만으론 약간 아래로 보인다(실측: 위 여백 +1px, 아래 -2.3px) — 반 칸(0.15em) 올려 제목 글자 높이 한가운데에 맞춘다. */
+  }
+  .article-summary { margin: 6px 0 4px 20px; color: #1F2937; font-size: var(--fs-md); }
+  /* [수정: 2026-07-30] "이미 확인함" 표시를 브라우저에 영구 기억(localStorage)하는 대신,
+     "지금 펼쳐서 보고 있는 기사"에만 실시간으로 적용한다 — 예전 방식은 클릭했던 기사가
+     전부 보라색으로 남아 화면이 정신없어진다는 피드백에 따른 변경. details가 열려있는
+     동안에만 :has()로 색을 입히므로(자바스크립트 불필요), 닫거나 다른 기사를 열면 이
+     기사는 자동으로 원래 색으로 돌아간다. */
+  /* [수정: 2026-08-21] 색(남색) 대신 opacity로 — 화면에 남는 파랑이 전부 "누를 수
+     있는 것"이 되도록, 상태 표시는 색이 아닌 밝기로만 준다. */
+  .article:has(details[open]) .title-line { opacity: 0.62; }
+  /* [수정: 2026-08-03] 게시 시각은 복사/내보내기 텍스트(_build_plain_text)에는 원래도
+     포함되지 않지만, 화면에서 마우스로 직접 드래그해 복사할 땐 화면에 보이는 대로
+     같이 딸려왔다 — user-select: none으로 이 부분만 드래그 선택 자체가 안 되게 한다
+     (화면 표시는 그대로 유지, 클립보드에만 안 실림). */
+  .pub-time {
+    flex-shrink: 0; color: #6B7280; font-size: var(--fs-sm); white-space: nowrap;
+    user-select: none; -webkit-user-select: none;
+  }
+  .move-btn, .hide-btn, .copy-btn {
+    flex-shrink: 0; background: transparent; border: none; color: #6B7280; font-size: 1rem;
+    cursor: pointer; padding: 2px 6px; user-select: none; -webkit-user-select: none;
+  }
+  .move-btn:disabled { color: #E5E7EB; cursor: not-allowed; }
+  .hide-btn:hover { color: #DC2626; }
+  /* [수정: 2026-08-14] 원문보기를 아이콘 묶음에서 빼내 게시시각 옆 텍스트 링크로
+     옮겼다 — ↗(원문보기)와 복사 아이콘이 17px 크기에선 둘 다 "네모 두 겹" 실루엣이라
+     구분이 안 된다는 지적(사용자 스크린샷). 성격도 달라서(원문보기=이동, 나머지=편집)
+     자리를 아예 분리하는 게 맞다고 판단 — 왼쪽(게시시각 옆)은 화면을 보는 동작, 오른쪽
+     (article-actions)은 화면을 바꾸는 동작이라는 구획이 이제 색과 위치 둘 다로 드러난다.
+     글자 링크라 클릭 영역도 아이콘보다 넓어져 모바일에서 유리하다. */
+  .time-sep { color: #6B7280; font-size: var(--fs-sm); margin: 0 2px; user-select: none; -webkit-user-select: none; }
+  .origin-link-text {
+    flex-shrink: 0; color: #2563EB; font-size: var(--fs-sm); text-decoration: none;
+    display: inline-flex; align-items: center; gap: 2px; white-space: nowrap;
+  }
+  .origin-link-text:hover { text-decoration: underline; }
+  .origin-link-icon { width: 0.75em; height: 0.75em; }
+
+  /* [추가: 2026-08-21] 🔍 검색어 — 이 기사가 어떤 검색어로 걸렸는지. 게시시각·원문보기와
+     같은 줄·같은 크기(0.8rem)의 회색 글자다(칩으로 안 만든 이유는 render_article 주석).
+     [수정: 2026-09-14] 남는 자리만큼만 보여주고 나머지는 …로 자른다 — 전부 보여주던 때는
+     검색어가 긴 행에서 버튼 묶음이 통째로 아랫줄로 밀렸다. 세 값이 짝이다:
+     flex-basis 0 → 줄바꿈을 판단할 때 검색어 길이를 안 친다(그래서 버튼을 밀어내지 않는다),
+     flex-grow 1 + max-width: max-content → 남는 자리를 제 글자 길이까지만 채운다(남는 건
+     버튼 묶음의 margin-left: auto가 가져가 버튼이 오른쪽 끝에 그대로 선다),
+     min-width 5em → 그보다 자리가 적으면(좁은 화면) 검색어가 버튼과 함께 다음 줄로 넘어간다.
+     고정 폭(실시간 현황의 210px)으로 자르지 않은 이유: 「⏱ 늦게 들어온 기사」 칩이 붙는
+     행은 칩 폭(약 110px)만큼 자리가 모자라, 칩 없는 행 기준으로 정한 값으로는 여전히
+     밀린다(KW_CHIP_MOCKUP.html 실측). 확정본·초안 공용 — 한 곳에서만 고친다. */
+  .kw-inline {
+    font-size: var(--fs-sm); color: #6B7280;
+    display: inline-flex; align-items: center; gap: 4px;
+    flex: 1 1 0; min-width: 5em; max-width: max-content;
+  }
+  /* 구분점은 span 안에 있다(다음 줄로 넘어갈 때 점만 윗줄에 남지 않게). 오른쪽 여백은
+     밖에 있던 때의 간격(점 2px + 줄 gap 8px)을 그대로 맞춘 값. */
+  .kw-inline > .time-sep { margin-right: 6px; }
+  /* 돋보기는 값보다 한 톤 흐리게 — 먼저 읽혀야 하는 건 검색어 자체다. 크기는 바로 옆
+     원문보기 아이콘(.origin-link-icon)과 같은 0.75em이라 액션 줄에서 높이가 안 튄다. */
+  .kw-inline .kw-ic { width: 0.75em; height: 0.75em; color: #9CA3AF; flex-shrink: 0; }
+  .kw-inline .kw-v {
+    color: #4B5563; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+
+  /* 켜진 동안 툴바 버튼을 채운 파랑으로 — 지금 화면이 평소 화면이 아니라는 표시. */
+  .actions .photo-gather-btn.is-on, .actions .photo-gather-btn.is-on:hover {
+    background: #2563EB; color: #FFFFFF; border-color: #2563EB;
+  }
+  /* 모아 보는 중 띠 — 수십 건을 훑으며 체크를 풀어도 「전체 선택」·「원래 화면으로」가
+     화면 위로 사라지지 않게 sticky. 자리는 키워드 메모 칸과 같다(그 칸은 이 동안 숨는다).
+     상단 배너가 topbar를 밀어내면 같은 변수만큼 따라 내려간다(메모 칸과 같은 규칙). */
+  .photo-gather-strip {
+    position: sticky; top: 60px; z-index: 15; display: flex; align-items: center; gap: 10px;
+    flex-wrap: wrap; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: var(--r-lg);
+    padding: 9px 12px; margin: 12px 0 6px;
+  }
+  body.has-finalize-banner .photo-gather-strip { top: calc(60px + var(--finalize-banner-h, 0px)); }
+  body.round-over .photo-gather-strip { top: calc(60px + var(--round-banner-h, 0px)); }
+  .photo-gather-strip label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); cursor: pointer; }
+  .photo-gather-strip .pg-msg { font-size: var(--fs-md); color: #1E3A5F; }
+  .photo-gather-strip .pg-sp { flex: 1; }
+  .photo-gather-strip button { padding: 5px 12px; font-size: var(--fs-md); }
+  .pg-done { text-align: center; color: #6B7280; padding: 28px 0 16px; font-size: var(--fs-md); }
+  /* 원래 소제목 이름표 — 보고서에 나갈 자리. 📂 미분류 칸에서 온 기사엔 안 붙인다. */
+  .pg-from {
+    flex-shrink: 0; max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: var(--fs-xs); color: #4B5563; background: #F8FAFC; border: 1px solid #E5E7EB;
+    border-radius: var(--r-md); padding: 0 6px;
+  }
+  /* 모아 보는 중엔 전부가 사진 추정이라 흐림·📷 칩이 행마다 같은 값(=장식)이 된다. */
+  body.photo-gather .article.is-photo { opacity: 1; }
+  body.photo-gather .photo-badge { display: none; }
+  /* 목록 밖의 것들은 이 동안 접는다. ↑↓는 소제목 안 순서라 한 줄로 모인 목록에선 뜻이 없다. */
+  body.photo-gather .subheading:not(.photo-gather-view),
+  body.photo-gather .manual-divider, body.photo-gather .manual-zone, body.photo-gather .bottom,
+  body.photo-gather .keyword-note-zone, body.photo-gather .late-banner,
+  body.photo-gather .toc-toggle-btn, body.photo-gather .toc-popover,
+  body.photo-gather .move-btn, body.photo-gather #bulk-move-up, body.photo-gather #bulk-move-down {
+    display: none !important;
+  }
+
+  /* [추가: 2026-08-14] 체크박스가 있는 화면(확정본/초안)에서 게시시각·원문보기가 제목
+     글자 시작점과 다른 줄에서 시작해 왼쪽 끝이 들쭉날쭉하다는 지적(사용자 스크린샷의
+     분홍 사각형) — 브라우저에서 title-line의 실제 렌더 좌표를 재서 맞췄다(28px,
+     체크박스 자체의 기본 여백까지 포함된 값이라 "체크박스 폭+gap" 계산과는 다르다).
+     체크박스가 없는 지난 기사 화면은 :has()가 매치되지 않아 원래대로 0부터 시작한다
+     (article-select CSS 자체가 그 화면엔 없다). */
+  /* 체크박스 16px 기준: 왼쪽 여백 4 + 16 + 오른쪽 여백 3 + gap 8 = 31px (13px일 땐 28px). */
+  .article:has(.article-select) .action-row { padding-left: 31px; }
+  /* [추가: 2026-08-13] 복사하기 — 클릭하면 아이콘이 1초간 check로 바뀐다(copyArticleIcon).
+     기본 상태는 복사 아이콘만, .is-copied 상태는 check 아이콘만 보인다 — 색은 두
+     상태 모두 그대로 무채색(다른 아이콘 버튼과 통일, 전환 자체가 이미 충분한 신호). */
+  /* [추가: 2026-09-01] 소제목 헤더의 📋(.group-copy-btn)도 같은 전환을 쓴다 — 같은
+     일(복사)에 같은 피드백이어야 하므로 규칙을 복제하지 않고 선택자만 늘린다.
+     색·크기는 옆의 ✏️🗑️와 맞추려고 .rename-btn을 함께 걸었고, 여기서는 아이콘
+     두 개를 겹쳐 두기 위한 display만 준다. */
+  .copy-btn, .group-copy-btn { display: inline-flex; align-items: center; }
+  .copy-btn .icon-done, .group-copy-btn .icon-done { display: none; }
+  .copy-btn.is-copied .icon-default, .group-copy-btn.is-copied .icon-default { display: none; }
+  .copy-btn.is-copied .icon-done, .group-copy-btn.is-copied .icon-done { display: inline-flex; }
+  /* [추가: 2026-08-05] 원문 다시 가져오기 버튼 — 평소엔 숨겨두고 그 기사 카드에
+     마우스를 올렸을 때만 나타난다(제목 옆이 붐비지 않게). */
+  .refetch-btn {
+    flex-shrink: 0; background: transparent; border: none; color: #6B7280; font-size: var(--fs-base);
+    cursor: pointer; padding: 2px 6px; user-select: none; -webkit-user-select: none;
+    opacity: 0; transition: opacity 0.15s;
+  }
+  .article:hover .refetch-btn { opacity: 1; }
+  .refetch-btn:disabled { opacity: 0.35 !important; cursor: not-allowed; }
+  /* [추가: 2026-08-11] "⋯ 더보기" 메뉴 — 원문 다시 불러오기 / 기사제목 직접 수정.
+     예전엔 이 둘과 복사하기까지 셋이 제목 줄에 아이콘으로 직접 붙어 있었고
+     .refetch-btn의 opacity:0으로 숨겼다가 카드 호버 시에만 나타났는데, (1) 호버할
+     때마다 아이콘이 4→8개로 늘어 목록을 훑을 때 산만했고 (2) **모바일엔 호버가 없어
+     아예 누를 수 없었다.** 그래서 ⋯ 버튼은 호버와 무관하게 항상 보이고, 메뉴 안은
+     아이콘 대신 글자로 이름을 보여준다. [수정: 2026-08-13] 복사하기는 다시 메뉴에서
+     빠져나가 상시 노출 아이콘(.copy-btn)이 됐다 — URL 줄이 사라지며 화면에서
+     클립보드로 가는 유일한 경로가 됐기 때문. */
+  .more-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+  .more-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 1.05rem; line-height: 1;
+    cursor: pointer; padding: 3px 7px; border-radius: var(--r-sm);
+    user-select: none; -webkit-user-select: none;
+  }
+  .more-btn:hover { background: #EFF6FF; color: #2563EB; }
+  .more-menu {
+    display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 60;
+    min-width: 172px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+    padding: 4px; box-shadow: var(--sh-pop);
+  }
+  .more-wrap.is-open .more-menu { display: block; }
+  /* ⋯ 버튼 — 메뉴의 「복사하기」를 누르면 1초간 ✓로 바뀐다(copyArticleIcon). */
+  .more-btn .icon-default { display: inline-flex; }
+  .more-btn .icon-done { display: none; }
+  .more-btn.is-copied .icon-default { display: none; }
+  .more-btn.is-copied .icon-done { display: inline-flex; }
+  .more-menu button {
+    display: block; width: 100%; text-align: left; background: transparent; border: none;
+    padding: 8px 10px; border-radius: var(--r-sm); font-size: var(--fs-md); color: #1F2937;
+    cursor: pointer; white-space: nowrap;
+  }
+  .more-menu button:hover { background: #EFF6FF; }
+  .more-menu button:disabled { opacity: 0.5; cursor: progress; }
+  /* 🏷 라벨 팝오버 — 확정본·초안·정기 보관함 공용(app.renderer.label_popover_style). */
+
+  /* [추가: 2026-08-18] 🏷 라벨 — PRD.md 기능10, 2026-08-18 목업 대화. 앰버 계열은
+     기존 COLOR_* 팔레트(파랑=담당자 액션/보라=AI 액션)와 겹치지 않는 세 번째 축으로
+     확정했다(MAIN_FLOW_MOCKUP.html의 --label-bg/--label-text 그대로). */
+  .lab-pop-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+  .lab-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 1rem; line-height: 1;
+    cursor: pointer; padding: 3px 6px; border-radius: var(--r-sm); display: inline-flex; align-items: center;
+    user-select: none; -webkit-user-select: none;
+  }
+  .lab-btn:hover { background: #EFF6FF; color: #2563EB; }
+  .lab-btn.on { color: #8A5A14; background: #FBF0DA; }
+  .lab-btn .lab-count { font-size: var(--fs-xs); font-weight: 700; margin-left: 2px; }
+  .lab-pop {
+    position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 60; width: 260px;
+    text-align: left; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+    padding: 11px 12px; box-shadow: var(--sh-pop);
+  }
+  .lab-pop.hidden { display: none; }
+  .lab-pop h4 { margin: 0 0 6px; font-size: var(--fs-xs); color: #6B7280; font-weight: 700; }
+  .lab-pop .attached { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; min-height: 20px; }
+  .lab-pop .attached .none { font-size: var(--fs-xs); color: #6B7280; }
+  .lab-pop .known { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+  .lab-pop .known .none { font-size: var(--fs-xs); color: #6B7280; }
+  .lab-chip {
+    display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-xs); font-weight: 700;
+    color: #8A5A14; background: #FBF0DA; border: 1px solid rgba(138, 90, 20, 0.28);
+    border-radius: var(--r-pill); padding: 2px 8px; white-space: nowrap;
+  }
+  .lab-chip .x { color: #8A5A14; opacity: 0.55; cursor: pointer; font-weight: 700; }
+  .lab-chip .x:hover { opacity: 1; }
+  .known-chip {
+    font-size: var(--fs-xs); font-weight: 600; color: #6B7280; cursor: pointer;
+    background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 2px 8px;
+  }
+  .known-chip:hover { background: #FBF0DA; color: #8A5A14; border-color: rgba(138, 90, 20, 0.28); }
+  .known-chip.used { background: #FBF0DA; color: #8A5A14; border-color: rgba(138, 90, 20, 0.28); font-weight: 700; }
+  .known-chip .n { opacity: 0.6; font-weight: 500; margin-left: 3px; }
+  .lab-pop .addbox { display: flex; gap: 5px; }
+  .lab-pop .addbox input {
+    flex: 1; font-size: var(--fs-xs); padding: 5px 7px; border: 1px solid #E5E7EB; border-radius: var(--r-sm);
+  }
+  .lab-pop .addbox button {
+    font-size: var(--fs-xs); font-weight: 700; padding: 5px 10px; border-radius: var(--r-sm); cursor: pointer;
+    background: #FBF0DA; color: #8A5A14; border: 1px solid rgba(138, 90, 20, 0.28);
+  }
+  .lab-pop .sim-warn {
+    margin-top: 8px; font-size: var(--fs-xs); line-height: 1.7; color: #8A5A14; background: #FBF0DA;
+    border: 1px dashed rgba(138, 90, 20, 0.28); border-radius: var(--r-md); padding: 6px 8px;
+  }
+  .lab-pop .sim-warn.hidden { display: none; }
+  .lab-pop .sim-warn button {
+    font-size: var(--fs-xs); font-weight: 700; padding: 3px 8px; border-radius: var(--r-sm); cursor: pointer;
+    margin-left: 3px; border: none;
+  }
+  .lab-pop .sim-warn .use { background: #8A5A14; color: #FFFFFF; }
+  .lab-pop .sim-warn .keep { background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; }
+  .lab-pop .hint { font-size: var(--fs-xs); color: #6B7280; margin: 8px 0 0; line-height: 1.7; }
+  .lab-row {
+    display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 6px;
+    padding-top: 6px; border-top: 1px dashed #E5E7EB;
+  }
+  .lab-row .tagmark { color: #8A5A14; opacity: 0.75; }
+
+  /* [추가: 2026-08-05] ✏️ 직접 수정 — 🔄가 원문에서도 못 찾는 경우의 최후 수단으로
+     펼쳐지는 인라인 편집 칸. */
+  .edit-summary-form {
+    margin: 8px 0 4px 20px; padding: 10px 12px; border: 1px solid #2563EB; border-radius: var(--r-lg);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .edit-summary-form input, .edit-summary-form textarea {
+    width: 100%; box-sizing: border-box; padding: 6px 10px; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    font-size: var(--fs-md); color: #1F2937; background: #FFFFFF; font-family: inherit;
+  }
+  .edit-summary-form .edit-summary-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .edit-summary-form button { font-size: var(--fs-sm); padding: 5px 12px; }
+  .empty { text-align: center; margin-top: 80px; font-size: var(--fs-lg); color: #6B7280; }
+  .cute-caption { font-family: 'Gaegu', sans-serif; font-size: 1.4rem; margin-top: 6px; }
+  .bottom { margin-top: 40px; background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 16px 18px; }
+  .bottom h3 { margin: 0 0 8px; font-size: var(--fs-base); color: #1E3A5F; }
+  .bottom-summary { padding-top: 2px; }
+  .bottom-header-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .bottom-header-row h3 { margin: 0; }
+  .bottom-summary-copy {
+    font-size: var(--fs-sm); color: #2563EB; background: transparent; border: 1px solid #E5E7EB;
+    border-radius: var(--r-md); padding: 3px 10px; cursor: pointer; font-family: inherit;
+  }
+  .bottom-summary-item { padding: 8px 0; border-bottom: 1px solid #E5E7EB; }
+  .bottom-summary-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .bottom-summary-item strong { display: block; color: #1E3A5F; margin-bottom: 3px; }
+  .bottom-summary-item p { margin: 0; white-space: pre-line; }
+  .manual-divider {
+    display: flex; align-items: center; gap: 10px; margin: 32px 0 4px;
+    color: #6B7280; font-size: var(--fs-sm);
+  }
+  .manual-divider::before, .manual-divider::after { content: ""; flex: 1; border-top: 1px dashed #E5E7EB; }
+  /* 📌 담아둔 기사 칸 — "📂 소제목 미분류"(.subheading-unclassified)와 **같은 문법**을 쓰고
+     색만 가른다: 왼쪽 4px 띠 + 옅은 바탕 + 오른쪽만 둥근 모서리. 둘 다 "보고서에 아직
+     안 들어간 임시 칸"이라 모양을 맞추고, 앰버(=담당자가 아직 모르는 것)와 그보다 한 단계
+     어두운 캐러멜(=한 번은 보고 골라둔 것)로 단계를 가른다. 파랑은 앱 전체에서 "담당자의
+     동작"이라 이 칸에 쓰면 뜻이 겹친다(시안 mockups/PINNED_ICON_BADGE_MOCKUP.html). */
+  .manual-zone {
+    border-left: 4px solid #B7803F; background: #FAF3EA;
+    border-radius: 0 var(--r-lg) var(--r-lg) 0; padding: 10px 16px 12px; margin-top: 10px;
+  }
+  .manual-zone-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .manual-zone-title { font-weight: 600; color: #1F2937; font-size: var(--fs-base); }
+  .manual-zone-hint { font-size: var(--fs-sm); color: #6B7280; }
+  /* 건수 칩 — 미분류 칸의 .unclassified-count(앰버)를 빌려 쓰지 않고 칸 색(캐러멜)을 따른다. */
+  .manual-zone-count {
+    margin-left: 4px; font-weight: 700; font-size: var(--fs-sm); color: #7A4E1C;
+    background: #F1E3D0; border: 1px solid #DFC5A3; border-radius: var(--r-pill); padding: 1px 8px;
+  }
+  /* [추가: 2026-08-26] 제목·건수·배정 버튼을 한 묶음으로 왼쪽에 붙인다 — 📂 소제목 미분류
+     칸의 헤더와 같은 구성(제목 → 건수 → 배정 버튼)이라 두 칸이 같은 줄로 읽힌다.
+     baseline 정렬로는 버튼이 글자 밑선에 매달려 보여 이 묶음만 center로 맞춘다. */
+  .manual-zone-left { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .manual-zone .article:first-child { margin-top: 10px; }
+  /* [추가: 2026-08-05] "+ 직접 키워드 작성하기" — AI 키워드 블록과 별개로, 이용자가
+     자유 서식으로 적어두는 메모 한 줄. 저장된 메모가 있으면 처음부터 열려서 보이고,
+     없으면 버튼을 눌러야 나타난다(is-open 토글). */
+  /* [수정: 2026-08-07] 스크롤해서 기사를 읽다가 메모를 적으려면 위로 되돌아가야 했던
+     문제 — sticky로 고정해 상단 바(topbar, 높이만큼 top: 60px) 바로 아래 붙어서 화면에
+     계속 보이게 한다. background를 명시해야 아래로 스크롤된 기사 카드들이 비쳐 보이지
+     않는다. */
+  .keyword-note-zone {
+    display: none; align-items: center; gap: 8px; border: 1px dashed #E5E7EB; border-radius: var(--r-lg);
+    padding: 10px 14px; margin: 10px 0 4px; flex-wrap: wrap;
+    position: sticky; top: 60px; z-index: 15; background: #FFFFFF;
+  }
+  .keyword-note-zone.is-open { display: flex; }
+  /* [수정: 2026-09-07] 「마감 후 자동 배정」 배너가 뜨면 topbar가 배너 높이만큼
+     내려가는데(body.has-finalize-banner .topbar) 이 sticky의 top은 60px 그대로여서
+     메모 칸이 배너·topbar 뒤(z-index 15 < 20·21)에 완전히 가려졌다 — 담당자 눈에는
+     "확정본만 상단 고정이 안 되는" 것으로 보인다. topbar와 같은 변수를 따라가게 한다. */
+  body.has-finalize-banner .keyword-note-zone { top: calc(60px + var(--finalize-banner-h, 0px)); }
+  .keyword-note-zone input {
+    flex: 1; min-width: 220px; height: var(--h-md); box-sizing: border-box; padding: 0 10px; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    font-size: var(--fs-md); color: #1F2937; background: #FFFFFF;
+  }
+  /* [추가: 2026-08-10] 저장된 메모는 곧바로 다시 손대지 않도록 잠가둔다 — (수정)을
+     눌러야 편집 가능해진다(아래 toggleKeywordEditMode). "이미 저장됐다"는 상태를
+     입력칸 자체로도 보여준다는 취지(사용자 피드백). */
+  .keyword-note-zone input:disabled { background: #F8FAFC; color: #6B7280; }
+  .keyword-note-zone button { font-size: var(--fs-sm); height: var(--h-md); padding: 0 12px; box-sizing: border-box;
+    border-radius: var(--r-md); white-space: nowrap; }
+  /* 모양 규칙: 지우기(삭제·취소)는 채움 파랑으로 두지 않는다 — 글자 버튼, 올리면 빨강. */
+  .keyword-note-zone .clear-btn { background: transparent; color: #6B7280; }
+  .keyword-note-zone .clear-btn:hover { background: transparent; color: #DC2626; }
+  /* [추가: 2026-08-26] 직전 회차 메모를 끌어와 미리 채워둔 상태 — 아직 "이번 회차 메모"가
+     아니라는 뜻이라 "주의"(앰버) 계열을 쓴다(설정 화면의 "저장 안 함"과 같은 뜻).
+     flex-wrap 컨테이너 안에서 width:100%로 다음 줄에 온다. */
+  /* [추가: 2026-08-13] 이모지 대신 쓰는 단색 SVG 아이콘(app.icons) 공통 크기·색 —
+     currentColor라 부모의 글자색을 그대로 물려받는다. */
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+
+  /* ===== 시안 전용 ===== */
+  body { background: #F8FAFC; padding: 28px 16px 80px; }
+  .mk-wrap { max-width: 822px; margin: 0 auto; }  /* 안쪽 .actions 폭이 실제 화면과 같은 750px이 되도록 */
+  .mk-lead { color: #1F2937; font-size: var(--fs-md); line-height: 1.7; margin: 0 0 26px; }
+  .mk-lead b { color: #1E3A5F; }
+  .mk-case { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+    padding: 18px 20px 20px; margin-bottom: 18px; }
+  .mk-case.pick { border-color: #2563EB; box-shadow: 0 0 0 3px #EFF6FF; }
+  .mk-head { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; }
+  .mk-name { font-size: var(--fs-lg); color: #1E3A5F; font-weight: 700; }
+  .mk-pick-chip { font-size: var(--fs-xs); color: #FFFFFF; background: #2563EB;
+    border-radius: var(--r-pill); padding: 2px 9px; }
+  .mk-sub { font-size: var(--fs-sm); color: #6B7280; margin: 0 0 14px; }
+  .mk-stage { border: 1px dashed #E5E7EB; border-radius: var(--r-md); padding: 14px 14px 16px; }
+  .mk-note { font-size: var(--fs-sm); color: #4B5563; line-height: 1.75; margin: 13px 0 0;
+    padding-left: 13px; border-left: 3px solid #E5E7EB; }
+  .mk-note.good { border-left-color: #2563EB; }
+  .mk-note.bad { border-left-color: #DC2626; }
+  .mk-note b { color: #1F2937; }
+  .mk-depth { display: flex; gap: 6px; flex-wrap: wrap; margin: 11px 0 0; font-size: var(--fs-xs); color: #6B7280; }
+  .mk-depth span { background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 2px 9px; }
+
+  /* B안: 사진 모아 보기를 오른쪽 글자 버튼으로 */
+  .actions .export-links button.pg-text.is-on {
+    color: #2563EB; text-decoration: underline; text-underline-offset: 3px;
+  }
+  /* C안: 사진 모아 보기를 오른쪽 알약 칩으로 */
+  .actions .pg-chip {
+    background: #FFFFFF; color: #4B5563; border: 1px solid #E5E7EB; border-radius: var(--r-pill);
+    font-weight: 500; font-size: var(--fs-md); height: var(--h-md); padding: 0 12px;
+  }
+  .actions .pg-chip:hover { background: #EFF6FF; color: #2563EB; border-color: #BFDBFE; }
+  .actions .pg-chip.is-on, .actions .pg-chip.is-on:hover {
+    background: #2563EB; color: #FFFFFF; border-color: #2563EB;
+  }
+  /* D안: + 버튼까지 글자로 내린 경우 */
+  .actions button.demoted {
+    background: transparent; border: none; color: #4B5563; font-weight: 500; padding: 6px 8px;
+  }
+  .actions button.demoted:hover { background: transparent; color: #2563EB;
+    text-decoration: underline; text-underline-offset: 3px; }
+</style>
+</head>
+<body>
+<div class="mk-wrap">
+  <p class="mk-lead">확정본·초안 툴바의 <b>정보 뎁스</b> 비교 — 지금 화면의 CSS를 그대로 가져와 그렸습니다.
+  네 안 모두 실제 버튼이라 마우스를 올리면 hover도 같이 보입니다.<br>
+  툴바 폭은 실제 화면과 같은 750px입니다(컨테이너 800px − 안쪽 여백). 「사진 추정」 버튼이 떠 있는 동안은
+  <b>네 안 모두 오른쪽 묶음이 아랫줄로 내려갑니다</b> — 줄 수는 안에서 갈리지 않으니, 볼 것은 <b>층</b>입니다.<br>
+  지금 툴바가 말하려는 위계는 셋입니다 — <b>채움 = AI가 한다</b> · <b>테두리 = 보고서 내용을 바꾼다</b> · <b>글자 = 가져가거나 보기만 바꾼다</b>.</p>
+
+  <!-- ================= A안 ================= -->
+  <div class="mk-case">
+    <div class="mk-head"><span class="mk-name">A안 — 지금</span></div>
+    <p class="mk-sub">왼쪽에 테두리 버튼 셋이 나란히 선다.</p>
+    <div class="mk-stage">
+      <div class="actions">
+        <button class="create-group-btn" type="button">+ 새 소제목</button>
+        <button class="create-group-btn" type="button">+ 키워드 직접 작성</button>
+        <button class="create-group-btn photo-gather-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="3.6"/></svg> 사진 추정 모아 보기 (3)</button>
+        <span class="actions-divider"></span>
+        <button class="create-group-btn regen-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg> AI 모든 기사 재분류</button>
+        <span class="actions-right">
+          <span class="export-links">
+            <button type="button">copy</button><button type="button">txt</button><button type="button">xlsx</button>
+          </span>
+          <select class="view-mode-select">
+            <option>소제목 내 언론사순</option><option>소제목 내 시간순</option><option>시간순</option><option>언론사순</option>
+          </select>
+        </span>
+      </div>
+    </div>
+    <div class="mk-depth"><span>테두리 ×3</span><span>채움 ×1</span><span>글자 ×3</span><span>select ×1</span></div>
+    <p class="mk-note bad"><b>문제.</b> 「📷 사진 추정 모아 보기」는 <b>화면만 바꾸는 보기</b>인데(복사·txt·발송이 안 변한다)
+    테두리를 써서 「보고서를 바꾸는 버튼」 자리에 서 있습니다. 뜻이 다른 셋이 같은 옷을 입어 왼쪽이 한 덩어리로 뭉개집니다.
+    오른쪽 「보기 순서」와 같은 일을 하는 버튼이 툴바 반대쪽에 다른 모양으로 있는 셈입니다.</p>
+  </div>
+
+  <!-- ================= B안 ================= -->
+  <div class="mk-case">
+    <div class="mk-head"><span class="mk-name">B안 — 사진 모아 보기를 오른쪽 글자로</span></div>
+    <p class="mk-sub">보기를 바꾸는 것끼리 오른쪽에 모은다. 켜지면 밑줄 + 파랑.</p>
+    <div class="mk-stage">
+      <div class="actions">
+        <button class="create-group-btn" type="button">+ 새 소제목</button>
+        <button class="create-group-btn" type="button">+ 키워드 직접 작성</button>
+        <span class="actions-divider"></span>
+        <button class="create-group-btn regen-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg> AI 모든 기사 재분류</button>
+        <span class="actions-right">
+          <span class="export-links">
+            <button class="pg-text" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="3.6"/></svg> 사진 추정 (3)</button>
+            <button type="button">copy</button><button type="button">txt</button><button type="button">xlsx</button>
+          </span>
+          <select class="view-mode-select">
+            <option>소제목 내 언론사순</option><option>소제목 내 시간순</option><option>시간순</option><option>언론사순</option>
+          </select>
+        </span>
+      </div>
+    </div>
+    <div class="mk-depth"><span>테두리 ×2</span><span>채움 ×1</span><span>글자 ×4</span><span>select ×1</span></div>
+    <p class="mk-note"><b>얻는 것.</b> 왼쪽 테두리가 둘로 줄어 「보고서를 바꾸는 건 이 둘」이 한눈에 잡힙니다.<br>
+    <b>잃는 것.</b> 켜졌는지가 약합니다. 지금은 켜지면 <b>채운 파랑</b>이라 「평소 화면이 아니다」가 분명한데,
+    글자 버튼은 켜짐을 밑줄로밖에 못 말합니다. 모아 보는 동안은 소제목·📌·요약이 다 숨어 화면이 크게 달라지므로,
+    되돌아갈 스위치가 어디 있는지 흐려지면 곤란합니다.</p>
+  </div>
+
+  <!-- ================= C안 ================= -->
+  <div class="mk-case pick">
+    <div class="mk-head"><span class="mk-name">C안 — 사진 모아 보기를 오른쪽 알약으로</span><span class="mk-pick-chip">권함</span></div>
+    <p class="mk-sub">끄고 켜는 것이라 알약. 왼쪽은 꺼짐, 오른쪽은 켜진 모습.</p>
+    <div class="mk-stage">
+      <div class="actions">
+        <button class="create-group-btn" type="button">+ 새 소제목</button>
+        <button class="create-group-btn" type="button">+ 키워드 직접 작성</button>
+        <span class="actions-divider"></span>
+        <button class="create-group-btn regen-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg> AI 모든 기사 재분류</button>
+        <span class="actions-right">
+          <button class="pg-chip" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="3.6"/></svg> 사진 추정 (3)</button>
+          <span class="export-links">
+            <button type="button">copy</button><button type="button">txt</button><button type="button">xlsx</button>
+          </span>
+          <select class="view-mode-select">
+            <option>소제목 내 언론사순</option><option>소제목 내 시간순</option><option>시간순</option><option>언론사순</option>
+          </select>
+        </span>
+      </div>
+    </div>
+    <div class="mk-stage" style="margin-top:10px">
+      <div class="actions">
+        <button class="create-group-btn" type="button">+ 새 소제목</button>
+        <button class="create-group-btn" type="button">+ 키워드 직접 작성</button>
+        <span class="actions-divider"></span>
+        <button class="create-group-btn regen-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg> AI 모든 기사 재분류</button>
+        <span class="actions-right">
+          <button class="pg-chip is-on" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="3.6"/></svg> 사진 추정 (3)</button>
+          <span class="export-links">
+            <button type="button">copy</button><button type="button">txt</button><button type="button">xlsx</button>
+          </span>
+          <select class="view-mode-select">
+            <option>소제목 내 언론사순</option><option>소제목 내 시간순</option><option>시간순</option><option>언론사순</option>
+          </select>
+        </span>
+      </div>
+    </div>
+    <div class="mk-depth"><span>테두리 ×2</span><span>채움 ×1</span><span>알약 ×1</span><span>글자 ×3</span><span>select ×1</span></div>
+    <p class="mk-note good"><b>이유.</b> 모양 규칙이 이미 답을 갖고 있습니다 — <b>「알약 = 상태를 알려 준다, 누르면 켜고 끄기만」</b>.
+    사진 모아 보기는 정확히 그것이고, 건수 (3)까지 달고 있어 알약이 제자리입니다.<br>
+    네모(무언가를 한다)와 섞이지 않으면서 <b>켜짐은 지금처럼 채운 파랑 그대로</b> 지킬 수 있습니다 — B안이 잃는 것을 안 잃습니다.
+    0건이면 안 그리는 규칙도 그대로입니다.</p>
+  </div>
+
+  <!-- ================= D안 ================= -->
+  <div class="mk-case">
+    <div class="mk-head"><span class="mk-name">D안 — 두 「+」 버튼까지 글자로</span></div>
+    <p class="mk-sub">네모를 최소로. 테두리는 아예 없앤다.</p>
+    <div class="mk-stage">
+      <div class="actions">
+        <button class="demoted" type="button">+ 새 소제목</button>
+        <button class="demoted" type="button">+ 키워드 직접 작성</button>
+        <span class="actions-divider"></span>
+        <button class="create-group-btn regen-btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg> AI 모든 기사 재분류</button>
+        <span class="actions-right">
+          <button class="pg-chip" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="3.6"/></svg> 사진 추정 (3)</button>
+          <span class="export-links">
+            <button type="button">copy</button><button type="button">txt</button><button type="button">xlsx</button>
+          </span>
+          <select class="view-mode-select">
+            <option>소제목 내 언론사순</option><option>소제목 내 시간순</option><option>시간순</option><option>언론사순</option>
+          </select>
+        </span>
+      </div>
+    </div>
+    <div class="mk-depth"><span>채움 ×1</span><span>알약 ×1</span><span>글자 ×5</span><span>select ×1</span></div>
+    <p class="mk-note bad"><b>안 하는 쪽을 권합니다.</b> 뎁스는 가장 단순해 보이지만, 왼쪽 글자와 오른쪽 글자가 같은 옷이 되면서
+    <b>「바꾸는 것 ↔ 가져가는 것」이라는 툴바의 뜻 구분이 사라집니다.</b> 보이는 건 「버튼 하나(AI)와 링크 여섯」이 됩니다.<br>
+    게다가 「+ 새 소제목」·「+ 키워드 직접 작성」은 둘 다 <b>보고서에 들어갈 것을 만드는</b> 동작이고
+    (소제목은 보고서의 칸, 메모는 헤더 아래 한 줄), 그 기능으로 들어가는 <b>유일한 입구</b>입니다.
+    못 찾으면 대안이 없는 버튼을 가장 약한 층에 두게 됩니다.</p>
+  </div>
+
+  <p class="mk-lead" style="margin-top:26px">C안으로 가면 수시 원본·수시 확정본의 같은 버튼(<b>app/adhoc/renderer.py</b>)도 같이 바꿉니다 —
+  규칙상 두 곳의 동작·모양은 함께 움직입니다.</p>
+</div>
+</body>
+</html>

@@ -1,4 +1,4 @@
-# Design Ref: DESIGN.md §1 "지난 기사 더보기" — 보관 중인 회차(RETENTION_DAYS)를 날짜별 -> 시간대별 토글로 조회
+# Design Ref: archive/DESIGN.md §1 "지난 기사 더보기" — 보관 중인 회차(RETENTION_DAYS)를 날짜별 -> 시간대별 토글로 조회
 import html
 import json
 import logging
@@ -7,6 +7,7 @@ from datetime import datetime, time as dt_time, timedelta
 from pathlib import Path
 from typing import Optional
 
+from app.topnav import regular_nav, topnav_style
 from app.config import (
     CUTE_FONT_BASE64,
     CUTE_FONT_NAME,
@@ -32,7 +33,9 @@ from app.manual_keyword_note import load_manual_keyword_note
 from app.summary_overrides import apply_summary_overrides
 from app.icons import icon
 from app.labels import load_labels
+from app import send_log
 from app.renderer import (
+    send_log_href,
     apply_line_template,
     apply_subheading_format,
     format_slot_time_kr,
@@ -41,6 +44,7 @@ from app.renderer import (
     label_popover_style,
     render_article,
 )
+from app.today_cuts import cut_origin
 from app.settings import active_schedule_times, load_settings
 from app.storage import (
     latest_run_key,
@@ -71,10 +75,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   body {{ margin: 0; background: {bg}; color: {text}; font-family: {font_stack}; }}
   .container {{
     max-width: 800px; margin: 24px auto; padding: 24px; background: {card};
-    border: 1px solid {border}; border-radius: 8px;
+    border: 1px solid {border}; border-radius: var(--r-lg);
   }}
-  h1 {{ font-size: 1.3rem; color: {header}; margin: 0 0 4px; }}
-  .page-sub {{ color: {muted}; font-size: 0.82rem; margin: 0 0 14px; }}
+  h1 {{ font-size: var(--fs-xl); color: {header}; margin: 0 0 4px; }}
+  .page-sub {{ color: {muted}; font-size: var(--fs-sm); margin: 0 0 14px; }}
   .empty {{ color: {muted}; margin-top: 12px; }}
   .slot-empty {{ text-align: center; color: {muted}; padding: 8px 0; }}
   /* [추가: 2026-09-03] 예정돼 있었는데 저장된 회차가 없는 자리 — 실측(8/19~9/2)에서
@@ -86,7 +90,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     display: flex; align-items: center; gap: 10px; color: {muted}; }}
   .slot-missing::before {{ content: "·"; color: {muted}; font-size: 0.75rem; }}
   .slot-missing .slot-label {{ flex: none; white-space: nowrap; }}
-  .missing-mark {{ font-size: 0.78rem; color: {muted}; }}
+  .missing-mark {{ font-size: var(--fs-sm); color: {muted}; }}
   /* [추가: 2026-09-11] 담당자가 지운 회차 — 「수집 기록 없음」과 같은 자리에 「삭제함 ·
      되살리기」로 남는다. 지운 걸 "앱이 못 모은 것"처럼 보이게 두면 거짓말이 된다.
      수시 보관함의 같은 줄(.run-line.gone)과 같은 모양이다. */
@@ -94,24 +98,24 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     display: flex; align-items: center; gap: 10px; color: {muted}; background: {bg}; }}
   .slot-gone::before {{ content: "·"; color: {muted}; font-size: 0.75rem; }}
   .slot-gone .slot-label {{ flex: none; white-space: nowrap; }}
-  .gone-tag {{ flex: none; font-size: 0.72rem; border: 1px dashed {dash_border}; border-radius: 10px;
+  .gone-tag {{ flex: none; font-size: var(--fs-xs); border: 1px dashed {dash_border}; border-radius: var(--r-pill);
     padding: 0 8px; color: {muted}; background: {card}; }}
-  .gone-when {{ font-size: 0.76rem; color: {text_faint}; }}
+  .gone-when {{ font-size: var(--fs-sm); color: {text_faint}; }}
   .restore-btn {{ flex: none; margin-left: auto; border: none; background: none; color: {accent};
-    font: inherit; font-size: 0.8rem; cursor: pointer; padding: 2px 4px; }}
+    font: inherit; font-size: var(--fs-sm); cursor: pointer; padding: 2px 4px; }}
   .restore-btn:hover {{ text-decoration: underline; text-underline-offset: 3px; }}
   details.slot.just-restored > summary {{ background: {row_moved}; }}
   /* 회차 줄 끝 🗑 — 확정본 기사 행의 🗑와 같은 무게(평소 회색, hover만 빨강). 확인창 없이
      바로 지우고, 그 자리에 「삭제함 · 되살리기」가 남는다. 오늘 회차·가장 최근 회차엔 안 그린다. */
   .slot-del {{ flex: none; margin-left: auto; border: none; background: none; color: {text_faint};
-    cursor: pointer; padding: 3px 6px; border-radius: 5px; line-height: 1; display: inline-flex; font-size: 0.95rem; }}
+    cursor: pointer; padding: 3px 6px; border-radius: var(--r-sm); line-height: 1; display: inline-flex; font-size: 0.95rem; }}
   details.slot[open] > summary .slot-del {{ margin-left: 0; }}
   .slot-del:hover {{ color: {error}; background: {error_bg}; }}
   /* [추가: 2026-09-15] 날짜 줄 🗑 — 그 날의 (지울 수 있는) 회차 모두, 확인창 한 번. 모양은
      회차 줄 🗑와 같다. 통째로 지우면 날짜 줄이 all-gone이 되어 복사·txt·xlsx·🗑 대신
      「삭제함 · 모두 되살리기」가 보인다(수시 보관함 사안 줄과 같은 규칙). */
   .day-del {{ flex: none; border: none; background: none; color: {text_faint}; cursor: pointer;
-    padding: 3px 6px; border-radius: 5px; line-height: 1; display: inline-flex; font-size: 0.95rem; font-weight: 400; }}
+    padding: 3px 6px; border-radius: var(--r-sm); line-height: 1; display: inline-flex; font-size: 0.95rem; font-weight: 400; }}
   .day-del:hover {{ color: {error}; background: {error_bg}; }}
   .day-gone-mark {{ display: none; align-items: center; gap: 6px; font-weight: 400; }}
   details.date.all-gone > summary .day-gone-mark {{ display: inline-flex; }}
@@ -124,9 +128,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   input.pick:disabled {{ cursor: not-allowed; opacity: 0.4; }}
   .pick-sp {{ display: none; width: 15px; flex: none; }}
   .slot-cnt, .lock-note, .tidy-only {{ display: none; }}
-  .slot-cnt {{ flex: none; min-width: 34px; font-size: 0.78rem; color: {muted}; font-variant-numeric: tabular-nums; }}
+  .slot-cnt {{ flex: none; min-width: 34px; font-size: var(--fs-sm); color: {muted}; font-variant-numeric: tabular-nums; }}
   .slot-cnt.zero {{ color: {warn_accent}; font-weight: 700; }}
-  .lock-note {{ font-size: 0.74rem; color: {muted}; font-weight: 400; }}
+  .lock-note {{ font-size: var(--fs-xs); color: {muted}; font-weight: 400; }}
   body.hist-tidy input.pick, body.hist-tidy .pick-sp, body.hist-tidy .slot-cnt, body.hist-tidy .lock-note {{ display: inline-block; }}
   body.hist-tidy .tidy-only {{ display: inline-flex; }}
   body.hist-tidy .normal-only, body.hist-tidy .exp, body.hist-tidy .slot-del, body.hist-tidy .day-del,
@@ -134,71 +138,75 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   body.hist-tidy details.slot > summary::before, body.hist-tidy .slot-missing::before, body.hist-tidy .slot-gone::before {{ content: ""; }}
   details.slot:has(> summary input.pick:checked) > summary {{ background: {hover}; }}
   .result-bar .tidy-btn + .tidy-bar + .exp {{ margin-left: 0; }}
-  .tidy-btn {{ margin-left: auto; border: 1px solid {border}; background: {card}; color: {muted}; border-radius: 6px;
-    padding: 6px 13px; font-size: 0.8rem; cursor: pointer; font-family: inherit; white-space: nowrap; }}
+  .tidy-btn {{ margin-left: auto; border: 1px solid {border}; background: {card}; color: {muted}; border-radius: var(--r-md);
+    padding: 6px 13px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; white-space: nowrap; }}
   .tidy-btn:hover {{ border-color: {error_border}; color: {error}; background: {error_bg}; }}
-  .tidy-bar {{ margin-left: auto; align-items: center; gap: 8px; font-size: 0.78rem; color: {muted}; }}
-  .pick-empty {{ border: 1px dashed {dash_border}; background: {card}; color: {text_soft}; border-radius: 6px;
-    padding: 5px 11px; font-size: 0.78rem; cursor: pointer; font-family: inherit; }}
+  .tidy-bar {{ margin-left: auto; align-items: center; gap: 8px; font-size: var(--fs-sm); color: {muted}; }}
+  .pick-empty {{ border: 1px dashed {dash_border}; background: {card}; color: {text_soft}; border-radius: var(--r-md);
+    padding: 5px 11px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; }}
   .pick-empty:hover {{ border-color: {accent}; color: {accent}; border-style: solid; }}
-  .done-btn {{ border: 1px solid {accent}; background: {accent}; color: {on_fill}; border-radius: 6px;
-    padding: 5px 13px; font-size: 0.8rem; cursor: pointer; font-family: inherit; font-weight: 600; }}
+  .done-btn {{ border: 1px solid {accent}; background: {accent}; color: {on_fill}; border-radius: var(--r-md);
+    padding: 5px 13px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; font-weight: 600; }}
   /* 고른 게 있을 때만 뜨는 바 — /hidden 일괄 복구 바·확정본 일괄이동 바와 같은 규칙과 색. */
   .sel-bar {{ display: none; position: sticky; top: 62px; z-index: 5; align-items: center; gap: 10px;
-    background: {hover}; border: 1px solid {accent_border}; border-radius: 8px; padding: 8px 12px;
-    margin: 0 0 8px; font-size: 0.84rem; color: {header}; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08); }}
+    background: {hover}; border: 1px solid {accent_border}; border-radius: var(--r-lg); padding: 8px 12px;
+    margin: 0 0 8px; font-size: var(--fs-md); color: {header}; box-shadow: var(--sh-float); }}
   .sel-bar.on {{ display: flex; }}
   .sel-bar .sp {{ flex: 1; }}
-  .sel-bar .clr {{ background: transparent; color: {muted}; border: 1px solid {border}; border-radius: 6px;
-    padding: 5px 10px; font-size: 0.8rem; cursor: pointer; font-family: inherit; }}
+  .sel-bar .clr {{ background: transparent; color: {muted}; border: 1px solid {border}; border-radius: var(--r-md);
+    padding: 5px 10px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; }}
   .sel-bar .del {{ display: inline-flex; align-items: center; gap: 5px; background: {card}; color: {error};
-    border: 1px solid {error}; border-radius: 6px; padding: 5px 12px; font-size: 0.8rem; font-weight: 600;
+    border: 1px solid {error}; border-radius: var(--r-md); padding: 5px 12px; font-size: var(--fs-sm); font-weight: 600;
     cursor: pointer; font-family: inherit; }}
   .sel-bar .del:hover {{ background: {error_bg}; }}
-  .lazy-day-hint {{ color: {muted}; font-size: 0.85rem; padding: 8px 4px; margin: 0; }}
+  .lazy-day-hint {{ color: {muted}; font-size: var(--fs-md); padding: 8px 4px; margin: 0; }}
   .cute-caption {{ font-family: '{cute_font_name}', sans-serif; font-size: 1.1rem; margin-top: 4px; }}
   /* [추가: 2026-08-21] 기간 조회 — app.adhoc.archive_renderer .period-bar와 같은 모양.
      다만 서버 왕복은 없다: 정기는 날짜 목록이 이미 전부 DOM에 있으므로(지연 로딩은
      "회차 안의 기사 내용"만 늦출 뿐 날짜 자체는 항상 렌더링돼 있다), 클라이언트 JS로
      날짜 블록을 보이기/숨기기만 하면 된다. */
-  .period-bar {{ border: 1px solid {border}; border-radius: 10px; padding: 10px 12px; background: {bg}; margin: 14px 0; }}
+  .period-bar {{ border: 1px solid {border}; border-radius: var(--r-lg); padding: 10px 12px; background: {bg}; margin: 14px 0; }}
   .prow {{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }}
   /* [수정: 2026-09-16] 두 줄(빠른 설정 / 직접 입력 + 사이 구분선)을 한 줄로 합쳤다 — 두 줄을 만들던 건
      안내 문구 둘(「날짜 기준으로 조회합니다」·「시작일 ~ 종료일을 직접 넣고 조회」)이었는데, 앞은
      「기간」 라벨이, 뒤는 날짜 칸 두 개와 ~가 이미 한 말이다. 컨트롤은 하나도 안 뺐다(101 → 52px).
      수시 보관함(app/adhoc/archive_renderer.py)도 같은 규칙. 시안 HISTORY_PERIOD_BAR_MOCKUP.html B안. */
   .prow .pdiv {{ width: 1px; align-self: stretch; background: {border}; margin: 0 2px; }}
-  .prow .jlab {{ color: {muted}; font-size: 0.8rem; font-weight: 600; width: 44px; flex: none; }}
-  .prow input[type=date] {{ font: inherit; font-size: 0.85rem; border: 1px solid {border}; border-radius: 6px;
+  .prow .jlab {{ color: {muted}; font-size: var(--fs-sm); font-weight: 600; width: 44px; flex: none; }}
+  .prow input[type=date] {{ font: inherit; font-size: var(--fs-md); border: 1px solid {border}; border-radius: var(--r-md);
     background: {card}; color: {text}; padding: 5px 8px; font-variant-numeric: tabular-nums; }}
   .prow .tilde {{ color: {muted}; margin: 0 2px; font-weight: 600; }}
-  .prow .go {{ border: 1px solid {accent}; background: {accent}; color: {on_fill}; border-radius: 6px;
-    padding: 6px 14px; font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit; }}
+  .prow .go {{ border: 1px solid {accent}; background: {accent}; color: {on_fill}; border-radius: var(--r-md);
+    padding: 6px 14px; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; font-family: inherit; }}
   .prow .go:hover {{ filter: brightness(1.08); }}
-  .seg {{ display: inline-flex; border: 1px solid {border}; border-radius: 8px; overflow: hidden; background: {card}; }}
-  .seg-btn {{ border: none; background: {card}; color: {muted}; font: inherit; font-size: 0.82rem;
+  .seg {{ display: inline-flex; border: 1px solid {border}; border-radius: var(--r-md); overflow: hidden; background: {card}; }}
+  .seg-btn {{ border: none; background: {card}; color: {muted}; font: inherit; font-size: var(--fs-sm);
     padding: 6px 15px; cursor: pointer; border-right: 1px solid {border}; }}
   .seg-btn:last-child {{ border-right: none; }}
   .seg-btn.on {{ background: {accent}; color: {on_fill}; font-weight: 600; }}
   .result-bar {{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 2px 8px; }}
-  .result-line {{ font-size: 0.82rem; color: {muted}; margin: 0; }}
+  .result-line {{ font-size: var(--fs-sm); color: {muted}; margin: 0; }}
   .result-line b {{ color: {header}; }}
   /* 복사/txt/엑셀 — 결과 전체·날짜·회차 세 층에 같은 모양(app.adhoc.archive_renderer의
      같은 클래스와 동일 규칙). 날짜·결과 전체 층은 "이미 펼쳐서(=로딩된) 화면에 있는
      내용"만 모아 클라이언트에서 이어붙인다 — 회차 층이 이미 만들어둔 data-copy-text를
      재사용하므로 서버에 텍스트를 새로 계산시키지 않는다. 엑셀만 예외로 서버 재계산이
      필요해 기존 /download-excel-history를 그대로 재사용한다(날짜 목록만 넘기면 된다). */
-  .exp {{ display: inline-flex; gap: 4px; flex: none; margin-left: auto; }}
-  .exp button {{ border: 1px solid {border}; background: {card}; color: {muted}; border-radius: 6px;
-    padding: 4px 11px; font-size: 0.75rem; cursor: pointer; font-family: inherit; white-space: nowrap; }}
-  .exp button:hover {{ background: {hover}; color: {accent}; border-color: {accent_border}; }}
-  .exp button.xls:hover {{ background: {hover}; color: {accent}; border-color: {accent_border}; }}  /* [수정: 2026-08-21] 초록→파랑 */
-  .exp.lg button {{ font-size: 0.8rem; padding: 6px 13px; }}
+  /* 모양은 확정본·초안 툴바의 가져가기 버튼(app.renderer.export_links_style)과 같다 —
+     테두리·배경 없는 글자 버튼, hover에서만 accent + 밑줄. 네 자리(정기 보관함 .exp/
+     .slot-export-actions, 수시 보관함 .exp, 라벨 보관함 .exp)가 같은 값이다. */
+  .exp {{ display: inline-flex; gap: 2px; flex: none; margin-left: auto; }}
+  .exp button {{ border: none; background: transparent; color: {text_soft}; font-weight: 500;
+    border-radius: var(--r-md); padding: 4px 8px; font-size: var(--fs-sm); cursor: pointer;
+    font-family: inherit; white-space: nowrap; }}
+  .exp button:hover {{ background: transparent; color: {accent};
+    text-decoration: underline; text-underline-offset: 3px; }}
+  .exp.lg button {{ padding: 6px 8px; }}
   /* 상태 칩 — 근거는 전부 이미 저장된 값(오늘 날짜 등)뿐, 새로 계산하지 않는다.
      회차 수·기사 건수는 상시 표시하지 않는다 — 하루 4회 고정이라 정보가 아니고,
      건수는 찾는 기준이 아니다(사용자 판단). 발송 여부는 더 이상 이 칩이 아니라
      아래 .sent-dot이 맡는다. */
-  .chip {{ font-size: 0.74rem; border-radius: 10px; padding: 1px 9px; border: 1px solid; flex: none; }}
+  .chip {{ font-size: var(--fs-xs); border-radius: var(--r-pill); padding: 1px 9px; border: 1px solid; flex: none; }}
   .chip-today {{ background: {hover}; color: {accent}; border-color: {accent_border}; font-weight: 600; }}
   /* [추가: 2026-09-03] 그날 회차가 하나도 없는 날짜 — "주의"(앰버) 세트를 그대로 쓴다
      (회차 마감 배너와 같은 뜻: "지금 보고 있는 게 네가 생각하는 그거랑 조금 다르다").
@@ -211,7 +219,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      키워드가 더 자주 보게 되는 정보라, 칩이 그 줄의 무게를 더 가져가면 안 된다).
      성공은 꽉 찬 초록 점, 실패는 속이 빈 빨간 링 — 색만 다르면 적록색약에서
      구분이 안 되므로 "형태"를 가른다. 사유는 title 툴팁으로(마우스오버). */
-  .sent-dot {{ display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  .sent-dot {{ display: inline-block; width: 7px; height: 7px; border-radius: var(--r-circle);
     background: {send}; flex: none; }}
   /* [추가: 2026-08-26] 실패 = 속 빈 빨간 링. 성공 점과 크기를 다르게 잡은 건(9px vs 7px)
      테두리만 그리면 채운 점보다 시각적으로 작아 보여서 — 링 두께(2px)를 감안해도
@@ -221,21 +229,27 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      "Design direction" — 주의는 앰버, 오류는 빨강). 판정은 app.classifier.
      run_looks_rule_based이고, 저장된 classification_degraded가 없는 옛 회차도
      소제목 이름 모양으로 소급 판정된다. */
-  .degraded-mark {{ display: inline-block; margin-left: 6px; font-size: 0.72rem;
+  .degraded-mark {{ display: inline-block; margin-left: 6px; font-size: var(--fs-xs);
     color: {warn_text}; background: {warn_chip_bg}; border: 1px solid {warn_border};
-    border-radius: 4px; padding: 0 5px; line-height: 1.5; cursor: help; }}
-  .sent-dot.fail {{ width: 9px; height: 9px; border-radius: 50%; background: transparent;
+    border-radius: var(--r-sm); padding: 0 5px; line-height: 1.5; cursor: help; }}
+  .sent-dot-link {{ display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: 18px; height: 18px; margin: -5px -4px; border-radius: var(--r-circle); }}
+  .sent-dot-link:hover {{ background: {hover}; }}
+  .sent-dot.fail {{ width: 9px; height: 9px; border-radius: var(--r-circle); background: transparent;
     border: 2px solid {error}; box-sizing: border-box; }}
   /* [추가: 2026-08-26] 회차별 키워드 메모 — 칩이 아니라 그냥 회색 글자다. 참고용 자유
      텍스트지 라벨·발송상태처럼 "구조화된 값"이 아니라서 테두리를 두르지 않는다
      (app.renderer의 "🔍 검색어" 표시와 같은 판단). 잘리면 title 툴팁에 전체가 뜬다. */
-  .slot-note {{ font-size: 0.82rem; color: {muted}; flex: 1 1 auto; min-width: 0;
+  /* 「✂ 오늘만 여기서 끊기」로 생긴 회차 — 중립 회색 작은 알약(설명은 title) */
+  .cut-mark {{ flex: none; font-size: var(--fs-xs); color: {muted}; background: {pill_bg}; border: 1px solid {border};
+    border-radius: var(--r-pill); padding: 0 7px; cursor: help; }}
+  .slot-note {{ font-size: var(--fs-sm); color: {muted}; flex: 1 1 auto; min-width: 0;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
   details.slot > summary > .slot-label {{ flex: none; white-space: nowrap; }}
   details.date {{ margin: 0; border-top: 1px solid {border}; }}
   details.date > summary {{
     list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px;
-    padding: 10px 4px; font-size: 1.05rem; color: {header}; font-weight: 600;
+    padding: 10px 4px; font-size: var(--fs-lg); color: {header}; font-weight: 600;
   }}
   details.date > summary::-webkit-details-marker {{ display: none; }}
   details.date > summary::before {{ content: "▸"; color: {muted}; font-size: 0.8rem; font-weight: 400; }}
@@ -254,25 +268,26 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   details.slot > summary::before {{ content: "▸"; color: {muted}; font-size: 0.75rem; }}
   details.slot[open] > summary::before {{ content: "▾"; }}
   details.slot > summary:hover {{ background: {hover}; }}
-  .slot-export-actions {{ display: none; gap: 6px; flex-shrink: 0; margin-left: auto; }}
+  .slot-export-actions {{ display: none; gap: 2px; flex-shrink: 0; margin-left: auto; }}
   details.slot[open] > summary .slot-export-actions {{ display: flex; }}
   .slot-export-actions button, .slot-export-actions a.btn {{
-    background: {bg}; color: {muted}; border: 1px solid {border}; border-radius: 6px;
-    padding: 5px 12px; font-size: 0.8rem; font-family: inherit; cursor: pointer;
+    background: transparent; color: {text_soft}; border: none; border-radius: var(--r-md);
+    font-weight: 500; padding: 4px 8px; font-size: var(--fs-sm); font-family: inherit; cursor: pointer;
     text-decoration: none; display: inline-flex; align-items: center;
   }}
-  .slot-export-actions button:hover, .slot-export-actions a.btn:hover {{ background: {hover}; color: {text}; }}
+  .slot-export-actions button:hover, .slot-export-actions a.btn:hover {{
+    background: transparent; color: {accent}; text-decoration: underline; text-underline-offset: 3px; }}
   /* [추가: 2026-07-30] 저장 시점의 소제목 구성(group 필드)이 있는 회차는 이 제목으로
      묶어서 보여준다 — 재분류가 아니라 저장해둔 결과를 그대로 복원하는 것뿐이다. */
   .history-group {{ margin-top: 14px; }}
   .history-group h3 {{
-    font-size: 1rem; color: {header}; border-bottom: 1px solid {border};
+    font-size: var(--fs-base); color: {header}; border-bottom: 1px solid {border};
     padding-bottom: 4px; margin: 0 0 6px 20px;
   }}
   /* [수정: 2026-09-16] 행 여백 한 단계씩 축소 — padding은 원래 4px, 제목·메타 줄 사이 4→2px,
      행 사이 10→6px. 글자·버튼 크기는 그대로다(한 건 74 → 64px). 확정본·초안·정기 보관함·
      수시 네 파일에 같은 값이 복제돼 있으니 한쪽만 고치지 않는다. 시안 ARTICLE_ROW_DENSITY_MOCKUP.html B안. */
-  .article {{ margin: 6px 0 6px 20px; line-height: 1.5; padding: 4px 6px; border-radius: 8px; }}
+  .article {{ margin: 6px 0 6px 20px; line-height: 1.5; padding: 4px 6px; border-radius: var(--r-md); }}
   /* [추가: 2026-08-20] app.renderer와 동일한 이유(위 finalize-added 주석 참고) —
      render_article이 [단독] 기사에 항상 붙이는 art-scoop/t-scoop, [속보]의 t-flash도
      이 화면 CSS에 없으면 알맹이 없이 밋밋해진다. 이 화면엔 is-new-arrival/just-moved
@@ -295,7 +310,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      작고 조용해서 스캔을 방해하지 않는다. 결과적으로 확정본에서 「확인했어요」를 누른
      뒤 상태와 같아진다("보관함 = 이미 지나간 것"). */
   .finalize-added-badge {{
-    flex-shrink: 0; padding: 1px 7px; border-radius: 999px; font-size: 0.7rem; font-weight: 700;
+    flex-shrink: 0; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 700;
     background: {card}; color: {ai_text}; border: 1px solid {ai_border}; white-space: nowrap;
     position: relative; top: -0.15em;  /* [수정: 2026-08-21] 제목보다 글자가 작은 알약이라 baseline 정렬만으론 약간 아래로 보인다(실측: 위 여백 +1px, 아래 -2.3px) — 반 칸(0.15em) 올려 제목 글자 높이 한가운데에 맞춘다. */
   }}
@@ -308,7 +323,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      여기다. 확정본 쪽 상단 배너(.late-banner)는 이 화면에 없다 — 그건 "지금 확인해라"는
      할 일 알림이라 읽기 전용 화면엔 끌 수단이 없다(연보라 음영을 뺀 것과 같은 이유). */
   .late-badge {{
-    flex-shrink: 0; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 0.72rem;
+    flex-shrink: 0; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
     color: {warn_text}; background: {warn_chip_bg}; border: 1px solid {warn_border}; white-space: nowrap;
   }}
   /* [수정: 2026-08-13] app.renderer와 동일 — summary를 1행에서 2행(.title-row/
@@ -340,16 +355,12 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      CSS 규칙 자체가 빠져 있어서 제목과 똑같은 굵기/크기로 보이던 문제(발견: 사용자
      스크린샷). */
   .pub-time {{
-    flex-shrink: 0; color: {muted}; font-size: 0.8rem; white-space: nowrap;
+    flex-shrink: 0; color: {muted}; font-size: var(--fs-sm); white-space: nowrap;
     user-select: none; -webkit-user-select: none;
   }}
-  .article-summary {{ margin: 6px 0 4px 20px; color: {text}; font-size: 0.95rem; }}
-  /* [수정: 2026-08-13] app.renderer와 동일 — URL 밑줄 텍스트를 없애며(.url 폐기,
-     "원문보기" 아이콘으로 대체) footer는 이 화면에선 항상 비어 렌더된다(지난 기사엔
-     extra_buttons_html을 쓰는 담아둔 기사 구획이 없음, 무해). */
-  .article-footer {{ display: flex; align-items: center; gap: 8px; }}
+  .article-summary {{ margin: 6px 0 4px 20px; color: {text}; font-size: var(--fs-md); }}
   .hide-btn, .copy-btn {{
-    flex-shrink: 0; background: transparent; border: none; color: {muted}; font-size: 1rem;
+    flex-shrink: 0; background: transparent; border: none; color: {muted}; font-size: var(--fs-base);
     cursor: pointer; padding: 2px 6px; user-select: none; -webkit-user-select: none;
   }}
   .hide-btn:hover {{ color: {error}; }}
@@ -357,9 +368,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      링크로 바뀌었다(복사 아이콘과 실루엣이 겹쳐 구분이 안 된다는 지적). 이 화면은
      체크박스가 없어 들여쓰기(app.renderer의 :has(.article-select) 규칙)는 적용
      대상이 아니다. */
-  .time-sep {{ color: {muted}; font-size: 0.8rem; margin: 0 2px; user-select: none; -webkit-user-select: none; }}
+  .time-sep {{ color: {muted}; font-size: var(--fs-sm); margin: 0 2px; user-select: none; -webkit-user-select: none; }}
   .origin-link-text {{
-    flex-shrink: 0; color: {accent}; font-size: 0.8rem; text-decoration: none;
+    flex-shrink: 0; color: {accent}; font-size: var(--fs-sm); text-decoration: none;
     display: inline-flex; align-items: center; gap: 2px; white-space: nowrap;
   }}
   .origin-link-text:hover {{ text-decoration: underline; }}
@@ -370,7 +381,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .copy-btn.is-copied .icon-done {{ display: inline-flex; }}
   /* [추가: 2026-08-05] app.renderer와 동일 — 원문 다시 가져오기 버튼, 평소 숨김. */
   .refetch-btn {{
-    flex-shrink: 0; background: transparent; border: none; color: {muted}; font-size: 1rem;
+    flex-shrink: 0; background: transparent; border: none; color: {muted}; font-size: var(--fs-base);
     cursor: pointer; padding: 2px 6px; user-select: none; -webkit-user-select: none;
     opacity: 0; transition: opacity 0.15s;
   }}
@@ -386,53 +397,49 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .more-wrap {{ position: relative; display: inline-flex; flex-shrink: 0; }}
   .more-btn {{
     background: transparent; border: none; color: {muted}; font-size: 1.05rem; line-height: 1;
-    cursor: pointer; padding: 3px 7px; border-radius: 4px;
+    cursor: pointer; padding: 3px 7px; border-radius: var(--r-sm);
     user-select: none; -webkit-user-select: none;
   }}
   .more-btn:hover {{ background: {hover}; color: {accent}; }}
   .more-menu {{
     display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 60;
-    min-width: 172px; background: {card}; border: 1px solid {border}; border-radius: 8px;
-    padding: 4px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.13);
+    min-width: 172px; background: {card}; border: 1px solid {border}; border-radius: var(--r-lg);
+    padding: 4px; box-shadow: var(--sh-pop);
   }}
   .more-wrap.is-open .more-menu {{ display: block; }}
+  /* ⋯ 버튼 — 메뉴의 「복사하기」를 누르면 1초간 ✓로 바뀐다(copyArticleIcon). */
+  .more-btn .icon-default {{ display: inline-flex; }}
+  .more-btn .icon-done {{ display: none; }}
+  .more-btn.is-copied .icon-default {{ display: none; }}
+  .more-btn.is-copied .icon-done {{ display: inline-flex; }}
   .more-menu button {{
     display: block; width: 100%; text-align: left; background: transparent; border: none;
-    padding: 8px 10px; border-radius: 5px; font-size: 0.85rem; color: {text};
+    padding: 8px 10px; border-radius: var(--r-sm); font-size: var(--fs-md); color: {text};
     cursor: pointer; white-space: nowrap;
   }}
   .more-menu button:hover {{ background: {hover}; }}
   .more-menu button:disabled {{ opacity: 0.5; cursor: progress; }}
   /* [추가: 2026-08-05] app.renderer와 동일 — ✏️ 직접 수정 인라인 편집 칸. */
   .edit-summary-form {{
-    margin: 8px 0 4px 20px; padding: 10px 12px; border: 1px solid {accent}; border-radius: 8px;
+    margin: 8px 0 4px 20px; padding: 10px 12px; border: 1px solid {accent}; border-radius: var(--r-lg);
     display: flex; flex-direction: column; gap: 8px;
   }}
   .edit-summary-form input, .edit-summary-form textarea {{
-    width: 100%; box-sizing: border-box; padding: 6px 10px; border: 1px solid {border}; border-radius: 6px;
-    font-size: 0.88rem; color: {text}; background: {card}; font-family: inherit;
+    width: 100%; box-sizing: border-box; padding: 6px 10px; border: 1px solid {border}; border-radius: var(--r-md);
+    font-size: var(--fs-md); color: {text}; background: {card}; font-family: inherit;
   }}
   .edit-summary-form .edit-summary-actions {{ display: flex; justify-content: flex-end; gap: 8px; }}
-  .edit-summary-form button {{ font-size: 0.82rem; padding: 5px 12px; }}
+  .edit-summary-form button {{ font-size: var(--fs-sm); padding: 5px 12px; }}
   /* [추가: 2026-07-26] 다른 화면들과 같은 상단 고정 바.
      [수정: 2026-08-10] 홈만 있던 것에 실시간 현황·스크랩 초안 바로가기를 추가했다
-     (사용자 요청) — 다른 화면들과 같은 3칸 구성(왼쪽 홈·가운데 실시간현황·오른쪽
+     (사용자 요청) — 다른 화면들과 같은 3칸 구성(왼쪽 홈·가운데 실시간 현황·오른쪽
      나머지 하나)으로 맞췄다. */
   /* [수정: 2026-09-16] 카드 위 여백 60→44px — 60px은 상단 고정바(54px)를 피하려는 값인데 글자 위로
      30px이 비었다. 44px이면 16px 남는다. 확정본·초안·실시간·정기 보관함·설정·수시·정책 단어 추이
      일곱 화면이 같은 값을 써야 화면을 오갈 때 제목이 들썩이지 않는다(수시·추이는 84→68px 형태).
      시안 SUBHEAD_SPACING_MOCKUP.html B안. */
   .container {{ padding-top: 44px; }}
-  .topbar {{
-    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
-    background: {card}; border-bottom: 1px solid {border}; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  }}
-  .topbar-inner {{
-    max-width: 800px; margin: 0 auto; padding: 12px 24px;
-    display: flex; justify-content: space-between; align-items: center;
-  }}
-  .topbar a {{ color: {accent}; text-decoration: none; font-size: 0.92rem; font-weight: 600; padding: 6px 10px; border-radius: 6px; }}
-  .topbar a:hover {{ background: {hover}; }}
+{topnav_style}
   /* [추가: 2026-08-13] app.renderer와 동일 — 단색 SVG 아이콘(app.icons) 공통 크기·색. */
   .ic {{ width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
     stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }}
@@ -441,11 +448,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 </style>
 </head>
 <body>
-<div class="topbar"><div class="topbar-inner">
-  <a href="home.html">홈</a>
-  <a href="{live_href}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color:{error}"><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><path d="M6.4 6.4a8 8 0 0 0 0 11.2M17.6 17.6a8 8 0 0 0 0-11.2"/></svg> 실시간</a>
-  <a href="{preview_href}">초안</a>
-</div></div>
+{topnav_html}
 <div class="container">
   <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg> 정기 보관함</h1>
   <p class="page-sub">날짜별로 쌓인 스크랩 · {retention_label} 보관됩니다</p>
@@ -472,11 +475,13 @@ document.addEventListener("click", function(e) {{
 }});
 // [수정: 2026-08-13] app.renderer와 동일 — 복사하기가 상시 노출 아이콘이 되며
 // 글자 치환 대신 아이콘을 1초간 check로 바꾼다.
-function copyArticleIcon(btn) {{
+// flashEl: ✓로 바꿀 대상(없으면 누른 버튼). ⋯ 메뉴의 「복사하기」는 메뉴가 곧 닫히므로 ⋯ 버튼을 넘긴다.
+function copyArticleIcon(btn, flashEl) {{
+  var mark = flashEl || btn;
   navigator.clipboard.writeText(btn.dataset.copyText).then(function() {{
-    btn.classList.add("is-copied");
-    clearTimeout(btn._copyTimer);
-    btn._copyTimer = setTimeout(function() {{ btn.classList.remove("is-copied"); }}, 1000);
+    mark.classList.add("is-copied");
+    clearTimeout(mark._copyTimer);
+    mark._copyTimer = setTimeout(function() {{ mark.classList.remove("is-copied"); }}, 1000);
   }}).catch(function() {{
     alert("복사에 실패했습니다.");
   }});
@@ -622,7 +627,7 @@ function deleteDay(btn) {{
   var label = day.querySelector(':scope > summary .d').textContent;
   var msg = label + ' 회차를 모두 지울까요?\\n회차 ' + keys.length + '개 · 기사 '
     + Number(btn.dataset.count || 0).toLocaleString() + '건';
-  if (btn.dataset.keep) {{ msg += '\\n가장 최근 회차(' + btn.dataset.keep + ')는 남아요 — 확정본 화면과 자동 발송이 보고 있어요.'; }}
+  if (btn.dataset.keep) {{ msg += '\\n가장 최근 회차(' + btn.dataset.keep + ')는 남아요 — 확정본 화면과 자동발송이 보고 있어요.'; }}
   msg += '\\n\\n지운 자리에 「삭제함」이 남고, 거기서 되살릴 수 있어요.';
   if (!confirm(msg)) {{ return; }}
   deleteRuns(keys).then(function (data) {{
@@ -807,7 +812,7 @@ function copyHistoryDayText(btn) {{
 function downloadHistoryDayText(btn) {{
   var day = btn.closest('details.date');
   if (!historyDayIsLoaded(day)) {{ alert('날짜를 먼저 펼쳐주세요.'); return; }}
-  historyDownloadText(day.dataset.date + '_언론모니터링_전체.txt', historySlotTexts(day).join('\\n\\n'));
+  historyDownloadText(day.dataset.date + '_언론모니터링.txt', historySlotTexts(day).join('\\n\\n'));
 }}
 function downloadHistoryDayExcel(btn) {{
   var day = btn.closest('details.date');
@@ -828,7 +833,7 @@ function downloadHistoryAllText() {{
   var dates = [];
   days.forEach(function (d) {{ texts = texts.concat(historySlotTexts(d)); dates.push(d.dataset.date); }});
   if (!texts.length) {{ alert('펼친 날짜가 없습니다. 내보낼 날짜를 먼저 펼쳐주세요.'); return; }}
-  historyDownloadText(historyDateRangeLabel(dates) + '_언론모니터링_전체.txt', texts.join('\\n\\n'));
+  historyDownloadText(historyDateRangeLabel(dates) + '_언론모니터링.txt', texts.join('\\n\\n'));
 }}
 function downloadHistoryAllExcel() {{
   var dates = historyLoadedDayDetails().map(function (d) {{ return d.dataset.date; }});
@@ -837,7 +842,7 @@ function downloadHistoryAllExcel() {{
 }}
 // [추가: 2026-08-21] 기간 조회 — 서버 왕복 없이 data-date만 보고 날짜 블록을
 // 숨기고/보여준다(위 CSS 주석 참고). "오늘"은 클라이언트 시계로 계산하지만 이건
-// 화면 필터일 뿐 저장 데이터에 영향이 없으므로(실시간현황의 "N분 전"과 같은 성격)
+// 화면 필터일 뿐 저장 데이터에 영향이 없으므로(실시간 현황의 "N분 전"과 같은 성격)
 // 시계가 조금 어긋나도 큰 문제가 안 된다.
 function historyFmtDate(d) {{
   var mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -909,7 +914,7 @@ def _group_articles_by_saved_group(articles: list, run: dict) -> Optional["Order
     정한다(그 회차의 round_id로 읽는다 — 이름표 load_group_labels와 같은 방식). 예전엔
     "기사 목록에서 먼저 나온 순"(= 언론사 우선순위순)을 그대로 써서, 담당자가 확정본에서
     ▲▼로 정한 순서가 보관함·복사·txt·엑셀에서 전부 사라졌다. 실제로 발송된 텍스트
-    (app.renderer.build_latest_plain_text)에는 그 순서가 들어갔으므로, 보관함에서
+    (app.renderer.latest_confirmed_report)에는 그 순서가 들어갔으므로, 보관함에서
     꺼낸 텍스트가 발송된 보고서와 달랐다(HISTORY.md "정기 보관함 소제목 순서" 참고).
     """
     if not articles or not all("group" in a for a in articles):
@@ -1010,7 +1015,7 @@ def _slot_export_actions_html(
     date_str = run["run_at"][:10]
     # [수정: 2026-08-18] 정기·수시 공통 파일명 규칙(날짜_종류_구분)으로 통일 —
     # app.renderer.render_page의 export_filename과 동일한 형식.
-    filename = html.escape(f"{date_str}_언론모니터링_{run['run_slot'].replace(':', '-')}.txt")
+    filename = html.escape(f"{date_str}_언론모니터링_{run['run_slot'].replace(':', '-')}기준.txt")
     copy_text_attr = html.escape(plain_text)
     # [수정: 2026-08-12] data: URI 대신 서버가 Content-Disposition으로 응답하는 표준
     # 다운로드로 바꿨다(app.settings_server._handle_download_text) — 지난 기사는 회차마다
@@ -1026,9 +1031,19 @@ def _slot_export_actions_html(
         'onclick="event.stopPropagation();">'
         f'<input type="hidden" name="filename" value="{filename}">'
         f'<input type="hidden" name="text" value="{copy_text_attr}">'
-        '<button type="submit" class="btn">txt</button>'
+        '<button type="submit" class="btn">텍스트</button>'
         '</form>'
         "</span>"
+    )
+
+
+def _sent_dot_link(run: dict, dot_class: str, tip: str) -> str:
+    """발송 점 — 누르면 발송 기록(/send-log)의 그 회차 줄로. 점이 7px라 누르는 자리는 링크가 넓힌다.
+    tip은 이미 이스케이프된 툴팁."""
+    href = html.escape(send_log_href(run["run_at"][:10], run["run_slot"]), quote=True)
+    return (
+        f'<a class="sent-dot-link" href="{href}" title="{tip}&#10;누르면 받은 사람 보기" '
+        f'onclick="event.stopPropagation()"><span class="{dot_class}"></span></a>'
     )
 
 
@@ -1047,7 +1062,7 @@ def _send_failure_tooltip(run: dict) -> str:
     """
     failure = run.get("send_failure") or {}
     lines = (
-        ["일부 채널만 실패했습니다(다른 채널은 정상 발송)"]
+        ["일부는 못 받았습니다(나머지는 정상 발송)"]
         if run.get("send_count", 0) > 0
         else ["발송 실패"]
     )
@@ -1195,21 +1210,23 @@ def _render_slot(
     # 툴팁으로 옮긴다. 점이 없는 줄 = 여전히 "이 앱을 통해 나간 기록이 없음"이지
     # "미발송"으로 단정하지 않는다(위 .sent-dot CSS 주석과 같은 원칙).
     sent_dot_html = ""
+    log_entry = send_log.latest_for_run(f"{run['run_at'][:10]}|{run['run_slot']}")
+    log_tip = f"&#10;{html.escape(send_log.tally_text(log_entry))}" if log_entry else ""
     if run.get("send_failure"):
         # [추가: 2026-08-26] 실패(app.storage.record_send_failure가 채운 send_failure)를
         # 성공(send_count)보다 먼저 본다 — 텔레그램이 부분 실패해도 이메일이 전원
         # 성공하면 send_count가 이미 올라 "발송 완료"로 기록되지만(app.confirm_send가
         # 지키는 기존 규칙), 그래도 담당자가 봐야 할 건 "뭔가 안 갔다"는 사실 쪽이다.
         # 그 안에서 성공 여부는 툴팁 첫 줄이 말해준다(_send_failure_tooltip).
-        sent_dot_html = f'<span class="sent-dot fail" title="{_send_failure_tooltip(run)}"></span>'
+        sent_dot_html = _sent_dot_link(run, "sent-dot fail", f"{_send_failure_tooltip(run)}{log_tip}")
     elif run.get("send_count", 0) > 0 and run.get("sent_at"):
         sent_time_kr = html.escape(format_slot_time_kr(run["sent_at"][11:16]))
         sent_tip = (
-            f"{sent_time_kr}에 자동 발송 완료"
+            f"{sent_time_kr}에 자동발송 완료"
             if run.get("sent_by") == "auto"
             else f"{sent_time_kr} 발송 완료"
         )
-        sent_dot_html = f'<span class="sent-dot" title="{sent_tip}"></span>'
+        sent_dot_html = _sent_dot_link(run, "sent-dot", f"{sent_tip}{log_tip}")
     # [추가: 2026-08-26] 회차 옆 키워드 메모 — 그 회차에 실제로 저장된 것만(이어받은
     # 값은 화면(초안·확정본)에서만 보이고 여기엔 안 새어든다, app.manual_keyword_note).
     note = load_manual_keyword_note((run["run_at"][:10], run["run_slot"]))
@@ -1245,8 +1262,17 @@ def _render_slot(
         else f'<button type="button" class="slot-del" title="이 회차 삭제" data-key="{html.escape(key)}" '
         f'onclick="event.preventDefault(); event.stopPropagation(); deleteRuns([this.dataset.key])">{icon("trash")}</button>'
     )
+    # 「✂ 오늘만 여기서 끊기」로 생긴 회차 표식 — 나중에 「이날 왜 15:57 회차가 있지?」의 답
+    # (app.today_cuts는 지난 날짜 기록을 지우지 않고 남긴다).
+    cut_from = cut_origin(run["run_at"][:10], run["run_slot"])
+    cut_html = (
+        f'<span class="cut-mark" title="오늘만 끊은 회차 — 원래 {html.escape(cut_from or "")} 회차를 '
+        f'{html.escape(run["run_slot"])}에 나눴어요">✂</span>'
+        if cut_from is not None
+        else ""
+    )
     summary_html = (
-        f'<summary>{pick_html}<span class="slot-label">{label}</span>{count_html}{sent_dot_html}{degraded_html}'
+        f'<summary>{pick_html}<span class="slot-label">{label}</span>{cut_html}{count_html}{sent_dot_html}{degraded_html}'
         f'{note_html}{export_actions_html}{del_html}</summary>'
     )
     open_attr = " open" if open_first else ""
@@ -1260,7 +1286,7 @@ def _render_slot(
 # [추가: 2026-09-11] 지우면 안 되는 회차의 이유 — app.storage.run_lock_reason과 짝이다.
 _LOCK_TIPS = {
     "today": "오늘 회차는 지울 수 없어요 — 지우면 앱이 곧바로 그 회차를 다시 수집해요",
-    "latest": "가장 최근 회차는 지울 수 없어요 — 확정본 화면과 자동 발송이 이 회차를 보고 있어요",
+    "latest": "가장 최근 회차는 지울 수 없어요 — 확정본 화면과 자동발송이 이 회차를 보고 있어요",
 }
 
 
@@ -1315,8 +1341,8 @@ def _date_label(run_date, today) -> str:
 _DAY_EXPORT_ACTIONS_HTML = (
     '<span class="exp">'
     '<button type="button" onclick="event.stopPropagation(); copyHistoryDayText(this);">복사</button>'
-    '<button type="button" onclick="event.stopPropagation(); downloadHistoryDayText(this);">txt</button>'
-    '<button type="button" class="xls" onclick="event.stopPropagation(); downloadHistoryDayExcel(this);">xlsx</button>'
+    '<button type="button" onclick="event.stopPropagation(); downloadHistoryDayText(this);">텍스트</button>'
+    '<button type="button" class="xls" onclick="event.stopPropagation(); downloadHistoryDayExcel(this);">엑셀</button>'
     "</span>"
 )
 
@@ -1349,6 +1375,8 @@ def _theme() -> dict:
         # [추가: 2026-09-16] 🏷 라벨 팝오버 — 확정본·초안과 한 곳에서 온다.
         "label_popover_style": label_popover_style(),
         "label_popover_script": label_popover_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
+        "topnav_style": topnav_style(),
+        "topnav_html": regular_nav("archive"),
     }
 
 
@@ -1454,8 +1482,8 @@ def _period_and_result_html(total_days: int, empty_count: int = 0) -> str:
     <button type="button" class="done-btn" onclick="setHistoryTidy(false)">완료</button></span>
   <span class="exp lg">
     <button type="button" onclick="copyHistoryAllText(this)">복사</button>
-    <button type="button" onclick="downloadHistoryAllText()">txt</button>
-    <button type="button" class="xls" onclick="downloadHistoryAllExcel()">xlsx</button>
+    <button type="button" onclick="downloadHistoryAllText()">텍스트</button>
+    <button type="button" class="xls" onclick="downloadHistoryAllExcel()">엑셀</button>
   </span>
 </div>
 <div class="sel-bar" id="hist-selbar">
@@ -1509,7 +1537,7 @@ def _day_lock_note_html(run_date, today, latest_key: Optional[tuple]) -> str:
     if latest_key and latest_key[0] == run_date.isoformat():
         return (
             f'<span class="lock-note">가장 최근 회차({html.escape(latest_key[1] or "")})는 지울 수 없어요 — '
-            "확정본 화면과 자동 발송이 보고 있어요</span>"
+            "확정본 화면과 자동발송이 보고 있어요</span>"
         )
     return ""
 
@@ -1639,10 +1667,8 @@ def render_history_page(
         # [추가: 2026-08-21] "오늘" 여부는 날짜 문자열에 안 섞고 별도 칩으로 — 문구는
         # 며칠이 지나도 그대로고, 칩만 그날 하루 붙었다 떨어진다.
         today_chip_html = '<span class="chip chip-today">오늘</span>' if run_date == today else ""
-        # [추가: 2026-08-21] 맨 위(가장 최신) 날짜만 펼친 채로 보여준다 — 그 안의 맨 위
-        # 회차도 함께 펼친다(_render_day_slots의 open_first_slot). 나머지는 접힌 채로
-        # 시작해 목록이 한눈에 훑어진다(기존에도 기본 전부 접힘이었다).
-        open_attr = " open" if day_index == 0 else ""
+        # 날짜·회차는 모두 접힌 채로 시작한다 — 담당자가 고른 것만 펼친다.
+        open_attr = ""
         has_live = run_date in dates_with_runs
         head = (
             f'{_day_pick_html(run_date, today, has_live)}<span class="d">{date_label}</span>{today_chip_html}'
@@ -1677,7 +1703,7 @@ def render_history_page(
         if day_index < EAGER_HISTORY_DAYS and run_date in grouped:
             slots_html = _render_day_slots(
                 grouped[run_date], highlight_words, line_template, subheading_format,
-                open_first_slot=(day_index == 0), run_date=run_date,
+                run_date=run_date,
                 deleted_entries=deleted_here, latest_key=latest_key,
             )
             # [추가: 2026-08-18] data-date는 지연 로딩 날짜만 갖고 있었는데, 엑셀 내보내기가

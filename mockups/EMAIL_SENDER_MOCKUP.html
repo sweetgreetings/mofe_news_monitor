@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>이메일 보내는 계정 시안</title>
+<style>
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  
+  .container {
+    max-width: 800px; margin: 24px auto; padding: 24px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: 8px;
+  }
+  
+  
+  .container { padding-top: 44px; }
+  h1 { font-size: 1.3rem; color: #1E3A5F; }
+  .hint { color: #6B7280; font-size: 0.85rem; margin-bottom: 16px; }
+  .caption { color: #6B7280; font-size: 0.78rem; margin: 0 0 12px; }
+  .error { color: #DC2626; margin: 12px 0; }
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    background: #FFFFFF; border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .topbar-inner {
+    max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .topbar a { color: #2563EB; text-decoration: none; font-size: 0.92rem; font-weight: 600; padding: 6px 10px; border-radius: 6px; }
+  .topbar a:hover { background: #EFF6FF; }
+  .save-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    background: #FFFFFF; border-top: 1px solid #E5E7EB; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  }
+  .save-bar-inner { max-width: 800px; margin: 0 auto; padding: 12px 24px; }
+  .save-bar button { width: 100%; }
+  
+  button, a.btn {
+    background: #2563EB; color: #FFFFFF; border: none; border-radius: 4px;
+    padding: 8px 16px; font-size: 1rem; font-family: inherit; cursor: pointer; text-decoration: none;
+    appearance: none; -webkit-appearance: none;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  button:hover, a.btn:hover { background: #1E3A5F; }
+  button:disabled { background: #E5E7EB; color: #6B7280; cursor: not-allowed; }
+  input[type=text], input[type=number] {
+    background: #F8FAFC; color: #1F2937; border: 1px solid #E5E7EB; border-radius: 4px;
+    padding: 6px 10px; font-size: 1rem;
+  }
+  .del-btn {
+    background: transparent; color: #6B7280; border: 1px solid #E5E7EB; border-radius: 4px;
+    padding: 4px 10px; font-size: 0.8rem; margin-left: 6px; cursor: pointer;
+  }
+  .del-btn:hover { background: #EFF6FF; color: #DC2626; border-color: #DC2626; }
+  
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+
+  label.field { display: block; font-size: 0.88rem; font-weight: 600; color: #1E3A5F; margin: 18px 0 6px; }
+  input[type=password] {
+    background: #F8FAFC; color: #1F2937; border: 1px solid #E5E7EB; border-radius: 4px;
+    padding: 8px 10px; font-size: 1rem; font-family: inherit; width: 100%; box-sizing: border-box;
+  }
+  .status {
+    display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: 6px;
+    font-size: 0.86rem; line-height: 1.5; margin-bottom: 4px;
+  }
+  .status-ok { background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; }
+  .status-warn { background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; }
+  .status-info { background: #EFF6FF; color: #1E3A5F; border: 1px solid #BFDBFE; }
+  .key-row { display: flex; gap: 6px; align-items: center; }
+  .key-row input { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .eye {
+    flex: 0 0 auto; background: transparent; color: #6B7280; border: 1px solid #E5E7EB;
+    font-size: 0.8rem; padding: 8px 10px;
+  }
+  .eye:hover { background: #EFF6FF; color: #1E3A5F; }
+  .saved-key {
+    display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: #F8FAFC;
+    border: 1px solid #E5E7EB; border-radius: 4px; font-family: ui-monospace, Menlo, monospace;
+    font-size: 0.9rem; color: #1F2937; margin-top: 8px;
+  }
+  .saved-key .tag { margin-left: auto; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; font-size: 0.74rem; color: #6B7280; }
+  .test-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  .test-result { font-size: 0.84rem; color: #6B7280; }
+  .test-result.ok { color: #166534; }
+  .test-result.err { color: #DC2626; }
+  details.howto { margin-top: 22px; border: 1px solid #E5E7EB; border-radius: 6px; padding: 10px 12px; background: #F8FAFC; }
+  details.howto summary { cursor: pointer; font-size: 0.88rem; font-weight: 600; color: #1E3A5F; }
+  details.howto ol { margin: 10px 0 0; padding-left: 18px; font-size: 0.84rem; line-height: 1.75; }
+  details.howto code { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 3px; padding: 1px 5px; font-size: 0.82rem; }
+  .note { margin-top: 20px; font-size: 0.8rem; color: #6B7280; line-height: 1.65; border-top: 1px dashed #E5E7EB; padding-top: 14px; }
+  .note code { background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: 3px; padding: 1px 5px; font-size: 0.78rem; }
+  .container { padding-bottom: 88px; }
+
+  button.ghost { background: transparent; color: #2563EB; border: 1px solid #BFDBFE; }
+  button.ghost:hover { background: #EFF6FF; color: #1E3A5F; border-color: #A9C6F5; }
+  button.danger { background: transparent; color: #6B7280; border: 1px solid #E5E7EB; font-size: 0.82rem; padding: 6px 12px; }
+  button.danger:hover { background: #FEF2F2; color: #DC2626; border-color: #DC2626; }
+
+  .menu a {
+    display: flex; align-items: center; gap: 11px; margin: 6px 0; padding: 12px 12px;
+    font-size: 0.95rem; font-weight: 500; color: #1F2937; text-decoration: none;
+    border-radius: 8px; background: #F8FAFC;
+  }
+  .menu a:hover { background: #EFF6FF; }
+  .menu-chev { margin-left: auto; color: #E5E7EB; font-size: 0.9rem; }
+  .category-name {
+    color: #1E3A5F; font-size: 0.95rem; margin-bottom: 8px;
+    padding-bottom: 4px; border-bottom: 1px solid #E5E7EB;
+  }
+  .badge-warn, .badge-env {
+    margin-left: auto; font-size: 0.74rem; font-weight: 700; border-radius: 10px; padding: 2px 8px;
+  }
+  .badge-warn { color: #92400E; background: #FEF3C7; }
+  .badge-env { color: #6B7280; background: #F8FAFC; border: 1px solid #E5E7EB; }
+  .badge-warn + .menu-chev, .badge-env + .menu-chev { margin-left: 8px; }
+
+  .mk { max-width: 800px; margin: 24px auto 0; padding: 0 16px; box-sizing: border-box; }
+  .mk-title { font-size: 1.1rem; color: #1E3A5F; margin: 0 0 4px; font-weight: 700; }
+  .mk-sub { color: #6B7280; font-size: 0.85rem; margin: 0 0 12px; }
+  .mk-menu { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px 18px; max-width: 360px; }
+  .menu a.is-new { outline: 2px dashed #93C5FD; outline-offset: -2px; }
+  .topbar { display: none; }
+  .container { margin-top: 20px; }
+  .svc { display: flex; gap: 6px; margin: 8px 0 12px; flex-wrap: wrap; }
+  .svc-chip { background: #FFFFFF; color: #1F2937; border: 1px solid #E5E7EB; border-radius: 16px; padding: 5px 14px; font-size: 0.88rem; }
+  .svc-chip:hover { background: #EFF6FF; }
+  .svc-chip.on { background: #EFF6FF; color: #2563EB; border-color: #2563EB; font-weight: 600; }
+  .grid2 { display: grid; grid-template-columns: minmax(0,1fr) 110px; gap: 12px; margin-bottom: 14px; }
+  .grid2 input { width: 100%; box-sizing: border-box; margin-top: 6px; }
+  input[readonly] { color: #6B7280; }
+  input.wide { width: 100%; max-width: 420px; box-sizing: border-box; margin: 6px 0 14px; display: block; }
+  .key-row { margin: 6px 0 4px; }
+  .opt { color: #6B7280; font-weight: 400; font-size: 0.82rem; }
+  .notes { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 16px 22px; margin-bottom: 110px; }
+  .notes h2 { font-size: 1rem; color: #1E3A5F; margin: 0 0 8px; }
+  .notes ul { margin: 0; padding-left: 18px; font-size: 0.88rem; line-height: 1.75; }
+</style></head><body>
+<div class="mk">
+  <p class="mk-title">이메일 보내는 계정 — 시안</p>
+  <p class="mk-sub">지금 실행 중인 앱의 「AI 연동」 화면 CSS를 그대로 썼습니다. 메뉴 자리는 <b>설정 › 연동</b> 맨 아래입니다.</p>
+  <div class="mk-menu">
+    <div class="category-name">연동</div>
+    <div class="menu">
+      <a href="#">네이버 검색 API<span class="badge-env">.env</span><span class="menu-chev">›</span></a>
+      <a href="#">AI 연동 (Claude)<span class="badge-env">.env</span><span class="menu-chev">›</span></a>
+      <a href="#" class="is-new">이메일 보내는 계정<span class="badge-env">.env</span><span class="menu-chev">›</span></a>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <h1>✉️ 이메일 보내는 계정</h1>
+  <p class="hint">
+    정기 확정본을 이메일로 보낼 때 쓰는 계정입니다. <b>없어도 앱은 그대로 돌아갑니다</b> —
+    이메일만 건너뛰고 텔레그램은 평소대로 나갑니다.
+  </p>
+
+  <div class="status status-info"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg> .env의 계정을 쓰고 있습니다 — 여기에 저장하면 그 값이 우선합니다.</div>
+  <p class="caption">설정에 저장된 값이 없어 .env로 넘어간 상태입니다. 그대로 둬도 됩니다.</p>
+
+  <form onsubmit="return false">
+    <label class="field">메일 서비스</label>
+    <div class="svc">
+      <button type="button" class="svc-chip on" data-host="smtp.naver.com" data-port="587">네이버</button>
+      <button type="button" class="svc-chip" data-host="smtp.gmail.com" data-port="587">Gmail</button>
+    </div>
+    <div class="grid2">
+      <div>
+        <label class="field" for="host">SMTP 서버</label>
+        <input type="text" id="host" value="smtp.naver.com" readonly>
+      </div>
+      <div>
+        <label class="field" for="port">포트</label>
+        <input type="text" id="port" value="587" readonly>
+      </div>
+    </div>
+
+    <label class="field" for="addr">보내는 사람 주소</label>
+    <input type="text" id="addr" class="wide" placeholder="sweetgreetings@naver.com" style="margin-bottom:4px">
+    <p class="caption">위에서 고른 서비스의 주소여야 합니다(네이버면 @naver.com). 다른 주소를 넣으면 메일 서버가 발송을 거절합니다.</p>
+
+    <label class="field" for="name">보내는 사람 이름 <span class="opt">(선택)</span></label>
+    <input type="text" id="name" class="wide" placeholder="예: 재경부 디소팀">
+    <p class="caption">받는 사람 메일함에 주소 대신 보이는 이름입니다. 비우면 주소가 그대로 보입니다.</p>
+
+    <label class="field" for="pw">앱 비밀번호</label>
+    <div class="key-row">
+      <input type="password" id="pw" placeholder="16자리" autocomplete="off" spellcheck="false">
+      <button type="button" class="eye" onclick="var i=document.getElementById('pw');var s=i.type==='password';i.type=s?'text':'password';this.textContent=s?'가리기':'보기'">보기</button>
+    </div>
+    <p class="caption">계정 로그인 비밀번호가 아니라, 메일 서비스에서 따로 발급하는 「앱 비밀번호」입니다.</p>
+
+    <div class="test-row">
+      <button type="button" class="ghost" onclick="document.getElementById('t').className='test-result ok';document.getElementById('t').textContent='✔ 보내는 사람 주소로 시험 메일을 보냈습니다 — 받은편지함을 확인해주세요.'">시험 메일 보내기</button>
+      <span class="test-result" id="t"></span>
+    </div>
+    <p class="caption">시험 메일은 받는 사람 명단이 아니라 <b>보내는 사람 주소 자신</b>에게 한 통 갑니다.</p>
+
+    <details class="howto">
+      <summary>앱 비밀번호는 어디서 받나요?</summary>
+      <ol>
+        <li><b>Gmail</b>: Google 계정 → 보안 → 2단계 인증을 켠 뒤 → <b>앱 비밀번호</b>에서 16자리를 만듭니다.</li>
+        <li><b>네이버</b>: 메일 환경설정 → POP3/IMAP 설정에서 <b>SMTP 사용</b>을 켜고, 2단계 인증을 쓰면 애플리케이션 비밀번호를 만듭니다.</li>
+        <li>korea.kr 같은 기관 메일은 외부 앱 발송을 막는 경우가 많아 보내는 계정으로는 고를 수 없습니다 — 받는 사람으로는 그대로 쓸 수 있습니다.</li>
+      </ol>
+    </details>
+
+    <p class="note">
+      <b>비밀번호는 이 컴퓨터 밖으로 나가지 않습니다.</b> <code>data/credentials.json</code>에만
+      저장되고, 화면·복사·내보내기·발송 어디에도 실리지 않으며 로그에도 남기지 않습니다.<br><br>
+      <b>틀린 값을 넣어도 앱은 안 멈춥니다</b> — 이메일 발송만 실패로 기록되고(정기 보관함의
+      빨간 링), 텔레그램은 그대로 나갑니다. 그래서 저장 전 [시험 메일 보내기]가 중요합니다.
+    </p>
+    <div class="save-bar"><div class="save-bar-inner"><button type="submit">저장</button></div></div>
+  </form>
+</div>
+
+<div class="mk notes">
+  <h2>정할 것</h2>
+  <ul>
+    <li><b>메일 서비스는 네이버·Gmail 둘뿐</b>입니다. 누르면 서버·포트가 채워지고 고칠 수 없습니다(기관 메일은 외부 발송을 막는 경우가 많아 「직접 입력」은 두지 않음).</li>
+    <li><b>보내는 사람 이름</b>은 새 기능입니다(지금은 주소만 보임). 필요 없으면 칸을 뺍니다.</li>
+    <li><b>시험 메일</b>은 보내는 주소 자신에게 — 받는 사람들에게 시험 메일이 가지 않게 했습니다.</li>
+    <li>저장 방식은 네이버·AI 키와 같습니다(<code>data/credentials.json</code>, 화면 값이 <code>.env</code>보다 우선, 🗑로 지우면 <code>.env</code>로 돌아감).</li>
+  </ul>
+</div>
+<script>
+document.querySelectorAll('.svc-chip').forEach(function(b){b.onclick=function(){
+  document.querySelectorAll('.svc-chip').forEach(function(x){x.classList.remove('on')});b.classList.add('on');
+  var h=document.getElementById('host'),p=document.getElementById('port');
+  if(b.dataset.host){h.value=b.dataset.host;p.value=b.dataset.port;h.readOnly=p.readOnly=true;}
+}});
+</script>
+</body></html>

@@ -16,7 +16,7 @@
 # 그 발송만 CONFIRM_SEND_GRACE_SEC(기본 5분) 유예를 갖는다 — 진짜 되돌릴 수 없는
 # 지점이 거기뿐이기 때문. 5분 안에 사람이 안 누르면 app.scheduler의 매 tick
 # (check_pending_confirm_and_send)이 대신 보내고, 그 사실을 sent_by="auto"로 기록해
-# 화면에 "🤖 N시 M분 자동 발송 완료" 배지로 알려준다.
+# 화면에 "🤖 N시 M분 자동발송 완료" 배지로 알려준다.
 import logging
 from datetime import datetime
 from typing import Optional
@@ -26,13 +26,28 @@ from app.email_recipients import active_recipient_emails, load_email_recipients
 from app.email_sender import send_text as send_email_text
 from app.history_renderer import generate_history_page
 from app.landing_renderer import generate_landing_page
-from app.renderer import build_latest_plain_text, generate_screen
+from app.renderer import generate_screen, latest_confirmed_report
+from app import send_log
+from app.report_message import content_labels, email_message, plan_messages, send_planned
 from app.settings import auto_send_grace_sec, is_auto_send_enabled, load_settings
 from app.storage import confirm_run, is_today, list_run_meta, load_latest_run, record_send, record_send_failure
-from app.telegram_bot import send_text as send_telegram_text
-from app.telegram_recipients import active_recipient_chat_ids, load_telegram_recipients
+from app.telegram_recipients import load_telegram_recipients, report_recipients
 
 logger = logging.getLogger(__name__)
+
+# [추가: 2026-09-23] 아무에게도 못 간 회차의 자동발송 재시도 제동.
+# 스케줄러 tick이 10초라(app.scheduler.POLL_INTERVAL_SEC), 제동이 없으면 봇 토큰 만료나
+# SMTP 차단처럼 사람이 고쳐야 풀리는 실패에서 같은 회차를 하루 종일 10초마다 다시 시도한다
+# — 그때마다 발송이 스케줄러 스레드에서 동기로 돌아 수집·알림 tick까지 잡아먹는다.
+# 1분 간격 5번(약 4분)은 네트워크 순단은 넘기고 영구 실패는 포기하는 선이다. 포기하면
+# 발송 기록(app.send_log)에 한 줄 남겨 담당자가 직접 발송하도록 부른다 —
+# 조용히 멈추면 안 된다(CODING_CONVENTIONS §3).
+_MAX_AUTO_SEND_ATTEMPTS = 5
+_AUTO_SEND_RETRY_GAP_SEC = 60.0
+# {run_key: {"n": 시도 횟수, "at": 마지막 시도 ISO}} — 메모리에만 둔다(앱 재시작 시 초기화).
+# 파일에 두면 tick마다 쓰기가 생기고, 재시작 뒤 다시 몇 번 시도해 보는 쪽이 안전한 방향이다
+# (아무에게도 안 간 회차라 중복 발송 위험이 없다).
+_auto_send_attempts: dict = {}
 
 
 def seconds_since(iso_timestamp: str, now: Optional[datetime] = None) -> float:
@@ -98,6 +113,81 @@ def _channel_failures(channel_label: str, result, name_by_target: dict) -> list:
     return failures
 
 
+def _delivered_any(result) -> bool:
+    """이 채널에서 **한 명이라도 실제로 받았는가**.
+
+    [추가: 2026-09-23] 예전엔 `if telegram_result:`(= SendResult.ok = 대상 전원 성공)로
+    판단했다. 그래서 받는 사람 셋 중 하나가 봇을 차단했거나 chat id에 오타가 있으면
+    ok가 영영 False → send_count가 0에 머물고 → check_pending_confirm_and_send가
+    **10초마다 같은 보고서를 다시 보냈다**. 멀쩡한 두 사람은 같은 회차를 하루 종일
+    반복해서 받고, record_send_failure는 원인이 같으면 다시 안 쓰므로 화면에도 단서가
+    남지 않았다(실측: 5 tick 연속 send_count=0).
+
+    "이미 받은 사람에게 또 보내지 않는다"가 "못 받은 사람에게 다시 시도한다"보다
+    우선이라, 판단 기준을 delivered(실제 도착한 사람)로 낮춘다. 못 받은 사람은
+    record_send_failure → 정기 보관함 빨간 링 + 발송 기록에 그대로 남으므로 묻히지
+    않는다(위 [추가: 2026-08-26] 문단이 세운 "성공은 했는데 일부는 못 받았다"를
+    채널 단위에서 사람 단위로 넓힌 것뿐이다).
+
+    delivered가 없는 옛/가짜 결과(테스트가 send_text를 bool로 바꿔치기하는 경우)는
+    예전 판단(bool)으로 물러선다 — app.send_log.deliveries의 getattr 방어와 같은 이유.
+    """
+    if result is None:
+        return False
+    if getattr(result, "delivered", None):
+        return True
+    return bool(result)
+
+
+def _run_key(run: dict) -> str:
+    """발송 기록이 회차를 가리키는 키 — 「YYYY-MM-DD|HH:MM」(app.manual_keyword_note와 같은 모양)."""
+    return f"{str(run.get('run_at', ''))[:10]}|{run.get('run_slot', '')}"
+
+
+def _auto_retry_ready(run: dict, now: datetime) -> bool:
+    """아무에게도 못 간 이 회차를 지금 다시 시도해도 되는지 — 첫 시도는 즉시, 그 뒤는
+    _AUTO_SEND_RETRY_GAP_SEC 간격으로 _MAX_AUTO_SEND_ATTEMPTS번까지만."""
+    key = _run_key(run)
+    today = key.split("|", 1)[0]
+    for stale in [k for k in _auto_send_attempts if k.split("|", 1)[0] != today]:
+        del _auto_send_attempts[stale]
+    rec = _auto_send_attempts.get(key)
+    if rec is None:
+        return True
+    if rec["n"] >= _MAX_AUTO_SEND_ATTEMPTS:
+        return False
+    return seconds_since(rec["at"], now) >= _AUTO_SEND_RETRY_GAP_SEC
+
+
+def _note_auto_attempt(run: dict, now: datetime) -> int:
+    """자동발송을 한 번 시도했다고 적고, 지금까지 몇 번째인지 돌려준다."""
+    key = _run_key(run)
+    n = (_auto_send_attempts.get(key) or {}).get("n", 0) + 1
+    _auto_send_attempts[key] = {"n": n, "at": now.isoformat(timespec="seconds")}
+    return n
+
+
+def _record_send_log(run: dict, auto: bool, rows: list, attempted: bool = True, note: str = "") -> None:
+    """정기 확정본 발송 한 번을 발송 기록(app.send_log)에 남긴다.
+
+    자동발송은 실패하면 tick마다 다시 시도하므로 같은 결과는 한 줄로 합친다(coalesce).
+    받는 사람이 아무도 없으면(두 채널 다 안 씀) "보내지 않음"으로 한 줄.
+    """
+    key = _run_key(run)
+    skipped = bool(note) or not attempted
+    send_log.record(
+        "regular",
+        f"{run.get('run_slot', '')} 확정본",
+        rows,
+        auto=auto,
+        send_no=0 if skipped else run.get("send_count", 0) + 1,
+        run_key=key,
+        note=note or ("받는 사람이 없어요 — 텔레그램·이메일 받는 사람에서 정기 칸을 켜주세요" if not attempted else ""),
+        skipped=skipped,
+        coalesce=f"regular-auto:{key}" if auto else "",
+    )
+
+
 def send_confirmed_run(run: dict, text_override: Optional[str] = None, auto: bool = False) -> tuple[dict, bool]:
     """확정된 회차를 텔레그램·이메일로 전송한다(설정된 채널만, 없으면 그 채널은 건너뜀).
 
@@ -108,7 +198,7 @@ def send_confirmed_run(run: dict, text_override: Optional[str] = None, auto: boo
     text_override: (전송) 버튼이 fetch로 넘기는, 화면에 이미 렌더링된 PLAIN_TEXT —
     서버가 다시 계산한 상태가 아니라 지금 화면 그대로(직전 수정 포함)를 보내기 위해서다
     (기존 개별 Telegram/Email 버튼과 같은 이유). 자동 전송 타임아웃처럼 화면이 열려있지
-    않을 때는 생략되며, 그때는 build_latest_plain_text()로 서버가 직접 계산한다.
+    않을 때는 생략되며, 그때는 latest_confirmed_report()로 서버가 직접 계산한다.
 
     auto: [추가: 2026-08-10] 담당자가 (전송)을 직접 눌렀는지(False), 담당자가 반응하지
     않아 시스템이 대신 처리했는지(True) — 실제로 전송에 성공했을 때만
@@ -120,10 +210,13 @@ def send_confirmed_run(run: dict, text_override: Optional[str] = None, auto: boo
     "발송 완료"로 기록해버렸다 — 봇 토큰이 만료되거나 SMTP가 막혀도 화면·자동전송
     양쪽에서 "보냈다"고 거짓으로 표시되는 사고였다(실제로 아무 채널도 안 나갔는데도
     수동 버튼이 "이메일 및 텔레그램으로 발송되었습니다" 토스트를 띄운 걸 확인했다).
-    이제 send_telegram_text/send_email_text가 실제로 True(성공)를 돌려준 채널이
-    하나라도 있을 때만 record_send를 부른다 — 반환값 두 번째 요소(bool)가 그 여부다.
-    아무 것도 안 나갔으면 회차는 그대로 두고 False를 돌려줘, 호출부가 "발송 완료"가
-    아니라 실패로 처리하게 한다(자동 전송은 다음 tick에 다시 시도된다).
+    이제 실제로 기사가 나간 채널이 하나라도 있을 때만 record_send를 부른다 — 반환값
+    두 번째 요소(bool)가 그 여부다. 아무 것도 안 나갔으면 회차는 그대로 두고 False를
+    돌려줘, 호출부가 "발송 완료"가 아니라 실패로 처리하게 한다(자동 전송은 다음 tick에
+    다시 시도된다 — 단 무한히는 아니다, check_pending_confirm_and_send 참고).
+
+    [수정: 2026-09-23] 그 "실제로 나갔는가"의 기준을 채널 전원 성공(SendResult.ok)에서
+    **한 명이라도 도착(_delivered_any)**으로 낮췄다 — 이유는 _delivered_any 참고.
 
     [추가: 2026-08-26] 실패한 채널·대상·이유를 app.storage.record_send_failure로
     회차 파일에 같이 남긴다(정기 보관함의 빨간 점 툴팁이 읽는 값) — "채널 하나라도
@@ -134,9 +227,14 @@ def send_confirmed_run(run: dict, text_override: Optional[str] = None, auto: boo
     치지 않는다 — 안 쓰는 채널까지 "실패"로 보이면 안 쓰는 게 정상인 회차마다 매번
     빨간 점이 뜨는 거짓 경보가 된다.
     """
-    plain_text = text_override if text_override is not None else build_latest_plain_text()
+    # [수정: 2026-09-17] 요약도 같이 만든다 — 텔레그램 받는 사람마다 기사·요약을 고른다
+    # (app.report_message). 요약은 화면이 보내주지 않으므로 늘 서버가 계산하고, 소제목은
+    # 기사 목록과 같은 스냅샷을 본다(latest_confirmed_report).
+    report = latest_confirmed_report()
+    plain_text = text_override if text_override is not None else (report["text"] if report else None)
     if not plain_text:
         return run, False
+    summary_text = report["summary"] if report else ""
 
     # send_count는 아직 늘리지 않은 원래 값 — "이미 한 번 이상 보낸 적 있다"만 보면 된다
     # (record_send가 한 뒤의 값과 달리 여기선 미리 늘릴 필요가 없다: 전송 성공 여부를
@@ -147,23 +245,38 @@ def send_confirmed_run(run: dict, text_override: Optional[str] = None, auto: boo
 
     sent_any = False
     telegram_result = None
-    chat_ids = active_recipient_chat_ids()
-    if chat_ids:
-        telegram_result = send_telegram_text(text_to_send, chat_ids)
-        if telegram_result:
+    degraded = run_looks_rule_based(run)
+    tg_recipients = report_recipients("regular")
+    if tg_recipients:
+        plan = plan_messages(tg_recipients, "regular", text_to_send, summary_text, degraded=degraded)
+        telegram_result = send_planned(plan)
+        if _delivered_any(telegram_result):
             sent_any = True
 
     email_result = None
     recipients = active_recipient_emails()
     if recipients:
-        email_result = send_email_text(text_to_send.split("\n", 1)[0], text_to_send, recipients)
-        if email_result:
+        email_result = send_email_text(
+            text_to_send.split("\n", 1)[0], email_message(text_to_send, summary_text, degraded), recipients
+        )
+        if _delivered_any(email_result):
             sent_any = True
 
-    failures = _channel_failures(
-        "텔레그램", telegram_result, {r["chat_id"]: r.get("name") for r in load_telegram_recipients()}
-    ) + _channel_failures(
-        "이메일", email_result, {r["email"]: r.get("name") for r in load_email_recipients()}
+    tg_names = {r["chat_id"]: r.get("name") for r in load_telegram_recipients()}
+    email_names = {r["email"]: r.get("name") for r in load_email_recipients()}
+    failures = _channel_failures("텔레그램", telegram_result, tg_names) + _channel_failures(
+        "이메일", email_result, email_names
+    )
+    # 이메일은 사람마다 고르는 칸이 없어 모두 같은 것을 받는다(email_message와 같은 판단).
+    email_content = "기사 + 요약" if summary_text and not degraded else "기사 목록"
+    _record_send_log(
+        run, auto,
+        send_log.deliveries(
+            "telegram", telegram_result, tg_names,
+            content_labels(tg_recipients, "regular", summary_text, degraded),
+        )
+        + send_log.deliveries("email", email_result, email_names, {r: email_content for r in recipients}),
+        attempted=bool(tg_recipients or recipients),
     )
 
     updated_run = run
@@ -182,18 +295,18 @@ def check_pending_confirm_and_send(now: Optional[datetime] = None) -> None:
     [수정: 2026-08-11] "확정" 개념이 없어져(회차는 수집 즉시 확정됨,
     main._scrape_and_render) 이 함수가 실제로 하는 일은 자동 "발송" 하나뿐이다 —
     run_at + 유예 시간이 지났는데 담당자가 (발송)을 안 눌렀으면 (send_count==0) 시스템이
-    대신 보낸다(auto=True로 기록해 화면에 "🤖 자동 발송 완료" 배지가 뜨게 한다). 아래 확정
+    대신 보낸다(auto=True로 기록해 화면에 "🤖 자동발송 완료" 배지가 뜨게 한다). 아래 확정
     분기는 이 변경 전에 "확정 대기" 상태로 저장돼 남아있을 수 있는 옛 회차를 위한 안전망으로만
     남겨둔다 — 새로 수집되는 회차는 이미 확정된 상태로 들어오므로 평소엔 타지 않는다.
 
-    [수정: 2026-08-11] 자동 발송 사용 여부와 유예 시간을 설정 화면(/auto-send)에서 읽는다.
+    [수정: 2026-08-11] 자동발송 사용 여부와 유예 시간을 설정 화면(/auto-send)에서 읽는다.
     예전엔 `/telegram`·`/email`에 채널별 "자동 전송" 체크박스가 있었지만 이 경로가 그 값을
     읽지 않아 **꺼놔도 그냥 나갔다**(고아 설정). 끄면 담당자가 (발송)을 누를 때까지 나가지
     않는다.
 
     [추가: 2026-08-12] 이 회차의 소제목 분류가 LLM 실패로 규칙 기반(단어 빈도)에 떨어졌으면
     (run["classification_degraded"]) 자동발송을 하지 않는다 — 2026-08-11 17시 회차가
-    `<대통령>`/`<부총리>` 같은 소제목이 망가진 채로 아무도 모르게 자동 발송된 사고가
+    `<대통령>`/`<부총리>` 같은 소제목이 망가진 채로 아무도 모르게 자동발송된 사고가
     있었다. "자동화가 스스로 실패를 감지했을 때만 사람을 부른다"는 원칙(사용자 합의) —
     정상일 땐 지금처럼 손 안 대고 나가고, 실패를 감지했을 때만 멈춰서 확인을 기다린다.
     확정본 화면(app.renderer.render_page)이 이 필드를 보고 카운트다운 대신 경고를
@@ -221,19 +334,36 @@ def check_pending_confirm_and_send(now: Optional[datetime] = None) -> None:
     # 배선은 고쳤지만(그 회차부터 필드가 남는다) 이미 저장된 옛 회차는 필드가 없으므로,
     # 저장값이 있으면 그걸 쓰고 없을 때만 소제목 이름 모양으로 추정하는 쪽을 쓴다.
     if run_looks_rule_based(run):
+        # 한 번도 안 보낸 회차만 적는다(보낸 뒤에도 이 분기는 tick마다 지나간다). 같은 줄은 한 번만.
+        if run.get("send_count", 0) == 0:
+            _record_send_log(run, True, [], note="자동발송 건너뜀 — AI 분류 실패, 확인 후 직접 발송해 주세요")
         return
 
     if run.get("send_count", 0) == 0:
+        # [추가: 2026-09-23] 재시도 제동 — 아무에게도 못 간 회차만 여기 걸린다
+        # (한 명이라도 받았으면 record_send가 send_count를 올려 이 분기를 안 탄다).
+        if not _auto_retry_ready(run, now):
+            return
         _, sent = send_confirmed_run(run, auto=True)
+        tried = _note_auto_attempt(run, now)
         if not sent:
-            # 채널 미설정이거나 전송 자체가 실패한 경우 — send_count가 그대로라
-            # 다음 tick(POLL_INTERVAL_SEC)에 자동으로 다시 시도된다. 텔레그램/이메일
-            # 쪽 send_text가 이미 구체적인 원인을 warning으로 남기므로 여기선 "자동
-            # 발송이 안 나갔다"는 사실만 남긴다.
-            logger.warning(
-                "자동 발송이 나가지 않았습니다(run_slot=%s) — 채널 미설정이거나 전송 실패, 다음 tick에 재시도합니다",
-                run.get("run_slot"),
-            )
+            # 채널 미설정이거나 아무에게도 못 간 경우 — send_count가 그대로라 다음
+            # 시도가 _AUTO_SEND_RETRY_GAP_SEC 뒤에 온다. 텔레그램/이메일 쪽 send_text가
+            # 이미 구체적인 원인을 warning으로 남기므로 여긴 "안 나갔다"는 사실만 남긴다.
+            if tried >= _MAX_AUTO_SEND_ATTEMPTS:
+                logger.warning(
+                    "자동발송 %d번 모두 실패(run_slot=%s) — 더 시도하지 않습니다. 확인 후 직접 발송해주세요",
+                    tried, run.get("run_slot"),
+                )
+                _record_send_log(
+                    run, True, [],
+                    note=f"자동발송을 {tried}번 시도했지만 아무에게도 가지 못했어요 — 확인 후 직접 발송해주세요",
+                )
+            else:
+                logger.warning(
+                    "자동발송이 나가지 않았습니다(run_slot=%s, %d/%d번째) — 채널 미설정이거나 전송 실패, 잠시 뒤 다시 시도합니다",
+                    run.get("run_slot"), tried, _MAX_AUTO_SEND_ATTEMPTS,
+                )
         # [추가: 2026-08-26] 성공이든 실패든 확정본(index.html)을 다시 그린다 — 예전엔
         # 이 tick이 회차 파일만 갱신하고 화면은 안 그려서, send_count·sent_by(성공)나
         # send_failure(실패)가 저장돼도 index.html은 그대로였다. 다음 회차가 오거나

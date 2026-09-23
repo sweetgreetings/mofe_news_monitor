@@ -62,3 +62,19 @@ def take_turn(slot_end: str, now: Optional[datetime] = None) -> bool:
         except OSError:
             return False
         return True
+
+
+def copy_turn(src_end: str, dst_end: str, now: Optional[datetime] = None) -> None:
+    """「✂ 오늘만 여기서 끊기」 — 원래 회차가 자동 분류를 이미 썼으면 끊은 회차도 쓴 것으로 적는다
+    (같은 초안을 이어 쓰는 것이라 한 번 더 전체 분류를 열면 이름이 갈아엎힌다, app.today_cuts)."""
+    with _lock:
+        slots = _load_slots(now)
+        if src_end not in slots or dst_end in slots:
+            return
+        try:
+            atomic_write_text(
+                AUTO_CLASSIFY_TURNS_FILE,
+                json.dumps({"date": _today_str(now), "slots": slots + [dst_end]}, ensure_ascii=False),
+            )
+        except OSError:
+            pass

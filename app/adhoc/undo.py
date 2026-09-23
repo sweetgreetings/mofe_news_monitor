@@ -14,7 +14,7 @@
 # 같은 값) 하나로 합쳐 불필요한 스냅샷을 줄인다.
 #
 # 범위: hide·unhide·move-article·move-order·bulk-move·classify·add-custom-group·
-# 검색어 추가/삭제·꼭 포함할 검색어 추가/삭제(ADHOC_DESIGN.md §6.4a)·
+# 검색어 추가/삭제·검색 방식 변경(ADHOC_DESIGN.md §6.4a)·
 # [추가: 2026-09-15] 로데이터 원본의 「숨김」 표시 붙이기/떼기(raw_marks — 원본 카드 안에만 남는다)
 # 만 되돌린다. report_title(사안명)은 담당자가 직접 타이핑한 자유 서식 텍스트라
 # "잘못 눌렀다"보다는 "다시 고쳐 쓴다"에 가까워서 뺐다 — 정기가 소제목 이름(자동 생성
@@ -27,7 +27,7 @@ from typing import Optional
 
 from app.atomic_write import atomic_write_text
 
-from app.adhoc.card import ADHOC_DIR, card_lock, load_card, save_card
+from app.adhoc.card import ADHOC_DIR, card_lock, load_card, mark_hidden, save_card
 
 UNDO_DIR = ADHOC_DIR / "undo"
 UNDO_DIR.mkdir(parents=True, exist_ok=True)
@@ -87,6 +87,54 @@ def push(card_id: str, label: str, coalesce_sec: float = 3.0) -> None:
         _save(card_id, data)
 
 
+def attach_link(
+    card_id: str, label: str, target_id: str, added: list[str], revived: list[str],
+    pulled: Optional[list[str]] = None,
+) -> None:
+    """[추가: 2026-09-17] 방금 쌓은 되돌리기 기록에 **다른 카드에 남긴 흔적**을 덧붙인다 —
+    확정본의 「다른 사안 확정본으로 옮기기」는 이 카드(숨김)와 받는 카드(추가) 둘을 고치는데,
+    스냅샷은 이 카드 것뿐이라 ↩가 받는 쪽을 모르면 두 확정본에 같은 기사가 남는다.
+
+    push 뒤에 부른다(무엇을 새로 넣었는지는 옮긴 뒤에야 안다). 3초 합치기로 push가 새 기록을
+    안 쌓았어도 마지막 기록의 label이 같으면 거기에 이어 붙인다 — 그 기록의 스냅샷이 두 번의
+    옮기기를 함께 되돌리므로 받는 쪽 흔적도 둘 다 있어야 한다.
+
+    [추가: 2026-09-22] pulled — 원본의 「보냄 취소」가 받는 카드에서 **숨긴** 기사. ↩가 다시
+    보이게 한다(원본 스냅샷만으로는 확정본 쪽 사본이 숨은 채 남는다).
+    """
+    if not (added or revived or pulled):
+        return
+    with _lock_for(card_id):
+        data = _load(card_id)
+        if not data["entries"] or data["entries"][-1]["label"] != label:
+            return
+        data["entries"][-1].setdefault("links", []).append(
+            {"card_id": target_id, "added": list(added), "revived": list(revived), "pulled": list(pulled or [])}
+        )
+        _save(card_id, data)
+
+
+def _unapply_link(link: dict) -> None:
+    """받는 카드에서 옮겨온 흔적을 거둔다 — 새로 넣은 기사는 빼고, 되살린 기사는 다시 숨긴다.
+    받는 카드가 지워졌으면 할 일이 없다."""
+    target_id = link.get("card_id") or ""
+    with card_lock(target_id):
+        target = load_card(target_id)
+        if target is None:
+            return
+        added = set(link.get("added") or [])
+        revived = set(link.get("revived") or [])
+        pulled = set(link.get("pulled") or [])
+        target["articles"] = [a for a in target["articles"] if a["url"] not in added]
+        for article in target["articles"]:
+            if article["url"] in revived and not article.get("hidden"):
+                mark_hidden(article)
+            elif article["url"] in pulled and article.get("hidden"):
+                article["hidden"] = False
+                article.pop("hidden_at", None)
+        save_card(target)
+
+
 def peek_label(card_id: str) -> Optional[str]:
     """다음에 되돌릴 동작의 이름 — 되돌릴 게 없으면 None(↩ 버튼을 숨기는 근거)."""
     entries = _load(card_id)["entries"]
@@ -107,6 +155,16 @@ def undo(card_id: str) -> Optional[str]:
             return None
         entry = data["entries"].pop()
         with card_lock(card_id):
-            save_card(entry["snapshot"])
+            snapshot = entry["snapshot"]
+            # [추가: 2026-09-17] 발송 기록은 되돌리지 않는다 — 이미 밖으로 나간 사실이라
+            # 숨기기를 되돌렸다고 "안 보낸 것"이 되면 다음 발송에 (수정)이 안 붙는다.
+            current = load_card(card_id) or {}
+            for key in ("send_count", "sent_at", "send_log"):
+                if key in current:
+                    snapshot[key] = current[key]
+            save_card(snapshot)
         _save(card_id, data)
-        return entry["label"]
+    # 받는 카드는 이 카드 락을 놓은 뒤에 고친다(두 락을 겹쳐 쥐지 않는다).
+    for link in reversed(entry.get("links") or []):
+        _unapply_link(link)
+    return entry["label"]

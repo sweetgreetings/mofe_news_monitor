@@ -21,20 +21,25 @@ import logging
 from datetime import datetime
 from typing import Callable, Optional
 
-from app.alerted_urls import already_alerted_urls, mark_alerted
+from app import send_log
+from app.alert_event import folded_by_sent, group_by_event
+from app.alerted_urls import already_alerted_urls, alerted_items, mark_alerted
 from app.api_usage import should_pause_polling
 from app.breaking_alert import is_within_window, load_breaking_alert_settings
 from app.breaking_alert_state import load_state, save_state
-from app.config import DEFAULT_ARTICLE_LINE_TEMPLATE
+from app.breaking_burst import check_and_alert_burst
+from app.config import BURST_MAX_OUTLET_NAMES, DEFAULT_ARTICLE_LINE_TEMPLATE
 from app.filters import headline_kind
 from app.naver_api import kst_today_at, search_keywords
 from app.settings import active_search_groups, load_settings
 from app.telegram_bot import send_text as send_telegram_text
-from app.telegram_recipients import active_alert_chat_ids
+from app.telegram_recipients import active_alert_chat_ids, load_telegram_recipients
 
 logger = logging.getLogger(__name__)
 
 _ALERT_KINDS = ("단독", "속보")
+# 같은 사건 묶기를 적용하는 말머리 — [속보]만이다(이유는 app.alert_event 맨 위 주석).
+_FOLD_KIND = "속보"
 
 
 def _line_for(article: dict, template: str) -> str:
@@ -110,6 +115,52 @@ def _article_block(article: dict, template: str, now: datetime) -> str:
     return "\n".join(line for line in lines if line)
 
 
+def _event_block(group: list, template: str, now: datetime) -> str:
+    """같은 사건 묶음 한 덩어리 — 대표 기사 블록 + 나머지 언론사 이름 한 줄.
+
+    같은 사건을 15개 언론사가 낸 날(2026-09-22 실측)엔 이 줄 하나가 블록 14개를 대신한다.
+    이름을 적는 상한은 몰림 알림과 같은 값(BURST_MAX_OUTLET_NAMES)을 쓴다 — 두 메시지의
+    언론사 나열이 같은 모양이어야 한다. 언론사 이름을 하나도 못 읽으면 건수만 적는다
+    (없는 이름을 지어내지 않는다)."""
+    lead, rest = group[0], group[1:]
+    block = _article_block(lead, template, now)
+    if not rest:
+        return block
+    lead_name = (lead.get("outlet") or "").strip()
+    names: list = []
+    for article in rest:
+        name = (article.get("outlet") or "").strip()
+        if name and name != lead_name and name not in names:
+            names.append(name)
+    if not names:
+        return f"{block}\n↳ 같은 사건 {len(rest)}건"
+    shown = names[:BURST_MAX_OUTLET_NAMES]
+    line = " · ".join(shown)
+    if len(names) > len(shown):
+        line += f" 외 {len(names) - len(shown)}곳"
+    return f"{block}\n↳ 같은 사건: {line}"
+
+
+def _record_item(article: dict, kind: str, now: datetime, folded: bool = False) -> dict:
+    """app.alerted_urls에 남길 한 건. folded=True는 같은 사건이라 통에 안 실린 기사다."""
+    item = {
+        "url": article["url"],
+        "kind": kind,
+        "outlet": article.get("outlet", ""),
+        "title": article.get("title", ""),
+        "pub_date": article.get("pub_date"),
+        "at": now.isoformat(timespec="seconds"),
+    }
+    if folded:
+        item["folded"] = True
+    return item
+
+
+def _recipient_names() -> dict:
+    """{chat_id: 이름} — 발송 기록에 사람 이름으로 적는다."""
+    return {r["chat_id"]: r.get("name") for r in load_telegram_recipients()}
+
+
 def _send_batch(kind: str, articles: list, header: str, settings: dict, now: datetime) -> None:
     """이 말머리(kind)를 받기로 한 사람에게만 보낸다 — [단독]/[속보] 수신자가 서로
     다를 수 있어(app.telegram_recipients.active_alert_chat_ids) kind마다 따로 보낸다."""
@@ -117,8 +168,19 @@ def _send_batch(kind: str, articles: list, header: str, settings: dict, now: dat
     if not chat_ids:
         return
     template = settings.get("article_line_template", DEFAULT_ARTICLE_LINE_TEMPLATE)
-    body = "\n\n".join(_article_block(a, template, now) for a in articles)
-    send_telegram_text(f"{header}\n\n{body}", chat_ids)
+    # [속보]는 한 통 안에서 같은 사건끼리 묶는다(app.alert_event) — 15개 언론사가 같은
+    # 사건을 낸 통이 블록 15개가 아니라 1개 + 언론사 한 줄이 된다. [단독]은 묶지 않는다.
+    if kind == _FOLD_KIND:
+        blocks = [_event_block(group, template, now) for group in group_by_event(articles)]
+    else:
+        blocks = [_article_block(a, template, now) for a in articles]
+    body = "\n\n".join(blocks)
+    result = send_telegram_text(f"{header}\n\n{body}", chat_ids)
+    send_log.record(
+        send_log.alert_kind(kind), header,
+        send_log.deliveries("telegram", result, _recipient_names()),
+        articles=articles, now=now,
+    )
 
 
 def detect_and_alert(
@@ -146,10 +208,38 @@ def detect_and_alert(
         kind = headline_kind(article.get("title", ""))
         if kind not in _ALERT_KINDS:
             continue
+        # 같은 기사가 여러 키워드에 동시에 걸려 이 목록에 여러 번 들어온다(폴링·몰아보내기는
+        # 키워드별 결과를 평평하게 합친다) — 한 번만 담는다. 예전엔 이걸 안 걸러 한 메시지에
+        # 같은 기사가 두세 번 실렸다(HISTORY.md "[단독]·[속보] 같은 기사 중복").
+        seen.add(url)
         candidates.setdefault(kind, []).append(article)
 
     if not candidates:
         return 0
+
+    # [추가] 오늘 이미 알림이 나간 사건의 후속 [속보]는 **새 통을 만들지 않는다**
+    # (app.alert_event) — 폴링이 3분마다 돌아 한 사건이 여러 통으로 갈라지므로, 한 통 안
+    # 묶기만으로는 울리는 횟수가 그대로다. 접은 기사도 아래에서 기록엔 남겨(홈 목록·몰림
+    # 판정) 어디서도 사라지지 않는다.
+    folded = []
+    flash_candidates = candidates.get(_FOLD_KIND)
+    if flash_candidates:
+        sent_flash = [it for it in alerted_items(now) if it.get("kind") == _FOLD_KIND]
+        fresh = []
+        for article in flash_candidates:
+            previous = folded_by_sent(article, sent_flash) if sent_flash else None
+            if previous is None:
+                fresh.append(article)
+            else:
+                folded.append(article)
+                logger.info(
+                    "[속보] 같은 사건이라 새 알림을 보내지 않음 — %s (앞서 보낸 기사: %s)",
+                    article.get("title", "")[:40], (previous.get("title") or "")[:40],
+                )
+        if fresh:
+            candidates[_FOLD_KIND] = fresh
+        else:
+            candidates.pop(_FOLD_KIND)
 
     settings = load_settings()
     header_fn = header_fn or _default_header
@@ -161,16 +251,24 @@ def detect_and_alert(
     for kind, arts in candidates.items():
         _send_batch(kind, arts, header_fn(kind, arts), settings, now)
         newly_handled.extend(a["url"] for a in arts)
-        sent_items.extend({
-            "url": a["url"],
-            "kind": kind,
-            "outlet": a.get("outlet", ""),
-            "title": a.get("title", ""),
-            "pub_date": a.get("pub_date"),
-            "at": now.isoformat(timespec="seconds"),
-        } for a in arts)
+        sent_items.extend(_record_item(a, kind, now) for a in arts)
+
+    # 접은 기사도 같은 기록에 남긴다 — 홈 [속보] 목록엔 그대로 보이고, 몰림 판정도 이
+    # 기록으로 세므로 "개별 알림은 한 통, 정말 몰리면 몰림 알림이 전체 언론사 수를 알림"이
+    # 된다. folded 표시를 달아 "왜 이 기사는 어느 통에도 없나"를 나중에 되짚을 수 있게 한다.
+    newly_handled.extend(a["url"] for a in folded)
+    sent_items.extend(_record_item(a, _FOLD_KIND, now, folded=True) for a in folded)
 
     mark_alerted(newly_handled, now, items=sent_items)
+    # [속보]를 새로 보냈으면 몰림인지 본다 — 개별 알림 뒤에 요약 한 통(app.breaking_burst).
+    # 기록을 남긴 뒤에 불러야 방금 보낸 기사까지 센다. **접기만 한 경우에도 본다** — 몰림
+    # 알림이야말로 이때 필요한 정보이고(접힌 기사가 그 통의 언론사 목록으로 드러난다),
+    # 여기서 빼면 쏟아진 사실이 아무 데도 남지 않는다.
+    if _FOLD_KIND in candidates or folded:
+        try:
+            check_and_alert_burst(now)
+        except Exception:
+            logger.exception("[속보] 몰림 판정 실패 — 개별 알림은 이미 보냈습니다")
     return len(newly_handled)
 
 
@@ -215,10 +313,14 @@ def _notify_pause_once(now: datetime) -> None:
         return
     chat_ids = sorted(set(active_alert_chat_ids("단독")) | set(active_alert_chat_ids("속보")))
     if chat_ids:
-        send_telegram_text(
+        result = send_telegram_text(
             "⚠️ 오늘 네이버 API 호출이 한도의 80%를 넘어 [단독]·[속보] 수시 감시를 잠시 "
             "멈췄습니다. 정기 회차 검사는 그대로 동작합니다.",
             chat_ids,
+        )
+        send_log.record(
+            "quota", "네이버 API 호출 한도 80% 넘음 — [단독]·[속보] 감시 멈춤",
+            send_log.deliveries("telegram", result, _recipient_names()), now=now,
         )
     save_state({**state, "pause_notified_date": today})
 
@@ -278,7 +380,8 @@ def poll_and_alert_tick(now: Optional[datetime] = None) -> None:
     sent = detect_and_alert(flat_articles, header_fn=header_fn, now=now)
     if catch_up_due:
         logger.info(
-            "[단독]·[속보] 감시 시작 몰아보내기 — 자정부터 재확인, %d건 발송 (키워드 %d개)",
+            # "발송"이라 쓰지 않는다 — 돌려받는 수에는 같은 사건이라 접은 [속보]도 든다.
+            "[단독]·[속보] 감시 시작 몰아보내기 — 자정부터 재확인, %d건 처리 (키워드 %d개)",
             sent,
             len(keywords),
         )

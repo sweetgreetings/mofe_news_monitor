@@ -50,3 +50,10 @@ def recent_attempts(round_id: Optional[tuple]) -> list:
     """이 회차의 시도 기록을 오래된 순으로 돌려준다 — 화면의 재시도 이력 표시용."""
     with _lock:
         return list(_attempts.get(round_id, []))
+
+
+def copy_attempts(src_round: Optional[tuple], dst_round: Optional[tuple]) -> None:
+    """「✂ 오늘만 여기서 끊기」로 회차 이름이 바뀔 때 시도 기록을 새 회차로 복사한다(app.today_cuts)."""
+    with _lock:
+        if src_round in _attempts:
+            _attempts[dst_round] = list(_attempts[src_round])

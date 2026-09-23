@@ -10,6 +10,7 @@ from typing import Optional
 
 import requests
 
+from app.topnav import regular_nav, topnav_style
 from app.config import (
     COLOR_ACCENT,
     DEFAULT_ARTICLE_LINE_TEMPLATE,
@@ -27,8 +28,6 @@ from app.credentials import naver_is_configured
 from app.curation import is_hidden as _article_is_hidden, load_hidden_urls
 from app.summary_overrides import apply_summary_overrides
 from app.filters import (
-    exclude_personnel_articles,
-    exclude_photo_articles,
     headline_kind as _headline_kind,
     HEADLINE_TAG_RE as _HEADLINE_TAG_RE,
     is_editorial as _is_editorial,
@@ -58,13 +57,13 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>실시간</title>
+<title>전체 기사</title>
 {extra_head_html}
 <style>
   body {{ margin: 0; background: {bg}; color: {text}; font-family: {font_stack}; }}
   .container {{
     max-width: 800px; margin: 24px auto; padding: 24px; background: {card};
-    border: 1px solid {border}; border-radius: 8px;
+    border: 1px solid {border}; border-radius: var(--r-lg);
   }}
   /* [수정: 2026-07-27] 상단 고정 바 — HOME + 다른 두 화면(초안/완성본)으로 바로 이동.
      하단 고정 바는 🗑️(숨긴 기사 관리) 전용 — 상단이 3개 내비게이션으로 꽉 차서 자리를
@@ -74,16 +73,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      일곱 화면이 같은 값을 써야 화면을 오갈 때 제목이 들썩이지 않는다(수시·추이는 84→68px 형태).
      시안 SUBHEAD_SPACING_MOCKUP.html B안. */
   .container {{ padding-top: 44px; padding-bottom: 56px; }}
-  .topbar {{
-    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
-    background: {card}; border-bottom: 1px solid {border}; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  }}
-  .topbar-inner {{
-    max-width: 800px; margin: 0 auto; padding: 12px 24px;
-    display: flex; justify-content: space-between; align-items: center;
-  }}
-  .topbar a {{ color: {accent}; text-decoration: none; font-size: 0.92rem; font-weight: 600; padding: 6px 10px; border-radius: 6px; }}
-  .topbar a:hover {{ background: {live_bg}; }}
+{topnav_style}
   .bottombar {{
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
     background: {card}; border-top: 1px solid {border}; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
@@ -92,7 +82,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     max-width: 800px; margin: 0 auto; padding: 10px 24px;
     display: flex; justify-content: flex-end;
   }}
-  .bottombar a {{ color: {accent}; text-decoration: none; font-size: 1.1rem; padding: 6px 10px; border-radius: 6px; }}
+  .bottombar a {{ color: {accent}; text-decoration: none; font-size: 1.1rem; padding: 6px 10px; border-radius: var(--r-md); }}
   .bottombar a:hover {{ background: {live_bg}; }}
   /* [추가: 2026-08-03, 정리: 2026-08-21] 하단바 🖍️ 형광펜 편집 팝오버 — 다른 화면과
      같은 파란 hover(COLOR_HOVER)를 쓴다. 이 화면 고유의 붉은 톤은 COLOR_LIVE_BG로
@@ -100,34 +90,34 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .highlight-wrap {{ position: relative; }}
   .highlight-toggle {{
     background: transparent; border: none; color: {muted}; font-size: 1.1rem; cursor: pointer;
-    padding: 6px 10px; border-radius: 6px;
+    padding: 6px 10px; border-radius: var(--r-md);
   }}
   .highlight-toggle:hover {{ background: {hover}; }}
   .highlight-popover {{
     display: none; position: absolute; bottom: 100%; right: 0; margin-bottom: 8px;
-    background: {card}; border: 1px solid {border}; border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); padding: 12px; width: 220px; z-index: 30;
+    background: {card}; border: 1px solid {border}; border-radius: var(--r-lg);
+    box-shadow: var(--sh-pop); padding: 12px; width: 220px; z-index: 30;
   }}
   .highlight-popover.is-open {{ display: block; }}
   .highlight-chips {{ display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }}
   .highlight-chip {{
-    display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 14px;
-    font-size: 0.82rem; color: {text}; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--r-pill);
+    font-size: var(--fs-sm); color: {text}; cursor: pointer;
   }}
   .highlight-chip button {{
-    background: transparent; border: none; padding: 0; font-size: 0.8rem; cursor: pointer;
+    background: transparent; border: none; padding: 0; font-size: var(--fs-sm); cursor: pointer;
     color: inherit; line-height: 1;
   }}
-  .highlight-empty {{ color: {muted}; font-size: 0.8rem; margin: 0 0 8px; }}
+  .highlight-empty {{ color: {muted}; font-size: var(--fs-sm); margin: 0 0 8px; }}
   .highlight-add-form {{ display: flex; gap: 6px; }}
-  .highlight-add-form input {{ flex: 1; font-size: 0.85rem; padding: 5px 8px; min-width: 0; }}
-  .highlight-add-form button {{ font-size: 0.82rem; padding: 5px 10px; white-space: nowrap; }}
+  .highlight-add-form input {{ flex: 1; font-size: var(--fs-md); padding: 5px 8px; min-width: 0; }}
+  .highlight-add-form button {{ font-size: var(--fs-sm); padding: 5px 10px; white-space: nowrap; }}
   .live-head {{ display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }}
-  .live-badge {{ display: inline-flex; align-items: center; gap: 6px; color: {error}; font-size: 1.25rem; font-weight: 600; }}
-  .pulse {{ width: 8px; height: 8px; border-radius: 50%; background: {error}; }}
+  .live-badge {{ display: inline-flex; align-items: center; gap: 6px; color: {error}; font-size: var(--fs-xl); font-weight: 600; }}
+  .pulse {{ width: 8px; height: 8px; border-radius: var(--r-circle); background: {error}; }}
   .refresh-btn {{
-    background: {card}; color: {accent}; border: 1px solid {accent}; border-radius: 6px;
-    padding: 7px 14px; font-size: 0.9rem; font-weight: 500; text-decoration: none; white-space: nowrap;
+    background: {card}; color: {accent}; border: 1px solid {accent}; border-radius: var(--r-md);
+    padding: 7px 14px; font-size: var(--fs-md); font-weight: 500; text-decoration: none; white-space: nowrap;
   }}
   .refresh-btn:hover {{ background: {live_bg}; }}
   /* [추가: 2026-08-13] 최초 검색(콜드 캐시) 중엔 새로고침을 <a href>가 아니라 <span>으로
@@ -149,21 +139,21 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      LIVE_TOP_COMPACT_MOCKUP.html B안. */
   .filter-box {{
     margin: 14px 0 4px; padding: 10px 14px; background: {bg}; border: 1px solid {border};
-    border-radius: 8px; display: flex; flex-direction: column; gap: 8px;
+    border-radius: var(--r-lg); display: flex; flex-direction: column; gap: 8px;
   }}
   .fb-row {{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }}
-  .fb-row label {{ font-size: 0.92rem; display: flex; align-items: center; gap: 8px; cursor: pointer; white-space: nowrap; }}
+  .fb-row label {{ font-size: var(--fs-md); display: flex; align-items: center; gap: 8px; cursor: pointer; white-space: nowrap; }}
   .fb-row label:has(input:disabled) {{ color: {muted}; cursor: not-allowed; }}
   .live-row.is-hidden-by-filter {{ display: none; }}
   /* [추가: 2026-08-13] 실시간 현황 그룹 필터 바 — 제목 검색, 그룹 칩(OR), "아직 안
      담은 것만", 키워드별 건수 펼침. 전부 이미 렌더링된 목록을 클라이언트에서만
      거른다(서버 재검색 없음, applyLiveFilters). */
-  .filter-search-input {{ flex: 1 1 190px; min-width: 150px; box-sizing: border-box; font-size: 0.9rem; padding: 7px 10px; }}
+  .filter-search-input {{ flex: 1 1 190px; min-width: 150px; box-sizing: border-box; font-size: var(--fs-md); padding: 7px 10px; }}
   .chip-row {{ display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }}
   .group-chip {{
     display: inline-flex; align-items: center; gap: 5px; max-width: 160px;
-    background: {card}; border: 1px solid {border}; border-radius: 999px;
-    padding: 5px 11px; font-size: 0.82rem; color: {text}; cursor: pointer;
+    background: {card}; border: 1px solid {border}; border-radius: var(--r-pill);
+    padding: 5px 11px; font-size: var(--fs-sm); color: {text}; cursor: pointer;
   }}
   /* 그룹명이 길어도 칩 폭은 고정 — 자르는 건 화면 표시뿐, 저장된 이름은 그대로다. */
   .group-chip .chip-label {{
@@ -174,13 +164,13 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .group-chip.is-active .chip-count {{ color: {accent}; }}
   .group-chip.status-chip {{ font-style: italic; }}
   .kw-breakdown-toggle {{
-    background: transparent; border: none; color: {muted}; font-size: 0.8rem;
+    background: transparent; border: none; color: {muted}; font-size: var(--fs-sm);
     cursor: pointer; padding: 5px 4px; margin-left: auto;
   }}
   .kw-breakdown-toggle:hover {{ color: {accent}; }}
   .keyword-breakdown {{
     display: none; flex-direction: column; gap: 3px; padding: 8px 10px;
-    background: {card}; border: 1px solid {border}; border-radius: 8px; font-size: 0.82rem;
+    background: {card}; border: 1px solid {border}; border-radius: var(--r-lg); font-size: var(--fs-sm);
   }}
   .keyword-breakdown.is-open {{ display: flex; }}
   .kw-row {{ display: flex; justify-content: space-between; color: {text}; }}
@@ -189,7 +179,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .row-group-tag {{
     display: inline-block; margin-left: 6px; max-width: 90px; overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap; vertical-align: -2px;
-    padding: 1px 7px; border-radius: 999px; font-size: 0.69rem;
+    padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
     color: {accent}; background: {live_bg}; border: 1px solid {border};
   }}
   /* [추가: 2026-08-13] app.renderer와 동일한 "⋯ 더보기" 메뉴 — 🔄/✏️를 접어 그룹 칩에
@@ -197,35 +187,35 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .more-wrap {{ position: relative; display: inline-flex; flex-shrink: 0; }}
   .more-btn {{
     background: transparent; border: none; color: {muted}; font-size: 1.05rem; line-height: 1;
-    cursor: pointer; padding: 3px 7px; border-radius: 4px;
+    cursor: pointer; padding: 3px 7px; border-radius: var(--r-sm);
   }}
   .more-btn:hover {{ background: {hover}; color: {accent}; }}
   .more-menu {{
     display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 60;
-    min-width: 172px; background: {card}; border: 1px solid {border}; border-radius: 8px;
-    padding: 4px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.13);
+    min-width: 172px; background: {card}; border: 1px solid {border}; border-radius: var(--r-lg);
+    padding: 4px; box-shadow: var(--sh-pop);
   }}
   .more-wrap.is-open .more-menu {{ display: block; }}
   .more-menu button {{
     display: block; width: 100%; text-align: left; background: transparent; border: none;
-    padding: 8px 10px; border-radius: 5px; font-size: 0.85rem; color: {text};
+    padding: 8px 10px; border-radius: var(--r-sm); font-size: var(--fs-md); color: {text};
     cursor: pointer; white-space: nowrap;
   }}
   .more-menu button:hover {{ background: {live_bg}; }}
   .live-warning {{
-    background: {error_bg}; border: 1px solid {error}; border-radius: 8px; padding: 10px 14px;
-    margin: 12px 0; font-size: 0.85rem; color: {error}; line-height: 1.5;
+    background: {error_bg}; border: 1px solid {error}; border-radius: var(--r-lg); padding: 10px 14px;
+    margin: 12px 0; font-size: var(--fs-md); color: {error}; line-height: 1.5;
   }}
   /* [추가: 2026-08-24] 오류가 아니라 "참고해 두면 좋을 안내"라 .live-warning(빨강)이
      아니라 앰버(주의) 계열을 쓴다 — CLAUDE.md 색 규칙: 빨강은 오류, 앰버는 주의. */
   .live-heavy-kw-warning {{
-    background: {warn_bg}; border: 1px solid {warn_border}; border-radius: 8px; padding: 10px 14px;
-    margin: 12px 0; font-size: 0.85rem; color: {warn_text}; line-height: 1.5;
+    background: {warn_bg}; border: 1px solid {warn_border}; border-radius: var(--r-lg); padding: 10px 14px;
+    margin: 12px 0; font-size: var(--fs-md); color: {warn_text}; line-height: 1.5;
   }}
   /* [수정: 2026-09-16] 건수 카드(.stat-card, 59px + 여백 20px)를 없애고 그 문장을 「● 실시간」
      바로 옆에 붙였다 — 숫자 하나와 한 줄 설명에 카드 한 장을 쓰던 자리. 문장·id(stat-count·
      stat-scope)는 그대로라 applyLiveFilters가 예전처럼 건수를 고쳐 쓴다. */
-  .head-stat {{ font-size: 0.82rem; font-weight: 400; color: {muted}; margin-left: 4px; }}
+  .head-stat {{ font-size: var(--fs-sm); font-weight: 400; color: {muted}; margin-left: 4px; }}
   .head-stat #stat-count {{ color: {header}; font-weight: 600; }}
   .live-row {{
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -246,7 +236,15 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [추가: 2026-07-27] 스크랩 초안/완성본에 있다가 🗑️로 숨겨진 기사는 "이미 스크랩됨"과는
      다른 상태다(살아있는 초안이 아니라 휴지통에 있음) — 취소선으로 "제외됨"을 조용히
      알려준다. 스크랩됨처럼 색띠까지는 필요 없다는 판단으로 회색 음영만 유지한다. */
-  .live-row.is-hidden {{ opacity: 0.5; text-decoration: line-through; }}
+  /* 흐림·취소선은 기사 글자에만 — 행 전체에 걸면 「숨김」 버튼까지 흐려져 누를 수 있는
+     버튼으로 안 보였다(되살리는 버튼인데 끝난 상태 표시처럼 읽힘). */
+  .live-row.is-hidden .live-row-text {{ opacity: 0.5; text-decoration: line-through; }}
+  /* 숨긴 행의 버튼: 평소엔 「🗑 숨김」(상태), 마우스를 올리면 「↩ 되살리기」(누르면 일어날 일).
+     두 라벨을 다 넣고 CSS로만 바꾼다 — 폭은 .add-btn min-width 그대로라 옆 버튼이 안 흔들린다. */
+  .unhide-btn .lab-hover {{ display: none; }}
+  .unhide-btn:hover {{ background: {hover}; }}
+  .unhide-btn:hover .lab-rest {{ display: none; }}
+  .unhide-btn:hover .lab-hover {{ display: inline; }}
   /* [수정: 2026-07-27] "직접 추가한 기사"(임시보드)에만 담겨 있고 아직 정식 스크랩에
      안 들어간 기사는 회색 계열 색띠로 보여준다 — 처음엔 호박색을 썼는데, "아직 임시로
      담아둔 것"이 "이미 확정된 스크랩됨"(초록)보다 더 튀어 보이는 게 어색하다는 피드백에
@@ -265,9 +263,52 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      뜻으로 사진 추정 배지와 같은 채도 낮은 호박색 계열을 왼쪽 색띠에 쓴다. */
   .live-row.is-undated {{ border-left-color: {undated_bar}; }}
   .pub-time-unknown {{ color: {photo_badge_text}; }}
+  /* [추가] 시간대별 묶기 — 하루치가 200건 가까이 쌓이면 한 줄 목록으로는 훑을 수 없다.
+     서버는 지금처럼 전부 내려주고(필터 없음 원칙), 묶기·접기는 화면에서만 한다. 머리줄은
+     스크롤해도 상단바(54px) 아래에 붙어 지금 몇 시대를 보는지 놓치지 않게 한다. */
+  .hg-bar {{
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin: 0 0 10px; font-size: var(--fs-md); color: {muted};
+  }}
+  .hg-bar .hg-toggle {{
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid {border}; background: {card}; color: {text};
+    border-radius: var(--r-pill); padding: 5px 12px; font-size: var(--fs-md); cursor: pointer;
+  }}
+  .hg-bar .hg-toggle.is-on {{ background: {hover}; border-color: {accent}; color: {accent}; }}
+  .hg-bar .hg-link {{
+    background: none; border: 0; padding: 0; color: {muted}; font-size: var(--fs-md); cursor: pointer;
+  }}
+  .hg-bar .hg-link:hover {{ color: {accent}; text-decoration: underline; }}
+  .hg-bar .hg-sep {{ color: {border}; }}
+  .hour-group {{ margin: 0 0 8px; }}
+  .hour-group > summary {{
+    list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: var(--r-lg); background: {card}; border: 1px solid {border};
+    position: sticky; top: 54px; z-index: 3;
+  }}
+  .hour-group > summary::-webkit-details-marker {{ display: none; }}
+  .hour-group > summary:hover {{ background: {hover}; }}
+  .hour-group .hg-caret {{ width: 14px; height: 14px; color: {muted}; transition: transform .15s; flex-shrink: 0; }}
+  .hour-group[open] > summary .hg-caret {{ transform: rotate(90deg); }}
+  .hour-group .hg-time {{ font-weight: 600; color: {header}; font-size: var(--fs-base); }}
+  .hour-group .hg-range {{ color: {muted}; font-size: var(--fs-sm); }}
+  .hour-group .hg-count {{ margin-left: auto; color: {muted}; font-size: var(--fs-md); font-variant-numeric: tabular-nums; }}
+  .hour-group[open] > summary {{ border-bottom-left-radius: 0; border-bottom-right-radius: 0; }}
+  .hour-group .hg-body {{ border: 1px solid {border}; border-top: 0; border-radius: 0 0 var(--r-lg) var(--r-lg); background: {card}; }}
+  /* 묶음 첫 행의 윗줄은 머리줄 테두리와 겹치므로 뗀다(두 줄로 보인다). */
+  .hour-group .hg-body > .live-row:first-child {{ border-top: 0; }}
+  /* 필터를 걸어 한 건도 안 남은 시간대는 머리줄째 감춘다(빈 줄만 남으면 세는 데 방해된다). */
+  .hour-group.is-empty {{ display: none; }}
+  /* 새 기사가 들어오는 가장 최근 시간대만 파란 테두리로 가볍게 표시. */
+  .hour-group.hg-latest > summary {{ border-color: {accent_border}; }}
+  .hour-group.hg-latest .hg-time {{ color: {accent}; }}
+  /* 묶기를 끄면 예전 한 줄 최신순 그대로. */
+  .live-list.is-ungrouped .hour-group > summary {{ display: none; }}
+  .live-list.is-ungrouped .hour-group .hg-body {{ border: 0; }}
   .live-undated-section {{ margin-top: 22px; padding-top: 14px; border-top: 1px solid {border}; }}
-  .live-undated-heading {{ font-size: 1rem; color: {header}; margin: 0 0 4px; }}
-  .live-undated-desc {{ font-size: 0.82rem; color: {muted}; line-height: 1.6; margin: 0 0 8px; }}
+  .live-undated-heading {{ font-size: var(--fs-base); color: {header}; margin: 0 0 4px; }}
+  .live-undated-desc {{ font-size: var(--fs-sm); color: {muted}; line-height: 1.6; margin: 0 0 8px; }}
   .live-row-text {{ min-width: 0; }}
   /* [수정: 2026-07-29] 버그 수정 — 📌 버튼 옆에 🗑️ 아이콘을 추가하면서 .live-row의
      자식이 2개(텍스트+버튼)에서 3개(텍스트+버튼+아이콘)로 늘었는데, justify-content:
@@ -275,23 +316,23 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      텅 비면서 핀이 화면 한가운데로 떠밀려 보였다. 두 버튼을 이 래퍼 하나로 묶어 다시
      "텍스트 vs 버튼 묶음" 2개짜리 레이아웃으로 되돌린다. */
   .live-row-actions {{ display: flex; align-items: center; gap: 6px; flex-shrink: 0; }}
-  .outlet-tag {{ color: {muted}; font-size: 0.8rem; }}
+  .outlet-tag {{ color: {muted}; font-size: var(--fs-sm); }}
   /* [추가: 2026-08-11] 표식 없는 사진기사 추정 배지 — 기존 상태색(노랑=새 기사, 초록=이동,
      파랑=선택)과 겹치지 않게, 채도 낮은 모래색 테두리 알약으로 "행 강조"가 아니라 "작은
      라벨"로 읽히게 했다. */
   .photo-badge {{
-    display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px;
-    font-size: 0.69rem; color: {photo_badge_text}; background: {photo_badge_bg}; border: 1px solid {photo_badge_border};
+    display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-pill);
+    font-size: var(--fs-xs); color: {photo_badge_text}; background: {photo_badge_bg}; border: 1px solid {photo_badge_border};
     white-space: nowrap; vertical-align: 1px;
   }}
-  .pub-time {{ color: {muted}; font-size: 0.78rem; margin-left: 6px; }}
+  .pub-time {{ color: {muted}; font-size: var(--fs-sm); margin-left: 6px; }}
   /* [추가: 2026-08-25] 🔍 검색어 — 확정본·초안(app.renderer의 .kw-inline)과 같은 모양·같은
      뜻이다. 그룹 칩(.row-group-tag)이 "어느 그룹"이라면 이건 "그 안의 어느 검색어"라, 칩과
      달리 테두리를 두르지 않고 회색 글자로만 둔다(참고용 메타 정보). 간격은 이 화면 관례대로
      구분점(·) 대신 margin-left: 6px. */
   .kw-inline {{
     display: inline-flex; align-items: center; gap: 4px; margin-left: 6px;
-    font-size: 0.78rem; color: {muted}; vertical-align: -1px;
+    font-size: var(--fs-sm); color: {muted}; vertical-align: -1px;
   }}
   .kw-inline .kw-ic {{ width: 0.75em; height: 0.75em; color: {text_faint_alt}; flex-shrink: 0; }}
   /* [수정: 2026-08-25] 그룹 칩(.row-group-tag)과 같은 말줄임 패턴 — 실측(431건 전수, 렌더
@@ -303,7 +344,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     display: inline-block; max-width: 210px; overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap; vertical-align: -3px; color: {text_soft};
   }}
-  .live-title {{ font-size: 0.95rem; margin: 2px 0 2px; overflow-wrap: anywhere; color: {text}; }}
+  .live-title {{ font-size: var(--fs-base); margin: 2px 0 2px; overflow-wrap: anywhere; color: {text}; }}
   .live-title summary {{ cursor: pointer; -webkit-tap-highlight-color: transparent; color: {text}; }}
   .live-title summary::marker {{ color: {muted}; }}
   /* [추가: 2026-08-19] 제목 맨 앞 말머리([단독]/[속보])는 배지로 감싸지 않고 글자색만
@@ -316,8 +357,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      세 화면 전부 이 값으로 맞췄다. */
   .t-scoop {{ color: {scoop_text}; font-weight: 800; }}
   .t-flash {{ color: {flash_text}; font-weight: 600; }}
-  .live-summary {{ margin: 6px 0 4px 20px; color: {text}; font-size: 0.9rem; }}
-  .live-url {{ font-size: 0.78rem; overflow-wrap: anywhere; }}
+  .live-summary {{ margin: 6px 0 4px 20px; color: {text}; font-size: var(--fs-md); }}
+  .live-url {{ font-size: var(--fs-sm); overflow-wrap: anywhere; }}
   .live-url a {{ color: {accent}; text-decoration: underline; }}
   /* [수정: 2026-07-29] 상태별 라벨 길이가 다 달라서(📌/📌 담아둠/✓ 스크랩됨/🤖 자동 선별/
      🗑️ 숨김) 버튼 너비가 들쭉날쭉했고, 그 옆에 붙는 휴지통 아이콘 위치까지 같이
@@ -330,7 +371,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      재봤을 때 74~84px) 위 "휴지통이 항상 같은 자리에" 규칙이 그대로 깨진다. */
   .add-btn {{
     flex-shrink: 0; background: {card}; color: {text}; border: 1px solid {border};
-    border-radius: 6px; padding: 6px 9px; font-size: 0.8rem; cursor: pointer; white-space: nowrap;
+    border-radius: var(--r-md); padding: 6px 9px; font-size: var(--fs-sm); cursor: pointer; white-space: nowrap;
     min-width: 84px; text-align: center;
   }}
   .add-btn:disabled {{ color: {muted}; cursor: not-allowed; }}
@@ -348,7 +389,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .copy-btn {{
     flex-shrink: 0; display: inline-flex; align-items: center; gap: 3px;
     background: {card}; color: {text}; border: 1px solid {border};
-    border-radius: 6px; padding: 6px 10px; font-size: 0.8rem; cursor: pointer; white-space: nowrap;
+    border-radius: var(--r-md); padding: 6px 10px; font-size: var(--fs-sm); cursor: pointer; white-space: nowrap;
   }}
   .copy-btn:hover {{ color: {accent}; border-color: {accent}; background: {hover}; }}
   .copy-btn .icon-done {{ display: none; }}
@@ -359,43 +400,43 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      화면(index/history)에서도 똑같이 안 보인다(app.curation.hide_article, 전역
      숨김) — live.html 전용 임시 숨김이 아니다(의도된 동작, 사용자 확인됨).*/
   .hide-from-live-btn {{
-    flex-shrink: 0; background: transparent; border: none; color: {muted}; font-size: 1rem;
+    flex-shrink: 0; background: transparent; border: none; color: {muted}; font-size: var(--fs-base);
     cursor: pointer; padding: 4px 6px;
   }}
   .hide-from-live-btn:hover {{ color: {error}; }}
   /* [추가: 2026-08-05] 원문 다시 가져오기 버튼 — app.renderer.render_article과 동일한
      이유·동작(평소 숨김, 그 행에 마우스를 올리면 나타남). */
   .refetch-btn {{
-    flex-shrink: 0; background: transparent; border: none; color: {muted}; font-size: 1rem;
+    flex-shrink: 0; background: transparent; border: none; color: {muted}; font-size: var(--fs-base);
     cursor: pointer; padding: 4px 6px; opacity: 0; transition: opacity 0.15s;
   }}
   .live-row:hover .refetch-btn {{ opacity: 1; }}
   .refetch-btn:disabled {{ opacity: 0.35 !important; cursor: not-allowed; }}
   /* [추가: 2026-08-05] app.renderer와 동일 — ✏️ 직접 수정 인라인 편집 칸. */
   .edit-summary-form {{
-    margin: 8px 0 4px 20px; padding: 10px 12px; border: 1px solid {accent}; border-radius: 8px;
+    margin: 8px 0 4px 20px; padding: 10px 12px; border: 1px solid {accent}; border-radius: var(--r-lg);
     display: flex; flex-direction: column; gap: 8px;
   }}
   .edit-summary-form input, .edit-summary-form textarea {{
-    width: 100%; box-sizing: border-box; padding: 6px 10px; border: 1px solid {border}; border-radius: 6px;
-    font-size: 0.88rem; color: {text}; background: {card}; font-family: inherit;
+    width: 100%; box-sizing: border-box; padding: 6px 10px; border: 1px solid {border}; border-radius: var(--r-md);
+    font-size: var(--fs-md); color: {text}; background: {card}; font-family: inherit;
   }}
   .edit-summary-form .edit-summary-actions {{ display: flex; justify-content: flex-end; gap: 8px; }}
-  .edit-summary-form button {{ font-size: 0.82rem; padding: 5px 12px; }}
-  .empty {{ text-align: center; margin: 60px 0; font-size: 1.2rem; color: {muted}; }}
-  .error-box {{ text-align: center; margin: 60px 0; color: {muted}; font-size: 0.95rem; line-height: 1.7; }}
+  .edit-summary-form button {{ font-size: var(--fs-sm); padding: 5px 12px; }}
+  .empty {{ text-align: center; margin: 60px 0; font-size: var(--fs-lg); color: {muted}; }}
+  .error-box {{ text-align: center; margin: 60px 0; color: {muted}; font-size: var(--fs-base); line-height: 1.7; }}
   /* [추가: 2026-08-13] 콜드 캐시 대기 화면(render_live_loading_page) — 스피너·안내
      문구·안심 문구 3단 구성. .loading-spin-icon은 위 .refresh-btn과 별개로 이 화면
      한가운데에 크게 도는 아이콘용(같은 회전 애니메이션을 재사용). */
   .loading-box {{ text-align: center; padding: 28px 16px 32px; }}
   .loading-spin-icon {{ font-size: 2.1rem; color: {accent}; margin-bottom: 18px; }}
-  .loading-title {{ margin: 0 0 10px; font-size: 1.05rem; font-weight: 600; color: {header}; }}
-  .loading-desc {{ margin: 0 0 22px; font-size: 0.85rem; color: {muted}; line-height: 1.65; }}
+  .loading-title {{ margin: 0 0 10px; font-size: var(--fs-base); font-weight: 600; color: {header}; }}
+  .loading-desc {{ margin: 0 0 22px; font-size: var(--fs-md); color: {muted}; line-height: 1.65; }}
   /* [추가: 2026-08-13, 정리: 2026-08-21] 안심시키는 문구라 붉은 톤(COLOR_LIVE_BG)이
      아니라 다른 화면과 같은 차분한 파란색(COLOR_HOVER)을 쓴다. */
   .loading-reassure {{
     display: inline-flex; align-items: center; gap: 7px; background: {hover};
-    border-radius: 6px; padding: 9px 15px; font-size: 0.8rem; color: {header};
+    border-radius: var(--r-md); padding: 9px 15px; font-size: var(--fs-sm); color: {header};
   }}
   /* [추가: 2026-08-13] app.renderer와 동일 — 단색 SVG 아이콘(app.icons) 공통 크기·색. */
   .ic {{ width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
@@ -403,11 +444,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 </style>
 </head>
 <body>
-<div class="topbar"><div class="topbar-inner">
-  <a href="{home_href}">홈</a>
-  <a href="{preview_href}">초안</a>
-  <a href="{scrap_href}">확정본</a>
-</div></div>
+{topnav_html}
 <div class="container">
   <div class="live-head">
     <span class="live-badge"><span class="pulse"></span> 실시간{head_stat_html}</span>
@@ -426,7 +463,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
       </form>
     </div>
   </div>
-  <a href="{hidden_href}" title="숨긴 기사 관리"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></a>
+  <a href="{hidden_href}" title="휴지통"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></a>
 </div></div>
 <script>
 // [추가: 2026-08-03] app.renderer와 동일한 이유·동작 — 하단바 🖍️ 형광펜 팝오버.
@@ -552,9 +589,9 @@ function hideFromLive(btn) {{
       // [수정: 2026-07-29] 숨김 상태 버튼은 재클릭으로 되돌릴 수 있어야 하므로 비활성화하지
       // 않는다 — onclick도 unhideFromLive로 바꿔줘야 재클릭이 실제로 되돌리기를 호출한다.
       addBtn.disabled = false;
-      addBtn.className = "add-btn added";
-      addBtn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg> 숨김';
-      addBtn.title = "숨긴 기사입니다 — 눌러서 되돌릴 수 있어요(숨긴 기사 관리에서도 가능)";
+      addBtn.className = "add-btn added unhide-btn";
+      addBtn.innerHTML = {unhide_label_js};
+      addBtn.title = {unhide_title_js};
       addBtn.onclick = function() {{ unhideFromLive(addBtn); }};
       btn.remove();
     }} else {{
@@ -738,6 +775,43 @@ function applyLiveFilters() {{
   if (statCount) statCount.textContent = visible + "건";
   var statScope = document.getElementById("stat-scope");
   if (statScope) statScope.textContent = onlyScrap ? "스크랩 언론사만" : "전체 언론사";
+  syncHourGroups();
+  saveLiveFilterState();
+}}
+// [추가] 시간대 묶음 — 필터가 돌 때마다 머리줄 건수를 보이는 만큼으로 고쳐 쓰고, 0건이
+// 된 시간대는 통째로 감춘다(상단 누적 건수와 같은 축: 필터와 AND). 제목을 검색하는
+// 동안에는 걸린 시간대를 자동으로 펼친다 — 접힌 채로 "N건"만 보이면 찾은 걸 못 본다.
+function syncHourGroups() {{
+  var search = document.getElementById("live-title-search");
+  var searching = !!(search && search.value.trim());
+  document.querySelectorAll(".hour-group").forEach(function (group) {{
+    var rows = group.querySelectorAll(".live-row");
+    var visible = 0;
+    rows.forEach(function (row) {{ if (!row.classList.contains("is-hidden-by-filter")) visible++; }});
+    var count = group.querySelector(".hg-count");
+    if (count) count.textContent = visible + "건";
+    group.classList.toggle("is-empty", visible === 0);
+    if (searching && visible > 0) group.open = true;
+  }});
+}}
+function openAllHourGroups() {{
+  document.querySelectorAll(".hour-group").forEach(function (g) {{ g.open = true; }});
+}}
+function closeAllHourGroups() {{
+  document.querySelectorAll(".hour-group").forEach(function (g) {{ g.open = false; }});
+}}
+// 묶기 끄기 = 예전 한 줄 최신순으로 되돌리기. 머리줄만 감추고 전부 펼쳐두므로 행 순서는
+// 그대로다(다시 켜면 접힘 상태도 그대로 살아난다).
+function toggleHourGrouping(btn) {{
+  var list = document.getElementById("live-list");
+  if (!list) return;
+  var grouped = !list.classList.toggle("is-ungrouped");
+  btn.classList.toggle("is-on", grouped);
+  btn.setAttribute("aria-pressed", grouped ? "true" : "false");
+  document.querySelectorAll(".hour-group").forEach(function (g) {{
+    if (!grouped) {{ g.dataset.wasOpen = g.open ? "1" : "0"; g.open = true; }}
+    else if (g.dataset.wasOpen === "0") {{ g.open = false; }}
+  }});
 }}
 function toggleGroupChip(btn) {{
   btn.classList.toggle("is-active");
@@ -802,6 +876,38 @@ function markTruncatedKeywords() {{
   }});
 }}
 markTruncatedKeywords();
+// [추가] 필터 체크박스 다섯 개는 이 브라우저에 기억한다 — 담당자가 「선택 언론사만」을 한 번
+// 켜두면 다음에 열 때도 그대로다. 설정 화면에 기본값 항목을 따로 만들지 않는 이유: 사용자가
+// 한 명이라 설정값이 주는 이득이 없는데 "설정에 적힌 기본값"과 "지금 화면 상태"라는 두 개의
+// 진실만 생긴다. 제목 검색어·그룹 칩은 그때그때 찾는 값이라 기억하지 않는다(매번 빈 상태).
+var LIVE_FILTER_KEY = "liveFilters";
+var LIVE_FILTER_IDS = [
+  "scrap-outlet-only", "headline-scoop-only", "headline-flash-only",
+  "headline-editorial-only", "unclaimed-only"
+];
+function saveLiveFilterState() {{
+  try {{
+    var state = {{}};
+    LIVE_FILTER_IDS.forEach(function (id) {{
+      var el = document.getElementById(id);
+      if (el) state[id] = !!el.checked;
+    }});
+    localStorage.setItem(LIVE_FILTER_KEY, JSON.stringify(state));
+  }} catch (e) {{ /* 시크릿 창 등에서 저장이 막혀도 화면은 그대로 돌아야 한다 */ }}
+}}
+function restoreLiveFilterState() {{
+  var state = null;
+  try {{ state = JSON.parse(localStorage.getItem(LIVE_FILTER_KEY) || "null"); }} catch (e) {{ state = null; }}
+  if (!state) return;
+  var restored = false;
+  LIVE_FILTER_IDS.forEach(function (id) {{
+    var el = document.getElementById(id);
+    // 언론사 목록이 비어 체크박스가 잠겨 있으면 되살리지 않는다 — 켜면 한 건도 안 남는다.
+    if (el && !el.disabled && state[id]) {{ el.checked = true; restored = true; }}
+  }});
+  if (restored) applyLiveFilters();
+}}
+restoreLiveFilterState();
 </script>
 </body>
 </html>
@@ -830,7 +936,23 @@ def _theme() -> dict:
         # 값을 직접 적어야 했다.
         **PALETTE,
         "font_stack": FONT_STACK,
+        "topnav_style": topnav_style(),
+        "topnav_html": regular_nav("live"),
+        # 숨긴 행 버튼 — 서버 렌더링(_render_row)과 hideFromLive가 같은 마크업을 쓴다.
+        "unhide_label_js": json.dumps(unhide_btn_label(), ensure_ascii=False),
+        "unhide_title_js": json.dumps(UNHIDE_BTN_TITLE, ensure_ascii=False),
     }
+
+
+UNHIDE_BTN_TITLE = "숨김을 풀어 원래 자리로 되돌려요 (초안·확정본에도 다시 보여요)"
+
+
+def unhide_btn_label() -> str:
+    """숨긴 행 버튼 라벨 — 평소 「🗑 숨김」, 마우스를 올리면 「↩ 되살리기」(CSS .unhide-btn)."""
+    return (
+        f'<span class="lab-rest">{icon("trash")} 숨김</span>'
+        f'<span class="lab-hover">{icon("undo")} 되살리기</span>'
+    )
 
 
 def _highlight_words_json(highlight_words: list) -> str:
@@ -915,8 +1037,6 @@ def _auto_drafted_urls(articles: list, settings: dict) -> set:
         return set()
 
     outlet_order = settings.get("outlet_order", [])
-    exclude_photo = settings.get("exclude_photo_in_scrap", False)
-    exclude_personnel = settings.get("exclude_personnel_in_scrap", False)
 
     result = set()
     for article in articles:
@@ -930,10 +1050,6 @@ def _auto_drafted_urls(articles: list, settings: dict) -> set:
         if parsed <= slot_start:
             continue
         if outlet_order and article["outlet"] not in outlet_order:
-            continue
-        if exclude_photo and not exclude_photo_articles([article]):
-            continue
-        if exclude_personnel and not exclude_personnel_articles([article]):
             continue
         haystack = (article["title"] + " " + article.get("summary", "")).lower()
         if not any(keyword in haystack for keyword in scrap_keywords):
@@ -1041,9 +1157,9 @@ def _render_row(
         row_class = "live-row is-hidden"
         data_status = "hidden"
         disabled = ""
-        title_attr = "숨긴 기사입니다 — 눌러서 되돌릴 수 있어요(숨긴 기사 관리에서도 가능)"
-        btn_class = "add-btn added"
-        btn_label = f'{icon("trash")} 숨김'
+        title_attr = UNHIDE_BTN_TITLE
+        btn_class = "add-btn added unhide-btn"
+        btn_label = unhide_btn_label()
         btn_onclick = "unhideFromLive(this)"
     elif is_scrapped:
         row_class = "live-row is-scrapped"
@@ -1118,7 +1234,7 @@ def _render_row(
     # [수정: 2026-09-03] 배지가 두 층을 겸하게 되면서(제목 [포토] 표식 / 표식 없는 추정)
     # 툴팁만 갈라 놓는다 — 옛 문구는 [포토]가 붙은 기사에는 거짓말이다.
     photo_badge_html = (
-        f'<span class="photo-badge" title="{html.escape(photo_badge_tip(article.get("title", "")))}">'
+        f'<span class="photo-badge" title="{html.escape(photo_badge_tip(article.get("title", ""), article.get("url", "")))}">'
         f'{icon("camera")} 사진 추정</span>'
         if looks_like_photo_caption(article)
         else ""
@@ -1208,6 +1324,72 @@ def _render_row(
         f'onclick="{btn_onclick}"{disabled} title="{title_attr}">{btn_label}</button>'
         f"{copy_btn_html}{more_menu_html}{hide_icon_html}"
         "</div>"
+        "</div>"
+    )
+
+
+# [추가] 처음 열었을 때 펼쳐둘 시간대 수 — 최근 두 시간대. 새로 들어온 기사는 바로
+# 보이면서, 그 아래로는 열 줄 남짓으로 접혀 하루치가 한눈에 들어온다.
+HOUR_GROUPS_OPEN = 2
+
+
+def _pub_hour(article: dict):
+    """기사의 발행 시각(시 단위). 못 읽으면 None — 그런 기사는 애초에 이 목록에 안 온다."""
+    raw = article.get("pub_date")
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw).hour
+    except (ValueError, TypeError):
+        return None
+
+
+def _hour_groups_html(articles: list, row_fn) -> str:
+    """발행시각 목록을 시간대별 <details>로 묶는다 (최신순 입력 순서를 그대로 유지).
+
+    묶는 축은 발행 시각의 "시"뿐이다 — 정기 회차 창으로 묶지 않는다. 회차는 하루를 다
+    덮지 않고(마지막 회차 뒤에 나온 기사는 어느 회차에도 안 속한다) 요일 그룹에 따라
+    칸 이름·개수까지 바뀌어서, 그날그날 모양이 달라지는 서랍이 된다.
+
+    건수는 서버가 그린 값이고, 필터가 걸리면 화면의 syncHourGroups가 보이는 만큼으로
+    고쳐 쓴다(상단 누적 건수와 같은 축).
+    """
+    groups: list = []
+    for article in articles:
+        hour = _pub_hour(article)
+        if not groups or groups[-1]["hour"] != hour:
+            groups.append({"hour": hour, "articles": []})
+        groups[-1]["articles"].append(article)
+
+    parts = []
+    for index, group in enumerate(groups):
+        hour = group["hour"]
+        label = "시각 미상" if hour is None else f"{hour}시대"
+        range_label = "" if hour is None else f"{hour:02d}:00 ~ {hour:02d}:59"
+        classes = "hour-group hg-latest" if index == 0 else "hour-group"
+        open_attr = " open" if index < HOUR_GROUPS_OPEN else ""
+        rows = "".join(row_fn(a) for a in group["articles"])
+        parts.append(
+            f'<details class="{classes}"{open_attr}>'
+            f'<summary>{icon("flow_next", "ic hg-caret")}'
+            f'<span class="hg-time">{label}</span>'
+            f'<span class="hg-range">{range_label}</span>'
+            f'<span class="hg-count">{len(group["articles"])}건</span></summary>'
+            f'<div class="hg-body">{rows}</div>'
+            "</details>"
+        )
+    return "".join(parts)
+
+
+def _hour_group_bar_html() -> str:
+    """시간대 묶음 위의 한 줄 — 묶기 끄기(예전 한 줄 목록)와 모두 펼치기/접기."""
+    return (
+        '<div class="hg-bar">'
+        '<button type="button" class="hg-toggle is-on" aria-pressed="true" '
+        'onclick="toggleHourGrouping(this)">시간대별 묶기</button>'
+        '<button type="button" class="hg-link" onclick="openAllHourGroups()">모두 펼치기</button>'
+        '<span class="hg-sep">·</span>'
+        '<button type="button" class="hg-link" onclick="closeAllHourGroups()">모두 접기</button>'
         "</div>"
     )
 
@@ -1410,7 +1592,14 @@ def render_live_page(
                 line_template=line_template,
             )
 
-        rows_html = "\n".join(_row(a) for a in dated_articles) or '<p class="empty">💤</p>'
+        # [수정] 시간대별로 묶어 접어 둔다 — 하루치가 200건 가까이 쌓여 한 줄 목록으로는
+        # 훑기 어렵다(사용자 요청). 서버가 내려주는 기사는 그대로이고 묶기·접기만 화면이다.
+        rows_html = (
+            _hour_group_bar_html()
+            + '<div class="live-list" id="live-list">'
+            + _hour_groups_html(dated_articles, _row)
+            + "</div>"
+        ) if dated_articles else '<p class="empty">💤</p>'
         if undated_articles:
             undated_html = (
                 '<div class="live-undated-section" id="live-undated-section">'
@@ -1669,7 +1858,7 @@ def generate_live_page() -> Path:
 
     app.naver_api.search_keywords가 (results_by_keyword, failed_keywords) 튜플을
     돌려준다 — 키워드별로 재시도까지 다 써도 실패한 게 있으면 failed_keywords에
-    담겨온다. 실시간현황은 5분 뒤 재시도(정기 스크랩의 방식)를 기다릴 수 없는
+    담겨온다. 실시간 현황은 5분 뒤 재시도(정기 스크랩의 방식)를 기다릴 수 없는
     화면이라(사용자가 새로고침을 누르고 바로 결과를 봄), 실패한 키워드는 캐시의
     "마지막으로 본 시각"을 전진시키지 않고 그대로 둔다 — 다음 새로고침이 실패했던
     구간을 포함해 그 키워드만 다시 검색한다(성공한 다른 키워드는 영향받지 않는다,
@@ -1778,14 +1967,14 @@ def _ensure_live_generation_running() -> None:
             try:
                 generate_live_page()
             except Exception:
-                logger.exception("백그라운드 실시간현황 생성 실패")
+                logger.exception("백그라운드 실시간 현황 생성 실패")
 
         _live_generation_thread = threading.Thread(target=_run, daemon=True)
         _live_generation_thread.start()
 
 
 def generate_live_page_or_wait() -> Path:
-    """실시간현황 라우트(/live.html)가 실제로 호출하는 진입점.
+    """실시간 현황 라우트(/live.html)가 실제로 호출하는 진입점.
 
     [추가: 2026-08-13] 오늘 처음 보는(캐시에 last_seen이 없는) 키워드가 하나라도
     있으면 — 즉 이번 요청이 콜드 캐시라 수십~백여 초가 걸릴 상황이면 — 그 검색을

@@ -23,19 +23,6 @@ from app.sorter import sort_by_pub_desc
 # 같은 이유로 잠근다(ThreadingHTTPServer 동시 요청 대비).
 _lock = threading.Lock()
 
-# 라벨 하나로 표현할 수 있는 스냅샷 필드 7개(기능11 엑셀 8열 중 라벨명을 뺀 나머지) +
-# source(8번째 필드, 화면의 정기/수시 출처 태그용, [수정: 2026-08-18] q1 논의로 추가).
-_SNAPSHOT_KEYS = (
-    "scrap_date",
-    "scrap_end",
-    "pub_date",
-    "outlet",
-    "title",
-    "group",
-    "source",
-)
-
-
 class LabelCollisionError(Exception):
     """이름 변경이 이미 있는 다른 라벨과 부딪힐 때 — app.curation의 소제목 이름 충돌
     (409 "이미 '{name}'라는 이름의 소제목이 있습니다")과 같은 성격의 거절이다.

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>시안 · 발송 기록</title>
+<style>
+  /* ── 지금 앱(설정 서버 화면) 공용 CSS 그대로 ── */
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem; --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%; --h-sm: 24px; --h-md: 30px; --h-lg: 36px; --fab-lg: 56px; --fab-sm: 48px; --sh-float: 0 4px 12px rgba(15, 23, 42, 0.12); --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14); --sh-modal: 0 16px 40px rgba(15, 23, 42, 0.22); }
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .container { max-width: 800px; margin: 24px auto; padding: 24px; padding-top: 44px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: var(--r-lg); }
+  h1 { font-size: var(--fs-xl); color: #1E3A5F; }
+  .hint { color: #6B7280; font-size: var(--fs-md); margin-bottom: 16px; }
+  .topbar { position: sticky; top: 0; z-index: 20; background: #FFFFFF; border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); }
+  .topbar-inner { max-width: 800px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .topbar-inner > .tn { color: #2563EB; text-decoration: none; font-size: var(--fs-md); font-weight: 600;
+    padding: 5px 14px; border: 1px solid transparent; border-radius: var(--r-pill); white-space: nowrap; }
+  .topbar-inner > a.tn:hover { background: #EFF6FF; }
+  .topbar-inner > .tn-sep { width: 1px; height: 18px; background: #E5E7EB; margin: 0 16px; }
+  .topbar-inner > a.tn.back { color: #4B5563; }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+
+  /* 휴지통(/hidden)의 날짜 묶음·덩어리 카드 문법 그대로 */
+  .day > summary { display: flex; align-items: center; gap: 8px; padding: 6px 2px; margin: 18px 0 8px;
+    font-size: var(--fs-md); font-weight: 700; color: #1E3A5F; cursor: pointer; list-style: none;
+    border-bottom: 1px solid #E5E7EB; }
+  .day > summary::-webkit-details-marker { display: none; }
+  .day > summary::before { content: "▸"; color: #6B7280; font-size: 0.72rem; width: 10px; flex: none; }
+  .day[open] > summary::before { content: "▾"; }
+  .chip-today { font-size: var(--fs-xs); font-weight: 600; background: #EFF6FF; color: #2563EB;
+    border: 1px solid #BFDBFE; border-radius: var(--r-pill); padding: 1px 8px; }
+  .day .dcnt { font-weight: 400; color: #6B7280; font-size: var(--fs-sm); }
+  .day .dfail { font-weight: 600; color: #DC2626; font-size: var(--fs-sm); }
+
+  /* ── 새로 생기는 것 ── */
+  .filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 4px; }
+  .fchip { font-size: var(--fs-sm); padding: 3px 12px; border-radius: var(--r-pill); border: 1px solid #E5E7EB;
+    background: #FFFFFF; color: #4B5563; cursor: pointer; font-family: inherit; }
+  .fchip.on { background: #EFF6FF; border-color: #BFDBFE; color: #2563EB; font-weight: 600; }
+  .fchip.fail.on { background: #FEF2F2; border-color: #FECACA; color: #DC2626; }
+  .fsep { width: 1px; height: 16px; background: #E5E7EB; margin: 0 6px; }
+
+  .send { border: 1px solid #E5E7EB; border-radius: var(--r-lg); margin: 0 0 8px; overflow: hidden; }
+  .send > summary { display: flex; align-items: center; gap: 9px; padding: 9px 12px; font-size: var(--fs-md);
+    background: #F8FAFC; cursor: pointer; list-style: none; }
+  .send > summary::-webkit-details-marker { display: none; }
+  .send > summary::before { content: "▸"; color: #6B7280; font-size: 0.72rem; width: 10px; flex: none; }
+  .send[open] > summary::before { content: "▾"; }
+  .send[open] > summary { border-bottom: 1px solid #E5E7EB; }
+  .send > summary:hover { background: #F3F4F6; }
+  .send.has-fail { border-color: #FECACA; }
+  .send .t { color: #6B7280; font-variant-numeric: tabular-nums; flex: none; width: 3.1em; }
+  .kind { flex: none; font-size: var(--fs-xs); font-weight: 600; border-radius: var(--r-pill); padding: 1px 8px; border: 1px solid; }
+  .k-reg { background: #EFF6FF; color: #2563EB; border-color: #BFDBFE; }
+  .k-adhoc { background: #E3F1EE; color: #146B5E; border-color: rgba(20, 107, 94, 0.45); }
+  .k-alert { background: #FEF2F2; color: #B91C1C; border-color: #FECACA; }
+  .k-warn { background: #FFFBEB; color: #92400E; border-color: #FDE68A; }
+  .send .what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .send .by { flex: none; color: #6B7280; font-size: var(--fs-sm); }
+  .tally { flex: none; font-size: var(--fs-sm); color: #6B7280; font-variant-numeric: tabular-nums; }
+  .tally b { font-weight: 600; color: #1F2937; }
+  .tally .bad { color: #DC2626; font-weight: 700; }
+  .mark { flex: none; width: 18px; text-align: center; font-weight: 700; }
+  .mark.ok { color: #15803D; }
+  .mark.bad { color: #DC2626; }
+  .send.skipped > summary { color: #6B7280; }
+
+  .body { padding: 6px 12px 10px 31px; font-size: var(--fs-md); }
+  .sent-what { color: #6B7280; font-size: var(--fs-sm); margin: 4px 0 8px; line-height: 1.6; }
+  .sent-what a { color: #6B7280; }
+  .rc { display: grid; grid-template-columns: minmax(0, 7em) 5.2em minmax(0, 1fr); gap: 0 12px; }
+  .rc > div { padding: 6px 0; border-top: 1px solid #F1F5F9; line-height: 1.45; }
+  .rc .h { border-top: none; color: #6B7280; font-size: var(--fs-xs); padding: 2px 0; }
+  .rc .ch { color: #6B7280; font-size: var(--fs-sm); }
+  .st-ok { color: #15803D; }
+  .st-bad { color: #DC2626; font-weight: 600; }
+  .st-note { color: #6B7280; font-size: var(--fs-sm); }
+  .fix { display: block; color: #6B7280; font-size: var(--fs-sm); font-weight: 400; margin-top: 2px; }
+  .fix a { color: #2563EB; }
+  .retry { margin-top: 10px; display: flex; align-items: center; gap: 10px; }
+  .btn-line { height: var(--h-md); padding: 0 12px; font-size: var(--fs-md); font-family: inherit; background: #FFFFFF;
+    color: #2563EB; border: 1px solid #2563EB; border-radius: var(--r-md); cursor: pointer; }
+  .btn-line:hover { background: #EFF6FF; }
+  .later { font-size: var(--fs-xs); color: #B45309; }
+  .foot { margin-top: 22px; color: #6B7280; font-size: var(--fs-sm); text-align: center; }
+
+  @media (max-width: 640px) {
+    .send > summary { flex-wrap: wrap; row-gap: 2px; }
+    .send .what { flex-basis: calc(100% - 5em); order: 5; padding-left: 19px; }
+    .send .by { display: none; }
+    .rc { grid-template-columns: minmax(0, 1fr) 4.6em; }
+    .rc > .ch, .rc > .h { display: none; }
+    .rc > .res { grid-column: 1 / -1; border-top: none; padding-top: 0; }
+  }
+
+  /* ── 시안 전용 ── */
+  .mk-note { background:#FFFFFF; border:1px dashed #94A3B8; border-radius: var(--r-lg); padding:14px 16px; margin:0 0 18px; font-size:0.84rem; line-height:1.65; }
+  .mk-note h2 { font-size:0.95rem; color:#1E3A5F; margin:0 0 6px; }
+  .mk-note ul { margin:4px 0 0; padding-left:18px; }
+  .mk-note li { margin:2px 0; }
+  .mk-note .q { color:#92400E; background:#FFFBEB; border:1px solid #FDE68A; border-radius: var(--r-md); padding:8px 10px; margin-top:10px; }
+  .mk-tag { display:inline-block; font-size:0.7rem; font-weight:700; color:#FFFFFF; background:#64748B; border-radius: var(--r-pill); padding:1px 8px; margin-right:6px; vertical-align:1px; }
+  .mk-sec { max-width: 800px; margin: 28px auto; padding: 0 24px; }
+  .mk-sec h2 { font-size: 0.95rem; color: #1E3A5F; margin: 0 0 10px; }
+  .mk-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 640px) { .mk-grid { grid-template-columns: minmax(0, 1fr); } }
+  .mk-box { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 12px 14px; font-size: var(--fs-md); }
+  .mk-box h3 { font-size: var(--fs-sm); color: #6B7280; margin: 0 0 8px; font-weight: 600; }
+  .mk-box .d { font-size: var(--fs-sm); color: #6B7280; margin: 8px 0 0; line-height: 1.55; }
+  .sent-done { color: #6B7280; font-size: var(--fs-md); text-decoration: none; border-bottom: 1px dashed transparent; }
+  .sent-done:hover, .sent-done.hov { color: #2563EB; border-bottom-color: #2563EB; }
+  .sent-dot { display: inline-block; width: 8px; height: 8px; border-radius: var(--r-circle); background: #15803D; vertical-align: 1px; }
+  .sent-dot.fail { background: transparent; border: 2px solid #DC2626; width: 6px; height: 6px; }
+  .tipbox { display: inline-block; margin-top: 6px; background: #1F2937; color: #FFFFFF; font-size: var(--fs-xs); border-radius: var(--r-md); padding: 4px 8px; }
+  .menu-sub { font-size: var(--fs-xs); color: #6B7280; font-weight: 600; margin: 0 0 4px; }
+  .menu-item { display: block; padding: 5px 0; color: #2563EB; text-decoration: none; }
+  .menu-item.new { background: #FFFBEB; outline: 2px dashed #F59E0B; outline-offset: 2px; border-radius: var(--r-sm); }
+</style>
+</head>
+<body>
+<div class="topbar"><div class="topbar-inner">
+  <a class="tn" href="#">홈</a>
+  <span class="tn-sep" aria-hidden="true"></span>
+  <a class="tn back" href="#">← 설정</a>
+</div></div>
+
+<div class="container">
+  <div class="mk-note">
+    <h2><span class="mk-tag">시안</span>발송 기록 <code>/send-log</code></h2>
+    앱이 보낸 모든 메시지(정기·수시 보고서, [단독]·[속보]·몰림 알림, 호출 한도 경고)가 <b>누구에게 도착했는지</b>를 한곳에서 봅니다.
+    <ul>
+      <li><b>읽었는지는 적지 않아요.</b> 텔레그램 봇은 읽음 표시를 받을 수 없고, 메일의 읽음 확인은 틀리게 나오는 일이 많습니다(Gmail은 이미지를 미리 받아 두고, 기관 메일은 이미지를 막아요).</li>
+      <li>그래서 결과 말도 채널마다 다르게 씁니다. 텔레그램은 <b>도착</b>(텔레그램이 그 대화방에 넣었다는 뜻), 이메일은 <b>메일 서버가 받음</b>(나중에 반송될 수 있어요)으로 적습니다.</li>
+      <li>줄 하나가 <b>발송 한 번</b>입니다. 펼치면 사람마다 결과가 나오고, 실패하면 <b>이유를 사람 말로 바꾸고 고치는 방법</b>까지 적습니다.</li>
+      <li>보관은 <b>90일</b>입니다. 오늘만 펼친 채로 시작해요(휴지통과 같은 날짜 묶음).</li>
+      <li>보내지 않은 것도 한 줄 남깁니다. 예: 자동발송을 건너뜀(AI 분류 실패). 안 가면 "왜 안 왔지?"를 물을 곳이 여기이기 때문입니다.</li>
+    </ul>
+    <div class="q"><b>고를 것</b> · 실패한 사람에게만 <b>「다시 보내기」</b> 버튼(아래 11:32 줄)을 이번에 같이 만들까요, 아니면 기록 화면만 먼저 만들까요?<br>
+    <b>물어볼 것</b> · 한도 경고처럼 앱이 담당자에게만 보내는 알림도 여기 둘까요? 시안은 둔다고 잡았어요.</div>
+  </div>
+
+  <h1>발송 기록</h1>
+  <p class="hint">90일 보관 · 도착 여부까지 적고, 읽었는지는 텔레그램·메일이 알려 주지 않아 적지 않습니다.</p>
+
+  <div class="filters">
+    <button class="fchip on">전체</button>
+    <button class="fchip">보고서</button>
+    <button class="fchip">알림</button>
+    <span class="fsep"></span>
+    <button class="fchip fail">실패만 (1)</button>
+  </div>
+
+  <details class="day" open>
+    <summary>9월 23일 (수) <span class="chip-today">오늘</span> <span class="dcnt">7회</span> <span class="dfail">· 실패 1</span></summary>
+
+    <details class="send">
+      <summary>
+        <span class="t">14:05</span><span class="kind k-reg">정기</span>
+        <span class="what">14:00 확정본</span>
+        <span class="by">🤖 자동</span>
+        <span class="tally">텔레그램 <b>5/5</b> · 이메일 <b>3/3</b></span>
+        <span class="mark ok">✓</span>
+      </summary>
+    </details>
+
+    <details class="send">
+      <summary>
+        <span class="t">13:40</span><span class="kind k-adhoc">수시</span>
+        <span class="what">인사청문회 13:05 확정본 (수정)</span>
+        <span class="by">수동 · 2회째</span>
+        <span class="tally">텔레그램 <b>2/2</b></span>
+        <span class="mark ok">✓</span>
+      </summary>
+      <div class="body">
+        <div class="sent-what">받는 것: 기사 목록 + 요약 · 확인창에서 1명 뺌(최OO)</div>
+        <div class="rc">
+          <div class="h">이름</div><div class="h ch">채널</div><div class="h">결과</div>
+          <div>담당자</div><div class="ch">텔레그램</div><div class="res"><span class="st-ok">✓ 도착</span> <span class="st-note">· 2통으로 나눠 감</span></div>
+          <div>김OO 과장</div><div class="ch">텔레그램</div><div class="res"><span class="st-ok">✓ 도착</span> <span class="st-note">· 🔕 알림 없이</span></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="send has-fail" open>
+      <summary>
+        <span class="t">11:32</span><span class="kind k-alert">[속보]</span>
+        <span class="what">2건 · 연합뉴스 「기재부, 하반기 경제정책방향…」 외 1</span>
+        <span class="by">폴링</span>
+        <span class="tally">텔레그램 <b>3</b>/<span class="bad">4</span></span>
+        <span class="mark bad">✕</span>
+      </summary>
+      <div class="body">
+        <div class="sent-what">
+          보낸 기사 · <a href="#">연합뉴스 [속보] 기재부, 하반기 경제정책방향 발표…성장률 1.8%로 낮춰</a><br>
+          · <a href="#">KBS [속보] 부총리 "추경 편성 검토 안 해"</a>
+        </div>
+        <div class="rc">
+          <div class="h">이름</div><div class="h ch">채널</div><div class="h">결과</div>
+          <div>담당자</div><div class="ch">텔레그램</div><div class="res"><span class="st-ok">✓ 도착</span></div>
+          <div>김OO 과장</div><div class="ch">텔레그램</div><div class="res"><span class="st-ok">✓ 도착</span></div>
+          <div>이OO 사무관</div><div class="ch">텔레그램</div><div class="res"><span class="st-ok">✓ 도착</span> <span class="st-note">· 🔕 알림 없이 (업무 시간 밖)</span></div>
+          <div>박OO 주무관</div><div class="ch">텔레그램</div><div class="res"><span class="st-bad">✕ 봇을 차단했어요</span>
+            <span class="fix">받는 사람이 텔레그램에서 봇 차단을 풀면 다음 발송부터 받습니다.</span></div>
+        </div>
+        <div class="retry"><button class="btn-line">↻ 박OO 주무관에게 다시 보내기</button><span class="later">← 고를 것: 이번에 같이 만들지</span></div>
+      </div>
+    </details>
+
+    <details class="send">
+      <summary>
+        <span class="t">11:05</span><span class="kind k-reg">정기</span>
+        <span class="what">11:00 확정본</span>
+        <span class="by">수동</span>
+        <span class="tally">텔레그램 <b>5/5</b> · 이메일 <b>3/3</b></span>
+        <span class="mark ok">✓</span>
+      </summary>
+      <div class="body">
+        <div class="rc">
+          <div class="h">이름</div><div class="h ch">채널</div><div class="h">결과</div>
+          <div>담당자</div><div class="ch">텔레그램</div><div class="res"><span class="st-ok">✓ 도착</span> <span class="st-note">· 기사 + 요약</span></div>
+          <div>김OO 과장</div><div class="ch">텔레그램</div><div class="res"><span class="st-ok">✓ 도착</span> <span class="st-note">· 요약만</span></div>
+          <div>…</div><div class="ch"></div><div class="res"></div>
+          <div>대변인실</div><div class="ch">이메일</div><div class="res"><span class="st-ok">✓ 메일 서버가 받음</span></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="send">
+      <summary>
+        <span class="t">10:12</span><span class="kind k-alert">🔥 몰림</span>
+        <span class="what">[속보] 09:45~10:12 사이 6개 언론사</span>
+        <span class="by">폴링</span>
+        <span class="tally">텔레그램 <b>4/4</b></span>
+        <span class="mark ok">✓</span>
+      </summary>
+    </details>
+
+    <details class="send">
+      <summary>
+        <span class="t">09:13</span><span class="kind k-alert">[단독]</span>
+        <span class="what">📴 앱을 켜기 전에 게시된 [단독] 3건</span>
+        <span class="by">몰아보내기</span>
+        <span class="tally">텔레그램 <b>2/2</b></span>
+        <span class="mark ok">✓</span>
+      </summary>
+    </details>
+
+    <details class="send skipped">
+      <summary>
+        <span class="t">09:05</span><span class="kind k-reg">정기</span>
+        <span class="what">09:00 확정본 · 자동발송 건너뜀 — AI 분류 실패</span>
+        <span class="by">🤖 자동</span>
+        <span class="tally">보내지 않음</span>
+        <span class="mark">–</span>
+      </summary>
+      <div class="body"><div class="sent-what">확정본에서 (발송)을 누르면 이 아래에 새 줄로 남습니다.</div></div>
+    </details>
+  </details>
+
+  <details class="day">
+    <summary>9월 22일 (화) <span class="dcnt">9회</span></summary>
+  </details>
+  <details class="day">
+    <summary>9월 21일 (월) <span class="dcnt">6회</span></summary>
+  </details>
+
+  <p class="foot">6월 25일부터 90일치가 남아 있어요</p>
+</div>
+
+<div class="mk-sec">
+  <h2>들어가는 길 세 곳</h2>
+  <div class="mk-grid">
+    <div class="mk-box">
+      <h3>① 확정본 머리줄 (정기·수시)</h3>
+      <a class="sent-done hov" href="#">✔️ 11시 5분 발송 완료 (2회)</a>
+      <p class="d">지금 있는 회색 글자를 누르면 <b>그 발송 줄이 펼쳐진 채로</b> 발송 기록이 열립니다. 올리면 파랑 밑줄, 툴팁 「받은 사람 보기」. 일부 실패면 빨강 <b>「⚠ 1명 못 받음」</b>이 뒤에 붙어요.</p>
+    </div>
+    <div class="mk-box">
+      <h3>② 정기 보관함 발송 점</h3>
+      11:00 기준 <span class="sent-dot"></span> &nbsp; 14:00 기준 <span class="sent-dot fail"></span><br>
+      <span class="tipbox">11시 5분 발송 · 텔레그램 5/5 · 이메일 3/3 — 누르면 발송 기록</span>
+      <p class="d">점은 지금 그대로 두고 툴팁에 건수를 더합니다. 누르면 ①과 같은 곳으로 가요.</p>
+    </div>
+    <div class="mk-box">
+      <h3>③ 설정 메뉴 · 받는 사람 지정</h3>
+      <div class="menu-sub">받는 사람 지정</div>
+      <a class="menu-item" href="#">텔레그램</a>
+      <a class="menu-item" href="#">이메일 <span style="color:#6B7280;font-size:var(--fs-xs)">정기 확정본만</span></a>
+      <a class="menu-item new" href="#">발송 기록</a>
+      <p class="d">상단바엔 넣지 않아요(흐름 화면 자리). 텔레그램 받는 사람 화면 맨 위 「보내는 봇」 줄 끝에도 <b>「발송 기록 →」</b>을 둡니다.</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

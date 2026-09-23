@@ -13,12 +13,8 @@ from urllib.parse import parse_qs, quote, urlencode, urlsplit
 from app.adhoc import archive_renderer, card, renderer, undo
 from app.adhoc.card import AdhocCardError
 from app.adhoc.classifier import classify_card
-from app.adhoc.collector import (
-    AdhocCollectError,
-    AdhocKeywordCapError,
-    recompute_condition,
-    run_collect,
-)
+from app.adhoc.send import AdhocSendError, send_bundle
+from app.adhoc.collector import AdhocCollectError, run_collect
 from app.excel_export import build_workbook_bytes
 from app.label_undo import push as label_undo_push
 from app.labels import attach_label, detach_label, snapshot_source
@@ -60,10 +56,14 @@ def _archive_redirect(handler, back: str, deleted: list, restored: str = "") -> 
     handler._redirect("/adhoc" + (f"?{urlencode(query, doseq=True)}" if query else ""))
 
 
-def _card_redirect(handler, card_id: str, error: str = "") -> None:
+def _card_redirect(handler, card_id: str, error: str = "", notice: str = "", notice_card: str = "") -> None:
     target = f"/adhoc/card?id={quote(card_id)}"
     if error:
         target += f"&error={quote(error)}"
+    if notice:
+        target += f"&notice={quote(notice)}"
+    if notice and notice_card:
+        target += f"&notice_card={quote(notice_card)}"
     handler._redirect(target)
 
 
@@ -86,6 +86,8 @@ def handle_get(handler, path: str) -> bool:
                 preset=query.get("preset", [""])[0],
                 deleted_ids=_id_list(query.get("deleted", [""])[0]),
                 restored_id=query.get("restored", [""])[0],
+                view=query.get("view", [""])[0],
+                sort=query.get("sort", [""])[0],
             )
         )
         return True
@@ -106,8 +108,15 @@ def handle_get(handler, path: str) -> bool:
             handler.send_response(404)
             handler.end_headers()
             return True
-        error = _query(path).get("error", [""])[0]
-        handler._respond(renderer.render_card_page(c, error=error or None))
+        query = _query(path)
+        error = query.get("error", [""])[0]
+        notice = query.get("notice", [""])[0]
+        notice_card = query.get("notice_card", [""])[0]
+        handler._respond(
+            renderer.render_card_page(
+                c, error=error or None, notice=notice or None, notice_card=notice_card or None
+            )
+        )
         return True
 
     if base == "/adhoc/card/download":
@@ -146,18 +155,6 @@ def handle_post(handler, path: str, form: dict) -> bool:
     if path == "/adhoc/card/recollect":
         _handle_recollect(handler, form)
         return True
-    if path == "/adhoc/card/add-keyword":
-        _handle_edit_keywords(handler, form, field="keywords", add=True)
-        return True
-    if path == "/adhoc/card/remove-keyword":
-        _handle_edit_keywords(handler, form, field="keywords", add=False)
-        return True
-    if path == "/adhoc/card/add-must-keyword":
-        _handle_edit_keywords(handler, form, field="must_keywords", add=True)
-        return True
-    if path == "/adhoc/card/remove-must-keyword":
-        _handle_edit_keywords(handler, form, field="must_keywords", add=False)
-        return True
     if path == "/adhoc/card/rename":
         _handle_rename(handler, form)
         return True
@@ -173,6 +170,9 @@ def handle_post(handler, path: str, form: dict) -> bool:
     if path == "/adhoc/card/raw-unhide":
         _handle_raw_mark(handler, form, hide=False)
         return True
+    if path == "/adhoc/card/raw-unsend":
+        _handle_raw_unsend(handler, form)
+        return True
     if path == "/adhoc/card/hide-group":
         _handle_hide_group(handler, form)
         return True
@@ -185,11 +185,17 @@ def handle_post(handler, path: str, form: dict) -> bool:
     if path == "/adhoc/card/send-to-bundle":
         _handle_send_to_bundle(handler, form)
         return True
+    if path == "/adhoc/card/send":
+        _handle_send(handler, form)
+        return True
     if path == "/adhoc/card/move-article":
         _handle_move_article(handler, form)
         return True
     if path == "/adhoc/card/move-order":
         _handle_move_order(handler, form)
+        return True
+    if path == "/adhoc/card/move-to-bundle":
+        _handle_move_to_bundle(handler, form)
         return True
     if path == "/adhoc/card/bulk-move":
         _handle_bulk_move(handler, form)
@@ -372,70 +378,6 @@ def _handle_recollect(handler, form: dict) -> None:
     _card_redirect(handler, card_id)
 
 
-_FIELD_LABEL = {"keywords": "검색어", "must_keywords": "꼭 포함할 검색어"}
-
-
-def _handle_edit_keywords(handler, form: dict, field: str, add: bool) -> None:
-    """카드 안에서 검색어(OR) / 꼭 포함할 검색어(AND)를 고친다 — ADHOC_DESIGN.md §6.4a.
-
-    고친 뒤 곧바로 목록을 지금 조건에 맞춘다(§6.4 교체 모델). 캐시(§6.4c) 덕분에 지우기만
-    한 경우에는 네이버 호출이 0회다.
-
-    1,000건 상한에 걸리는 말을 "꼭 포함할 검색어"에 넣으면 적용을 거부하는데(§6.4b), 그때는
-    **이미 저장한 검색어를 되돌려놓는다** — 화면에 칩은 붙었는데 목록은 안 걸러진 어정쩡한
-    상태로 남으면 담당자가 지금 뭐가 적용됐는지 알 수 없게 된다.
-    """
-    card_id = _field(form, "id")
-    word = _field(form, "keyword").strip()
-    label = _FIELD_LABEL[field]
-
-    if not word:
-        _card_redirect(handler, card_id, error=f"{label}를 입력해주세요.")
-        return
-
-    undo.push(card_id, f"{label} {'추가' if add else '삭제'}")
-
-    with card.card_lock(card_id):
-        c = card.load_card(card_id)
-        if c is None:
-            handler.send_response(404)
-            handler.end_headers()
-            return
-        before = list(c[field])
-        if add:
-            if word in c[field]:
-                _card_redirect(handler, card_id)  # 이미 있는 말 — 조용히 무시
-                return
-            c[field] = before + [word]
-        else:
-            c[field] = [k for k in before if k != word]
-        try:
-            card._validate_keywords(c["keywords"])
-            card._validate_must_keywords(c["must_keywords"])
-        except AdhocCardError as error:
-            _card_redirect(handler, card_id, error=str(error))
-            return
-        card.save_card(c)
-
-    # 재검색은 카드 락 밖에서 — recompute_condition이 자기 락을 다시 잡는다
-    # (threading.Lock은 재진입 불가. _handle_recollect과 같은 구조).
-    try:
-        recompute_condition(card_id)
-    except AdhocKeywordCapError as error:
-        with card.card_lock(card_id):
-            reverted = card.load_card(card_id)
-            if reverted is not None:
-                reverted[field] = before
-                card.save_card(reverted)
-        _card_redirect(handler, card_id, error=str(error))
-        return
-    except AdhocCollectError as error:
-        _card_redirect(handler, card_id, error=str(error))
-        return
-
-    _card_redirect(handler, card_id)
-
-
 def _handle_rename(handler, form: dict) -> None:
     card_id = _field(form, "id")
     report_title = _field(form, "report_title").strip()
@@ -474,7 +416,7 @@ def _handle_set_hidden(handler, form: dict, hidden: bool) -> None:
 
 
 def _handle_raw_mark(handler, form: dict, hide: bool) -> None:
-    """[추가: 2026-09-15] 로데이터 원본의 🗑 / 「🗑 숨김」 다시 누르기 — 실시간현황의 🗑와 같은
+    """[추가: 2026-09-15] 로데이터 원본의 🗑 / 「🗑 숨김」 다시 누르기 — 실시간 현황의 🗑와 같은
     동작이다: 기사를 목록에서 빼지 않고 「숨김」 표시만 붙이고 뗀다(card.set_raw_mark).
 
     이 카드 스택에 되돌리기를 쌓는다(표시가 이 카드 안에만 남으므로). 보낸 기사엔 🗑가
@@ -497,6 +439,49 @@ def _handle_raw_mark(handler, form: dict, hide: bool) -> None:
     undo.push(card_id, "기사 숨김 표시" if hide else "기사 숨김 표시 해제")
     card.set_raw_mark(card_id, url, hide, bundles)
     _card_redirect(handler, card_id)
+
+
+def _handle_raw_unsend(handler, form: dict) -> None:
+    """[추가: 2026-09-22] 원본의 「✓ 보냄」 다시 누르기 = 보냄 취소(card.unsend_raw).
+
+    확정본의 사본을 숨기고 원본 행은 다시 「확정본으로」가 된다. 되돌리기는 **두 스택에**
+    쌓는다(다른 사안으로 옮기기와 같은 이유): 원본 ↩는 원본 스냅샷 + 확정본 사본을 다시
+    보이게 하는 흔적(undo.attach_link의 pulled), 확정본 ↩는 그 확정본 스냅샷. 어제 카드는
+    다시 보낼 수 없어 막는다(자정 잠금).
+    """
+    card_id = _field(form, "id")
+    url = _field(form, "url")
+    c = card.load_card(card_id)
+    if c is None:
+        handler.send_response(404)
+        handler.end_headers()
+        return
+    today = datetime.now().strftime("%Y-%m-%d")
+    if not card.is_raw(c) or not url or c.get("collect_date") != today:
+        _card_redirect(handler, card_id)
+        return
+    # 같은 사안의 다른 판에서 보낸 사본도 대상이다 — 이 판에도 「✓ 보냄」으로 보였으니까.
+    ids = card.version_ids(c)
+    bundles = [
+        b for b in card.bundles_for_date(today)
+        if any(
+            a["url"] == url and not a.get("hidden")
+            and (a.get("sent_from") or {}).get("card_id") in ids
+            for a in b["articles"]
+        )
+    ]
+    if not bundles:
+        _card_redirect(handler, card_id)
+        return
+    label = "보냄 취소"
+    undo.push(card_id, label)
+    for b in bundles:
+        undo.push(b["id"], "원본에서 보냄 취소")
+    touched = card.unsend_raw(card_id, url, bundles)
+    for bundle_id in touched:
+        undo.attach_link(card_id, label, bundle_id, [], [], pulled=[url])
+    names = "·".join(f"「{card.bundle_label(b)}」" for b in bundles if b["id"] in touched)
+    _card_redirect(handler, card_id, notice=f"{names} 확정본에서 뺐어요." if names else "")
 
 
 def _handle_hide_group(handler, form: dict) -> None:
@@ -542,6 +527,25 @@ def _handle_bulk_hide(handler, form: dict) -> None:
     undo.push(card_id, "기사 여러 건 숨기기")
     card.hide_articles(card_id, urls)
     _card_redirect(handler, card_id)
+
+
+def _handle_send(handler, form: dict) -> None:
+    """[추가: 2026-09-17] 수시 확정본의 (발송) — 확인창에서 체크를 푼 사람(exclude)만 빼고
+    텔레그램 명단에 보낸다(app.adhoc.send). 뺀 사람은 저장하지 않는다(이번 한 번만)."""
+    card_id = _field(form, "id")
+    try:
+        result = send_bundle(card_id, excluded_chat_ids=set(form.get("exclude", [])))
+    except AdhocSendError as error:
+        _card_redirect(handler, card_id, error=str(error))
+        return
+    if result["failed"]:
+        sent_part = f'{result["sent"]}명에게는 보냈지만, ' if result["sent"] else ""
+        _card_redirect(
+            handler, card_id,
+            error=f'{sent_part}{", ".join(result["failed"])}에게는 보내지 못했어요 — 텔레그램 받는 사람의 chat id를 확인해주세요.',
+        )
+        return
+    _card_redirect(handler, card_id, notice=f'텔레그램으로 {result["sent"]}명에게 보냈어요.')
 
 
 def _handle_create_bundle(handler, form: dict) -> None:
@@ -603,7 +607,7 @@ def _handle_send_to_bundle(handler, form: dict) -> None:
         urls = form.get("urls", [])
     # 이미 보낸 기사는 조용히 건너뛴다(규칙 10 "다시 누르면 남은 것만") — 여기서 미리
     # 빼두면 아래 send_to_bundle의 URL 중복 제거와 이중으로 안전하다.
-    already_sent = card.sent_index(card_id, today_bundles)
+    already_sent = card.sent_index(card.version_ids(source), today_bundles)
     urls = [u for u in urls if u not in already_sent]
     if not urls:
         _card_redirect(handler, card_id)
@@ -618,7 +622,8 @@ def _handle_send_to_bundle(handler, form: dict) -> None:
             # 만든다. 「지금까지 불러오기」를 누른 뒤 보내면 그래서 새 확정본이 생긴다
             # (card.default_bundle_for — 정기의 회차 마감과 같은 경계).
             bundle = card.default_bundle_for(source, today_bundles) or card.new_bundle_card(
-                source["report_title"], issue_id=source.get("issue_id") or "", basis_time=basis
+                source["report_title"], issue_id=source.get("issue_id") or "", basis_time=basis,
+                source_card_id=source["id"], source_version=card.version_of(source),
             )
         elif target == _NEW_ISSUE_SENTINEL:
             bundle = card.new_bundle_card(_field(form, "bundle_name"), basis_time=basis)
@@ -688,6 +693,53 @@ def _handle_move_article(handler, form: dict) -> None:
                 break
         card.save_card(c)
     _card_redirect(handler, card_id)
+
+
+def _handle_move_to_bundle(handler, form: dict) -> None:
+    """[추가: 2026-09-17] 확정본의 「옮기기 ▾」 → 「다른 사안 확정본으로」 (행 하나 · 선택 바 여러 건).
+
+    이동이다 — 이 확정본에선 숨겨지고 받는 확정본에 들어간다(card.move_to_bundle). 받을 수
+    있는 곳은 화면 메뉴와 같은 card.move_targets(오늘 · 다른 사안)로 서버가 다시 확인한다 —
+    열어둔 옛 탭에서 눌려도 같은 사안·지난 날짜로 새지 않게.
+
+    되돌리기는 두 스택에 쌓는다: 보낸 쪽 ↩는 받는 쪽 흔적까지 거두고(undo.attach_link),
+    받는 쪽 ↩는 그 확정본 안에서만 되돌린다(원본에서 보낼 때 받는 카드에 쌓는 것과 같다 —
+    안 쌓으면 받는 쪽 ↩가 이 동작을 건너뛰고 그 전 동작을 되돌린다).
+    """
+    card_id = _field(form, "id")
+    target_id = _field(form, "bundle")
+    urls = form.get("urls", [])
+    source = card.load_card(card_id)
+    if source is None:
+        handler.send_response(404)
+        handler.end_headers()
+        return
+    today = datetime.now().strftime("%Y-%m-%d")
+    if not card.is_bundle(source) or source.get("collect_date") != today:
+        _card_redirect(handler, card_id, error="오늘 확정본에서만 다른 사안으로 옮길 수 있어요.")
+        return
+    targets = {b["id"]: b for b in card.move_targets(source, card.bundles_for_date(today))}
+    target = targets.get(target_id)
+    if target is None:
+        _card_redirect(handler, card_id, error="옮길 확정본을 찾을 수 없어요. 새로고침 후 다시 시도해주세요.")
+        return
+    if not card.visible_urls_among(source, urls):
+        _card_redirect(handler, card_id)
+        return
+    label = "다른 사안으로 옮기기"
+    undo.push(card_id, label)
+    undo.push(target_id, "다른 사안에서 옮겨오기")
+    try:
+        result = card.move_to_bundle(card_id, target_id, urls)
+    except AdhocCardError as error:
+        _card_redirect(handler, card_id, error=str(error))
+        return
+    undo.attach_link(card_id, label, target_id, result["added"], result["revived"])
+    _card_redirect(
+        handler, card_id,
+        notice=f'{result["moved"]}건을 「{card.bundle_label(card.load_card(target_id) or target)}」 확정본으로 옮겼어요.',
+        notice_card=target_id,
+    )
 
 
 def _handle_move_order(handler, form: dict) -> None:

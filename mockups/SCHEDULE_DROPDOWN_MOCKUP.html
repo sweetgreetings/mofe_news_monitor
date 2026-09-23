@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>수집 시간 시안</title>
+<style>
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem; --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --h-sm: 24px; --h-md: 30px; --h-lg: 36px; }
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .page { max-width: 800px; margin: 24px auto; padding: 0 16px 60px; }
+  .note { font-size: var(--fs-md); color: #6B7280; margin: 0 0 6px; line-height: 1.6; }
+  .opt-title { font-size: var(--fs-lg); color: #1E3A5F; font-weight: 700; margin: 34px 0 4px; }
+  .opt-title .rec { font-size: var(--fs-xs); color: #2563EB; background: #EFF6FF; border-radius: var(--r-pill); padding: 3px 9px; margin-left: 6px; vertical-align: 2px; }
+  .container { padding: 20px 24px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg); }
+  h1 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 8px; }
+  .hint { color: #6B7280; font-size: var(--fs-md); margin: 0 0 12px; line-height: 1.6; }
+  button { font-family: inherit; }
+  input[type=text], input[type=number] {
+    background: #F8FAFC; color: #1F2937; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    padding: 6px 10px; font-size: var(--fs-base); font-family: inherit;
+  }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+
+  .schedule-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; align-items: start; }
+  @media (max-width: 640px) { .schedule-form { grid-template-columns: minmax(0, 1fr); } }
+  .group-block { border: 1px solid #E5E7EB; border-radius: var(--r-md); padding: 14px; margin: 6px 0; }
+  .group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .group-name-input { font-weight: 600; flex: 1; min-width: 70px; }
+  .toggle { position: relative; display: inline-flex; align-items: center; flex-shrink: 0; cursor: pointer; }
+  .toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .toggle .track { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 24px; background: #E5E7EB; border-radius: var(--r-sm); }
+  .toggle input:checked ~ .track { background: #2563EB; }
+  .toggle-text { font-size: 0.68rem; font-weight: 700; }
+  .toggle-text.on { display: none; color: #FFFFFF; }
+  .toggle-text.off { color: #6B7280; }
+  .toggle input:checked ~ .track .toggle-text.on { display: inline; }
+  .toggle input:checked ~ .track .toggle-text.off { display: none; }
+  .today-active-badge { flex-shrink: 0; font-size: var(--fs-xs); font-weight: 700; color: #2563EB; background: #EFF6FF; border-radius: var(--r-pill); padding: 3px 9px; white-space: nowrap; }
+  .del-group { background: transparent; color: #6B7280; border: 1px solid #E5E7EB; border-radius: var(--r-md); padding: 4px 10px; font-size: var(--fs-sm); cursor: pointer; white-space: nowrap; }
+  .del-group:hover { color: #DC2626; border-color: #DC2626; }
+  .add-btn { background: #FFFFFF; color: #2563EB; border: 1px solid #2563EB; border-radius: var(--r-md); padding: 0 14px; height: var(--h-md); font-size: var(--fs-md); cursor: pointer; margin-top: 6px; }
+  .add-btn:hover { background: #EFF6FF; }
+  .add-btn:disabled { background: #E5E7EB; color: #6B7280; border-color: #E5E7EB; cursor: not-allowed; }
+
+  /* ── 지금 모양 (비교용) ── */
+  .old .day-row { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 0 0 10px; font-size: var(--fs-md); }
+  .old .day-row label { display: inline-flex; align-items: center; gap: 3px; }
+  .old .time-row { margin: 8px 0; display: flex; align-items: center; gap: 4px; }
+  .old .time-row input[type=number] { width: 46px; text-align: center; }
+  .old select { background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: var(--r-md); padding: 6px 4px; font-size: var(--fs-base); font-family: inherit; }
+  .old .del { background: transparent; color: #6B7280; border: 1px solid #E5E7EB; border-radius: var(--r-md); padding: 4px 10px; font-size: var(--fs-sm); margin-left: 6px; }
+
+  /* ── 새 모양: 요일 = 켜고 끄는 알약 칩 ── */
+  .day-chips { display: flex; gap: 5px; margin: 0 0 12px; flex-wrap: wrap; }
+  .day-chip { position: relative; cursor: pointer; }
+  .day-chip input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .day-chip span {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: var(--h-md); border-radius: var(--r-pill);
+    border: 1px dashed #D1D5DB; color: #9CA3AF; background: #FFFFFF;
+    font-size: var(--fs-md); font-weight: 600; user-select: none; transition: all .12s;
+  }
+  .day-chip input:checked + span { border: 1px solid #2563EB; background: #EFF6FF; color: #2563EB; }
+  .day-chip input:focus-visible + span { outline: 2px solid #93C5FD; outline-offset: 1px; }
+
+  /* ── 새 모양: 시간대 줄 = [시작 ▾] ~ [종료 ▾] [×] ── */
+  .slot-list { display: flex; flex-direction: column; gap: 6px; }
+  .slot { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+  .slot .num { width: 18px; font-size: var(--fs-sm); color: #9CA3AF; text-align: right; font-variant-numeric: tabular-nums; flex: none; }
+  .slot .tilde { color: #9CA3AF; }
+  .slot select {
+    appearance: none; -webkit-appearance: none;
+    height: var(--h-lg); padding: 0 28px 0 12px; font-size: var(--fs-base); font-family: inherit;
+    font-variant-numeric: tabular-nums; color: #1F2937; background-color: #F8FAFC;
+    border: 1px solid #E5E7EB; border-radius: var(--r-md); cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center; background-size: 14px;
+  }
+  .slot select:hover { border-color: #BFDBFE; }
+  .slot select:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37, 99, 235, .15); }
+  .a .slot select { width: 96px; }
+  .b .slot select { width: 64px; padding-right: 24px; }
+  .b .slot .colon { color: #6B7280; margin: 0 -2px; }
+  .b .pair { display: inline-flex; align-items: center; gap: 4px; }
+  .slot .x {
+    margin-left: auto; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: none; border-radius: var(--r-sm); color: #9CA3AF; cursor: pointer; font-size: 1rem;
+  }
+  .slot .x:hover { color: #DC2626; background: #FEF2F2; }
+  .slot.is-new { animation: sage 1.2s ease-out; }
+  @keyframes sage { from { background: #E7EFE8; } to { background: transparent; } }
+  .slot-err { font-size: var(--fs-sm); color: #B45309; margin: 2px 0 0 24px; display: none; }
+  .slot.bad select { border-color: #F59E0B; }
+  .slot.bad + .slot-err { display: block; }
+
+  .callout { margin-top: 10px; font-size: var(--fs-sm); color: #6B7280; background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: var(--r-md); padding: 8px 12px; line-height: 1.6; }
+  .callout b { color: #1F2937; }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="note">수집 시간 화면 시안 — 세 가지를 바꿨습니다. ① 시각을 숫자 칸 대신 드롭다운 ② 시간대 왼쪽 체크박스 없앰(안 쓰면 × 로 지운다) ③ 요일 체크박스를 크게 누르는 알약 칩으로. 아래 두 안은 모두 실제로 눌러볼 수 있습니다(추가·삭제·요일 켜고 끄기).</p>
+
+  <!-- ───────── 지금 ───────── -->
+  <div class="opt-title">지금</div>
+  <div class="container old">
+    <div class="schedule-form">
+      <div class="group-block">
+        <div class="group-head"><label class="toggle"><input type="checkbox" checked><span class="track"><span class="toggle-text on">ON</span><span class="toggle-text off">OFF</span></span></label><input type="text" class="group-name-input" value="주중"><span class="today-active-badge">오늘 적용 중</span><button class="del-group">그룹 삭제</button></div>
+        <div class="day-row"><label><input type="checkbox" checked>월</label><label><input type="checkbox" checked>화</label><label><input type="checkbox" checked>수</label><label><input type="checkbox" checked>목</label><label><input type="checkbox" checked>금</label><label><input type="checkbox">토</label><label><input type="checkbox">일</label></div>
+        <div class="time-row"><input type="checkbox" checked><input type="number" value="0">:<select><option>00</option></select> ~ <input type="number" value="6">:<select><option>00</option></select><button class="del">del</button></div>
+        <div class="time-row"><input type="checkbox" checked><input type="number" value="6">:<select><option>00</option></select> ~ <input type="number" value="9">:<select><option>30</option></select><button class="del">del</button></div>
+        <div class="time-row"><input type="checkbox" checked><input type="number" value="9">:<select><option>30</option></select> ~ <input type="number" value="11">:<select><option>00</option></select><button class="del">del</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────── A안 ───────── -->
+  <div class="opt-title">A안 · 시각 하나를 통째로 고르기 <span class="rec">추천</span></div>
+  <p class="note">분이 00·30 둘뿐이라 <b>「09:30」 한 칸</b>으로 고릅니다. 한 줄에 드롭다운 두 개라 눈에 제일 잘 들어오고, 30분 단위 규칙이 모양에서 저절로 지켜집니다.</p>
+  <div class="container a" data-variant="a">
+    <h1>⏰ 수집 시간</h1>
+    <p class="hint">회차마다 시작~종료 시각을 고르세요. 그 사이에 게시된 기사가 그 회차에 모입니다. 요일을 켜 둔 그룹이 그날 쓰이고, 켜 둔 그룹이 하나뿐이면 요일과 상관없이 그 그룹이 쓰입니다.</p>
+    <div class="schedule-form"></div>
+    <div class="callout"><b>+ 시간대 추가</b>를 누르면 새 줄의 시작이 바로 윗줄 종료 시각으로 채워집니다(회차는 보통 이어지니까). 종료가 시작보다 이르면 그 줄만 앰버 테두리 + 한 줄 안내.</div>
+  </div>
+
+  <!-- ───────── B안 ───────── -->
+  <div class="opt-title">B안 · 시 ▾ : 분 ▾ 따로</div>
+  <p class="note">수시 새 수집의 시간 드롭다운과 같은 모양. 대신 한 줄에 드롭다운이 네 개라 두 장 나란히 놓으면 빽빽하고, 분 칸은 00·30 두 개뿐이라 칸 하나를 거의 버립니다.</p>
+  <div class="container b" data-variant="b">
+    <h1>⏰ 수집 시간</h1>
+    <p class="hint">회차마다 시작~종료 시각을 고르세요. 그 사이에 게시된 기사가 그 회차에 모입니다.</p>
+    <div class="schedule-form"></div>
+  </div>
+</div>
+
+<script>
+var X_ICON = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+var DAYS = [["mon","월"],["tue","화"],["wed","수"],["thu","목"],["fri","금"],["sat","토"],["sun","일"]];
+var GROUPS = [
+  { name: "주중", today: true, days: ["mon","tue","wed","thu","fri"],
+    times: [["00:00","06:00"],["06:00","09:30"],["09:30","11:00"],["11:00","14:00"],["14:00","17:00"],["17:00","19:30"]] },
+  { name: "주말", today: false, days: ["sat","sun"],
+    times: [["00:00","10:00"],["10:00","13:00"],["13:00","16:00"]] }
+];
+var MAX = 10;
+function pad(n) { return (n < 10 ? "0" : "") + n; }
+var HALF = []; for (var h = 0; h < 24; h++) { HALF.push(pad(h) + ":00"); HALF.push(pad(h) + ":30"); }
+
+function optsA(sel) { return HALF.map(function (v) { return '<option' + (v === sel ? ' selected' : '') + '>' + v + '</option>'; }).join(""); }
+function optsH(sel) { var o = ""; for (var h = 0; h < 24; h++) o += '<option' + (pad(h) === sel ? ' selected' : '') + '>' + h + '</option>'; return o; }
+function optsM(sel) { return ["00","30"].map(function (m) { return '<option' + (m === sel ? ' selected' : '') + '>' + m + '</option>'; }).join(""); }
+
+function slotHtml(v, s, e) {
+  var inner;
+  if (v === "a") {
+    inner = '<select class="s">' + optsA(s) + '</select><span class="tilde">~</span><select class="e">' + optsA(e) + '</select>';
+  } else {
+    var sp = s.split(":"), ep = e.split(":");
+    inner = '<span class="pair"><select class="sh">' + optsH(sp[0]) + '</select><span class="colon">:</span><select class="sm">' + optsM(sp[1]) + '</select></span>'
+          + '<span class="tilde">~</span>'
+          + '<span class="pair"><select class="eh">' + optsH(ep[0]) + '</select><span class="colon">:</span><select class="em">' + optsM(ep[1]) + '</select></span>';
+  }
+  return '<div class="slot"><span class="num"></span>' + inner
+       + '<button type="button" class="x" title="이 시간대 지우기" aria-label="이 시간대 지우기">' + X_ICON + '</button></div>'
+       + '<div class="slot-err">종료가 시작보다 빨라요</div>';
+}
+
+function valOf(slot, v, which) {
+  if (v === "a") return slot.querySelector("." + which).value;
+  var p = which === "s" ? "s" : "e";
+  return pad(+slot.querySelector("." + p + "h").value) + ":" + slot.querySelector("." + p + "m").value;
+}
+
+function renumber(block) {
+  var slots = block.querySelectorAll(".slot");
+  slots.forEach(function (s, i) { s.querySelector(".num").textContent = i + 1; });
+  block.querySelector(".add-btn").disabled = slots.length >= MAX;
+  slots.forEach(function (s) { s.querySelector(".x").style.visibility = slots.length <= 1 ? "hidden" : ""; });
+}
+
+function check(slot, v) { slot.classList.toggle("bad", valOf(slot, v, "e") <= valOf(slot, v, "s")); }
+
+function render(container) {
+  var v = container.dataset.variant;
+  var form = container.querySelector(".schedule-form");
+  form.innerHTML = GROUPS.map(function (g) {
+    var chips = DAYS.map(function (d) {
+      return '<label class="day-chip"><input type="checkbox"' + (g.days.indexOf(d[0]) >= 0 ? ' checked' : '') + '><span>' + d[1] + '</span></label>';
+    }).join("");
+    var slots = g.times.map(function (t) { return slotHtml(v, t[0], t[1]); }).join("");
+    return '<div class="group-block">'
+      + '<div class="group-head"><label class="toggle" title="이 그룹 사용"><input type="checkbox" checked><span class="track"><span class="toggle-text on">ON</span><span class="toggle-text off">OFF</span></span></label>'
+      + '<input type="text" class="group-name-input" value="' + g.name + '">'
+      + (g.today ? '<span class="today-active-badge">오늘 적용 중</span>' : '')
+      + '<button type="button" class="del-group">그룹 삭제</button></div>'
+      + '<div class="day-chips">' + chips + '</div>'
+      + '<div class="slot-list">' + slots + '</div>'
+      + '<button type="button" class="add-btn">+ 시간대 추가</button>'
+      + '</div>';
+  }).join("");
+  form.querySelectorAll(".group-block").forEach(renumber);
+
+  form.addEventListener("click", function (ev) {
+    var x = ev.target.closest(".x");
+    if (x) {
+      var slot = x.closest(".slot"), block = slot.closest(".group-block");
+      slot.nextElementSibling.remove(); slot.remove(); renumber(block);
+      return;
+    }
+    var add = ev.target.closest(".add-btn");
+    if (add) {
+      var block2 = add.closest(".group-block"), list = block2.querySelector(".slot-list");
+      var last = list.querySelectorAll(".slot"); last = last[last.length - 1];
+      var start = last ? valOf(last, v, "e") : "09:00";
+      var i = HALF.indexOf(start), end = HALF[Math.min(i + 4, HALF.length - 1)];
+      list.insertAdjacentHTML("beforeend", slotHtml(v, start, end));
+      var news = list.querySelectorAll(".slot"); news = news[news.length - 1];
+      news.classList.add("is-new"); renumber(block2);
+    }
+  });
+  form.addEventListener("change", function (ev) {
+    var slot = ev.target.closest(".slot"); if (slot) check(slot, v);
+  });
+}
+document.querySelectorAll("[data-variant]").forEach(render);
+</script>
+</body>
+</html>

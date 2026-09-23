@@ -1,0 +1,1304 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>시안 · 맨 위로 버튼</title><style>
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .container {
+    max-width: 800px; margin: 24px auto; padding: 24px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding-top: 44px; padding-bottom: 56px;  /* [수정: 2026-09-16] 60→44px, app/renderer.py 같은 자리 참고 */
+  }
+
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem; --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%; --h-sm: 24px; --h-md: 30px; --h-lg: 36px; --fab-lg: 56px; --fab-sm: 48px; --sh-float: 0 4px 12px rgba(15, 23, 42, 0.12); --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14); --sh-modal: 0 16px 40px rgba(15, 23, 42, 0.22); }
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    background: #FFFFFF; border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .topbar-inner {
+    max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: flex-start; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .topbar-inner > .tn { color: #2563EB; text-decoration: none; font-size: var(--fs-md); font-weight: 600;
+    padding: 5px 14px; border: 1px solid transparent; border-radius: var(--r-pill); white-space: nowrap; }
+  .topbar-inner > a.tn:hover { background: #EFF6FF; }
+  .topbar-inner > .tn-sep { width: 1px; height: 18px; background: #E5E7EB; margin: 0 16px; }
+  .topbar-inner > .tn.is-current { cursor: default; background: #EFF6FF;
+    border-color: #BFDBFE; color: #2563EB; }
+  .topbar.adhoc .topbar-inner > .tn.is-current { background: #E3F1EE;
+    border-color: rgba(20, 107, 94, 0.45); color: #146B5E; }
+  .topbar-inner > .tn.is-empty { color: #6B7280; opacity: 0.55; cursor: not-allowed; }
+  .topbar-inner > a.tn.back { color: #4B5563; }
+  .topbar-inner > a.tn.back:hover { color: #2563EB; }
+  @media (max-width: 480px) {
+    .topbar-inner { padding: 12px 12px; gap: 2px; }
+    .topbar-inner > .tn { padding: 5px 8px; }
+    .topbar-inner > .tn-sep { margin: 0 8px; }
+  }
+
+  /* [추가: 2026-08-18] 회차 종료(카운트다운 0) 안내 띠 — round-countdown이 0에 닿아도
+     예전엔 화면이 아무 말도 안 해서, 담당자가 마감된 초안인 줄 모르고 계속 고치다
+     그 작업이 어디에도 반영 안 되는 사고가 있었다(HISTORY.md 2026-08-18). topbar처럼
+     position:fixed로 맨 위에 붙이고, JS(showRoundOverBanner)가 topbar를 그만큼
+     아래로 밀어낸다 — 사용자가 목업 3안 중 "상단 고정 띠"를 골랐다: 스크롤 위치와
+     무관하게 항상 보여야 놓치지 않는다는 이유. */
+  .round-over-banner {
+    display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 21;
+    background: #FFFBEB; border-bottom: 1px solid #FDE68A;
+  }
+  .round-over-banner.is-visible { display: block; }
+  .round-over-banner-inner {
+    max-width: 800px; margin: 0 auto; padding: 11px 24px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .round-over-banner .msg { flex: 1; min-width: 200px; font-size: var(--fs-md); color: #92400E; }
+  .round-over-banner .msg b { color: #92400E; }
+  .round-over-banner .go {
+    background: #1E3A5F; color: #FFFFFF; border: none; border-radius: var(--r-md);
+    padding: 8px 14px; font-size: var(--fs-md); font-weight: 700; cursor: pointer; white-space: nowrap;
+    text-decoration: none; display: inline-block;
+  }
+  .round-over-banner .go:hover { background: #16304D; }
+  .round-over-banner .dismiss {
+    background: transparent; border: none; color: #92400E; font-size: var(--fs-sm);
+    cursor: pointer; text-decoration: underline; padding: 4px;
+  }
+  /* [추가: 2026-08-20] AI 소제목 분류가 규칙 기반(단어 빈도)으로 떨어졌을 때의 경고.
+     이 폴백은 여태 화면에 아무 흔적을 안 남겨서, 담당자가 <부총리>처럼 뭉개진 소제목을
+     눈으로 발견할 때까지 아무도 몰랐다(2026-08-20 09:30 회차). 회차 마감 띠와 달리
+     화면 위에 고정하지 않고 기사 목록 맨 위에 흐르는 박스로 둔다 — 마감은 "지금 하던
+     일이 헛수고가 된다"는 즉시성이 있지만 이건 "지금 보이는 소제목을 믿지 마라"라서
+     목록과 함께 스크롤되는 편이 맞다.
+     [수정: 2026-08-20] 배너 안에 붉은 실행 버튼을 따로 두지 않는다 — 툴바에 이미
+     같은 라벨의 "전체 기사 재분류" 버튼이 있고(스크롤 없이 90~120px 위, 실측), 같은
+     라벨의 버튼이 화면에 둘이면 "다른 건가?"라는 새 의문만 늘어난다. 대신 문구가
+     .btn-ref로 툴바 버튼을 가리킨다. */
+  .classify-degraded {
+    background: #FEF2F2; border: 1px solid #FECACA; border-left: 4px solid #DC2626;
+    border-radius: var(--r-lg); padding: 12px 14px; margin-bottom: 14px;
+  }
+  .classify-degraded .msg { font-size: var(--fs-md); color: #DC2626; line-height: 1.6; }
+  .classify-degraded .msg b { color: #DC2626; }
+  /* [추가: 2026-08-20] 문구 안에서 툴바 버튼을 가리키는 인라인 칩 — 실제 그 버튼과
+     같은 색·같은 아이콘(app/icons.py "bot")을 써서 "이게 그 버튼이다"가 바로
+     읽히게 한다(app.preview_renderer._actions_html의 .reclassify-btn과 배색 통일). */
+  .classify-degraded .btn-ref {
+    display: inline-flex; align-items: center; gap: 4px; background: #F0EAFB;
+    border: 1px solid #DCD0F2; border-radius: var(--r-sm); padding: 1px 8px 1px 6px;
+    font-weight: 700; color: #4A3F8F; white-space: nowrap;
+  }
+  .classify-degraded .btn-ref .ic { width: 0.95em; height: 0.95em; }
+  /* [추가: 2026-08-20] 연속 재분류 실패 이력 — "재분류마저 실패" 문구에서만 붙는다. */
+  .classify-degraded .retry-log {
+    display: block; margin-top: 8px; padding-top: 7px; border-top: 1px dashed #FECACA;
+    color: #6B7280; font-size: var(--fs-sm); font-variant-numeric: tabular-nums;
+  }
+  /* 배너가 뜨면 그만큼 topbar를 아래로 밀어 겹치지 않게 한다(높이는 JS가 실측).
+     [수정: 2026-08-20] topbar만 밀고 .container는 그대로 뒀더니, .container의
+     고정 margin-top(24px)이 밀려난 topbar보다 위에 있어 본문(제목 줄 포함)이
+     topbar 밑에 가려졌다(확정본에 같은 표시를 새로 넣으며 발견 — HISTORY.md
+     "마감 후 자동 배정" 참고). .container도 같은 높이만큼 같이 밀어야 한다. */
+  body.round-over .topbar { top: var(--round-banner-h, 0px); }
+  body.round-over .container { margin-top: calc(24px + var(--round-banner-h, 0px)); }
+  .bottombar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    background: #FFFFFF; border-top: 1px solid #E5E7EB; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  }
+  .bottombar-inner {
+    max-width: 800px; margin: 0 auto; padding: 10px 24px;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  }
+  .bottombar a { color: #2563EB; text-decoration: none; font-size: 1.1rem; padding: 6px 10px; border-radius: var(--r-md); }
+  .bottombar a:hover { background: #EFF6FF; }
+  /* [추가: 2026-08-03] app.renderer와 동일한 이유 — 하단바 🖍️ 형광펜 편집 팝오버. */
+  .highlight-wrap { position: relative; }
+  .highlight-toggle {
+    background: transparent; border: none; color: #6B7280; font-size: 1.1rem; cursor: pointer;
+    padding: 6px 10px; border-radius: var(--r-md);
+  }
+  .highlight-toggle:hover { background: #EFF6FF; }
+  .highlight-popover {
+    display: none; position: absolute; bottom: 100%; right: 0; margin-bottom: 8px;
+    background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+    box-shadow: var(--sh-pop); padding: 12px; width: 220px; z-index: 30;
+  }
+  .highlight-popover.is-open { display: block; }
+  .highlight-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .highlight-chip {
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--r-pill);
+    font-size: var(--fs-sm); color: #1F2937; cursor: pointer;
+  }
+  .highlight-chip button {
+    background: transparent; border: none; padding: 0; font-size: var(--fs-sm); cursor: pointer;
+    color: inherit; line-height: 1;
+  }
+  .highlight-empty { color: #6B7280; font-size: var(--fs-sm); margin: 0 0 8px; }
+  .highlight-add-form { display: flex; gap: 6px; }
+  .highlight-add-form input { flex: 1; font-size: var(--fs-md); padding: 5px 8px; min-width: 0; }
+  .highlight-add-form button { font-size: var(--fs-sm); padding: 5px 10px; white-space: nowrap; }
+  /* [추가: 2026-08-05] app.renderer와 동일한 소제목 미니 목차(펼침형). */
+  /* [수정: 2026-08-10] app.renderer와 동일한 이유 — (확정)/(전송) 버튼과 색이 겹치지
+     않도록 중립색으로 톤다운. */
+  /* [추가: 2026-08-11] ↩ 되돌리기 — 오른쪽 플로팅 버튼들(발송·목차)과 성격이
+     반대인 "취소" 계열이라 사용자 요청대로 화면 왼쪽 아래에 따로 뒀다. 되돌릴 게 있을
+     때만 렌더링한다(항상 떠 있으면 "뭘 되돌리는지" 알 수 없어 오히려 불안하다). */
+  /* [수정: 2026-09-02] 왼쪽 아래는 두 칸짜리 스택 — 아래가 휴지통, 위가 ↩ 되돌리기
+     (확정본·수시 화면과 같은 배치). 휴지통이 0건이라 안 그려질 때도 ↩는 제자리에 둔다. */
+  .undo-fab {
+    position: fixed; left: 20px; bottom: 88px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
+    background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; font-size: 1.4rem;
+    cursor: pointer; box-shadow: var(--sh-float); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .undo-fab:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .undo-fab:disabled { opacity: 0.5; cursor: progress; }
+
+  /* 좌하단 휴지통 — 수시 화면(.fab.left)과 같은 규격. ↩ 되돌리기가 위로 올라간다. */
+  .trash-fab {
+    position: fixed; left: 20px; bottom: 20px; width: var(--fab-lg); height: var(--fab-lg); border-radius: var(--r-circle);
+    background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB;
+    box-shadow: var(--sh-float); cursor: pointer; z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .trash-fab:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .trash-fab .badge {
+    position: absolute; top: -3px; right: -3px; background: #DC2626; color: #FFFFFF;
+    font-size: var(--fs-xs); font-weight: 700; border-radius: var(--r-pill); padding: 0 5px; line-height: 1.55;
+  }
+  .trash-pop {
+    display: none; position: fixed; left: 20px; bottom: 88px; width: 336px;
+    background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+    box-shadow: var(--sh-pop); padding: 12px 14px; z-index: 210;
+  }
+  .trash-pop.is-open { display: block; }
+  .trash-pop h5 {
+    margin: 0 0 3px; font-size: var(--fs-md); color: #1E3A5F;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .trash-pop .tnote { font-size: var(--fs-xs); color: #6B7280; margin: 0 0 4px; line-height: 1.45; }
+  .trash-pop .trow {
+    display: flex; gap: 8px; align-items: center; padding: 8px 0;
+    border-top: 1px solid #F1F5F9; font-size: var(--fs-sm);
+  }
+  .trash-pop .trow .tx { flex: 1; color: #6B7280; line-height: 1.4; }
+  .trash-pop .trow .tx b { color: #1E3A5F; }
+  .trash-pop .trow .tm { color: #9CA3AF; font-size: var(--fs-xs); margin-left: 4px; }
+  .trash-pop .cnt {
+    flex: none; font-size: var(--fs-xs); font-weight: 700; color: #6B7280;
+    background: #F3F4F6; border-radius: var(--r-pill); padding: 1px 7px;
+  }
+  .trash-pop .undo-mini {
+    flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-xs);
+    color: #6B7280; background: transparent; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    padding: 3px 8px; cursor: pointer; white-space: nowrap;
+  }
+  .trash-pop .undo-mini:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .trash-pop .undo-mini svg { width: 13px; height: 13px; }
+  .trash-pop .more {
+    display: block; text-align: center; margin: 6px -14px -12px; padding: 9px 0 10px;
+    border-top: 1px solid #E5E7EB; font-size: var(--fs-sm); font-weight: 600;
+    color: #2563EB; text-decoration: none; border-radius: 0 0 var(--r-lg) var(--r-lg);
+  }
+  .trash-pop .more:hover { background: #EFF6FF; }
+
+
+  .hide-notice {
+    position: fixed; left: calc(20px + var(--fab-sm) + 12px); bottom: 88px; height: var(--fab-sm); box-sizing: border-box;
+    max-width: calc(100vw - 52px - var(--fab-sm)); display: flex; align-items: center; gap: 12px;
+    padding: 0 8px 0 16px; border-radius: var(--r-pill); background: #1E3A5F; color: #FFFFFF;
+    font-size: var(--fs-md); font-weight: 600; white-space: nowrap;
+    box-shadow: var(--sh-float); z-index: 220; transition: opacity 0.3s;
+  }
+  .hide-notice.is-leaving { opacity: 0; }
+  .hide-notice button {
+    font: inherit; font-weight: 700; color: #1E3A5F; background: #FFFFFF; border: none;
+    border-radius: var(--r-pill); padding: 7px 12px; cursor: pointer;
+  }
+  .hide-notice button:hover { color: #2563EB; }
+
+
+  .is-hiding { opacity: 0.4; pointer-events: none; transition: opacity 0.15s; }
+  .hiding-note { font-size: var(--fs-sm); font-weight: 600; color: #2563EB; white-space: nowrap; }
+
+
+  #name-picker-back { position: fixed; inset: 0; z-index: 39; background: rgba(15,23,42,0.12); }
+  #name-picker { position: fixed; top: 13vh; left: 50%; transform: translateX(-50%); z-index: 40;
+    width: 372px; max-width: calc(100vw - 32px); background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: var(--r-lg); box-shadow: var(--sh-modal); padding: 14px 14px 10px; }
+  .np-title { font-size: var(--fs-md); font-weight: 700; color: #1E3A5F; margin: 0 0 9px; }
+  #np-input { width: 100%; font: inherit; font-size: var(--fs-base); padding: 8px 10px;
+    border: 1px solid #E5E7EB; border-radius: var(--r-md); color: #1F2937; background: #FFFFFF; }
+  #np-input:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 3px #EFF6FF; }
+  #np-input.is-bad { border-color: #DC2626; box-shadow: 0 0 0 3px #FEF2F2; }
+  .np-lead { font-size: var(--fs-sm); color: #6B7280; margin: 11px 6px 2px; }
+  .np-list { max-height: 250px; overflow-y: auto; margin: 0 -4px; }
+  .np-row { display: flex; align-items: baseline; gap: 8px; width: calc(100% - 8px);
+    margin: 0 4px; padding: 5px 8px; border: none; background: none; border-radius: var(--r-sm);
+    font: inherit; text-align: left; cursor: pointer; color: #1F2937; }
+  .np-row:hover { background: #EFF6FF; }
+  .np-row .np-nm { flex: 1; font-size: var(--fs-md); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 볼드 = 담당자가 직접 고치거나 만든 이름. 직접 만든 소제목이 「다른 소제목」 드롭다운·미니
+     목차에서 이미 볼드인 것과 같은 뜻이라 새 표시를 만들지 않고 그 관례를 그대로 이어쓴다. */
+  .np-row.np-mine .np-nm { font-weight: 700; }
+  .np-row .np-when { font-size: var(--fs-xs); color: #6B7280; white-space: nowrap; }
+  .np-row.np-used { color: #6B7280; cursor: not-allowed; }
+  .np-row.np-used:hover { background: none; }
+  .np-row.np-used .np-nm { text-decoration: line-through; text-decoration-color: #CBD5E1; font-weight: 400; }
+  .np-row .np-tag { font-size: var(--fs-xs); color: #6B7280; border: 1px solid #E5E7EB;
+    border-radius: var(--r-pill); padding: 0 6px; white-space: nowrap; }
+  /* [추가: 2026-09-10] 회차 구분선 — 기본 목록(안 쳤을 때)에만 그린다. 치면 걸린 이름이
+     대개 1~3건인데 서로 다른 회차라 구분선이 이름 수만큼 붙어(실측 '개각' 2건 → 4줄) 줄만
+     두 배가 되고, 그때 담당자가 묻는 건 "몇 회차 것인가"가 아니라 "그 글자가 든 이름이
+     있나"라서다. 줄 오른쪽 .np-when이 이미 회차를 말하므로 같은 말을 두 번 하는 셈이기도 하다. */
+  .np-sep { font-size: var(--fs-xs); color: #6B7280; margin: 9px 8px 2px; padding-top: 7px;
+    border-top: 1px dashed #E5E7EB; }
+  .np-sep:first-child { border-top: none; padding-top: 0; margin-top: 2px; }
+  .np-hint { color: #6B7280; font-size: var(--fs-sm); margin: 7px 6px 0; opacity: 0.85; }
+  .np-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    margin-top: 10px; padding-top: 9px; border-top: 1px solid #E5E7EB; }
+  .np-msg { font-size: var(--fs-sm); color: #6B7280; flex: 1; }
+  .np-msg.bad { color: #DC2626; }
+  .np-msg.new { color: #2563EB; }
+  .np-btns { display: flex; gap: 6px; }
+  .np-btns button { font: inherit; font-size: var(--fs-md); padding: 6px 13px; border-radius: var(--r-md); cursor: pointer; }
+  .np-cancel { background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; }
+  .np-ok { background: #2563EB; color: #FFFFFF; border: none; font-weight: 700; }
+  .np-ok:hover { background: #1D4ED8; }
+  .np-ok:disabled { opacity: 0.45; cursor: not-allowed; }
+  .np-key { font-size: var(--fs-xs); color: #6B7280; text-align: right; margin: 6px 2px 0; }
+
+  .toc-toggle-btn {
+    position: fixed; right: 20px; bottom: 20px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
+    background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; font-size: 1.2rem; cursor: pointer;
+    box-shadow: var(--sh-float); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .toc-toggle-btn:hover { background: #EFF6FF; }
+  /* [추가: 2026-08-11] 확정본의 (발송) 카운트다운(빨강, 경고성)과 다른 맥락 — "이번 회차가
+     언제 끝나는지" 참고용 정보라 회색으로 톤을 낮췄다. ☰ 버튼 바로 위에 둔다. */
+  /* [수정: 2026-08-13] 시:분 → 시:분:초. 숫자가 매초 바뀌므로 tabular-nums로 자릿수 폭을
+     고정한다 — 안 그러면 문구 전체가 초마다 미세하게 흔들려 시선을 뺏는다. */
+  .round-countdown {
+    position: fixed; right: 20px; bottom: 74px; text-align: right;
+    font-size: var(--fs-sm); font-weight: 700; color: #6B7280; z-index: 199; white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  /* [추가: 2026-08-13] 회차 종료 10분 이내 — 초는 늘 보이되 "지금 급한가"는 색이 말한다
+     (9시간짜리 회차도 있어, 초가 흐른다는 것만으로는 임박 여부를 알 수 없다). 확정본
+     발송 카운트다운과 같은 빨강(#DC2626)을 쓴다 — 같은 "마감 임박"이라는 뜻이므로. */
+  .round-countdown.urgent { color: #DC2626; }
+  /* [수정: 2026-08-18] app.renderer와 동일 — 하단 (취소)/(적용) 바가 스크롤을 따라
+     밀려나지 않도록 스크롤 영역(.toc-scroll)을 바깥 상자에서 분리했다. */
+  .toc-popover {
+    display: none; position: fixed; right: 20px; bottom: 74px; width: 200px;
+    background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: var(--r-lg); box-shadow: var(--sh-pop); z-index: 200;
+  }
+  .toc-popover.is-open { display: block; }
+  .toc-scroll { max-height: 320px; overflow-y: auto; padding: 8px; }
+  /* [추가: 2026-08-05] app.renderer와 동일 — 목차 안에서 소제목 순서까지 바꿀 수 있게
+     항목마다 작은 ▲▼를 붙였다(이름 클릭=이동, 화살표 클릭=순서 변경으로 분리). */
+  .toc-row { display: flex; align-items: center; justify-content: space-between; border-radius: var(--r-sm); }
+  .toc-row a {
+    flex: 1; min-width: 0; padding: 6px 8px; font-size: var(--fs-md); color: #1F2937;
+    text-decoration: none; border-radius: var(--r-sm); white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .toc-row a:hover { background: #EFF6FF; }
+  .toc-row-btns { display: flex; gap: 1px; flex-shrink: 0; padding-right: 4px; }
+  .toc-order-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 0.72rem; cursor: pointer;
+    padding: 2px 4px; border-radius: var(--r-sm);
+  }
+  .toc-order-btn:hover { background: #EFF6FF; }
+  .toc-order-btn:disabled { opacity: 0.3; cursor: default; }
+  /* [수정: 2026-08-18] ▲▼가 더는 새로고침을 일으키지 않으므로, 이 표시는 (적용)을
+     누를 때까지 남아 "이번에 뭘 옮겼는지"를 누적해서 보여준다. */
+  .toc-row.toc-row-moved { background: #E7EFE8; }
+  .toc-empty { color: #6B7280; font-size: var(--fs-sm); padding: 6px 8px; }
+  /* [추가: 2026-08-18] app.renderer와 동일한 팝오버 하단 확정 바 — 담당자가 "(적용)을
+     누르기 전까지는 아무것도 바뀌지 않았다"고 믿을 수 있어야 하므로 서버로 나가는 길은
+     (적용) 하나뿐이다. 구조는 .edit-summary-form을 따랐다(취소 왼쪽·커밋 오른쪽).
+     바꾼 게 없으면 아예 나타나지 않는다. */
+  .toc-foot {
+    display: none; flex-direction: column; gap: 6px;
+    padding: 8px; border-top: 1px solid #E5E7EB;
+    background: #FFFFFF; border-radius: 0 0 var(--r-lg) var(--r-lg);
+  }
+  .toc-foot.is-dirty { display: flex; }
+  .toc-dirty-count { font-size: var(--fs-sm); color: #6B7280; }
+  .toc-foot-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .toc-foot-actions button { font-size: var(--fs-sm); padding: 5px 12px; border-radius: var(--r-sm); cursor: pointer; }
+  .toc-cancel-btn { background: transparent; color: #6B7280; border: 1px solid #E5E7EB; }
+  .toc-cancel-btn:hover { background: #EFF6FF; }
+  .toc-apply-btn { background: #2563EB; color: #FFFFFF; border: none; font-weight: 700; }
+  .toc-apply-btn:hover { background: #1D4ED8; }
+  .toc-foot-actions button:disabled { opacity: 0.6; cursor: progress; }
+  @keyframes toc-nudge { 0%, 100% { background: #FFFFFF; } 25%, 75% { background: #EFF6FF; } }
+  .toc-foot.nudge { animation: toc-nudge 0.5s ease-in-out; }
+  /* [추가: 2026-07-30] 체크박스로 기사를 선택했을 때만 나타나는 "일괄 이동" 바 —
+     장바구니처럼 화면 하단에 붙어있다가, 선택이 하나도 없으면 숨어서 원래 있던
+     🗑️(숨긴 기사 관리)만 오른쪽에 그대로 남는다. */
+  .bulk-move-bar { display: none; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--fs-md); }
+  .bulk-move-bar.is-active { display: flex; }
+  .bulk-move-bar .bulk-move-count { font-weight: 600; color: #1E3A5F; white-space: nowrap; }
+  #bulk-move-select {
+    border: 1px solid #2563EB; border-radius: var(--r-md); padding: 5px 8px; font-size: var(--fs-md);
+    color: #1F2937; background: #FFFFFF;
+  }
+  .bulk-move-bar button { padding: 5px 12px; font-size: var(--fs-md); }
+  /* [추가: 2026-08-04] app.renderer와 동일 — 일괄 위/아래 이동 버튼. */
+  #bulk-move-up, #bulk-move-down { padding: 5px 10px; }
+  #bulk-move-up:disabled, #bulk-move-down:disabled { opacity: 0.35; cursor: not-allowed; }
+  .bulk-move-bar .clear-btn { background: transparent; color: #6B7280; }
+  .bulk-move-bar .clear-btn:hover { background: #EFF6FF; }
+  /* [추가: 2026-09-15] 「AI 기사 나누기」 — 확정본과 같은 값(app.renderer.split_button_style). */
+
+  .bulk-move-bar .bulk-split-divider { width: 1px; height: 24px; background: #E5E7EB; margin: 0 2px; }
+  .bulk-move-bar .split-btn {
+    display: inline-flex; align-items: center; gap: 5px; font-weight: 600; border-radius: var(--r-md);
+    background: #F0EAFB; color: #4A3F8F; border: 1px solid #DCD0F2;
+  }
+  .bulk-move-bar .split-btn:hover { background: #E7DBFA; border-color: #CBB8ED; }
+  .bulk-move-bar .split-btn[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
+  .bulk-move-bar .split-btn[aria-disabled="true"]:hover { background: #F0EAFB; border-color: #DCD0F2; }
+  .bulk-move-bar .split-btn:disabled { opacity: 0.7; cursor: progress; }
+  .bulk-move-bar .split-btn[hidden], .bulk-move-bar .bulk-split-divider[hidden] { display: none; }
+  /* 이 드롭다운은 가장 긴 소제목 이름만큼 넓어져서(실측 199px) 나누기 버튼이 붙자 800px 바가
+     두 줄로 넘어갔다. 닫혀 있을 땐 늘 「이동할 소제목」만 보이고, 펼친 목록은 이 폭과 무관하게
+     이름 전체를 보여준다. */
+  #bulk-move-select { max-width: 150px; }
+
+
+  .screen-tag { display: inline-flex; align-items: center; font-size: var(--fs-sm); font-weight: 700;
+    padding: 3px 11px; border-radius: var(--r-pill); border: 1px solid; margin-right: 10px;
+    vertical-align: 0.18em; line-height: 1.3; }
+  .screen-tag.work { background: #F1F5F9; border-color: #E5E7EB;
+    color: #6B7280; }
+  .screen-tag.final { background: #EFF6FF; border-color: #BFDBFE;
+    color: #2563EB; }
+  .head-sub { font-size: 0.72em; font-weight: 500; color: #6B7280; margin-left: 6px; }
+
+  .actions .create-group-btn {
+    background: transparent; color: #2563EB; border: 1px solid #BFDBFE;
+    border-radius: var(--r-md); font-weight: 400;
+  }
+  .actions .create-group-btn:hover { background: #EFF6FF; border-color: #A9C6F5; }
+  /* [수정: 2026-08-12] 초안 툴바에 있던 "🤖 미분류 배정"을 📂 소제목 미분류 칸의
+     헤더로 옮겼다 — 미분류를 발견하는 그 자리에서 바로 누르도록(스크롤 불필요),
+     그리고 미분류가 0건이면 그 칸 자체가 안 뜨니 버튼도 자동으로 사라진다(disabled
+     처리가 따로 필요 없다). 대신 툴바엔 "🤖 전체 기사 재분류"가 새로 생겼다(아래).
+     색은 여전히 연보라(#F0EAFB) — "파랑=담당자가 하는 일 / 연보라=AI가 하는 일"이라는
+     색 언어를 따른 것(CLAUDE.md "Design direction"). 채운 배경으로 둔다 — 이 버튼은
+     안전하고(기존 소제목을 안 건드림) 자주 눌러도 되는 쪽이라 눈에 잘 띄어야 한다. */
+  .assign-unclassified-btn {
+    background: #F0EAFB; color: #4A3F8F; border: 1px solid #DCD0F2; border-radius: var(--r-md);
+    font-size: var(--fs-sm); font-weight: 600; padding: 4px 10px; cursor: pointer;
+  }
+  .assign-unclassified-btn:hover { background: #E7DBFA; border-color: #CBB8ED; }
+  .assign-unclassified-btn:disabled { opacity: 0.5; cursor: progress; }
+  .actions-divider { width: 1px; height: 26px; background: #E5E7EB; margin: 0 2px; }
+  /* [추가: 2026-08-12] "🤖 전체 기사 재분류" — 기존 소제목 이름·구성을 전부 새로 짓는
+     파괴적 동작이라, 안전한 "미분류 배정"과 달리 **테두리만**(고스트) 둬 한 발 물러나
+     보이게 한다. 같은 연보라 계열이라 "AI가 하는 일"이라는 건 알 수 있으면서도, 채워
+     칠하지 않아 상시 노출된 위험한 버튼처럼 부각되지 않는다. */
+  /* [수정: 2026-08-26] 고스트(테두리만) → "AI 기사 배정"과 같은 채운 연보라. 사용자 결정:
+     AI가 하는 일 셋이 색까지 갈려 있으면 계열이 하나로 안 읽힌다. 파괴적이라는 신호는
+     아이콘(새로고침 = 처음부터 다시)과 항상 뜨는 confirm()이 계속 맡는다. */
+  .actions .reclassify-btn {
+    background: #F0EAFB; color: #4A3F8F; border: 1px solid #DCD0F2;
+  }
+  .actions .reclassify-btn:hover { background: #E7DBFA; border-color: #CBB8ED; }
+  .actions .reclassify-btn:disabled { opacity: 0.5; cursor: progress; }
+  .regen-badge {
+    display: inline-block; margin-left: 6px; min-width: 17px; padding: 0 5px;
+    background: #DC2626; color: #FFFFFF; border-radius: var(--r-pill);
+    font-size: var(--fs-xs); font-weight: 700; line-height: 17px; text-align: center;
+  }
+  /* "📂 소제목 미분류" 묶음 — 임시 상태라는 게 보이게 구분한다.
+     [수정: 2026-08-21] 빨간 2px 점선 → 앰버 왼쪽 띠 + 옅은 앰버 바탕. 빨강(#DC2626)은
+     같은 화면의 [단독]/[속보] 기사 행(scoop_bar·scoop_text)과 AI 분류 실패 배너가
+     이미 쓰고 있어, 한 화면에 뜻이 다른 빨강이 셋이었다(사용자 지적). 미분류는 오류가
+     아니라 "아직 안 끝난 일"이므로 CLAUDE.md "Design direction"의 앰버=주의 세트를
+     그대로 쓴다 — 새로 만든 색은 없다. 점선을 뺀 건 색과 별개로 점선 사각 테두리 자체가
+     낡아 보인다는 지적 때문. 바탕이 생겨 글자가 테두리에 붙지 않도록 padding을 준다. */
+  .subheading.subheading-unclassified {
+    border-left: 4px solid #F59E0B; background: #FFFBEB;
+    border-radius: 0 var(--r-lg) var(--r-lg) 0; padding: 10px 16px 12px;
+  }
+  /* [추가: 2026-08-11] AI가 만든 소제목 표식. 화면 전용이며, 소제목 이름 문자열과
+     완전히 분리된 별도 span이라 복사/다운로드/발송 텍스트에는 절대 따라가지 않는다. */
+  .ai-badge { margin-left: 6px; font-size: var(--fs-sm); opacity: 0.75; vertical-align: middle; }
+  /* [추가: 2026-08-20] 소제목별 기사 건수 칩 — app.renderer._render_groups와 동일. */
+  .subheading-count {
+    margin-left: 6px; font-size: var(--fs-sm); font-weight: 700; color: #6B7280;
+    background: #F3F4F6; border-radius: var(--r-pill); padding: 1px 8px;
+  }
+  /* 「✂ 오늘만 여기서 끊기」(app.cut_round, 시안 SLOT_CUT_MOCKUP.html) — 평소엔 회색 시각 글자와
+     같은 색의 흐린 ✂ 하나, 마우스를 올리면 파랑 + 「여기서 끊기」 글자. 평소엔 안 쓰는 기능이라
+     자리만 기억할 수 있게 둔다. 끊기 창은 머리줄 아래에 뜬다(h1이 기준 상자). */
+  .preview-head h1 { position: relative; }
+  .cut-btn { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; vertical-align: middle;
+    border: 1px solid transparent; background: transparent; color: #6B7280; border-radius: var(--r-md);
+    font-family: inherit; font-size: var(--fs-sm); font-weight: 600; padding: 1px 5px; cursor: pointer;
+    opacity: 0.45; transition: opacity .12s, background .12s; }
+  .cut-btn .lbl { display: none; font-size: var(--fs-xs); }
+  .cut-btn:hover, .cut-btn.is-open { opacity: 1; color: #2563EB; border-color: #BFDBFE; background: #EFF6FF; }
+  .cut-btn:hover .lbl, .cut-btn.is-open .lbl { display: inline; }
+  /* 끊은 상태 칩 — 오늘에만 해당하는 상태라 중립 회색, 취소 글자만 파랑(담당자의 동작) */
+  .cut-chip { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; vertical-align: middle;
+    font-size: var(--fs-xs); font-weight: 700; color: #4B5563; background: #F3F4F6; border: 1px solid #E5E7EB;
+    border-radius: var(--r-pill); padding: 2px 4px 2px 10px; }
+  .cut-chip.done { padding-right: 10px; }
+  .cut-chip button { border: none; background: #FFFFFF; color: #2563EB; border-radius: var(--r-pill); font-family: inherit;
+    font-size: var(--fs-xs); font-weight: 600; padding: 1px 9px; cursor: pointer; }
+  .cut-chip button:hover { background: #EFF6FF; }
+  .cut-pop { position: absolute; left: 0; top: calc(100% + 8px); z-index: 30; width: 380px; max-width: calc(100vw - 48px);
+    background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg); box-shadow: var(--sh-pop);
+    padding: 14px 16px 12px; font-size: var(--fs-md); font-weight: 400; color: #1F2937; box-sizing: border-box; }
+  .cut-pop[hidden] { display: none; }
+  .cut-pop h4 { margin: 0 0 3px; color: #1E3A5F; font-size: var(--fs-base); }
+  .cut-pop .sub { color: #6B7280; font-size: var(--fs-sm); margin: 0 0 12px; line-height: 1.55; }
+  .cut-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .cut-tchip { border: 1px solid #E5E7EB; background: #FFFFFF; color: #4B5563; border-radius: var(--r-md); font-family: inherit;
+    font-size: var(--fs-sm); padding: 4px 10px; cursor: pointer; font-variant-numeric: tabular-nums; }
+  .cut-tchip:hover { background: #EFF6FF; }
+  .cut-tchip.on { background: #2563EB; border-color: #2563EB; color: #FFFFFF; font-weight: 600; }
+  .cut-tchip small { opacity: .75; margin-left: 3px; }
+  .cut-time { font-family: inherit; font-size: var(--fs-md); border: 1px solid #D1D5DB; border-radius: var(--r-md);
+    padding: 3px 8px; font-variant-numeric: tabular-nums; }
+  .cut-split { margin: 12px 0 0; border: 1px solid #E5E7EB; border-radius: var(--r-lg); overflow: hidden; }
+  .cut-split > div { display: flex; align-items: baseline; gap: 8px; padding: 7px 11px; font-size: var(--fs-sm); }
+  .cut-split > div + div { border-top: 1px solid #E5E7EB; }
+  .cut-split .k { color: #6B7280; min-width: 92px; font-variant-numeric: tabular-nums; }
+  .cut-split .v b { color: #2563EB; }
+  .cut-split .top { background: #EFF6FF; }
+  .cut-when { margin: 10px 0 0; font-size: var(--fs-sm); color: #6B7280; line-height: 1.55; }
+  .cut-when.warn { color: #92400E; }
+  .cut-when.err { color: #DC2626; }
+  .cut-foot { display: flex; justify-content: flex-end; gap: 6px; margin-top: 12px; }
+  .cut-foot button { font-family: inherit; font-size: var(--fs-md); border-radius: var(--r-md); padding: 6px 13px; cursor: pointer; }
+  .cut-foot .no { border: 1px solid #E5E7EB; background: #FFFFFF; color: #6B7280; }
+  .cut-foot .ok { border: 1px solid #2563EB; background: #2563EB; color: #FFFFFF; font-weight: 600; }
+  .cut-foot .ok:disabled { opacity: .45; cursor: not-allowed; }
+  /* 끊은 직후 안내 — 흐름 안 한 줄(파랑 = 담당자의 동작) */
+  .cut-done-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #EFF6FF;
+    border: 1px solid #BFDBFE; color: #1E3A5F; border-radius: var(--r-lg); padding: 9px 12px;
+    font-size: var(--fs-md); margin: 0 0 14px; }
+  .cut-done-line a { margin-left: auto; color: #2563EB; font-weight: 600; text-decoration: none; }
+  .total-count-badge {
+    margin-left: 8px; font-size: var(--fs-sm); font-weight: 700; color: #6B7280;
+    background: #F3F4F6; border-radius: var(--r-pill); padding: 2px 10px; vertical-align: middle;
+  }
+  /* [추가: 2026-08-21] 제목 옆 "미분류 N건" — 📂 소제목 미분류 칸은 언제나 화면 맨
+     아래라, 기사가 쌓이면 스크롤을 끝까지 내리기 전엔 있는 줄도 모른다(사용자 지적).
+     아래 .unclassified-count와 같은 배색을 그대로 써서 "위의 이 숫자 = 아래 그 칸"이
+     한눈에 이어지게 하고, 눌러서 바로 그 칸으로 내려가게 한다(scrollToUnclassified).
+     0건(정상 상태)이면 아예 안 그린다 — 늘 떠 있으면 숫자를 안 읽게 된다.
+     [수정: 2026-08-21] 빨강 → 앰버(주의 세트). 위 .subheading-unclassified 박스를
+     앰버로 바꾸면서 이 배지만 빨강으로 남으면 박스 위에서 붕 뜨고, [단독]/[속보]
+     빨강과도 계속 겹친다 — 박스·건수 배지·이 배지 셋을 한 번에 맞춘다. */
+  .pending-count-badge {
+    margin-left: 6px; font-size: var(--fs-sm); font-weight: 700; vertical-align: middle;
+    color: #92400E; background: #FEF3C7; border: 1px solid #FDE68A;
+    border-radius: var(--r-pill); padding: 2px 9px; cursor: pointer; font-family: inherit;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .pending-count-badge:hover { background: #FFFFFF; }
+  /* 글자 대신 아래 칸 제목과 같은 열린 폴더 + 숫자(뜻은 툴팁) — 📌 뱃지와 같은 모양. */
+  .pending-count-badge .ic { width: 1.05em; height: 1.05em; }
+  /* 임시 보관함(아직 분류 안 된 기사) 제목 — 소제목이 아니라 대기실이라는 게 읽히도록
+     꺾쇠 없이 회색 기울임꼴로, 확정된 소제목들과 시각적으로 확실히 구분한다. */
+  /* [수정: 2026-08-26] font-style: italic 제거 — 옆의 건수 칩·배정 버튼과 밑줄이
+     안 맞아 한 줄로 안 읽혔다. "임시 칸"이라는 신호는 앰버 왼쪽 띠 + 회색 글자 +
+     폴더 아이콘이 이미 충분히 한다(사용자 판단). */
+  .unclassified-title { color: #6B7280; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 5px; }
+  /* [수정: 2026-08-21] 빨강 → 앰버, 위 .pending-count-badge와 같은 이유·같은 배색. */
+  .unclassified-count {
+    margin-left: 4px; font-style: normal; font-weight: 700; font-size: var(--fs-sm);
+    color: #92400E; background: #FEF3C7; border-radius: var(--r-pill); padding: 1px 8px;
+  }
+  /* [수정: 2026-09-18] 체크박스가 작아 누르기 어렵다는 지적 — 브라우저 기본 13px → 16px
+     (시안 mockups/CHECKBOX_SIZE_MOCKUP.html B안). 소제목 머리 체크박스도 같은 크기,
+     체크 색은 앱 파랑. 기사 체크박스는 커진 만큼 2px 내려 제목 첫 줄 가운데에 맞춘다. */
+  .article-select, .group-select-all { width: 16px; height: 16px; margin: 3px 3px 0 4px;
+    accent-color: #2563EB; cursor: pointer; }
+  .article-select { flex-shrink: 0; position: relative; top: 2px; }
+  .group-select-all { vertical-align: -3px; }
+  .group-move-select {
+    flex-shrink: 0; width: 100px; height: var(--h-sm); box-sizing: border-box; border: 1px solid #E5E7EB; border-radius: var(--r-sm);
+    padding: 0 4px; font-size: var(--fs-sm); color: #6B7280; background: #FFFFFF;
+  }
+  /* app.renderer와 동일 — 📌 담아둔 기사의 승격 드롭다운만 조금 넓다 — 「확정본에 넣기…」가 100px에선 잘린다
+     (실측: 글자 81px + 안쪽 여백 8 + 테두리 2 + 화살표 자리 ≈ 111px). 나머지 규격은
+     「다른 소제목」과 같다. */
+  .group-move-select.promote-select { width: 114px; }
+  /* [추가: 2026-08-04] app.renderer와 동일 — 소제목별/시간순/언론사순 보기 전환 select. */
+  .view-mode-select {
+    border: 1px solid #2563EB; border-radius: var(--r-md); padding: 6px 10px; font-size: var(--fs-md);
+    color: #1F2937; background: #FFFFFF;
+  }
+  /* [수정: 2026-08-04] app.renderer와 동일 — 사용자가 직접 만든 소제목은 기사가
+     차 있어도 점선 테두리를 유지해 자동 분류 소제목과 구분되게 한다. */
+  .subheading-custom { border: 2px dashed #7DD3FC; border-radius: var(--r-lg); padding: 8px 16px; }
+  .empty-group-hint { color: #6B7280; font-size: var(--fs-md); margin: 6px 0 0; }
+  header h1 { font-size: var(--fs-xl); margin-bottom: 6px; color: #1E3A5F; }
+  .preview-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .preview-hint {
+    font-size: var(--fs-md); color: #6B7280; background: #EFF6FF; border-radius: var(--r-lg);
+    padding: 10px 14px; margin-bottom: 20px; line-height: 1.6;
+  }
+  /* [추가: 2026-08-11] hint가 빈 문자열이면(위 round-countdown 중복 안내문 삭제) 박스
+     자체를 완전히 접어 빈 여백이 남지 않게 한다. */
+  .preview-hint:empty { display: none; }
+  .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+  /* [추가: 2026-08-12] 툴바 버튼 높이를 고정값으로 못박는다 — 🤖 이모지가 들어간
+     버튼만 브라우저에 따라 색이모지 글꼴의 내부 line-height가 라틴/한글 텍스트보다
+     커서 박스 자체가 다른 버튼보다 눈에 띄게 부풀어 보이는 문제가 실제로 있었다
+     (padding·font-size는 다른 버튼과 똑같은데도 발생). height를 고정하면 내용이
+     이모지든 텍스트든 상관없이 박스 크기가 항상 같다. */
+  .actions button, .actions a.btn { height: 32px; box-sizing: border-box; }
+  /* [추가: 2026-08-10] app.renderer와 동일 — 정렬 보기 방식은 액션이 아니라 표시
+     옵션이라 툴바 맨 오른쪽으로 분리했다(사용자 선택). */
+  .actions .view-mode-select { margin-left: auto; }
+  /* [수정: 2026-08-03] app.renderer와 동일한 이유 — button은 a와 달리 font-family를
+     상속받지 않고, appearance:auto(네이티브 OS 버튼 껍데기)까지 남아있어 폰트만 맞춰선
+     완전히 똑같이 안 보인다. 크롬이 button 텍스트만 내부적으로 수직 중앙 정렬해주는
+     것까지 발견해 align-items: center를 직접 지정했다. */
+  button, a.btn {
+    background: #2563EB; color: #FFFFFF; border: none; border-radius: var(--r-md);
+    padding: 6px 14px; font-size: var(--fs-md); font-family: inherit; cursor: pointer; text-decoration: none;
+    appearance: none; -webkit-appearance: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    user-select: none; -webkit-user-select: none;
+  }
+  button:hover, a.btn:hover { background: #1E3A5F; }
+  /* [수정: 2026-08-03] app.renderer와 동일한 이유로 액션 툴바만 소프트 필로(시안 B) */
+  .actions button, .actions a.btn {
+    background: #EFF6FF; color: #2563EB; font-weight: 600; border-radius: var(--r-md);
+    height: var(--h-md); padding-top: 0; padding-bottom: 0; box-sizing: border-box;
+  }
+  .actions button:hover, .actions a.btn:hover { background: #EFF6FF; }
+  /* scroll-margin-top — .topbar가 position:fixed라, 목차·"미분류 N건"으로 뛰어오면
+     소제목 제목줄이 그 띠 아래에 깔려 안 보였다. 회차 마감 배너가 떠 있으면 그만큼 더
+     내려야 하므로 --round-banner-h를 같이 더한다(배너가 없으면 0px). */
+  /* [수정: 2026-09-16] 소제목 사이 28→20px — 소제목 밑줄이 이미 구분선 노릇을 한다.
+     초안(app/preview_renderer.py)에도 같은 값이 있다. */
+  .subheading { margin-top: 20px; scroll-margin-top: calc(64px + var(--round-banner-h, 0px)); }
+  /* [수정: 2026-08-05] app.renderer와 동일 — h2 기본 margin 제거 + 아이콘 오른쪽 정렬. */
+  .subheading h2 {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    font-size: var(--fs-lg); color: #1E3A5F; border-bottom: 1px solid #E5E7EB;
+    margin: 0 0 6px; padding-bottom: 6px;
+  }
+  .subheading-title { display: flex; align-items: center; gap: 4px; min-width: 0; }
+  .subheading-icons { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+  .rename-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 0.9rem; cursor: pointer;
+    vertical-align: middle; user-select: none; -webkit-user-select: none;
+  }
+  /* [추가: 2026-08-13] app.renderer와 동일 — 소제목 🗑️만 hover 빨강, ✏️는 무채색 유지. */
+  .rename-btn.group-hide-btn:hover { color: #DC2626; }
+  /* [추가: 2026-08-03] app.renderer와 동일한 이유 — 소제목 순서 조정 버튼. */
+  /* [수정: 2026-08-05] app.renderer와 동일 — 기사 ↑/↓(.move-btn)과 가로폭 통일. */
+  /* [수정: 2026-08-13] app.renderer와 동일 — 소제목은 ▲▼(목차 팝오버와 같은 기호),
+     기사는 ↑↓로 대상을 형태로 구분한다. 두 화면이 갈리면 안 되므로 같이 바꾼다. */
+  .order-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 0.78rem; cursor: pointer;
+    vertical-align: middle; padding: 2px 6px; user-select: none; -webkit-user-select: none;
+  }
+  .order-btn:disabled { opacity: 0.35; cursor: default; }
+  /* [수정: 2026-09-16] 행 여백 한 단계씩 축소 — padding 6→4px, 제목·메타 줄 사이 4→2px,
+     행 사이 10→6px. 글자·버튼 크기는 그대로다(한 건 74 → 64px). 확정본·초안·정기 보관함·
+     수시 네 파일에 같은 값이 복제돼 있으니 한쪽만 고치지 않는다. 시안 ARTICLE_ROW_DENSITY_MOCKUP.html B안. */
+  .article { margin: 6px 0; line-height: 1.5; padding: 4px 8px; border-radius: var(--r-md); }
+  /* [추가: 2026-08-20] app.renderer와 동일 — [단독] 카드 강조 + 말머리 글자색.
+     우선순위 원칙도 동일(다른 상태 배경보다 먼저 선언해 가장 낮은 우선순위). */
+  .article.art-scoop { background: #FEF2F2; border-left: 3px solid #DC2626; padding-left: 9px; }
+  .t-scoop { color: #B91C1C; font-weight: 800; }
+  .t-flash { color: #B91C1C; font-weight: 600; }
+  /* [추가: 2026-08-05] app.renderer와 동일 — 마우스 오버 시 연한 회색 표시. */
+  .article:hover { background: #F3F4F6; }
+  /* [추가: 2026-08-21] app.renderer와 동일 — 사진 추정 기사는 지우지 않고 행을
+     흐리게만 표시한다. 여태 이 화면엔 .photo-badge CSS 자체가 없었다(사진기사 제외
+     설정이 항상 켜져 있던 전제라 이 배지가 뜰 일이 실질적으로 없었음) — 설정 기본값을
+     끔으로 바꾸며 처음으로 실제 렌더링 대상이 됐다. */
+  .article.is-photo { opacity: 0.55; }
+  .article.is-photo:hover, .article.is-photo:has(.article-select:checked) { opacity: 1; }
+  /* [추가: 2026-08-03] app.renderer와 동일한 이유 — 체크된 기사만 연한 배경으로
+     표시한다 (디자인 시안 A). */
+  .article:has(.article-select:checked) { background: #EFF6FF; }
+  /* [추가: 2026-08-05, 수정: 2026-09-04] app.renderer와 동일 — 승격 직후 그 기사를 한 번
+     표시한다. 색은 노랑에서 이동 색으로 옮겼다(담아둔 기사는 승격 전부터 이 화면 아래
+     구획에 떠 있어 "처음 보는 기사"가 아니다 — 자세한 이유는 app.renderer의 같은 자리). */
+  .article.just-promoted { background: #E7EFE8; }
+  /* [수정: 2026-08-05] app.renderer와 동일 — 순서 이동은 노란색(새 기사 도착과 겹침)
+     대신 연두색을 쓴다. [수정: 2026-09-04] 승격도 이 색으로 합류했다. */
+  .article.just-moved { background: #E7EFE8; }
+  /* [수정: 2026-08-13] app.renderer와 동일 — summary를 1행에서 2행(.title-row/
+     .action-row)으로 나눴다. 제목이 게시시각·액션 묶음과 폭을 다투다 대부분 2~3줄로
+     꺾이던 문제 때문. */
+  .article summary {
+    cursor: pointer; display: flex; flex-direction: column; gap: 2px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .article summary::marker { color: #6B7280; }
+  /* [수정: 2026-07-30, 유지: 2026-08-13] 🗑️를 제목 바로 옆(2행)에 둔다 — 예전 footer
+     위치는 요약을 펼치면 제목에서 멀어져 헷갈렸다. */
+  .title-row { display: flex; align-items: baseline; justify-content: flex-start; gap: 8px; }
+  /* [수정: 2026-08-13] app.renderer와 동일 — 좁은 화면에서 액션 묶음이 옆으로 넘치던
+     문제(실측) 때문에 wrap을 허용한다. */
+  .action-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 4px; }
+  /* [추가: 2026-08-07] app.renderer와 동일 — 모바일 사파리 탭 하이라이트 잔상 방지. */
+  .title-line { min-width: 0; overflow-wrap: anywhere; color: #1F2937; -webkit-tap-highlight-color: transparent; }
+  /* [추가: 2026-09-11] app.renderer와 동일 — 제목 앞 언론사를 괄호 대신 회색·조금 작은 글자로. */
+  .title-outlet { color: #6B7280; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  /* [수정: 2026-08-05, 2026-08-13] app.renderer와 동일 — 액션 묶음만 margin-left: auto로
+     2행 오른쪽 끝에 붙이고, 그래도 안 들어가면 wrap한다. */
+  .article-actions {
+    margin-left: auto; display: flex; align-items: center; justify-content: flex-end;
+    gap: 4px; flex-shrink: 0; flex-wrap: wrap; row-gap: 4px;
+  }
+  /* [추가: 2026-08-21] app.renderer와 동일 — 사진 추정 배지(아이콘+문구 칩). */
+  .photo-badge {
+    flex-shrink: 0; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
+    color: #6B7280; background: #F3F4F6; border: 1px solid #E5E7EB; white-space: nowrap;
+    position: relative; top: -0.15em;  /* [수정: 2026-08-21] 제목보다 글자가 작은 알약이라 baseline 정렬만으론 약간 아래로 보인다(실측: 위 여백 +1px, 아래 -2.3px) — 반 칸(0.15em) 올려 제목 글자 높이 한가운데에 맞춘다. */
+  }
+
+  /* [추가: 2026-09-03] "앞 회차 기사" 칩 — 회차 마감 순간 네이버 검색이 아직 안 주던
+     기사를 다음 회차가 주워 담았을 때 붙는다(app.scraper.collect_run의 late_pickup,
+     [추가: 2026-09-04] app.preview_renderer._compute_preview_articles의 같은 표식).
+     자리는 제목 줄이 아니라 메타 줄이다 — 제목 줄엔 이미 🤖 "마감 후 자동 배정" 배지가
+     붙고, 회수된 기사는 그 회차에서 처음 보는 기사라 거의 항상 그 배지도 함께 단다.
+     두 표시가 서로 다른 줄을 쓰면 border-left(연보라 띠)를 두고 다툴 일이 없다.
+     그래서 이 표시에는 왼쪽 띠를 주지 않는다 — 띠는 "훑을 때 덩어리로 보이는" 자리라
+     하나만 써야 하고, "AI가 소제목을 대신 정했다"가 담당자가 손볼 일이 더 크다.
+     색은 상단 배너와 같은 "주의"(앰버) 계열이라, 배너에서 [N건]을 눌러 내려왔을 때
+     같은 색이 눈에 들어와 "배너가 말한 게 이거"로 이어져 읽힌다. */
+  .late-badge {
+    flex-shrink: 0; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
+    color: #92400E; background: #FEF3C7; border: 1px solid #FDE68A; white-space: nowrap;
+  }
+
+
+  /* 툴바 오른쪽 「copy · txt · xlsx」 — 확정본·초안 공용. 툴바 규칙: 박스는 내용을 바꾸는
+     버튼(왼쪽), 글자는 가져가거나 보기만 바꾸는 것(오른쪽). 그래서 .actions button의 옅은
+     파란 채움을 끄고 글자만 남긴다. hover는 배경 없이 글자색 + 밑줄.
+     시안 mockups/TOOLBAR_GROUPING_MOCKUP.html A안. */
+  .actions .actions-right { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .actions .actions-right .view-mode-select { margin-left: 0; }
+  .actions .export-links { display: inline-flex; align-items: center; }
+  .actions .export-links button {
+    background: transparent; border: none; color: #4B5563; font-weight: 500;
+    padding: 6px 8px; border-radius: var(--r-md);
+  }
+  .actions .export-links button:hover {
+    background: transparent; color: #2563EB; text-decoration: underline; text-underline-offset: 3px;
+  }
+
+  .article-summary { margin: 6px 0 4px 20px; color: #1F2937; font-size: var(--fs-md); }
+  /* [수정: 2026-07-30] "이미 확인함"을 영구 기억(localStorage)하지 않고 "지금 펼쳐서
+     보고 있는 기사"에만 실시간 적용 — app.renderer와 같은 이유·같은 방식(:has()). */
+  /* [수정: 2026-08-21] 색(남색) 대신 opacity로 — 화면에 남는 파랑이 전부 "누를 수
+     있는 것"이 되도록, 상태 표시는 색이 아닌 밝기로만 준다. */
+  .article:has(details[open]) .title-line { opacity: 0.62; }
+  /* [추가: 2026-07-29] 지난번 이 화면을 봤을 때는 없다가 이번에 새로 들어온 기사 —
+     초안은 새로고침할 때마다 다시 검색하므로 뭐가 새로 섞였는지 표시해준다
+     (app.preview_renderer._compute_preview_articles가 매번 새로 검색·병합한 결과). */
+  .article.is-new-arrival { background: #FFF9C4; border-radius: var(--r-md); padding: 8px 10px; }
+  /* [추가: 2026-08-12] "🤖 미분류 기사 분류"가 방금 자리를 정해준 기사 — 어디에 배정됐는지
+     담당자가 바로 찾을 수 있게 한 번만 표시하고 다음 새로고침에 사라진다(.just-moved와 같은 방식).
+     색은 🤖 버튼과 같은 연보라 — "저 버튼을 눌렀더니 이것들이 생겼다"가 그대로 이어진다.
+     .is-new-arrival(노랑)보다 **뒤에** 선언해 겹칠 때 연보라가 이긴다: 노랑은 "기사가 왔다"는
+     이미 아는 정보고, 연보라는 "내가 시켜서 방금 배정됐다"는 지금 확인해야 할 정보다. */
+  .article.just-classified { background: #F0EAFB; }
+  /* [수정: 2026-08-03] app.renderer와 동일한 이유 — 화면에서 직접 드래그해 복사할 때
+     게시 시각이 같이 딸려오지 않도록 이 부분만 선택 자체를 막는다. */
+  .pub-time {
+    flex-shrink: 0; color: #6B7280; font-size: var(--fs-sm); white-space: nowrap;
+    user-select: none; -webkit-user-select: none;
+  }
+  .move-btn, .hide-btn, .copy-btn {
+    flex-shrink: 0; background: transparent; border: none; color: #6B7280; font-size: 1rem;
+    cursor: pointer; padding: 2px 6px; user-select: none; -webkit-user-select: none;
+  }
+  .move-btn:disabled { color: #E5E7EB; cursor: not-allowed; }
+  .hide-btn:hover { color: #DC2626; }
+  /* [수정: 2026-08-14] app.renderer와 동일 — 원문보기가 아이콘에서 게시시각 옆 텍스트
+     링크로 바뀌었다(복사 아이콘과 실루엣이 겹쳐 구분이 안 된다는 지적). */
+  .time-sep { color: #6B7280; font-size: var(--fs-sm); margin: 0 2px; user-select: none; -webkit-user-select: none; }
+  .origin-link-text {
+    flex-shrink: 0; color: #2563EB; font-size: var(--fs-sm); text-decoration: none;
+    display: inline-flex; align-items: center; gap: 2px; white-space: nowrap;
+  }
+  .origin-link-text:hover { text-decoration: underline; }
+  .origin-link-icon { width: 0.75em; height: 0.75em; }
+
+  /* [추가: 2026-08-21] 🔍 검색어 — 이 기사가 어떤 검색어로 걸렸는지. 게시시각·원문보기와
+     같은 줄·같은 크기(0.8rem)의 회색 글자다(칩으로 안 만든 이유는 render_article 주석).
+     [수정: 2026-09-14] 남는 자리만큼만 보여주고 나머지는 …로 자른다 — 전부 보여주던 때는
+     검색어가 긴 행에서 버튼 묶음이 통째로 아랫줄로 밀렸다. 세 값이 짝이다:
+     flex-basis 0 → 줄바꿈을 판단할 때 검색어 길이를 안 친다(그래서 버튼을 밀어내지 않는다),
+     flex-grow 1 + max-width: max-content → 남는 자리를 제 글자 길이까지만 채운다(남는 건
+     버튼 묶음의 margin-left: auto가 가져가 버튼이 오른쪽 끝에 그대로 선다),
+     min-width 5em → 그보다 자리가 적으면(좁은 화면) 검색어가 버튼과 함께 다음 줄로 넘어간다.
+     고정 폭(실시간 현황의 210px)으로 자르지 않은 이유: 「⏱ 늦게 들어온 기사」 칩이 붙는
+     행은 칩 폭(약 110px)만큼 자리가 모자라, 칩 없는 행 기준으로 정한 값으로는 여전히
+     밀린다(KW_CHIP_MOCKUP.html 실측). 확정본·초안 공용 — 한 곳에서만 고친다. */
+  .kw-inline {
+    font-size: var(--fs-sm); color: #6B7280;
+    display: inline-flex; align-items: center; gap: 4px;
+    flex: 1 1 0; min-width: 5em; max-width: max-content;
+  }
+  /* 구분점은 span 안에 있다(다음 줄로 넘어갈 때 점만 윗줄에 남지 않게). 오른쪽 여백은
+     밖에 있던 때의 간격(점 2px + 줄 gap 8px)을 그대로 맞춘 값. */
+  .kw-inline > .time-sep { margin-right: 6px; }
+  /* 돋보기는 값보다 한 톤 흐리게 — 먼저 읽혀야 하는 건 검색어 자체다. 크기는 바로 옆
+     원문보기 아이콘(.origin-link-icon)과 같은 0.75em이라 액션 줄에서 높이가 안 튄다. */
+  .kw-inline .kw-ic { width: 0.75em; height: 0.75em; color: #9CA3AF; flex-shrink: 0; }
+  .kw-inline .kw-v {
+    color: #4B5563; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+
+  /* 켜진 동안 툴바 버튼을 채운 파랑으로 — 지금 화면이 평소 화면이 아니라는 표시. */
+  .actions .photo-gather-btn.is-on, .actions .photo-gather-btn.is-on:hover {
+    background: #2563EB; color: #FFFFFF; border-color: #2563EB;
+  }
+  /* 모아 보는 중 띠 — 수십 건을 훑으며 체크를 풀어도 「전체 선택」·「원래 화면으로」가
+     화면 위로 사라지지 않게 sticky. 자리는 키워드 메모 칸과 같다(그 칸은 이 동안 숨는다).
+     상단 배너가 topbar를 밀어내면 같은 변수만큼 따라 내려간다(메모 칸과 같은 규칙). */
+  .photo-gather-strip {
+    position: sticky; top: 60px; z-index: 15; display: flex; align-items: center; gap: 10px;
+    flex-wrap: wrap; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: var(--r-lg);
+    padding: 9px 12px; margin: 12px 0 6px;
+  }
+  body.has-finalize-banner .photo-gather-strip { top: calc(60px + var(--finalize-banner-h, 0px)); }
+  body.round-over .photo-gather-strip { top: calc(60px + var(--round-banner-h, 0px)); }
+  .photo-gather-strip label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); cursor: pointer; }
+  .photo-gather-strip .pg-msg { font-size: var(--fs-md); color: #1E3A5F; }
+  .photo-gather-strip .pg-sp { flex: 1; }
+  .photo-gather-strip button { padding: 5px 12px; font-size: var(--fs-md); }
+  .pg-done { text-align: center; color: #6B7280; padding: 28px 0 16px; font-size: var(--fs-md); }
+  /* 원래 소제목 이름표 — 보고서에 나갈 자리. 📂 미분류 칸에서 온 기사엔 안 붙인다. */
+  .pg-from {
+    flex-shrink: 0; max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: var(--fs-xs); color: #4B5563; background: #F8FAFC; border: 1px solid #E5E7EB;
+    border-radius: var(--r-md); padding: 0 6px;
+  }
+  /* 모아 보는 중엔 전부가 사진 추정이라 흐림·📷 칩이 행마다 같은 값(=장식)이 된다. */
+  body.photo-gather .article.is-photo { opacity: 1; }
+  body.photo-gather .photo-badge { display: none; }
+  /* 목록 밖의 것들은 이 동안 접는다. ↑↓는 소제목 안 순서라 한 줄로 모인 목록에선 뜻이 없다. */
+  body.photo-gather .subheading:not(.photo-gather-view),
+  body.photo-gather .manual-divider, body.photo-gather .manual-zone, body.photo-gather .bottom,
+  body.photo-gather .keyword-note-zone, body.photo-gather .late-banner,
+  body.photo-gather .toc-toggle-btn, body.photo-gather .toc-popover,
+  body.photo-gather .move-btn, body.photo-gather #bulk-move-up, body.photo-gather #bulk-move-down {
+    display: none !important;
+  }
+
+  /* [추가: 2026-08-14] app.renderer와 동일 — title-line 렌더 좌표 실측(28px)만큼
+     action-row를 들여써 게시시각·원문보기가 제목 글자 시작점과 같은 줄에서 시작하게 한다. */
+  /* 체크박스 16px 기준: 왼쪽 여백 4 + 16 + 오른쪽 여백 3 + gap 8 = 31px (13px일 땐 28px). */
+  .article:has(.article-select) .action-row { padding-left: 31px; }
+  /* [추가: 2026-09-01] app.renderer와 동일 — 소제목 헤더의 📋(.group-copy-btn)도
+     같은 아이콘 전환을 쓴다(색·크기는 옆 ✏️🗑️와 같은 .rename-btn에서 물려받는다). */
+  .copy-btn, .group-copy-btn { display: inline-flex; align-items: center; }
+  .copy-btn .icon-done, .group-copy-btn .icon-done { display: none; }
+  .copy-btn.is-copied .icon-default, .group-copy-btn.is-copied .icon-default { display: none; }
+  .copy-btn.is-copied .icon-done, .group-copy-btn.is-copied .icon-done { display: inline-flex; }
+  /* [추가: 2026-08-05] app.renderer와 동일 — 원문 다시 가져오기 버튼, 평소 숨김. */
+  .refetch-btn {
+    flex-shrink: 0; background: transparent; border: none; color: #6B7280; font-size: var(--fs-base);
+    cursor: pointer; padding: 2px 6px; user-select: none; -webkit-user-select: none;
+    opacity: 0; transition: opacity 0.15s;
+  }
+  .article:hover .refetch-btn { opacity: 1; }
+  .refetch-btn:disabled { opacity: 0.35 !important; cursor: not-allowed; }
+  /* [추가: 2026-08-11] "⋯ 더보기" 메뉴 — 원문 다시 불러오기 / 기사제목 직접 수정.
+     예전엔 이 둘과 복사하기까지 셋이 제목 줄에 아이콘으로 직접 붙어 있었고
+     .refetch-btn의 opacity:0으로 숨겼다가 카드 호버 시에만 나타났는데, (1) 호버할
+     때마다 아이콘이 4→8개로 늘어 목록을 훑을 때 산만했고 (2) **모바일엔 호버가 없어
+     아예 누를 수 없었다.** 그래서 ⋯ 버튼은 호버와 무관하게 항상 보이고, 메뉴 안은
+     아이콘 대신 글자로 이름을 보여준다. [수정: 2026-08-13] app.renderer와 동일 —
+     복사하기는 다시 메뉴에서 빠져나가 상시 노출 아이콘(.copy-btn)이 됐다. */
+  .more-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+  .more-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 1.05rem; line-height: 1;
+    cursor: pointer; padding: 3px 7px; border-radius: var(--r-sm);
+    user-select: none; -webkit-user-select: none;
+  }
+  .more-btn:hover { background: #EFF6FF; color: #2563EB; }
+  .more-menu {
+    display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 60;
+    min-width: 172px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+    padding: 4px; box-shadow: var(--sh-pop);
+  }
+  .more-wrap.is-open .more-menu { display: block; }
+  /* ⋯ 버튼 — 메뉴의 「복사하기」를 누르면 1초간 ✓로 바뀐다(copyArticleIcon). */
+  .more-btn .icon-default { display: inline-flex; }
+  .more-btn .icon-done { display: none; }
+  .more-btn.is-copied .icon-default { display: none; }
+  .more-btn.is-copied .icon-done { display: inline-flex; }
+  .more-menu button {
+    display: block; width: 100%; text-align: left; background: transparent; border: none;
+    padding: 8px 10px; border-radius: var(--r-sm); font-size: var(--fs-md); color: #1F2937;
+    cursor: pointer; white-space: nowrap;
+  }
+  .more-menu button:hover { background: #EFF6FF; }
+  .more-menu button:disabled { opacity: 0.5; cursor: progress; }
+  /* 🏷 라벨 팝오버 — 확정본과 같은 값(app.renderer.label_popover_style). */
+
+  /* [추가: 2026-08-18] 🏷 라벨 — PRD.md 기능10, 2026-08-18 목업 대화. 앰버 계열은
+     기존 COLOR_* 팔레트(파랑=담당자 액션/보라=AI 액션)와 겹치지 않는 세 번째 축으로
+     확정했다(MAIN_FLOW_MOCKUP.html의 --label-bg/--label-text 그대로). */
+  .lab-pop-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+  .lab-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 1rem; line-height: 1;
+    cursor: pointer; padding: 3px 6px; border-radius: var(--r-sm); display: inline-flex; align-items: center;
+    user-select: none; -webkit-user-select: none;
+  }
+  .lab-btn:hover { background: #EFF6FF; color: #2563EB; }
+  .lab-btn.on { color: #8A5A14; background: #FBF0DA; }
+  .lab-btn .lab-count { font-size: var(--fs-xs); font-weight: 700; margin-left: 2px; }
+  .lab-pop {
+    position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 60; width: 260px;
+    text-align: left; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+    padding: 11px 12px; box-shadow: var(--sh-pop);
+  }
+  .lab-pop.hidden { display: none; }
+  .lab-pop h4 { margin: 0 0 6px; font-size: var(--fs-xs); color: #6B7280; font-weight: 700; }
+  .lab-pop .attached { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; min-height: 20px; }
+  .lab-pop .attached .none { font-size: var(--fs-xs); color: #6B7280; }
+  .lab-pop .known { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+  .lab-pop .known .none { font-size: var(--fs-xs); color: #6B7280; }
+  .lab-chip {
+    display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-xs); font-weight: 700;
+    color: #8A5A14; background: #FBF0DA; border: 1px solid rgba(138, 90, 20, 0.28);
+    border-radius: var(--r-pill); padding: 2px 8px; white-space: nowrap;
+  }
+  .lab-chip .x { color: #8A5A14; opacity: 0.55; cursor: pointer; font-weight: 700; }
+  .lab-chip .x:hover { opacity: 1; }
+  .known-chip {
+    font-size: var(--fs-xs); font-weight: 600; color: #6B7280; cursor: pointer;
+    background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 2px 8px;
+  }
+  .known-chip:hover { background: #FBF0DA; color: #8A5A14; border-color: rgba(138, 90, 20, 0.28); }
+  .known-chip.used { background: #FBF0DA; color: #8A5A14; border-color: rgba(138, 90, 20, 0.28); font-weight: 700; }
+  .known-chip .n { opacity: 0.6; font-weight: 500; margin-left: 3px; }
+  .lab-pop .addbox { display: flex; gap: 5px; }
+  .lab-pop .addbox input {
+    flex: 1; font-size: var(--fs-xs); padding: 5px 7px; border: 1px solid #E5E7EB; border-radius: var(--r-sm);
+  }
+  .lab-pop .addbox button {
+    font-size: var(--fs-xs); font-weight: 700; padding: 5px 10px; border-radius: var(--r-sm); cursor: pointer;
+    background: #FBF0DA; color: #8A5A14; border: 1px solid rgba(138, 90, 20, 0.28);
+  }
+  .lab-pop .sim-warn {
+    margin-top: 8px; font-size: var(--fs-xs); line-height: 1.7; color: #8A5A14; background: #FBF0DA;
+    border: 1px dashed rgba(138, 90, 20, 0.28); border-radius: var(--r-md); padding: 6px 8px;
+  }
+  .lab-pop .sim-warn.hidden { display: none; }
+  .lab-pop .sim-warn button {
+    font-size: var(--fs-xs); font-weight: 700; padding: 3px 8px; border-radius: var(--r-sm); cursor: pointer;
+    margin-left: 3px; border: none;
+  }
+  .lab-pop .sim-warn .use { background: #8A5A14; color: #FFFFFF; }
+  .lab-pop .sim-warn .keep { background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; }
+  .lab-pop .hint { font-size: var(--fs-xs); color: #6B7280; margin: 8px 0 0; line-height: 1.7; }
+  .lab-row {
+    display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 6px;
+    padding-top: 6px; border-top: 1px dashed #E5E7EB;
+  }
+  .lab-row .tagmark { color: #8A5A14; opacity: 0.75; }
+
+  /* [추가: 2026-08-05] app.renderer와 동일 — ✏️ 직접 수정 인라인 편집 칸. */
+  .edit-summary-form {
+    margin: 8px 0 4px 20px; padding: 10px 12px; border: 1px solid #2563EB; border-radius: var(--r-lg);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .edit-summary-form input, .edit-summary-form textarea {
+    width: 100%; box-sizing: border-box; padding: 6px 10px; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    font-size: var(--fs-md); color: #1F2937; background: #FFFFFF; font-family: inherit;
+  }
+  .edit-summary-form .edit-summary-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .edit-summary-form button { font-size: var(--fs-sm); padding: 5px 12px; }
+  .empty { text-align: center; margin-top: 60px; font-size: var(--fs-lg); color: #6B7280; }
+  .bottom { margin-top: 40px; background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 16px 18px; }
+  .bottom h3 { margin: 0 0 8px; font-size: var(--fs-base); color: #1E3A5F; }
+  .bottom-summary { padding-top: 2px; }
+  .bottom-header-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .bottom-header-row h3 { margin: 0; }
+  .bottom-summary-copy {
+    font-size: var(--fs-sm); color: #2563EB; background: transparent; border: 1px solid #E5E7EB;
+    border-radius: var(--r-md); padding: 3px 10px; cursor: pointer; font-family: inherit;
+  }
+  .bottom-summary-item { padding: 8px 0; border-bottom: 1px solid #E5E7EB; }
+  .bottom-summary-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .bottom-summary-item strong { display: block; color: #1E3A5F; margin-bottom: 3px; }
+  .bottom-summary-item p { margin: 0; white-space: pre-line; }
+  .manual-divider {
+    display: flex; align-items: center; gap: 10px; margin: 32px 0 4px;
+    color: #6B7280; font-size: var(--fs-sm);
+  }
+  .manual-divider::before, .manual-divider::after { content: ""; flex: 1; border-top: 1px dashed #E5E7EB; }
+  /* app.renderer와 동일 — "📂 소제목 미분류" 칸과 같은 문법(왼쪽 4px 띠 + 옅은 바탕 +
+     오른쪽만 둥근 모서리)을 쓰고 색만 캐러멜로 가른다. 이유는 app.renderer의 같은 자리. */
+  .manual-zone {
+    border-left: 4px solid #B7803F; background: #FAF3EA;
+    border-radius: 0 var(--r-lg) var(--r-lg) 0; padding: 10px 16px 12px; margin-top: 10px;
+  }
+  .manual-zone-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .manual-zone-title { font-weight: 600; color: #1F2937; font-size: var(--fs-base); }
+  .manual-zone-hint { font-size: var(--fs-sm); color: #6B7280; }
+  /* app.renderer와 동일 — 건수 칩은 칸 색(캐러멜)을 따른다. */
+  .manual-zone-count {
+    margin-left: 4px; font-weight: 700; font-size: var(--fs-sm); color: #7A4E1C;
+    background: #F1E3D0; border: 1px solid #DFC5A3; border-radius: var(--r-pill); padding: 1px 8px;
+  }
+  /* [추가: 2026-08-26] app/renderer.py의 같은 자리와 동일 — 제목·건수·"AI 기사 배정"을
+     한 묶음으로 왼쪽에 붙여, 📂 소제목 미분류 칸 헤더와 같은 구성으로 읽히게 한다. */
+  .manual-zone-left { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .manual-zone .article:first-child { margin-top: 10px; }
+  /* [추가: 2026-08-05] app.renderer와 동일 — 직접 키워드 작성 메모 칸. */
+  /* [수정: 2026-08-07] app.renderer와 동일 — 스크롤 중에도 계속 보이도록 sticky 고정. */
+  .keyword-note-zone {
+    display: none; align-items: center; gap: 8px; border: 1px dashed #E5E7EB; border-radius: var(--r-lg);
+    padding: 10px 14px; margin: 10px 0 4px; flex-wrap: wrap;
+    position: sticky; top: 60px; z-index: 15; background: #FFFFFF;
+  }
+  .keyword-note-zone.is-open { display: flex; }
+  /* [수정: 2026-09-07] app.renderer와 동일 — 회차 마감 배너가 뜨면 topbar가 배너
+     높이만큼 내려가므로(body.round-over .topbar) 이 sticky의 top도 같이 따라간다. */
+  body.round-over .keyword-note-zone { top: calc(60px + var(--round-banner-h, 0px)); }
+  .keyword-note-zone input {
+    flex: 1; min-width: 220px; height: var(--h-md); box-sizing: border-box; padding: 0 10px; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    font-size: var(--fs-md); color: #1F2937; background: #FFFFFF;
+  }
+  /* [추가: 2026-08-10] app.renderer와 동일 — 저장된 메모는 (수정)을 눌러야 편집 가능. */
+  .keyword-note-zone input:disabled { background: #F8FAFC; color: #6B7280; }
+  .keyword-note-zone button { font-size: var(--fs-sm); height: var(--h-md); padding: 0 12px; box-sizing: border-box;
+    border-radius: var(--r-md); white-space: nowrap; }
+  /* 모양 규칙: 지우기(삭제·취소)는 채움 파랑으로 두지 않는다 — 글자 버튼, 올리면 빨강. */
+  .keyword-note-zone .clear-btn { background: transparent; color: #6B7280; }
+  .keyword-note-zone .clear-btn:hover { background: transparent; color: #DC2626; }
+  /* [추가: 2026-09-21] "+ URL로 추가" — 네이버에서 직접 찾아온 기사를 URL만으로
+     📌 담아둔 기사 칸에 올리는 입구. 검색어 화면(상시 조건)을 안 거치는 게 요점이라
+     모양은 키워드 메모 칸과 같은 점선 패널로 맞췄다. 여러 줄 붙여넣기를 받으므로
+     input이 아니라 textarea다. */
+  /* 테두리는 파랑(accent) 실선 — 색 계열 규칙상 파랑이 "담당자의 동작"이다(연보라는
+     AI 전용, 청록은 수시 정체성). 점선을 안 쓰는 건 이 화면에 점선 상자가 이미 둘
+     있어서다: 회색 점선 = 키워드 메모 칸, 하늘색 굵은 점선 = 직접 만든 소제목.
+     셋이 한 화면에 서므로 실선으로 갈라야 서로 안 헷갈린다. */
+
+  /* 「+ 수기로 기사 추가」 — 입구와 입력칸이 📌 담아둔 기사 칸 안에 있다(넣는 곳 = 보이는
+     곳). 칸이 이미 색(띠 + 옅은 바탕)을 가져서 입력칸까지 같은 계열이면 한 덩어리로 묻힌다 —
+     흰 바탕 + 회색 테두리 + 옅은 그림자로 "칸 위에 얹힌 입력칸"으로 가른다(새 색 없음).
+     시안 mockups/MANUAL_ADD_PLACEMENT_MOCKUP.html 「색 비교」 가안. */
+  .manual-zone-empty { font-size: var(--fs-sm); color: #6B7280; }
+  /* 툴바의 「+ 새 소제목」과 같은 테두리 버튼 — 전역 button 규칙(채운 파랑)을 덮는다.
+     칸 바탕이 옅은 캐러멜이라 바탕만 흰색, 글자·테두리는 칸 색. */
+  .manual-zone .url-add-open-btn {
+    font-size: var(--fs-sm); padding: 3px 9px; background: #FFFFFF; color: #7A4E1C;
+    border: 1px solid #DFC5A3; border-radius: var(--r-md); font-weight: 400; cursor: pointer;
+  }
+  .manual-zone .url-add-open-btn:hover { background: #F1E3D0; }
+  .url-add-zone {
+    display: none; border: 1px solid #D1D5DB; border-radius: var(--r-lg);
+    padding: 10px 14px; margin: 10px 0 2px; background: #FFFFFF;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.10);
+  }
+  .url-add-zone.is-open { display: block; }
+  /* 한 번에 한 건만 받는다 — 여러 줄을 받으면 결과가 목록이 되고, 어느 줄이 왜
+     실패했는지 대조해야 한다. 순서 [주소칸][추가][×] — 누를 것이 입력 바로 옆, 닫기는 끝. */
+  .url-add-row { display: flex; align-items: center; gap: 8px; }
+  .url-add-row input {
+    flex: 1; min-width: 0; padding: 6px 10px; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    font-size: var(--fs-md); color: #1F2937; background: #FFFFFF;
+  }
+  .url-add-row input:disabled { background: #F8FAFC; color: #6B7280; }
+  .url-add-hint { color: #6B7280; font-size: var(--fs-sm); margin-top: 7px; }
+  .url-add-zone button { font-size: var(--fs-sm); padding: 5px 10px; white-space: nowrap; }
+  .url-add-zone .url-add-close {
+    background: none; border: none; color: #6B7280; padding: 4px 6px; font-size: 1rem;
+    line-height: 1; cursor: pointer;
+  }
+  .url-add-zone .url-add-close:hover { color: #1F2937; }
+  /* 거부 사유는 지우지 않고 남긴다 — 실패가 조용히 사라지면 안 된다(CODING_CONVENTIONS §3).
+     주의 세트(앰버) 재사용. 입력한 주소도 남겨 어디가 틀렸는지 보고 고치게 한다. */
+  .url-add-warn {
+    display: none; margin-top: 8px; padding: 8px 11px; border-radius: var(--r-md); font-size: var(--fs-sm);
+    line-height: 1.55; background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E;
+  }
+  .url-add-warn.is-on { display: block; }
+  .url-add-warn b { display: block; }
+  .url-add-warn span { color: #A16207; }
+  /* 제목 옆 「📌 N」 — 칸이 늘 맨 아래라 미분류 뱃지처럼 눌러서 내려간다. 칸과 같은 캐러멜.
+     모양(아이콘 + 숫자, 화살표 없음)은 초안의 미분류 뱃지(.pending-count-badge)와 같다. */
+  .pinned-jump-badge {
+    margin-left: 6px; font-size: var(--fs-sm); font-weight: 700; vertical-align: middle;
+    display: inline-flex; align-items: center; gap: 4px;
+    color: #7A4E1C; background: #F1E3D0; border: 1px solid #DFC5A3;
+    border-radius: var(--r-pill); padding: 2px 9px; cursor: pointer; font-family: inherit;
+  }
+  .pinned-jump-badge:hover { background: #FFFFFF; }
+  .pinned-jump-badge .ic { width: 1.05em; height: 1.05em; }
+
+
+  .kn-history { flex-basis: 100%; margin-top: 2px; padding-top: 8px; border-top: 1px dashed #E5E7EB; }
+  .keyword-note-zone:has(#keyword-note-input:disabled) .kn-history { display: none; }
+  .kn-h-head { font-size: var(--fs-xs); color: #9CA3AF; margin-bottom: 4px; }
+  .kn-h-list { max-height: 7.2em; overflow-y: auto; }
+  .kn-h-row { display: flex; gap: 10px; font-size: var(--fs-sm); line-height: 1.6; color: #4B5563; cursor: text; }
+  .kn-h-when { flex: none; min-width: 7.5em; color: #9CA3AF; font-variant-numeric: tabular-nums; }
+  .kn-h-text { min-width: 0; overflow-wrap: anywhere; }
+  .kn-w.is-same { color: #2563EB; font-weight: 600; }
+
+  /* [추가: 2026-08-26] app.renderer와 동일 — 직전 회차 메모를 미리 채워둔 상태 표시. */
+  /* [추가: 2026-08-13] app.renderer와 동일 — 단색 SVG 아이콘(app.icons) 공통 크기·색. */
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+</style>
+<style>
+html,body{background:#EEF1F5 !important}
+.mk{max-width:1180px;margin:0 auto;padding:28px 16px 80px;font-family:inherit}
+.mk h1{font-size:var(--fs-xl);color:#1E3A5F;margin:0 0 6px}
+.mk .lead{color:#6B7280;font-size:var(--fs-md);margin:0 0 26px;line-height:1.6}
+.opt{margin:0 0 44px}
+.opt h2{font-size:var(--fs-lg);color:#1E3A5F;margin:0 0 4px}
+.opt h2 .rec{font-size:var(--fs-xs);background:#2563EB;color:#fff;border-radius:var(--r-pill);padding:2px 8px;margin-left:6px;vertical-align:2px}
+.opt p{margin:0 0 12px;color:#374151;font-size:var(--fs-md);line-height:1.65}
+.opt ul{margin:0 0 12px 18px;padding:0;color:#374151;font-size:var(--fs-md);line-height:1.7}
+.pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media(max-width:900px){.pair{grid-template-columns:minmax(0,1fr)}}
+.frame{position:relative;height:520px;transform:translateZ(0);overflow:hidden;border:1px solid #D1D5DB;border-radius:var(--r-lg);background:#F8FAFC}
+.frame .scr{height:100%;overflow:auto}
+.frame .container{margin-top:14px !important}
+.scr-name{position:absolute;top:8px;left:10px;z-index:400;font-size:var(--fs-xs);background:#1E3A5F;color:#fff;border-radius:var(--r-pill);padding:2px 9px}
+.confirm-send-fab{position:fixed;right:20px;bottom:80px;width:var(--fab-lg);height:var(--fab-lg);border-radius:var(--r-circle);background:#15803D;color:#fff;border:none;font-size:var(--fs-md);font-weight:700;box-shadow:var(--sh-float);z-index:200;display:flex;align-items:center;justify-content:center}
+/* A: 떠 있는 ↑ — 목차 ☰ 왼쪽, 같은 48px 동그라미·같은 중립색 */
+.top-fab{position:fixed;right:80px;bottom:20px;width:var(--fab-sm);height:var(--fab-sm);border-radius:var(--r-circle);
+ background:#fff;color:#6B7280;border:1px solid #E5E7EB;box-shadow:var(--sh-float);z-index:200;display:flex;align-items:center;justify-content:center;font-size:1.2rem;cursor:pointer}
+.top-fab:hover{background:#EFF6FF;color:#2563EB;border-color:#2563EB}
+/* B: 페이지 끝 글자 버튼 */
+.page-end{text-align:center;padding:18px 0 4px}
+.page-top-link{background:none;border:none;color:#6B7280;font-size:var(--fs-sm);cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-family:inherit}
+.page-top-link:hover{color:#2563EB;text-decoration:underline}
+/* C: 목차 팝오버 맨 위 줄 */
+.toc-top{padding:6px 8px 0}
+.toc-top a{display:flex;align-items:center;gap:6px;padding:6px 8px;font-size:var(--fs-md);color:#2563EB;text-decoration:none;border-radius:var(--r-sm);border-bottom:1px solid #E5E7EB}
+.toc-top a:hover{background:#EFF6FF}
+.frame .toc-popover{right:20px;bottom:74px}
+.cap{font-size:var(--fs-sm);color:#6B7280;margin-top:6px}
+</style></head><body>
+<div class="mk">
+<h1>맨 위로 가는 버튼 — 시안 세 가지</h1>
+<p class="lead">초안·확정본은 기사가 많으면 페이지가 수만 px로 길어지고, 맨 아래 「📌 담아둔 기사」까지 내려오면 위로 돌아갈 길이 스크롤뿐이다.<br>
+아래 화면은 지금 떠 있는 초안에서 그대로 떠 온 맨 아래 부분이다(각 화면 안에서 스크롤해 볼 수 있다).</p>
+
+<div class="opt"><h2>A. 떠 있는 ↑ 버튼 — 목차 ☰ 왼쪽 <span class="rec">추천</span></h2>
+<p>☰과 같은 48px 동그라미·같은 중립색. <b>한 화면 이상 내려갔을 때만</b> 나타나고 맨 위에선 사라진다.</p>
+<ul><li>맨 아래뿐 아니라 <b>어디서든</b> 한 번에 올라간다 — 긴 소제목 중간에서도.</li>
+<li>☰ 왼쪽(오른쪽 80px)이라 확정본의 <b>발송(☰ 위)</b>과 부딪히지 않고, 두 화면에서 같은 자리.</li>
+<li>동그라미 = 떠 있는 버튼(모양 규칙 그대로). 아이콘은 막대 달린 ↑(「맨 위」) — 기사 ↑↓·소제목 ▲▼와 헷갈리지 않게.</li></ul>
+<div class="pair"><div class="frame"><span class="scr-name">초안</span><div class="scr"><div class="container"><div id="preview-body"><section class="subheading subheading-custom" id="subheading-4" data-toc-name="&lt;기타&gt;" data-order-locked="1" data-group="기타"><h2><span class="subheading-title"><input type="checkbox" class="group-select-all" onclick="event.stopPropagation();" onchange="toggleGroupSelectAll(this);" title="이 소제목 기사 전체 선택"> &lt;기타&gt;<span class="subheading-count">3</span></span><span class="subheading-icons"><button class="rename-btn group-copy-btn" type="button" data-copy-text="&lt;기타&gt;
+ㅇ (머니투데이) [단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발
+https://n.news.naver.com/mnews/article/008/0005417359
+
+ㅇ (시사저널) 與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나
+https://n.news.naver.com/mnews/article/586/0000138763
+
+ㅇ (데일리안) 유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”
+https://n.news.naver.com/mnews/article/119/0003135664
+" onclick="copyArticleIcon(this)" title="이 소제목만 복사"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button> <button class="rename-btn" type="button" data-name="기타" data-current="기타" onclick="renameGroup(this)" title="소제목 이름 바꾸기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button> <button class="rename-btn group-hide-btn" type="button" onclick="hideGroup(this)" title="이 소제목 기사 3건 통째로 숨기기(기사 각각 숨긴 것과 동일 — 되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button></span></h2><div class="article art-scoop" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-outlet-rank="0"><details><summary><div class="title-row"><input type="checkbox" class="article-select" data-url="https://n.news.naver.com/mnews/article/008/0005417359" onclick="event.stopPropagation();" onchange="updateBulkMoveBar();"><span class="title-line"><span class="title-outlet">머니투데이</span><span class="t-scoop">[단독]</span><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발</span></div><div class="action-row"><span class="pub-time">14:44 · <span class="pub-time-relative" data-pub-date="2026-09-22T14:44:00+09:00"></span></span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/008/0005417359" target="_blank" rel="noopener noreferrer" title="https://n.news.naver.com/mnews/article/008/0005417359">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 수집된 검색어입니다"><span class="time-sep">·</span><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 기획재정부, 재정경제기획위원회</span></span><span class="article-actions"><select class="group-move-select" onclick="event.stopPropagation();" onchange="event.stopPropagation(); moveArticleToGroup(this);"><option value="" selected disabled>다른 소제목</option><option value="이형일 부총리 취임 및 경제 방침">이형일 부총리 현안 점검 - 첫 간부회의</option><option value="구윤철 전 부총리 퇴임">구윤철 전 부총리 퇴임</option><option value="대미 투자 1호 프로젝트 확정">대미투자 국회 보고</option><option value="공공조달 정책">제4차 조달정책심의위원회</option></select><span class="lab-pop-wrap"><button class="iconbtn lab-btn" type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-outlet="머니투데이" data-title="[단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발" data-pub-date="2026-09-22T14:44:00+09:00" data-group="기타" data-scrap-date="2026-09-22" data-scrap-end="17:00" onclick="event.stopPropagation(); event.preventDefault(); toggleLabelPopover(this);" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="lab-pop hidden" onclick="event.stopPropagation(); event.preventDefault();"><h4>이 기사에 붙은 라벨</h4><div class="attached"><span class="none">아직 없음</span></div><h4>이미 쓴 라벨 (눌러서 붙이기)</h4><div class="known"><span class="known-chip" data-label="사진 아님" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">사진 아님<span class="n">2</span></span><span class="known-chip" data-label="부정기사" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">부정기사<span class="n">1</span></span><span class="known-chip" data-label="비상경제본부회의" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">비상경제본부회의<span class="n">1</span></span><span class="known-chip" data-label="카톡보고" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">카톡보고<span class="n">1</span></span><span class="known-chip" data-label="테스트" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">테스트<span class="n">1</span></span></div><div class="addbox"><input type="text" placeholder="새 라벨 입력" class="lab-input" onkeydown="event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);"><button type="button" onclick="event.stopPropagation(); event.preventDefault(); addLabelFromInput(this.previousElementSibling);">추가</button></div><div class="sim-warn hidden"></div><p class="hint">라벨은 보고서 텍스트(복사·txt·발송)에 나가지 않습니다. 화면과 엑셀 내보내기에만 표시됩니다.</p></span></span><span class="more-wrap"><button class="more-btn" type="button" onclick="event.stopPropagation(); toggleArticleMenu(this);" title="더보기" aria-label="더보기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button><span class="more-menu"><button type="button" data-copy-text="ㅇ (머니투데이) [단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발
+https://n.news.naver.com/mnews/article/008/0005417359" onclick="event.stopPropagation(); closeArticleMenus(); copyArticleIcon(this, this.closest('.more-wrap').querySelector('.more-btn'));">복사하기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-title="[단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발" data-summary="별도 법인으로 출범한 수협은행의 첫 연임 행장이 된다. 이 원장이 최종 후보로 선정되면 금융위원회 출신 최초이며 재정경제부 출신 이원태 전 행장이 물러난 2017년 이후 9년 만의 관료 출신 수협은행장이 된다." onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button></span></span><button class="hide-btn" type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-outlet="머니투데이" data-title="[단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발" data-pub-date="2026-09-22T14:44:00+09:00" data-group="기타" onclick="event.stopPropagation(); hideArticle(this);" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-direction="up" onclick="event.stopPropagation(); previewMoveArticle(this);" disabled title="소제목 안에서 위로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-direction="down" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><p class="article-summary">별도 법인으로 출범한 수협은행의 첫 연임 행장이 된다. 이 원장이 최종 후보로 선정되면 금융위원회 출신 최초이며 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 출신 이원태 전 행장이 물러난 2017년 이후 9년 만의 관료 출신 수협은행장이 된다.</p></details></div>
+<div class="article" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-outlet-rank="31"><details><summary><div class="title-row"><input type="checkbox" class="article-select" data-url="https://n.news.naver.com/mnews/article/586/0000138763" onclick="event.stopPropagation();" onchange="updateBulkMoveBar();"><span class="title-line"><span class="title-outlet">시사저널</span>與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나</span></div><div class="action-row"><span class="pub-time">14:45 · <span class="pub-time-relative" data-pub-date="2026-09-22T14:45:00+09:00"></span></span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/586/0000138763" target="_blank" rel="noopener noreferrer" title="https://n.news.naver.com/mnews/article/586/0000138763">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 수집된 검색어입니다"><span class="time-sep">·</span><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 재경부</span></span><span class="article-actions"><select class="group-move-select" onclick="event.stopPropagation();" onchange="event.stopPropagation(); moveArticleToGroup(this);"><option value="" selected disabled>다른 소제목</option><option value="이형일 부총리 취임 및 경제 방침">이형일 부총리 현안 점검 - 첫 간부회의</option><option value="구윤철 전 부총리 퇴임">구윤철 전 부총리 퇴임</option><option value="대미 투자 1호 프로젝트 확정">대미투자 국회 보고</option><option value="공공조달 정책">제4차 조달정책심의위원회</option></select><span class="lab-pop-wrap"><button class="iconbtn lab-btn" type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-outlet="시사저널" data-title="與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나" data-pub-date="2026-09-22T14:45:00+09:00" data-group="기타" data-scrap-date="2026-09-22" data-scrap-end="17:00" onclick="event.stopPropagation(); event.preventDefault(); toggleLabelPopover(this);" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="lab-pop hidden" onclick="event.stopPropagation(); event.preventDefault();"><h4>이 기사에 붙은 라벨</h4><div class="attached"><span class="none">아직 없음</span></div><h4>이미 쓴 라벨 (눌러서 붙이기)</h4><div class="known"><span class="known-chip" data-label="사진 아님" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">사진 아님<span class="n">2</span></span><span class="known-chip" data-label="부정기사" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">부정기사<span class="n">1</span></span><span class="known-chip" data-label="비상경제본부회의" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">비상경제본부회의<span class="n">1</span></span><span class="known-chip" data-label="카톡보고" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">카톡보고<span class="n">1</span></span><span class="known-chip" data-label="테스트" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">테스트<span class="n">1</span></span></div><div class="addbox"><input type="text" placeholder="새 라벨 입력" class="lab-input" onkeydown="event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);"><button type="button" onclick="event.stopPropagation(); event.preventDefault(); addLabelFromInput(this.previousElementSibling);">추가</button></div><div class="sim-warn hidden"></div><p class="hint">라벨은 보고서 텍스트(복사·txt·발송)에 나가지 않습니다. 화면과 엑셀 내보내기에만 표시됩니다.</p></span></span><span class="more-wrap"><button class="more-btn" type="button" onclick="event.stopPropagation(); toggleArticleMenu(this);" title="더보기" aria-label="더보기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button><span class="more-menu"><button type="button" data-copy-text="ㅇ (시사저널) 與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나
+https://n.news.naver.com/mnews/article/586/0000138763" onclick="event.stopPropagation(); closeArticleMenus(); copyArticleIcon(this, this.closest('.more-wrap').querySelector('.more-btn'));">복사하기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-title="與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나" data-summary="재정경제부는 지난달 발표한 2026년 세제개편안에 가상자산 과세 유예안을 포함하지 않았고, 당시 재경부 관계자는 &quot;현행법대로 내년 1월 가상자산 과세를 할 것&quot;이라고 밝혔다. 국세청도 시행을 전제로 과세 준비를 진행... " onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button></span></span><button class="hide-btn" type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-outlet="시사저널" data-title="與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나" data-pub-date="2026-09-22T14:45:00+09:00" data-group="기타" onclick="event.stopPropagation(); hideArticle(this);" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-direction="up" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 위로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-direction="down" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><p class="article-summary"><span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 지난달 발표한 2026년 세제개편안에 가상자산 과세 유예안을 포함하지 않았고, 당시 <span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span> 관계자는 &quot;현행법대로 내년 1월 가상자산 과세를 할 것&quot;이라고 밝혔다. 국세청도 시행을 전제로 과세 준비를 진행... </p></details></div>
+<div class="article" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-outlet-rank="32"><details><summary><div class="title-row"><input type="checkbox" class="article-select" data-url="https://n.news.naver.com/mnews/article/119/0003135664" onclick="event.stopPropagation();" onchange="updateBulkMoveBar();"><span class="title-line"><span class="title-outlet">데일리안</span>유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”</span></div><div class="action-row"><span class="pub-time">16:20 · <span class="pub-time-relative" data-pub-date="2026-09-22T16:20:00+09:00"></span></span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/119/0003135664" target="_blank" rel="noopener noreferrer" title="https://n.news.naver.com/mnews/article/119/0003135664">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 수집된 검색어입니다"><span class="time-sep">·</span><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><span class="article-actions"><select class="group-move-select" onclick="event.stopPropagation();" onchange="event.stopPropagation(); moveArticleToGroup(this);"><option value="" selected disabled>다른 소제목</option><option value="이형일 부총리 취임 및 경제 방침">이형일 부총리 현안 점검 - 첫 간부회의</option><option value="구윤철 전 부총리 퇴임">구윤철 전 부총리 퇴임</option><option value="대미 투자 1호 프로젝트 확정">대미투자 국회 보고</option><option value="공공조달 정책">제4차 조달정책심의위원회</option></select><span class="lab-pop-wrap"><button class="iconbtn lab-btn" type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-outlet="데일리안" data-title="유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”" data-pub-date="2026-09-22T16:20:00+09:00" data-group="기타" data-scrap-date="2026-09-22" data-scrap-end="17:00" onclick="event.stopPropagation(); event.preventDefault(); toggleLabelPopover(this);" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="lab-pop hidden" onclick="event.stopPropagation(); event.preventDefault();"><h4>이 기사에 붙은 라벨</h4><div class="attached"><span class="none">아직 없음</span></div><h4>이미 쓴 라벨 (눌러서 붙이기)</h4><div class="known"><span class="known-chip" data-label="사진 아님" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">사진 아님<span class="n">2</span></span><span class="known-chip" data-label="부정기사" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">부정기사<span class="n">1</span></span><span class="known-chip" data-label="비상경제본부회의" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">비상경제본부회의<span class="n">1</span></span><span class="known-chip" data-label="카톡보고" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">카톡보고<span class="n">1</span></span><span class="known-chip" data-label="테스트" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">테스트<span class="n">1</span></span></div><div class="addbox"><input type="text" placeholder="새 라벨 입력" class="lab-input" onkeydown="event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);"><button type="button" onclick="event.stopPropagation(); event.preventDefault(); addLabelFromInput(this.previousElementSibling);">추가</button></div><div class="sim-warn hidden"></div><p class="hint">라벨은 보고서 텍스트(복사·txt·발송)에 나가지 않습니다. 화면과 엑셀 내보내기에만 표시됩니다.</p></span></span><span class="more-wrap"><button class="more-btn" type="button" onclick="event.stopPropagation(); toggleArticleMenu(this);" title="더보기" aria-label="더보기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button><span class="more-menu"><button type="button" data-copy-text="ㅇ (데일리안) 유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”
+https://n.news.naver.com/mnews/article/119/0003135664" onclick="event.stopPropagation(); closeArticleMenus(); copyArticleIcon(this, this.closest('.more-wrap').querySelector('.more-btn'));">복사하기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-title="유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”" data-summary="통행료 인상 역시 “재정경제부 권한으로, 대중교통과 철도 등에 대한 요금 논의가 있을 때 자연스럽게 같이 검토될 사안”이라고 내다봤다. 이날 홍지선 국토부 장관이 임명된 것에 대해선 원활한 소통을 이어가겠단... " onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button></span></span><button class="hide-btn" type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-outlet="데일리안" data-title="유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”" data-pub-date="2026-09-22T16:20:00+09:00" data-group="기타" onclick="event.stopPropagation(); hideArticle(this);" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-direction="up" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 위로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-direction="down" onclick="event.stopPropagation(); previewMoveArticle(this);" disabled title="소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><p class="article-summary">통행료 인상 역시 “<span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 권한으로, 대중교통과 철도 등에 대한 요금 논의가 있을 때 자연스럽게 같이 검토될 사안”이라고 내다봤다. 이날 홍지선 국토부 장관이 임명된 것에 대해선 원활한 소통을 이어가겠단... </p></details></div></section><div class="bottom"><div class="bottom-summary"><div class="bottom-header-row"><h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.6a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 20.5l1.6-4.5A8.4 8.4 0 0 1 12 3.2a8.4 8.4 0 0 1 9 8.4Z"/></svg> AI가 읽은 소제목별 주요 요약</h3><button type="button" class="bottom-summary-copy" onclick="copyAiSummary(this)" data-copy-text="🤖 AI가 읽은 소제목별 주요 요약
+
+&lt;이형일 부총리 현안 점검 - 첫 간부회의&gt;
+겸 재정경제부 장관이 이날 오후 첫 주요 간부회의를 주재해 경제상황과 주요 현안을 점검했다. 이 부총리는 그간 경제팀을 이끌어 온 구윤철 전 부총리의 노고에 감사를 표하는 한편 직원들에게 업무 연속성 유지를.
+
+&lt;구윤철 전 부총리 퇴임&gt;
+이재명 대통령은 이날 이형일 부총리 겸 재경부 장관 후보자의 임명안을 재가했다. 이 부총리는 재가 직후 임기를 시작했다. 구 전 부총리는 &quot;잠재성장률 3%, 수출 4대 강국, 1인당 국민소득 5만달러를 향한 &#x27;3·4·5 비전&#x27;을.
+
+&lt;대미투자 국회 보고&gt;
+김정관 산업통상부 장관과 이형일 부총리 겸 재정경제부 장관은 이날 국회 산업통상자원중소벤처기업위원회와 재정경제기획위원회 전체회의에 각각 출석해 이 같은 내용의 대미 투자 계획을 비공개 보고했다. 국회에.
+
+&lt;제4차 조달정책심의위원회&gt;
+재정경제부는 22일 허장 제2차관 주재로 제4차 조달정책심의위원회를 열고 ‘공공기관 계약특례 정비 및 관리체계 개선방안’과 ‘혁신제품 유형Ⅰ 정비안’ 등을 심의·의결했다고 밝혔다. 공공기관 계약특례는 재경부.
+
+&lt;기타&gt;
+- [단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발
+- 與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나
+- 유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”">복사</button></div><div class="bottom-summary-item"><strong>&lt;이형일 부총리 현안 점검 - 첫 간부회의&gt;</strong><p>겸 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 장관이 이날 오후 첫 주요 간부회의를 주재해 경제상황과 주요 현안을 점검했다. 이 부총리는 그간 경제팀을 이끌어 온 구윤철 전 부총리의 노고에 감사를 표하는 한편 직원들에게 업무 연속성 유지를.</p></div><div class="bottom-summary-item"><strong>&lt;구윤철 전 부총리 퇴임&gt;</strong><p>이재명 대통령은 이날 <span class="hl-word" data-word="이형일" style="background-color:#E4F1FC;color:#1F2937">이형일</span> 부총리 겸 <span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span> 장관 후보자의 임명안을 재가했다. 이 부총리는 재가 직후 임기를 시작했다. 구 전 부총리는 &quot;잠재성장률 3%, 수출 4대 강국, 1인당 국민소득 5만달러를 향한 &#x27;3·4·5 비전&#x27;을.</p></div><div class="bottom-summary-item"><strong>&lt;대미투자 국회 보고&gt;</strong><p>김정관 산업통상부 장관과 <span class="hl-word" data-word="이형일" style="background-color:#E4F1FC;color:#1F2937">이형일</span> 부총리 겸 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 장관은 이날 국회 산업통상자원중소벤처기업위원회와 재정경제기획위원회 전체회의에 각각 출석해 이 같은 내용의 대미 투자 계획을 비공개 보고했다. 국회에.</p></div><div class="bottom-summary-item"><strong>&lt;제4차 조달정책심의위원회&gt;</strong><p><span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 22일 허장 제2차관 주재로 제4차 조달정책심의위원회를 열고 ‘공공기관 계약특례 정비 및 관리체계 개선방안’과 ‘혁신제품 유형Ⅰ 정비안’ 등을 심의·의결했다고 밝혔다. 공공기관 계약특례는 <span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span>.</p></div><div class="bottom-summary-item"><strong>&lt;기타&gt;</strong><p>- [단독]<span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발
+- 與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나
+- 유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”</p></div></div></div><div class="manual-divider">이 아래는 복사·내보내기에 포함되지 않음</div><div class="manual-zone"><div class="manual-zone-head"><div class="manual-zone-left"><span class="manual-zone-title"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg> 담아둔 기사</span><span class="manual-zone-empty">전체 기사에서 📌 담아두거나, 직접 넣을 수 있어요</span><button class="create-group-btn url-add-open-btn" type="button" id="url-add-open-btn" onclick="openUrlAdd()" title="네이버에서 직접 찾은 기사를 주소만으로 담아둡니다">+ 수기로 기사 추가</button></div><span class="manual-zone-hint">자정에 자동으로 비워져요</span></div><div class="url-add-zone" id="url-add-zone"><div class="url-add-row"><input type="text" id="url-add-input" placeholder="네이버 기사 주소를 붙여넣으세요" onkeydown="urlAddKey(event)" oninput="clearUrlAddWarn()"><button type="button" id="url-add-btn" onclick="submitUrlAdd()">추가</button><button class="url-add-close" type="button" onclick="closeUrlAdd()" title="닫기" aria-label="닫기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div><div class="url-add-hint">붙여넣고 추가(또는 Enter)하면 바로 담아둔 기사에 들어가요.</div><div class="url-add-warn" id="url-add-warn" role="alert"></div></div></div></div>
+<div style="height:40px"></div></div></div>
+<button type="button" class="undo-fab" onclick="undoLastAction(this)" title="기사 숨기기 되돌리기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg></button><button type="button" class="trash-fab" onclick="toggleTrashPopover()" title="숨긴 기사 221건"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg><span class="badge">221</span></button><button type="button" class="toc-toggle-btn" onclick="toggleTocPopover()" title="소제목 목차"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><button type="button" class="top-fab" title="맨 위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14"/><path d="m7 13 5-5 5 5"/><path d="M12 8v12"/></svg></button><div class="bottombar"><div class="bottombar-inner">
+  <div class="highlight-wrap">
+    <button type="button" class="highlight-toggle" onclick="toggleHighlightPopover()" title="형광펜 단어 편집"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3.2 20.8 9l-8.2 8.2H6.8V11.4Z"/><path d="m11.4 6.8 5.8 5.8"/><path d="M3.5 21h17"/></svg></button>
+    <div class="highlight-popover" id="highlight-popover">
+      <div class="highlight-chips" id="highlight-chips"></div>
+      <form class="highlight-add-form" onsubmit="return addHighlightWord(event);">
+        <input type="text" id="highlight-new-word" placeholder="단어 추가" maxlength="20">
+        <button type="submit">추가</button>
+      </form>
+    </div>
+  </div>
+</div></div></div><div class="frame"><span class="scr-name">확정본</span><div class="scr"><div class="container"><div id="preview-body"><section class="subheading subheading-custom" id="subheading-4" data-toc-name="&lt;기타&gt;" data-order-locked="1" data-group="기타"><h2><span class="subheading-title"><input type="checkbox" class="group-select-all" onclick="event.stopPropagation();" onchange="toggleGroupSelectAll(this);" title="이 소제목 기사 전체 선택"> &lt;기타&gt;<span class="subheading-count">3</span></span><span class="subheading-icons"><button class="rename-btn group-copy-btn" type="button" data-copy-text="&lt;기타&gt;
+ㅇ (머니투데이) [단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발
+https://n.news.naver.com/mnews/article/008/0005417359
+
+ㅇ (시사저널) 與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나
+https://n.news.naver.com/mnews/article/586/0000138763
+
+ㅇ (데일리안) 유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”
+https://n.news.naver.com/mnews/article/119/0003135664
+" onclick="copyArticleIcon(this)" title="이 소제목만 복사"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button> <button class="rename-btn" type="button" data-name="기타" data-current="기타" onclick="renameGroup(this)" title="소제목 이름 바꾸기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button> <button class="rename-btn group-hide-btn" type="button" onclick="hideGroup(this)" title="이 소제목 기사 3건 통째로 숨기기(기사 각각 숨긴 것과 동일 — 되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button></span></h2><div class="article art-scoop" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-outlet-rank="0"><details><summary><div class="title-row"><input type="checkbox" class="article-select" data-url="https://n.news.naver.com/mnews/article/008/0005417359" onclick="event.stopPropagation();" onchange="updateBulkMoveBar();"><span class="title-line"><span class="title-outlet">머니투데이</span><span class="t-scoop">[단독]</span><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발</span></div><div class="action-row"><span class="pub-time">14:44 · <span class="pub-time-relative" data-pub-date="2026-09-22T14:44:00+09:00"></span></span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/008/0005417359" target="_blank" rel="noopener noreferrer" title="https://n.news.naver.com/mnews/article/008/0005417359">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 수집된 검색어입니다"><span class="time-sep">·</span><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 기획재정부, 재정경제기획위원회</span></span><span class="article-actions"><select class="group-move-select" onclick="event.stopPropagation();" onchange="event.stopPropagation(); moveArticleToGroup(this);"><option value="" selected disabled>다른 소제목</option><option value="이형일 부총리 취임 및 경제 방침">이형일 부총리 현안 점검 - 첫 간부회의</option><option value="구윤철 전 부총리 퇴임">구윤철 전 부총리 퇴임</option><option value="대미 투자 1호 프로젝트 확정">대미투자 국회 보고</option><option value="공공조달 정책">제4차 조달정책심의위원회</option></select><span class="lab-pop-wrap"><button class="iconbtn lab-btn" type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-outlet="머니투데이" data-title="[단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발" data-pub-date="2026-09-22T14:44:00+09:00" data-group="기타" data-scrap-date="2026-09-22" data-scrap-end="17:00" onclick="event.stopPropagation(); event.preventDefault(); toggleLabelPopover(this);" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="lab-pop hidden" onclick="event.stopPropagation(); event.preventDefault();"><h4>이 기사에 붙은 라벨</h4><div class="attached"><span class="none">아직 없음</span></div><h4>이미 쓴 라벨 (눌러서 붙이기)</h4><div class="known"><span class="known-chip" data-label="사진 아님" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">사진 아님<span class="n">2</span></span><span class="known-chip" data-label="부정기사" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">부정기사<span class="n">1</span></span><span class="known-chip" data-label="비상경제본부회의" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">비상경제본부회의<span class="n">1</span></span><span class="known-chip" data-label="카톡보고" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">카톡보고<span class="n">1</span></span><span class="known-chip" data-label="테스트" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">테스트<span class="n">1</span></span></div><div class="addbox"><input type="text" placeholder="새 라벨 입력" class="lab-input" onkeydown="event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);"><button type="button" onclick="event.stopPropagation(); event.preventDefault(); addLabelFromInput(this.previousElementSibling);">추가</button></div><div class="sim-warn hidden"></div><p class="hint">라벨은 보고서 텍스트(복사·txt·발송)에 나가지 않습니다. 화면과 엑셀 내보내기에만 표시됩니다.</p></span></span><span class="more-wrap"><button class="more-btn" type="button" onclick="event.stopPropagation(); toggleArticleMenu(this);" title="더보기" aria-label="더보기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button><span class="more-menu"><button type="button" data-copy-text="ㅇ (머니투데이) [단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발
+https://n.news.naver.com/mnews/article/008/0005417359" onclick="event.stopPropagation(); closeArticleMenus(); copyArticleIcon(this, this.closest('.more-wrap').querySelector('.more-btn'));">복사하기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-title="[단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발" data-summary="별도 법인으로 출범한 수협은행의 첫 연임 행장이 된다. 이 원장이 최종 후보로 선정되면 금융위원회 출신 최초이며 재정경제부 출신 이원태 전 행장이 물러난 2017년 이후 9년 만의 관료 출신 수협은행장이 된다." onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button></span></span><button class="hide-btn" type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-outlet="머니투데이" data-title="[단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발" data-pub-date="2026-09-22T14:44:00+09:00" data-group="기타" onclick="event.stopPropagation(); hideArticle(this);" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-direction="up" onclick="event.stopPropagation(); previewMoveArticle(this);" disabled title="소제목 안에서 위로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-direction="down" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><p class="article-summary">별도 법인으로 출범한 수협은행의 첫 연임 행장이 된다. 이 원장이 최종 후보로 선정되면 금융위원회 출신 최초이며 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 출신 이원태 전 행장이 물러난 2017년 이후 9년 만의 관료 출신 수협은행장이 된다.</p></details></div>
+<div class="article" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-outlet-rank="31"><details><summary><div class="title-row"><input type="checkbox" class="article-select" data-url="https://n.news.naver.com/mnews/article/586/0000138763" onclick="event.stopPropagation();" onchange="updateBulkMoveBar();"><span class="title-line"><span class="title-outlet">시사저널</span>與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나</span></div><div class="action-row"><span class="pub-time">14:45 · <span class="pub-time-relative" data-pub-date="2026-09-22T14:45:00+09:00"></span></span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/586/0000138763" target="_blank" rel="noopener noreferrer" title="https://n.news.naver.com/mnews/article/586/0000138763">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 수집된 검색어입니다"><span class="time-sep">·</span><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 재경부</span></span><span class="article-actions"><select class="group-move-select" onclick="event.stopPropagation();" onchange="event.stopPropagation(); moveArticleToGroup(this);"><option value="" selected disabled>다른 소제목</option><option value="이형일 부총리 취임 및 경제 방침">이형일 부총리 현안 점검 - 첫 간부회의</option><option value="구윤철 전 부총리 퇴임">구윤철 전 부총리 퇴임</option><option value="대미 투자 1호 프로젝트 확정">대미투자 국회 보고</option><option value="공공조달 정책">제4차 조달정책심의위원회</option></select><span class="lab-pop-wrap"><button class="iconbtn lab-btn" type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-outlet="시사저널" data-title="與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나" data-pub-date="2026-09-22T14:45:00+09:00" data-group="기타" data-scrap-date="2026-09-22" data-scrap-end="17:00" onclick="event.stopPropagation(); event.preventDefault(); toggleLabelPopover(this);" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="lab-pop hidden" onclick="event.stopPropagation(); event.preventDefault();"><h4>이 기사에 붙은 라벨</h4><div class="attached"><span class="none">아직 없음</span></div><h4>이미 쓴 라벨 (눌러서 붙이기)</h4><div class="known"><span class="known-chip" data-label="사진 아님" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">사진 아님<span class="n">2</span></span><span class="known-chip" data-label="부정기사" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">부정기사<span class="n">1</span></span><span class="known-chip" data-label="비상경제본부회의" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">비상경제본부회의<span class="n">1</span></span><span class="known-chip" data-label="카톡보고" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">카톡보고<span class="n">1</span></span><span class="known-chip" data-label="테스트" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">테스트<span class="n">1</span></span></div><div class="addbox"><input type="text" placeholder="새 라벨 입력" class="lab-input" onkeydown="event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);"><button type="button" onclick="event.stopPropagation(); event.preventDefault(); addLabelFromInput(this.previousElementSibling);">추가</button></div><div class="sim-warn hidden"></div><p class="hint">라벨은 보고서 텍스트(복사·txt·발송)에 나가지 않습니다. 화면과 엑셀 내보내기에만 표시됩니다.</p></span></span><span class="more-wrap"><button class="more-btn" type="button" onclick="event.stopPropagation(); toggleArticleMenu(this);" title="더보기" aria-label="더보기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button><span class="more-menu"><button type="button" data-copy-text="ㅇ (시사저널) 與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나
+https://n.news.naver.com/mnews/article/586/0000138763" onclick="event.stopPropagation(); closeArticleMenus(); copyArticleIcon(this, this.closest('.more-wrap').querySelector('.more-btn'));">복사하기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-title="與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나" data-summary="재정경제부는 지난달 발표한 2026년 세제개편안에 가상자산 과세 유예안을 포함하지 않았고, 당시 재경부 관계자는 &quot;현행법대로 내년 1월 가상자산 과세를 할 것&quot;이라고 밝혔다. 국세청도 시행을 전제로 과세 준비를 진행... " onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button></span></span><button class="hide-btn" type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-outlet="시사저널" data-title="與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나" data-pub-date="2026-09-22T14:45:00+09:00" data-group="기타" onclick="event.stopPropagation(); hideArticle(this);" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-direction="up" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 위로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-direction="down" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><p class="article-summary"><span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 지난달 발표한 2026년 세제개편안에 가상자산 과세 유예안을 포함하지 않았고, 당시 <span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span> 관계자는 &quot;현행법대로 내년 1월 가상자산 과세를 할 것&quot;이라고 밝혔다. 국세청도 시행을 전제로 과세 준비를 진행... </p></details></div>
+<div class="article" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-outlet-rank="32"><details><summary><div class="title-row"><input type="checkbox" class="article-select" data-url="https://n.news.naver.com/mnews/article/119/0003135664" onclick="event.stopPropagation();" onchange="updateBulkMoveBar();"><span class="title-line"><span class="title-outlet">데일리안</span>유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”</span></div><div class="action-row"><span class="pub-time">16:20 · <span class="pub-time-relative" data-pub-date="2026-09-22T16:20:00+09:00"></span></span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/119/0003135664" target="_blank" rel="noopener noreferrer" title="https://n.news.naver.com/mnews/article/119/0003135664">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 수집된 검색어입니다"><span class="time-sep">·</span><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><span class="article-actions"><select class="group-move-select" onclick="event.stopPropagation();" onchange="event.stopPropagation(); moveArticleToGroup(this);"><option value="" selected disabled>다른 소제목</option><option value="이형일 부총리 취임 및 경제 방침">이형일 부총리 현안 점검 - 첫 간부회의</option><option value="구윤철 전 부총리 퇴임">구윤철 전 부총리 퇴임</option><option value="대미 투자 1호 프로젝트 확정">대미투자 국회 보고</option><option value="공공조달 정책">제4차 조달정책심의위원회</option></select><span class="lab-pop-wrap"><button class="iconbtn lab-btn" type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-outlet="데일리안" data-title="유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”" data-pub-date="2026-09-22T16:20:00+09:00" data-group="기타" data-scrap-date="2026-09-22" data-scrap-end="17:00" onclick="event.stopPropagation(); event.preventDefault(); toggleLabelPopover(this);" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="lab-pop hidden" onclick="event.stopPropagation(); event.preventDefault();"><h4>이 기사에 붙은 라벨</h4><div class="attached"><span class="none">아직 없음</span></div><h4>이미 쓴 라벨 (눌러서 붙이기)</h4><div class="known"><span class="known-chip" data-label="사진 아님" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">사진 아님<span class="n">2</span></span><span class="known-chip" data-label="부정기사" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">부정기사<span class="n">1</span></span><span class="known-chip" data-label="비상경제본부회의" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">비상경제본부회의<span class="n">1</span></span><span class="known-chip" data-label="카톡보고" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">카톡보고<span class="n">1</span></span><span class="known-chip" data-label="테스트" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">테스트<span class="n">1</span></span></div><div class="addbox"><input type="text" placeholder="새 라벨 입력" class="lab-input" onkeydown="event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);"><button type="button" onclick="event.stopPropagation(); event.preventDefault(); addLabelFromInput(this.previousElementSibling);">추가</button></div><div class="sim-warn hidden"></div><p class="hint">라벨은 보고서 텍스트(복사·txt·발송)에 나가지 않습니다. 화면과 엑셀 내보내기에만 표시됩니다.</p></span></span><span class="more-wrap"><button class="more-btn" type="button" onclick="event.stopPropagation(); toggleArticleMenu(this);" title="더보기" aria-label="더보기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button><span class="more-menu"><button type="button" data-copy-text="ㅇ (데일리안) 유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”
+https://n.news.naver.com/mnews/article/119/0003135664" onclick="event.stopPropagation(); closeArticleMenus(); copyArticleIcon(this, this.closest('.more-wrap').querySelector('.more-btn'));">복사하기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-title="유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”" data-summary="통행료 인상 역시 “재정경제부 권한으로, 대중교통과 철도 등에 대한 요금 논의가 있을 때 자연스럽게 같이 검토될 사안”이라고 내다봤다. 이날 홍지선 국토부 장관이 임명된 것에 대해선 원활한 소통을 이어가겠단... " onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button></span></span><button class="hide-btn" type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-outlet="데일리안" data-title="유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”" data-pub-date="2026-09-22T16:20:00+09:00" data-group="기타" onclick="event.stopPropagation(); hideArticle(this);" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-direction="up" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 위로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-direction="down" onclick="event.stopPropagation(); previewMoveArticle(this);" disabled title="소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><p class="article-summary">통행료 인상 역시 “<span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 권한으로, 대중교통과 철도 등에 대한 요금 논의가 있을 때 자연스럽게 같이 검토될 사안”이라고 내다봤다. 이날 홍지선 국토부 장관이 임명된 것에 대해선 원활한 소통을 이어가겠단... </p></details></div></section><div class="bottom"><div class="bottom-summary"><div class="bottom-header-row"><h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.6a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 20.5l1.6-4.5A8.4 8.4 0 0 1 12 3.2a8.4 8.4 0 0 1 9 8.4Z"/></svg> AI가 읽은 소제목별 주요 요약</h3><button type="button" class="bottom-summary-copy" onclick="copyAiSummary(this)" data-copy-text="🤖 AI가 읽은 소제목별 주요 요약
+
+&lt;이형일 부총리 현안 점검 - 첫 간부회의&gt;
+겸 재정경제부 장관이 이날 오후 첫 주요 간부회의를 주재해 경제상황과 주요 현안을 점검했다. 이 부총리는 그간 경제팀을 이끌어 온 구윤철 전 부총리의 노고에 감사를 표하는 한편 직원들에게 업무 연속성 유지를.
+
+&lt;구윤철 전 부총리 퇴임&gt;
+이재명 대통령은 이날 이형일 부총리 겸 재경부 장관 후보자의 임명안을 재가했다. 이 부총리는 재가 직후 임기를 시작했다. 구 전 부총리는 &quot;잠재성장률 3%, 수출 4대 강국, 1인당 국민소득 5만달러를 향한 &#x27;3·4·5 비전&#x27;을.
+
+&lt;대미투자 국회 보고&gt;
+김정관 산업통상부 장관과 이형일 부총리 겸 재정경제부 장관은 이날 국회 산업통상자원중소벤처기업위원회와 재정경제기획위원회 전체회의에 각각 출석해 이 같은 내용의 대미 투자 계획을 비공개 보고했다. 국회에.
+
+&lt;제4차 조달정책심의위원회&gt;
+재정경제부는 22일 허장 제2차관 주재로 제4차 조달정책심의위원회를 열고 ‘공공기관 계약특례 정비 및 관리체계 개선방안’과 ‘혁신제품 유형Ⅰ 정비안’ 등을 심의·의결했다고 밝혔다. 공공기관 계약특례는 재경부.
+
+&lt;기타&gt;
+- [단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발
+- 與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나
+- 유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”">복사</button></div><div class="bottom-summary-item"><strong>&lt;이형일 부총리 현안 점검 - 첫 간부회의&gt;</strong><p>겸 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 장관이 이날 오후 첫 주요 간부회의를 주재해 경제상황과 주요 현안을 점검했다. 이 부총리는 그간 경제팀을 이끌어 온 구윤철 전 부총리의 노고에 감사를 표하는 한편 직원들에게 업무 연속성 유지를.</p></div><div class="bottom-summary-item"><strong>&lt;구윤철 전 부총리 퇴임&gt;</strong><p>이재명 대통령은 이날 <span class="hl-word" data-word="이형일" style="background-color:#E4F1FC;color:#1F2937">이형일</span> 부총리 겸 <span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span> 장관 후보자의 임명안을 재가했다. 이 부총리는 재가 직후 임기를 시작했다. 구 전 부총리는 &quot;잠재성장률 3%, 수출 4대 강국, 1인당 국민소득 5만달러를 향한 &#x27;3·4·5 비전&#x27;을.</p></div><div class="bottom-summary-item"><strong>&lt;대미투자 국회 보고&gt;</strong><p>김정관 산업통상부 장관과 <span class="hl-word" data-word="이형일" style="background-color:#E4F1FC;color:#1F2937">이형일</span> 부총리 겸 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 장관은 이날 국회 산업통상자원중소벤처기업위원회와 재정경제기획위원회 전체회의에 각각 출석해 이 같은 내용의 대미 투자 계획을 비공개 보고했다. 국회에.</p></div><div class="bottom-summary-item"><strong>&lt;제4차 조달정책심의위원회&gt;</strong><p><span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 22일 허장 제2차관 주재로 제4차 조달정책심의위원회를 열고 ‘공공기관 계약특례 정비 및 관리체계 개선방안’과 ‘혁신제품 유형Ⅰ 정비안’ 등을 심의·의결했다고 밝혔다. 공공기관 계약특례는 <span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span>.</p></div><div class="bottom-summary-item"><strong>&lt;기타&gt;</strong><p>- [단독]<span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발
+- 與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나
+- 유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”</p></div></div></div><div class="manual-divider">이 아래는 복사·내보내기에 포함되지 않음</div><div class="manual-zone"><div class="manual-zone-head"><div class="manual-zone-left"><span class="manual-zone-title"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg> 담아둔 기사</span><span class="manual-zone-empty">전체 기사에서 📌 담아두거나, 직접 넣을 수 있어요</span><button class="create-group-btn url-add-open-btn" type="button" id="url-add-open-btn" onclick="openUrlAdd()" title="네이버에서 직접 찾은 기사를 주소만으로 담아둡니다">+ 수기로 기사 추가</button></div><span class="manual-zone-hint">자정에 자동으로 비워져요</span></div><div class="url-add-zone" id="url-add-zone"><div class="url-add-row"><input type="text" id="url-add-input" placeholder="네이버 기사 주소를 붙여넣으세요" onkeydown="urlAddKey(event)" oninput="clearUrlAddWarn()"><button type="button" id="url-add-btn" onclick="submitUrlAdd()">추가</button><button class="url-add-close" type="button" onclick="closeUrlAdd()" title="닫기" aria-label="닫기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div><div class="url-add-hint">붙여넣고 추가(또는 Enter)하면 바로 담아둔 기사에 들어가요.</div><div class="url-add-warn" id="url-add-warn" role="alert"></div></div></div></div>
+<div style="height:40px"></div></div></div>
+<button type="button" class="undo-fab" onclick="undoLastAction(this)" title="기사 숨기기 되돌리기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg></button><button type="button" class="trash-fab" onclick="toggleTrashPopover()" title="숨긴 기사 221건"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg><span class="badge">221</span></button><button type="button" class="confirm-send-fab send">발송</button><button type="button" class="toc-toggle-btn" onclick="toggleTocPopover()" title="소제목 목차"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><button type="button" class="top-fab" title="맨 위로"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14"/><path d="m7 13 5-5 5 5"/><path d="M12 8v12"/></svg></button><div class="bottombar"><div class="bottombar-inner">
+  <div class="highlight-wrap">
+    <button type="button" class="highlight-toggle" onclick="toggleHighlightPopover()" title="형광펜 단어 편집"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3.2 20.8 9l-8.2 8.2H6.8V11.4Z"/><path d="m11.4 6.8 5.8 5.8"/><path d="M3.5 21h17"/></svg></button>
+    <div class="highlight-popover" id="highlight-popover">
+      <div class="highlight-chips" id="highlight-chips"></div>
+      <form class="highlight-add-form" onsubmit="return addHighlightWord(event);">
+        <input type="text" id="highlight-new-word" placeholder="단어 추가" maxlength="20">
+        <button type="submit">추가</button>
+      </form>
+    </div>
+  </div>
+</div></div></div></div></div>
+
+<div class="opt"><h2>B. 페이지 끝 글자 버튼 「↑ 맨 위로」</h2>
+<p>📌 칸 아래, 페이지가 끝나는 자리에 회색 글자 하나. 떠 있는 버튼이 늘지 않는다.</p>
+<ul><li>대신 <b>맨 끝까지 내려왔을 때만</b> 쓸 수 있다. 중간에선 여전히 스크롤.</li></ul>
+<div class="pair"><div class="frame"><span class="scr-name">초안</span><div class="scr"><div class="container"><div id="preview-body"><section class="subheading subheading-custom" id="subheading-4" data-toc-name="&lt;기타&gt;" data-order-locked="1" data-group="기타"><h2><span class="subheading-title"><input type="checkbox" class="group-select-all" onclick="event.stopPropagation();" onchange="toggleGroupSelectAll(this);" title="이 소제목 기사 전체 선택"> &lt;기타&gt;<span class="subheading-count">3</span></span><span class="subheading-icons"><button class="rename-btn group-copy-btn" type="button" data-copy-text="&lt;기타&gt;
+ㅇ (머니투데이) [단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발
+https://n.news.naver.com/mnews/article/008/0005417359
+
+ㅇ (시사저널) 與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나
+https://n.news.naver.com/mnews/article/586/0000138763
+
+ㅇ (데일리안) 유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”
+https://n.news.naver.com/mnews/article/119/0003135664
+" onclick="copyArticleIcon(this)" title="이 소제목만 복사"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button> <button class="rename-btn" type="button" data-name="기타" data-current="기타" onclick="renameGroup(this)" title="소제목 이름 바꾸기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button> <button class="rename-btn group-hide-btn" type="button" onclick="hideGroup(this)" title="이 소제목 기사 3건 통째로 숨기기(기사 각각 숨긴 것과 동일 — 되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button></span></h2><div class="article art-scoop" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-outlet-rank="0"><details><summary><div class="title-row"><input type="checkbox" class="article-select" data-url="https://n.news.naver.com/mnews/article/008/0005417359" onclick="event.stopPropagation();" onchange="updateBulkMoveBar();"><span class="title-line"><span class="title-outlet">머니투데이</span><span class="t-scoop">[단독]</span><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발</span></div><div class="action-row"><span class="pub-time">14:44 · <span class="pub-time-relative" data-pub-date="2026-09-22T14:44:00+09:00"></span></span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/008/0005417359" target="_blank" rel="noopener noreferrer" title="https://n.news.naver.com/mnews/article/008/0005417359">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 수집된 검색어입니다"><span class="time-sep">·</span><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 기획재정부, 재정경제기획위원회</span></span><span class="article-actions"><select class="group-move-select" onclick="event.stopPropagation();" onchange="event.stopPropagation(); moveArticleToGroup(this);"><option value="" selected disabled>다른 소제목</option><option value="이형일 부총리 취임 및 경제 방침">이형일 부총리 현안 점검 - 첫 간부회의</option><option value="구윤철 전 부총리 퇴임">구윤철 전 부총리 퇴임</option><option value="대미 투자 1호 프로젝트 확정">대미투자 국회 보고</option><option value="공공조달 정책">제4차 조달정책심의위원회</option></select><span class="lab-pop-wrap"><button class="iconbtn lab-btn" type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-outlet="머니투데이" data-title="[단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발" data-pub-date="2026-09-22T14:44:00+09:00" data-group="기타" data-scrap-date="2026-09-22" data-scrap-end="17:00" onclick="event.stopPropagation(); event.preventDefault(); toggleLabelPopover(this);" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="lab-pop hidden" onclick="event.stopPropagation(); event.preventDefault();"><h4>이 기사에 붙은 라벨</h4><div class="attached"><span class="none">아직 없음</span></div><h4>이미 쓴 라벨 (눌러서 붙이기)</h4><div class="known"><span class="known-chip" data-label="사진 아님" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">사진 아님<span class="n">2</span></span><span class="known-chip" data-label="부정기사" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">부정기사<span class="n">1</span></span><span class="known-chip" data-label="비상경제본부회의" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">비상경제본부회의<span class="n">1</span></span><span class="known-chip" data-label="카톡보고" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">카톡보고<span class="n">1</span></span><span class="known-chip" data-label="테스트" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">테스트<span class="n">1</span></span></div><div class="addbox"><input type="text" placeholder="새 라벨 입력" class="lab-input" onkeydown="event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);"><button type="button" onclick="event.stopPropagation(); event.preventDefault(); addLabelFromInput(this.previousElementSibling);">추가</button></div><div class="sim-warn hidden"></div><p class="hint">라벨은 보고서 텍스트(복사·txt·발송)에 나가지 않습니다. 화면과 엑셀 내보내기에만 표시됩니다.</p></span></span><span class="more-wrap"><button class="more-btn" type="button" onclick="event.stopPropagation(); toggleArticleMenu(this);" title="더보기" aria-label="더보기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button><span class="more-menu"><button type="button" data-copy-text="ㅇ (머니투데이) [단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발
+https://n.news.naver.com/mnews/article/008/0005417359" onclick="event.stopPropagation(); closeArticleMenus(); copyArticleIcon(this, this.closest('.more-wrap').querySelector('.more-btn'));">복사하기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-title="[단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발" data-summary="별도 법인으로 출범한 수협은행의 첫 연임 행장이 된다. 이 원장이 최종 후보로 선정되면 금융위원회 출신 최초이며 재정경제부 출신 이원태 전 행장이 물러난 2017년 이후 9년 만의 관료 출신 수협은행장이 된다." onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button></span></span><button class="hide-btn" type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-outlet="머니투데이" data-title="[단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발" data-pub-date="2026-09-22T14:44:00+09:00" data-group="기타" onclick="event.stopPropagation(); hideArticle(this);" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-direction="up" onclick="event.stopPropagation(); previewMoveArticle(this);" disabled title="소제목 안에서 위로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-direction="down" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><p class="article-summary">별도 법인으로 출범한 수협은행의 첫 연임 행장이 된다. 이 원장이 최종 후보로 선정되면 금융위원회 출신 최초이며 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 출신 이원태 전 행장이 물러난 2017년 이후 9년 만의 관료 출신 수협은행장이 된다.</p></details></div>
+<div class="article" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-outlet-rank="31"><details><summary><div class="title-row"><input type="checkbox" class="article-select" data-url="https://n.news.naver.com/mnews/article/586/0000138763" onclick="event.stopPropagation();" onchange="updateBulkMoveBar();"><span class="title-line"><span class="title-outlet">시사저널</span>與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나</span></div><div class="action-row"><span class="pub-time">14:45 · <span class="pub-time-relative" data-pub-date="2026-09-22T14:45:00+09:00"></span></span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/586/0000138763" target="_blank" rel="noopener noreferrer" title="https://n.news.naver.com/mnews/article/586/0000138763">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 수집된 검색어입니다"><span class="time-sep">·</span><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 재경부</span></span><span class="article-actions"><select class="group-move-select" onclick="event.stopPropagation();" onchange="event.stopPropagation(); moveArticleToGroup(this);"><option value="" selected disabled>다른 소제목</option><option value="이형일 부총리 취임 및 경제 방침">이형일 부총리 현안 점검 - 첫 간부회의</option><option value="구윤철 전 부총리 퇴임">구윤철 전 부총리 퇴임</option><option value="대미 투자 1호 프로젝트 확정">대미투자 국회 보고</option><option value="공공조달 정책">제4차 조달정책심의위원회</option></select><span class="lab-pop-wrap"><button class="iconbtn lab-btn" type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-outlet="시사저널" data-title="與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나" data-pub-date="2026-09-22T14:45:00+09:00" data-group="기타" data-scrap-date="2026-09-22" data-scrap-end="17:00" onclick="event.stopPropagation(); event.preventDefault(); toggleLabelPopover(this);" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="lab-pop hidden" onclick="event.stopPropagation(); event.preventDefault();"><h4>이 기사에 붙은 라벨</h4><div class="attached"><span class="none">아직 없음</span></div><h4>이미 쓴 라벨 (눌러서 붙이기)</h4><div class="known"><span class="known-chip" data-label="사진 아님" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">사진 아님<span class="n">2</span></span><span class="known-chip" data-label="부정기사" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">부정기사<span class="n">1</span></span><span class="known-chip" data-label="비상경제본부회의" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">비상경제본부회의<span class="n">1</span></span><span class="known-chip" data-label="카톡보고" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">카톡보고<span class="n">1</span></span><span class="known-chip" data-label="테스트" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">테스트<span class="n">1</span></span></div><div class="addbox"><input type="text" placeholder="새 라벨 입력" class="lab-input" onkeydown="event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);"><button type="button" onclick="event.stopPropagation(); event.preventDefault(); addLabelFromInput(this.previousElementSibling);">추가</button></div><div class="sim-warn hidden"></div><p class="hint">라벨은 보고서 텍스트(복사·txt·발송)에 나가지 않습니다. 화면과 엑셀 내보내기에만 표시됩니다.</p></span></span><span class="more-wrap"><button class="more-btn" type="button" onclick="event.stopPropagation(); toggleArticleMenu(this);" title="더보기" aria-label="더보기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button><span class="more-menu"><button type="button" data-copy-text="ㅇ (시사저널) 與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나
+https://n.news.naver.com/mnews/article/586/0000138763" onclick="event.stopPropagation(); closeArticleMenus(); copyArticleIcon(this, this.closest('.more-wrap').querySelector('.more-btn'));">복사하기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-title="與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나" data-summary="재정경제부는 지난달 발표한 2026년 세제개편안에 가상자산 과세 유예안을 포함하지 않았고, 당시 재경부 관계자는 &quot;현행법대로 내년 1월 가상자산 과세를 할 것&quot;이라고 밝혔다. 국세청도 시행을 전제로 과세 준비를 진행... " onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button></span></span><button class="hide-btn" type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-outlet="시사저널" data-title="與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나" data-pub-date="2026-09-22T14:45:00+09:00" data-group="기타" onclick="event.stopPropagation(); hideArticle(this);" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-direction="up" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 위로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-direction="down" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><p class="article-summary"><span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 지난달 발표한 2026년 세제개편안에 가상자산 과세 유예안을 포함하지 않았고, 당시 <span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span> 관계자는 &quot;현행법대로 내년 1월 가상자산 과세를 할 것&quot;이라고 밝혔다. 국세청도 시행을 전제로 과세 준비를 진행... </p></details></div>
+<div class="article" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-outlet-rank="32"><details><summary><div class="title-row"><input type="checkbox" class="article-select" data-url="https://n.news.naver.com/mnews/article/119/0003135664" onclick="event.stopPropagation();" onchange="updateBulkMoveBar();"><span class="title-line"><span class="title-outlet">데일리안</span>유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”</span></div><div class="action-row"><span class="pub-time">16:20 · <span class="pub-time-relative" data-pub-date="2026-09-22T16:20:00+09:00"></span></span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/119/0003135664" target="_blank" rel="noopener noreferrer" title="https://n.news.naver.com/mnews/article/119/0003135664">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 수집된 검색어입니다"><span class="time-sep">·</span><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><span class="article-actions"><select class="group-move-select" onclick="event.stopPropagation();" onchange="event.stopPropagation(); moveArticleToGroup(this);"><option value="" selected disabled>다른 소제목</option><option value="이형일 부총리 취임 및 경제 방침">이형일 부총리 현안 점검 - 첫 간부회의</option><option value="구윤철 전 부총리 퇴임">구윤철 전 부총리 퇴임</option><option value="대미 투자 1호 프로젝트 확정">대미투자 국회 보고</option><option value="공공조달 정책">제4차 조달정책심의위원회</option></select><span class="lab-pop-wrap"><button class="iconbtn lab-btn" type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-outlet="데일리안" data-title="유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”" data-pub-date="2026-09-22T16:20:00+09:00" data-group="기타" data-scrap-date="2026-09-22" data-scrap-end="17:00" onclick="event.stopPropagation(); event.preventDefault(); toggleLabelPopover(this);" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="lab-pop hidden" onclick="event.stopPropagation(); event.preventDefault();"><h4>이 기사에 붙은 라벨</h4><div class="attached"><span class="none">아직 없음</span></div><h4>이미 쓴 라벨 (눌러서 붙이기)</h4><div class="known"><span class="known-chip" data-label="사진 아님" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">사진 아님<span class="n">2</span></span><span class="known-chip" data-label="부정기사" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">부정기사<span class="n">1</span></span><span class="known-chip" data-label="비상경제본부회의" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">비상경제본부회의<span class="n">1</span></span><span class="known-chip" data-label="카톡보고" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">카톡보고<span class="n">1</span></span><span class="known-chip" data-label="테스트" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">테스트<span class="n">1</span></span></div><div class="addbox"><input type="text" placeholder="새 라벨 입력" class="lab-input" onkeydown="event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);"><button type="button" onclick="event.stopPropagation(); event.preventDefault(); addLabelFromInput(this.previousElementSibling);">추가</button></div><div class="sim-warn hidden"></div><p class="hint">라벨은 보고서 텍스트(복사·txt·발송)에 나가지 않습니다. 화면과 엑셀 내보내기에만 표시됩니다.</p></span></span><span class="more-wrap"><button class="more-btn" type="button" onclick="event.stopPropagation(); toggleArticleMenu(this);" title="더보기" aria-label="더보기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button><span class="more-menu"><button type="button" data-copy-text="ㅇ (데일리안) 유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”
+https://n.news.naver.com/mnews/article/119/0003135664" onclick="event.stopPropagation(); closeArticleMenus(); copyArticleIcon(this, this.closest('.more-wrap').querySelector('.more-btn'));">복사하기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-title="유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”" data-summary="통행료 인상 역시 “재정경제부 권한으로, 대중교통과 철도 등에 대한 요금 논의가 있을 때 자연스럽게 같이 검토될 사안”이라고 내다봤다. 이날 홍지선 국토부 장관이 임명된 것에 대해선 원활한 소통을 이어가겠단... " onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button></span></span><button class="hide-btn" type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-outlet="데일리안" data-title="유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”" data-pub-date="2026-09-22T16:20:00+09:00" data-group="기타" onclick="event.stopPropagation(); hideArticle(this);" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-direction="up" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 위로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-direction="down" onclick="event.stopPropagation(); previewMoveArticle(this);" disabled title="소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><p class="article-summary">통행료 인상 역시 “<span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 권한으로, 대중교통과 철도 등에 대한 요금 논의가 있을 때 자연스럽게 같이 검토될 사안”이라고 내다봤다. 이날 홍지선 국토부 장관이 임명된 것에 대해선 원활한 소통을 이어가겠단... </p></details></div></section><div class="bottom"><div class="bottom-summary"><div class="bottom-header-row"><h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.6a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 20.5l1.6-4.5A8.4 8.4 0 0 1 12 3.2a8.4 8.4 0 0 1 9 8.4Z"/></svg> AI가 읽은 소제목별 주요 요약</h3><button type="button" class="bottom-summary-copy" onclick="copyAiSummary(this)" data-copy-text="🤖 AI가 읽은 소제목별 주요 요약
+
+&lt;이형일 부총리 현안 점검 - 첫 간부회의&gt;
+겸 재정경제부 장관이 이날 오후 첫 주요 간부회의를 주재해 경제상황과 주요 현안을 점검했다. 이 부총리는 그간 경제팀을 이끌어 온 구윤철 전 부총리의 노고에 감사를 표하는 한편 직원들에게 업무 연속성 유지를.
+
+&lt;구윤철 전 부총리 퇴임&gt;
+이재명 대통령은 이날 이형일 부총리 겸 재경부 장관 후보자의 임명안을 재가했다. 이 부총리는 재가 직후 임기를 시작했다. 구 전 부총리는 &quot;잠재성장률 3%, 수출 4대 강국, 1인당 국민소득 5만달러를 향한 &#x27;3·4·5 비전&#x27;을.
+
+&lt;대미투자 국회 보고&gt;
+김정관 산업통상부 장관과 이형일 부총리 겸 재정경제부 장관은 이날 국회 산업통상자원중소벤처기업위원회와 재정경제기획위원회 전체회의에 각각 출석해 이 같은 내용의 대미 투자 계획을 비공개 보고했다. 국회에.
+
+&lt;제4차 조달정책심의위원회&gt;
+재정경제부는 22일 허장 제2차관 주재로 제4차 조달정책심의위원회를 열고 ‘공공기관 계약특례 정비 및 관리체계 개선방안’과 ‘혁신제품 유형Ⅰ 정비안’ 등을 심의·의결했다고 밝혔다. 공공기관 계약특례는 재경부.
+
+&lt;기타&gt;
+- [단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발
+- 與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나
+- 유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”">복사</button></div><div class="bottom-summary-item"><strong>&lt;이형일 부총리 현안 점검 - 첫 간부회의&gt;</strong><p>겸 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 장관이 이날 오후 첫 주요 간부회의를 주재해 경제상황과 주요 현안을 점검했다. 이 부총리는 그간 경제팀을 이끌어 온 구윤철 전 부총리의 노고에 감사를 표하는 한편 직원들에게 업무 연속성 유지를.</p></div><div class="bottom-summary-item"><strong>&lt;구윤철 전 부총리 퇴임&gt;</strong><p>이재명 대통령은 이날 <span class="hl-word" data-word="이형일" style="background-color:#E4F1FC;color:#1F2937">이형일</span> 부총리 겸 <span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span> 장관 후보자의 임명안을 재가했다. 이 부총리는 재가 직후 임기를 시작했다. 구 전 부총리는 &quot;잠재성장률 3%, 수출 4대 강국, 1인당 국민소득 5만달러를 향한 &#x27;3·4·5 비전&#x27;을.</p></div><div class="bottom-summary-item"><strong>&lt;대미투자 국회 보고&gt;</strong><p>김정관 산업통상부 장관과 <span class="hl-word" data-word="이형일" style="background-color:#E4F1FC;color:#1F2937">이형일</span> 부총리 겸 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 장관은 이날 국회 산업통상자원중소벤처기업위원회와 재정경제기획위원회 전체회의에 각각 출석해 이 같은 내용의 대미 투자 계획을 비공개 보고했다. 국회에.</p></div><div class="bottom-summary-item"><strong>&lt;제4차 조달정책심의위원회&gt;</strong><p><span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 22일 허장 제2차관 주재로 제4차 조달정책심의위원회를 열고 ‘공공기관 계약특례 정비 및 관리체계 개선방안’과 ‘혁신제품 유형Ⅰ 정비안’ 등을 심의·의결했다고 밝혔다. 공공기관 계약특례는 <span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span>.</p></div><div class="bottom-summary-item"><strong>&lt;기타&gt;</strong><p>- [단독]<span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발
+- 與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나
+- 유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”</p></div></div></div><div class="manual-divider">이 아래는 복사·내보내기에 포함되지 않음</div><div class="manual-zone"><div class="manual-zone-head"><div class="manual-zone-left"><span class="manual-zone-title"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg> 담아둔 기사</span><span class="manual-zone-empty">전체 기사에서 📌 담아두거나, 직접 넣을 수 있어요</span><button class="create-group-btn url-add-open-btn" type="button" id="url-add-open-btn" onclick="openUrlAdd()" title="네이버에서 직접 찾은 기사를 주소만으로 담아둡니다">+ 수기로 기사 추가</button></div><span class="manual-zone-hint">자정에 자동으로 비워져요</span></div><div class="url-add-zone" id="url-add-zone"><div class="url-add-row"><input type="text" id="url-add-input" placeholder="네이버 기사 주소를 붙여넣으세요" onkeydown="urlAddKey(event)" oninput="clearUrlAddWarn()"><button type="button" id="url-add-btn" onclick="submitUrlAdd()">추가</button><button class="url-add-close" type="button" onclick="closeUrlAdd()" title="닫기" aria-label="닫기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div><div class="url-add-hint">붙여넣고 추가(또는 Enter)하면 바로 담아둔 기사에 들어가요.</div><div class="url-add-warn" id="url-add-warn" role="alert"></div></div></div><div class="page-end"><button type="button" class="page-top-link"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg> 맨 위로</button></div></div>
+<div style="height:40px"></div></div></div>
+<button type="button" class="undo-fab" onclick="undoLastAction(this)" title="기사 숨기기 되돌리기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg></button><button type="button" class="trash-fab" onclick="toggleTrashPopover()" title="숨긴 기사 221건"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg><span class="badge">221</span></button><button type="button" class="toc-toggle-btn" onclick="toggleTocPopover()" title="소제목 목차"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><div class="bottombar"><div class="bottombar-inner">
+  <div class="highlight-wrap">
+    <button type="button" class="highlight-toggle" onclick="toggleHighlightPopover()" title="형광펜 단어 편집"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3.2 20.8 9l-8.2 8.2H6.8V11.4Z"/><path d="m11.4 6.8 5.8 5.8"/><path d="M3.5 21h17"/></svg></button>
+    <div class="highlight-popover" id="highlight-popover">
+      <div class="highlight-chips" id="highlight-chips"></div>
+      <form class="highlight-add-form" onsubmit="return addHighlightWord(event);">
+        <input type="text" id="highlight-new-word" placeholder="단어 추가" maxlength="20">
+        <button type="submit">추가</button>
+      </form>
+    </div>
+  </div>
+</div></div></div><div></div></div></div>
+
+<div class="opt"><h2>C. 목차 ☰ 맨 위에 「맨 위로」 줄</h2>
+<p>새 버튼 없이 목차를 열면 첫 줄이 「맨 위로」. 어디서든 되지만 <b>두 번 눌러야</b> 한다.</p>
+<div class="pair"><div class="frame"><span class="scr-name">초안 · 목차 연 상태</span><div class="scr"><div class="container"><div id="preview-body"><section class="subheading subheading-custom" id="subheading-4" data-toc-name="&lt;기타&gt;" data-order-locked="1" data-group="기타"><h2><span class="subheading-title"><input type="checkbox" class="group-select-all" onclick="event.stopPropagation();" onchange="toggleGroupSelectAll(this);" title="이 소제목 기사 전체 선택"> &lt;기타&gt;<span class="subheading-count">3</span></span><span class="subheading-icons"><button class="rename-btn group-copy-btn" type="button" data-copy-text="&lt;기타&gt;
+ㅇ (머니투데이) [단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발
+https://n.news.naver.com/mnews/article/008/0005417359
+
+ㅇ (시사저널) 與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나
+https://n.news.naver.com/mnews/article/586/0000138763
+
+ㅇ (데일리안) 유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”
+https://n.news.naver.com/mnews/article/119/0003135664
+" onclick="copyArticleIcon(this)" title="이 소제목만 복사"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button> <button class="rename-btn" type="button" data-name="기타" data-current="기타" onclick="renameGroup(this)" title="소제목 이름 바꾸기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button> <button class="rename-btn group-hide-btn" type="button" onclick="hideGroup(this)" title="이 소제목 기사 3건 통째로 숨기기(기사 각각 숨긴 것과 동일 — 되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button></span></h2><div class="article art-scoop" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-outlet-rank="0"><details><summary><div class="title-row"><input type="checkbox" class="article-select" data-url="https://n.news.naver.com/mnews/article/008/0005417359" onclick="event.stopPropagation();" onchange="updateBulkMoveBar();"><span class="title-line"><span class="title-outlet">머니투데이</span><span class="t-scoop">[단독]</span><span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발</span></div><div class="action-row"><span class="pub-time">14:44 · <span class="pub-time-relative" data-pub-date="2026-09-22T14:44:00+09:00"></span></span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/008/0005417359" target="_blank" rel="noopener noreferrer" title="https://n.news.naver.com/mnews/article/008/0005417359">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 수집된 검색어입니다"><span class="time-sep">·</span><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 기획재정부, 재정경제기획위원회</span></span><span class="article-actions"><select class="group-move-select" onclick="event.stopPropagation();" onchange="event.stopPropagation(); moveArticleToGroup(this);"><option value="" selected disabled>다른 소제목</option><option value="이형일 부총리 취임 및 경제 방침">이형일 부총리 현안 점검 - 첫 간부회의</option><option value="구윤철 전 부총리 퇴임">구윤철 전 부총리 퇴임</option><option value="대미 투자 1호 프로젝트 확정">대미투자 국회 보고</option><option value="공공조달 정책">제4차 조달정책심의위원회</option></select><span class="lab-pop-wrap"><button class="iconbtn lab-btn" type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-outlet="머니투데이" data-title="[단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발" data-pub-date="2026-09-22T14:44:00+09:00" data-group="기타" data-scrap-date="2026-09-22" data-scrap-end="17:00" onclick="event.stopPropagation(); event.preventDefault(); toggleLabelPopover(this);" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="lab-pop hidden" onclick="event.stopPropagation(); event.preventDefault();"><h4>이 기사에 붙은 라벨</h4><div class="attached"><span class="none">아직 없음</span></div><h4>이미 쓴 라벨 (눌러서 붙이기)</h4><div class="known"><span class="known-chip" data-label="사진 아님" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">사진 아님<span class="n">2</span></span><span class="known-chip" data-label="부정기사" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">부정기사<span class="n">1</span></span><span class="known-chip" data-label="비상경제본부회의" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">비상경제본부회의<span class="n">1</span></span><span class="known-chip" data-label="카톡보고" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">카톡보고<span class="n">1</span></span><span class="known-chip" data-label="테스트" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">테스트<span class="n">1</span></span></div><div class="addbox"><input type="text" placeholder="새 라벨 입력" class="lab-input" onkeydown="event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);"><button type="button" onclick="event.stopPropagation(); event.preventDefault(); addLabelFromInput(this.previousElementSibling);">추가</button></div><div class="sim-warn hidden"></div><p class="hint">라벨은 보고서 텍스트(복사·txt·발송)에 나가지 않습니다. 화면과 엑셀 내보내기에만 표시됩니다.</p></span></span><span class="more-wrap"><button class="more-btn" type="button" onclick="event.stopPropagation(); toggleArticleMenu(this);" title="더보기" aria-label="더보기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button><span class="more-menu"><button type="button" data-copy-text="ㅇ (머니투데이) [단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발
+https://n.news.naver.com/mnews/article/008/0005417359" onclick="event.stopPropagation(); closeArticleMenus(); copyArticleIcon(this, this.closest('.more-wrap').querySelector('.more-btn'));">복사하기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-title="[단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발" data-summary="별도 법인으로 출범한 수협은행의 첫 연임 행장이 된다. 이 원장이 최종 후보로 선정되면 금융위원회 출신 최초이며 재정경제부 출신 이원태 전 행장이 물러난 2017년 이후 9년 만의 관료 출신 수협은행장이 된다." onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button></span></span><button class="hide-btn" type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-outlet="머니투데이" data-title="[단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발" data-pub-date="2026-09-22T14:44:00+09:00" data-group="기타" onclick="event.stopPropagation(); hideArticle(this);" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-direction="up" onclick="event.stopPropagation(); previewMoveArticle(this);" disabled title="소제목 안에서 위로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/008/0005417359" data-direction="down" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><p class="article-summary">별도 법인으로 출범한 수협은행의 첫 연임 행장이 된다. 이 원장이 최종 후보로 선정되면 금융위원회 출신 최초이며 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 출신 이원태 전 행장이 물러난 2017년 이후 9년 만의 관료 출신 수협은행장이 된다.</p></details></div>
+<div class="article" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-outlet-rank="31"><details><summary><div class="title-row"><input type="checkbox" class="article-select" data-url="https://n.news.naver.com/mnews/article/586/0000138763" onclick="event.stopPropagation();" onchange="updateBulkMoveBar();"><span class="title-line"><span class="title-outlet">시사저널</span>與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나</span></div><div class="action-row"><span class="pub-time">14:45 · <span class="pub-time-relative" data-pub-date="2026-09-22T14:45:00+09:00"></span></span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/586/0000138763" target="_blank" rel="noopener noreferrer" title="https://n.news.naver.com/mnews/article/586/0000138763">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 수집된 검색어입니다"><span class="time-sep">·</span><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 재경부</span></span><span class="article-actions"><select class="group-move-select" onclick="event.stopPropagation();" onchange="event.stopPropagation(); moveArticleToGroup(this);"><option value="" selected disabled>다른 소제목</option><option value="이형일 부총리 취임 및 경제 방침">이형일 부총리 현안 점검 - 첫 간부회의</option><option value="구윤철 전 부총리 퇴임">구윤철 전 부총리 퇴임</option><option value="대미 투자 1호 프로젝트 확정">대미투자 국회 보고</option><option value="공공조달 정책">제4차 조달정책심의위원회</option></select><span class="lab-pop-wrap"><button class="iconbtn lab-btn" type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-outlet="시사저널" data-title="與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나" data-pub-date="2026-09-22T14:45:00+09:00" data-group="기타" data-scrap-date="2026-09-22" data-scrap-end="17:00" onclick="event.stopPropagation(); event.preventDefault(); toggleLabelPopover(this);" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="lab-pop hidden" onclick="event.stopPropagation(); event.preventDefault();"><h4>이 기사에 붙은 라벨</h4><div class="attached"><span class="none">아직 없음</span></div><h4>이미 쓴 라벨 (눌러서 붙이기)</h4><div class="known"><span class="known-chip" data-label="사진 아님" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">사진 아님<span class="n">2</span></span><span class="known-chip" data-label="부정기사" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">부정기사<span class="n">1</span></span><span class="known-chip" data-label="비상경제본부회의" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">비상경제본부회의<span class="n">1</span></span><span class="known-chip" data-label="카톡보고" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">카톡보고<span class="n">1</span></span><span class="known-chip" data-label="테스트" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">테스트<span class="n">1</span></span></div><div class="addbox"><input type="text" placeholder="새 라벨 입력" class="lab-input" onkeydown="event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);"><button type="button" onclick="event.stopPropagation(); event.preventDefault(); addLabelFromInput(this.previousElementSibling);">추가</button></div><div class="sim-warn hidden"></div><p class="hint">라벨은 보고서 텍스트(복사·txt·발송)에 나가지 않습니다. 화면과 엑셀 내보내기에만 표시됩니다.</p></span></span><span class="more-wrap"><button class="more-btn" type="button" onclick="event.stopPropagation(); toggleArticleMenu(this);" title="더보기" aria-label="더보기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button><span class="more-menu"><button type="button" data-copy-text="ㅇ (시사저널) 與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나
+https://n.news.naver.com/mnews/article/586/0000138763" onclick="event.stopPropagation(); closeArticleMenus(); copyArticleIcon(this, this.closest('.more-wrap').querySelector('.more-btn'));">복사하기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-title="與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나" data-summary="재정경제부는 지난달 발표한 2026년 세제개편안에 가상자산 과세 유예안을 포함하지 않았고, 당시 재경부 관계자는 &quot;현행법대로 내년 1월 가상자산 과세를 할 것&quot;이라고 밝혔다. 국세청도 시행을 전제로 과세 준비를 진행... " onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button></span></span><button class="hide-btn" type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-outlet="시사저널" data-title="與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나" data-pub-date="2026-09-22T14:45:00+09:00" data-group="기타" onclick="event.stopPropagation(); hideArticle(this);" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-direction="up" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 위로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/586/0000138763" data-direction="down" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><p class="article-summary"><span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 지난달 발표한 2026년 세제개편안에 가상자산 과세 유예안을 포함하지 않았고, 당시 <span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span> 관계자는 &quot;현행법대로 내년 1월 가상자산 과세를 할 것&quot;이라고 밝혔다. 국세청도 시행을 전제로 과세 준비를 진행... </p></details></div>
+<div class="article" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-outlet-rank="32"><details><summary><div class="title-row"><input type="checkbox" class="article-select" data-url="https://n.news.naver.com/mnews/article/119/0003135664" onclick="event.stopPropagation();" onchange="updateBulkMoveBar();"><span class="title-line"><span class="title-outlet">데일리안</span>유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”</span></div><div class="action-row"><span class="pub-time">16:20 · <span class="pub-time-relative" data-pub-date="2026-09-22T16:20:00+09:00"></span></span><span class="time-sep">·</span><a class="origin-link-text" href="https://n.news.naver.com/mnews/article/119/0003135664" target="_blank" rel="noopener noreferrer" title="https://n.news.naver.com/mnews/article/119/0003135664">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="kw-inline" title="이 기사가 수집된 검색어입니다"><span class="time-sep">·</span><svg class="ic kw-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부</span></span><span class="article-actions"><select class="group-move-select" onclick="event.stopPropagation();" onchange="event.stopPropagation(); moveArticleToGroup(this);"><option value="" selected disabled>다른 소제목</option><option value="이형일 부총리 취임 및 경제 방침">이형일 부총리 현안 점검 - 첫 간부회의</option><option value="구윤철 전 부총리 퇴임">구윤철 전 부총리 퇴임</option><option value="대미 투자 1호 프로젝트 확정">대미투자 국회 보고</option><option value="공공조달 정책">제4차 조달정책심의위원회</option></select><span class="lab-pop-wrap"><button class="iconbtn lab-btn" type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-outlet="데일리안" data-title="유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”" data-pub-date="2026-09-22T16:20:00+09:00" data-group="기타" data-scrap-date="2026-09-22" data-scrap-end="17:00" onclick="event.stopPropagation(); event.preventDefault(); toggleLabelPopover(this);" title="라벨"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button><span class="lab-pop hidden" onclick="event.stopPropagation(); event.preventDefault();"><h4>이 기사에 붙은 라벨</h4><div class="attached"><span class="none">아직 없음</span></div><h4>이미 쓴 라벨 (눌러서 붙이기)</h4><div class="known"><span class="known-chip" data-label="사진 아님" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">사진 아님<span class="n">2</span></span><span class="known-chip" data-label="부정기사" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">부정기사<span class="n">1</span></span><span class="known-chip" data-label="비상경제본부회의" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">비상경제본부회의<span class="n">1</span></span><span class="known-chip" data-label="카톡보고" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">카톡보고<span class="n">1</span></span><span class="known-chip" data-label="테스트" onclick="event.stopPropagation(); event.preventDefault(); knownChipClick(this);">테스트<span class="n">1</span></span></div><div class="addbox"><input type="text" placeholder="새 라벨 입력" class="lab-input" onkeydown="event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);"><button type="button" onclick="event.stopPropagation(); event.preventDefault(); addLabelFromInput(this.previousElementSibling);">추가</button></div><div class="sim-warn hidden"></div><p class="hint">라벨은 보고서 텍스트(복사·txt·발송)에 나가지 않습니다. 화면과 엑셀 내보내기에만 표시됩니다.</p></span></span><span class="more-wrap"><button class="more-btn" type="button" onclick="event.stopPropagation(); toggleArticleMenu(this);" title="더보기" aria-label="더보기"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button><span class="more-menu"><button type="button" data-copy-text="ㅇ (데일리안) 유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”
+https://n.news.naver.com/mnews/article/119/0003135664" onclick="event.stopPropagation(); closeArticleMenus(); copyArticleIcon(this, this.closest('.more-wrap').querySelector('.more-btn'));">복사하기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button><button type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-title="유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”" data-summary="통행료 인상 역시 “재정경제부 권한으로, 대중교통과 철도 등에 대한 요금 논의가 있을 때 자연스럽게 같이 검토될 사안”이라고 내다봤다. 이날 홍지선 국토부 장관이 임명된 것에 대해선 원활한 소통을 이어가겠단... " onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button></span></span><button class="hide-btn" type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-outlet="데일리안" data-title="유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”" data-pub-date="2026-09-22T16:20:00+09:00" data-group="기타" onclick="event.stopPropagation(); hideArticle(this);" title="이 기사 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-direction="up" onclick="event.stopPropagation(); previewMoveArticle(this);" title="소제목 안에서 위로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button><button class="move-btn" type="button" data-url="https://n.news.naver.com/mnews/article/119/0003135664" data-direction="down" onclick="event.stopPropagation(); previewMoveArticle(this);" disabled title="소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span></div></summary><p class="article-summary">통행료 인상 역시 “<span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 권한으로, 대중교통과 철도 등에 대한 요금 논의가 있을 때 자연스럽게 같이 검토될 사안”이라고 내다봤다. 이날 홍지선 국토부 장관이 임명된 것에 대해선 원활한 소통을 이어가겠단... </p></details></div></section><div class="bottom"><div class="bottom-summary"><div class="bottom-header-row"><h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.6a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 20.5l1.6-4.5A8.4 8.4 0 0 1 12 3.2a8.4 8.4 0 0 1 9 8.4Z"/></svg> AI가 읽은 소제목별 주요 요약</h3><button type="button" class="bottom-summary-copy" onclick="copyAiSummary(this)" data-copy-text="🤖 AI가 읽은 소제목별 주요 요약
+
+&lt;이형일 부총리 현안 점검 - 첫 간부회의&gt;
+겸 재정경제부 장관이 이날 오후 첫 주요 간부회의를 주재해 경제상황과 주요 현안을 점검했다. 이 부총리는 그간 경제팀을 이끌어 온 구윤철 전 부총리의 노고에 감사를 표하는 한편 직원들에게 업무 연속성 유지를.
+
+&lt;구윤철 전 부총리 퇴임&gt;
+이재명 대통령은 이날 이형일 부총리 겸 재경부 장관 후보자의 임명안을 재가했다. 이 부총리는 재가 직후 임기를 시작했다. 구 전 부총리는 &quot;잠재성장률 3%, 수출 4대 강국, 1인당 국민소득 5만달러를 향한 &#x27;3·4·5 비전&#x27;을.
+
+&lt;대미투자 국회 보고&gt;
+김정관 산업통상부 장관과 이형일 부총리 겸 재정경제부 장관은 이날 국회 산업통상자원중소벤처기업위원회와 재정경제기획위원회 전체회의에 각각 출석해 이 같은 내용의 대미 투자 계획을 비공개 보고했다. 국회에.
+
+&lt;제4차 조달정책심의위원회&gt;
+재정경제부는 22일 허장 제2차관 주재로 제4차 조달정책심의위원회를 열고 ‘공공기관 계약특례 정비 및 관리체계 개선방안’과 ‘혁신제품 유형Ⅰ 정비안’ 등을 심의·의결했다고 밝혔다. 공공기관 계약특례는 재경부.
+
+&lt;기타&gt;
+- [단독]정부측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발
+- 與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나
+- 유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”">복사</button></div><div class="bottom-summary-item"><strong>&lt;이형일 부총리 현안 점검 - 첫 간부회의&gt;</strong><p>겸 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 장관이 이날 오후 첫 주요 간부회의를 주재해 경제상황과 주요 현안을 점검했다. 이 부총리는 그간 경제팀을 이끌어 온 구윤철 전 부총리의 노고에 감사를 표하는 한편 직원들에게 업무 연속성 유지를.</p></div><div class="bottom-summary-item"><strong>&lt;구윤철 전 부총리 퇴임&gt;</strong><p>이재명 대통령은 이날 <span class="hl-word" data-word="이형일" style="background-color:#E4F1FC;color:#1F2937">이형일</span> 부총리 겸 <span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span> 장관 후보자의 임명안을 재가했다. 이 부총리는 재가 직후 임기를 시작했다. 구 전 부총리는 &quot;잠재성장률 3%, 수출 4대 강국, 1인당 국민소득 5만달러를 향한 &#x27;3·4·5 비전&#x27;을.</p></div><div class="bottom-summary-item"><strong>&lt;대미투자 국회 보고&gt;</strong><p>김정관 산업통상부 장관과 <span class="hl-word" data-word="이형일" style="background-color:#E4F1FC;color:#1F2937">이형일</span> 부총리 겸 <span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span> 장관은 이날 국회 산업통상자원중소벤처기업위원회와 재정경제기획위원회 전체회의에 각각 출석해 이 같은 내용의 대미 투자 계획을 비공개 보고했다. 국회에.</p></div><div class="bottom-summary-item"><strong>&lt;제4차 조달정책심의위원회&gt;</strong><p><span class="hl-word" data-word="재정경제부" style="background-color:#E4F1FC;color:#1F2937">재정경제부</span>는 22일 허장 제2차관 주재로 제4차 조달정책심의위원회를 열고 ‘공공기관 계약특례 정비 및 관리체계 개선방안’과 ‘혁신제품 유형Ⅰ 정비안’ 등을 심의·의결했다고 밝혔다. 공공기관 계약특례는 <span class="hl-word" data-word="재경부" style="background-color:#E4F1FC;color:#1F2937">재경부</span>.</p></div><div class="bottom-summary-item"><strong>&lt;기타&gt;</strong><p>- [단독]<span class="hl-word" data-word="정부" style="background-color:#EDE2FA;color:#1F2937">정부</span>측 표도 갈렸다…신학기 3표·이형주 2표, 수협은행장 선정 불발
+- 與에서도 &quot;기본법 통과가 먼저&quot;…&#x27;코인 과세 유예&#x27; 불붙나
+- 유정훈 도공 사장 “휴게소 8곳 직계약…가격 낮추고 선택지 넓힌다”</p></div></div></div><div class="manual-divider">이 아래는 복사·내보내기에 포함되지 않음</div><div class="manual-zone"><div class="manual-zone-head"><div class="manual-zone-left"><span class="manual-zone-title"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg> 담아둔 기사</span><span class="manual-zone-empty">전체 기사에서 📌 담아두거나, 직접 넣을 수 있어요</span><button class="create-group-btn url-add-open-btn" type="button" id="url-add-open-btn" onclick="openUrlAdd()" title="네이버에서 직접 찾은 기사를 주소만으로 담아둡니다">+ 수기로 기사 추가</button></div><span class="manual-zone-hint">자정에 자동으로 비워져요</span></div><div class="url-add-zone" id="url-add-zone"><div class="url-add-row"><input type="text" id="url-add-input" placeholder="네이버 기사 주소를 붙여넣으세요" onkeydown="urlAddKey(event)" oninput="clearUrlAddWarn()"><button type="button" id="url-add-btn" onclick="submitUrlAdd()">추가</button><button class="url-add-close" type="button" onclick="closeUrlAdd()" title="닫기" aria-label="닫기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div><div class="url-add-hint">붙여넣고 추가(또는 Enter)하면 바로 담아둔 기사에 들어가요.</div><div class="url-add-warn" id="url-add-warn" role="alert"></div></div></div></div>
+<div style="height:40px"></div></div></div>
+<button type="button" class="undo-fab" onclick="undoLastAction(this)" title="기사 숨기기 되돌리기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg></button><button type="button" class="trash-fab" onclick="toggleTrashPopover()" title="숨긴 기사 221건"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg><span class="badge">221</span></button><button type="button" class="toc-toggle-btn" onclick="toggleTocPopover()" title="소제목 목차"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><div class="toc-popover is-open"><div class="toc-top"><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14"/><path d="m7 13 5-5 5 5"/><path d="M12 8v12"/></svg> 맨 위로</a></div><div class="toc-scroll">
+<div class="toc-row"><a href="#">&lt;이형일 부총리 현안 점검&gt;</a></div>
+<div class="toc-row"><a href="#">&lt;코인 과세 유예 논란&gt;</a></div>
+<div class="toc-row"><a href="#">&lt;종부세 개편&gt;</a></div>
+<div class="toc-row"><a href="#">&lt;기타&gt;</a></div>
+<div class="toc-row"><a href="#" style="color:#6B7280">📌 담아둔 기사</a></div></div></div><div class="bottombar"><div class="bottombar-inner">
+  <div class="highlight-wrap">
+    <button type="button" class="highlight-toggle" onclick="toggleHighlightPopover()" title="형광펜 단어 편집"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3.2 20.8 9l-8.2 8.2H6.8V11.4Z"/><path d="m11.4 6.8 5.8 5.8"/><path d="M3.5 21h17"/></svg></button>
+    <div class="highlight-popover" id="highlight-popover">
+      <div class="highlight-chips" id="highlight-chips"></div>
+      <form class="highlight-add-form" onsubmit="return addHighlightWord(event);">
+        <input type="text" id="highlight-new-word" placeholder="단어 추가" maxlength="20">
+        <button type="submit">추가</button>
+      </form>
+    </div>
+  </div>
+</div></div></div><div></div></div></div>
+</div>
+<script>document.querySelectorAll('.frame .scr').forEach(function(e){e.scrollTop=e.scrollHeight;});</script>
+</body></html>

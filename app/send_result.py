@@ -19,13 +19,16 @@ class SendResult:
     본다"는 그 위의 판단과 헷갈리지 않게, 여기서는 판단 기준을 바꾸지 않는다).
     """
 
-    def __init__(self, ok: bool, failures: list = None):
+    def __init__(self, ok: bool, failures: list = None, delivered: list = None):
         self.ok = ok
         # 각 원소: {"target": chat_id/이메일 주소 또는 None(채널 자체 문제), "error": str}
         self.failures = failures or []
+        # 받은 사람 — {"target", "silent"(텔레그램, 알림 없이 갔는가), "parts"(몇 통으로 나눴나)}.
+        # 발송 기록(app.send_log)이 "누구에게 도착했는지"를 적으려면 실패만으로는 모자란다.
+        self.delivered = delivered or []
 
     def __bool__(self) -> bool:
         return self.ok
 
     def __repr__(self) -> str:
-        return f"SendResult(ok={self.ok}, failures={self.failures})"
+        return f"SendResult(ok={self.ok}, failures={self.failures}, delivered={self.delivered})"

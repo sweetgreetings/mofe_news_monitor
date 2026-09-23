@@ -109,7 +109,8 @@ def date_range_label(dates: list[str]) -> str:
     "2026-08-11~08-18_언론모니터링.xlsx" 예시 형식)으로 줄인다 — 보관함처럼 여러 날짜를
     펼쳐 한 번에 뽑을 때 쓴다.
     """
-    valid = sorted(d for d in dates if _DATE_RANGE_RE.match(d))
+    # 같은 날짜가 여러 번 들어와도(수시 보관함 — 같은 날 확정본 여러 장) 하루로 친다.
+    valid = sorted({d for d in dates if _DATE_RANGE_RE.match(d)})
     if not valid:
         return datetime.now().strftime("%Y-%m-%d")
     if len(valid) == 1:

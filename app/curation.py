@@ -48,12 +48,12 @@ def _load_records(now: Optional[datetime] = None, days: int = 1) -> list:
     화면만 정리하는" 용도라 다음날까지 끌고 갈 필요가 없다는 판단. app.manual_articles와
     같은 패턴으로, 파일을 그 자리에서 지우진 않고 읽을 때 걸러낸다.
 
-    [수정: 2026-09-04] **"숨김이 작동하는 기간"과 "쓰레기통에 보이는 기간"을 갈랐다**
+    [수정: 2026-09-04] **"숨김이 작동하는 기간"과 "휴지통에 보이는 기간"을 갈랐다**
     (사용자 요청 — "다음 날 어제 뭘 뺐는지 확인하고 싶다"). 필터는 days=1, 열람만
     HIDDEN_VIEW_DAYS(7일)였다.
 
     [수정: 2026-09-16] **그 둘을 다시 합쳤다 — 이제 판정도 HIDDEN_VIEW_DAYS다**(사용자
-    결정, load_hidden_urls 참고). 자정 해제가 없어져 "쓰레기통에 있는데 되살릴 수 없는 줄"
+    결정, load_hidden_urls 참고). 자정 해제가 없어져 "휴지통에 있는데 되살릴 수 없는 줄"
     자체가 사라졌다. 이 함수의 days 기본값 1은 그대로 두는데, 이제 안전장치라기보다
     **인자를 반드시 넘기라는 표시**다 — 숨김을 읽는 세 통로(load_hidden_urls /
     load_hidden_records / load_hidden_batches)가 전부 HIDDEN_VIEW_DAYS를 명시한다.
@@ -85,14 +85,14 @@ def load_hidden_urls(now: Optional[datetime] = None) -> set:
 
     [수정: 2026-09-16] **오늘 하루에서 7일로 늘렸다**(사용자 결정 — "자정 넘으면 복구를
     못 하게 막혀 있는 거냐"는 물음에서 시작). 예전엔 이 함수만 오늘치를 봐서 자정이 지나면
-    숨김이 저절로 풀렸고, 그래서 쓰레기통에 보이는 지난 날짜 기록은 **되살릴 것이 없는**
-    기록이었다(화면도 그 자리에 복구 버튼을 안 줬다). 담당자가 기대한 건 "쓰레기통에
+    숨김이 저절로 풀렸고, 그래서 휴지통에 보이는 지난 날짜 기록은 **되살릴 것이 없는**
+    기록이었다(화면도 그 자리에 복구 버튼을 안 줬다). 담당자가 기대한 건 "휴지통에
     있으면 언제든 되살린다"였고, 덤으로 하나가 더 맞아떨어진다 — 정기 보관함이
     filter_hidden을 거치므로, 자정에 숨김이 풀리면 **어제 실제로 발송한 보고서에는 없던
     기사가 오늘 보관함에는 다시 보였다**(2026-09-10에 소제목 순서로 고친 "보관함 텍스트가
     발송본과 다르다"와 같은 종류의 어긋남).
 
-    **열람 기간과 판정 기간을 일부러 같은 상수로 묶어 둔다** — 두 값이 갈리면 "쓰레기통에는
+    **열람 기간과 판정 기간을 일부러 같은 상수로 묶어 둔다** — 두 값이 갈리면 "휴지통에는
     보이는데 복구는 안 되는" 줄이 다시 생긴다(그때를 위해 화면은 잠긴 복구 버튼을 그릴 수
     있게 해뒀다, app.settings_server.render_hidden_page).
 
@@ -141,41 +141,62 @@ def hide_article(
     기존 방식대로 정식 회차 역조회로 대체한다(하위 호환).
 
     [추가: 2026-09-02] group(숨길 때 그 기사가 속해 있던 소제목 이름)도 같이 적는다 —
-    쓰레기통이 "한 번에 숨긴 덩어리"에 이름을 붙이는 데만 쓴다(load_hidden_batches).
+    휴지통이 "한 번에 숨긴 덩어리"에 이름을 붙이는 데만 쓴다(load_hidden_batches).
     숨김 판정에는 **관여하지 않는다**(대조는 URL 하나뿐 — is_hidden 참고). 안 넘어오면
     None으로 남고, 그 묶음은 소제목 이름 없이 "골라서 숨김"으로 표시된다(옛 기록도 동일).
     """
+    hide_articles(
+        [{"url": url, "outlet": outlet, "title": title, "pub_date": pub_date, "group": group}],
+        now=now,
+    )
+
+
+def hide_articles(items, now: Optional[datetime] = None) -> int:
+    """여러 기사를 **한 번의 읽기-수정-쓰기로** 숨긴다. 새로 숨긴 건수를 돌려준다.
+
+    items: `{"url", "outlet", "title", "pub_date", "group"}` dict 목록(url 말고는 없어도 된다).
+    소제목 통째 숨기기·선택 바 일괄 숨기기가 한 요청에 모아 보낸다 — 예전엔 기사 수만큼
+    요청을 나눠 보내, 파일 쓰기·되돌리기 기록·화면 재생성이 기사 수만큼 되풀이됐다.
+    hidden_at은 넘긴 순서대로 마이크로초씩 벌린다(같은 시각이면 휴지통 정렬이 뒤집힌다).
+    """
+    base = now or datetime.now()
+    added = 0
     with _hidden_lock:
         # [수정: 2026-09-04] 읽을 때 7일치를 통째로 들고 와 그대로 다시 쓴다 — 예전처럼
         # 오늘 것만 읽어 쓰면, 오늘 첫 숨기기 한 번이 어제 이전 기록을 파일에서 통째로
-        # 지워 쓰레기통의 7일 열람이 성립하지 않는다(파일에 남는 기간 = 여기서 읽는 기간).
+        # 지워 휴지통의 7일 열람이 성립하지 않는다(파일에 남는 기간 = 여기서 읽는 기간).
         records = _load_records(now, HIDDEN_VIEW_DAYS)
-        # [수정: 2026-09-16] 중복 검사가 읽어온 기록 **전체**를 본다. 예전엔 오늘 기록만
-        # 봤는데, 그건 자정에 숨김이 풀리던 시절 "3일 전 기록 때문에 오늘의 🗑️가 먹통이
-        # 되는" 것을 막으려던 장치였다. 이제 그 3일 전 기록은 여전히 살아 있어(숨김 유지
-        # 기간 = 열람 기간) 그 기사는 애초에 화면에 안 보인다 — 오늘 날짜로 한 건 더 쌓으면
-        # 같은 기사가 쓰레기통에 두 줄로 보이고, 한 줄만 복구해도 안 돌아온다.
-        if not any(record["url"] == url for record in records):
-            # [수정: 2026-07-26] 초 단위(timespec="seconds")가 아니라 마이크로초까지 그대로
-            # 남긴다 — 사용자가 여러 기사를 1초 안에 연달아 숨기면 초 단위로는 시각이 같아져,
-            # 정렬(내림차순)이 안정 정렬 특성상 오히려 먼저 숨긴 게 위로 가는 사고가 난다.
+        # [수정: 2026-09-16] 중복 검사가 읽어온 기록 **전체**를 본다. 3일 전 기록도 여전히
+        # 살아 있어(숨김 유지 기간 = 열람 기간) 오늘 날짜로 한 건 더 쌓으면 같은 기사가
+        # 휴지통에 두 줄로 보이고, 한 줄만 복구해도 안 돌아온다.
+        known = {record["url"] for record in records}
+        for item in items:
+            url = item.get("url")
+            if not url or url in known:
+                continue
+            known.add(url)
+            # [수정: 2026-07-26] 초 단위가 아니라 마이크로초까지 남긴다 — 1초 안에 연달아
+            # 숨기면 시각이 같아져 정렬(내림차순)이 먼저 숨긴 걸 위로 올린다.
             records.append(
                 {
                     "url": url,
-                    "hidden_at": (now or datetime.now()).isoformat(),
-                    "outlet": outlet,
-                    "title": title,
-                    "pub_date": pub_date,
-                    "group": group,
+                    "hidden_at": (base + timedelta(microseconds=added)).isoformat(),
+                    "outlet": item.get("outlet"),
+                    "title": item.get("title"),
+                    "pub_date": item.get("pub_date"),
+                    "group": item.get("group"),
                 }
             )
+            added += 1
+        if added:
             _write_records(records)
+    return added
 
 
 def unhide_articles(urls, now: Optional[datetime] = None) -> int:
     """여러 기사의 숨김을 **한 번의 읽기-수정-쓰기로** 해제한다. 실제로 지운 건수를 돌려준다.
 
-    [추가: 2026-09-02] 쓰레기통의 "모두 복구"·"선택한 기사 복구"용. 단건 해제를 여러 번
+    [추가: 2026-09-02] 휴지통의 "모두 복구"·"선택한 기사 복구"용. 단건 해제를 여러 번
     부르면(unhide_article) 파일을 건수만큼 다시 쓰고, 그때마다 화면 재생성까지 딸려와
     12건 복구에 파일 쓰기가 12번 일어난다 — 숨기기 쪽이 잠금을 둔 이유(경합)와 같은
     문제라 애초에 한 번에 처리한다.
@@ -632,40 +653,6 @@ def display_name_in_use(
     return False
 
 
-def rounds_using_display_name(display_name: str, date_str: str) -> list:
-    """오늘 **다른 회차**에서 이 표시 이름을 이미 쓰고 있는지 — [(회차 시각, 원래 단어)] 목록.
-
-    [추가: 2026-09-03] display_name_in_use는 "지금 이 화면(=한 회차)"만 본다. 그건 이름표
-    (group_labels)가 회차별로 살기 때문에 맞는 범위였는데, **커스텀 소제목(custom_groups)은
-    하루 전체가 범위**라 그 경계가 어긋나 있었다 — 09:30 회차에서 「1주택 세제 개편안 논란」에
-    "세제개편안 후속" 이름표를 붙여둔 뒤 14:00 회차 화면에서 「세제개편안 후속」을 새로 만들면,
-    14:00의 이름표에는 그 이름이 없으니 검사를 그냥 통과한다. 그런데 만들어진 커스텀 소제목은
-    하루 전체에 뜨므로, **09:30 회차 화면으로 돌아가면 똑같은 이름의 소제목이 두 줄** 있다
-    (2026-09-03 제보 — 복사·txt로 나가는 보고서에도 같은 소제목이 두 번 찍힌다).
-
-    그래서 커스텀 소제목을 만들 때만 이 함수로 하루 전체를 훑는다. 이름표를 바꾸는 쪽
-    (_handle_rename_group)은 이 함수가 필요 없다 — 커스텀 소제목은 어느 회차 화면에도 늘
-    그려지므로 그 화면의 active_names에 이미 들어 있다.
-    """
-    if not GROUP_LABELS_FILE.exists():
-        return []
-    try:
-        data = json.loads(GROUP_LABELS_FILE.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, TypeError):
-        return []
-    if not isinstance(data, dict):
-        return []
-    prefix = date_str + "|"
-    hits = []
-    for key, bucket in data.items():
-        if not key.startswith(prefix) or not isinstance(bucket, dict):
-            continue
-        for topic_word, label in bucket.items():
-            if label == display_name:
-                hits.append((key[len(prefix):], topic_word))
-    return sorted(set(hits))
-
-
 def display_group_name(name: str, labels: dict) -> str:
     """소제목 단어를 화면에 보여줄 이름으로 바꾼다 (이름표가 없으면 원래 단어 그대로)."""
     return labels.get(name, name)
@@ -708,9 +695,9 @@ def is_hidden(article: dict, hidden_urls: set) -> bool:
 
     [추가: 2026-08-25] filter_hidden이 안에서만 쓰던 계산을 밖으로 뺐다 — "이 기사가
     숨김 상태인가"를 **거르지 않고 물어보기만 하는** 화면이 생겼기 때문(수시 모니터링의
-    📌 담아두기 버튼, 실시간현황의 "🗑️ 숨김" 표시). 판정이 두 벌로 갈라지면 화면은
+    📌 담아두기 버튼, 실시간 현황의 "🗑️ 숨김" 표시). 판정이 두 벌로 갈라지면 화면은
     "담을 수 있다"고 말하는데 확정본에서는 filter_hidden이 걸러내는 어긋남이 그대로
-    재발하므로(실제로 2026-08-27에 실시간현황이 그 상태였다), 판정은 반드시 이 함수
+    재발하므로(실제로 2026-08-27에 실시간 현황이 그 상태였다), 판정은 반드시 이 함수
     하나만 거친다.
 
     호출부가 목록을 돌 때마다 파일을 다시 읽지 않도록 URL 집합을 인자로 받는다

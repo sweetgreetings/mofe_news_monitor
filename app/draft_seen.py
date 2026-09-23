@@ -103,3 +103,14 @@ def record_draft_seen(round_id: tuple, condition: list, visible: list) -> None:
                 seen_order[url] = len(seen_order) + 1
         data["last_visible"] = [a["url"] for a in visible if a.get("url")]
         atomic_write_text(DRAFT_SEEN_FILE, json.dumps(data, ensure_ascii=False))
+
+
+def move_round(src_round: tuple, dst_round: tuple) -> None:
+    """「✂ 오늘만 여기서 끊기」 — 붙잡기 목록을 끊은 회차 이름으로 **옮긴다**(app.today_cuts).
+    한 회차 분만 담는 저장소라 복사하지 않는다 — 끊은 뒤 이어지는 회차는 새 기사로 시작한다."""
+    with _lock:
+        data = _read()
+        if tuple(data.get("round_id") or ()) != tuple(src_round):
+            return
+        data["round_id"] = list(dst_round)
+        atomic_write_text(DRAFT_SEEN_FILE, json.dumps(data, ensure_ascii=False))

@@ -3,7 +3,7 @@
 #
 # 카운터를 둔다는 것 자체가 "짐작하지 말고 잰다"(CODING_CONVENTIONS.md §1) 원칙의
 # 적용이다 — 알림 설정 화면이 보여주는 예상 호출량(키워드 수 × 폴링 횟수)은 어디까지나
-# 그 폴링만의 추정치이고, 실제 한도는 정기 스크랩·실시간현황·수시 모니터링 호출까지
+# 그 폴링만의 추정치이고, 실제 한도는 정기 스크랩·실시간 현황·수시 모니터링 호출까지
 # 전부 같이 나눠 쓴다. 추정이 아니라 실측으로 멈출지 판단하려면 실제 호출 지점
 # (app.naver_api._search_one_keyword)에서 세는 수밖에 없다.
 import json
@@ -59,6 +59,6 @@ def usage_ratio(now: Optional[datetime] = None) -> float:
 
 def should_pause_polling(now: Optional[datetime] = None) -> bool:
     """[단독]·[속보] 알림의 "폴링"만 멈출지 판단한다(app.breaking_alert_sender.
-    poll_and_alert_tick) — 정기 스크랩·실시간현황·수시 모니터링은 이 값을 보지 않는다
+    poll_and_alert_tick) — 정기 스크랩·실시간 현황·수시 모니터링은 이 값을 보지 않는다
     (본업은 절대 안 막는다, 사용자 결정)."""
     return usage_ratio(now) >= API_USAGE_WARN_RATIO

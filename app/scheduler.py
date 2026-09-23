@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Callable, List, Optional
 
 from app.breaking_alert_sender import poll_and_alert_tick
+from app.negative_guess import negative_guess_tick
 from app.config import LAST_SLOT_COLLECT_DELAY_MIN, MAX_RETRIES
 from app.confirm_send import check_pending_confirm_and_send
 from app.renderer import generate_waiting_page
@@ -30,7 +31,7 @@ def _resolve_schedule_times(schedule_times: Optional[List[dict]]) -> List[dict]:
     바꾼 시간대·횟수가 다음 tick(최대 POLL_INTERVAL_SEC 이내)부터 바로 반영된다.
 
     [추가: 2026-07-29] enabled=False인 시간대는 여기서 걸러낸다 — current_active_slot/
-    next_pending_slot/find_slot_to_run 등 이 함수를 거치는 모든 곳이 자동으로 꺼둔
+    next_pending_slot/find_slots_to_run 등 이 함수를 거치는 모든 곳이 자동으로 꺼둔
     시간대를 무시하게 된다(평일/휴일처럼 상황에 따라 켜고 끌 시간대를 지우지 않고
     남겨둘 수 있다). enabled 필드가 없는 옛 데이터는 켜진 것으로 간주한다.
 
@@ -173,19 +174,6 @@ def find_slots_to_run(
     return sorted(passed, key=lambda window: window["end"])
 
 
-def find_slot_to_run(
-    now: datetime,
-    schedule_times: Optional[List[dict]] = None,
-    already_run: Callable[[str], bool] = run_exists,
-) -> Optional[dict]:
-    """실행해야 할 회차 중 **가장 최근** 것 하나. 없으면 None.
-
-    find_slots_to_run의 마지막 원소일 뿐이라 판단 로직이 두 벌로 갈리지 않는다.
-    """
-    slots = find_slots_to_run(now, schedule_times, already_run)
-    return slots[-1] if slots else None
-
-
 def run_due_slot(
     now: Optional[datetime] = None,
     schedule_times: Optional[List[dict]] = None,
@@ -246,6 +234,9 @@ def run_scheduler(
     # 즉시 반환하므로(비용 0), cleanup_adhoc_cards처럼 기본값을 빈 람다로 둘 필요 없이
     # 매 tick 그대로 불러도 된다.
     check_breaking_alert: Callable[[datetime], None] = poll_and_alert_tick,
+    # 홈 「부정 추정 기사」 — 판정 안 한 오늘 회차가 있을 때만 백그라운드 스레드로 판정하고
+    # 바로 돌아온다(없으면 비용 0, app.negative_guess).
+    check_negative_guess: Callable[[datetime], None] = negative_guess_tick,
     should_continue: Callable[[], bool] = lambda: True,
 ) -> None:
     """앱이 켜져 있는 동안 poll_interval_sec마다 실행할 회차가 있는지 확인하고 수집한다.
@@ -276,7 +267,7 @@ def run_scheduler(
     data/adhoc/ 두 폴더만 지워도 정기 쪽에 흔적이 안 남는다(CLAUDE.md "수시 모니터링" 절).
     그래서 기본값은 아무 일도 안 하는 람다이고, main.py가 실제 함수를 주입한다.
 
-    now_fn/sleep/scrape/cleanup/render_waiting/check_confirm_send/check_breaking_alert/
+    now_fn/sleep/scrape/cleanup/render_waiting/check_confirm_send/check_breaking_alert/check_negative_guess/
     should_continue는 테스트에서 주입할 수 있다.
 
     [추가: 2026-08-10] 매 tick마다 확정·전송 유예 시간 경과도 함께 확인한다
@@ -296,6 +287,7 @@ def run_scheduler(
             run_due_slot(now=now, schedule_times=schedule_times, scrape=scrape)
             check_confirm_send(now)
             check_breaking_alert(now)
+            check_negative_guess(now)
             cleanup()
             cleanup_overrides()
             cleanup_adhoc_cards()

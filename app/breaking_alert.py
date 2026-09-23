@@ -9,6 +9,10 @@ from typing import Optional
 from app.atomic_write import atomic_write_text
 from app.config import (
     BREAKING_ALERT_FILE,
+    BURST_MIN_OUTLETS_CHOICES,
+    BURST_WINDOW_CHOICES,
+    DEFAULT_BURST_MIN_OUTLETS,
+    DEFAULT_BURST_WINDOW_MIN,
     DEFAULT_BREAKING_ALERT_END,
     DEFAULT_BREAKING_ALERT_INTERVAL_MIN,
     DEFAULT_BREAKING_ALERT_START,
@@ -31,6 +35,10 @@ def _default() -> dict:
         "end": DEFAULT_BREAKING_ALERT_END,
         "interval_min": DEFAULT_BREAKING_ALERT_INTERVAL_MIN,
         "catch_up_enabled": True,
+        # [속보] 몰림 알림(app.breaking_burst). 키가 없는 옛 설정 파일도 이 기본값으로 켜진다.
+        "burst_enabled": True,
+        "burst_window_min": DEFAULT_BURST_WINDOW_MIN,
+        "burst_min_outlets": DEFAULT_BURST_MIN_OUTLETS,
     }
 
 
@@ -53,6 +61,16 @@ def _validate_time(value: str, label: str) -> str:
     return value
 
 
+def _choice(value, choices: tuple, label: str) -> int:
+    try:
+        number = int(str(value).strip())
+    except (TypeError, ValueError):
+        raise BreakingAlertSettingsError(f"{label} 값이 올바르지 않습니다.")
+    if number not in choices:
+        raise BreakingAlertSettingsError(f"{label} 값이 올바르지 않습니다.")
+    return number
+
+
 def save_breaking_alert_settings(
     enabled: bool,
     group_names: list,
@@ -60,6 +78,9 @@ def save_breaking_alert_settings(
     end: str,
     interval_min,
     catch_up_enabled: bool,
+    burst_enabled: bool = True,
+    burst_window_min=DEFAULT_BURST_WINDOW_MIN,
+    burst_min_outlets=DEFAULT_BURST_MIN_OUTLETS,
 ) -> dict:
     """설정 화면(/breaking-alert)의 "저장". 감시 대상 그룹은 이름 문자열로 저장한다 —
     이 프로젝트의 기존 저장소들(data/group_order.json, data/custom_groups.json 등)과
@@ -77,6 +98,8 @@ def save_breaking_alert_settings(
         raise BreakingAlertSettingsError(
             f"확인 주기는 {MIN_BREAKING_ALERT_INTERVAL_MIN}~{MAX_BREAKING_ALERT_INTERVAL_MIN}분 사이로 입력해주세요."
         )
+    burst_window = _choice(burst_window_min, BURST_WINDOW_CHOICES, "몰림 알림의 시간")
+    burst_outlets = _choice(burst_min_outlets, BURST_MIN_OUTLETS_CHOICES, "몰림 알림의 언론사 수")
     data = {
         "enabled": bool(enabled),
         "group_names": [str(name) for name in group_names if str(name).strip()],
@@ -84,6 +107,9 @@ def save_breaking_alert_settings(
         "end": end,
         "interval_min": interval,
         "catch_up_enabled": bool(catch_up_enabled),
+        "burst_enabled": bool(burst_enabled),
+        "burst_window_min": burst_window,
+        "burst_min_outlets": burst_outlets,
     }
     atomic_write_text(BREAKING_ALERT_FILE, json.dumps(data, ensure_ascii=False, indent=2))
     return data

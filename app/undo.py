@@ -20,6 +20,7 @@
 # 하에) 실제로는 아무 것도 안 바뀌는 상태였다. `_snapshot_latest_run_file`/
 # `_restore_latest_run_file`로 회차 파일 원본도 같이 뜨고 되돌리게 했다 —
 # HISTORY.md 같은 섹션 참고.
+import hashlib
 import json
 import threading
 from datetime import date, datetime
@@ -69,6 +70,77 @@ _SNAPSHOT_FILES = {
 # 파일 읽기-수정-쓰기가 여러 스레드에서 겹치지 않게 한다
 # (app.curation의 hidden_articles 락과 같은 이유 — ThreadingHTTPServer).
 _lock = threading.Lock()
+
+# [추가: 2026-09-23] 스냅샷 조각을 내용 해시로 한 번만 저장한다(`blobs`), 항목은 해시만 든다.
+# 스냅샷에 무엇이 들어가는지는 하나도 안 바꾼다 — 같은 값을 20번 저장하던 것을 한 번으로
+# 줄일 뿐이라 복원 결과는 완전히 같다.
+#
+# 실측(2026-09-23, 항목 11개 6.0MB): 조각별 「항목당 크기 / 서로 다른 값」이
+#   llm_cache 215K / 2개, hidden 198K / 4개, overrides 184K / 6개, run_file 26K / 1개
+# — **전체의 66%가 같은 값의 반복 저장**이었다. 큐레이션 한 번이 파일 하나만 바꾸는데
+# 스냅샷은 매번 전부를 다시 담았기 때문이다. 중복만 없애면 7.0MB → 2.4MB.
+# 되돌리기 스택은 큐레이션 버튼을 누를 때마다 통째로 읽고 다시 쓰므로(push) 이 크기가
+# 곧 클릭 한 번의 지연이다 — 20단계가 찬 상태에서 push 140ms를 실측하고 고쳤다.
+_FORMAT_VERSION = 2
+
+
+def _blob_ref(blobs: dict, value) -> str:
+    """스냅샷 조각 하나를 blobs에 넣고(이미 있으면 그대로) 그 해시를 돌려준다.
+
+    값을 JSON 문자열로 굳혀서 해시한다 — 조각이 파일 원문(str), "그땐 파일이 없었다"(None),
+    LLM 캐시·회차 파일(dict)로 제각각이라 한 가지 표현으로 맞춰야 비교가 된다. None도
+    `"null"`이라는 정상적인 내용이라 참조가 생긴다(키가 **아예 없는** 것과 구별돼야 한다 —
+    undo()의 `if key in files` 규칙이 그 구별에 기대고 있다).
+    """
+    text = json.dumps(value, ensure_ascii=False, sort_keys=True)
+    digest = hashlib.sha1(text.encode("utf-8")).hexdigest()
+    if digest not in blobs:
+        blobs[digest] = text
+    return digest
+
+
+def _resolve(blobs: dict, ref: Optional[str]):
+    """해시 참조를 원래 값으로 되돌린다. 참조가 없거나 blob이 사라졌으면 None."""
+    if not isinstance(ref, str):
+        return None
+    text = blobs.get(ref)
+    if text is None:
+        return None
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return None
+
+
+def _collect_blobs(data: dict) -> None:
+    """남은 항목이 가리키지 않는 blob을 버린다 — 상한을 넘겨 밀려난 항목의 조각 정리."""
+    used = set()
+    for entry in data.get("entries", []):
+        used.update(ref for ref in (entry.get("files") or {}).values() if isinstance(ref, str))
+        for key in ("llm_cache", "run_file"):
+            if isinstance(entry.get(key), str):
+                used.add(entry[key])
+    data["blobs"] = {h: text for h, text in (data.get("blobs") or {}).items() if h in used}
+
+
+def _migrate_legacy(data: dict) -> dict:
+    """옛 형식(조각을 항목 안에 그대로 담던 기록)을 해시 참조 형식으로 옮긴다.
+
+    스택은 자정에 비므로 옛 형식이 살아 있는 건 바꾼 날 하루뿐이지만, 그날 쌓여 있던
+    되돌리기가 통째로 날아가면 안 되므로 읽을 때 조용히 맞춰 준다.
+    """
+    blobs: dict = {}
+    for entry in data.get("entries", []):
+        if "files" in entry:
+            entry["files"] = {
+                key: _blob_ref(blobs, value) for key, value in (entry["files"] or {}).items()
+            }
+        for key in ("llm_cache", "run_file"):
+            if key in entry:
+                entry[key] = _blob_ref(blobs, entry[key])
+    data["blobs"] = blobs
+    data["v"] = _FORMAT_VERSION
+    return data
 
 
 def _read_raw(path) -> Optional[str]:
@@ -192,10 +264,16 @@ def _load() -> dict:
     try:
         data = json.loads(UNDO_FILE.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError):
-        return {"date": date.today().isoformat(), "entries": []}
+        return _empty()
     if data.get("date") != date.today().isoformat():
-        return {"date": date.today().isoformat(), "entries": []}
+        return _empty()
+    if data.get("v") != _FORMAT_VERSION:
+        return _migrate_legacy(data)
     return data
+
+
+def _empty() -> dict:
+    return {"date": date.today().isoformat(), "v": _FORMAT_VERSION, "entries": [], "blobs": {}}
 
 
 def _save(data: dict) -> None:
@@ -251,20 +329,35 @@ def push(
                 if (last["touched"], last["batch"]) != old:
                     _save(data)
                 return
+        blobs = data.setdefault("blobs", {})
         data["entries"].append(
             {
                 "label": label,
                 "at": datetime.now().isoformat(timespec="seconds"),
-                "files": {key: _read_raw(path) for key, path in _SNAPSHOT_FILES.items()},
-                "llm_cache": _snapshot_llm_cache(),
-                "run_file": _snapshot_latest_run_file(),
+                "files": {
+                    key: _blob_ref(blobs, _read_raw(path)) for key, path in _SNAPSHOT_FILES.items()
+                },
+                "llm_cache": _blob_ref(blobs, _snapshot_llm_cache()),
+                "run_file": _blob_ref(blobs, _snapshot_latest_run_file()),
                 "touched": touched,
                 "batch": batch,
             }
         )
         # 오래된 것부터 버려 상한을 지킨다.
         data["entries"] = data["entries"][-_MAX_ENTRIES:]
+        _collect_blobs(data)
         _save(data)
+
+
+def clear() -> None:
+    """오늘 되돌리기 기록을 비운다 — 「✂ 오늘만 여기서 끊기」 직후에 부른다(app.cut_round).
+
+    되돌리기는 저장소 파일을 **통째로** 복원하므로, 끊기 전 기록을 되돌리면 끊는 순간 새 회차
+    이름으로 복사해 둔 이름표·순서·분류 캐시가 지워진다(끊은 회차의 확정본은 그대로 남아 두
+    쪽이 어긋난다). 끊기를 사이에 두고 뒤로 건너가지 못하게 스택을 끊는다.
+    """
+    with _lock:
+        _save(_empty())
 
 
 def peek_label() -> Optional[str]:
@@ -285,13 +378,16 @@ def undo() -> Optional[dict]:
         if not data["entries"]:
             return None
         entry = data["entries"].pop()
+        blobs = data.get("blobs") or {}
+        files = entry.get("files") or {}
         for key, path in _SNAPSHOT_FILES.items():
             # [수정: 2026-09-15] 스냅샷에 그 키가 **아예 없으면**(그 파일이 목록에 들어오기 전에
             # 쌓인 기록) 건드리지 않는다. 예전처럼 get(key)의 None을 "그땐 파일이 없었다"로
             # 읽으면, 새로 추가한 파일(assigned)이 옛 기록을 되돌리는 순간 통째로 지워진다.
-            if key in entry["files"]:
-                _write_raw(path, entry["files"][key])
-        _restore_llm_cache(entry.get("llm_cache", {}))
-        _restore_latest_run_file(entry.get("run_file"))
+            if key in files:
+                _write_raw(path, _resolve(blobs, files[key]))
+        _restore_llm_cache(_resolve(blobs, entry.get("llm_cache")) or {})
+        _restore_latest_run_file(_resolve(blobs, entry.get("run_file")))
+        _collect_blobs(data)
         _save(data)
         return {"label": entry["label"], "touched": list(entry.get("touched") or [])}

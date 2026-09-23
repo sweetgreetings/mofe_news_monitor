@@ -1,10 +1,13 @@
-# Design Ref: DESIGN.md §1 화면 구성 — 최신 회차를 밝은 카드형 정적 HTML 화면으로 렌더링
+# Design Ref: archive/DESIGN.md §1 화면 구성 — 최신 회차를 밝은 카드형 정적 HTML 화면으로 렌더링
 import html
 import json
+import re
+import urllib.parse
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
+from app.topnav import regular_nav, topnav_style
 from app.classifier import (
     classify_articles,
     forced_group_target_names,
@@ -13,12 +16,18 @@ from app.classifier import (
 )
 from app.config import (
     COLOR_ACCENT,
+    COLOR_ACCENT_BORDER,
+    COLOR_SCREEN_TAG_REG_BG,
+    COLOR_SCREEN_TAG_REG_BORDER,
+    COLOR_SCREEN_TAG_REG_TEXT,
+    COLOR_SCREEN_TAG_WORK_BG,
+    COLOR_SCREEN_TAG_WORK_BORDER,
+    COLOR_SCREEN_TAG_WORK_TEXT,
     COLOR_BG,
     COLOR_BORDER,
     COLOR_CARD,
     COLOR_HOVER,
     COLOR_TEXT,
-    CONFIRM_SEND_GRACE_SEC,
     CUTE_FONT_BASE64,
     CUTE_FONT_NAME,
     DEFAULT_ARTICLE_LINE_TEMPLATE,
@@ -47,7 +56,7 @@ from app.curation import (
     load_hidden_batches,
 )
 from app.summary_overrides import apply_summary_overrides
-from app.manual_keyword_note import load_manual_keyword_note
+from app.manual_keyword_note import load_manual_keyword_note, past_notes
 from app.custom_groups import load_custom_groups
 from app.subheading_names import name_pool
 from app.excel_export import format_pub_datetime
@@ -87,34 +96,21 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>언론 모니터링</title>
+<title>확정본 · 언론 모니터링 {run_slot} 기준</title>
 <style>
   {cute_font_face}
   body {{ margin: 0; background: {bg}; color: {text}; font-family: {font_stack}; }}
   .container {{
     max-width: 800px; margin: 24px auto; padding: 24px; background: {card};
-    border: 1px solid {border}; border-radius: 8px;
+    border: 1px solid {border}; border-radius: var(--r-lg);
   }}
-  /* [수정: 2026-07-27] 상단 고정 바 — HOME + 다른 두 화면(초안/실시간)으로 바로 이동.
-     🗑️(숨긴 기사 관리)는 하단 고정 바로 옮겼다 — 상단이 3개 내비게이션으로 꽉 차서
-     자리를 따로 뺐다. 이 화면은 file://로 직접 열릴 수도 있어 절대경로(설정 서버
-     주소)를 쓰는 링크가 섞여 있다 — home.html은 같은 폴더의 정적 파일이라 상대경로로도
-     항상 동작한다. */
   /* [수정: 2026-09-16] 카드 위 여백 60→44px — 60px은 상단 고정바(54px)를 피하려는 값인데 글자 위로
      30px이 비었다. 44px이면 16px 남는다. 확정본·초안·실시간·정기 보관함·설정·수시·정책 단어 추이
      일곱 화면이 같은 값을 써야 화면을 오갈 때 제목이 들썩이지 않는다(수시·추이는 84→68px 형태).
      시안 SUBHEAD_SPACING_MOCKUP.html B안. */
   .container {{ padding-top: 44px; padding-bottom: 56px; }}
-  .topbar {{
-    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
-    background: {card}; border-bottom: 1px solid {border}; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  }}
-  .topbar-inner {{
-    max-width: 800px; margin: 0 auto; padding: 12px 24px;
-    display: flex; justify-content: space-between; align-items: center;
-  }}
-  .topbar a {{ color: {accent}; text-decoration: none; font-size: 0.92rem; font-weight: 600; padding: 6px 10px; border-radius: 6px; }}
-  .topbar a:hover {{ background: {hover}; }}
+  /* 상단바 CSS는 app/topnav.py 한 곳 — 모든 화면이 같은 값을 쓴다. */
+{topnav_style}
   .bottombar {{
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
     background: {card}; border-top: 1px solid {border}; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
@@ -123,35 +119,35 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     max-width: 800px; margin: 0 auto; padding: 10px 24px;
     display: flex; justify-content: space-between; align-items: center; gap: 10px;
   }}
-  .bottombar a {{ color: {accent}; text-decoration: none; font-size: 1.1rem; padding: 6px 10px; border-radius: 6px; }}
+  .bottombar a {{ color: {accent}; text-decoration: none; font-size: 1.1rem; padding: 6px 10px; border-radius: var(--r-md); }}
   .bottombar a:hover {{ background: {hover}; }}
   /* [추가: 2026-08-03] 하단바 🖍️ — 형광펜 단어를 설정 화면까지 안 가고 이 화면에서
-     바로 추가·삭제할 수 있는 팝오버. 쓰레기통(숨긴 기사 관리) 바로 왼쪽에 둔다. */
+     바로 추가·삭제할 수 있는 팝오버. 휴지통(숨긴 기사 관리) 바로 왼쪽에 둔다. */
   .highlight-wrap {{ position: relative; }}
   .highlight-toggle {{
     background: transparent; border: none; color: {muted}; font-size: 1.1rem; cursor: pointer;
-    padding: 6px 10px; border-radius: 6px;
+    padding: 6px 10px; border-radius: var(--r-md);
   }}
   .highlight-toggle:hover {{ background: {hover}; }}
   .highlight-popover {{
     display: none; position: absolute; bottom: 100%; right: 0; margin-bottom: 8px;
-    background: {card}; border: 1px solid {border}; border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); padding: 12px; width: 220px; z-index: 30;
+    background: {card}; border: 1px solid {border}; border-radius: var(--r-lg);
+    box-shadow: var(--sh-pop); padding: 12px; width: 220px; z-index: 30;
   }}
   .highlight-popover.is-open {{ display: block; }}
   .highlight-chips {{ display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }}
   .highlight-chip {{
-    display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 14px;
-    font-size: 0.82rem; color: {text}; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--r-pill);
+    font-size: var(--fs-sm); color: {text}; cursor: pointer;
   }}
   .highlight-chip button {{
-    background: transparent; border: none; padding: 0; font-size: 0.8rem; cursor: pointer;
+    background: transparent; border: none; padding: 0; font-size: var(--fs-sm); cursor: pointer;
     color: inherit; line-height: 1;
   }}
-  .highlight-empty {{ color: {muted}; font-size: 0.8rem; margin: 0 0 8px; }}
+  .highlight-empty {{ color: {muted}; font-size: var(--fs-sm); margin: 0 0 8px; }}
   .highlight-add-form {{ display: flex; gap: 6px; }}
-  .highlight-add-form input {{ flex: 1; font-size: 0.85rem; padding: 5px 8px; min-width: 0; }}
-  .highlight-add-form button {{ font-size: 0.82rem; padding: 5px 10px; white-space: nowrap; }}
+  .highlight-add-form input {{ flex: 1; font-size: var(--fs-md); padding: 5px 8px; min-width: 0; }}
+  .highlight-add-form button {{ font-size: var(--fs-sm); padding: 5px 10px; white-space: nowrap; }}
   /* [추가: 2026-08-05] 소제목 미니 목차 — 소제목 하나 안에 기사가 많아지면 원하는
      소제목을 찾으려고 계속 스크롤해야 하는 문제가 있어, 평소엔 숨겨진 버튼(펼침형,
      사용자가 고정형 대신 선택)을 눌러야만 목차가 나타나게 했다. 화면을 항상 가리지
@@ -159,9 +155,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [수정: 2026-08-10] 원래 accent(파랑) 배경이라 (확정)/(전송) 버튼과 색이 겹쳐
      헷갈린다는 피드백 — 눈에 안 튀는 중립색(카드 배경+테두리)으로 바꿨다. */
   .toc-toggle-btn {{
-    position: fixed; right: 20px; bottom: 20px; width: 46px; height: 46px; border-radius: 50%;
+    position: fixed; right: 20px; bottom: 20px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
     background: {card}; color: {muted}; border: 1px solid {border}; font-size: 1.2rem; cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12); z-index: 200;
+    box-shadow: var(--sh-float); z-index: 200;
     display: flex; align-items: center; justify-content: center;
   }}
   .toc-toggle-btn:hover {{ background: {hover}; }}
@@ -171,24 +167,28 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [추가: 2026-08-11] ↩ 되돌리기 — 오른쪽 플로팅 버튼들(발송·목차)과 성격이
      반대인 "취소" 계열이라 사용자 요청대로 화면 왼쪽 아래에 따로 뒀다. 되돌릴 게 있을
      때만 렌더링한다(항상 떠 있으면 "뭘 되돌리는지" 알 수 없어 오히려 불안하다). */
-  /* [수정: 2026-09-02] 왼쪽 아래는 이제 두 칸짜리 스택이다 — 아래가 쓰레기통(숨긴 기사),
+  /* [수정: 2026-09-02] 왼쪽 아래는 이제 두 칸짜리 스택이다 — 아래가 휴지통(숨긴 기사),
      위가 ↩ 되돌리기. 수시 수집 결과 화면(.fab.left / .fab.left.upper)과 같은 배치라
-     두 흐름을 오갈 때 같은 자리에 같은 것이 있다. 쓰레기통이 0건이라 안 그려질 때도 ↩는
+     두 흐름을 오갈 때 같은 자리에 같은 것이 있다. 휴지통이 0건이라 안 그려질 때도 ↩는
      제자리(위 칸)에 둔다 — 숨기기 한 번에 버튼이 아래에서 위로 뛰면 그게 더 불안하다. */
   .undo-fab {{
-    position: fixed; left: 20px; bottom: 88px; width: 50px; height: 50px; border-radius: 50%;
+    position: fixed; left: 20px; bottom: 88px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
     background: {card}; color: {muted}; border: 1px solid {border}; font-size: 1.3rem;
-    cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12); z-index: 200;
+    cursor: pointer; box-shadow: var(--sh-float); z-index: 200;
     display: flex; align-items: center; justify-content: center;
   }}
   .undo-fab:hover {{ background: {hover}; color: {accent}; border-color: {accent}; }}
   .undo-fab:disabled {{ opacity: 0.5; cursor: progress; }}
 {hidden_trash_style}
+{scroll_top_style}
+{hide_batch_style}
+{url_add_style}
+{note_history_style}
 {name_picker_style}
   .confirm-send-fab {{
-    position: fixed; right: 20px; bottom: 80px; width: 56px; height: 56px; border-radius: 50%;
-    background: {send}; color: {on_fill}; border: none; font-size: 0.92rem; font-weight: 700;
-    cursor: pointer; box-shadow: 0 4px 12px rgba(21, 128, 61, 0.4); z-index: 200;
+    position: fixed; right: 20px; bottom: 80px; width: var(--fab-lg); height: var(--fab-lg); border-radius: var(--r-circle);
+    background: {send}; color: {on_fill}; border: none; font-size: var(--fs-md); font-weight: 700;
+    cursor: pointer; box-shadow: var(--sh-float); z-index: 200;
     display: flex; align-items: center; justify-content: center;
   }}
   .confirm-send-fab:disabled {{ opacity: 0.6; cursor: not-allowed; }}
@@ -197,24 +197,29 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      없이 짧게(0.9초) 보여주기만 한다. */
   .confirm-toast {{
     position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 300;
-    background: {header}; color: {on_fill}; padding: 10px 20px; border-radius: 8px;
-    font-size: 0.9rem; font-weight: 600; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    background: {header}; color: {on_fill}; padding: 10px 20px; border-radius: var(--r-lg);
+    font-size: var(--fs-md); font-weight: 600; box-shadow: var(--sh-float);
   }}
   /* 카운트다운은 (발송) 버튼(bottom:80) 바로 위 146px에 둔다. */
   .send-countdown {{
     position: fixed; right: 20px; bottom: 146px; width: 130px; text-align: right;
-    font-size: 0.78rem; font-weight: 700; color: {error}; z-index: 200; white-space: nowrap;
+    font-size: var(--fs-sm); font-weight: 700; color: {error}; z-index: 200; white-space: nowrap;
   }}
   /* [추가: 2026-08-10] 담당자가 아니라 시스템이 대신 전송한 회차 표시 — 카운트다운(빨강,
      경고성)과 다른 맥락이라 회색으로 톤을 낮췄다.
      [수정: 2026-08-13] 담당자가 직접 (발송)을 눌렀을 때도 같은 자리에 같은 스타일로
-     표시한다(.auto-sent -> .sent-done으로 이름 변경) — 예전엔 자동 발송만 흔적이 남고
+     표시한다(.auto-sent -> .sent-done으로 이름 변경) — 예전엔 자동발송만 흔적이 남고
      사람이 누른 건 토스트가 사라지면 아무것도 안 남아서, 새로고침 후 "내가 보냈나?"를
      확인할 방법이 없었다(재발송 위험). 사람/기계 구분은 색이 아니라 앞머리 이모지
      (✔️/🤖)가 맡는다 — 둘 다 "이미 끝난 일"이라 색까지 나눌 이유가 없다(사용자 선택).
      width는 "(2회)" 같은 꼬리표가 붙어도 잘리지 않게 고정값 대신 내용에 맞춘다
      (fixed 요소 + width:auto = 내용 폭, right:20px 기준으로 왼쪽으로 늘어난다). */
   .send-countdown.sent-done {{ color: {muted}; width: auto; }}
+  /* 발송 완료 글자를 누르면 발송 기록(/send-log)의 그 회차 줄로 — 누가 받았는지 보는 길. */
+  a.send-countdown.sent-done, .send-countdown .send-log-link {{ text-decoration: none; }}
+  a.send-countdown.sent-done:hover {{ color: {accent}; text-decoration: underline; }}
+  .send-countdown .send-log-link {{ color: inherit; font-weight: 600; }}
+  .send-countdown .send-log-link:hover {{ text-decoration: underline; }}
   /* [추가: 2026-08-11] 카운트다운이 0에 닿는 순간 그 자리에서 바로 바뀌는 완료 문구 —
      "곧 나갑니다"에 가까운 낙관적 표시라, 서버가 실제로 확인해 남기는 회색 배지
      (.auto-sent)와는 색을 달리해 파란색으로 둔다. */
@@ -235,7 +240,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .toc-popover {{
     display: none; position: fixed; right: 20px; bottom: 74px; width: 200px;
     background: {card}; border: 1px solid {border};
-    border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15); z-index: 200;
+    border-radius: var(--r-lg); box-shadow: var(--sh-pop); z-index: 200;
   }}
   .toc-popover.is-open {{ display: block; }}
   .toc-scroll {{ max-height: 320px; overflow-y: auto; padding: 8px; }}
@@ -243,17 +248,17 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      ▲▼를 붙였다 — 이름 클릭(이동)과 화살표 클릭(순서 변경)을 분리해서, 클릭 하나에
      동작 하나만 대응하도록 했다(선택 후 상단 고정 화살표 방식은 이름 클릭의 기존
      "이동" 의미와 충돌해서 채택하지 않음). */
-  .toc-row {{ display: flex; align-items: center; justify-content: space-between; border-radius: 4px; }}
+  .toc-row {{ display: flex; align-items: center; justify-content: space-between; border-radius: var(--r-sm); }}
   .toc-row a {{
-    flex: 1; min-width: 0; padding: 6px 8px; font-size: 0.85rem; color: {text};
-    text-decoration: none; border-radius: 4px; white-space: nowrap; overflow: hidden;
+    flex: 1; min-width: 0; padding: 6px 8px; font-size: var(--fs-md); color: {text};
+    text-decoration: none; border-radius: var(--r-sm); white-space: nowrap; overflow: hidden;
     text-overflow: ellipsis;
   }}
   .toc-row a:hover {{ background: {hover}; }}
   .toc-row-btns {{ display: flex; gap: 1px; flex-shrink: 0; padding-right: 4px; }}
   .toc-order-btn {{
     background: transparent; border: none; color: {muted}; font-size: 0.72rem; cursor: pointer;
-    padding: 2px 4px; border-radius: 4px;
+    padding: 2px 4px; border-radius: var(--r-sm);
   }}
   .toc-order-btn:hover {{ background: {hover}; }}
   .toc-order-btn:disabled {{ opacity: 0.3; cursor: default; }}
@@ -263,7 +268,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      [수정: 2026-08-18] 이제 ▲▼가 새로고침을 일으키지 않으므로, 이 표시는 (적용)을
      누를 때까지 계속 남아 "이번에 뭘 옮겼는지"를 누적해서 보여준다. */
   .toc-row.toc-row-moved {{ background: {row_moved}; }}
-  .toc-empty {{ color: {muted}; font-size: 0.82rem; padding: 6px 8px; }}
+  .toc-empty {{ color: {muted}; font-size: var(--fs-sm); padding: 6px 8px; }}
   /* [추가: 2026-08-18] 팝오버 하단 확정 바 — 담당자가 "(적용)을 누르기 전까지는 아무것도
      바뀌지 않았다"고 믿을 수 있어야 하므로, 서버로 나가는 길은 (적용) 하나뿐이다.
      구조는 .edit-summary-form을 그대로 따랐다(내용 위 / 오른쪽 정렬 액션 아래, 취소가
@@ -273,12 +278,12 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .toc-foot {{
     display: none; flex-direction: column; gap: 6px;
     padding: 8px; border-top: 1px solid {border};
-    background: {card}; border-radius: 0 0 8px 8px;
+    background: {card}; border-radius: 0 0 var(--r-lg) var(--r-lg);
   }}
   .toc-foot.is-dirty {{ display: flex; }}
-  .toc-dirty-count {{ font-size: 0.76rem; color: {muted}; }}
+  .toc-dirty-count {{ font-size: var(--fs-sm); color: {muted}; }}
   .toc-foot-actions {{ display: flex; justify-content: flex-end; gap: 8px; }}
-  .toc-foot-actions button {{ font-size: 0.78rem; padding: 5px 12px; border-radius: 5px; cursor: pointer; }}
+  .toc-foot-actions button {{ font-size: var(--fs-sm); padding: 5px 12px; border-radius: var(--r-sm); cursor: pointer; }}
   .toc-cancel-btn {{ background: transparent; color: {muted}; border: 1px solid {border}; }}
   .toc-cancel-btn:hover {{ background: {hover}; }}
   .toc-apply-btn {{ background: {accent}; color: {on_fill}; border: none; font-weight: 700; }}
@@ -291,30 +296,40 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .toc-foot.nudge {{ animation: toc-nudge 0.5s ease-in-out; }}
   /* [추가: 2026-07-30] app.preview_renderer와 동일한 체크박스 일괄이동 바 —
      평소엔 숨어있다가 체크박스를 선택하면 왼쪽에 나타나고, 🗑️는 그대로 오른쪽에 남는다. */
-  .bulk-move-bar {{ display: none; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.85rem; }}
+  .bulk-move-bar {{ display: none; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--fs-md); }}
   .bulk-move-bar.is-active {{ display: flex; }}
   .bulk-move-bar .bulk-move-count {{ font-weight: 600; color: {header}; white-space: nowrap; }}
   #bulk-move-select {{
-    border: 1px solid {accent}; border-radius: 4px; padding: 5px 8px; font-size: 0.85rem;
+    border: 1px solid {accent}; border-radius: var(--r-md); padding: 5px 8px; font-size: var(--fs-md);
     color: {text}; background: {card};
   }}
-  .bulk-move-bar button {{ padding: 5px 12px; font-size: 0.85rem; }}
+  .bulk-move-bar button {{ padding: 5px 12px; font-size: var(--fs-md); }}
   /* [추가: 2026-08-04] 일괄 위/아래 이동 버튼 — 선택한 기사가 서로 다른 소제목에
      걸쳐 있거나 소제목의 맨 위/아래에 닿으면 비활성화된다(updateBulkMoveBar). */
   #bulk-move-up, #bulk-move-down {{ padding: 5px 10px; }}
   #bulk-move-up:disabled, #bulk-move-down:disabled {{ opacity: 0.35; cursor: not-allowed; }}
   .bulk-move-bar .clear-btn {{ background: transparent; color: {muted}; }}
   .bulk-move-bar .clear-btn:hover {{ background: {hover}; }}
-  .article-select {{ margin-top: 3px; flex-shrink: 0; }}
+  /* [수정: 2026-09-18] 체크박스가 작아 누르기 어렵다는 지적 — 브라우저 기본 13px → 16px
+     (시안 mockups/CHECKBOX_SIZE_MOCKUP.html B안). 소제목 머리 체크박스도 같은 크기,
+     체크 색은 앱 파랑. 기사 체크박스는 커진 만큼 2px 내려 제목 첫 줄 가운데에 맞춘다. */
+  .article-select, .group-select-all {{ width: 16px; height: 16px; margin: 3px 3px 0 4px;
+    accent-color: {accent}; cursor: pointer; }}
+  .article-select {{ flex-shrink: 0; position: relative; top: 2px; }}
+  .group-select-all {{ vertical-align: -3px; }}
   .group-move-select {{
-    flex-shrink: 0; width: 100px; border: 1px solid {border}; border-radius: 4px;
-    padding: 2px 4px; font-size: 0.78rem; color: {muted}; background: {card};
+    flex-shrink: 0; width: 100px; height: var(--h-sm); box-sizing: border-box; border: 1px solid {border}; border-radius: var(--r-sm);
+    padding: 0 4px; font-size: var(--fs-sm); color: {muted}; background: {card};
   }}
+  /* 📌 담아둔 기사의 승격 드롭다운만 조금 넓다 — 「확정본에 넣기…」가 100px에선 잘린다
+     (실측: 글자 81px + 안쪽 여백 8 + 테두리 2 + 화살표 자리 ≈ 111px). 나머지 규격은
+     「다른 소제목」과 같다. */
+  .group-move-select.promote-select {{ width: 114px; }}
   /* [추가: 2026-08-04] 소제목별/시간순/언론사순 보기 전환 — 실제 소제목 구성은 그대로
      두고 화면에 나열하는 순서만 바꾸는 용도라, 다른 액션 버튼과 톤을 맞추되 select임을
      알 수 있게 테두리를 살짝 강조한다. */
   .view-mode-select {{
-    border: 1px solid {accent}; border-radius: 6px; padding: 6px 10px; font-size: 0.85rem;
+    border: 1px solid {accent}; border-radius: var(--r-md); padding: 6px 10px; font-size: var(--fs-md);
     color: {text}; background: {card};
   }}
   /* [수정: 2026-08-04] 기사가 없을 때만 걸리던 점선 테두리를, 사용자가 직접 만든
@@ -324,9 +339,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      전체를 감싸 계속 보인다). */
   /* [수정: 2026-08-05] 빈 여백이 너무 넓어 보인다는 피드백 — 패딩을 줄였다. 사실 가장
      큰 원인은 아래 .subheading h2 쪽 브라우저 기본 margin이었다(같이 수정). */
-  .subheading-custom {{ border: 2px dashed {custom_group_border}; border-radius: 8px; padding: 8px 16px; }}
-  .empty-group-hint {{ color: {muted}; font-size: 0.85rem; margin: 6px 0 0; }}
-  header h1 {{ font-size: 1.4rem; margin: 0; color: {header}; }}
+  .subheading-custom {{ border: 2px dashed {custom_group_border}; border-radius: var(--r-lg); padding: 8px 16px; }}
+  .empty-group-hint {{ color: {muted}; font-size: var(--fs-md); margin: 6px 0 0; }}
+  header h1 {{ font-size: var(--fs-xl); margin: 0; color: {header}; }}
   /* [추가: 2026-08-10] "지난 기사"는 복사·다운로드 같은 이 화면의 액션이 아니라 다른
      화면으로 이동하는 링크라 툴바에서 빼고 제목 옆(내비게이션 자리)으로 옮겼다
      (시안 A, 사용자 선택) — 회색 톤으로 제목보다 눈에 덜 띄게 둔다. */
@@ -349,8 +364,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      수직 중앙 정렬해주지만 a 태그는 그런 처리가 없다는 걸 마지막으로 발견 — align-items:
      center를 직접 지정해 브라우저 기본 동작에 기대지 않고 두 태그를 완전히 동일하게 그린다. */
   button, a.btn {{
-    background: {accent}; color: {on_fill}; border: none; border-radius: 4px;
-    padding: 6px 14px; font-size: 0.9rem; font-family: inherit; cursor: pointer; text-decoration: none;
+    background: {accent}; color: {on_fill}; border: none; border-radius: var(--r-md);
+    padding: 6px 14px; font-size: var(--fs-md); font-family: inherit; cursor: pointer; text-decoration: none;
     appearance: none; -webkit-appearance: none;
     display: inline-flex; align-items: center; justify-content: center;
     user-select: none; -webkit-user-select: none;
@@ -361,7 +376,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      .actions button 쪽이 위 전역 button 규칙보다 더 구체적이라(class+element > element)
      이 툴바 안에서만 덮어쓰고, 🗑️/↑/↓ 등 다른 버튼은 그대로 원색 유지. */
   .actions button, .actions a.btn {{
-    background: {hover}; color: {accent}; font-weight: 600; border-radius: 8px;
+    background: {hover}; color: {accent}; font-weight: 600; border-radius: var(--r-md);
+    height: var(--h-md); padding-top: 0; padding-bottom: 0; box-sizing: border-box;
   }}
   .actions button:hover, .actions a.btn:hover {{ background: {accent_tonal}; }}
   /* [수정: 2026-08-03] "+ 새 소제목 만들기"만 나머지 툴바 버튼과 기능이 달라(내용을
@@ -370,7 +386,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      덮어쓴다. */
   .actions .create-group-btn {{
     background: transparent; color: {accent}; border: 1px solid {ghost_border};
-    border-radius: 6px; font-weight: 400;
+    border-radius: var(--r-md); font-weight: 400;
   }}
   .actions .create-group-btn:hover {{ background: {hover}; border-color: {ghost_border_hover}; }}
   /* [추가: 2026-08-11] 확정본 "🤖 전체 기사 재분류" 버튼 — 왼쪽 그룹 맨 끝(구분선 뒤)에 둔다.
@@ -390,18 +406,18 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .actions .regen-btn:disabled {{ opacity: 0.5; cursor: progress; }}
   /* [추가: 2026-08-11] AI가 만든 소제목 표식. 화면 전용이며, 소제목 이름 문자열과
      완전히 분리된 별도 span이라 복사/다운로드/발송 텍스트에는 절대 따라가지 않는다. */
-  .ai-badge {{ margin-left: 6px; font-size: 0.8rem; opacity: 0.75; vertical-align: middle; }}
+  .ai-badge {{ margin-left: 6px; font-size: var(--fs-sm); opacity: 0.75; vertical-align: middle; }}
   /* [추가: 2026-08-20] 소제목별 기사 건수 칩 — 이름 바깥 별도 span(복사/다운로드/발송
      텍스트에 안 새게). 📂 미분류의 빨간 unclassified-count와 같은 모양·중립 회색이라
      "빨강=처리할 것 / 회색=그냥 정보"로 구분된다. */
   .subheading-count {{
-    margin-left: 6px; font-size: 0.75rem; font-weight: 700; color: {muted};
-    background: {pill_bg}; border-radius: 999px; padding: 1px 8px;
+    margin-left: 6px; font-size: var(--fs-sm); font-weight: 700; color: {muted};
+    background: {pill_bg}; border-radius: var(--r-pill); padding: 1px 8px;
   }}
   /* 헤더의 회차 전체 기사 건수 칩 — 같은 이유로 h1 옆 별도 span. */
   .total-count-badge {{
-    margin-left: 8px; font-size: 0.78rem; font-weight: 700; color: {muted};
-    background: {pill_bg}; border-radius: 999px; padding: 2px 10px; vertical-align: middle;
+    margin-left: 8px; font-size: var(--fs-sm); font-weight: 700; color: {muted};
+    background: {pill_bg}; border-radius: var(--r-pill); padding: 2px 10px; vertical-align: middle;
   }}
   /* 임시 보관함(아직 분류 안 된 기사) 제목 — 소제목이 아니라 대기실이라는 게 읽히도록
      꺾쇠 없이 회색 기울임꼴로, 확정된 소제목들과 시각적으로 확실히 구분한다. */
@@ -412,8 +428,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [수정: 2026-08-21] 빨강 → 앰버(주의 세트) — app.preview_renderer의 같은 배지와
      동일한 이유(이 화면도 [단독]/[속보] 빨강과 겹친다)로 같이 맞춘다. */
   .unclassified-count {{
-    margin-left: 4px; font-style: normal; font-weight: 700; font-size: 0.8rem;
-    color: {warn_text}; background: {warn_chip_bg}; border-radius: 999px; padding: 1px 8px;
+    margin-left: 4px; font-style: normal; font-weight: 700; font-size: var(--fs-sm);
+    color: {warn_text}; background: {warn_chip_bg}; border-radius: var(--r-pill); padding: 1px 8px;
   }}
   /* [수정: 2026-09-16] 소제목 사이 28→20px — 소제목 밑줄이 이미 구분선 노릇을 한다.
      초안(app/preview_renderer.py)에도 같은 값이 있다. */
@@ -426,7 +442,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      있어 그대로 둔다 — 소제목 헤더와 기사 한 줄은 서로 다른 문제라 같은 답을 쓰지 않는다. */
   .subheading h2 {{
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    font-size: 1.1rem; color: {header}; border-bottom: 1px solid {border};
+    font-size: var(--fs-lg); color: {header}; border-bottom: 1px solid {border};
     margin: 0 0 6px; padding-bottom: 6px;
   }}
   .subheading-title {{ display: flex; align-items: center; gap: 4px; min-width: 0; }}
@@ -457,7 +473,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [수정: 2026-09-16] 행 여백 한 단계씩 축소 — padding 6→4px, 제목·메타 줄 사이 4→2px,
      행 사이 10→6px. 글자·버튼 크기는 그대로다(한 건 74 → 64px). 확정본·초안·정기 보관함·
      수시 네 파일에 같은 값이 복제돼 있으니 한쪽만 고치지 않는다. 시안 ARTICLE_ROW_DENSITY_MOCKUP.html B안. */
-  .article {{ margin: 6px 0; line-height: 1.5; padding: 4px 8px; border-radius: 8px; }}
+  .article {{ margin: 6px 0; line-height: 1.5; padding: 4px 8px; border-radius: var(--r-md); }}
   /* [추가: 2026-08-20] [단독] 기사는 카드 자체를 강조한다(빨강 좌측바 + 연빨강 배경) —
      담당자 지목: "단독이 가장 중요"이므로 글자색 하나로는 [속보]가 여러 건 나올 때
      묻힐 수 있다(개수와 무관하게 항상 덩어리로 먼저 보이게). 다른 상태 배경(hover·
@@ -518,13 +534,13 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .article.finalize-added-bg {{ background: {ai_bg}; }}
   .article.finalize-added.is-focused {{ outline: 2px solid {ai_mark}; outline-offset: 2px; }}
   .finalize-added-badge {{
-    flex-shrink: 0; padding: 1px 7px; border-radius: 999px; font-size: 0.7rem; font-weight: 700;
+    flex-shrink: 0; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 700;
     background: {card}; color: {ai_text}; border: 1px solid {ai_border}; white-space: nowrap;
     position: relative; top: -0.15em;  /* [수정: 2026-08-21] 제목보다 글자가 작은 알약이라 baseline 정렬만으론 약간 아래로 보인다(실측: 위 여백 +1px, 아래 -2.3px) — 반 칸(0.15em) 올려 제목 글자 높이 한가운데에 맞춘다. */
   }}
   /* h2 옆 — 마감 시점에 이름 자체가 새로 생긴 소제목. */
   .new-subheading-badge {{
-    font-size: 0.68rem; font-weight: 700; padding: 2px 7px; border-radius: 999px;
+    font-size: var(--fs-xs); font-weight: 700; padding: 2px 7px; border-radius: var(--r-pill);
     background: {ai_bg}; color: {ai_text}; border: 1px solid {ai_border}; white-space: nowrap;
     margin-left: 4px; vertical-align: middle;
   }}
@@ -540,15 +556,15 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     max-width: 800px; margin: 0 auto; padding: 11px 24px;
     display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   }}
-  .finalize-banner .msg {{ flex: 1; min-width: 200px; font-size: 0.86rem; color: {ai_text}; }}
+  .finalize-banner .msg {{ flex: 1; min-width: 200px; font-size: var(--fs-md); color: {ai_text}; }}
   .finalize-banner .msg b {{ color: {ai_text_strong}; }}
   .finalize-banner .go {{
-    background: {header}; color: {on_fill}; border: none; border-radius: 6px;
-    padding: 8px 14px; font-size: 0.84rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+    background: {header}; color: {on_fill}; border: none; border-radius: var(--r-md);
+    padding: 8px 14px; font-size: var(--fs-md); font-weight: 700; cursor: pointer; white-space: nowrap;
   }}
   .finalize-banner .go:hover {{ background: {header_pressed}; }}
   .finalize-banner .dismiss {{
-    background: transparent; border: none; color: {ai_text_muted}; font-size: 0.82rem;
+    background: transparent; border: none; color: {ai_text_muted}; font-size: var(--fs-sm);
     cursor: pointer; text-decoration: underline; padding: 4px;
   }}
   /* 배너가 뜨면 그만큼 topbar와 본문을 아래로 밀어 겹치지 않게 한다(높이는 JS가 실측). */
@@ -575,6 +591,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      AI가 옮긴 것이 "새로 왔다"보다 지금 묻는 질문에 가깝다). 다음 새로고침에 사라진다. */
   .article.just-classified {{ background: {ai_bg}; }}
 {split_button_style}
+{screen_tag_style}
   /* [수정: 2026-08-13] summary를 1행(제목이 게시시각·액션 묶음과 폭을 다투던 flex 한
      줄)에서 2행으로 나눴다 — 제목이 대부분 2~3줄로 꺾이던 문제(실측: 액션 묶음이
      카드 폭의 약 40%를 고정 점유) 때문. 1행(.title-row)은 체크박스+제목이 카드 전체
@@ -610,42 +627,39 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     margin-left: auto; display: flex; align-items: center; justify-content: flex-end;
     gap: 4px; flex-shrink: 0; flex-wrap: wrap; row-gap: 4px;
   }}
-  /* [수정: 2026-08-21] 표식 없는 사진기사 추정 배지 — app.live_renderer의 실시간현황과
+  /* [수정: 2026-08-21] 표식 없는 사진기사 추정 배지 — app.live_renderer의 실시간 현황과
      같은 "아이콘+문구" 칩·같은 채도 낮은 모래색으로 맞췄다(전에는 제목 줄이 빡빡하다는
      이유로 아이콘만 썼는데, 사진기사 제외 설정을 기본 끔으로 바꾸며 이 배지가 흔히
      보이게 됐으니 문구가 바로 읽혀야 한다). */
 {late_badge_style}
+{export_links_style}
   /* 상단 안내 배너 — 초안의 "AI 분류 실패" 상자와 같은 자리(기사 목록 위 흐름 안).
      회차 마감 배너처럼 화면 상단에 고정하지 않는다: 그건 "지금 하는 작업이 헛수고"라는
      급한 경고라 그렇게 한 것이고, 이건 그 정도가 아니다. 회수가 0건이면 서버가 이
      배너를 아예 안 그린다(0건이면 안 그린다 — 📂 미분류 배지·📷 사진 추정 버튼과 같은
      원칙. 늘 떠 있는 안내는 곧 안 읽히는 안내가 된다). */
   .late-banner {{
-    margin: 0 0 14px; padding: 11px 16px; border-radius: 8px;
+    margin: 0 0 14px; padding: 11px 16px; border-radius: var(--r-lg);
     background: {warn_bg}; border: 1px solid {warn_border}; color: {warn_text};
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   }}
-  .late-banner .msg {{ flex: 1; min-width: 220px; font-size: 0.86rem; line-height: 1.5; }}
+  .late-banner .msg {{ flex: 1; min-width: 220px; font-size: var(--fs-md); line-height: 1.5; }}
   .late-banner .cnt {{
-    font-family: inherit; font-weight: 800; font-size: 0.86rem; cursor: pointer;
-    border: 1px solid {warn_border}; border-radius: 6px; padding: 2px 9px;
+    font-family: inherit; font-weight: 800; font-size: var(--fs-md); cursor: pointer;
+    border: 1px solid {warn_border}; border-radius: var(--r-md); padding: 2px 9px;
     background: {warn_chip_bg}; color: {warn_text};
   }}
   .late-banner .cnt:hover {{ background: {card}; }}
   .late-banner .q {{
     border: 1px solid {warn_border}; background: {card}; color: {warn_text};
-    border-radius: 6px; padding: 2px 7px; font-size: 0.8rem; cursor: help; line-height: 1.4;
+    border-radius: var(--r-md); padding: 2px 7px; font-size: var(--fs-sm); cursor: help; line-height: 1.4;
   }}
   .photo-badge {{
-    flex-shrink: 0; padding: 1px 7px; border-radius: 999px; font-size: 0.72rem;
+    flex-shrink: 0; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
     color: {photo_badge_text}; background: {photo_badge_bg}; border: 1px solid {photo_badge_border}; white-space: nowrap;
     position: relative; top: -0.15em;  /* [수정: 2026-08-21] 제목보다 글자가 작은 알약이라 baseline 정렬만으론 약간 아래로 보인다(실측: 위 여백 +1px, 아래 -2.3px) — 반 칸(0.15em) 올려 제목 글자 높이 한가운데에 맞춘다. */
   }}
-  .article-summary {{ margin: 6px 0 4px 20px; color: {text}; font-size: 0.95rem; }}
-  /* [수정: 2026-08-13] URL 밑줄 텍스트를 화면에서 없애며(.url 클래스 폐기, "원문보기"
-     아이콘으로 대체) footer엔 이제 extra_buttons_html(담아둔 기사의 승격 조작)만
-     남는다 — 대부분의 기사에선 이 div가 비어 렌더된다(높이 0, 무해). */
-  .article-footer {{ display: flex; align-items: center; gap: 8px; }}
+  .article-summary {{ margin: 6px 0 4px 20px; color: {text}; font-size: var(--fs-md); }}
   /* [수정: 2026-07-30] "이미 확인함" 표시를 브라우저에 영구 기억(localStorage)하는 대신,
      "지금 펼쳐서 보고 있는 기사"에만 실시간으로 적용한다 — 예전 방식은 클릭했던 기사가
      전부 보라색으로 남아 화면이 정신없어진다는 피드백에 따른 변경. details가 열려있는
@@ -659,7 +673,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      같이 딸려왔다 — user-select: none으로 이 부분만 드래그 선택 자체가 안 되게 한다
      (화면 표시는 그대로 유지, 클립보드에만 안 실림). */
   .pub-time {{
-    flex-shrink: 0; color: {muted}; font-size: 0.8rem; white-space: nowrap;
+    flex-shrink: 0; color: {muted}; font-size: var(--fs-sm); white-space: nowrap;
     user-select: none; -webkit-user-select: none;
   }}
   .move-btn, .hide-btn, .copy-btn {{
@@ -674,9 +688,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      자리를 아예 분리하는 게 맞다고 판단 — 왼쪽(게시시각 옆)은 화면을 보는 동작, 오른쪽
      (article-actions)은 화면을 바꾸는 동작이라는 구획이 이제 색과 위치 둘 다로 드러난다.
      글자 링크라 클릭 영역도 아이콘보다 넓어져 모바일에서 유리하다. */
-  .time-sep {{ color: {muted}; font-size: 0.8rem; margin: 0 2px; user-select: none; -webkit-user-select: none; }}
+  .time-sep {{ color: {muted}; font-size: var(--fs-sm); margin: 0 2px; user-select: none; -webkit-user-select: none; }}
   .origin-link-text {{
-    flex-shrink: 0; color: {accent}; font-size: 0.8rem; text-decoration: none;
+    flex-shrink: 0; color: {accent}; font-size: var(--fs-sm); text-decoration: none;
     display: inline-flex; align-items: center; gap: 2px; white-space: nowrap;
   }}
   .origin-link-text:hover {{ text-decoration: underline; }}
@@ -689,7 +703,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      체크박스 자체의 기본 여백까지 포함된 값이라 "체크박스 폭+gap" 계산과는 다르다).
      체크박스가 없는 지난 기사 화면은 :has()가 매치되지 않아 원래대로 0부터 시작한다
      (article-select CSS 자체가 그 화면엔 없다). */
-  .article:has(.article-select) .action-row {{ padding-left: 28px; }}
+  /* 체크박스 16px 기준: 왼쪽 여백 4 + 16 + 오른쪽 여백 3 + gap 8 = 31px (13px일 땐 28px). */
+  .article:has(.article-select) .action-row {{ padding-left: 31px; }}
   /* [추가: 2026-08-13] 복사하기 — 클릭하면 아이콘이 1초간 check로 바뀐다(copyArticleIcon).
      기본 상태는 복사 아이콘만, .is-copied 상태는 check 아이콘만 보인다 — 색은 두
      상태 모두 그대로 무채색(다른 아이콘 버튼과 통일, 전환 자체가 이미 충분한 신호). */
@@ -704,7 +719,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [추가: 2026-08-05] 원문 다시 가져오기 버튼 — 평소엔 숨겨두고 그 기사 카드에
      마우스를 올렸을 때만 나타난다(제목 옆이 붐비지 않게). */
   .refetch-btn {{
-    flex-shrink: 0; background: transparent; border: none; color: {muted}; font-size: 1rem;
+    flex-shrink: 0; background: transparent; border: none; color: {muted}; font-size: var(--fs-base);
     cursor: pointer; padding: 2px 6px; user-select: none; -webkit-user-select: none;
     opacity: 0; transition: opacity 0.15s;
   }}
@@ -721,19 +736,24 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .more-wrap {{ position: relative; display: inline-flex; flex-shrink: 0; }}
   .more-btn {{
     background: transparent; border: none; color: {muted}; font-size: 1.05rem; line-height: 1;
-    cursor: pointer; padding: 3px 7px; border-radius: 4px;
+    cursor: pointer; padding: 3px 7px; border-radius: var(--r-sm);
     user-select: none; -webkit-user-select: none;
   }}
   .more-btn:hover {{ background: {hover}; color: {accent}; }}
   .more-menu {{
     display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 60;
-    min-width: 172px; background: {card}; border: 1px solid {border}; border-radius: 8px;
-    padding: 4px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.13);
+    min-width: 172px; background: {card}; border: 1px solid {border}; border-radius: var(--r-lg);
+    padding: 4px; box-shadow: var(--sh-pop);
   }}
   .more-wrap.is-open .more-menu {{ display: block; }}
+  /* ⋯ 버튼 — 메뉴의 「복사하기」를 누르면 1초간 ✓로 바뀐다(copyArticleIcon). */
+  .more-btn .icon-default {{ display: inline-flex; }}
+  .more-btn .icon-done {{ display: none; }}
+  .more-btn.is-copied .icon-default {{ display: none; }}
+  .more-btn.is-copied .icon-done {{ display: inline-flex; }}
   .more-menu button {{
     display: block; width: 100%; text-align: left; background: transparent; border: none;
-    padding: 8px 10px; border-radius: 5px; font-size: 0.85rem; color: {text};
+    padding: 8px 10px; border-radius: var(--r-sm); font-size: var(--fs-md); color: {text};
     cursor: pointer; white-space: nowrap;
   }}
   .more-menu button:hover {{ background: {hover}; }}
@@ -743,39 +763,52 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [추가: 2026-08-05] ✏️ 직접 수정 — 🔄가 원문에서도 못 찾는 경우의 최후 수단으로
      펼쳐지는 인라인 편집 칸. */
   .edit-summary-form {{
-    margin: 8px 0 4px 20px; padding: 10px 12px; border: 1px solid {accent}; border-radius: 8px;
+    margin: 8px 0 4px 20px; padding: 10px 12px; border: 1px solid {accent}; border-radius: var(--r-lg);
     display: flex; flex-direction: column; gap: 8px;
   }}
   .edit-summary-form input, .edit-summary-form textarea {{
-    width: 100%; box-sizing: border-box; padding: 6px 10px; border: 1px solid {border}; border-radius: 6px;
-    font-size: 0.88rem; color: {text}; background: {card}; font-family: inherit;
+    width: 100%; box-sizing: border-box; padding: 6px 10px; border: 1px solid {border}; border-radius: var(--r-md);
+    font-size: var(--fs-md); color: {text}; background: {card}; font-family: inherit;
   }}
   .edit-summary-form .edit-summary-actions {{ display: flex; justify-content: flex-end; gap: 8px; }}
-  .edit-summary-form button {{ font-size: 0.82rem; padding: 5px 12px; }}
-  .empty {{ text-align: center; margin-top: 80px; font-size: 1.3rem; color: {muted}; }}
+  .edit-summary-form button {{ font-size: var(--fs-sm); padding: 5px 12px; }}
+  .empty {{ text-align: center; margin-top: 80px; font-size: var(--fs-lg); color: {muted}; }}
   .cute-caption {{ font-family: '{cute_font_name}', sans-serif; font-size: 1.4rem; margin-top: 6px; }}
-  .bottom {{ margin-top: 40px; background: {bg}; border: 1px solid {border}; border-radius: 8px; padding: 16px 18px; }}
-  .bottom h3 {{ margin: 0 0 8px; font-size: 1rem; color: {header}; }}
+  .bottom {{ margin-top: 40px; background: {bg}; border: 1px solid {border}; border-radius: var(--r-lg); padding: 16px 18px; }}
+  .bottom h3 {{ margin: 0 0 8px; font-size: var(--fs-base); color: {header}; }}
   .bottom-summary {{ padding-top: 2px; }}
   .bottom-header-row {{ display: flex; align-items: center; justify-content: space-between; gap: 8px; }}
   .bottom-header-row h3 {{ margin: 0; }}
   .bottom-summary-copy {{
-    font-size: 0.78rem; color: {accent}; background: transparent; border: 1px solid {border};
-    border-radius: 6px; padding: 3px 10px; cursor: pointer; font-family: inherit;
+    font-size: var(--fs-sm); color: {accent}; background: transparent; border: 1px solid {border};
+    border-radius: var(--r-md); padding: 3px 10px; cursor: pointer; font-family: inherit;
   }}
   .bottom-summary-item {{ padding: 8px 0; border-bottom: 1px solid {border}; }}
   .bottom-summary-item:last-child {{ border-bottom: none; padding-bottom: 0; }}
   .bottom-summary-item strong {{ display: block; color: {header}; margin-bottom: 3px; }}
-  .bottom-summary-item p {{ margin: 0; }}
+  .bottom-summary-item p {{ margin: 0; white-space: pre-line; }}
   .manual-divider {{
     display: flex; align-items: center; gap: 10px; margin: 32px 0 4px;
-    color: {muted}; font-size: 0.75rem;
+    color: {muted}; font-size: var(--fs-sm);
   }}
   .manual-divider::before, .manual-divider::after {{ content: ""; flex: 1; border-top: 1px dashed {border}; }}
-  .manual-zone {{ border: 1px dashed {border}; border-radius: 8px; padding: 14px 18px; margin-top: 10px; }}
+  /* 📌 담아둔 기사 칸 — "📂 소제목 미분류"(.subheading-unclassified)와 **같은 문법**을 쓰고
+     색만 가른다: 왼쪽 4px 띠 + 옅은 바탕 + 오른쪽만 둥근 모서리. 둘 다 "보고서에 아직
+     안 들어간 임시 칸"이라 모양을 맞추고, 앰버(=담당자가 아직 모르는 것)와 그보다 한 단계
+     어두운 캐러멜(=한 번은 보고 골라둔 것)로 단계를 가른다. 파랑은 앱 전체에서 "담당자의
+     동작"이라 이 칸에 쓰면 뜻이 겹친다(시안 mockups/PINNED_ICON_BADGE_MOCKUP.html). */
+  .manual-zone {{
+    border-left: 4px solid {pinned_bar}; background: {pinned_bg};
+    border-radius: 0 var(--r-lg) var(--r-lg) 0; padding: 10px 16px 12px; margin-top: 10px;
+  }}
   .manual-zone-head {{ display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }}
-  .manual-zone-title {{ font-weight: 600; color: {text}; font-size: 0.95rem; }}
-  .manual-zone-hint {{ font-size: 0.75rem; color: {muted}; }}
+  .manual-zone-title {{ font-weight: 600; color: {text}; font-size: var(--fs-base); }}
+  .manual-zone-hint {{ font-size: var(--fs-sm); color: {muted}; }}
+  /* 건수 칩 — 미분류 칸의 .unclassified-count(앰버)를 빌려 쓰지 않고 칸 색(캐러멜)을 따른다. */
+  .manual-zone-count {{
+    margin-left: 4px; font-weight: 700; font-size: var(--fs-sm); color: {pinned_text};
+    background: {pinned_chip_bg}; border: 1px solid {pinned_border}; border-radius: var(--r-pill); padding: 1px 8px;
+  }}
   /* [추가: 2026-08-26] 제목·건수·배정 버튼을 한 묶음으로 왼쪽에 붙인다 — 📂 소제목 미분류
      칸의 헤더와 같은 구성(제목 → 건수 → 배정 버튼)이라 두 칸이 같은 줄로 읽힌다.
      baseline 정렬로는 버튼이 글자 밑선에 매달려 보여 이 묶음만 center로 맞춘다. */
@@ -789,7 +822,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      계속 보이게 한다. background를 명시해야 아래로 스크롤된 기사 카드들이 비쳐 보이지
      않는다. */
   .keyword-note-zone {{
-    display: none; align-items: center; gap: 8px; border: 1px dashed {border}; border-radius: 8px;
+    display: none; align-items: center; gap: 8px; border: 1px dashed {border}; border-radius: var(--r-lg);
     padding: 10px 14px; margin: 10px 0 4px; flex-wrap: wrap;
     position: sticky; top: 60px; z-index: 15; background: {card};
   }}
@@ -800,14 +833,18 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      "확정본만 상단 고정이 안 되는" 것으로 보인다. topbar와 같은 변수를 따라가게 한다. */
   body.has-finalize-banner .keyword-note-zone {{ top: calc(60px + var(--finalize-banner-h, 0px)); }}
   .keyword-note-zone input {{
-    flex: 1; min-width: 220px; padding: 6px 10px; border: 1px solid {border}; border-radius: 6px;
-    font-size: 0.88rem; color: {text}; background: {card};
+    flex: 1; min-width: 220px; height: var(--h-md); box-sizing: border-box; padding: 0 10px; border: 1px solid {border}; border-radius: var(--r-md);
+    font-size: var(--fs-md); color: {text}; background: {card};
   }}
   /* [추가: 2026-08-10] 저장된 메모는 곧바로 다시 손대지 않도록 잠가둔다 — (수정)을
      눌러야 편집 가능해진다(아래 toggleKeywordEditMode). "이미 저장됐다"는 상태를
      입력칸 자체로도 보여준다는 취지(사용자 피드백). */
   .keyword-note-zone input:disabled {{ background: {bg}; color: {muted}; }}
-  .keyword-note-zone button {{ font-size: 0.82rem; padding: 5px 10px; white-space: nowrap; }}
+  .keyword-note-zone button {{ font-size: var(--fs-sm); height: var(--h-md); padding: 0 12px; box-sizing: border-box;
+    border-radius: var(--r-md); white-space: nowrap; }}
+  /* 모양 규칙: 지우기(삭제·취소)는 채움 파랑으로 두지 않는다 — 글자 버튼, 올리면 빨강. */
+  .keyword-note-zone .clear-btn {{ background: transparent; color: {muted}; }}
+  .keyword-note-zone .clear-btn:hover {{ background: transparent; color: {error}; }}
   /* [추가: 2026-08-26] 직전 회차 메모를 끌어와 미리 채워둔 상태 — 아직 "이번 회차 메모"가
      아니라는 뜻이라 "주의"(앰버) 계열을 쓴다(설정 화면의 "저장 안 함"과 같은 뜻).
      flex-wrap 컨테이너 안에서 width:100%로 다음 줄에 온다. */
@@ -819,45 +856,46 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
 {finalize_banner_html}
-<div class="topbar"><div class="topbar-inner">
-  <a href="home.html">홈</a>
-  <a href="{live_href}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color:{error}"><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><path d="M6.4 6.4a8 8 0 0 0 0 11.2M17.6 17.6a8 8 0 0 0 0-11.2"/></svg> 실시간</a>
-  <a href="{preview_href}">초안</a>
-</div></div>
+{topnav_html}
 <div class="container">
   <header>
     <div class="header-top">
-      <h1>언론 모니터링 {run_slot} 기준{total_count_html}</h1>
+      <h1><span class="screen-tag final">확정본</span>언론 모니터링 {run_slot} 기준{total_count_html}</h1>
     </div>
     <div class="actions">
-      <button onclick="copyPlainText()">복사</button>
-      <form method="POST" action="/download-text" style="display:contents" onsubmit="this.text.value=PLAIN_TEXT;">
-        <input type="hidden" name="filename" value="{export_filename}">
-        <input type="hidden" name="text" value="">
-        <button type="submit" class="btn">txt</button>
-      </form>
-      <form method="POST" action="/download-excel" style="display:contents">
-        <input type="hidden" name="filename" value="{export_excel_filename}">
-        <input type="hidden" name="rows" value="{export_rows_json}">
-        <button type="submit" class="btn">⬇ xlsx</button>
-      </form>
       <button class="create-group-btn" type="button" onclick="createCustomGroup()">+ 새 소제목</button>
       {keyword_note_btn_html}
-      {photo_gather_btn_html}
       <span class="actions-divider"></span>
       {regen_btn_html}
-      <select class="view-mode-select" onchange="applyViewMode(this.value)" title="소제목 구성은 그대로 두고 화면에 나열하는 순서만 바꿉니다">
-        <option value="subheading" selected>소제목별</option>
-        <option value="group-time">소제목 내 시간순</option>
-        <option value="time">시간순</option>
-        <option value="outlet">언론사순</option>
-      </select>
+      <span class="actions-right">
+        {photo_gather_btn_html}
+        <span class="export-links">
+          <button type="button" onclick="copyPlainText()" title="보고서 텍스트를 클립보드에 복사">복사</button>
+          <form method="POST" action="/download-text" style="display:contents" onsubmit="this.text.value=PLAIN_TEXT;">
+            <input type="hidden" name="filename" value="{export_filename}">
+            <input type="hidden" name="text" value="">
+            <button type="submit" title="txt 파일로 받기">텍스트</button>
+          </form>
+          <form method="POST" action="/download-excel" style="display:contents">
+            <input type="hidden" name="filename" value="{export_excel_filename}">
+            <input type="hidden" name="rows" value="{export_rows_json}">
+            <button type="submit" title="엑셀 파일로 받기">엑셀</button>
+          </form>
+        </span>
+        <select class="view-mode-select" onchange="applyViewMode(this.value)" title="소제목 구성은 그대로 두고 화면에 나열하는 순서만 바꿉니다">
+          <option value="subheading" selected>소제목 내 언론사순</option>
+          <option value="group-time">소제목 내 시간순</option>
+          <option value="time">시간순</option>
+          <option value="outlet">언론사순</option>
+        </select>
+      </span>
     </div>
   </header>
   <div class="keyword-note-zone{note_open_class}" id="keyword-note-zone" data-run-slot="{run_slot_raw}">
     <input type="text" id="keyword-note-input" value="{note_value_attr}" placeholder="키워드 a, 키워드 b, 키워드 c..." onkeydown="keywordNoteKey(event)"{note_input_disabled_attr}>
     <button type="button" onclick="toggleKeywordEditMode(this)">{note_save_btn_label}</button>
     <button class="clear-btn" type="button" onclick="{note_clear_btn_onclick}">{note_clear_btn_label}</button>
+    {note_history_html}
   </div>
   {late_pickup_banner_html}
   {body}
@@ -867,6 +905,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 {undo_fab_html}
 {hidden_trash_html}
 {name_picker_html}
+{scroll_top_html}
 <button type="button" class="toc-toggle-btn" onclick="toggleTocPopover()" title="소제목 목차"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
 <div class="toc-popover" id="toc-popover"></div>
 <div class="bottombar"><div class="bottombar-inner">
@@ -876,7 +915,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     <button type="button" onclick="bulkMoveSelected()">옮기기</button>
     <button type="button" id="bulk-move-up" onclick="bulkMoveOrder('up')" title="선택한 기사들을 통째로 위로 이동(같은 소제목 안에서만)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
     <button type="button" id="bulk-move-down" onclick="bulkMoveOrder('down')" title="선택한 기사들을 통째로 아래로 이동(같은 소제목 안에서만)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
-    <button type="button" onclick="bulkHideSelected()" title="선택한 기사 전부 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+    <button type="button" onclick="bulkHideSelected(this)" title="선택한 기사 전부 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
     {split_button_html}
     <button class="clear-btn" type="button" onclick="clearSelection()">선택 해제</button>
   </div>
@@ -893,6 +932,11 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 </div></div>
 <script>
 {hidden_trash_script}
+{scroll_top_script}
+{hide_batch_script}
+{range_select_script}
+{url_add_script}
+{note_history_script}
 {name_picker_script}
 {kw_inline_script}
 {photo_gather_script}
@@ -930,11 +974,13 @@ document.addEventListener("click", function(e) {{
 // [추가: 2026-09-01] 소제목 헤더의 📋(.group-copy-btn)도 이 함수를 그대로 쓴다 —
 // 하는 일이 "data-copy-text를 클립보드에 넣고 아이콘을 1초간 ✓로"로 완전히 같아서,
 // 이름만 다른 쌍둥이 함수를 만들면 한쪽만 고쳤을 때 피드백이 어긋난다.
-function copyArticleIcon(btn) {{
+// flashEl: ✓로 바꿀 대상(없으면 누른 버튼). ⋯ 메뉴의 「복사하기」는 메뉴가 곧 닫히므로 ⋯ 버튼을 넘긴다.
+function copyArticleIcon(btn, flashEl) {{
+  var mark = flashEl || btn;
   navigator.clipboard.writeText(btn.dataset.copyText).then(function() {{
-    btn.classList.add("is-copied");
-    clearTimeout(btn._copyTimer);
-    btn._copyTimer = setTimeout(function() {{ btn.classList.remove("is-copied"); }}, 1000);
+    mark.classList.add("is-copied");
+    clearTimeout(mark._copyTimer);
+    mark._copyTimer = setTimeout(function() {{ mark.classList.remove("is-copied"); }}, 1000);
   }}).catch(function() {{
     alert("복사에 실패했습니다.");
   }});
@@ -975,7 +1021,10 @@ function sendReport(btn) {{
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{text: PLAIN_TEXT}})
   }}).then(function(res) {{
-    if (res.ok) {{ showToast("이메일 및 텔레그램으로 발송되었습니다.", function() {{ location.reload(); }}); }}
+    // 200 = 일부만 받음(서버 본문 "partial"), 204 = 모두 받음. 일부만 받았을 때 다시 누르면 받은
+    // 사람에게도 (수정)으로 한 번 더 가므로, 누가 못 받았는지부터 보게 한다.
+    if (res.status === 200) {{ alert("일부는 못 받았어요 — 받은 사람에겐 이미 갔습니다. 새로고침 뒤 「받은 사람 보기」에서 누가 왜 못 받았는지 확인하세요."); location.reload(); }}
+    else if (res.ok) {{ showToast("이메일 및 텔레그램으로 발송되었습니다.", function() {{ location.reload(); }}); }}
     // [수정: 2026-08-26] 예전엔 여기서 끝(재사용 가능하게 버튼만 풀어줌)이라, 실패
     // 사유가 이 토스트 한 줄 말고는 어디에도 안 남았다 — 새로고침하면 왜 실패했는지가
     // 사라졌다. 이제 서버가 실패 시에도 화면을 다시 그려두므로(app.settings_server.
@@ -996,11 +1045,11 @@ function updateSendCountdown() {{
   var el = document.getElementById("send-countdown");
   if (!el) return;
   var remain = Math.max(0, Math.floor((GRACE_DEADLINE_MS - Date.now()) / 1000));
-  // [추가: 2026-08-11] 0에 닿으면 "00:00 후 자동 발송"에서 멈춰 있어(새로고침 전까지)
+  // [추가: 2026-08-11] 0에 닿으면 "00:00 후 자동발송"에서 멈춰 있어(새로고침 전까지)
   // "안 보내진 건가?" 헷갈린다는 피드백 — 완료 문구(파란 글자)로 바꾼다. 실제 자동
   // 발송은 서버가 POLL_INTERVAL_SEC(10초)마다 확인하므로 이 문구가 실제 발송보다 최대
   // 10초쯤 먼저 뜰 수 있는 "곧 됩니다" 성격의 낙관적 표시다 — 화면을 다시 열면 서버가
-  // 실제로 기록한 결과(회색 "🤖 N시 M분 자동 발송 완료" 배지)로 정확히 바뀐다.
+  // 실제로 기록한 결과(회색 "🤖 N시 M분 자동발송 완료" 배지)로 정확히 바뀐다.
   if (remain <= 0) {{
     el.textContent = "자동발송 완료되었습니다.";
     el.classList.add("auto-sent-just-now");
@@ -1381,11 +1430,11 @@ function cycleChipColor(chip) {{
 // 못 받았다. 실제로 2026-08-20 09:30 회차에서 일괄로 숨긴 뉴스1 기사가 같은 제목·같은
 // 언론사로 기사 ID만 바뀌어 다시 들어왔다. 세 경로가 같은 본문을 쓰게 해서 원천 차단한다.
 // (dataset 값이 없으면 "undefined" 문자열이 그대로 실려 가짜 언론사명이 저장되므로 || "".)
-// [추가: 2026-09-02] group — 쓰레기통이 "한 번에 숨긴 덩어리"에 소제목 이름을 붙이는 데
+// [추가: 2026-09-02] group — 휴지통이 "한 번에 숨긴 덩어리"에 소제목 이름을 붙이는 데
 // 쓴다(숨김 판정에는 관여하지 않는다). 세 경로(단건·일괄·소제목 통째)가 이 함수 하나를
 // 쓰므로 여기 한 줄이면 전부 실려 간다.
-// [추가: 2026-09-15] batch — 일괄·소제목 통째 숨기기는 한 번의 동작을 기사 수만큼 요청으로
-// 나눠 보낸다. 같은 값을 실어 보내 서버(app.undo.push)가 "한 동작"으로 알아보게 하고,
+// [추가: 2026-09-15] batch — 일괄·소제목 통째 숨기기가 한 번의 동작임을 서버에 알린다(지금은
+// postHideBatch 한 요청으로 보내지만, 되돌린 뒤 전부 칠하는 표시로 계속 쓴다). 같은 값을 실어 보내 서버(app.undo.push)가 "한 동작"으로 알아보게 하고,
 // 되돌린 뒤 그때 숨긴 기사를 전부 칠한다. 단건 🗑️는 안 붙인다 — 3초 안에 따로따로 누른
 // 숨기기는 되돌리기는 한 번에 되지만 칠하는 건 마지막으로 누른 기사뿐이다.
 function hideArticleBody(btn, batch) {{
@@ -1667,29 +1716,24 @@ function bulkMoveOrder(direction) {{
   }});
 }}
 // [추가: 2026-08-05] 체크박스로 선택한 기사 여러 개를 한꺼번에 숨긴다 — hideGroup(소제목
-// 통째로 숨기기)과 같은 방식(URL별로 /hide-article을 여러 번 호출)이라 서버 쪽 추가
-// 구현 없이 그대로 재사용한다. hideGroup과 달리 선택한 기사가 여러 소제목에 걸쳐 있어도
+// 통째로 숨기기)과 같은 방식(postHideBatch로 /hide-article 한 번)이다. hideGroup과 달리 선택한 기사가 여러 소제목에 걸쳐 있어도
 // 상관없다 — 숨기기는 소제목 경계와 무관한 동작이라서.
-function bulkHideSelected() {{
+function bulkHideSelected(trigger) {{
   // [수정: 2026-08-20] 체크박스(url만 있음)가 아니라 그 행의 🗑️ 버튼을 모은다 —
   // 언론사·제목·발행시각까지 함께 보내려면 그 값들을 들고 있는 쪽이 필요하다(hideArticleBody).
   var btns = Array.prototype.map.call(document.querySelectorAll(".article-select:checked"), function(cb) {{
     var article = cb.closest(".article");
     return article ? article.querySelector(".hide-btn[data-url]") : null;
   }}).filter(function(btn) {{ return btn; }});
-  if (!btns.length) {{ return; }}
-  if (!confirm(btns.length + "개 기사를 숨길까요? (숨긴 기사 관리에서 하나씩 되돌릴 수 있어요)")) return;
-  var batch = newHideBatchId();
-  Promise.all(btns.map(function(btn) {{
-    return fetch("http://{settings_host}:{settings_port}/hide-article", {{
-      method: "POST", keepalive: true,
-      headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
-      body: hideArticleBody(btn, batch)
-    }});
-  }})).then(function(responses) {{
-    if (responses.every(function(res) {{ return res.ok; }})) {{ location.reload(); }}
-    else {{ alert("일부 기사를 숨기지 못했습니다. 다시 시도해주세요."); }}
+  if (!btns.length || document.querySelector(".hiding-note")) {{ return; }}
+  // [수정: 2026-09-22] 기사 수만큼 요청을 나눠 보내던 것을 한 요청으로(postHideBatch), 누르는
+  // 순간 고른 기사를 흐리게 하고 「N건 숨기는 중…」을 띄운다(hide_batch_script).
+  var restore = showHiding(btns.map(function(btn) {{ return btn.closest(".article"); }}), trigger, btns.length);
+  postHideBatch(btns, newHideBatchId()).then(function(res) {{
+    if (res.ok) {{ location.reload(); }}
+    else {{ restore(); alert("숨기지 못했습니다. 다시 시도해주세요."); }}
   }}).catch(function() {{
+    restore();
     alert("숨기기에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
   }});
 }}
@@ -1991,25 +2035,25 @@ function _renameGroupSubmit(name, newLabel) {{
 function hideGroup(btn) {{
   var section = btn.closest(".subheading");
   // [수정: 2026-09-16] 확인창을 없앴다 — 보관함 줄 끝 🗑(확인창 없음)와 같은 근거다:
-  // 되돌릴 자리가 곧바로 화면에 남는다(좌하단 ↩ 한 번이면 통째로 되살아나고, 쓰레기통
+  // 되돌릴 자리가 곧바로 화면에 남는다(좌하단 ↩ 한 번이면 통째로 되살아나고, 휴지통
   // 팝오버엔 「소제목명 N건 · ↩ 모두 복구」 한 줄이 남는다). 소제목 하나가 통째로
   // 사라지는 건 화면에서 즉시 보이므로 "모르고 지나치는" 실수도 안 생긴다.
-  // 하단바 일괄 🗑(bulkHideSelected)는 확인창을 그대로 둔다 — 체크가 여러 소제목에
-  // 흩어져 있을 수 있어 무엇이 사라지는지 누르기 전에 한눈에 안 보이기 때문.
+  // 하단바 일괄 🗑(bulkHideSelected)도 확인창이 없다.
   // [수정: 2026-08-20] url만 뽑아 보내던 것을, 버튼 자체를 넘겨 언론사·제목·발행시각까지
   // 함께 보내도록 바꿨다(hideArticleBody 주석 참고).
+  if (section.querySelector(".hiding-note")) {{ return; }}
   var btns = Array.prototype.slice.call(section.querySelectorAll(".hide-btn[data-url]"));
-  var batch = newHideBatchId();
-  Promise.all(btns.map(function (btn) {{
-    return fetch("http://{settings_host}:{settings_port}/hide-article", {{
-      method: "POST", keepalive: true,
-      headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
-      body: hideArticleBody(btn, batch)
-    }});
-  }})).then(function (responses) {{
-    if (responses.every(function (res) {{ return res.ok; }})) {{ location.reload(); }}
-    else {{ alert("일부 기사를 숨기지 못했습니다. 다시 시도해주세요."); }}
+  if (!btns.length) {{ return; }}
+  // [수정: 2026-09-22] 기사 수만큼 요청을 나눠 보내던 것을 한 요청으로 — 요청마다 되돌리기
+  // 기록 쓰기와 화면 재생성이 되풀이돼 기사가 많을수록 몇 초씩 걸렸다. 누르는 순간 그 소제목의
+  // 기사 줄을 흐리게 하고 🗑 자리 앞에 「N건 숨기는 중…」을 띄운다(hide_batch_script) — 머리줄은
+  // 흐리지 않는다(안내 글자까지 흐려져 안 읽힌다).
+  var restore = showHiding(btns.map(function (b) {{ return b.closest(".article"); }}), btn, btns.length);
+  postHideBatch(btns, newHideBatchId()).then(function (res) {{
+    if (res.ok) {{ location.reload(); }}
+    else {{ restore(); alert("숨기지 못했습니다. 다시 시도해주세요."); }}
   }}).catch(function () {{
+    restore();
     alert("숨기기에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
   }});
 }}
@@ -2240,7 +2284,7 @@ def apply_line_template(template: str, outlet: str, title: str) -> str:
 
     str.format이 아니라 단순 문자열 치환(.replace)을 쓴다 — outlet/title 값이나
     template 자체에 우연히 중괄호가 들어 있어도 format 필드로 잘못 해석되거나
-    깨지지 않는다(DESIGN.md §3).
+    깨지지 않는다(archive/DESIGN.md §3).
     """
     return template.replace("{outlet}", outlet).replace("{title}", title)
 
@@ -2355,9 +2399,14 @@ def render_article(
     "직접 추가한 기사" 구획처럼 "그룹 내 순서"라는 개념이 없는 곳에서는 의미가 없다).
     move_handler/up_handler: ↑/↓ 버튼이 호출할 JS 함수 이름(up_handler를 생략하면
     move_handler와 같다).
-    extra_buttons_html: [추가: 2026-07-28] footer에 끼워 넣을 추가 버튼 HTML —
-    "담아둔 기사" 구획(_render_manual_section)이 기사마다 승격 조작(화면별 소제목
-    드롭다운, 소제목이 없으면 📥 버튼)을 붙이는 데 쓴다.
+    extra_buttons_html: [추가: 2026-07-28] 액션 줄(.article-actions) 맨 앞에 끼워 넣을
+    추가 조작 HTML — "담아둔 기사" 구획(_render_manual_section)이 기사마다 승격 조작
+    (화면별 소제목 드롭다운, 소제목이 없으면 📥 버튼)을 붙이는 데 쓴다.
+    [수정: 2026-09-21] 기사 아래 별도 줄(.article-footer)에 있던 것을 액션 줄로 올렸다 —
+    그 조작 하나 때문에 담아둔 기사만 행이 3줄이었고(다른 기사는 2줄), 같은 성격의
+    "다른 소제목" 드롭다운(group_select_html)이 이미 액션 줄에 앉아 있어 자리가 갈릴
+    이유도 없었다. 이제 그 바로 앞 자리에 같은 규격으로 붙는다. 이 인자가 비면
+    액션 줄은 예전과 완전히 같다.
 
     checkbox: [추가: 2026-07-30] 기사 앞에 다중 선택용 체크박스를 보여준다 — 스크랩
     초안(preview.html)의 "여러 개 선택해서 한 번에 다른 소제목으로 옮기기" 하단 바가
@@ -2408,7 +2457,8 @@ def render_article(
     이게 화면에서 클립보드로 가는 유일한 경로가 되므로 🗑️·원문보기와 같은 급이다.
     액션 순서는 다른 소제목 → 원문보기 → 복사하기 → ⋯ → 🗑️ → ↑ → ↓ (기존 코드가
     이미 다른 소제목을 맨 앞에 두던 순서를 그대로 유지, 원문보기·복사하기만 그 뒤에
-    끼워 넣었다). extra_buttons_html은 이제 유일하게 footer에 남는 내용이다.
+    끼워 넣었다). [수정: 2026-09-21] 항상 비어 있던 .article-footer div는 없앴다 —
+    유일한 내용이던 extra_buttons_html이 액션 줄로 올라가면서 남길 이유가 사라졌다.
     """
     outlet = html.escape(article["outlet"])
     # [추가: 2026-07-29] 화면 표시용 언론사 이름만 outlet_display_label을 거친다(매일경제만
@@ -2454,6 +2504,9 @@ def render_article(
     if move is not None:
         up_disabled = " disabled" if move.get("disable_up") else ""
         down_disabled = " disabled" if move.get("disable_down") else ""
+        # hidden: 자리(폭)는 남기고 안 보이게, 누를 수도 없게 한다(📂 소제목 미분류).
+        if move.get("hidden"):
+            up_disabled = down_disabled = ' disabled aria-hidden="true" tabindex="-1" style="visibility:hidden"'
         effective_up_handler = up_handler or move_handler
         # [수정: 2026-07-30] ↑/↓가 summary 안으로 옮겨오면서, 🗑️와 같은 이유로
         # stopPropagation이 필요해졌다 — 없으면 클릭이 위(펼치기 토글)로도 번진다.
@@ -2489,37 +2542,22 @@ def render_article(
         f'<a class="origin-link-text" href="{url}" target="_blank" rel="noopener noreferrer" '
         f'title="{url}">원문보기{icon("external_link", "ic origin-link-icon")}</a>'
     )
-    # [추가: 2026-08-13] 복사하기 — "⋯ 더보기" 메뉴에서 꺼내 상시 노출 아이콘으로
-    # 승격했다(URL 줄이 사라지며 이게 클립보드로 가는 유일한 경로가 됐기 때문). 누르면
-    # 아이콘 자체가 1초간 check로 바뀌었다가 되돌아온다(copyArticleIcon, CSS
-    # .copy-btn.is-copied) — 메뉴 안에 있을 때 쓰던 글자 치환(구 copyArticleText)은
-    # 더 이상 호출하는 곳이 없어 이 승격과 함께 정리했다.
-    copy_btn_html = (
-        f'<button class="copy-btn" type="button" data-copy-text="{copy_text_attr}" '
-        'onclick="event.stopPropagation(); copyArticleIcon(this);" '
-        'title="복사하기" aria-label="복사하기">'
-        f'<span class="icon-default">{icon("copy")}</span>'
-        f'<span class="icon-done">{icon("check")}</span>'
-        "</button>"
-    )
-    # [수정: 2026-08-11] 원문 다시 불러오기·기사제목 직접 수정을 "⋯ 더보기" 메뉴 안으로
-    # 넣었다. 예전엔 이 둘과 복사하기까지 셋이 제목 줄에 직접 붙어 있었고 평소엔
-    # opacity:0으로 숨겼다가 카드에 마우스를 올리면 나타났는데, 그 방식에 두 가지
-    # 문제가 있었다: (1) 호버할 때마다 아이콘이 늘어나 목록을 훑을 때 시선이 계속
-    # 끌렸다. (2) **모바일엔 호버가 없어서 이 셋을 아예 누를 수 없었다.** 이 앱은
-    # 폰에서도 본다. 그래서 ⋯ 버튼은 호버와 무관하게 **항상** 보이고, 메뉴 안에서는
-    # 아이콘 대신 글자로 이름을 보여준다.
-    # [수정: 2026-08-13] 복사하기는 이 메뉴에서 다시 빠져나가 상시 아이콘이 됐다(위
-    # copy_btn_html) — 남은 둘은 "가끔 쓰는, 한 번 누르면 끝나는" 동작이라 메뉴에
-    # 두는 게 여전히 맞다. 자주 쓰는 🗑️·↑·↓는 메뉴에 넣지 않고 밖에 그대로 뒀다 —
-    # 특히 ↑↓는 원하는 자리까지 여러 번 눌러야 하는 동작이라, 메뉴에 넣으면
-    # 열고-누르고-닫히고를 반복하게 된다.
+    # 복사하기는 "⋯ 더보기" 메뉴 첫 항목이다 — 한 건만 복사하는 건 가끔 하는 일인데
+    # 모든 행에 아이콘이 붙어 있으면 목록이 어수선하다. 메뉴는 누르는 순간 닫히므로
+    # 피드백은 ⋯ 아이콘 자체가 1초간 ✓로 바뀌는 것으로 준다(copyArticleIcon의 두 번째
+    # 인자, CSS .more-btn.is-copied). 원문 다시 불러오기·기사제목 직접 수정과 함께
+    # "가끔 쓰는, 한 번 누르면 끝나는" 동작이다. 🗑·↑↓는 자주 쓰므로 메뉴 밖에 둔다.
     more_menu_html = (
         '<span class="more-wrap">'
         '<button class="more-btn" type="button" '
         'onclick="event.stopPropagation(); toggleArticleMenu(this);" '
-        f'title="더보기" aria-label="더보기">{icon("dots")}</button>'
+        'title="더보기" aria-label="더보기">'
+        f'<span class="icon-default">{icon("dots")}</span>'
+        f'<span class="icon-done">{icon("check")}</span></button>'
         '<span class="more-menu">'
+        f'<button type="button" data-copy-text="{copy_text_attr}" '
+        'onclick="event.stopPropagation(); closeArticleMenus(); '
+        "copyArticleIcon(this, this.closest('.more-wrap').querySelector('.more-btn'));\">복사하기</button>"
         f'<button type="button" data-url="{url}" '
         'onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button>'
         f'<button type="button" data-url="{url}" '
@@ -2581,7 +2619,7 @@ def render_article(
     # 놓는다 — "표식은 없지만 추정"이라는 옛 문구는 [포토]가 붙은 기사에는 거짓말이다.
     # [수정: 2026-09-15] 문구는 app.filters.photo_badge_tip 한 곳에서 — 실제 붙은 표식을 적는다.
     photo_badge_html = (
-        f'<span class="photo-badge" title="{html.escape(photo_badge_tip(article.get("title", "")))}">'
+        f'<span class="photo-badge" title="{html.escape(photo_badge_tip(article.get("title", ""), article.get("url", "")))}">'
         f'{icon("camera")} 사진 추정</span>'
         if is_photo
         else ""
@@ -2626,7 +2664,7 @@ def render_article(
         article_class += " art-scoop"
     # [추가: 2026-08-21] 사진 추정 기사는 지우지 않고 행을 흐리게 표시한다(CSS
     # .article.is-photo) — 판정이 틀렸을 때 담당자가 그 자리에서 처리(체크 해제)할 수
-    # 있어야 한다는 결정. 마우스를 올리면 다시 밝아진다(아래 CSS). 실시간현황이 이미
+    # 있어야 한다는 결정. 마우스를 올리면 다시 밝아진다(아래 CSS). 실시간 현황이 이미
     # 같은 함수를 "지우지 않고 표시만" 하는 데 쓰고 있어(app.filters.looks_like_photo_
     # caption docstring), 그 원칙을 확정본·초안에도 맞춘 것이다.
     if is_photo:
@@ -2707,14 +2745,13 @@ def render_article(
         # 두면 칩의 가로 위치가 검색어 길이만큼 행마다 달라진다(목업 실측 108px 차이).
         # 원문보기보다는 뒤라 누르는 링크 자리는 안 흔들린다. KW_CHIP_MOCKUP.html C안.
         f'{time_row_html}{late_badge_html}{kw_inline_html}'
-        f'<span class="article-actions">{group_select_html}{copy_btn_html}{label_btn_html}'
+        f'<span class="article-actions">{extra_buttons_html}{group_select_html}{label_btn_html}'
         f"{more_menu_html}{hide_btn_html}{move_html}</span>"
         "</div>"
         f"{label_row_html}"
         "</summary>"
         f'<p class="article-summary">{summary_html}</p>'
         "</details>"
-        f'<div class="article-footer">{extra_buttons_html}</div>'
         "</div>"
     )
 
@@ -2839,7 +2876,13 @@ def _render_groups(
                     # 맨 위/아래에서 바로 비활성화한다 — 예전엔 화면 전체의 첫/마지막
                     # 기사에서만 꺼져서, 눌리긴 하는데 아무 일도 안 일어나는(또는 예전엔
                     # 옆 소제목으로 넘어가버리던) 구간이 생겼다.
-                    move={"disable_up": i == 0, "disable_down": i == last_index},
+                    # 📂 소제목 미분류는 배정 전 임시 칸이라 순서를 맞출 일이 없다 — ↑↓를
+                    # 자리만 남기고 숨긴다(옆 아이콘 위치가 다른 소제목 행과 같게).
+                    move={
+                        "disable_up": i == 0,
+                        "disable_down": i == last_index,
+                        "hidden": group["name"] == UNCLASSIFIED_GROUP_NAME,
+                    },
                     checkbox=True,
                     group_select_html=group_select,
                     outlet_rank=rank_by_url.get(a["url"], 0),
@@ -2995,6 +3038,35 @@ def _format_summary_title(name: str, labels: dict, subheading_format: str) -> st
     return apply_subheading_format(html.escape(subheading_format), display_name)
 
 
+def build_summary_text(
+    groups: list, labels: dict,
+    subheading_format: str = DEFAULT_SUBHEADING_FORMAT_TEMPLATE,
+    summaries: Optional[list] = None,
+) -> str:
+    """「💬 AI가 읽은 소제목별 주요 요약」 텍스트 — 화면 복사 버튼과 텔레그램 「요약」 발송이
+    같이 쓴다. 맨 위에 블록 제목, 그 아래 소제목마다 `<소제목>` + 요약. 요약이 하나도
+    없으면 빈 문자열(발송 쪽이 기사 목록으로 대신 보낸다).
+
+    복사 텍스트는 화면 표시용 html.escape를 거치지 않은 원문 그대로 담는다
+    (_build_plain_text와 같은 이유 — 클립보드에 &lt; 같은 엔티티가 붙으면 안 됨).
+    """
+    if summaries is None:
+        summaries = summarize_groups(groups)
+    lines = []
+    for item in summaries:
+        if not item.get("summary"):
+            continue
+        raw_title = display_group_name(item["name"], labels)
+        if item["name"] != UNCLASSIFIED_GROUP_NAME:
+            raw_title = apply_subheading_format(subheading_format, raw_title)
+        lines.append(f'{raw_title}\n{item["summary"]}')
+    if not lines:
+        return ""
+    # [수정: 2026-09-10] 맨 위에 이 블록의 제목을 함께 담는다(사용자 요청) — 붙여넣은
+    # 쪽에서 이 문단이 무엇인지 알 수 있어야 한다.
+    return "\n\n".join([AI_SUMMARY_HEADING] + lines)
+
+
 def _render_bottom(
     groups: list, highlight_words: list, labels: dict,
     subheading_format: str = DEFAULT_SUBHEADING_FORMAT_TEMPLATE,
@@ -3005,7 +3077,6 @@ def _render_bottom(
     # 그래서 이 블록엔 실제로 AI가 쓴 소제목별 요약만 남는다. 배경은 HISTORY.md 참고.
     summaries = summarize_groups(groups)
     summary_items = []
-    copy_lines = []
     for s in summaries:
         summary_items.append(
             f'<div class="bottom-summary-item">'
@@ -3013,15 +3084,9 @@ def _render_bottom(
             f'<p>{highlight_keywords(s["summary"], highlight_words)}</p>'
             "</div>"
         )
-        # 복사 텍스트는 화면 표시용 html.escape를 거치지 않은 원문 그대로 담는다
-        # (_build_plain_text와 같은 이유 — 클립보드에 &lt; 같은 엔티티가 그대로 붙으면 안 됨).
-        raw_title = display_group_name(s["name"], labels)
-        if s["name"] != UNCLASSIFIED_GROUP_NAME:
-            raw_title = apply_subheading_format(subheading_format, raw_title)
-        copy_lines.append(f'{raw_title}\n{s["summary"]}')
-    # [수정: 2026-09-10] 복사 텍스트 맨 위에 이 블록의 제목을 함께 담는다(사용자 요청) —
-    # 붙여넣은 쪽에서 이 문단이 무엇인지 알 수 있어야 한다.
-    copy_text = "\n\n".join([AI_SUMMARY_HEADING] + copy_lines)
+    # [수정: 2026-09-17] 복사 텍스트는 텔레그램 「요약」 발송과 같은 함수로 만든다 — 둘이
+    # 갈리면 복사한 요약과 받는 사람이 받은 요약이 조용히 달라진다.
+    copy_text = build_summary_text(groups, labels, subheading_format, summaries=summaries)
     return (
         '<div class="bottom">'
         '<div class="bottom-summary">'
@@ -3051,7 +3116,7 @@ def _manual_promote_control_html(
     누르면 확정본), 담당자는 소제목만 고른다 — 고르는 순간 그 소제목으로 들어가므로
     "어디 갔지?"가 아예 안 생긴다. 화면을 넘나드는 승격(초안 화면에서 확정본으로)은
     같이 없앴다: 두 화면에 버튼 두 개가 다 떠 있던 게 애초에 혼란의 원인이었고,
-    확정본은 수집 5분 뒤 자동 발송이라(app.confirm_send) 실제로 쓸 일도 거의 없다.
+    확정본은 수집 5분 뒤 자동발송이라(app.confirm_send) 실제로 쓸 일도 거의 없다.
 
     소제목이 하나도 없는 화면(기사 0건 회차·회차 종료 안내·검색 오류)에서는 고를 게
     없으므로 📥 버튼 하나로 떨어뜨리고, 서버가 자동 분류에 맡긴다.
@@ -3071,7 +3136,7 @@ def _manual_promote_control_html(
         for n in group_names
     )
     return (
-        f'<select class="group-move-select" data-url="{url_attr}" '
+        f'<select class="group-move-select promote-select" data-url="{url_attr}" '
         'onclick="event.stopPropagation();" '
         f'onchange="event.stopPropagation(); {handler}(this);">'
         f'<option value="" selected disabled>{placeholder}</option>'
@@ -3100,6 +3165,8 @@ def _render_manual_section(
     show_label_control: bool = False,
     scrap_date: str = "",
     scrap_end: str = "",
+    add_button_html: str = "",
+    add_panel_html: str = "",
 ) -> str:
     """"직접 추가한 기사" 구획을 렌더링한다 (실시간 기사 현황의 "📌" 결과물).
 
@@ -3112,14 +3179,16 @@ def _render_manual_section(
     승격으로 동작해서, 원하는 기사를 승격하려면 먼저 순서를 맨 위까지 옮겨야 하는
     번거로움이 있었다(피드백: "너무 빡세다"). 순서와 무관하게 아무 기사나 바로 승격할 수
     있게 되면서, 목록 안 순서바꾸기(↑/↓, moveManualArticle) 자체가 더 이상 필요 없어져
-    같이 뺐다. 비어 있으면 아예 렌더링하지 않는다.
+    같이 뺐다. 비어 있으면 아예 렌더링하지 않는다 — 단, 입구(add_button_html, 초안의
+    「+ 수기로 기사 추가」)를 받으면 0건이어도 한 줄로 그린다. 입구가 이 칸 안에 있어서
+    칸이 사라지면 입구도 사라지기 때문이다. add_panel_html(주소 입력칸)은 머리 바로 아래.
 
     [수정: 2026-08-11] 그 조작이 이모지 버튼 두 개에서 화면별 소제목 드롭다운 하나로
     바뀌었다 — 이유는 _manual_promote_control_html 참고. 이 함수는 초안·확정본이 공유하는데
     (app.preview_renderer._manual_section_html), 이제 화면마다 목적지와 소제목 목록이
     다르므로 target/group_names를 인자로 받는다.
     """
-    if not manual_articles:
+    if not manual_articles and not add_button_html:
         return ""
     labels = labels or {}
     custom_names = custom_names or set()
@@ -3143,7 +3212,7 @@ def _render_manual_section(
         'title="담아둔 기사를 전부 초안에 넣고 기존 소제목에 배정합니다 '
         '(기존 소제목은 바뀌지 않습니다)">'
         f'{icon("bot")} AI 기사 배정</button>'
-        if target == "draft"
+        if target == "draft" and manual_articles
         else ""
     )
     articles_html = "\n".join(
@@ -3167,17 +3236,29 @@ def _render_manual_section(
         '<div class="manual-zone-head">'
         '<div class="manual-zone-left">'
         f'<span class="manual-zone-title">{icon("pin")} 담아둔 기사</span>'
-        f'<span class="unclassified-count">{len(manual_articles)}건</span>'
-        f"{assign_btn_html}"
+        + (
+            f'<span class="manual-zone-count">{len(manual_articles)}건</span>'
+            if manual_articles
+            else '<span class="manual-zone-empty">전체 기사에서 📌 담아두거나, 직접 넣을 수 있어요</span>'
+        )
+        + f"{assign_btn_html}{add_button_html}"
         "</div>"
         '<span class="manual-zone-hint">자정에 자동으로 비워져요</span>'
         "</div>"
-        f"{articles_html}"
+        f"{add_panel_html}{articles_html}"
         "</div>"
     )
 
 
-def _send_failure_banner_html(failure: dict, send_count: int, settings: dict) -> str:
+def send_log_href(run_date: str, run_slot: str) -> str:
+    """발송 기록 화면에서 이 회차의 가장 최근 발송 줄을 펼쳐 여는 주소."""
+    return (
+        f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/send-log?run="
+        + urllib.parse.quote(f"{run_date}|{run_slot}", safe="")
+    )
+
+
+def _send_failure_banner_html(failure: dict, send_count: int, settings: dict, log_href: str = "") -> str:
     """확정본의 카운트다운 자리에 대신 뜨는 발송 실패 경고.
 
     [추가: 2026-08-26] 사용자 지적 — "확정본이 지금 발송을 시도하는 바로 그 화면인데
@@ -3186,8 +3267,8 @@ def _send_failure_banner_html(failure: dict, send_count: int, settings: dict) ->
 
     send_count == 0(아무 채널도 안 나감)이면 다음에 뭐가 일어나는지도 같이 안내한다 —
     자동발송이 켜져 있으면 "곧 자동으로 다시 시도", 꺼져 있으면 "(발송)을 다시
-    눌러주세요". send_count > 0(부분 실패 — 다른 채널은 이미 성공해 record_send로
-    "발송 완료"가 확정된 상태)이면 문구를 "일부 채널만"으로 바꾼다 — 정기 보관함의
+    눌러주세요". send_count > 0(부분 실패 — 한 명이라도 받아 record_send로
+    "발송 완료"가 확정된 상태)이면 "일부는 못 받았어요"로 바꾼다 — 정기 보관함의
     빨간 점 툴팁(app.history_renderer._send_failure_tooltip)과 같은 구분이다.
     """
     channel_lines = "<br>".join(
@@ -3195,15 +3276,102 @@ def _send_failure_banner_html(failure: dict, send_count: int, settings: dict) ->
         for ch in failure.get("channels", [])
     )
     if send_count > 0:
-        headline = "일부 채널 발송 실패(다른 채널은 정상 발송됨)"
+        # 채널이 아니라 사람 단위다 — 같은 텔레그램 안에서도 한 명만 못 받을 수 있다(_delivered_any).
+        headline = "일부는 못 받았어요 — 받은 사람에겐 다시 보내지 않아요"
     elif is_auto_send_enabled(settings):
         headline = "발송 실패 — 곧 자동으로 다시 시도합니다"
     else:
         headline = "발송 실패 — 아래 (발송)을 다시 눌러주세요"
+    link_html = (
+        f'<br><a class="send-log-link" href="{html.escape(log_href, quote=True)}">받은 사람 보기 →</a>'
+        if log_href else ""
+    )
     return (
         '<span class="send-countdown send-failure">'
-        f'{icon("alert")} {html.escape(headline)}<br>{channel_lines}</span>'
+        f'{icon("alert")} {html.escape(headline)}<br>{channel_lines}{link_html}</span>'
     )
+
+
+# 「지난 회차 메모」 참고 목록 — 메모 칸 안, 입력칸 아래. 소제목 이름 고르기 창과 **일부러
+# 다르게** 생겼다: 저쪽은 골라서 넣는 떠 있는 창(줄이 버튼), 이쪽은 쓰는 동안 옆에 펴 두고
+# 보는 읽기 전용 글(줄을 눌러도 아무 일 없음, 끌어서 복사는 된다). 편집 중일 때만 보이고
+# (잠긴 저장 메모 상태에선 숨김), 치는 단어와 **똑같은** 단어가 파랗게 따라 칠해진다.
+# 단어 비교는 앞뒤 문장부호만 떼고 한다 — 「보도,」와 「보도」는 같은 단어. 떼는 문자는
+# 아래 한 곳이고 Python(data-w)과 JS(치는 말)가 같이 쓴다.
+_NOTE_WORD_PUNCT = ".,·;:!?()[]{}<>「」『』\"'“”‘’…"
+
+
+def _note_word_key(word: str) -> str:
+    return word.strip(_NOTE_WORD_PUNCT)
+
+
+def keyword_note_history_html(run_key=None) -> str:
+    """메모 칸 아래 「지난 회차 메모」 목록(없으면 빈 문자열). 재료는 저장된 메모뿐 — API 호출 없음."""
+    rows = past_notes(run_key)
+    if not rows:
+        return ""
+    today = datetime.now().strftime("%Y-%m-%d")
+    lines = []
+    for date, slots, text in rows:
+        day = "오늘" if date == today else f"{int(date[5:7])}/{int(date[8:10])}"
+        when = f'{day} {"·".join(html.escape(s) for s in slots)}'
+        words = []
+        for part in re.split(r"(\s+)", text):
+            key = _note_word_key(part) if part and not part.isspace() else ""
+            words.append(
+                f'<span class="kn-w" data-w="{html.escape(key)}">{html.escape(part)}</span>' if key else html.escape(part)
+            )
+        lines.append(f'<div class="kn-h-row"><span class="kn-h-when">{when}</span><span class="kn-h-text">{"".join(words)}</span></div>')
+    return (
+        '<div class="kn-history" aria-label="지난 회차 메모">'
+        '<div class="kn-h-head">지난 회차 메모</div>'
+        f'<div class="kn-h-list">{"".join(lines)}</div></div>'
+    )
+
+
+KEYWORD_NOTE_HISTORY_STYLE = """
+  .kn-history {{ flex-basis: 100%; margin-top: 2px; padding-top: 8px; border-top: 1px dashed {border}; }}
+  .keyword-note-zone:has(#keyword-note-input:disabled) .kn-history {{ display: none; }}
+  .kn-h-head {{ font-size: var(--fs-xs); color: {text_faint}; margin-bottom: 4px; }}
+  .kn-h-list {{ max-height: 7.2em; overflow-y: auto; }}
+  .kn-h-row {{ display: flex; gap: 10px; font-size: var(--fs-sm); line-height: 1.6; color: {text_soft}; cursor: text; }}
+  .kn-h-when {{ flex: none; min-width: 7.5em; color: {text_faint}; font-variant-numeric: tabular-nums; }}
+  .kn-h-text {{ min-width: 0; overflow-wrap: anywhere; }}
+  .kn-w.is-same {{ color: {accent}; font-weight: 600; }}
+"""
+
+
+def keyword_note_history_style() -> str:
+    return KEYWORD_NOTE_HISTORY_STYLE.format(**PALETTE)
+
+
+def keyword_note_history_script() -> str:
+    """치는 동안 같은 단어를 파랗게 — 입력할 때마다 다시 칠한다(중괄호 홑겹 완성 문자열)."""
+    punct = json.dumps(_NOTE_WORD_PUNCT)
+    return """
+(function () {
+  var input = document.getElementById("keyword-note-input");
+  if (!input || !document.querySelector(".kn-history")) return;
+  var P = """ + punct + """;
+  function isP(c) { return P.indexOf(c) !== -1; }
+  function key(w) {
+    var a = 0, b = w.length;
+    while (a < b && isP(w.charAt(a))) a++;
+    while (b > a && isP(w.charAt(b - 1))) b--;
+    return w.slice(a, b);
+  }
+  function paint() {
+    var typed = {};
+    input.value.split(/\\s+/).forEach(function (w) { var k = key(w); if (k) typed[k] = true; });
+    document.querySelectorAll(".kn-history .kn-w").forEach(function (el) {
+      el.classList.toggle("is-same", !!typed[el.dataset.w]);
+    });
+  }
+  input.addEventListener("input", paint);
+  input.addEventListener("focus", paint);
+  paint();
+})();
+"""
 
 
 def keyword_note_template_vars(run_key=None) -> dict:
@@ -3217,6 +3385,10 @@ def keyword_note_template_vars(run_key=None) -> dict:
     text = load_manual_keyword_note(run_key)
     saved = bool(text)
     return {
+        # 지난 회차 메모 참고 목록(편집 중일 때만 CSS로 보인다) + 그 CSS·JS.
+        "note_history_html": keyword_note_history_html(run_key),
+        "note_history_style": keyword_note_history_style(),
+        "note_history_script": keyword_note_history_script(),
         "note_open_class": " is-open" if text else "",
         "note_value_attr": html.escape(text),
         # [추가: 2026-08-10] 이미 저장된 메모가 있으면 입력칸을 잠가둔 채 시작한다 —
@@ -3320,16 +3492,17 @@ def build_group_copy_texts(
     }
 
 
-def build_latest_plain_text(
+def latest_confirmed_report(
     keywords: Optional[list] = None,
     highlight_words: Optional[list] = None,
     line_template: Optional[str] = None,
     subheading_format: Optional[str] = None,
-) -> Optional[str]:
-    """텔레그램 자동 전송처럼 화면(HTML) 없이도 최신 회차의 복사/내보내기 텍스트가 필요할
-    때 쓴다. generate_screen과 같은 방식으로 최신 회차를 찾되, 오늘 회차가 아직 없으면
-    (아직 스크랩 전이거나 자정이 지나 어제 회차만 남음) 예외 대신 None을 반환한다 —
-    호출하는 쪽(app.scheduler)이 "보낼 게 없다"로 조용히 넘어갈 수 있어야 하기 때문이다.
+) -> Optional[dict]:
+    """최신 확정 회차의 발송용 텍스트 두 가지 — {"run", "text"(기사 목록), "summary"(요약)}.
+    오늘 회차가 없으면 None. 화면(render_page)과 같은 소제목 계산을 거친다.
+
+    [추가: 2026-09-17] 텔레그램 받는 사람마다 기사·요약을 고르게 되면서 한 번에 둘 다
+    만든다 — 기사 목록과 요약이 서로 다른 시점의 소제목을 보면 안 된다.
     """
     run = load_latest_confirmed_run()
     if run is None or not is_today(run):
@@ -3357,9 +3530,13 @@ def build_latest_plain_text(
         round_id=round_id,
     )
     groups = apply_group_order(groups, round_id)
-    return _build_plain_text(
-        run["run_slot"], groups, line_template, labels, subheading_format, run_date=run["run_at"][:10]
-    )
+    return {
+        "run": run,
+        "text": _build_plain_text(
+            run["run_slot"], groups, line_template, labels, subheading_format, run_date=run["run_at"][:10]
+        ),
+        "summary": build_summary_text(groups, labels, subheading_format),
+    }
 
 
 def render_page(
@@ -3392,9 +3569,9 @@ def render_page(
     (main._scrape_and_render), 담당자에게 남는 유일한 수동 조작은 (발송)뿐이다. 그래서
     이 함수의 mode 파라미터("final"/"pending")와 (확정) 버튼·확정 대기 화면도 함께
     없앴다. 카운트다운은 아직 한 번도 안 보냈을 때만(send_count==0) run_at +
-    CONFIRM_SEND_GRACE_SEC 기준 "자동 발송까지 남은 시간"으로 보여준다(실제 자동 발송
+    CONFIRM_SEND_GRACE_SEC 기준 "자동발송까지 남은 시간"으로 보여준다(실제 자동발송
     판단은 app.confirm_send가 서버에서 하고, 이건 그 시계를 그대로 비추는 순수 표시용).
-    한 번이라도 보냈고 그게 자동이었으면 카운트다운 자리에 "🤖 N시 M분 자동 발송 완료"
+    한 번이라도 보냈고 그게 자동이었으면 카운트다운 자리에 "🤖 N시 M분 자동발송 완료"
     배지가 대신 뜬다.
 
     keywords: 검색 키워드 — 소제목 분류·주요 키워드 추출에서 "뻔한 단어"를 제외하는 데 쓴다.
@@ -3488,17 +3665,18 @@ def render_page(
         custom_names=set(custom_names),
         show_label_control=True,
         scrap_date=label_scrap_date,
-        scrap_end=run_slot,
+        scrap_end=run_slot,        # 「+ 수기로 기사 추가」 — 초안과 같은 입구·입력칸(0건이어도 칸이 한 줄로 남는다).
+        add_button_html=URL_ADD_BUTTON_HTML,
+        add_panel_html=URL_ADD_PANEL_HTML,
     )
 
     plain_text = _build_plain_text(
         run_slot, groups, line_template, labels, subheading_format, run_date=run_date
     )
-    # [수정: 2026-08-18] 파일명 형식을 정기·수시 공통 규칙(날짜_종류_구분)으로 통일 —
-    # 예전엔 "언론모니터링_09-00.txt"처럼 날짜가 아예 빠져 있었다. run_at이 없는(레거시)
-    # 회차는 오늘 날짜로 대체한다.
+    # 파일명은 정기·수시 공통 규칙(날짜_종류_구분). 회차 자리는 머리줄처럼 「N시 기준」이라
+    # `14-00기준`으로 적는다(`:`는 Windows 파일명에 못 쓴다). 초안·정기 보관함 회차 줄도 같은 모양.
     export_date = run_date
-    export_filename = f"{export_date}_언론모니터링_{run_slot.replace(':', '-')}.txt"
+    export_filename = f"{export_date}_언론모니터링_{run_slot.replace(':', '-')}기준.txt"
     # [추가: 2026-08-18] 엑셀 내보내기(PRD.md 기능11) — groups를 그대로 순회해 rows를
     # 만든다. _build_plain_text와 달리 UNCLASSIFIED_GROUP_NAME("📂 소제목 미분류")을
     # "기타"로 접지 않는다 — 기능11 규칙4가 명시적으로 "빈 값이거나 미분류인 행도
@@ -3506,33 +3684,20 @@ def render_page(
     # 새면 안 된다는 것이지, 이건 애초에 보고서가 아니라 "데이터"다). 소제목 표시 형식
     # (subheading_format)도 마찬가지 이유로 적용하지 않는다 — 기계가 다시 읽을 원본
     # 이름 그대로가 데이터 계약에 맞다.
-    export_rows = [
-        {
-            "스크랩일자": export_date,
-            "스크랩종료시간": run_slot,
-            "발행일 발행시간": format_pub_datetime(a.get("pub_date")),
-            "언론사명": a.get("outlet", ""),
-            "기사제목": a.get("title", ""),
-            "URL": a.get("url", ""),
-            "소제목": g["name"],
-            "라벨명": ", ".join(labels_for_url(a["url"])),
-        }
-        for g in groups
-        for a in g["articles"]
-    ]
-    export_excel_filename = f"{export_date}_언론모니터링_{run_slot.replace(':', '-')}.xlsx"
+    export_rows = build_export_rows(groups, export_date, run_slot)
+    export_excel_filename = f"{export_date}_언론모니터링_{run_slot.replace(':', '-')}기준.xlsx"
 
     note_vars = keyword_note_template_vars((run_date, run_slot))
     # [수정: 2026-08-10] 카운트다운을 초안(pending)에서 확정본(final)으로 옮겼다 — 위
     # docstring 참고. 확정본이라도 이미 한 번 보냈으면(send_count>=1) 더 이상 자동 전송
     # 대상이 아니므로 보여주지 않는다.
-    # [추가: 2026-08-11] 자동 발송을 꺼두면(설정 /auto-send) 카운트다운도 안 띄운다 —
-    # 아무 일도 안 일어나는데 "N분 후 자동 발송"이 흐르면 명백한 거짓말이다(사용자 지적).
+    # [추가: 2026-08-11] 자동발송을 꺼두면(설정 /auto-send) 카운트다운도 안 띄운다 —
+    # 아무 일도 안 일어나는데 "N분 후 자동발송"이 흐르면 명백한 거짓말이다(사용자 지적).
     # 유예 시간도 설정값을 그대로 따라간다.
     grace_deadline_ms = 0
     settings = load_settings()
     # [추가: 2026-08-12] 분류가 규칙 기반으로 떨어진 회차는 자동발송 자체가 보류되므로
-    # (app.confirm_send) 카운트다운을 아예 안 띄운다 — 안 그러면 "곧 자동 발송됩니다"가
+    # (app.confirm_send) 카운트다운을 아예 안 띄운다 — 안 그러면 "곧 자동발송됩니다"가
     # 거짓말이 된다. 아직 한 번도 안 보낸 경우에만 경고를 보여준다(한 번이라도 보냈으면
     # 담당자가 이미 확인하고 발송한 것이므로 더 알릴 게 없다).
     if send_count == 0 and run_at and is_auto_send_enabled(settings) and not classification_degraded:
@@ -3552,7 +3717,9 @@ def render_page(
         # (send_count > 0이어도 다른 채널이 실패했으면) 여전히 여기로 온다. "뭔가
         # 안 갔다"는 신호가 "일단 하나는 나갔다"는 사실보다 담당자에게 먼저 보여야
         # 한다(정기 보관함의 빨간 점과 같은 우선순위 판단).
-        send_countdown_html = _send_failure_banner_html(send_failure, send_count, settings)
+        send_countdown_html = _send_failure_banner_html(
+            send_failure, send_count, settings, send_log_href(run_date, run_slot)
+        )
     elif grace_deadline_ms:
         send_countdown_html = '<span class="send-countdown" id="send-countdown"></span>'
     elif send_count > 0 and sent_at:
@@ -3574,14 +3741,17 @@ def render_page(
         # 접두어(app.confirm_send)와 짝을 이뤄, 화면만 봐도 몇 번 내보냈는지 알 수 있다.
         repeat_suffix = f" ({send_count}회)" if send_count >= 2 else ""
         badge_text = (
-            f'{icon("bot")} {sent_time_kr}에 자동 발송 완료{repeat_suffix}'
+            f'{icon("bot")} {sent_time_kr}에 자동발송 완료{repeat_suffix}'
             if sent_by == "auto"
             else f'{icon("check_circle")} {sent_time_kr} 발송 완료{repeat_suffix}'
         )
-        send_countdown_html = f'<span class="send-countdown sent-done">{badge_text}</span>'
+        send_countdown_html = (
+            f'<a class="send-countdown sent-done" href="{html.escape(send_log_href(run_date, run_slot), quote=True)}" '
+            f'title="받은 사람 보기">{badge_text}</a>'
+        )
     else:
         send_countdown_html = ""
-    countdown_suffix = "후 자동 발송"
+    countdown_suffix = "후 자동발송"
     # [추가: 2026-08-11] 확정본도 소제목을 다시 분류할 수 있어야 한다는 요청 — 확정본은
     # 매 렌더링마다 기본적으로 자동 재분류되지만(app.classifier.classify_articles의
     # allow_llm_call 기본값 True) 그건 "기사 구성이 바뀌었을 때만" 실제로 API를 다시
@@ -3701,10 +3871,10 @@ def render_page(
         f"finalizeBannerDismissed:{(run_at or datetime.now().isoformat())[:10]}:{run_slot}"
     )
     total_count_html = (
-        f'<span class="total-count-badge">전체 {total_article_count}건</span>'
+        f'<span class="total-count-badge" title="이 회차 기사 {total_article_count}건 — 📂 소제목 미분류 포함, 📌 담아둔 기사 제외">{total_article_count}건</span>'
         if total_article_count
         else ""
-    )
+    ) + pinned_jump_badge_html(len(manual_articles))
     return _PAGE_TEMPLATE.format(
         run_slot=html.escape(format_slot_time_kr(run_slot)),
         run_slot_raw=html.escape(run_slot),
@@ -3726,6 +3896,7 @@ def render_page(
         finalize_banner_html=finalize_banner_html,
         late_pickup_banner_html=late_pickup_banner_html,
         late_badge_style=late_badge_style(),
+        export_links_style=export_links_style(),
         kw_inline_style=kw_inline_style(),
         kw_inline_script=kw_inline_script(),
         photo_gather_style=photo_gather_style(),
@@ -3758,10 +3929,19 @@ def render_page(
             f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/hidden"
         ),
         hidden_trash_script=hidden_trash_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
+        scroll_top_style=scroll_top_style(),
+        scroll_top_html=scroll_top_html(),
+        scroll_top_script=scroll_top_script(),
+        hide_batch_style=hide_batch_style(),
+        hide_batch_script=hide_batch_script(),
+        range_select_script=range_select_script(".article-select", ".article"),
+        url_add_style=url_add_style(),
+        url_add_script=url_add_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT, "confirmed"),
         label_popover_style=label_popover_style(),
         label_popover_script=label_popover_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
         # [추가: 2026-09-15] 「AI 기사 나누기」 — 초안과 같은 버튼, 보내는 곳만 확정본용.
         split_button_style=split_button_style(),
+        screen_tag_style=screen_tag_style(),
         split_button_html=split_button_html(),
         split_button_script=split_button_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT, "/split-group-final"),
         name_picker_style=name_picker_style(),
@@ -3780,6 +3960,8 @@ def render_page(
         # 초안이 어긋났다.
         **PALETTE,
         reclassify_safe_note=RECLASSIFY_SAFE_NOTE,
+        topnav_style=topnav_style(),
+        topnav_html=regular_nav("final"),
     )
 
 
@@ -3807,37 +3989,29 @@ def _waiting_page_html() -> str:
         )
     return f"""<!DOCTYPE html>
 <html lang="ko">
-<head><meta charset="UTF-8" /><title>언론 모니터링</title>
+<head><meta charset="UTF-8" /><title>확정본</title>
 <style>body{{margin:0;background:{COLOR_BG};color:{COLOR_TEXT};font-family:{FONT_STACK};
 display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;
-font-size:1.2rem;text-align:center;padding:60px 24px 0;line-height:1.8;box-sizing:border-box;}}
+font-size: var(--fs-lg);text-align:center;padding:60px 24px 0;line-height:1.8;box-sizing:border-box;}}
 .icon{{font-size:2rem;}}
-.topbar{{position:fixed;top:0;left:0;right:0;z-index:20;background:{COLOR_CARD};
-border-bottom:1px solid {COLOR_BORDER};box-shadow:0 2px 8px rgba(0,0,0,0.06);}}
-.topbar-inner{{max-width:800px;margin:0 auto;padding:12px 24px;display:flex;
-justify-content:space-between;align-items:center;}}
-.topbar a{{color:{COLOR_ACCENT};text-decoration:none;font-size:0.92rem;font-weight:600;
-padding:6px 10px;border-radius:6px;}}
-.topbar a:hover{{background:{COLOR_HOVER};}}</style>
+{topnav_style()}
+.reload-btn{{display:inline-block;margin-top:14px;font-size: var(--fs-base);font-weight:600;color:{COLOR_ACCENT};
+border:1px solid {COLOR_ACCENT_BORDER};background:{COLOR_CARD};border-radius:var(--r-md);padding:6px 16px;text-decoration:none;}}
+.reload-btn:hover{{background:{COLOR_HOVER};}}</style>
 </head>
 <body>
-<div class="topbar"><div class="topbar-inner">
-<a href="home.html">홈</a>
-<a href="history.html">정기 보관함</a>
-<a href="index.html">새로고침</a>
-</div></div>
-<div><div class="icon">🐰⏱️</div>{message}</div>
+{regular_nav("final")}
+<div><div class="icon">🐰⏱️</div>{message}<br><a class="reload-btn" href="index.html">새로고침</a></div>
 </body>
 </html>
 """
 
 
-
 # ─────────────────────────────────────────────────────────────────────────────
-# [추가: 2026-09-02] 좌하단 쓰레기통(숨긴 기사) — 확정본·초안 공용
+# [추가: 2026-09-02] 좌하단 휴지통(숨긴 기사) — 확정본·초안 공용
 #
 # 수시 수집 결과 화면(app/adhoc/renderer.py)의 좌하단 스택과 **겉모습을 똑같이** 맞춘다
-# (아래가 쓰레기통, 위가 ↩ 되돌리기, 빨간 배지, 0건이면 아예 안 그림) — 담당자가 두 흐름을
+# (아래가 휴지통, 위가 ↩ 되돌리기, 빨간 배지, 0건이면 아예 안 그림) — 담당자가 두 흐름을
 # 오갈 때 같은 자리에 같은 것이 있어야 하기 때문. 안쪽은 다르다:
 #   · 이름이 "숨긴 기사"다. 수시의 "목록 밖 기사"는 조건 밖 + 직접 숨김 두 종류를 담는
 #     이름이었지만, 정기엔 조건 밖 개념이 없어 전부 담당자가 직접 누른 것이고 전부 복구된다.
@@ -3851,51 +4025,51 @@ padding:6px 10px;border-radius:6px;}}
 _TRASH_POPOVER_MAX_ROWS = 5
 
 HIDDEN_TRASH_STYLE = """
-  /* 좌하단 쓰레기통 — 수시 화면(.fab.left)과 같은 규격. ↩ 되돌리기가 위로 올라간다. */
+  /* 좌하단 휴지통 — 수시 화면(.fab.left)과 같은 규격. ↩ 되돌리기가 위로 올라간다. */
   .trash-fab {{
-    position: fixed; left: 20px; bottom: 20px; width: 56px; height: 56px; border-radius: 50%;
+    position: fixed; left: 20px; bottom: 20px; width: var(--fab-lg); height: var(--fab-lg); border-radius: var(--r-circle);
     background: {card}; color: {muted}; border: 1px solid {border};
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12); cursor: pointer; z-index: 200;
+    box-shadow: var(--sh-float); cursor: pointer; z-index: 200;
     display: flex; align-items: center; justify-content: center;
   }}
   .trash-fab:hover {{ background: {hover}; color: {accent}; border-color: {accent}; }}
   .trash-fab .badge {{
     position: absolute; top: -3px; right: -3px; background: {error}; color: {on_fill};
-    font-size: 0.66rem; font-weight: 700; border-radius: 9px; padding: 0 5px; line-height: 1.55;
+    font-size: var(--fs-xs); font-weight: 700; border-radius: var(--r-pill); padding: 0 5px; line-height: 1.55;
   }}
   .trash-pop {{
     display: none; position: fixed; left: 20px; bottom: 88px; width: 336px;
-    background: {card}; border: 1px solid {border}; border-radius: 11px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16); padding: 12px 14px; z-index: 210;
+    background: {card}; border: 1px solid {border}; border-radius: var(--r-lg);
+    box-shadow: var(--sh-pop); padding: 12px 14px; z-index: 210;
   }}
   .trash-pop.is-open {{ display: block; }}
   .trash-pop h5 {{
-    margin: 0 0 3px; font-size: 0.85rem; color: {header};
+    margin: 0 0 3px; font-size: var(--fs-md); color: {header};
     display: flex; align-items: center; gap: 6px;
   }}
-  .trash-pop .tnote {{ font-size: 0.72rem; color: {muted}; margin: 0 0 4px; line-height: 1.45; }}
+  .trash-pop .tnote {{ font-size: var(--fs-xs); color: {muted}; margin: 0 0 4px; line-height: 1.45; }}
   .trash-pop .trow {{
     display: flex; gap: 8px; align-items: center; padding: 8px 0;
-    border-top: 1px solid {divider_soft}; font-size: 0.8rem;
+    border-top: 1px solid {divider_soft}; font-size: var(--fs-sm);
   }}
   .trash-pop .trow .tx {{ flex: 1; color: {muted}; line-height: 1.4; }}
   .trash-pop .trow .tx b {{ color: {header}; }}
-  .trash-pop .trow .tm {{ color: {text_faint}; font-size: 0.7rem; margin-left: 4px; }}
+  .trash-pop .trow .tm {{ color: {text_faint}; font-size: var(--fs-xs); margin-left: 4px; }}
   .trash-pop .cnt {{
-    flex: none; font-size: 0.7rem; font-weight: 700; color: {muted};
-    background: {pill_bg}; border-radius: 9px; padding: 1px 7px;
+    flex: none; font-size: var(--fs-xs); font-weight: 700; color: {muted};
+    background: {pill_bg}; border-radius: var(--r-pill); padding: 1px 7px;
   }}
   .trash-pop .undo-mini {{
-    flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem;
-    color: {muted}; background: transparent; border: 1px solid {border}; border-radius: 6px;
+    flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-xs);
+    color: {muted}; background: transparent; border: 1px solid {border}; border-radius: var(--r-md);
     padding: 3px 8px; cursor: pointer; white-space: nowrap;
   }}
   .trash-pop .undo-mini:hover {{ background: {hover}; color: {accent}; border-color: {accent}; }}
   .trash-pop .undo-mini svg {{ width: 13px; height: 13px; }}
   .trash-pop .more {{
     display: block; text-align: center; margin: 6px -14px -12px; padding: 9px 0 10px;
-    border-top: 1px solid {border}; font-size: 0.76rem; font-weight: 600;
-    color: {accent}; text-decoration: none; border-radius: 0 0 11px 11px;
+    border-top: 1px solid {border}; font-size: var(--fs-sm); font-weight: 600;
+    color: {accent}; text-decoration: none; border-radius: 0 0 var(--r-lg) var(--r-lg);
   }}
   .trash-pop .more:hover {{ background: {hover}; }}
 """
@@ -3906,53 +4080,53 @@ HIDDEN_TRASH_STYLE = """
 # 이름을 같은 사안의 옛 이름으로 되돌리려면 매번 손으로 다시 쳐야 했다(app.subheading_names의
 # 주석에 실측이 있다). 이 창은 **직전 회차 소제목을 그대로 보여주고**, 치면 오늘·어제 전부에서
 # 찾는다. 확정본·초안 두 화면이 같은 함수를 쓴다 — 각자 복제하면 한쪽만 고쳐져 갈라진다
-# (render_article·쓰레기통과 같은 이유).
+# (render_article·휴지통과 같은 이유).
 NAME_PICKER_STYLE = """
   #name-picker-back {{ position: fixed; inset: 0; z-index: 39; background: rgba(15,23,42,0.12); }}
   #name-picker {{ position: fixed; top: 13vh; left: 50%; transform: translateX(-50%); z-index: 40;
     width: 372px; max-width: calc(100vw - 32px); background: {card}; border: 1px solid {border};
-    border-radius: 10px; box-shadow: 0 10px 30px rgba(15,23,42,0.18); padding: 14px 14px 10px; }}
-  .np-title {{ font-size: 0.92rem; font-weight: 700; color: {header}; margin: 0 0 9px; }}
-  #np-input {{ width: 100%; font: inherit; font-size: 0.95rem; padding: 8px 10px;
-    border: 1px solid {border}; border-radius: 6px; color: {text}; background: {card}; }}
+    border-radius: var(--r-lg); box-shadow: var(--sh-modal); padding: 14px 14px 10px; }}
+  .np-title {{ font-size: var(--fs-md); font-weight: 700; color: {header}; margin: 0 0 9px; }}
+  #np-input {{ width: 100%; font: inherit; font-size: var(--fs-base); padding: 8px 10px;
+    border: 1px solid {border}; border-radius: var(--r-md); color: {text}; background: {card}; }}
   #np-input:focus {{ outline: none; border-color: {accent}; box-shadow: 0 0 0 3px {hover}; }}
   #np-input.is-bad {{ border-color: {error}; box-shadow: 0 0 0 3px {error_bg}; }}
-  .np-lead {{ font-size: 0.76rem; color: {muted}; margin: 11px 6px 2px; }}
+  .np-lead {{ font-size: var(--fs-sm); color: {muted}; margin: 11px 6px 2px; }}
   .np-list {{ max-height: 250px; overflow-y: auto; margin: 0 -4px; }}
   .np-row {{ display: flex; align-items: baseline; gap: 8px; width: calc(100% - 8px);
-    margin: 0 4px; padding: 5px 8px; border: none; background: none; border-radius: 5px;
+    margin: 0 4px; padding: 5px 8px; border: none; background: none; border-radius: var(--r-sm);
     font: inherit; text-align: left; cursor: pointer; color: {text}; }}
   .np-row:hover {{ background: {hover}; }}
-  .np-row .np-nm {{ flex: 1; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+  .np-row .np-nm {{ flex: 1; font-size: var(--fs-md); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
   /* 볼드 = 담당자가 직접 고치거나 만든 이름. 직접 만든 소제목이 「다른 소제목」 드롭다운·미니
      목차에서 이미 볼드인 것과 같은 뜻이라 새 표시를 만들지 않고 그 관례를 그대로 이어쓴다. */
   .np-row.np-mine .np-nm {{ font-weight: 700; }}
-  .np-row .np-when {{ font-size: 0.73rem; color: {muted}; white-space: nowrap; }}
+  .np-row .np-when {{ font-size: var(--fs-xs); color: {muted}; white-space: nowrap; }}
   .np-row.np-used {{ color: {muted}; cursor: not-allowed; }}
   .np-row.np-used:hover {{ background: none; }}
   .np-row.np-used .np-nm {{ text-decoration: line-through; text-decoration-color: {chip_off_border}; font-weight: 400; }}
-  .np-row .np-tag {{ font-size: 0.69rem; color: {muted}; border: 1px solid {border};
-    border-radius: 999px; padding: 0 6px; white-space: nowrap; }}
+  .np-row .np-tag {{ font-size: var(--fs-xs); color: {muted}; border: 1px solid {border};
+    border-radius: var(--r-pill); padding: 0 6px; white-space: nowrap; }}
   /* [추가: 2026-09-10] 회차 구분선 — 기본 목록(안 쳤을 때)에만 그린다. 치면 걸린 이름이
      대개 1~3건인데 서로 다른 회차라 구분선이 이름 수만큼 붙어(실측 '개각' 2건 → 4줄) 줄만
      두 배가 되고, 그때 담당자가 묻는 건 "몇 회차 것인가"가 아니라 "그 글자가 든 이름이
      있나"라서다. 줄 오른쪽 .np-when이 이미 회차를 말하므로 같은 말을 두 번 하는 셈이기도 하다. */
-  .np-sep {{ font-size: 0.72rem; color: {muted}; margin: 9px 8px 2px; padding-top: 7px;
+  .np-sep {{ font-size: var(--fs-xs); color: {muted}; margin: 9px 8px 2px; padding-top: 7px;
     border-top: 1px dashed {border}; }}
   .np-sep:first-child {{ border-top: none; padding-top: 0; margin-top: 2px; }}
-  .np-hint {{ color: {muted}; font-size: 0.75rem; margin: 7px 6px 0; opacity: 0.85; }}
+  .np-hint {{ color: {muted}; font-size: var(--fs-sm); margin: 7px 6px 0; opacity: 0.85; }}
   .np-foot {{ display: flex; align-items: center; justify-content: space-between; gap: 10px;
     margin-top: 10px; padding-top: 9px; border-top: 1px solid {border}; }}
-  .np-msg {{ font-size: 0.76rem; color: {muted}; flex: 1; }}
+  .np-msg {{ font-size: var(--fs-sm); color: {muted}; flex: 1; }}
   .np-msg.bad {{ color: {error}; }}
   .np-msg.new {{ color: {accent}; }}
   .np-btns {{ display: flex; gap: 6px; }}
-  .np-btns button {{ font: inherit; font-size: 0.85rem; padding: 6px 13px; border-radius: 6px; cursor: pointer; }}
+  .np-btns button {{ font: inherit; font-size: var(--fs-md); padding: 6px 13px; border-radius: var(--r-md); cursor: pointer; }}
   .np-cancel {{ background: {card}; color: {muted}; border: 1px solid {border}; }}
   .np-ok {{ background: {accent}; color: {on_fill}; border: none; font-weight: 700; }}
   .np-ok:hover {{ background: {accent_pressed}; }}
   .np-ok:disabled {{ opacity: 0.45; cursor: not-allowed; }}
-  .np-key {{ font-size: 0.72rem; color: {muted}; text-align: right; margin: 6px 2px 0; }}
+  .np-key {{ font-size: var(--fs-xs); color: {muted}; text-align: right; margin: 6px 2px 0; }}
 """
 
 
@@ -4124,7 +4298,7 @@ LATE_BADGE_STYLE = """
      색은 상단 배너와 같은 "주의"(앰버) 계열이라, 배너에서 [N건]을 눌러 내려왔을 때
      같은 색이 눈에 들어와 "배너가 말한 게 이거"로 이어져 읽힌다. */
   .late-badge {{
-    flex-shrink: 0; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 0.72rem;
+    flex-shrink: 0; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
     color: {warn_text}; background: {warn_chip_bg}; border: 1px solid {warn_border}; white-space: nowrap;
   }}
 """
@@ -4141,6 +4315,51 @@ def late_badge_style() -> str:
     return LATE_BADGE_STYLE.format(**PALETTE)
 
 
+EXPORT_LINKS_STYLE = """
+  /* 툴바 오른쪽 「복사 · 텍스트 · 엑셀」 — 확정본·초안 공용. 툴바 규칙: 박스는 내용을 바꾸는
+     버튼(왼쪽), 글자는 가져가거나 보기만 바꾸는 것(오른쪽). 그래서 .actions button의 옅은
+     파란 채움을 끄고 글자만 남긴다. hover는 배경 없이 글자색 + 밑줄.
+     시안 mockups/TOOLBAR_GROUPING_MOCKUP.html A안. */
+  .actions .actions-right {{ margin-left: auto; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }}
+  .actions .actions-right .view-mode-select {{ margin-left: 0; }}
+  .actions .export-links {{ display: inline-flex; align-items: center; }}
+  .actions .export-links button {{
+    background: transparent; border: none; color: {text_soft}; font-weight: 500;
+    padding: 6px 8px; border-radius: var(--r-md);
+  }}
+  .actions .export-links button:hover {{
+    background: transparent; color: {accent}; text-decoration: underline; text-underline-offset: 3px;
+  }}
+"""
+
+
+def export_links_style() -> str:
+    """툴바 「복사 · 텍스트 · 엑셀」 글자 버튼 CSS — 확정본·초안 공용."""
+    return EXPORT_LINKS_STYLE.format(**PALETTE)
+
+
+def build_export_rows(groups: list, export_date: str, run_slot: str) -> list[dict]:
+    """확정본·초안 엑셀 8열 행 — 화면의 소제목 순서대로 groups를 그대로 순회한다.
+
+    보고서 텍스트와 달리 📂 소제목 미분류를 「기타」로 접지 않고 소제목 표시 형식도
+    적용하지 않는다(PRD 기능11 규칙4 — 엑셀은 보고서가 아니라 데이터다).
+    """
+    return [
+        {
+            "스크랩일자": export_date,
+            "스크랩종료시간": run_slot,
+            "발행일 발행시간": format_pub_datetime(a.get("pub_date")),
+            "언론사명": a.get("outlet", ""),
+            "기사제목": a.get("title", ""),
+            "URL": a.get("url", ""),
+            "소제목": g["name"],
+            "라벨명": ", ".join(labels_for_url(a["url"])),
+        }
+        for g in groups
+        for a in g["articles"]
+    ]
+
+
 KW_INLINE_STYLE = """
   /* [추가: 2026-08-21] 🔍 검색어 — 이 기사가 어떤 검색어로 걸렸는지. 게시시각·원문보기와
      같은 줄·같은 크기(0.8rem)의 회색 글자다(칩으로 안 만든 이유는 render_article 주석).
@@ -4150,11 +4369,11 @@ KW_INLINE_STYLE = """
      flex-grow 1 + max-width: max-content → 남는 자리를 제 글자 길이까지만 채운다(남는 건
      버튼 묶음의 margin-left: auto가 가져가 버튼이 오른쪽 끝에 그대로 선다),
      min-width 5em → 그보다 자리가 적으면(좁은 화면) 검색어가 버튼과 함께 다음 줄로 넘어간다.
-     고정 폭(실시간현황의 210px)으로 자르지 않은 이유: 「⏱ 늦게 들어온 기사」 칩이 붙는
+     고정 폭(실시간 현황의 210px)으로 자르지 않은 이유: 「⏱ 늦게 들어온 기사」 칩이 붙는
      행은 칩 폭(약 110px)만큼 자리가 모자라, 칩 없는 행 기준으로 정한 값으로는 여전히
      밀린다(KW_CHIP_MOCKUP.html 실측). 확정본·초안 공용 — 한 곳에서만 고친다. */
   .kw-inline {{
-    font-size: 0.8rem; color: {muted};
+    font-size: var(--fs-sm); color: {muted};
     display: inline-flex; align-items: center; gap: 4px;
     flex: 1 1 0; min-width: 5em; max-width: max-content;
   }}
@@ -4201,30 +4420,44 @@ document.addEventListener("mouseover", function (e) {
 # 소제목 칸에서 사진을 늘 빼두는 안(A)은 기각했다: 숨기기 전까진 보고서엔 원래 소제목으로
 # 나가는데 화면엔 거기 없어 화면과 보고서가 어긋난다.
 PHOTO_GATHER_STYLE = """
-  /* 켜진 동안 툴바 버튼을 채운 파랑으로 — 지금 화면이 평소 화면이 아니라는 표시. */
+  /* 툴바 오른쪽 「📷 사진 추정 (N)」 — 모양 규칙대로 알약이다(알약 = 상태를 알려 주고
+     누르면 켜고 끄기만). 화면만 바꾸는 보기라 「보고서 내용을 바꾸는」 왼쪽 네모 버튼과
+     섞이면 안 되고, 복사·텍스트·엑셀·「보기 순서」와 같은 오른쪽 묶음에 선다.
+     .actions button(0,1,1)보다 이 선택자(0,2,0)가 구체적이라 툴바 기본 채움을 덮는다.
+     시안 mockups/TOOLBAR_DEPTH_MOCKUP.html C안. */
+  .actions .photo-gather-btn {{
+    background: {card}; color: {text_soft}; border: 1px solid {border};
+    border-radius: var(--r-pill); font-weight: 500; padding: 0 12px;
+  }}
+  .actions .photo-gather-btn:hover {{
+    background: {hover}; color: {accent}; border-color: {accent_border};
+  }}
+  /* 켜진 동안 채운 파랑으로 — 지금 화면이 평소 화면이 아니라는 표시. 모아 보는 동안은
+     소제목·📌·요약이 모두 숨으므로, 되돌아갈 스위치가 어디 있는지가 약해지면 안 된다
+     (그래서 글자 버튼으로 내리지 않고 알약으로 뒀다). */
   .actions .photo-gather-btn.is-on, .actions .photo-gather-btn.is-on:hover {{
-    background: {accent}; color: {card}; border-color: {accent};
+    background: {accent}; color: {on_fill}; border-color: {accent};
   }}
   /* 모아 보는 중 띠 — 수십 건을 훑으며 체크를 풀어도 「전체 선택」·「원래 화면으로」가
      화면 위로 사라지지 않게 sticky. 자리는 키워드 메모 칸과 같다(그 칸은 이 동안 숨는다).
      상단 배너가 topbar를 밀어내면 같은 변수만큼 따라 내려간다(메모 칸과 같은 규칙). */
   .photo-gather-strip {{
     position: sticky; top: 60px; z-index: 15; display: flex; align-items: center; gap: 10px;
-    flex-wrap: wrap; background: {hover}; border: 1px solid {accent_border}; border-radius: 10px;
+    flex-wrap: wrap; background: {hover}; border: 1px solid {accent_border}; border-radius: var(--r-lg);
     padding: 9px 12px; margin: 12px 0 6px;
   }}
   body.has-finalize-banner .photo-gather-strip {{ top: calc(60px + var(--finalize-banner-h, 0px)); }}
   body.round-over .photo-gather-strip {{ top: calc(60px + var(--round-banner-h, 0px)); }}
-  .photo-gather-strip label {{ display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; cursor: pointer; }}
-  .photo-gather-strip .pg-msg {{ font-size: 0.88rem; color: {header}; }}
+  .photo-gather-strip label {{ display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); cursor: pointer; }}
+  .photo-gather-strip .pg-msg {{ font-size: var(--fs-md); color: {header}; }}
   .photo-gather-strip .pg-sp {{ flex: 1; }}
-  .photo-gather-strip button {{ padding: 5px 12px; font-size: 0.85rem; }}
-  .pg-done {{ text-align: center; color: {muted}; padding: 28px 0 16px; font-size: 0.9rem; }}
+  .photo-gather-strip button {{ padding: 5px 12px; font-size: var(--fs-md); }}
+  .pg-done {{ text-align: center; color: {muted}; padding: 28px 0 16px; font-size: var(--fs-md); }}
   /* 원래 소제목 이름표 — 보고서에 나갈 자리. 📂 미분류 칸에서 온 기사엔 안 붙인다. */
   .pg-from {{
     flex-shrink: 0; max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    font-size: 0.74rem; color: {text_soft}; background: {bg}; border: 1px solid {border};
-    border-radius: 6px; padding: 0 6px;
+    font-size: var(--fs-xs); color: {text_soft}; background: {bg}; border: 1px solid {border};
+    border-radius: var(--r-md); padding: 0 6px;
   }}
   /* 모아 보는 중엔 전부가 사진 추정이라 흐림·📷 칩이 행마다 같은 값(=장식)이 된다. */
   body.photo-gather .article.is-photo {{ opacity: 1; }}
@@ -4264,7 +4497,7 @@ function _pgRefresh() {
   var done = view.querySelector(".pg-done");
   if (!n && !done) {
     view.insertAdjacentHTML("beforeend",
-      '<div class="pg-done">다 치웠어요. 숨긴 기사는 왼쪽 아래 쓰레기통에서 되살릴 수 있어요.</div>');
+      '<div class="pg-done">다 치웠어요. 숨긴 기사는 왼쪽 아래 휴지통에서 되살릴 수 있어요.</div>');
   } else if (n && done) { done.remove(); }
 }
 function photoGatherOn() {
@@ -4376,20 +4609,66 @@ def photo_gather_script(key_js: str) -> str:
 
 
 def photo_gather_button_html(count: int) -> str:
-    """툴바의 「📷 사진 추정 모아 보기 (N)」 — 사진 추정이 0건이면(가장 흔한 정상 상태)
-    버튼 자체를 안 그린다(예전 「사진 추정 전체 선택」과 같은 규칙)."""
+    """툴바 오른쪽 묶음의 「📷 사진 추정 (N)」 알약 — 사진 추정이 0건이면(가장 흔한 정상
+    상태) 버튼 자체를 안 그린다(예전 「사진 추정 전체 선택」과 같은 규칙).
+
+    화면만 바꾸는 보기라 왼쪽(보고서 내용을 바꾸는 네모 버튼)이 아니라 오른쪽에 서고,
+    모양도 네모가 아니라 알약이다 — 확정본·초안이 같은 함수를 쓴다."""
     if not count:
         return ""
     return (
-        '<button class="create-group-btn photo-gather-btn" type="button" onclick="togglePhotoGather()" '
+        '<button class="photo-gather-btn" type="button" onclick="togglePhotoGather()" '
         'title="사진 추정 기사만 한곳에 모아 봅니다 — 보고서(복사·txt·발송)는 그대로예요">'
-        f"{icon('camera')} 사진 추정 모아 보기 ({count})</button>"
+        f"{icon('camera')} 사진 추정 ({count})</button>"
     )
 
 
 def hidden_trash_style() -> str:
-    """쓰레기통 CSS — 템플릿 안에 {{hidden_trash_style}}로 끼워 넣는다(이미 값이 채워진 문자열)."""
+    """휴지통 CSS — 템플릿 안에 {{hidden_trash_style}}로 끼워 넣는다(이미 값이 채워진 문자열)."""
     return HIDDEN_TRASH_STYLE.format(**PALETTE)
+
+
+# 맨 위로 ↑ — 확정본·초안이 같이 쓴다(동작을 바꾸면 두 화면이 같이 바뀐다).
+# 목차 ☰ 바로 왼쪽, 같은 48px 동그라미·같은 중립색. 한 화면 이상 내려갔을 때만 보인다.
+# 자리를 ☰ 위가 아니라 왼쪽으로 둔 건 확정본의 발송 버튼이 ☰ 위에 있어서다 — 두 화면에서 같은 자리.
+SCROLL_TOP_STYLE = """
+  .top-fab {{
+    position: fixed; right: 80px; bottom: 20px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
+    background: {card}; color: {muted}; border: 1px solid {border}; font-size: 1.2rem; cursor: pointer;
+    box-shadow: var(--sh-float); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }}
+  .top-fab:hover {{ background: {hover}; color: {accent}; border-color: {accent}; }}
+  .top-fab[hidden] {{ display: none; }}
+"""
+
+
+def scroll_top_style() -> str:
+    """맨 위로 버튼 CSS — 템플릿 안에 {{scroll_top_style}}로 끼워 넣는다."""
+    return SCROLL_TOP_STYLE.format(**PALETTE)
+
+
+def scroll_top_html() -> str:
+    """맨 위로 버튼 마크업 — 처음엔 숨긴 채로 두고 스크롤 JS가 켠다."""
+    return (
+        '<button type="button" class="top-fab" id="top-fab" hidden '
+        'onclick="window.scrollTo({top: 0, behavior: \'smooth\'})" title="맨 위로" aria-label="맨 위로">'
+        f'{icon("to_top")}</button>'
+    )
+
+
+def scroll_top_script() -> str:
+    """맨 위로 버튼 JS — 한 화면 이상 내려갔을 때만 보인다."""
+    return """
+(function() {
+  var btn = document.getElementById("top-fab");
+  if (!btn) return;
+  function sync() { btn.hidden = window.scrollY < window.innerHeight; }
+  window.addEventListener("scroll", sync, {passive: true});
+  window.addEventListener("resize", sync);
+  sync();
+})();
+"""
 
 # [추가: 2026-09-16] 🏷 라벨 팝오버 CSS/JS — 확정본·초안·**정기 보관함** 세 화면이 같이 쓴다.
 # 원래는 app/renderer.py와 app/preview_renderer.py에 같은 값이 복붙돼 있었는데, 실제로 이미
@@ -4402,57 +4681,57 @@ LABEL_POPOVER_STYLE = """
   .lab-pop-wrap {{ position: relative; display: inline-flex; flex-shrink: 0; }}
   .lab-btn {{
     background: transparent; border: none; color: {muted}; font-size: 1rem; line-height: 1;
-    cursor: pointer; padding: 3px 6px; border-radius: 4px; display: inline-flex; align-items: center;
+    cursor: pointer; padding: 3px 6px; border-radius: var(--r-sm); display: inline-flex; align-items: center;
     user-select: none; -webkit-user-select: none;
   }}
   .lab-btn:hover {{ background: {hover}; color: {accent}; }}
   .lab-btn.on {{ color: {label_text}; background: {label_bg}; }}
-  .lab-btn .lab-count {{ font-size: 0.62rem; font-weight: 700; margin-left: 2px; }}
+  .lab-btn .lab-count {{ font-size: var(--fs-xs); font-weight: 700; margin-left: 2px; }}
   .lab-pop {{
     position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 60; width: 260px;
-    text-align: left; background: {card}; border: 1px solid {border}; border-radius: 8px;
-    padding: 11px 12px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.13);
+    text-align: left; background: {card}; border: 1px solid {border}; border-radius: var(--r-lg);
+    padding: 11px 12px; box-shadow: var(--sh-pop);
   }}
   .lab-pop.hidden {{ display: none; }}
-  .lab-pop h4 {{ margin: 0 0 6px; font-size: 0.66rem; color: {muted}; font-weight: 700; }}
+  .lab-pop h4 {{ margin: 0 0 6px; font-size: var(--fs-xs); color: {muted}; font-weight: 700; }}
   .lab-pop .attached {{ display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; min-height: 20px; }}
-  .lab-pop .attached .none {{ font-size: 0.66rem; color: {muted}; }}
+  .lab-pop .attached .none {{ font-size: var(--fs-xs); color: {muted}; }}
   .lab-pop .known {{ display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }}
-  .lab-pop .known .none {{ font-size: 0.66rem; color: {muted}; }}
+  .lab-pop .known .none {{ font-size: var(--fs-xs); color: {muted}; }}
   .lab-chip {{
-    display: inline-flex; align-items: center; gap: 4px; font-size: 0.64rem; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-xs); font-weight: 700;
     color: {label_text}; background: {label_bg}; border: 1px solid {label_border};
-    border-radius: 20px; padding: 2px 8px; white-space: nowrap;
+    border-radius: var(--r-pill); padding: 2px 8px; white-space: nowrap;
   }}
   .lab-chip .x {{ color: {label_text}; opacity: 0.55; cursor: pointer; font-weight: 700; }}
   .lab-chip .x:hover {{ opacity: 1; }}
   .known-chip {{
-    font-size: 0.64rem; font-weight: 600; color: {muted}; cursor: pointer;
-    background: {card}; border: 1px solid {border}; border-radius: 20px; padding: 2px 8px;
+    font-size: var(--fs-xs); font-weight: 600; color: {muted}; cursor: pointer;
+    background: {card}; border: 1px solid {border}; border-radius: var(--r-pill); padding: 2px 8px;
   }}
   .known-chip:hover {{ background: {label_bg}; color: {label_text}; border-color: {label_border}; }}
   .known-chip.used {{ background: {label_bg}; color: {label_text}; border-color: {label_border}; font-weight: 700; }}
   .known-chip .n {{ opacity: 0.6; font-weight: 500; margin-left: 3px; }}
   .lab-pop .addbox {{ display: flex; gap: 5px; }}
   .lab-pop .addbox input {{
-    flex: 1; font-size: 0.72rem; padding: 5px 7px; border: 1px solid {border}; border-radius: 5px;
+    flex: 1; font-size: var(--fs-xs); padding: 5px 7px; border: 1px solid {border}; border-radius: var(--r-sm);
   }}
   .lab-pop .addbox button {{
-    font-size: 0.7rem; font-weight: 700; padding: 5px 10px; border-radius: 5px; cursor: pointer;
+    font-size: var(--fs-xs); font-weight: 700; padding: 5px 10px; border-radius: var(--r-sm); cursor: pointer;
     background: {label_bg}; color: {label_text}; border: 1px solid {label_border};
   }}
   .lab-pop .sim-warn {{
-    margin-top: 8px; font-size: 0.64rem; line-height: 1.7; color: {label_text}; background: {label_bg};
-    border: 1px dashed {label_border}; border-radius: 6px; padding: 6px 8px;
+    margin-top: 8px; font-size: var(--fs-xs); line-height: 1.7; color: {label_text}; background: {label_bg};
+    border: 1px dashed {label_border}; border-radius: var(--r-md); padding: 6px 8px;
   }}
   .lab-pop .sim-warn.hidden {{ display: none; }}
   .lab-pop .sim-warn button {{
-    font-size: 0.62rem; font-weight: 700; padding: 3px 8px; border-radius: 20px; cursor: pointer;
+    font-size: var(--fs-xs); font-weight: 700; padding: 3px 8px; border-radius: var(--r-sm); cursor: pointer;
     margin-left: 3px; border: none;
   }}
   .lab-pop .sim-warn .use {{ background: {label_text}; color: {on_fill}; }}
   .lab-pop .sim-warn .keep {{ background: {card}; color: {muted}; border: 1px solid {border}; }}
-  .lab-pop .hint {{ font-size: 0.62rem; color: {muted}; margin: 8px 0 0; line-height: 1.7; }}
+  .lab-pop .hint {{ font-size: var(--fs-xs); color: {muted}; margin: 8px 0 0; line-height: 1.7; }}
   .lab-row {{
     display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 6px;
     padding-top: 6px; border-top: 1px dashed {border};
@@ -4632,8 +4911,7 @@ def label_popover_script(host: str, port: int) -> str:
     return LABEL_POPOVER_SCRIPT.format(settings_host=host, settings_port=port)
 
 
-
-# [추가: 2026-09-15] 「AI 기사 나누기」 — 확정본·초안 하단바가 같이 쓴다(쓰레기통과 같은 이유 —
+# [추가: 2026-09-15] 「AI 기사 나누기」 — 확정본·초안 하단바가 같이 쓴다(휴지통과 같은 이유 —
 # 두 화면이 같은 자리에 같은 것을 보여줘야 하는데 코드가 갈리면 한쪽만 고쳐져 어긋난다).
 # 세로선 왼쪽은 담당자가 직접 하는 일(옮기기·↑↓·🗑), 오른쪽은 AI에게 맡기는 일. 색은 「AI 기사
 # 배정」·「AI 모든 기사 재분류」와 같은 채운 연보라(AI가 하는 일 셋이 한 계열로 읽히게). 잠길
@@ -4642,7 +4920,7 @@ def label_popover_script(host: str, port: int) -> str:
 SPLIT_BUTTON_STYLE = """
   .bulk-move-bar .bulk-split-divider {{ width: 1px; height: 24px; background: {border}; margin: 0 2px; }}
   .bulk-move-bar .split-btn {{
-    display: inline-flex; align-items: center; gap: 5px; font-weight: 600; border-radius: 6px;
+    display: inline-flex; align-items: center; gap: 5px; font-weight: 600; border-radius: var(--r-md);
     background: {ai_bg}; color: {ai_text}; border: 1px solid {ai_border};
   }}
   .bulk-move-bar .split-btn:hover {{ background: {ai_bg_hover}; border-color: {ai_border_hover}; }}
@@ -4654,6 +4932,22 @@ SPLIT_BUTTON_STYLE = """
      두 줄로 넘어갔다. 닫혀 있을 땐 늘 「이동할 소제목」만 보이고, 펼친 목록은 이 폭과 무관하게
      이름 전체를 보여준다. */
   #bulk-move-select {{ max-width: 150px; }}
+"""
+
+
+def screen_tag_style() -> str:
+    """제목 맨 앞의 화면 이름 칩 — 초안 (초안) 회색 · 확정본 (확정본) 파랑. 두 화면이 같은
+    머리줄 「언론 모니터링 N시 기준」을 쓰고 어느 화면인지는 이 칩이 말한다(NAME_CHIP_MOCKUP.html).
+    화면 전용이라 복사·txt·발송 텍스트엔 없다. 수시(app/adhoc/renderer.py)도 같은 모양·자리다."""
+    return f"""
+  .screen-tag {{ display: inline-flex; align-items: center; font-size: var(--fs-sm); font-weight: 700;
+    padding: 3px 11px; border-radius: var(--r-pill); border: 1px solid; margin-right: 10px;
+    vertical-align: 0.18em; line-height: 1.3; }}
+  .screen-tag.work {{ background: {COLOR_SCREEN_TAG_WORK_BG}; border-color: {COLOR_SCREEN_TAG_WORK_BORDER};
+    color: {COLOR_SCREEN_TAG_WORK_TEXT}; }}
+  .screen-tag.final {{ background: {COLOR_SCREEN_TAG_REG_BG}; border-color: {COLOR_SCREEN_TAG_REG_BORDER};
+    color: {COLOR_SCREEN_TAG_REG_TEXT}; }}
+  .head-sub {{ font-size: 0.72em; font-weight: 500; color: {COLOR_SCREEN_TAG_WORK_TEXT}; margin-left: 6px; }}
 """
 
 
@@ -4809,7 +5103,7 @@ def _hhmm_of(value) -> str:
 
 
 def hidden_trash_html(hidden_href: str) -> str:
-    """좌하단 쓰레기통 버튼 + 팝오버. 숨긴 기사가 하나도 없으면 빈 문자열(아무것도 안 그린다).
+    """좌하단 휴지통 버튼 + 팝오버. 숨긴 기사가 하나도 없으면 빈 문자열(아무것도 안 그린다).
 
     [수정: 2026-09-04] **오늘치만 본다(days=1).** /hidden 화면은 7일치를 열람용으로
     보여주지만(app.config.HIDDEN_VIEW_DAYS), 이 배지 숫자가 뜻하는 건 "지금 이 화면에서
@@ -4822,17 +5116,17 @@ def hidden_trash_html(hidden_href: str) -> str:
         return ""
     rows = "".join(_trash_batch_row_html(batch) for batch in batches[:_TRASH_POPOVER_MAX_ROWS])
     # 더보기는 **항상** 그린다 — 하단바의 🗑️ 링크를 뺐으므로(같은 목적지가 둘이면 옆문이
-    # 된다) 이 링크가 쓰레기통 화면으로 가는 유일한 길이다. 다만 문구는 무엇이 기다리는지에
+    # 된다) 이 링크가 휴지통 화면으로 가는 유일한 길이다. 다만 문구는 무엇이 기다리는지에
     # 따라 갈린다: 묶음이 있으면 "펼쳐서 고를 수 있다"가 그 화면의 값어치라 그렇게 적는다.
     has_batch = any(len(batch["records"]) > 1 for batch in batches)
-    more_text = "쓰레기통 열어서 하나씩 고르기 →" if has_batch else "쓰레기통 열기 →"
+    more_text = "휴지통 열어서 하나씩 고르기 →" if has_batch else "휴지통 열기 →"
     return (
         f'<button type="button" class="trash-fab" onclick="toggleTrashPopover()" '
         f'title="숨긴 기사 {total}건">{icon("trash")}<span class="badge">{total}</span></button>'
         '<div class="trash-pop" id="trash-pop">'
         f'<h5>{icon("trash")} 숨긴 기사 {total}건</h5>'
         # [수정: 2026-09-16] 자정 해제가 없어졌다 — 숨김은 HIDDEN_VIEW_DAYS(7일)까지
-        # 유지되고, 그동안은 여기서도 쓰레기통에서도 되살릴 수 있다.
+        # 유지되고, 그동안은 여기서도 휴지통에서도 되살릴 수 있다.
         f'<p class="tnote">오늘 숨긴 기사예요. 숨김은 {HIDDEN_VIEW_DAYS}일 동안 유지되고, '
         f'그동안은 언제든 되살릴 수 있어요.</p>'
         f"{rows}"
@@ -4842,7 +5136,7 @@ def hidden_trash_html(hidden_href: str) -> str:
 
 
 def hidden_trash_script(settings_host: str, settings_port: int) -> str:
-    """쓰레기통 팝오버 JS — 템플릿 안에 {{hidden_trash_script}}로 끼워 넣는다.
+    """휴지통 팝오버 JS — 템플릿 안에 {{hidden_trash_script}}로 끼워 넣는다.
 
     복구하면 팝오버만 고쳐 그리지 않고 화면 전체를 다시 불러온다 — 숨김 해제는 기사 목록과
     소제목 구성이 같이 바뀌는 동작이라, 목록을 그대로 둔 채 배지만 줄이면 화면이 거짓말을
@@ -4880,6 +5174,334 @@ function unhideFromTrash(btn) {{
   }});
 }}
 """
+
+
+def pinned_jump_badge_html(count: int) -> str:
+    """제목 옆 「📌 N」 — 📌 칸은 늘 맨 아래라, 미분류 뱃지처럼 눌러서 그 칸으로 내려간다.
+    0건이면 안 그린다(늘 떠 있으면 안 읽게 된다). 글자 대신 칸 제목과 같은 핀 아이콘 + 숫자,
+    뜻은 툴팁. 칸 자체는 0건이어도 그려서 「+ 수기로 기사 추가」 입구는 남는다."""
+    if not count:
+        return ""
+    return (
+        '<button type="button" class="pinned-jump-badge" onclick="scrollToPinned()" '
+        f'title="담아둔 기사 {count}건 — 눌러서 그 칸으로 이동합니다" '
+        f'aria-label="담아둔 기사 {count}건">{icon("pin")}{count}</button>'
+    )
+
+
+# 「+ 수기로 기사 추가」 — 네이버에서 직접 찾은 기사를 주소만으로 📌 담아둔 기사에 올린다.
+# 입구가 툴바가 아니라 이 칸 머리에 있는 이유: 기사가 떨어지는 곳이 여기라서(툴바에 두면
+# 입력은 맨 위, 결과는 맨 아래였다), 그리고 툴바 왼쪽은 「초안을 바꾸는 버튼」 자리인데
+# 담아둔 기사는 보고서 밖이다. 확인 단계 없이 곧바로 담긴다(submitUrlAdd). 확정본·초안 공용 —
+# CSS·JS도 url_add_style()/url_add_script() 한 곳이라, 동작을 바꾸면 두 화면이 같이 바뀐다.
+URL_ADD_BUTTON_HTML = (
+    '<button class="create-group-btn url-add-open-btn" type="button" id="url-add-open-btn" '
+    'onclick="openUrlAdd()" title="네이버에서 직접 찾은 기사를 주소만으로 담아둡니다">'
+    "+ 수기로 기사 추가</button>"
+)
+URL_ADD_PANEL_HTML = (
+    '<div class="url-add-zone" id="url-add-zone">'
+    '<div class="url-add-row">'
+    '<input type="text" id="url-add-input" placeholder="네이버 기사 주소를 붙여넣으세요" '
+    'onkeydown="urlAddKey(event)" oninput="clearUrlAddWarn()">'
+    '<button type="button" id="url-add-btn" onclick="submitUrlAdd()">추가</button>'
+    '<button class="url-add-close" type="button" onclick="closeUrlAdd()" title="닫기" '
+    f'aria-label="닫기">{icon("x")}</button>'
+    "</div>"
+    '<div class="url-add-hint">붙여넣고 추가(또는 Enter)하면 바로 담아둔 기사에 들어가요.</div>'
+    '<div class="url-add-warn" id="url-add-warn" role="alert"></div>'
+    "</div>"
+)
+
+
+URL_ADD_STYLE = """
+  /* 「+ 수기로 기사 추가」 — 입구와 입력칸이 📌 담아둔 기사 칸 안에 있다(넣는 곳 = 보이는
+     곳). 칸이 이미 색(띠 + 옅은 바탕)을 가져서 입력칸까지 같은 계열이면 한 덩어리로 묻힌다 —
+     흰 바탕 + 회색 테두리 + 옅은 그림자로 "칸 위에 얹힌 입력칸"으로 가른다(새 색 없음).
+     시안 mockups/MANUAL_ADD_PLACEMENT_MOCKUP.html 「색 비교」 가안. */
+  .manual-zone-empty {{ font-size: var(--fs-sm); color: {muted}; }}
+  /* 툴바의 「+ 새 소제목」과 같은 테두리 버튼 — 전역 button 규칙(채운 파랑)을 덮는다.
+     칸 바탕이 옅은 캐러멜이라 바탕만 흰색, 글자·테두리는 칸 색. */
+  .manual-zone .url-add-open-btn {{
+    font-size: var(--fs-sm); padding: 3px 9px; background: {card}; color: {pinned_text};
+    border: 1px solid {pinned_border}; border-radius: var(--r-md); font-weight: 400; cursor: pointer;
+  }}
+  .manual-zone .url-add-open-btn:hover {{ background: {pinned_chip_bg}; }}
+  .url-add-zone {{
+    display: none; border: 1px solid {float_input_border}; border-radius: var(--r-lg);
+    padding: 10px 14px; margin: 10px 0 2px; background: {card};
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.10);
+  }}
+  .url-add-zone.is-open {{ display: block; }}
+  /* 한 번에 한 건만 받는다 — 여러 줄을 받으면 결과가 목록이 되고, 어느 줄이 왜
+     실패했는지 대조해야 한다. 순서 [주소칸][추가][×] — 누를 것이 입력 바로 옆, 닫기는 끝. */
+  .url-add-row {{ display: flex; align-items: center; gap: 8px; }}
+  .url-add-row input {{
+    flex: 1; min-width: 0; padding: 6px 10px; border: 1px solid {border}; border-radius: var(--r-md);
+    font-size: var(--fs-md); color: {text}; background: {card};
+  }}
+  .url-add-row input:disabled {{ background: {bg}; color: {muted}; }}
+  .url-add-hint {{ color: {muted}; font-size: var(--fs-sm); margin-top: 7px; }}
+  .url-add-zone button {{ font-size: var(--fs-sm); padding: 5px 10px; white-space: nowrap; }}
+  .url-add-zone .url-add-close {{
+    background: none; border: none; color: {muted}; padding: 4px 6px; font-size: 1rem;
+    line-height: 1; cursor: pointer;
+  }}
+  .url-add-zone .url-add-close:hover {{ color: {text}; }}
+  /* 거부 사유는 지우지 않고 남긴다 — 실패가 조용히 사라지면 안 된다(CODING_CONVENTIONS §3).
+     주의 세트(앰버) 재사용. 입력한 주소도 남겨 어디가 틀렸는지 보고 고치게 한다. */
+  .url-add-warn {{
+    display: none; margin-top: 8px; padding: 8px 11px; border-radius: var(--r-md); font-size: var(--fs-sm);
+    line-height: 1.55; background: {warn_bg}; border: 1px solid {warn_border}; color: {warn_text};
+  }}
+  .url-add-warn.is-on {{ display: block; }}
+  .url-add-warn b {{ display: block; }}
+  .url-add-warn span {{ color: {warn_sub}; }}
+  /* 제목 옆 「📌 N」 — 칸이 늘 맨 아래라 미분류 뱃지처럼 눌러서 내려간다. 칸과 같은 캐러멜.
+     모양(아이콘 + 숫자, 화살표 없음)은 초안의 미분류 뱃지(.pending-count-badge)와 같다. */
+  .pinned-jump-badge {{
+    margin-left: 6px; font-size: var(--fs-sm); font-weight: 700; vertical-align: middle;
+    display: inline-flex; align-items: center; gap: 4px;
+    color: {pinned_text}; background: {pinned_chip_bg}; border: 1px solid {pinned_border};
+    border-radius: var(--r-pill); padding: 2px 9px; cursor: pointer; font-family: inherit;
+  }}
+  .pinned-jump-badge:hover {{ background: {card}; }}
+  .pinned-jump-badge .ic {{ width: 1.05em; height: 1.05em; }}
+"""
+
+URL_ADD_SCRIPT = """
+// [추가: 2026-09-21] 「+ 수기로 기사 추가」 — 담당자가 네이버에서 직접 찾아온 기사를 URL만으로
+// 📌 담아둔 기사 칸에 올린다. 서버가 원문 페이지에서 언론사·제목·요약·발행시각을 읽는다
+// (app.naver_api.fetch_article_by_url). 검색 API는 안 부른다. 입구·입력칸 모두 📌 칸 안.
+// 확인 단계가 없다 — 성공하면 곧바로 새로고침해 담긴 기사 행 자체를 결과로 보여주고(세이지),
+// 입력칸은 비운 채 열어 둬 이어 붙일 수 있게 한다. 거부는 새로고침 없이 경고로 남긴다.
+var URL_ADD_JUST_ADDED_KEY = "urlAddJustAdded";
+function openUrlAdd() {{
+  document.getElementById("url-add-zone").classList.add("is-open");
+  var btn = document.getElementById("url-add-open-btn");
+  if (btn) btn.style.display = "none";
+  document.getElementById("url-add-input").focus();
+}}
+function closeUrlAdd() {{
+  document.getElementById("url-add-zone").classList.remove("is-open");
+  document.getElementById("url-add-input").value = "";
+  clearUrlAddWarn();
+  var btn = document.getElementById("url-add-open-btn");
+  if (btn) btn.style.display = "";
+}}
+function clearUrlAddWarn() {{
+  var warn = document.getElementById("url-add-warn");
+  if (warn) {{ warn.classList.remove("is-on"); warn.innerHTML = ""; }}
+}}
+function showUrlAddWarn(reason, detail) {{
+  var warn = document.getElementById("url-add-warn");
+  warn.innerHTML = "<b>" + escapeUrlAddHtml(reason) + "</b>"
+    + (detail ? "<span>" + escapeUrlAddHtml(detail) + "</span>" : "");
+  warn.classList.add("is-on");
+}}
+function urlAddKey(event) {{
+  if (event.key === "Enter") {{ event.preventDefault(); submitUrlAdd(); }}
+}}
+function submitUrlAdd() {{
+  var input = document.getElementById("url-add-input");
+  var btn = document.getElementById("url-add-btn");
+  var url = input.value.trim();
+  if (!url) {{ input.focus(); return; }}
+  // 응답까지 몇 초 걸린다(원문 페이지를 받아온다) — 두 번 눌러 중복으로 담기지 않도록
+  // 잠그고, 실패하면 반드시 푼다(성공하면 새로고침된다).
+  btn.disabled = true;
+  input.disabled = true;
+  btn.textContent = "불러오는 중…";
+  clearUrlAddWarn();
+  var unlock = function() {{
+    btn.disabled = false;
+    input.disabled = false;
+    btn.textContent = "추가";
+    input.focus();
+  }};
+  fetch("http://{settings_host}:{settings_port}/add-article-by-url", {{
+    method: "POST",
+    headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
+    body: new URLSearchParams({{url: url, screen: "{screen}"}})
+  }}).then(function(res) {{
+    // 거부도 400이 아니라 본문의 reason으로 알린다 — 사유를 그대로 보여주기 위해서다.
+    return res.json();
+  }}).then(function(data) {{
+    data = data || {{}};
+    if (!data.ok) {{
+      showUrlAddWarn(data.reason || "해당 URL로 기사를 불러올 수 없습니다.", data.detail || "");
+      unlock();
+      return;
+    }}
+    try {{
+      sessionStorage.setItem(URL_ADD_JUST_ADDED_KEY, JSON.stringify({{url: data.url || url, at: Date.now()}}));
+    }} catch (e) {{}}
+    location.reload();
+  }}).catch(function() {{
+    showUrlAddWarn("추가하지 못했습니다.", "앱이 실행 중인지 확인해 주세요.");
+    unlock();
+  }});
+}}
+// 새로고침 뒤: 입력칸을 다시 열고, 방금 담긴 행을 세이지(담당자가 방금 손댄 것)로 칠해
+// 보이게 한다. 10초 지난 기록은 버린다(다른 동작의 새로고침에 따라붙지 않게).
+// load에서 도는 이유: 아래 "새로 들어온 기사" 기준선 코드가 이 행에 노랑을 먼저 붙이므로
+// 그 뒤에 떼야 하고, 브라우저의 스크롤 복원보다도 뒤여야 scrollIntoView가 남는다.
+window.addEventListener("load", function restoreUrlAdd() {{
+  var raw = null;
+  try {{
+    raw = sessionStorage.getItem(URL_ADD_JUST_ADDED_KEY);
+    sessionStorage.removeItem(URL_ADD_JUST_ADDED_KEY);
+  }} catch (e) {{ return; }}
+  if (!raw) return;
+  var rec;
+  try {{ rec = JSON.parse(raw); }} catch (e) {{ return; }}
+  if (!rec || !rec.url || Date.now() - (rec.at || 0) > 10000) return;
+  if (!document.getElementById("url-add-zone")) return;
+  openUrlAdd();
+  var rows = document.querySelectorAll(".manual-zone .article");
+  for (var i = 0; i < rows.length; i++) {{
+    if (rows[i].getAttribute("data-url") === rec.url) {{
+      rows[i].classList.remove("is-new-arrival");
+      rows[i].classList.add("just-promoted");
+      rows[i].scrollIntoView({{block: "nearest"}});
+      break;
+    }}
+  }}
+}});
+function scrollToPinned() {{
+  var el = document.querySelector(".manual-zone");
+  if (el) {{ el.scrollIntoView({{behavior: "smooth", block: "start"}}); }}
+}}
+function escapeUrlAddHtml(s) {{
+  return String(s == null ? "" : s).replace(/[&<>"]/g, function(c) {{
+    return {{"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}}[c];
+  }});
+}}
+"""
+
+
+def url_add_style() -> str:
+    """「+ 수기로 기사 추가」 입력칸·제목 옆 「📌 담아둔 기사 N건 ↓」 CSS — 확정본·초안 공용."""
+    return URL_ADD_STYLE.format(**PALETTE)
+
+
+def url_add_script(settings_host: str, settings_port: int, screen: str) -> str:
+    """「+ 수기로 기사 추가」 JS — 확정본·초안 공용(중괄호 홑겹 완성 문자열).
+
+    screen("confirmed" | "preview")을 서버에 같이 보낸다 — "이미 이 회차에 있다"를 무엇과
+    대조할지가 화면마다 다르다(확정본은 저장된 회차, 초안은 아직 저장 전인 지금 초안)."""
+    return URL_ADD_SCRIPT.format(settings_host=settings_host, settings_port=settings_port, screen=screen)
+
+
+# Shift+클릭 범위 선택 — 확정본·초안·수시 원본/확정본·휴지통의 기사 체크박스 공용.
+# 기사 하나를 체크하고 Shift를 누른 채 다른 기사를 누르면 그 사이가 같은 상태(체크/해제)가
+# 된다. 안 보이는 행(사진 모아 보기·필터·접힌 묶음)은 건너뛴다 — 안 보이는 기사가 선택에
+# 섞이면 확인창 없는 🗑 일괄 숨김에 딸려 간다. skip_row에 걸리는 행도 건너뛴다(수시 원본의
+# 숨김·보냄 행 — 체크해서 보내면 숨김 표시가 풀리므로 범위로 쓸려 들어가면 안 된다).
+# 양 끝(직접 누른 기사)은 건너뛰지 않고 누른 쪽 상태를 따른다. 안내는 체크박스 툴팁뿐이다(선택 바엔 안 적는다). 시안 mockups/SHIFT_RANGE_SELECT_MOCKUP.html A안.
+RANGE_SELECT_SCRIPT = """
+(function () {
+  var BOX = %(box)s, SKIP = %(skip)s, ROW = %(row)s;
+  var anchor = null;
+  function visible(el) { return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length); }
+  function skipped(cb) { if (!SKIP) { return false; } var row = cb.closest(ROW); return !!(row && row.matches(SKIP)); }
+  // capture 단계 — 체크박스 자신의 onclick(stopPropagation)보다 먼저 돈다. 이 시점엔
+  // 누른 체크박스의 checked가 이미 바뀌어 있다.
+  document.addEventListener("click", function (e) {
+    var cb = e.target;
+    if (!cb.matches || !cb.matches(BOX)) { return; }
+    if (e.shiftKey && anchor && anchor !== cb && document.contains(anchor) && visible(anchor)) {
+      var all = Array.prototype.filter.call(document.querySelectorAll(BOX), visible);
+      var i = all.indexOf(anchor), j = all.indexOf(cb);
+      if (i >= 0 && j >= 0) {
+        var lo = Math.min(i, j), hi = Math.max(i, j);
+        for (var k = lo; k <= hi; k++) {
+          var box = all[k];
+          if (box === cb || (box !== anchor && skipped(box)) || box.checked === cb.checked) { continue; }
+          box.checked = cb.checked;
+          %(each)s
+        }
+        // Shift+클릭이 사이 글자를 파랗게 선택해 버리는 것을 지운다.
+        try { window.getSelection().removeAllRanges(); } catch (err) {}
+      }
+    }
+    anchor = cb;
+  }, true);
+  function addTips() {
+    document.querySelectorAll(BOX).forEach(function (cb) {
+      if (!cb.title) { cb.title = "선택 · Shift+클릭하면 사이 기사까지 한꺼번에"; }
+    });
+  }
+  if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", addTips); }
+  else { addTips(); }
+})();
+"""
+
+
+def range_select_script(box: str, row: str, skip_row: str = "", each_js: str = "") -> str:
+    """Shift+클릭 범위 선택 JS — 중괄호 홑겹 완성 문자열.
+
+    box: 체크박스 선택자, row: 그 체크박스의 행 선택자, skip_row: 범위에서 건너뛸 행 선택자,
+    each_js: 상태를 바꾼 체크박스(`box`) 하나마다 실행할 JS 문장 — 선택 바 갱신 같은 화면별
+    후처리는 끝에 누른 체크박스 자신의 onchange가 한 번 해 준다."""
+    return RANGE_SELECT_SCRIPT % {
+        "box": json.dumps(box),
+        "row": json.dumps(row),
+        "skip": json.dumps(skip_row),
+        "each": each_js,
+    }
+
+
+# 여러 기사 한 번에 숨기기 — 확정본·초안의 소제목 🗑(hideGroup)와 선택 바 🗑(bulkHideSelected)
+# 공용. 기사 수만큼 요청을 나눠 보내지 않고 한 요청에 모아 보낸다(서버 _handle_hide_article이
+# 한 번에 받아 되돌리기 기록·화면 재생성을 한 번씩만 한다). 누르는 순간 그 기사들을 흐리게 하고
+# 「숨기는 중…」을 띄운다 — 새로고침까지 걸리는 동안 눌렸는지 모르고 한 번 더 누르지 않게.
+# keepalive를 안 쓴다: 그 본문 상한(64KB)을 기사 100건이면 넘는다. 결과를 기다려 새로고침하므로 필요도 없다.
+HIDE_BATCH_STYLE = """
+  .is-hiding {{ opacity: 0.4; pointer-events: none; transition: opacity 0.15s; }}
+  .hiding-note {{ font-size: var(--fs-sm); font-weight: 600; color: {accent}; white-space: nowrap; }}
+"""
+
+HIDE_BATCH_SCRIPT = """
+function postHideBatch(btns, batch) {
+  var body = new URLSearchParams();
+  btns.forEach(function (btn) {
+    var one = hideArticleBody(btn);
+    ["url", "outlet", "title", "pubDate", "group"].forEach(function (key) { body.append(key, one.get(key) || ""); });
+  });
+  if (batch) { body.set("batch", batch); }
+  return fetch("http://%(host)s:%(port)s/hide-article", {
+    method: "POST",
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: body
+  });
+}
+// 숨기는 동안 표시 — dimEls는 흐리게 할 요소들, noteAfter 바로 앞에 「숨기는 중…」을 끼운다.
+// 돌려주는 함수를 부르면 원래대로 되돌린다(실패했을 때).
+function showHiding(dimEls, noteAfter, n) {
+  dimEls.forEach(function (el) { el.classList.add("is-hiding"); });
+  var note = document.createElement("span");
+  note.className = "hiding-note";
+  note.setAttribute("role", "status");
+  note.textContent = n + "건 숨기는 중…";
+  if (noteAfter) { noteAfter.disabled = true; noteAfter.insertAdjacentElement("beforebegin", note); }
+  return function () {
+    dimEls.forEach(function (el) { el.classList.remove("is-hiding"); });
+    if (noteAfter) { noteAfter.disabled = false; }
+    note.remove();
+  };
+}
+"""
+
+
+def hide_batch_style() -> str:
+    """여러 기사 숨기기 진행 표시 CSS — 값이 채워진 문자열."""
+    return HIDE_BATCH_STYLE.format(**PALETTE)
+
+
+def hide_batch_script() -> str:
+    """여러 기사 한 번에 숨기기 JS — 중괄호 홑겹 완성 문자열."""
+    return HIDE_BATCH_SCRIPT % {"host": SETTINGS_SERVER_HOST, "port": SETTINGS_SERVER_PORT}
 
 
 def generate_waiting_page() -> Path:

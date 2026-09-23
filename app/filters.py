@@ -39,10 +39,10 @@ _OUTLET_PHOTO_TAG_RE = re.compile(
 # [추가: 2026-07-24] "[속보]"는 아무리 단신이어도 예외로 항상 남긴다 (규칙12)
 BREAKING_NEWS_MARK = "[속보]"
 # [추가: 2026-07-26] 인사 발령 기사(짧은 이름·직함 나열이라 소제목 분류·요약에 잘 안 맞음)
-# 제외 마크 — exclude_photo_articles와 같은 패턴(app.config.DEFAULT_EXCLUDE_PERSONNEL_IN_SCRAP).
+# 제외 마크 — exclude_photo_articles와 같은 패턴(수시 새 수집의 「인사 기사 제외」 옵션이 쓴다).
 PERSONNEL_NOTICE_MARK = "[인사]"
 
-# [추가: 2026-08-20] 제목 맨 앞 [단독]/[속보] 말머리 판정 — app.live_renderer(실시간현황
+# [추가: 2026-08-20] 제목 맨 앞 [단독]/[속보] 말머리 판정 — app.live_renderer(실시간 현황
 # 글자색), app.renderer/app.preview_renderer(확정본·초안 글자색+카드 강조+[단독] 소제목
 # 내 최상단 정렬)가 공유한다. 부분일치는 배제하고 맨 앞만 인정한다(괄호 변형
 # []()<>《》【】〔〕 허용) — 저장된 고유 제목 1,339건 전수조사에서 괄호형 말머리는 전부
@@ -57,7 +57,7 @@ def headline_kind(title: str) -> Optional[str]:
     return match.group(1) if match else None
 
 
-# [추가: 2026-09-16] 사설 말머리 판정 — 실시간현황 특수조건 줄의 `[사설]` 체크박스
+# [추가: 2026-09-16] 사설 말머리 판정 — 실시간 현황 특수조건 줄의 `[사설]` 체크박스
 # **하나만** 쓴다. HEADLINE_TAG_RE에 "사설"을 끼워 넣지 않고 정규식을 따로 둔 이유:
 # 그 상수는 텔레그램 [단독]·[속보] 알림(app.breaking_alert_sender)·제목 글자색·
 # [단독] 소제목 내 최상단 정렬(sort_scoop_first)·사진 추정 예외까지 함께 물고 있어서,
@@ -94,8 +94,15 @@ def photo_tag_text(title: str) -> Optional[str]:
     return match.group(0).strip() if match else None
 
 
-def photo_badge_tip(title: str) -> str:
-    """📷 사진 추정 배지의 툴팁 문구 — 확정본·초안·실시간현황·수시가 함께 쓴다.
+def _body_verdict(url: str) -> Optional[bool]:
+    """원문 판정 결과(없으면 None). app.photo_body는 naver_api 쪽을 거쳐 이 모듈을 부르지
+    않지만, 순수 도구인 이 모듈이 import 시점에 네트워크 모듈을 끌어오지 않도록 늦게 읽는다."""
+    from app import photo_body
+    return photo_body.verdict(url)
+
+
+def photo_badge_tip(title: str, url: str = "") -> str:
+    """📷 사진 추정 배지의 툴팁 문구 — 확정본·초안·실시간 현황·수시가 함께 쓴다.
 
     [추가: 2026-09-15] 배지 글자는 표식·추정 모두 「📷 사진 추정」 하나이고 정확성은 여기서만
     갈린다(CLAUDE.md 사진기사 항목). 표식이면 **실제로 붙은 말머리**를 그대로 적는다 —
@@ -106,6 +113,8 @@ def photo_badge_tip(title: str) -> str:
     tag = photo_tag_text(title)
     if tag:
         return f"제목에 {tag} 표식이 붙은 사진기사입니다"
+    if url and _body_verdict(url):
+        return "원문이 사진과 설명 한 문장뿐인 사진기사입니다"
     return "제목에 [포토] 표식은 없지만 사진기사로 추정됩니다"
 
 
@@ -420,6 +429,11 @@ def looks_like_photo_caption(article: dict) -> bool:
         return False
     if has_photo_tag(title):
         return True
+    # 원문 층(app.photo_body) — 원문을 받아 판정했으면 그 결과가 아래 추정을 이긴다.
+    # 추정은 원문을 못 본 기사(자체 도메인·아직 판정 전·못 받음)에만 쓴다.
+    body = _body_verdict(article.get("url", ""))
+    if body is not None:
+        return body
     summary = (article.get("summary") or "").strip()
     if _summary_signal_at_tail(summary):
         return True
@@ -464,7 +478,7 @@ def deduplicate_by_title(articles: list[dict], prefer: Optional[dict] = None) ->
     (제목이 다르면, 같은 사건을 다룬 기사여도 그대로 모두 남긴다 — PRD.md 기능1 규칙 4)
 
     주의: "먼저 나온 것"이 남으므로, 언론사 우선순위 정렬(PLAN #5) 이후에
-    호출해야 동일 제목 중 우선순위 높은 언론사의 기사가 남는다. DESIGN.md
+    호출해야 동일 제목 중 우선순위 높은 언론사의 기사가 남는다. archive/DESIGN.md
     데이터 흐름도 참고.
 
     prefer: [추가: 2026-09-11] {url: 처음 초안에 보인 순번} — 같은 제목 묶음 안에 여기

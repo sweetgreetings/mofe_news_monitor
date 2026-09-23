@@ -12,8 +12,6 @@ from app.config import (
     DEFAULT_AUTO_SEND_ENABLED,
     DEFAULT_AUTO_SEND_GRACE_MIN,
     DEFAULT_HIGHLIGHT_KEYWORDS,
-    DEFAULT_EXCLUDE_PERSONNEL_IN_SCRAP,
-    DEFAULT_EXCLUDE_PHOTO_IN_SCRAP,
     DEFAULT_KEYWORD_GROUP_NAME,
     DEFAULT_SCHEDULE_GROUP_NAME,
     DEFAULT_SUBHEADING_FORMAT_TEMPLATE,
@@ -76,6 +74,8 @@ def _default_settings() -> dict:
         "highlight_keywords": [dict(item) for item in DEFAULT_HIGHLIGHT_KEYWORDS],
         "article_line_template": DEFAULT_ARTICLE_LINE_TEMPLATE,
         "subheading_format_template": DEFAULT_SUBHEADING_FORMAT_TEMPLATE,
+        "adhoc_article_line_template": DEFAULT_ARTICLE_LINE_TEMPLATE,
+        "adhoc_subheading_format_template": DEFAULT_SUBHEADING_FORMAT_TEMPLATE,
         "schedule_groups": [
             {
                 "name": DEFAULT_SCHEDULE_GROUP_NAME,
@@ -85,8 +85,6 @@ def _default_settings() -> dict:
             }
         ],
         "wordcloud_exclude_words": [],
-        "exclude_photo_in_scrap": DEFAULT_EXCLUDE_PHOTO_IN_SCRAP,
-        "exclude_personnel_in_scrap": DEFAULT_EXCLUDE_PERSONNEL_IN_SCRAP,
         "auto_send_enabled": DEFAULT_AUTO_SEND_ENABLED,
         "auto_send_grace_min": DEFAULT_AUTO_SEND_GRACE_MIN,
     }
@@ -150,23 +148,20 @@ def load_settings() -> dict:
     settings.setdefault("article_line_template", DEFAULT_ARTICLE_LINE_TEMPLATE)
     settings.setdefault("subheading_format_template", DEFAULT_SUBHEADING_FORMAT_TEMPLATE)
     settings.setdefault("wordcloud_exclude_words", [])
-    # [추가: 2026-08-11] 옛 include_*(포함할지) -> 새 exclude_*(제외할지) 1회 이관.
-    # 의미가 정반대라 값을 뒤집어 옮긴다 — "포함 안 함"이 곧 "제외함"이므로, 이미 쓰던
-    # 사람의 실제 수집 동작은 이름만 바뀌고 그대로 유지된다. 옛 키는 지워서 다음부터는
-    # 이 분기를 타지 않게 한다.
-    for old, new in (
-        ("include_photo_in_scrap", "exclude_photo_in_scrap"),
-        ("include_personnel_in_scrap", "exclude_personnel_in_scrap"),
-    ):
-        if old in settings:
-            settings.setdefault(new, not settings[old])
-            del settings[old]
-    settings.setdefault("exclude_photo_in_scrap", DEFAULT_EXCLUDE_PHOTO_IN_SCRAP)
-    settings.setdefault("exclude_personnel_in_scrap", DEFAULT_EXCLUDE_PERSONNEL_IN_SCRAP)
+    # [수정: 2026-09-18] 사진·인사 기사 제외 설정(수집 범위 화면)은 없앴다 — 켜두면 판정이
+    # 틀린 기사가 화면에 안 보이고 조용히 빠진다. 남아 있던 값(옛 include_* 포함)은 버린다.
+    for key in ("include_photo_in_scrap", "include_personnel_in_scrap",
+                "exclude_photo_in_scrap", "exclude_personnel_in_scrap"):
+        settings.pop(key, None)
+    # [추가: 2026-09-18] 수시 보고서 형식 — 정기와 따로 둔다. 처음엔 지금 정기 값을 복사해
+    # 시작한다(바꾼 첫날 수시 복사·발송 텍스트가 갑자기 달라지지 않게). 다른 설정을 한 번이라도
+    # 저장하면 이 값도 같이 파일에 적혀, 그 뒤 정기 형식을 바꿔도 수시는 따라가지 않는다.
+    settings.setdefault("adhoc_article_line_template", settings["article_line_template"])
+    settings.setdefault("adhoc_subheading_format_template", settings["subheading_format_template"])
     # [수정: 2026-08-11] 채널별 telegram_auto_send/email_auto_send는 통합 설정으로 대체됐다.
     # 옛 값을 이어받지 않고 버리는 이유: 그 설정은 발송 경로가 바뀐 뒤로 **아무도 읽지 않는
-    # 고아값**이었다(꺼놔도 자동 발송됐다). 즉 저장된 False는 "자동 발송을 끄고 싶다"는
-    # 의사가 아니라 아무 효력 없던 잔재라, 그대로 옮기면 지금까지 실제로 나가던 자동 발송이
+    # 고아값**이었다(꺼놔도 자동발송됐다). 즉 저장된 False는 "자동발송을 끄고 싶다"는
+    # 의사가 아니라 아무 효력 없던 잔재라, 그대로 옮기면 지금까지 실제로 나가던 자동발송이
     # 갑자기 멈춘다. 통합 설정은 실제 동작(=켜짐)을 기본값으로 시작한다.
     settings.pop("telegram_auto_send", None)
     settings.pop("email_auto_send", None)
@@ -512,40 +507,6 @@ def save_outlet_selection(selected: list) -> dict:
     return settings
 
 
-def save_highlight_keywords(items: list) -> dict:
-    """형광펜 단어(+색상) 목록을 저장한다 (PRD.md 기능1 규칙 6).
-
-    [수정: 2026-07-25] 직접 입력은 없앴다 — 검색 키워드 화면의 🖍️ 버튼(add_highlight_keyword/
-    toggle_highlight_keyword)으로만 추가되고, 이 화면은 색 변경·제거만 한다. items는
-    [{"word": ..., "color": 팔레트 인덱스}, ...] 형태(화면에서 del로 지운 항목은 이미
-    빠진 채로 넘어온다). 검색 키워드(save_keyword_groups)와는 완전히 별개 필드다.
-    0개~MAX_HIGHLIGHT_KEYWORDS개까지 허용(최소 개수 제한 없음 — 하나도 없으면 하이라이트를
-    아예 안 하는 것도 유효한 선택). 같은 단어가 중복되면(예: 화면 새로고침 타이밍) 첫
-    항목만 남긴다. color가 범위를 벗어나면(예: 손상된 값) 0으로 되돌린다.
-    """
-    cleaned = []
-    seen = set()
-    for item in items:
-        word = (item.get("word") or "").strip()
-        if not word or word.lower() in seen:
-            continue
-        seen.add(word.lower())
-        try:
-            color = int(item.get("color", 0))
-        except (TypeError, ValueError):
-            color = 0
-        if not (0 <= color < len(HIGHLIGHT_COLORS)):
-            color = 0
-        cleaned.append({"word": word, "color": color})
-
-    if len(cleaned) > MAX_HIGHLIGHT_KEYWORDS:
-        raise SettingsError(f"형광펜 단어는 최대 {MAX_HIGHLIGHT_KEYWORDS}개까지 가능합니다 (현재 {len(cleaned)}개).")
-    settings = load_settings()
-    settings["highlight_keywords"] = cleaned
-    _write(settings)
-    return settings
-
-
 def toggle_highlight_keyword(word: str) -> dict:
     """검색 키워드 화면의 🖍️ 버튼 — 이미 형광펜에 있으면 빼고, 없으면 다음 순번 색으로
     추가한다. 다음 색은 지금까지 등록된 개수를 팔레트 크기로 나눈 나머지로 정한다
@@ -588,29 +549,6 @@ def cycle_highlight_color(word: str) -> str:
     return HIGHLIGHT_COLORS[next_color]
 
 
-def add_highlight_keyword(word: str) -> dict:
-    """형광펜 화면의 "+ 추가" 입력창 — 검색 키워드에 없는 단어도 형광펜에 바로 등록할 수
-    있게 한다. [추가: 2026-07-26] toggle_highlight_keyword와 달리 이미 있으면 조용히
-    빼는 게 아니라 에러를 낸다 — 사용자가 직접 텍스트를 입력해 "추가"를 눌렀는데 아무
-    반응이 없으면 눌렸는지조차 알 수 없어 혼란스럽다는 판단(검색 키워드의 🖍️로 이미
-    들어와 있던 단어를 몰라서 또 입력한 경우도 포함). 색은 toggle과 같은 규칙(다음
-    순번 색)으로 정한다.
-    """
-    word = word.strip()
-    if not word:
-        raise SettingsError("추가할 단어를 입력해주세요.")
-    settings = load_settings()
-    items = settings.get("highlight_keywords", [])
-    if any(item["word"].lower() == word.lower() for item in items):
-        raise SettingsError("이미 등록된 형광펜 단어입니다.")
-    if len(items) >= MAX_HIGHLIGHT_KEYWORDS:
-        raise SettingsError(f"형광펜 단어는 최대 {MAX_HIGHLIGHT_KEYWORDS}개까지 가능합니다.")
-
-    settings["highlight_keywords"] = items + [{"word": word, "color": len(items) % len(HIGHLIGHT_COLORS)}]
-    _write(settings)
-    return settings
-
-
 def save_wordcloud_exclude_words(words: list) -> dict:
     """진입 화면 워드클라우드에서 빼고 싶은 단어를 저장한다.
 
@@ -629,17 +567,8 @@ def save_wordcloud_exclude_words(words: list) -> dict:
     return settings
 
 
-def save_scrap_page_settings(exclude_photo_in_scrap: bool, exclude_personnel_in_scrap: bool) -> dict:
-    """자동선별(정기 회차 수집) 시 [포토]/[인사] 기사를 제외할지 여부를 저장한다."""
-    settings = load_settings()
-    settings["exclude_photo_in_scrap"] = bool(exclude_photo_in_scrap)
-    settings["exclude_personnel_in_scrap"] = bool(exclude_personnel_in_scrap)
-    _write(settings)
-    return settings
-
-
 def save_auto_send_settings(enabled: bool, grace_min) -> dict:
-    """자동 발송 사용 여부와 유예 시간(분)을 저장한다 (설정 화면 /auto-send).
+    """자동발송 사용 여부와 유예 시간(분)을 저장한다 (설정 화면 /auto-send).
 
     유예 상한이 MAX_AUTO_SEND_GRACE_MIN인 이유는 app.config의 주석 참고 —
     회차 간격보다 길면 이전 회차가 조용히 안 나가고 묻힌다.
@@ -647,9 +576,9 @@ def save_auto_send_settings(enabled: bool, grace_min) -> dict:
     try:
         minutes = int(str(grace_min).strip())
     except (TypeError, ValueError):
-        raise SettingsError("자동 발송 시간은 숫자로 입력해주세요.")
+        raise SettingsError("자동발송 시간은 숫자로 입력해주세요.")
     if not 1 <= minutes <= MAX_AUTO_SEND_GRACE_MIN:
-        raise SettingsError(f"자동 발송 시간은 1~{MAX_AUTO_SEND_GRACE_MIN}분 사이로 입력해주세요.")
+        raise SettingsError(f"자동발송 시간은 1~{MAX_AUTO_SEND_GRACE_MIN}분 사이로 입력해주세요.")
     settings = load_settings()
     settings["auto_send_enabled"] = bool(enabled)
     settings["auto_send_grace_min"] = minutes
@@ -658,7 +587,7 @@ def save_auto_send_settings(enabled: bool, grace_min) -> dict:
 
 
 def auto_send_grace_sec(settings: Optional[dict] = None) -> int:
-    """자동 발송 유예 시간을 초로 — app.confirm_send와 app.renderer(카운트다운)가 공유한다."""
+    """자동발송 유예 시간을 초로 — app.confirm_send와 app.renderer(카운트다운)가 공유한다."""
     settings = settings if settings is not None else load_settings()
     return int(settings.get("auto_send_grace_min", DEFAULT_AUTO_SEND_GRACE_MIN)) * 60
 
@@ -678,10 +607,27 @@ def save_article_line_template(template: str) -> dict:
 
 
 def save_subheading_format_template(template: str) -> dict:
-    """소제목 형식을 저장한다(메일머지 두 번째 항목). 검증은 validate_subheading_format_template 참고."""
+    """소제목 형식을 저장한다(보고서 형식 두 번째 항목). 검증은 validate_subheading_format_template 참고."""
     cleaned = validate_subheading_format_template(template)
     settings = load_settings()
     settings["subheading_format_template"] = cleaned
+    _write(settings)
+    return settings
+
+
+# [추가: 2026-09-18] 수시 보고서 형식 — 정기와 같은 검증, 다른 키.
+def save_adhoc_article_line_template(template: str) -> dict:
+    cleaned = validate_article_line_template(template)
+    settings = load_settings()
+    settings["adhoc_article_line_template"] = cleaned
+    _write(settings)
+    return settings
+
+
+def save_adhoc_subheading_format_template(template: str) -> dict:
+    cleaned = validate_subheading_format_template(template)
+    settings = load_settings()
+    settings["adhoc_subheading_format_template"] = cleaned
     _write(settings)
     return settings
 
@@ -836,16 +782,26 @@ def pick_active_group_index(groups: list, now: Optional[datetime] = None) -> Opt
     return enabled_indices[0]
 
 
-def active_schedule_times(settings: dict, now: Optional[datetime] = None) -> list:
+def active_schedule_times(settings: dict, now: Optional[datetime] = None, with_cuts: bool = True) -> list:
     """지금 적용 중인 시간대 그룹의 시간대 목록을 돌려준다.
 
     app.scheduler가 매 tick마다 이걸 거쳐 "지금 어떤 시간대를 따라야 하는지" 얻는다 —
     그룹의 enabled/days를 바꾸면(저장 즉시) 다음 tick부터 바로 반영된다(규칙20과 같은
     패턴). 어느 그룹이 "지금 적용 중"인지의 실제 판단은 pick_active_group_index가 한다.
+
+    그 날짜에 「✂ 오늘만 여기서 끊기」로 끊은 시각이 있으면 **여기서만** 끼워 넣는다
+    (app.today_cuts.apply_cuts) — 스케줄러·초안·확정본 수집 창·보관함이 모두 이 함수를
+    거치므로 한 곳에서 끼워야 모두 같은 회차를 본다. with_cuts=False는 끊기 전 설정
+    그대로의 시간표(「원래 N시 회차」를 찾을 때).
     """
     groups = settings.get("schedule_groups", [])
     index = pick_active_group_index(groups, now)
-    return groups[index]["times"] if index is not None else []
+    times = groups[index]["times"] if index is not None else []
+    if not with_cuts:
+        return times
+    from app.today_cuts import apply_cuts
+
+    return apply_cuts(times, (now or datetime.now()).date())
 
 
 def move_outlet(name: str, direction: str) -> dict:

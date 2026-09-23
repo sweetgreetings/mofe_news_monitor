@@ -30,11 +30,9 @@ TRASH_DIR.mkdir(parents=True, exist_ok=True)
 # 최악이라는 판단(HISTORY.md "수시 모니터링" 참고).
 MAX_ADHOC_KEYWORDS = 5
 
-# ADHOC_DESIGN.md §6.4a — "꼭 포함할 검색어"(AND). 위 OR 고정은 **카드를 만드는 시점**의
-# 규칙으로 범위를 좁혔고, 이미 기사가 찬 카드 안에서는 AND를 허용한다 — 0건이 나와도
-# 조건을 지우면 즉시 돌아오므로 "0건이 최악"이라는 근거가 성립하지 않는다.
-# 상한이 3인 이유: 세 단어가 다 겹쳐야 걸러질 정도면 수집 검색어 자체를 다시 잡는 게
-# 맞다. 낮은 상한이 "이건 응급 처치지 검색 설계 도구가 아니다"를 화면으로 말해준다.
+# 검색 방식 「모두」(검색어가 모두 있는 기사만)의 검색어 상한. 「모두」는 같은 목록을
+# must_keywords에도 넣어 저장하므로(is_match_all) 이 상한이 곧 「모두」의 상한이다.
+# 상한이 3인 이유: 세 단어가 다 겹쳐야 걸러질 정도면 검색어 자체를 다시 잡는 게 맞다.
 MAX_ADHOC_MUST_KEYWORDS = 3
 
 # ADHOC_DESIGN.md §6.5 — 소제목 최대 5개(정기는 8개 — 사안이 한정적이라 늘리지 않는다).
@@ -68,7 +66,7 @@ def is_raw(card: dict) -> bool:
     """[추가: 2026-09-15] 로데이터 원본인가 — 이 날 이후에 만든 원본 카드에만 `raw`가 붙는다.
 
     수시 4단 흐름(새 수집 → 원본 → 확정본 → 수시 보관함, ADHOC_FLOW_SPLIT_MOCKUP.html)
-    에서 원본은 **거르지 않은 로데이터**다 — 실시간현황처럼 소제목·숨기기·라벨이 없고, 판단은
+    에서 원본은 **거르지 않은 로데이터**다 — 실시간 현황처럼 소제목·숨기기·라벨이 없고, 판단은
     전부 확정본에서 한다. 필드가 없는 옛 원본(그 전까지 소제목·숨김까지 하던 「원본 겸
     확정본」)은 예전 화면·예전 보관함 규칙을 그대로 쓴다 — 담당자가 정리해 둔 소제목·숨김이
     그대로 남아야 해서 옛 카드를 새 규칙으로 옮겨 적지 않는다(사용자 결정: 보관함에 그대로).
@@ -139,12 +137,47 @@ def _validate_keywords(keywords: list[str]) -> None:
 
 
 def _validate_must_keywords(must_keywords: list[str]) -> None:
-    """꼭 포함할 검색어 — 비어 있어도 된다(조건을 안 건 상태가 정상이다)."""
+    """「모두」 모드의 검색어 — 비어 있으면 「하나라도」 모드다."""
     cleaned = [k.strip() for k in must_keywords if k.strip()]
     if len(cleaned) > MAX_ADHOC_MUST_KEYWORDS:
         raise AdhocCardError(
-            f"꼭 포함할 검색어는 최대 {MAX_ADHOC_MUST_KEYWORDS}개까지 등록할 수 있습니다."
+            f"\u2018모두 있는\u2019은 검색어 {MAX_ADHOC_MUST_KEYWORDS}개까지예요."
         )
+
+
+# --- 검색 방식 -------------------------------------------------------------------
+#
+# 조건은 검색어 칸 하나 + 방식(하나라도 / 모두)이다 — 새 수집 화면과 같은 모양.
+# 저장은 따로 필드를 두지 않고 두 목록으로 한다:
+#   하나라도: keywords=[...], must_keywords=[]
+#   모두:     keywords=[...], must_keywords=keywords와 같은 목록(2개 이상)
+# 「모두」를 must_keywords에도 넣는 이유는 1,000건 상한 검사(§6.4b)가 must_keywords를
+# 보기 때문이다 — 조건 판정(article_in_condition)도 그대로 맞아떨어진다.
+
+
+def is_match_all(card: dict) -> bool:
+    """검색 방식이 「모두」인가. 검색어가 1개면 두 방식이 같은 뜻이라 「하나라도」로 본다."""
+    keywords = card.get("keywords") or []
+    return len(keywords) >= 2 and sorted(card.get("must_keywords") or []) == sorted(keywords)
+
+
+def normalize_condition(card: dict) -> None:
+    """옛 두 칸 조건(검색어 OR + 꼭 포함할 검색어 AND)을 칸 하나 + 방식 모양으로 고친다.
+
+    조건 = (검색어 중 하나라도) 그리고 (꼭 포함할 검색어 전부).
+    - 꼭 포함할 검색어 중 하나라도 검색어 칸에 있으면 앞 절은 뒤 절에 이미 들어 있으므로
+      조건은 「꼭 포함할 검색어 전부」와 **같은 뜻**이다 → 그 단어들로 줄인다.
+    - 겹치는 게 없으면(진짜 혼합) 새 모양으로 같은 뜻을 못 만든다 → 두 칸을 합쳐 「모두」로
+      읽는다. 기사가 덜 나올 수는 있어도 보고서에 조건 밖 기사가 섞이지는 않는 쪽이다.
+    검색할 단어 집합은 어느 경우든 그대로라 다시 검색할 필요가 없다.
+    """
+    keywords = list(card.get("keywords") or [])
+    must = list(card.get("must_keywords") or [])
+    if must and sorted(must) != sorted(keywords):
+        words = must if set(must) & set(keywords) else list(dict.fromkeys(keywords + must))
+        card["keywords"] = words
+        must = words
+    card["must_keywords"] = list(card["keywords"]) if must and len(card["keywords"]) >= 2 else []
 
 
 _HHMM_RE = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
@@ -286,12 +319,20 @@ def new_card(
     }
     if raw:
         card["raw"] = True
+    # 같은 날·같은 사안의 몇 번째 원본인가 — 화면에서 「인사청문회 #2」로 가른다(version_suffix).
+    # 만들 때 적어 두는 이유: 매번 순서로 세면 가운데 원본을 지웠을 때 뒤 원본의 번호가 바뀐다.
+    siblings = [
+        c for c in cards_for_date(card["collect_date"])
+        if card_kind(c) == KIND_COLLECT and issue_key(c) == issue_key(card)
+    ]
+    card["version"] = max((version_of(c, siblings) for c in siblings), default=0) + 1
     save_card(card)
     return card
 
 
 def new_bundle_card(
-    name: str, now: Optional[datetime] = None, issue_id: str = "", basis_time: str = ""
+    name: str, now: Optional[datetime] = None, issue_id: str = "", basis_time: str = "",
+    source_card_id: str = "", source_version: int = 0,
 ) -> dict:
     """모음 카드를 만든다 (ADHOC_DESIGN.md §6.13) — 검색어·시간창 검증을 타지 않는
     유일한 생성자다.
@@ -310,6 +351,9 @@ def new_bundle_card(
 
     basis_time: [추가: 2026-09-15] 이 확정본이 받는 **원본 기준 시각**(HH:MM) — 「불러올 때마다
     새 확정본」 규칙의 열쇠다(default_bundle_for). 원본에서 보내며 만들 때만 채운다.
+
+    source_card_id: 이 확정본을 처음 만든 원본 — 같은 사안의 다른 판(#2)이 같은 기준 시각을
+    가져도 이 확정본으로 섞여 들어오지 않게 한다(default_bundle_for).
     """
     now = now or datetime.now()
     name = name.strip()
@@ -343,6 +387,11 @@ def new_bundle_card(
     }
     if basis_time:
         card["basis_time"] = basis_time
+    if source_card_id:
+        card["source_card_id"] = source_card_id
+    if source_version:
+        # 처음 만든 원본의 판 번호 — 목록 이름(bundle_label)이 원본 탭과 같은 「#2」를 단다.
+        card["source_version"] = int(source_version)
     save_card(card)
     return card
 
@@ -355,10 +404,10 @@ def load_card(card_id: str) -> Optional[dict]:
         card = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, TypeError):
         return None
-    # [추가: 2026-08-20] must_keywords가 생기기 전에 만든 카드도 있으므로 읽는 시점에
-    # 기본값을 채운다 — 호출부마다 .get("must_keywords", [])를 흩뿌리지 않으려는 것이고,
-    # 저장은 하지 않으므로(빈 값은 "조건 없음"과 같은 뜻) 파일은 건드리지 않는다.
-    card.setdefault("must_keywords", [])
+    # must_keywords가 없는 옛 카드·두 칸이 섞인 옛 카드를 읽는 시점에 칸 하나 + 방식
+    # 모양으로 맞춘다(normalize_condition). 파일은 다음 저장 때 따라 바뀐다.
+    card.setdefault("keywords", [])
+    normalize_condition(card)
     return card
 
 
@@ -400,7 +449,7 @@ def latest_card_id(kind: Optional[str] = None) -> Optional[str]:
 def list_cards(issue_id: Optional[str] = None) -> list[dict]:
     """저장된 카드를 최신순(collect_date·시작시각 내림차순)으로 돌려준다.
 
-    app/storage.py list_all_runs()와 같은 방어적 파싱(깨진 파일 하나 때문에 전체가
+    app/run_index.py와 같은 방어적 파싱(깨진 파일 하나 때문에 전체가
     멈추지 않게) — 손상됐거나 필수 필드가 없는 카드 파일은 건너뛴다.
     """
     cards = []
@@ -487,6 +536,51 @@ def cards_for_date(date_str: str) -> list[dict]:
     return sorted((c for c in cards if c is not None), key=lambda c: c["created_at"])
 
 
+# --- 같은 사안의 원본 판 번호 ---------------------------------------------------------
+# 원본 하나 = 검색 조건 하나다. 조건을 바꾸려면 새로 수집하고, 같은 날 같은 사안의 원본이
+# 여럿이면 화면에서 「인사청문회 #2」로 가른다. 첫 원본엔 번호를 안 붙인다 — 두 번째가 생기는
+# 순간 이미 보던 탭 이름이 바뀌면 안 된다. 번호는 화면 전용이라 사안명·보고서 첫 줄엔 없다.
+
+
+def issue_key(card: dict) -> str:
+    """같은 사안인가를 가르는 열쇠 — 사안 id, 없는 옛 카드는 사안명."""
+    return card.get("issue_id") or f'name:{card.get("report_title", "")}'
+
+
+def raw_versions(card: dict, day_cards: Optional[list[dict]] = None) -> list[dict]:
+    """card와 같은 날·같은 사안의 원본들(card 포함), 만든 순서대로. day_cards를 주면 그 목록에서
+    고른다(이미 cards_for_date를 읽은 화면이 파일을 다시 열지 않게)."""
+    if day_cards is None:
+        day_cards = cards_for_date(card.get("collect_date") or "")
+    key = issue_key(card)
+    found = [c for c in day_cards if card_kind(c) == KIND_COLLECT and issue_key(c) == key]
+    if not any(c["id"] == card["id"] for c in found):
+        found.append(card)
+    return sorted(found, key=lambda c: c.get("created_at") or "")
+
+
+def version_of(card: dict, versions: Optional[list[dict]] = None) -> int:
+    """몇 번째 원본인가. 만들 때 적어 둔 값이 먼저이고, 그 전 카드는 만든 순서로 센다."""
+    if card.get("version"):
+        return int(card["version"])
+    versions = versions if versions is not None else raw_versions(card)
+    ids = [c["id"] for c in versions]
+    return ids.index(card["id"]) + 1 if card["id"] in ids else 1
+
+
+def version_suffix(card: dict, day_cards: Optional[list[dict]] = None) -> str:
+    """화면 이름 뒤에 붙일 「 #2」 — 확정본이거나 첫 원본이면 빈 문자열."""
+    if is_bundle(card):
+        return ""
+    n = version_of(card, raw_versions(card, day_cards))
+    return f" #{n}" if n >= 2 else ""
+
+
+def version_ids(card: dict, day_cards: Optional[list[dict]] = None) -> set:
+    """같은 사안 원본들의 id — 한 판에서 보낸 기사는 다른 판에서도 「✓ 보냄」으로 보인다."""
+    return {c["id"] for c in raw_versions(card, day_cards)}
+
+
 # --- 모음 카드 (ADHOC_DESIGN.md §6.13) -------------------------------------------
 
 
@@ -521,6 +615,9 @@ def default_bundle_for(source_card: dict, bundles: list[dict]) -> Optional[dict]
         b for b in bundles
         if b.get("issue_id") == source_card.get("issue_id")
         and (b.get("basis_time") or bundle_basis_time(b)) == basis
+        # 같은 사안의 다른 판(#2)이 만든 확정본은 기준 시각이 같아도 이어 쓰지 않는다 —
+        # 조건이 다른 원본의 기사가 한 확정본에 섞인다. 이 필드가 없는 옛 확정본은 예전대로.
+        and b.get("source_card_id", source_card["id"]) == source_card["id"]
     ]
     return max(same, key=lambda b: b["created_at"]) if same else None
 
@@ -556,29 +653,58 @@ def bundle_label(bundle: dict) -> str:
     """확정본을 목록에서 가리키는 이름 — 「인사청문회 15:05」. 같은 날 같은 사안의 확정본이
     불러올 때마다 새로 생기므로 이름만으로는 서로 구분이 안 된다. 사안명(보고서 첫 줄로 나가는
     글자)엔 아무것도 안 붙이고, 목록에서만 시각을 곁들인다."""
+    name = bundle["report_title"] + source_version_suffix(bundle)
     t = bundle_time(bundle)
-    return f'{bundle["report_title"]} {t}' if t else bundle["report_title"]
+    return f"{name} {t}" if t else name
 
 
-def sent_index(source_card_id: str, bundles: list[dict]) -> dict:
+_SOURCE_SUFFIX_CACHE: dict = {}
+
+
+def source_version_suffix(bundle: dict) -> str:
+    """확정본을 처음 만든 원본의 「 #2」 — 원본 탭 이름과 같은 번호를 목록 이름에 단다.
+    첫 원본에서 만들었거나 원본에서 만든 확정본이 아니면 빈 문자열. 만들 때 적어 둔
+    source_version이 먼저이고, 그 전 확정본은 원본 카드를 열어 센다(카드마다 한 번만)."""
+    if bundle.get("source_version"):
+        n = int(bundle["source_version"])
+        return f" #{n}" if n >= 2 else ""
+    # source_card_id가 생기기 전 확정본은 담긴 기사를 보낸 원본으로 대신 센다.
+    src_id = bundle.get("source_card_id") or next(
+        ((a.get("sent_from") or {}).get("card_id") for a in bundle.get("articles", [])
+         if (a.get("sent_from") or {}).get("card_id")),
+        "",
+    )
+    if not src_id:
+        return ""
+    if src_id not in _SOURCE_SUFFIX_CACHE:
+        src = load_card(src_id)
+        _SOURCE_SUFFIX_CACHE[src_id] = version_suffix(src) if src else ""
+    return _SOURCE_SUFFIX_CACHE[src_id]
+
+
+def sent_index(source_ids, bundles: list[dict]) -> dict:
     """{기사 URL: 그 기사를 받은 확정본 이름(bundle_label)} — 원본 목록에 「✓ 보냄」을 그리는 데 쓴다.
+
+    source_ids: 원본 id 하나 또는 id 묶음. 원본 화면은 같은 사안의 모든 판(version_ids)을 넘긴다 —
+    #1에서 보낸 기사가 #2에서 처리 안 한 기사로 보이면 같은 기사를 또 보내게 된다.
 
     **저장하지 않고 매번 다시 계산한다**(§6.13 규칙 5). 그래야 규칙 9(모음에서 숨기기가
     곧 보내기 취소)가 별도 배선 없이 성립한다 — 숨긴 기사는 아래에서 그냥 빠진다.
     """
+    ids = {source_ids} if isinstance(source_ids, str) else set(source_ids)
     index: dict = {}
     for bundle in bundles:
         for article in bundle["articles"]:
             if article.get("hidden"):
                 continue
-            if (article.get("sent_from") or {}).get("card_id") != source_card_id:
+            if (article.get("sent_from") or {}).get("card_id") not in ids:
                 continue
             index.setdefault(article["url"], bundle_label(bundle))
     return index
 
 
 # --- 로데이터 원본의 「🗑 숨김」 표시 (2026-09-15, ADHOC_RAW_TRASH_ROUND_MOCKUP.html) ------
-# 실시간현황의 🗑와 같은 동작이다 — 기사를 목록에서 **빼지 않고** 「숨김」 표시만 남긴다.
+# 실시간 현황의 🗑와 같은 동작이다 — 기사를 목록에서 **빼지 않고** 「숨김」 표시만 남긴다.
 # 원본 카드의 raw_marks에 URL별로 적는다:
 #   hidden — 원본에서 담당자가 🗑를 눌렀다
 #   shown  — 확정본에서 뺀 기사를 원본에서 「처리 안 함」으로 되돌렸다(그 시각 at 이전에
@@ -598,19 +724,22 @@ def mark_hidden(article: dict, now: Optional[datetime] = None) -> None:
     article["hidden_at"] = (now or datetime.now()).isoformat(timespec="seconds")
 
 
-def raw_row_states(source_card: dict, bundles: list[dict]) -> dict:
+def raw_row_states(source_card: dict, bundles: list[dict], source_ids: Optional[set] = None) -> dict:
     """원본 행마다의 상태 — {URL: ("sent", 확정본 이름) | ("hidden", 확정본 이름 또는 "")}.
 
     처리 안 한 기사는 담지 않는다. 우선순위는 보냄 > 원본에서 숨김 > 확정본에서 뺌. 두 번째
     값은 화면 툴팁용이다 — 원본에서 숨긴 건 빈 문자열, 확정본에서 뺀 건 그 확정본 이름.
     저장하지 않고 매번 다시 계산한다(sent_index와 같은 원칙).
+
+    보냄·확정본에서 뺌은 같은 사안의 모든 판(source_ids, 기본 version_ids)에서 보낸 사본을 본다.
     """
+    ids = source_ids if source_ids is not None else version_ids(source_card)
     sent: dict = {}
     pulled: dict = {}  # 확정본에서 뺀 사본 — {url: (가장 늦게 숨긴 시각, 확정본 이름)}
     for bundle in bundles:
         label = bundle_label(bundle)
         for article in bundle["articles"]:
-            if (article.get("sent_from") or {}).get("card_id") != source_card["id"]:
+            if (article.get("sent_from") or {}).get("card_id") not in ids:
                 continue
             url = article["url"]
             if not article.get("hidden"):
@@ -668,9 +797,10 @@ def set_raw_mark(card_id: str, url: str, hide: bool, bundles: list[dict], now: O
         if hide:
             marks[url] = {"state": RAW_MARK_HIDDEN, "at": now.isoformat(timespec="seconds")}
         else:
+            ids = version_ids(c)
             pulled = any(
                 a["url"] == url and a.get("hidden")
-                and (a.get("sent_from") or {}).get("card_id") == card_id
+                and (a.get("sent_from") or {}).get("card_id") in ids
                 for b in bundles for a in b["articles"]
             )
             if pulled:
@@ -679,6 +809,49 @@ def set_raw_mark(card_id: str, url: str, hide: bool, bundles: list[dict], now: O
                 marks.pop(url, None)
         save_card(c)
         return c
+
+
+def unsend_raw(card_id: str, url: str, bundles: list[dict], now: Optional[datetime] = None) -> list[str]:
+    """[추가: 2026-09-22] 원본의 「✓ 보냄」 다시 누르기 = 보냄 취소.
+
+    이 원본에서 보낸 그 기사의 사본을 오늘 확정본마다 숨긴다(확정본에서 🗑를 누른 것과 같다 —
+    sent_index가 숨긴 사본을 안 센다). 그리고 원본 표시를 같은 시각의 「shown」으로 적는다:
+    안 적으면 raw_row_states가 확정본에서 뺀 사본을 보고 「🗑 숨김」으로 그린다. 취소는
+    "처리 안 함"으로 돌아가는 것이지 "안 쓴다"가 아니다.
+
+    돌려주는 값은 사본을 숨긴 확정본 id 목록 — 되돌리기(undo.attach_link)가 그 사본을 다시
+    보이게 하는 데 쓴다. 보낸 사본이 없으면 아무것도 안 쓰고 빈 목록.
+    """
+    now = now or datetime.now()
+    stamp = now.isoformat(timespec="seconds")
+    source = load_card(card_id)
+    # 같은 사안의 다른 판에서 보낸 사본도 취소한다 — 이 판에도 「✓ 보냄」으로 보였으니까.
+    ids = version_ids(source) if source is not None else {card_id}
+    senders: set = set()
+    touched: list[str] = []
+    for bundle in bundles:
+        with card_lock(bundle["id"]):
+            b = load_card(bundle["id"])
+            if b is None:
+                continue
+            hit = False
+            for article in b["articles"]:
+                sender = (article.get("sent_from") or {}).get("card_id")
+                if article["url"] == url and not article.get("hidden") and sender in ids:
+                    mark_hidden(article, now)
+                    senders.add(sender)
+                    hit = True
+            if hit:
+                save_card(b)
+                touched.append(b["id"])
+    # 「shown」은 이 원본과, 실제로 보냈던 판에 적는다 — 안 적은 판에선 뺀 사본이 「🗑 숨김」으로 보인다.
+    for cid in ({card_id} | senders) if touched else set():
+        with card_lock(cid):
+            c = load_card(cid)
+            if c is not None:
+                c.setdefault("raw_marks", {})[url] = {"state": RAW_MARK_SHOWN, "at": stamp}
+                save_card(c)
+    return touched
 
 
 def clear_raw_marks(card_id: str, urls: list[str]) -> None:
@@ -762,46 +935,120 @@ def send_to_bundle(
             else:
                 bundle["custom_groups"].append(group)
 
-        # [추가: 2026-09-03] **확정본의 출발 순서는 언론사순이다** — 시간순인 수집 원본과
-        # 갈리는 지점이다. 목록 전체를 다시 세우지 않고 **새로 온 기사만 제자리에 끼워
-        # 넣는다**: 전체 재정렬은 담당자가 ↑↓로 맞춰둔 순서를 조용히 지워버리고, 그건
-        # CLAUDE.md "담당자 > AI: 정렬·분류 우선순위"가 금지한 바로 그 동작이다.
-        # 정렬 키는 sort_by_outlet_priority와 같은 함수를 쓴다(app.sorter.outlet_sort_key)
-        # — 정렬과 삽입이 각자 키를 만들면 한쪽만 고쳤을 때 조용히 어긋난다.
-        outlet_order = load_settings().get("outlet_order") or None
-        fresh = sorted(fresh, key=lambda a: outlet_sort_key(a, outlet_order))
-        target_group = group or None
-        for article in fresh:
-            copied = dict(article)
-            copied["group"] = target_group
-            copied["hidden"] = False
-            # added_by="manual"이라야 모음의 조건 필터(article_in_condition)와 시간창
-            # 검사(article_out_of_window)를 둘 다 통과한다 — §6.13 규칙 3.
-            copied["added_by"] = "manual"
-            copied["added_at"] = now.isoformat(timespec="seconds")
-            copied["sent_from"] = {
-                "card_id": source_card["id"],
-                "report_title": source_card["report_title"],
-                # [추가: 2026-09-15] 보낸 순간의 원본 기준 시각 — 확정본 머리줄의 「N시 N분
-                # 기준」이 이 값을 쓴다(bundle_basis_time). 원본이 나중에 더 불러와도 이 기사가
-                # 몇 시 기준 원본에서 골라졌는지는 안 변한다.
-                "window_end": window_of(source_card)["end"],
-            }
-            key = outlet_sort_key(copied, outlet_order)
-            # 같은 소제목 안에서 자기보다 순위가 낮은 첫 기사 **앞**에 선다. 다른 소제목
-            # 기사는 건너뛴다 — 화면은 소제목별로 묶어 보여주므로(_article_groups) 같은
-            # 소제목 안의 상대 순서만 뜻이 있다.
-            at = len(bundle["articles"])
-            for i, existing_article in enumerate(bundle["articles"]):
-                if existing_article.get("group") != target_group:
-                    continue
-                if outlet_sort_key(existing_article, outlet_order) > key:
-                    at = i
-                    break
-            bundle["articles"].insert(at, copied)
+        _insert_by_outlet(bundle, fresh, group or None, now, lambda article: {
+            "card_id": source_card["id"],
+            "report_title": source_card["report_title"],
+            # [추가: 2026-09-15] 보낸 순간의 원본 기준 시각 — 확정본 머리줄의 「N시 N분
+            # 기준」이 이 값을 쓴다(bundle_basis_time). 원본이 나중에 더 불러와도 이 기사가
+            # 몇 시 기준 원본에서 골라졌는지는 안 변한다.
+            "window_end": window_of(source_card)["end"],
+        })
 
         save_card(bundle)
         return len(fresh) + revived, group
+
+
+def _insert_by_outlet(bundle: dict, articles: list[dict], group: Optional[str], now: datetime, sent_from_of) -> None:
+    """확정본에 기사를 복사해 **언론사 순위 자리에 끼워 넣는다** — 원본에서 보내기
+    (send_to_bundle)와 다른 사안 확정본으로 옮기기(move_to_bundle)가 같이 쓴다.
+
+    [추가: 2026-09-03] **확정본의 출발 순서는 언론사순이다** — 시간순인 수집 원본과
+    갈리는 지점이다. 목록 전체를 다시 세우지 않고 **새로 온 기사만 제자리에 끼워
+    넣는다**: 전체 재정렬은 담당자가 ↑↓로 맞춰둔 순서를 조용히 지워버리고, 그건
+    CLAUDE.md "담당자 > AI: 정렬·분류 우선순위"가 금지한 바로 그 동작이다.
+    정렬 키는 sort_by_outlet_priority와 같은 함수를 쓴다(app.sorter.outlet_sort_key)
+    — 정렬과 삽입이 각자 키를 만들면 한쪽만 고쳤을 때 조용히 어긋난다.
+
+    sent_from_of(article) → 복사본에 적을 sent_from. 보내기는 원본 카드를, 옮기기는 기사가
+    원래 들고 있던 값을 그대로 적는다(그 기사를 고른 원본은 옮겨도 안 바뀐다).
+    """
+    outlet_order = load_settings().get("outlet_order") or None
+    for article in sorted(articles, key=lambda a: outlet_sort_key(a, outlet_order)):
+        copied = dict(article)
+        copied["group"] = group
+        copied["hidden"] = False
+        copied.pop("hidden_at", None)
+        # added_by="manual"이라야 모음의 조건 필터(article_in_condition)와 시간창
+        # 검사(article_out_of_window)를 둘 다 통과한다 — §6.13 규칙 3.
+        copied["added_by"] = "manual"
+        copied["added_at"] = now.isoformat(timespec="seconds")
+        sent_from = sent_from_of(article)
+        if sent_from:
+            copied["sent_from"] = sent_from
+        key = outlet_sort_key(copied, outlet_order)
+        # 같은 소제목 안에서 자기보다 순위가 낮은 첫 기사 **앞**에 선다. 다른 소제목
+        # 기사는 건너뛴다 — 화면은 소제목별로 묶어 보여주므로(_article_groups) 같은
+        # 소제목 안의 상대 순서만 뜻이 있다.
+        at = len(bundle["articles"])
+        for i, existing_article in enumerate(bundle["articles"]):
+            if existing_article.get("group") != group:
+                continue
+            if outlet_sort_key(existing_article, outlet_order) > key:
+                at = i
+                break
+        bundle["articles"].insert(at, copied)
+
+
+def move_targets(bundle: dict, bundles: list[dict]) -> list[dict]:
+    """[추가: 2026-09-17] 확정본의 「옮기기 ▾」 → 「다른 사안 확정본으로」에 올릴 확정본 —
+    bundles(그 날짜 확정본) 중 **사안이 다른** 것만, 만든 순서대로.
+
+    같은 사안의 다른 시각 확정본은 뺀다 — 사안을 가르는 동작이지 회차를 옮기는 동작이
+    아니다(시안 ADHOC_MOVE_DROPDOWN_MOCKUP.html). 사안 id가 없는 옛 확정본은 사안명으로 맞춘다.
+    """
+    own = issue_key(bundle)
+    return [b for b in bundles if b["id"] != bundle["id"] and issue_key(b) != own]
+
+
+def move_to_bundle(
+    source_id: str, target_id: str, urls: list[str], now: Optional[datetime] = None
+) -> dict:
+    """[추가: 2026-09-17] 확정본에서 고른 기사를 **다른 사안의 확정본으로 옮긴다** — 보내기
+    (send_to_bundle, 복사)와 달리 이 확정본에선 빠진다(숨김 처리 — 좌하단 「숨긴 기사」에서
+    되살릴 수 있고, 원본의 「✓ 보냄」은 받는 확정본이 이어받는다).
+
+    받는 쪽 규칙은 원본에서 보낼 때와 같다: 소제목 없이(📂 미분류) 언론사 순위 자리에 들어가고,
+    같은 URL이 이미 보이면 건너뛰고, 거기서 뺐던(숨긴) 사본이면 제자리에 되살린다.
+
+    화면에 보이는 기사만 옮긴다(visible_urls_among — 숨기기와 같은 기준). 두 카드를 함께
+    고치므로 락은 id 순서로 쥔다(두 확정본이 서로에게 동시에 옮겨도 교착이 안 생긴다).
+
+    돌려주는 값: {"moved": 옮긴 건수, "added": 받는 쪽에 새로 넣은 URL, "revived": 되살린 URL}
+    — 되돌리기(app.adhoc.undo.attach_link)가 받는 쪽을 원래대로 돌리는 데 쓴다.
+    """
+    now = now or datetime.now()
+    if source_id == target_id:
+        raise AdhocCardError("같은 확정본으로는 옮길 수 없습니다.")
+    first, second = sorted([source_id, target_id])
+    with card_lock(first), card_lock(second):
+        source = load_card(source_id)
+        target = load_card(target_id)
+        if source is None or target is None:
+            raise AdhocCardError("확정본을 찾을 수 없습니다. 새로고침 후 다시 시도해주세요.")
+        if not (is_bundle(source) and is_bundle(target)):
+            raise AdhocCardError("확정본끼리만 옮길 수 있습니다.")
+        if source.get("collect_date") != target.get("collect_date"):
+            raise AdhocCardError("다른 날짜의 확정본으로는 옮길 수 없습니다.")
+        wanted = set(visible_urls_among(source, urls))
+        if not wanted:
+            return {"moved": 0, "added": [], "revived": []}
+
+        existing = {a["url"]: a for a in target["articles"]}
+        revived = []
+        for url in wanted:
+            copy_in = existing.get(url)
+            if copy_in is not None and copy_in.get("hidden"):
+                copy_in["hidden"] = False
+                copy_in.pop("hidden_at", None)
+                revived.append(url)
+        fresh = [a for a in source["articles"] if a["url"] in wanted and a["url"] not in existing]
+        _insert_by_outlet(target, fresh, None, now, lambda article: article.get("sent_from"))
+        for article in source["articles"]:
+            if article["url"] in wanted:
+                mark_hidden(article, now)
+        save_card(target)
+        save_card(source)
+        return {"moved": len(wanted), "added": [a["url"] for a in fresh], "revived": revived}
 
 
 def bundle_sources(bundle: dict) -> list[tuple]:

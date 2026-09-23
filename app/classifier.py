@@ -9,6 +9,7 @@ from app.llm_classifier import (
     UNCLASSIFIED_GROUP_NAME,
     assign_to_existing,
     build_assign_candidates,
+    cached_group_layout,
     classify_with_llm,
     seed_cache,
 )
@@ -45,7 +46,11 @@ def _assign(articles: list, token_sets: list, topic_words: list) -> tuple:
 
 
 def _apply_forced_groups(
-    groups: list, forced_groups: dict, order_index: dict, custom_group_names: Optional[list] = None
+    groups: list,
+    forced_groups: dict,
+    order_index: dict,
+    custom_group_names: Optional[list] = None,
+    revivable_groups: Optional[list] = None,
 ) -> list:
     """사용자가 소제목 경계를 넘어 수동으로 옮긴 기사를 지정된 소제목으로 강제 이동한다
     (PRD.md 기능1 규칙 21 — ↑/↓로 소제목 자체를 바꾸는 경우).
@@ -70,8 +75,32 @@ def _apply_forced_groups(
     무시해버리면 사용자가 일부러 만든 소제목으로는 기사를 영영 옮길 수 없게 된다.
     이 이름들은 미리 빈 소제목으로 끼워넣어 두고, 끝까지 아무 기사도 안 들어오면
     마지막 필터(어차피 빈 그룹은 버림)에서 자연히 걸러진다.
+
+    [수정: 2026-09-17] revivable_groups(app.llm_classifier.cached_group_layout — 이번 회차
+    AI 분류에 있던 [(이름, 요약)])도 위 규칙의 예외다. AI 첫 분류로 들어간 기사가 전부
+    숨겨지면 _rebuild가 그 소제목을 빼는데, 「AI 기사 배정」 등으로 그리로 배정된 기사가
+    아직 보이면 소제목이 남아야 한다 — 안 그러면 그 기사들이 📂 미분류로 떨어지고 이
+    이름에 붙은 이름표·순서까지 함께 사라진다(2026-09-17 14:00 회차 「확대거시경제금융회의」,
+    HISTORY.md 참고). 캐시 순서상 원래 자리에 빈 칸으로 끼워두고, 끝까지 비면 마지막
+    필터가 버린다 — 가리키는 기사까지 다 숨기면 지금처럼 사라진다. 이번 회차 캐시 이름만
+    받으므로 다른 회차의 옛 배정이 이름을 되살리지는 않는다.
     """
     groups = list(groups)
+    if revivable_groups:
+        present = {g["name"] for g in groups}
+        targets = set(forced_groups.values())
+        cache_names = [name for name, _ in revivable_groups]
+        for idx, (name, summary) in enumerate(revivable_groups):
+            if name in present or name not in targets:
+                continue
+            # 캐시 순서상 바로 앞에 있으면서 지금 목록에도 있는 소제목 뒤에 끼운다.
+            pos = 0
+            for prev in reversed(cache_names[:idx]):
+                if prev in present:
+                    pos = next(i for i, g in enumerate(groups) if g["name"] == prev) + 1
+                    break
+            groups.insert(pos, {"name": name, "articles": [], "summary": summary})
+            present.add(name)
     if custom_group_names:
         existing = {g["name"] for g in groups}
         for name in custom_group_names:
@@ -160,7 +189,11 @@ def classify_articles(
         if forced_groups:
             order_index = {a["url"]: i for i, a in enumerate(articles)}
             llm_groups = _apply_forced_groups(
-                llm_groups, forced_groups, order_index, custom_group_names
+                llm_groups,
+                forced_groups,
+                order_index,
+                custom_group_names,
+                cached_group_layout(articles, max_subheadings, round_id),
             )
         return llm_groups
 
@@ -253,6 +286,20 @@ def classify_for_finalize(
     forced_groups = dict(forced_groups or {})
 
     llm_groups = classify_with_llm(articles, max_subheadings, allow_call=False, round_id=round_id)
+    order_index = {a["url"]: i for i, a in enumerate(articles)}
+    if llm_groups is not None and forced_groups:
+        llm_groups = _apply_forced_groups(
+            llm_groups,
+            forced_groups,
+            order_index,
+            custom_group_names,
+            cached_group_layout(articles, max_subheadings, round_id),
+        )
+    # 초안 분류의 기사를 담당자가 전부 숨겼고 배정된 기사로 되살아난 소제목도 없으면 전부
+    # 미분류다 — 끼워 넣을 기존 소제목이 없으니 분류가 아예 없던 회차와 같이 처음부터 분류한다.
+    # 배정으로 소제목이 하나라도 남으면 초안 화면 그대로 이어 간다.
+    if llm_groups is not None and all(g["name"] == UNCLASSIFIED_GROUP_NAME for g in llm_groups):
+        llm_groups = None
     if llm_groups is None:
         # [수정: 2026-08-14] 여기서만 allow_llm_call=True를 명시한다 — 초안에서 한 번도
         # 분류된 적 없는 회차(예: 아무도 열어보지 않은 심야 06:00 회차)라 재사용할 캐시가
@@ -272,10 +319,6 @@ def classify_for_finalize(
             {},
             [],
         )
-
-    order_index = {a["url"]: i for i, a in enumerate(articles)}
-    if forced_groups:
-        llm_groups = _apply_forced_groups(llm_groups, forced_groups, order_index, custom_group_names)
 
     unclassified = next((g for g in llm_groups if g["name"] == UNCLASSIFIED_GROUP_NAME), None)
     new_forced: dict = {}
@@ -375,7 +418,7 @@ def groups_for_confirmed_run(
     """확정된 회차의 소제목 묶음을 얻는다 — 저장된 스냅샷이 있으면 재분류하지 않고 그대로 쓴다.
 
     [추가: 2026-08-12] 확정본 화면(app.renderer.render_page)과 발송/복사 텍스트
-    (build_latest_plain_text)가 **둘 다** 이걸 써야 한다. 한쪽만 스냅샷을 읽으면 화면과
+    (latest_confirmed_report)가 **둘 다** 이걸 써야 한다. 한쪽만 스냅샷을 읽으면 화면과
     실제로 나가는 내용이 서로 다른 소제목으로 갈릴 수 있다.
 
     "group" 필드가 없는 옛 회차(이 스냅샷 기능이 생기기 전에 저장된 것)는 예전처럼

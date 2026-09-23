@@ -1,4 +1,4 @@
-# Design Ref: DESIGN.md §0 진입 화면 (home.html — 앱이 브라우저로 맨 처음 여는 화면), PRD.md 기능3
+# Design Ref: archive/DESIGN.md §0 진입 화면 (home.html — 앱이 브라우저로 맨 처음 여는 화면), PRD.md 기능3
 #
 # [수정: 2026-08-26] 홈 화면 재구성 — 예전엔 "실시간/정기/수시/라벨 4갈래 흐름도 +
 # 워드클라우드"가 전부였다. 그 위에 "오늘 무슨 일이 있었나"를 답하는 층을 새로 얹었다:
@@ -19,9 +19,11 @@ from pathlib import Path
 from typing import Optional
 
 from app.config import (
+    SHAPE_TOKENS_CSS,
     COLOR_TEXT_MUTED,
     COLOR_WORDCLOUD_TIERS,
     CUTE_FONT_BASE64,
+    DEFAULT_ARTICLE_LINE_TEMPLATE,
     CUTE_FONT_NAME,
     FONT_STACK,
     LANDING_HTML_PATH,
@@ -33,6 +35,7 @@ from app.config import (
 )
 from app.atomic_write import atomic_write_text
 from app.alerted_urls import alerted_items, already_alerted_urls
+from app.credentials import llm_is_configured, naver_is_configured
 from app.curation import filter_hidden
 from app.filters import is_schedule_listing
 from app.home_trend import load_trend_words
@@ -49,6 +52,7 @@ from app.trend_data import (
     word_hits,
 )
 from app.summarizer import extract_keyword_frequencies
+from app.negative_guess import load_state as load_negative_guess
 
 # [추가: 2026-08-18] home.html이 app.adhoc.card를 참조한다 — app/adhoc/* → app/* 단방향
 # 의존 규칙(ADHOC_DESIGN.md)의 첫 예외다. 수시 모니터링을 개발 중엔 분리해뒀지만
@@ -68,8 +72,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>재정경제부 언론 모니터링</title>
+<title>재경부 AI 뉴스 모니터링</title>
 <style>
+  {shape_tokens}
   {cute_font_face}
   * {{ box-sizing: border-box; }}
   body {{
@@ -84,31 +89,86 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     gap: 13px; margin-bottom: 13px; align-items: stretch; }}
   .pair > .card {{ margin-bottom: 0; }}
   @media (max-width: 800px) {{ .pair {{ grid-template-columns: minmax(0, 1fr); }} }}
-  .logo {{ display: block; max-width: 120px; max-height: 120px; margin: 0 auto 14px;
-    border-radius: 50%; }}
-  h1 {{ font-size: 1.2rem; font-weight: 600; margin: 0 0 3px; text-align: center; color: {header}; }}
-  .today {{ text-align: center; color: {muted}; font-size: 0.78rem; margin: 0 0 20px; }}
-  .card {{ background: {card}; border: 1px solid {border}; border-radius: 10px;
+  /* [수정: 2026-09-18] 가운데 큰 로고·제목 → 왼쪽 한 줄 머리(HOME_HEADER_COMPACT_MOCKUP.html
+     B안). 로고 그림에 「재정경제부」가 이미 있어 제목은 「AI 뉴스 모니터링」만. ⚙ 설정은
+     머리 오른쪽 끝(흐름도 카드의 「화면 바로 가기」 제목 줄은 없앴다). */
+  .hd {{ display: flex; align-items: center; gap: 14px; margin: 0 0 14px; padding: 2px 2px 0; }}
+  .hd .logo {{ height: 34px; width: auto; flex-shrink: 0; display: block; }}
+  .hd .ttl {{ display: flex; flex-direction: column; gap: 1px; min-width: 0; }}
+  .hd .logo + .ttl {{ padding-left: 14px; border-left: 1px solid {border}; }}
+  h1 {{ font-size: 1.05rem; font-weight: 600; margin: 0; color: {header}; }}
+  .today {{ color: {muted}; font-size: var(--fs-xs); margin: 0; }}
+  .hd .gearlink {{ align-self: center; }}
+  @media (max-width: 480px) {{ .hd {{ flex-wrap: wrap; }}
+    .hd .logo + .ttl {{ padding-left: 0; border-left: 0; }} }}
+  .card {{ background: {card}; border: 1px solid {border}; border-radius: var(--r-lg);
     padding: 17px 20px; margin-bottom: 13px; }}
-  .card h2 {{ font-size: 0.78rem; font-weight: 700; color: {muted}; margin: 0 0 13px;
+  .card h2 {{ font-size: var(--fs-sm); font-weight: 700; color: {muted}; margin: 0 0 13px;
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }}
+  /* 흐름도 카드는 칸이 크고 줄이 많아 다른 카드보다 안쪽 여백을 넉넉히 */
+  .flow-card {{ padding: 24px 26px; }}
   .card h2 .sub {{ font-weight: 500; opacity: 0.8; }}
 
-  /* ── 오늘 건수 + [단독]/[속보] ── */
-  /* [수정: 2026-08-27] 큰 숫자(2rem) + 알약 테두리 칩 → 본문 크기 한 줄 스트립 +
-     테두리 없는 글자형 칩. 건수는 "정기 모니터링하는 사람만 보는 값"이라 카드에서
-     가장 무거울 이유가 없다는 사용자 판단 — 값은 남기되 무게만 덜었다. */
-  .statrow {{ position: relative; display: flex; align-items: center; gap: 9px;
-    flex-wrap: wrap; font-size: 0.8rem; color: {muted}; }}
-  .statrow .val {{ color: {header}; font-weight: 700; }}
-  .scope {{ font-size: 0.68rem; color: {muted}; border: 1px solid {border};
-    border-radius: 20px; padding: 2px 8px; flex-shrink: 0; }}
-  .vs b {{ color: {error}; font-weight: 700; }}
-  .vs .yday {{ opacity: 0.62; }}
-  .statdot {{ color: {border}; }}
-  .hlset {{ margin-left: auto; display: flex; gap: 2px; flex-wrap: wrap; }}
-  .hl {{ display: inline-flex; align-items: center; gap: 5px; font-size: 0.76rem;
-    font-weight: 700; line-height: 1.2; padding: 4px 7px; border-radius: 5px;
+  /* ── 남색 카드: 부정 추정 기사 + [단독]/[속보] (시안 mockups/HOME_NEGATIVE_GUESS_MOCKUP.html) ──
+     한 줄: 「부정 추정 기사 N건 +M ▾ · HH:MM 회차까지」 │ [단독]/[속보]. 예전의 흰 건수 줄
+     (오늘 N건 · 어제 같은 시각 대비)과 매시 논조 전광판은 없앴다. */
+  .board {{ position: relative; background: {board_bg}; border-color: {board_bg}; color: {board_text};
+    padding: 10px 16px; font-size: var(--fs-sm); }}
+  .bd-row {{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; row-gap: 6px; }}
+  .bd-lab {{ color: {board_neg}; font-weight: 700; font-size: var(--fs-md); }}
+  .bd-wait {{ opacity: .85; }}
+  .bd-wait a {{ color: {board_new}; }}
+  .bd-slot {{ opacity: .7; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }}
+  details.ngbox {{ flex-shrink: 0; position: static; }}
+  .ng-sum {{ display: inline-flex; align-items: center; gap: 5px; list-style: none; cursor: pointer;
+    padding: 3px 6px; margin-left: -6px; border-radius: var(--r-sm); font-variant-numeric: tabular-nums; }}
+  .ng-sum::-webkit-details-marker {{ display: none; }}
+  .ng-sum:hover, .ngbox[open] > .ng-sum {{ background: {board_hover}; }}
+  .ng-sum .cnt {{ font-weight: 600; opacity: .85; }}
+  .ng-sum .dl {{ color: {board_new}; font-size: var(--fs-xs); font-weight: 700; }}
+  .ng-sum .caret {{ font-size: var(--fs-xs); opacity: .7; }}
+  .bd-right {{ margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }}
+  .bd-rule {{ width: 1px; height: 18px; background: {board_rule}; }}
+  .board .hl.scoop {{ color: {board_scoop}; }}
+  .board .hl.flash {{ color: {board_neg}; }}
+  .board .hl.legacy {{ color: {board_text}; }}
+  .board .hl:hover, .board .hlbox[open] > .hl {{ background: {board_hover}; }}
+  .board .hllist {{ color: {text}; }}
+  /* 부정 추정 기사 목록 — 단독/속보 목록과 같은 틀, 폭은 카드 전체 */
+  .nglist {{ position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 6; background: {card};
+    border: 1px solid {border}; border-radius: var(--r-lg); box-shadow: var(--sh-pop);
+    color: {text}; font-size: var(--fs-sm); }}
+  .nglist::before {{ content: ""; position: absolute; left: 0; right: 0; top: -8px; height: 8px; }}
+  .ng-head {{ padding: 10px 14px 6px; font-size: var(--fs-xs); color: {muted}; border-bottom: 1px solid {row_hover}; }}
+  .ng-head .c-neg {{ color: {error}; }}
+  .nglist ul {{ list-style: none; margin: 0; padding: 4px 4px 6px; max-height: 380px; overflow-y: auto; }}
+  li.ng {{ display: grid; grid-template-columns: 40px minmax(0,1fr) auto; column-gap: 10px; padding: 7px 10px;
+    border-radius: var(--r-md); align-items: baseline; }}
+  li.ng:hover {{ background: {row_hover}; }}
+  .ng .ht {{ color: {muted}; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }}
+  .ng .tt {{ min-width: 0; }}
+  .ng .o {{ color: {muted}; font-size: .86em; font-weight: 500; margin-right: .5em; }}
+  .ng .t {{ color: {text}; text-decoration: none; }}
+  .ng .t:hover {{ color: {accent}; text-decoration: underline; }}
+  .ng .nw {{ font-size: var(--fs-xs); font-weight: 700; color: {board_new_chip_text}; background: {board_new_chip_bg};
+    border-radius: var(--r-sm); padding: 1px 5px; margin-left: 6px; }}
+  .ng .why {{ grid-column: 2 / 3; font-size: var(--fs-xs); color: {muted}; margin-top: 2px; }}
+  .ng .why::before {{ content: "근거 · "; opacity: .75; }}
+  .ng .acts {{ display: inline-flex; gap: 12px; white-space: nowrap; }}
+  .ng .acts button {{ font: inherit; font-size: var(--fs-sm); color: {muted}; background: none; border: 0;
+    padding: 0; cursor: pointer; text-decoration: none; }}
+  .ng .acts button:hover {{ color: {accent}; text-decoration: underline; }}
+  .ng .acts button.done {{ color: {accent}; text-decoration: none; }}
+  @media (max-width: 640px) {{
+    .bd-right {{ margin-left: 0; flex-basis: 100%; }}
+    .bd-rule {{ display: none; }}
+    .bd-right .hlset .hl:first-child {{ margin-left: -7px; }}
+    li.ng {{ grid-template-columns: 36px minmax(0,1fr); }}
+    .ng .acts {{ grid-column: 2 / 3; margin-top: 4px; }}
+  }}
+  .hlset {{ display: flex; gap: 2px; flex-wrap: wrap; }}
+  .hl {{ display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-sm);
+    font-weight: 700; line-height: 1.2; padding: 4px 7px; border-radius: var(--r-sm);
     cursor: default; list-style: none; }}
   .hl::-webkit-details-marker {{ display: none; }}
   .hl .ic {{ margin-right: -1px; }}
@@ -120,25 +180,29 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .hlbox[open] > .hl .n {{ opacity: 1; }}
   .hllist {{ list-style: none; margin: 0; padding: 8px 4px; position: absolute;
     right: 0; top: calc(100% + 6px); z-index: 5; background: {card};
-    border: 1px solid {border}; border-radius: 9px;
-    box-shadow: 0 6px 20px rgba(30,58,95,.13); max-width: 100%; }}
+    border: 1px solid {border}; border-radius: var(--r-lg);
+    box-shadow: var(--sh-pop); max-width: 100%; }}
   /* 칩과 목록 사이 6px 틈을 지나가는 동안 닫히지 않도록 하는 투명 다리 */
   .hllist::before {{ content: ""; position: absolute; left: 0; right: 0; top: -8px; height: 8px; }}
   .hllist li {{ display: flex; align-items: baseline; gap: 8px; padding: 6px 12px;
-    font-size: 0.78rem; border-radius: 6px; }}
+    font-size: var(--fs-sm); border-radius: var(--r-md); }}
   .hllist li:hover {{ background: {hover}; }}
-  .hllist .ht {{ color: {muted}; font-size: 0.7rem; font-variant-numeric: tabular-nums; flex-shrink: 0; }}
-  .hllist .ho {{ color: {muted}; font-size: 0.7rem; min-width: 56px; flex-shrink: 0; }}
+  .hllist .ht {{ color: {muted}; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; flex-shrink: 0; }}
+  .hllist .ho {{ color: {muted}; font-size: var(--fs-xs); min-width: 56px; flex-shrink: 0; }}
   .hllist a {{ color: {text}; text-decoration: none; }}
   .hllist a:hover {{ color: {accent}; text-decoration: underline; }}
+  .hllist .hl-copy {{ margin-left: auto; padding-left: 10px; flex-shrink: 0; font: inherit; font-size: var(--fs-sm);
+    color: {muted}; background: none; border: 0; cursor: pointer; }}
+  .hllist .hl-copy:hover {{ color: {accent}; text-decoration: underline; }}
+  .hllist .hl-copy.done {{ color: {accent}; text-decoration: none; }}
   details.hlbox {{ position: static; }}
 
   /* ── 정책 단어 추이 (그래프 본체는 app.trend_chart.chart_css()가 {trend_chart_css}로 주입) ── */
-  .trend-more {{ margin-left: auto; font-size: 0.76rem; color: {accent}; font-weight: 700;
-    text-decoration: none; padding: 3px 8px; border-radius: 20px; }}
+  .trend-more {{ margin-left: auto; font-size: var(--fs-sm); color: {accent}; font-weight: 700;
+    text-decoration: none; padding: 3px 8px; border-radius: var(--r-md); }}
   .trend-more:hover {{ background: {hover}; }}
   .trend-chart-link {{ display: block; text-decoration: none; color: inherit; }}
-  .empty-trend {{ font-size: 0.8rem; color: {muted}; padding: 6px 0 2px; line-height: 1.7; }}
+  .empty-trend {{ font-size: var(--fs-sm); color: {muted}; padding: 6px 0 2px; line-height: 1.7; }}
   .empty-trend a {{ color: {accent}; font-weight: 600; text-decoration: none; }}
   .empty-trend a:hover {{ text-decoration: underline; }}
   {trend_chart_css}
@@ -147,24 +211,24 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .irow {{ border-bottom: 1px solid {border}; padding: 10px 0; }}
   .irow:last-of-type {{ border-bottom: none; }}
   .rowhead {{ display: flex; align-items: center; gap: 9px; }}
-  .rank {{ width: 19px; height: 19px; border-radius: 50%; background: {hover}; color: {accent};
-    font-size: 0.67rem; font-weight: 700; flex-shrink: 0; display: flex; align-items: center;
+  .rank {{ width: 19px; height: 19px; border-radius: var(--r-circle); background: {hover}; color: {accent};
+    font-size: var(--fs-xs); font-weight: 700; flex-shrink: 0; display: flex; align-items: center;
     justify-content: center; }}
   /* [수정: 2026-09-11] 이름+칩을 한 상자로 — 반쪽 칸에서 이름이 길면 칩만 아랫줄로
      내려가고 막대는 오른쪽 자리를 지킨다. */
   .ibox {{ flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 3px 8px; }}
-  .iname {{ font-size: 0.9rem; font-weight: 600; color: {header}; }}
+  .iname {{ font-size: var(--fs-md); font-weight: 600; color: {header}; }}
   .chips {{ display: flex; gap: 4px; flex-wrap: wrap; }}
-  .gchip {{ font-size: 0.61rem; font-weight: 600; color: {muted}; border: 1px solid {border};
-    border-radius: 20px; padding: 1px 7px; white-space: nowrap; }}
+  .gchip {{ font-size: var(--fs-xs); font-weight: 600; color: {muted}; border: 1px solid {border};
+    border-radius: var(--r-pill); padding: 1px 7px; white-space: nowrap; }}
   /* [수정: 2026-09-02] 건수 숫자 → 막대. 1위를 100%로 둔 상대 길이라 모수를
      설명할 필요가 없다(그래서 부제·기타 줄을 통째로 지울 수 있었다). 정확한
      건수는 title 툴팁으로만 남긴다. */
-  .ibar {{ margin-left: auto; width: 64px; height: 5px; border-radius: 3px;
+  .ibar {{ margin-left: auto; width: 64px; height: 5px; border-radius: var(--r-sm);
     background: {border}; flex-shrink: 0; overflow: hidden; }}
   .ibar i {{ display: block; height: 100%; background: {accent}; opacity: 0.55;
-    border-radius: 3px; }}
-  .empty-issues {{ font-size: 0.85rem; color: {muted}; padding: 8px 0; }}
+    border-radius: var(--r-sm); }}
+  .empty-issues {{ font-size: var(--fs-md); color: {muted}; padding: 8px 0; }}
 
   /* ── 흐름도 ── */
   /* [수정: 2026-09-15] 칸 이름만 크게 + 마우스를 올리면 말풍선(HOME_FLOW_CLEAN_MOCKUP.html
@@ -186,20 +250,25 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      누르는 곳이 아니라 칸 모양 없이 글자 + 왼쪽 띠만 둔다. 격자 앞에 이름표 열·10px 틈 두 칸이
      붙어 입구 칸이 3열이 됐다(.side·.conn도 5열). */
   .fl {{ display: grid; grid-template-columns: 48px 10px minmax(0, .72fr) 26px minmax(0, 1fr) 26px
-    minmax(0, 1fr) 26px minmax(0, 1fr); align-items: stretch; row-gap: 12px; }}
-  .fl .gap {{ grid-column: 1 / -1; height: 6px; }}
+    minmax(0, 1fr) 26px minmax(0, 1fr); align-items: stretch; row-gap: 14px; }}
+  .fl .gap {{ grid-column: 1 / -1; height: 4px; }}
   .fl .side {{ grid-column: 5; }}
   .fl .rl {{ grid-column: 1; display: flex; align-items: center; padding-left: 10px;
-    border-left: 3px solid; font-size: 0.92rem; font-weight: 800; white-space: nowrap; }}
+    border-left: 3px solid; font-size: var(--fs-md); font-weight: 800; white-space: nowrap; }}
   .fl .rl.reg {{ border-color: {flow_row_reg_bar}; color: {header}; }}
   .fl .rl.ad {{ border-color: {flow_row_adhoc_bar}; color: {adhoc_text}; }}
   .fl .tile.t-regkw, .fl .tile.t-adnew {{ grid-column: 3; }}
   .t-live.slim {{ min-height: 42px; background: {card}; border: 1px dashed {flow_live_side_border}; }}
-  .t-live.slim .nm {{ font-size: 0.94rem; }}
+  .t-live.slim .nm {{ font-size: var(--fs-md); }}
   .t-live.slim:hover {{ background: {live_bg}; border-style: solid; }}
   .fl-conn .conn {{ grid-column: 5; display: flex; flex-direction: column; align-items: center;
-    justify-content: center; gap: 1px; height: 30px; font-size: 0.72rem; font-weight: 600; color: {text_faint}; }}
-  .fl-conn .conn::before {{ content: ""; height: 9px; border-left: 2px dotted {flow_live_side_border}; }}
+    justify-content: center; gap: 0; height: 28px; font-size: var(--fs-xs); font-weight: 600; color: {text_faint};
+    position: relative; }}
+  /* 「담아두기」 글자는 점선 오른쪽 — 실시간 → 초안 선이 끊기지 않고 곧게 내려온다
+     (HOME_FLOW_ROOMY_MOCKUP.html C안) */
+  .fl-conn .conn .cl {{ position: absolute; left: calc(50% + 10px); top: 50%;
+    transform: translateY(-50%); white-space: nowrap; }}
+  .fl-conn .conn::before {{ content: ""; height: 22px; border-left: 2px dotted {flow_live_side_border}; }}
   .fl-conn .conn::after {{ content: ""; border-left: 4px solid transparent; border-right: 4px solid transparent;
     border-top: 5px solid {flow_live_side_border}; }}
   /* .tile이 이 아래에서 테두리를 transparent로 다시 정하므로 두 클래스로 명시도를 올린다 */
@@ -208,15 +277,15 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .tile.t-adnew {{ background: {card}; border: 1px dashed {flow_entry_adhoc_border}; color: {adhoc_text}; }}
   .tile.t-adnew:hover {{ background: {arch_adhoc_bg}; border-style: solid; }}
   .tile {{ position: relative; text-decoration: none; display: flex; align-items: center;
-    justify-content: center; gap: 10px; padding: 0 12px; min-height: 60px; border-radius: 12px;
+    justify-content: center; gap: 10px; padding: 0 12px; min-height: 56px; border-radius: var(--r-lg);
     border: 1px solid transparent;
     transition: background .12s, border-color .12s, transform .12s, box-shadow .12s; }}
-  .tile .nm {{ display: flex; align-items: center; gap: 10px; font-size: 1.02rem; font-weight: 700;
+  .tile .nm {{ display: flex; align-items: center; gap: 10px; font-size: var(--fs-base); font-weight: 700;
     letter-spacing: -0.01em; white-space: nowrap; }}
   .tile .nm .e {{ font-size: 1.15rem; }}
   /* z-index: 아래 줄 칸(뒤에 그려지는 형제)이 말풍선을 덮지 않게 올린 칸을 위로 */
   .tile:hover, .tile:focus-visible {{ transform: translateY(-1px); z-index: 5; outline: none;
-    box-shadow: 0 4px 12px rgba(30,58,95,.09); }}
+    box-shadow: var(--sh-float); }}
   .fl .ar {{ display: flex; align-items: center; justify-content: center; color: {flow_arrow}; }}
   .fl .ar .ic {{ width: 16px; height: 16px; stroke-width: 2; }}
   /* 지금 손대는 칸은 색을 채우고, 보관함(지난 것)은 흰 바탕 + 테두리로 한 발 물러선다 */
@@ -235,14 +304,14 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .t-lab:hover {{ border-color: {label_border}; }}
   /* 라벨 칸은 이름 + 칩을 한 덩어리로 가운데에 둔다 */
   .tagset {{ margin-left: 4px; display: flex; gap: 6px; flex-wrap: wrap; }}
-  .tag-chip {{ font-size: 0.74rem; font-weight: 600; color: {label_text};
+  .tag-chip {{ font-size: var(--fs-xs); font-weight: 600; color: {label_text};
     background: rgba(255,255,255,0.75); border: 1px solid {label_chip_border};
-    border-radius: 20px; padding: 3px 10px; }}
+    border-radius: var(--r-pill); padding: 3px 10px; }}
   /* 말풍선 — 칸 가운데 아래에 뜬다. 칸 위를 스치듯 지나갈 때 툭툭 뜨지 않게 0.15초 뒤에
      연다([단독]/[속보] 칩과 같은 이유). 안에 누를 것이 없어 pointer-events를 끈다. */
   .tip {{ position: absolute; top: calc(100% + 8px); left: 50%; z-index: 10; width: 280px;
-    max-width: calc(100vw - 40px); background: {card}; border: 1px solid {border}; border-radius: 10px;
-    box-shadow: 0 10px 28px rgba(30,58,95,.15); padding: 11px 14px 12px;
+    max-width: calc(100vw - 40px); background: {card}; border: 1px solid {border}; border-radius: var(--r-lg);
+    box-shadow: var(--sh-pop); padding: 11px 14px 12px;
     display: flex; flex-direction: column; gap: 4px; text-align: left; white-space: normal;
     opacity: 0; visibility: hidden; transform: translate(-50%, -4px); pointer-events: none;
     transition: opacity .12s, transform .12s, visibility 0s linear .12s; }}
@@ -252,10 +321,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .tile:hover .tip, .tile:focus-visible .tip {{ opacity: 1; visibility: visible;
     transform: translate(-50%, 0);
     transition: opacity .12s .15s, transform .12s .15s, visibility 0s .15s; }}
-  .tip b {{ font-size: 0.88rem; font-weight: 700; color: inherit; }}
-  .tip .tb {{ font-size: 0.78rem; font-weight: 500; color: {muted}; line-height: 1.6; }}
+  .tip b {{ font-size: var(--fs-md); font-weight: 700; color: inherit; }}
+  .tip .tb {{ font-size: var(--fs-sm); font-weight: 500; color: {muted}; line-height: 1.6; }}
   .tip .nx {{ display: flex; align-items: center; gap: 6px; margin-top: 3px; padding-top: 7px;
-    border-top: 1px solid {border}; font-size: 0.74rem; font-weight: 600; color: {muted}; }}
+    border-top: 1px solid {border}; font-size: var(--fs-xs); font-weight: 600; color: {muted}; }}
   .tip .nx i {{ font-style: normal; color: {flow_arrow}; }}
   /* 창이 페이지 폭(960)보다 좁으면 칸이 줄어 맨 왼쪽·오른쪽 칸의 가운데 말풍선이 창 밖으로
      삐져나간다(숨어 있어도 가로 스크롤이 생긴다) — 그때만 칸 끝에 맞춘다. */
@@ -267,11 +336,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     .tip.l::before {{ left: 28px; margin-left: 0; }}
     .tip.r::before {{ left: auto; right: 28px; margin-left: 0; }}
   }}
-  /* [수정: 2026-09-15] 설정은 흐름도 카드 제목 줄 오른쪽 — 다른 카드의 「더보기」와 같은
-     자리다. 예전엔 실시간 칸이 한 줄을 통째로 써서 그 줄의 빈 오른쪽에 있었는데, 실시간이
-     정기 줄로 들어가며 그 자리가 없어졌다. */
-  .gearlink {{ margin-left: auto; font-size: 0.76rem; font-weight: 500; color: {muted};
-    text-decoration: none; border: 1px solid {border}; border-radius: 20px; padding: 4px 11px;
+  /* ⚙ 설정 — 페이지 머리(.hd) 오른쪽 끝. */
+  .gearlink {{ margin-left: auto; font-size: var(--fs-sm); font-weight: 500; color: {muted};
+    text-decoration: none; border: 1px solid {border}; border-radius: var(--r-md); padding: 4px 11px;
     display: inline-flex; align-items: center; gap: 5px; }}
   .gearlink:hover {{ background: {hover}; }}
   /* 좁은 화면에선 칸이 한 줄씩 쌓이고 이름표는 그 줄 칸들 위의 머리글로 눕는다(띠 → 밑줄).
@@ -289,8 +356,26 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
 
   /* ── 워드클라우드 ── */
-  .wordcloud {{ display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline;
-    gap: 2px 7px; margin: 0 auto; max-width: 100%; }}
+  /* 쟁점·추이 아래 한 줄. 왼쪽부터 크기순, 한 줄에 안 들어가는 단어는 _WORDCLOUD_JS가
+     통째로 숨기고 끝에 +N(숨은 단어는 title)을 단다. 머리줄 대신 카드 위 말풍선(.wc-tip). */
+  .wc-card {{ position: relative; }}
+  .wordcloud {{ display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: baseline;
+    gap: 2px 7px; max-width: 100%; }}
+  .wc-word.wc-cut {{ display: none; }}
+  .wc-more {{ color: {text_faint}; font-size: var(--fs-sm); align-self: center; white-space: nowrap; cursor: default; }}
+  .wc-tip {{ position: absolute; bottom: calc(100% + 8px); left: 20px; z-index: 10;
+    background: {card}; border: 1px solid {border}; border-radius: var(--r-lg);
+    box-shadow: var(--sh-pop); padding: 9px 14px 10px;
+    display: flex; flex-direction: column; gap: 2px; white-space: nowrap;
+    opacity: 0; visibility: hidden; transform: translateY(4px); pointer-events: none;
+    transition: opacity .12s, transform .12s, visibility 0s linear .12s; }}
+  .wc-tip::after {{ content: ""; position: absolute; bottom: -6px; left: 22px;
+    width: 10px; height: 10px; background: {card}; border-right: 1px solid {border};
+    border-bottom: 1px solid {border}; transform: rotate(45deg); }}
+  .wc-card:hover .wc-tip {{ opacity: 1; visibility: visible; transform: translateY(0);
+    transition: opacity .12s .15s, transform .12s .15s, visibility 0s .15s; }}
+  .wc-tip b {{ font-size: var(--fs-md); font-weight: 700; color: {header}; }}
+  .wc-tip .tb {{ font-size: var(--fs-sm); color: {muted}; }}
   .wc-word {{ white-space: nowrap; line-height: 1.3; font-family: {font_stack}; display: inline-block; }}
   .wc-word:hover {{ animation: wc-jitter 0.35s ease-in-out; }}
   @media (prefers-reduced-motion: reduce) {{ .wc-word:hover {{ animation: none; }} }}
@@ -302,12 +387,11 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     80%  {{ transform: translate(1px, 0) rotate(1deg); }}
     100% {{ transform: translate(0, 0) rotate(0deg); }}
   }}
-  .wc-caption {{ color: {muted}; font-size: 0.7rem; margin: 10px 0 0; text-align: center; }}
-  .empty {{ color: {muted}; font-size: 0.9rem; text-align: center; }}
+  .empty {{ color: {muted}; font-size: var(--fs-lg); text-align: center; }}
   .cute-caption-sm {{ font-family: '{cute_font_name}', sans-serif; font-size: 0.85rem;
     color: {muted}; margin-top: 4px; }}
 
-  .contact {{ color: {muted}; font-size: 0.85rem; text-align: center; margin-top: 22px; }}
+  .contact {{ color: {muted}; font-size: var(--fs-md); text-align: center; margin-top: 22px; }}
   .contact a {{ color: {accent}; }}
   .ic {{ width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
     stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }}
@@ -315,26 +399,25 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
 <div class="page">
-  {logo_html}
-  <h1>재정경제부 AI 뉴스 모니터링</h1>
-  <p class="today">{today_label}</p>
+  <header class="hd">{logo_html}<div class="ttl"><h1>AI 뉴스 모니터링</h1><p class="today">{today_label}</p></div>{gear_html}</header>
 
-  {stat_html}
+  {board_html}
   <div class="pair">
     {issues_html}
     {trend_html}
   </div>
-  {flow_html}
-
-  <div class="card">
+  <div class="card wc-card">
+    <span class="wc-tip"><b>주요 언급어</b><span class="tb">{wordcloud_scope}</span></span>
     {wordcloud_html}
-    <p class="wc-caption">* 0시 이후 현재까지 주요 언급어</p>
   </div>
+  {flow_html}
 
   <p class="contact">문의 {mail_icon} <a href="mailto:sweetgreetings@naver.com">sweetgreetings@naver.com</a></p>
 </div>
 <script>
 {alert_hover_js}
+{board_js}
+{wordcloud_js}
 </script>
 </body>
 </html>
@@ -344,7 +427,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 # 티어로 바꿨다 — 그날 언급 횟수 분포가 한쪽에 몰리면(예: 대부분 2~3회, 소수만 7회)
 # 값 기준 보간은 크기가 양극단으로만 쏠려 "중간이 없어 보이는" 문제가 있었다.
 # 등수로 5등분하면 단어 수가 몇 개든 각 티어에 고르게 배정되어 중간 단계가 항상 존재한다.
-_TIER_SIZES_REM = (1.9, 1.55, 1.25, 1.0, 0.82)
+# 한 줄에 넣으려고 다섯 단계 차이는 두고 전체를 줄였다(HOME_WORDCLOUD_ROW_MOCKUP.html).
+_TIER_SIZES_REM = (1.3, 1.12, 0.98, 0.86, 0.76)
 _TIER_COLORS = COLOR_WORDCLOUD_TIERS
 # [추가: 2026-07-25] 검색 키워드(예: 등록해둔 인물명)도 워드클라우드 집계에 포함하되
 # (app.summarizer.extract_keyword_frequencies), "이건 검색어라 나온 거구나"를 한눈에
@@ -361,8 +445,7 @@ def render_word_cloud(freqs: list, search_keywords: Optional[list] = None) -> st
     검색 키워드 자체는(등록해둔 인물명 등) 티어와 무관하게 muted 회색으로 표시해,
     언급량이 많아서 뜬 실제 화제어와 구분되게 한다.
 
-    마우스를 올리면(title 속성, 자바스크립트 불필요) 실제 언급 횟수를 볼 수 있다 —
-    티어 색·크기만으로는 정확한 횟수나 다른 단어와의 차이를 알 수 없기 때문이다.
+    언급 횟수는 보여주지 않는다 — 정량이 아니라 오늘의 맥락을 훑는 칸이다.
     """
     if not freqs:
         return '<div class="empty">💤<div class="cute-caption-sm">구름이 잠잠</div></div>'
@@ -371,7 +454,7 @@ def render_word_cloud(freqs: list, search_keywords: Optional[list] = None) -> st
     total = len(freqs)
 
     spans = []
-    for rank, (word, freq) in enumerate(freqs):
+    for rank, (word, _freq) in enumerate(freqs):
         tier = min(4, rank * 5 // total)
         size = _TIER_SIZES_REM[tier]
         if word.lower() in keyword_set:
@@ -381,9 +464,45 @@ def render_word_cloud(freqs: list, search_keywords: Optional[list] = None) -> st
             weight = 700 if tier == 0 else 500
         spans.append(
             f'<span class="wc-word" style="font-size:{size:.2f}rem; color:{color}; '
-            f'font-weight:{weight};" title="{freq}회 언급">{html.escape(word)}</span>'
+            f'font-weight:{weight};">{html.escape(word)}</span>'
         )
     return f'<div class="wordcloud">{"".join(spans)}</div>'
+
+
+# 워드클라우드를 한 줄로 자른다. baseline 정렬이라 같은 줄도 offsetTop이 달라서,
+# 앞 줄 바닥보다 아래에서 시작하는 단어를 새 줄로 센다. 넘친 단어는 뒤에서부터 숨기고
+# 끝에 +N(숨은 단어 이름만 title)을 붙인다 — +N 자리가 없으면 한 단어 더 숨긴다.
+_WORDCLOUD_JS = """
+(function(){
+  var box = document.querySelector('.wc-card .wordcloud');
+  if (!box) return;
+  var words = [].slice.call(box.querySelectorAll('.wc-word'));
+  function rows(els){ var n = 0, bottom = -1;
+    els.forEach(function(w){ var t = w.offsetTop, b = t + w.offsetHeight;
+      if (t >= bottom - 2) { n++; bottom = b; } else if (b > bottom) { bottom = b; } });
+    return n; }
+  function shown(){ return words.filter(function(w){ return !w.classList.contains('wc-cut'); }); }
+  function fit(){
+    var old = box.querySelector('.wc-more'); if (old) old.remove();
+    words.forEach(function(w){ w.classList.remove('wc-cut'); });
+    while (rows(shown()) > 1) { var s = shown(); s[s.length - 1].classList.add('wc-cut'); }
+    if (shown().length === words.length) return;
+    var more = document.createElement('span'); more.className = 'wc-more'; box.appendChild(more);
+    while (true) {
+      var cut = words.filter(function(w){ return w.classList.contains('wc-cut'); });
+      more.textContent = '+' + cut.length;
+      more.title = cut.map(function(w){ return w.textContent; }).join(' · ');
+      var s2 = shown();
+      if (s2.length <= 1 || rows(s2.concat([more])) <= 1) break;
+      s2[s2.length - 1].classList.add('wc-cut');
+    }
+  }
+  var timer = null;
+  window.addEventListener('resize', function(){ clearTimeout(timer); timer = setTimeout(fit, 80); });
+  fit();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+})();
+"""
 
 
 def _render_logo() -> str:
@@ -459,39 +578,135 @@ def _label_chips_html() -> str:
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# 오늘 건수 + [단독]/[속보]
+# 남색 카드: 부정 추정 기사 + [단독]/[속보]
 # ══════════════════════════════════════════════════════════════════════════
+# 판정은 app.negative_guess(스케줄러가 회차마다 한 번)가 하고, 여기선 그 파일과 오늘 회차만
+# 읽는다 — 홈은 API를 부르지 않는다. 예전 흰 건수 줄은 없앴고, 거기 있던 [단독]/[속보] 칩이
+# 이 카드 오른쪽으로 옮겨 왔다(시안 mockups/HOME_NEGATIVE_GUESS_MOCKUP.html).
 
-def _stat_card_html(today_n: int, ysame_n: Optional[int], yday_total: Optional[int]) -> str:
-    """상단 통계 줄 — "정기 수집 기준" 오늘 건수, 어제 같은 시각 대비, [단독]/[속보].
+def _copy_text(item: dict, template: str) -> str:
+    """홈 목록의 「복사」 — 보고서와 같은 한 줄(article_line_template) + 다음 줄 URL."""
+    url = item.get("url") or ""
+    return template.format(outlet=item.get("outlet") or "", title=item.get("title") or url) + "\n" + url
 
-    [수정: 2026-08-27] 건수를 큰 숫자로 세우지 않고 본문 크기 한 줄에 눕힌다 — 이
-    값은 정기 모니터링 담당자만 신경 쓰는 값이라 홈 카드에서 가장 무거울 이유가
-    없다는 사용자 판단. 값 자체는 그대로 남긴다(빼면 "오늘 얼마나 모였나"를 물을
-    자리가 홈에 없어진다).
 
-    ysame_n이 None이면(오늘 첫 회차가 아직 없어 비교 기준 시각이 없음) 비교 문구를
-    아예 안 보여준다 — 앱이 모르는 걸 단정하지 않는다는 이 앱의 원칙 그대로.
-    """
-    if ysame_n is not None and ysame_n > 0:
-        delta_pct = (today_n - ysame_n) / ysame_n * 100
-        vs_html = (
-            '<span class="statdot">·</span>'
-            f'<span class="vs" title="어제 하루 전체는 {yday_total}건이었습니다">'
-            f'어제 같은 시각 {ysame_n}건 대비 <b>{delta_pct:+.0f}%</b></span>'
+def _ng_rows(items: list, new_slot: Optional[str], template: str) -> str:
+    rows = []
+    for it in items:
+        url = it.get("url") or ""
+        outlet = it.get("outlet") or ""
+        title = it.get("title") or url
+        copy_text = _copy_text(it, template)
+        is_new = ' <span class="nw">new</span>' if new_slot and it.get("run_slot") == new_slot else ""
+        reason = it.get("reason") or ""
+        why = f'<span class="why">{html.escape(reason)}</span>' if reason else ""
+        rows.append(
+            f'<li class="ng"><span class="ht">{html.escape((it.get("pub_date") or "")[11:16] or "--:--")}</span>'
+            f'<span class="tt"><span class="o">{html.escape(outlet)}</span>'
+            f'<a class="t" href="{html.escape(url)}" target="_blank" rel="noopener">{html.escape(title)}</a>'
+            f"{is_new}</span>"
+            # 원문은 제목 링크로 충분해 따로 안 둔다(사용자 결정) — 복사만.
+            f'<span class="acts"><button type="button" class="ng-copy" data-copy="{html.escape(copy_text)}">복사</button></span>'
+            f"{why}</li>"
         )
-    else:
-        vs_html = ""
+    return "".join(rows)
+
+
+def _board_left_html(settings: dict, runs_today: list, now: datetime) -> str:
+    state = load_negative_guess(now.strftime("%Y-%m-%d"))
+    lab = '<span class="bd-lab">부정 추정 기사</span>'
+    judged_slots = [run["run_slot"] for run in runs_today if run["run_slot"] in state["runs"]]
+    if not judged_slots:
+        if not llm_is_configured():
+            llm_url = f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/llm"
+            wait = f'<a href="{llm_url}">AI 연동</a>을 하면 회차마다 골라 둡니다'
+        elif not runs_today:
+            wait = "첫 회차 뒤에 표시"
+        else:
+            wait = "판정 중"
+        return f'{lab}<span class="bd-wait">{wait}</span>'
+
+    latest = judged_slots[-1]
+    slot_html = f'<span class="bd-slot">{html.escape(latest)} 회차까지</span>'
+    items = filter_hidden(list(state["items"].values()))
+    items.sort(key=lambda it: it.get("pub_date") or "", reverse=True)
+    if not items:
+        return f'<span class="bd-lab">부정 추정 기사 없음</span>{slot_html}'
+
+    total = sum(r.get("count", 0) for r in state["runs"].values())
+    tip = (f"정기 회차에 모인 기사 중 제목·요약에 「재경부」·「재정경제부」가 나온 {total}건을 AI가 읽고, "
+           "재경부나 그 정책을 비판·우려·지적한다고 추정한 기사입니다. 회차가 끝날 때마다 새로 더해집니다.")
+    # 그날 첫 회차는 전부 새로라 +N·new가 뜻이 없다 — 앞 회차가 있을 때만 단다.
+    new_slot = latest if len(judged_slots) > 1 else None
+    new_n = sum(1 for it in items if new_slot and it.get("run_slot") == new_slot)
+    delta = f' <span class="dl" title="{html.escape(latest)} 회차에서 새로 더해진 기사">+{new_n}</span>' if new_n else ""
+    template = settings.get("article_line_template", DEFAULT_ARTICLE_LINE_TEMPLATE)
     return (
-        '<div class="card"><div class="statrow">'
-        f'<span>오늘 <span class="val">{today_n}건</span></span>'
-        f'{vs_html}'
-        f'<span class="hlset">{_alert_line_html()}</span>'
-        "</div></div>"
+        f'<details class="ngbox"><summary class="ng-sum" title="{html.escape(tip)}">'
+        f'<span class="bd-lab">부정 추정 기사 <span class="cnt">{len(items)}건</span></span>{delta}'
+        '<span class="caret">▾</span></summary>'
+        f'<div class="nglist"><div class="ng-head">정기 기사 중 「재경부」·「재정경제부」가 나온 {total}건에서 '
+        f'AI가 <b class="c-neg">부정</b>으로 추정한 {len(items)}건 · 최신순 · 숨긴 기사 제외</div>'
+        f"<ul>{_ng_rows(items, new_slot, template)}</ul></div></details>{slot_html}"
     )
 
 
-def _alert_line_html() -> str:
+def _board_card_html(settings: dict, runs_today: list, now: Optional[datetime] = None) -> str:
+    now = now or datetime.now()
+    left = _board_left_html(settings, runs_today, now)
+    alerts = _alert_line_html(settings.get("article_line_template", DEFAULT_ARTICLE_LINE_TEMPLATE))
+    right = (f'<span class="bd-right"><span class="bd-rule" aria-hidden="true"></span>'
+             f'<span class="hlset">{alerts}</span></span>') if alerts else ""
+    return f'<div class="card board"><div class="bd-row">{left}{right}</div></div>'
+
+
+# 부정 추정 기사 목록: 마우스를 올리면 열리고, 누르면 고정된다. 여는·닫는 지연과 "클릭 = 고정"은
+# 아래 [단독]/[속보] 칩(_ALERT_HOVER_JS)과 같은 값이고, 둘은 한 번에 하나만 열린다.
+_BOARD_JS = """
+(function () {
+  var box = document.querySelector('details.ngbox');
+  if (!box) return;
+  var alerts = Array.prototype.slice.call(document.querySelectorAll('details.hlbox'));
+  var openT = null, closeT = null;
+  function clearT() { clearTimeout(openT); clearTimeout(closeT); }
+  function open() { alerts.forEach(function (a) { delete a.dataset.pinned; a.open = false; }); box.open = true; }
+  box.addEventListener('mouseenter', function () { clearT(); openT = setTimeout(open, 120); });
+  box.addEventListener('mouseleave', function () {
+    clearT(); closeT = setTimeout(function () { if (!box.dataset.pinned) box.open = false; }, 220);
+  });
+  box.querySelector('summary').addEventListener('click', function (e) {
+    e.preventDefault(); e.stopPropagation(); clearT();
+    if (box.dataset.pinned) { delete box.dataset.pinned; box.open = false; }
+    else { box.dataset.pinned = '1'; open(); }
+  });
+  box.querySelector('.nglist').addEventListener('click', function (e) { e.stopPropagation(); });
+  alerts.forEach(function (a) {
+    a.addEventListener('mouseenter', function () { if (!box.dataset.pinned) box.open = false; });
+  });
+  document.addEventListener('click', function () { delete box.dataset.pinned; box.open = false; });
+})();
+// 「복사」 — 부정 추정 기사·[단독]/[속보] 목록 공용
+(function () {
+  document.querySelectorAll('.ng-copy').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var text = b.getAttribute('data-copy');
+      function done() {
+        b.textContent = '복사됨'; b.classList.add('done');
+        setTimeout(function () { b.textContent = '복사'; b.classList.remove('done'); }, 1200);
+      }
+      function fallback() {
+        var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+        ta.select(); document.execCommand('copy'); ta.remove(); done();
+      }
+      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, fallback);
+      else fallback();
+    });
+  });
+})();
+"""
+
+
+def _alert_line_html(template: str = DEFAULT_ARTICLE_LINE_TEMPLATE) -> str:
     """오늘 [단독]/[속보] 알림 표시 — **알림 발송 기록(app.alerted_urls) 하나만** 본다.
 
     회차 파일에서 말머리를 다시 세면 알림과 숫자가 어긋난다: 알림 폴링(app.
@@ -523,7 +738,9 @@ def _alert_line_html() -> str:
             f'<li><span class="ht">{html.escape((it.get("pub_date") or "")[11:16] or "--:--")}</span>'
             f'<span class="ho">{html.escape(it.get("outlet") or "")}</span>'
             f'<a href="{html.escape(it["url"])}" target="_blank" rel="noopener">'
-            f'{html.escape(it.get("title") or it["url"])}</a></li>'
+            f'{html.escape(it.get("title") or it["url"])}</a>'
+            # 부정 추정 기사 목록과 같은 복사 — 보고서 한 줄 형식 + URL(사용자 요청)
+            f'<button type="button" class="ng-copy hl-copy" data-copy="{html.escape(_copy_text(it, template))}">복사</button></li>'
             for it in items
         )
         parts.append(
@@ -610,13 +827,21 @@ _ALERT_HOVER_JS = """
 _HOME_CHART_WIDTH = 412
 
 
-def _trend_card_html(today_str: str, trend_url: str) -> str:
+def _naver_key_empty_html() -> str:
+    """네이버 검색 키가 없어 정기 회차가 한 번도 못 돈 상태 — 쟁점·추이 두 카드가 같은 문구를 쓴다
+    (원인도 할 일도 하나라서, HOME_CARD_SCOPE_MOCKUP.html)."""
+    url = f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/naver"
+    return ('<p class="empty-trend">정기 회차가 돌아야 채워져요.<br>'
+            f'<a href="{html.escape(url)}">네이버 검색 키</a>를 먼저 넣어주세요.</p>')
+
+
+def _trend_card_html(today_str: str, trend_url: str, has_today_run: bool = False) -> str:
     words = load_trend_words()
     more_html = f'<a class="trend-more" href="{html.escape(trend_url)}">더보기</a>'
     if not words:
         return (
             '<div class="card"><h2>정책 단어 추이 <span class="sub">'
-            f'제목·요약 기준</span>{more_html}</h2>'
+            f'정기</span>{more_html}</h2>'
             '<p class="empty-trend">아직 지켜보는 단어가 없습니다.<br>'
             f'<a href="{html.escape(trend_url)}">더보기</a>에서 단어를 골라주세요.</p></div>'
         )
@@ -628,6 +853,18 @@ def _trend_card_html(today_str: str, trend_url: str) -> str:
     by_date = articles_by_date_range(start, end)
     buckets, unit = build_buckets(start, end)
     fill_bucket_status(buckets, unit, by_date, today_str)
+
+    # 지난 7일에 정기 회차가 하나도 없으면 빈 그래프 대신 까닭을 말한다 — 키가 없으면
+    # 쟁점 카드와 같은 문구, 키가 있고 오늘 회차가 돌았으면 내일(어제가 차는 날)부터 그려진다.
+    if not any(b["record"] for b in buckets):
+        if not naver_is_configured():
+            empty = _naver_key_empty_html()
+        elif has_today_run:
+            empty = '<p class="empty-trend">💤 내일부터 그려져요</p>'
+        else:
+            empty = '<p class="empty-trend">💤 정기 회차가 하루 치 쌓이면 다음 날부터 그려져요</p>'
+        return (f'<div class="card"><h2>정책 단어 추이 <span class="sub">정기</span>'
+                f'{more_html}</h2>{empty}</div>')
 
     colors = [PALETTE[f"trend_{i+1}"] for i in range(len(words))]
     series = []
@@ -647,7 +884,10 @@ def _trend_card_html(today_str: str, trend_url: str) -> str:
     # 해명하는 문장이다. 이 둘 때문에 추이 카드가 쟁점 카드보다 길어져 쟁점 밑이 비었다.
     # 합계·각주는 /trend(app.trend_renderer)에 그대로 남는다.
     return (
-        '<div class="card"><h2>정책 단어 추이 <span class="sub">최근 7일'
+        # 부제는 실제 범위 — 「정기」가 수시가 안 섞였음을, 어제에서 끝나는 날짜가 오늘이
+        # 아직 안 들어갔음을 설명 문장 없이 말한다(HOME_CARD_SCOPE_MOCKUP.html A안).
+        '<div class="card"><h2>정책 단어 추이 <span class="sub">'
+        f'정기 · {buckets[0]["wd_label"]} ~ {buckets[-1]["wd_label"]}'
         f'</span>{more_html}</h2>'
         f'<a class="trend-chart-link" href="{html.escape(trend_url)}">'
         f'{chart_html}</a></div>'
@@ -718,7 +958,30 @@ def _dominant_tags(articles: list, kw2g: dict) -> list:
     return [name for name, c in counts.most_common() if c * 2 >= len(articles)]
 
 
-def _issues_card_html(settings: dict, articles: list) -> str:
+def _issues_empty_html(settings: dict, last_run: Optional[dict]) -> str:
+    """쟁점이 없을 때 — 왜 비었는지에 따라 문구가 셋이다(HOME_CARD_SCOPE_MOCKUP.html B안).
+
+    회차가 돌았는데 비었으면 기사가 전부 「기타」·일정 나열에 모였다는 뜻이라 담담하게
+    「특별한 쟁점은 없다」로 푼다. 회차가 아직 없으면 언제 채워지는지를 말한다.
+    """
+    if last_run:
+        return ('<p class="empty-issues">💤 '
+                f'{html.escape(last_run["run_slot"])} 회차까지 특별한 쟁점은 없는 것으로 보여요</p>')
+    if not naver_is_configured():
+        return _naver_key_empty_html()
+    # 순환 import 회피 — _flow_card_html과 같은 이유.
+    from app.scheduler import next_pending_slot
+    from app.settings import active_schedule_times
+    slot = next_pending_slot(datetime.now(), active_schedule_times(settings))
+    if slot:
+        return f'<p class="empty-issues">💤 {html.escape(slot["end"])} 회차가 끝나면 채워져요</p>'
+    return '<p class="empty-issues">💤 오늘 정기 회차가 아직 없어요</p>'
+
+
+def _issues_card_html(settings: dict, articles: list, last_run: Optional[dict] = None) -> str:
+    # 부제는 실제 범위 — 회차가 저장될 때마다 끝 시각이 늘어난다(A안).
+    sub = f'정기 · {html.escape(last_run["run_slot"])} 회차까지' if last_run else "정기"
+    head = f'<div class="card"><h2>오늘의 쟁점 <span class="sub">{sub}</span></h2>'
     kw2g: dict = {}
     for group in settings.get("keyword_groups", []):
         for kw in group.get("keywords", []):
@@ -727,10 +990,7 @@ def _issues_card_html(settings: dict, articles: list) -> str:
 
     streams = _issue_streams(articles)
     if not streams:
-        return (
-            '<div class="card"><h2>오늘의 쟁점</h2>'
-            '<p class="empty-issues">💤 오늘 분류된 쟁점이 아직 없습니다.</p></div>'
-        )
+        return head + _issues_empty_html(settings, last_run) + "</div>"
 
     top = streams[:_ISSUE_TOP_N]
     top_count = len(top[0]["articles"])  # 1위를 100%로 둔 상대 길이
@@ -746,7 +1006,7 @@ def _issues_card_html(settings: dict, articles: list) -> str:
             f'<span class="ibar" title="{n}건"><i style="width:{round(n * 100 / top_count)}%"></i></span>'
             "</div></div>"
         )
-    return '<div class="card"><h2>오늘의 쟁점</h2>' + "".join(rows) + "</div>"
+    return head + "".join(rows) + "</div>"
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -763,8 +1023,8 @@ def _issues_card_html(settings: dict, articles: list) -> str:
 _FLOW_TIPS = {
     # [추가: 2026-09-15] 수시 4단 흐름(D안) — 두 줄 맨 앞의 입구 칸.
     "keywords": ("정기 스크랩 검색어",
-                 "켜 둔 그룹은 실시간에, 정기 스크랩을 체크한 그룹은 초안·확정본에도 들어가요.",
-                 ("저장", "실시간은 바로 · 정기는 다음 회차부터")),
+                 "켜 둔 그룹은 전체 기사에, 정기 스크랩을 체크한 그룹은 초안·확정본에도 들어가요.",
+                 ("저장", "전체 기사는 바로 · 정기는 다음 회차부터")),
     "adnew": ("사안·검색어·시간을 정해 모아요",
               "지난 1년 동안 한 수집이 조건째 목록으로 남아 있어, 골라서 다시 쓸 수 있어요.",
               ("수집", "원본")),
@@ -864,14 +1124,13 @@ def _flow_card_html(last_run: Optional[dict], settings: dict) -> str:
     # 두 줄에서 다른 이름은 「초안 ↔ 원본」 하나뿐이다(마감이 있냐 없냐 = 실제로 다른 지점).
     # [수정: 2026-09-15, 4차] 줄 앞에 이름표 「정기」「수시」 — 줄이 이름을 말하므로 보관함 칸은
     # 둘 다 「보관함」(말풍선의 「→ 정기 보관함」은 그 화면의 실제 제목이라 그대로 둔다).
-    return f'''<div class="card">
-    <h2>화면 바로 가기<a class="gearlink" href="{base}/">{icon("gear")} 설정</a></h2>
+    return f'''<div class="card flow-card">
     <div class="flow">
     <div class="fl fl-top">
       <span class="blank"></span><span class="blank"></span>
-      {_flow_tile("t-live slim side", f"{base}/live.html", "🔴", "실시간", *tips["live"])}
+      {_flow_tile("t-live slim side", f"{base}/live.html", "🔴", "전체 기사", *tips["live"])}
     </div>
-    <div class="fl fl-conn"><span></span><span></span><span class="conn">📌 담아두기</span></div>
+    <div class="fl fl-conn"><span></span><span></span><span class="conn"><span class="cl">📌 담아두기</span></span></div>
     <div class="fl">
       <span class="rl reg" title="정해진 시각마다 앱이 알아서 모아요">정기</span>
       {_flow_tile("t-regkw", f"{base}/keywords", "🔍", "검색어", *tips["keywords"], edge="l")}
@@ -880,15 +1139,15 @@ def _flow_card_html(last_run: Optional[dict], settings: dict) -> str:
       {arrow}
       {_flow_tile("t-reg", "index.html", "💎", "확정본", *tips["done"])}
       {arrow}
-      {_flow_tile("t-regarch", "history.html", "🗄️", "보관함", *tips["regarch"], edge="r")}
+      {_flow_tile("t-regarch", "history.html", "🪎", "보관함", *tips["regarch"], edge="r")}
       <span class="rl ad" title="사안이 생기면 직접 모아요">수시</span>
       {_flow_tile("t-adnew", f"{base}/adhoc/new", "🔎", "새 수집", *tips["adnew"], edge="l")}
       {arrow}
-      {_flow_tile("t-ad", base + adhoc["href"], "📃", "원본", *tips["collect"])}
+      {_flow_tile("t-ad", base + adhoc["href"], "🍅", "원본", *tips["collect"])}
       {arrow}
-      {_flow_tile("t-ad", base + adhoc["bundle_href"], "🗂️", "확정본", *tips["bundle"])}
+      {_flow_tile("t-ad", base + adhoc["bundle_href"], "🥗", "확정본", *tips["bundle"])}
       {arrow}
-      {_flow_tile("t-adarch", f"{base}/adhoc", "📚", "보관함", *tips["adarch"], edge="r")}
+      {_flow_tile("t-adarch", f"{base}/adhoc", "🧺", "보관함", *tips["adarch"], edge="r")}
       <div class="gap"></div>
       {_flow_tile("t-lab", f"{base}/labels", "🏷️", "라벨 보관함", *tips["label"], extra=label_chips)}
     </div>
@@ -900,13 +1159,11 @@ def render_landing_page(
     freqs: list,
     search_keywords: Optional[list] = None,
     *,
-    today_n: int = 0,
-    ysame_n: Optional[int] = None,
-    yday_total: Optional[int] = None,
     settings: Optional[dict] = None,
     today_str: Optional[str] = None,
     issue_articles: Optional[list] = None,
     last_run: Optional[dict] = None,
+    runs_today: Optional[list] = None,
 ) -> str:
     """진입 화면 HTML을 렌더링한다 (PRD.md 기능3)."""
     settings = settings or load_settings()
@@ -916,17 +1173,23 @@ def render_landing_page(
 
     return _PAGE_TEMPLATE.format(
         font_stack=FONT_STACK,
+        shape_tokens=SHAPE_TOKENS_CSS,
         cute_font_face=_CUTE_FONT_FACE_CSS,
         cute_font_name=CUTE_FONT_NAME,
         logo_html=_render_logo(),
+        gear_html=f'<a class="gearlink" href="http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/">{icon("gear")} 설정</a>',
         today_label=today_label,
-        stat_html=_stat_card_html(today_n, ysame_n, yday_total),
-        trend_html=_trend_card_html(today_str, f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/trend"),
+        board_html=_board_card_html(settings, runs_today if runs_today is not None else load_today_runs(today_str)),
+        trend_html=_trend_card_html(today_str, f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/trend",
+                                    has_today_run=last_run is not None),
         trend_chart_css=chart_css(),
         alert_hover_js=_ALERT_HOVER_JS,
-        issues_html=_issues_card_html(settings, issue_articles),
+        board_js=_BOARD_JS,
+        issues_html=_issues_card_html(settings, issue_articles, last_run),
         flow_html=_flow_card_html(last_run, settings),
         wordcloud_html=render_word_cloud(freqs, search_keywords),
+        wordcloud_scope=(f"정기 · 오늘 0시 ~ {last_run['run_slot']} 회차까지" if last_run else "정기"),
+        wordcloud_js=_WORDCLOUD_JS,
         mail_icon=icon("mail"),
         # [수정: 2026-08-21] 색 값은 전부 app.config.PALETTE 하나에서 온다.
         **PALETTE,
@@ -993,55 +1256,18 @@ def generate_landing_page(keywords: Optional[list] = None) -> Path:
 
     today_str = datetime.now().strftime("%Y-%m-%d")
     runs_today = load_today_runs(today_str)
-    # [수정: 2026-09-01] 상단 건수 줄만 숨김을 안 본다 — 아래 all_seen이 그 집계다.
-    # 워드클라우드·오늘의 쟁점이 쓰는 articles는 예전 그대로 숨김을 걸러낸 목록이다
-    # (그 둘은 "오늘 보고서에 뭐가 실렸나"라는 보고서 축이라 숨김이 반영돼야 한다).
-    all_seen = {article["url"] for run in runs_today for article in run["articles"]}
     articles = _report_articles(runs_today)
     last_run = runs_today[-1] if runs_today else None
-
-    # 어제 "같은 시각까지"와 비교한다(하루 전체가 아니다) — 오늘은 마지막 회차
-    # 시각까지만 수집됐으므로, 어제도 같은 구간만 더해야 정직한 비교가 된다.
-    #
-    # [수정: 2026-09-01] 양쪽 다 **숨김을 안 본다**. 예전엔 오늘만 filter_hidden으로
-    # 거르고 어제는 is_hidden이 사실상 아무것도 못 걸렀다 — 숨김 기록이 자정에
-    # 초기화되는 당일 전용 저장소(app.curation._load_records)라 어제 URL은 애초에
-    # 그 집합에 없기 때문이다. 그래서 "오늘만 큐레이션 후 건수, 어제는 원본 건수"를
-    # 나눈 증감률이 담당자가 정리할수록 아래로 치우쳤다(실측 2026-09-01: 오늘 원본
-    # 335건 중 265건을 숨겨 -3%로 표시됐으나 실제로는 어제 대비 증가였다).
-    # 정책 단어 추이와 같은 판단 — 배경은 HISTORY.md "정책 단어 추이가 숨김에
-    # 흔들리던 문제" 참고.
-    ysame_n: Optional[int] = None
-    yday_total: Optional[int] = None
-    if last_run:
-        cutoff_hour = int(last_run["run_slot"][:2])
-        yday_str = (datetime.strptime(today_str, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
-        yday_runs = load_today_runs(yday_str)
-        if yday_runs:
-            yseen: set = set()
-            yday_total = 0
-            ysame_n = 0
-            for run in yday_runs:
-                for a in run["articles"]:
-                    if a["url"] in yseen:
-                        continue
-                    yseen.add(a["url"])
-                    yday_total += 1
-                    pub = a.get("pub_date")
-                    if pub and int(pub[11:13]) < cutoff_hour:
-                        ysame_n += 1
 
     freqs = extract_keyword_frequencies(articles, keywords, top_n=LANDING_KEYWORD_COUNT, exclude_words=exclude_words)
     html_text = render_landing_page(
         freqs,
         keywords,
-        today_n=len(all_seen),
-        ysame_n=ysame_n,
-        yday_total=yday_total,
         settings=settings,
         today_str=today_str,
         issue_articles=articles,
         last_run=last_run,
+        runs_today=runs_today,
     )
     atomic_write_text(LANDING_HTML_PATH, html_text)
     return LANDING_HTML_PATH

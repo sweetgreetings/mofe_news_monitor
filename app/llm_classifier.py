@@ -56,7 +56,7 @@ UNCLASSIFIED_GROUP_NAME = "📂 소제목 미분류"
 # [추가: 2026-08-26] 위 이름을 **화면에 그릴 때만** 쓰는 조각. 앞의 📂를 떼어낸 글자와,
 # 그 자리에 대신 붙일 SVG 아이콘 이름이다. 저장값(UNCLASSIFIED_GROUP_NAME)은 그대로
 # 둬야 한다 — group_order.json·LLM 캐시·"기타" 병합이 전부 이 문자열로 대조한다.
-UNCLASSIFIED_ICON = "folder"
+UNCLASSIFIED_ICON = "folder_open"
 UNCLASSIFIED_DISPLAY_TEXT = UNCLASSIFIED_GROUP_NAME.split(" ", 1)[1]
 
 # [추가: 2026-09-10] 어디에도 안 맞는 기사를 담는 받이 소제목 이름. AI·규칙 기반·마감 흡수
@@ -412,6 +412,50 @@ def _cache_key(articles: list, max_subheadings: int, round_id: Optional[tuple] =
     return (round_id, frozenset(a["url"] for a in articles), max_subheadings)
 
 
+def _store_locked(key: tuple, groups: list) -> None:
+    """분류 결과를 메모리 캐시에 넣는다 (호출자가 락을 쥔 상태).
+
+    상한(_CACHE_MAX)에 닿으면 **오래된 항목부터 하나씩** 뺀다. 넣으려는 항목과 같은
+    회차의 항목은 가장 나중까지 남긴다. 예전처럼 캐시를 통째로 비우면, 시작할 때 파일에서
+    40개 넘게 불러온 프로세스는 새 분류 하나를 넣는 순간 다른 회차 분류를 전부 잃는다 —
+    그러면 직전 확정본을 다시 저장하는 큐레이션(snapshot_group_names)이 캐시를 못 찾고
+    규칙 기반 이름으로 회차 파일을 덮어쓴다(HISTORY.md "캐시 통째 비우기로 확정본
+    소제목이 규칙 기반으로 덮이던 문제"). 파일 쪽은 _persist_cache_locked가 병합하므로
+    여기서 뺀 항목도 파일에는 남는다.
+    """
+    _cache.pop(key, None)
+    while len(_cache) >= _CACHE_MAX:
+        victim = next((k for k in _cache if k[0] != key[0]), None) or next(iter(_cache))
+        del _cache[victim]
+    _cache[key] = [(g["name"], [a["url"] for a in g["articles"]], g.get("summary", "")) for g in groups]
+
+
+def copy_round_cache(src_round: tuple, dst_round: tuple) -> int:
+    """src 회차 이름으로 저장된 분류를 dst 회차 이름으로 복사하고, 복사한 항목 수를 돌려준다.
+
+    「✂ 오늘만 여기서 끊기」(app.today_cuts) — 끊는 순간 회차 이름이 바뀌는데, 캐시는
+    회차가 같아야만 재사용되므로(_find_reusable/_find_partial) 복사하지 않으면 끊은 회차의
+    확정본이 초안 분류를 못 찾고 AI를 새로 불러 소제목 이름을 갈아엎는다. 옮기지 않고
+    복사한다 — 나뉜 두 회차가 모두 이 분류를 이어 쓴다.
+    """
+    _ensure_cache_hydrated()
+    with _cache_lock:
+        copies = {
+            (dst_round, urls, max_sub): [(name, list(u), summary) for name, u, summary in groups]
+            for (round_id, urls, max_sub), groups in _cache.items()
+            if round_id == tuple(src_round)
+        }
+        for key, groups in copies.items():
+            _cache.pop(key, None)
+            while len(_cache) >= _CACHE_MAX:
+                victim = next((k for k in _cache if k[0] not in (tuple(src_round), dst_round)), None) or next(iter(_cache))
+                del _cache[victim]
+            _cache[key] = groups
+        if copies:
+            _persist_cache_locked()
+        return len(copies)
+
+
 def _find_reusable(key: tuple) -> Optional[list]:
     """기사가 "줄어들기만" 한 경우 재분류 없이 기존 분류를 재사용한다 (호출자가 락을 쥔 상태).
 
@@ -500,6 +544,25 @@ def _find_partial(key: tuple) -> Optional[list]:
     return best[1] if best else None
 
 
+def _round_cache_emptied(key: tuple) -> bool:
+    """이 회차의 분류 캐시가 있긴 한데, 담긴 기사를 담당자가 전부 숨겼는지 (호출자가 락을 쥔 상태).
+
+    초안 자동 분류는 회차당 한 번이라 기사가 5~6건일 때 쓰이는데, 그 몇 건을 다 숨기면
+    _find_partial이 빌려 올 게 없어 규칙 기반(단어 빈도)으로 떨어졌다. 그 분류가 틀린 게
+    아니라 **보여줄 기사가 사라졌을 뿐**이라, 이때는 남은 기사를 전부 📂 소제목 미분류로
+    보여주는 게 맞다(가짜 한 단어 소제목보다 정직하다). → H: 초안 첫 분류 기사를 다 숨기면
+    규칙 기반으로 떨어지던 문제
+    """
+    from app.curation import load_hidden_urls
+
+    round_id, _, max_subheadings = key
+    hidden_urls = load_hidden_urls()
+    return any(
+        cached_round_id == round_id and cached_max == max_subheadings and not (cached_urls - hidden_urls)
+        for (cached_round_id, cached_urls, cached_max) in _cache
+    )
+
+
 def _rebuild(cached: list, articles: list, keep_leftover: bool = False) -> list:
     """캐시(소제목 이름 + URL 목록)를 지금 기사 목록에 다시 입힌다.
 
@@ -535,6 +598,42 @@ def _rebuild(cached: list, articles: list, keep_leftover: bool = False) -> list:
         if leftover:
             groups.append({"name": UNCLASSIFIED_GROUP_NAME, "articles": leftover, "summary": ""})
     return groups
+
+
+def cached_group_layout(articles: list, max_subheadings: int = MAX_SUBHEADINGS, round_id: Optional[tuple] = None) -> list:
+    """classify_with_llm이 방금 입힌 캐시 분류의 소제목 [(이름, 요약), …]을 캐시 순서대로 돌려준다.
+
+    _rebuild는 지금 보이는 기사가 하나도 없는 소제목을 빼고 돌려주는데, 그 소제목으로
+    배정된(「AI 기사 배정」·↑↓·드롭다운) 기사가 아직 보이면 소제목이 남아야 한다 —
+    app.classifier._apply_forced_groups가 이 목록으로 되살릴 자리와 요약을 찾는다.
+    classify_with_llm과 같은 조회 순서를 쓰므로 API를 부르지 않는다. 캐시가 없으면 [].
+    """
+    if not is_configured():
+        return []
+    _ensure_cache_hydrated()
+    key = _cache_key(articles, max_subheadings, round_id)
+    with _cache_lock:
+        cached = _cache.get(key) or _find_reusable(key) or _find_partial(key)
+        if not cached and round_id is not None:
+            cached = _emptied_round_cache(key)
+    return [(name, summary) for name, _, summary in cached] if cached else []
+
+
+def _emptied_round_cache(key: tuple) -> Optional[list]:
+    """_round_cache_emptied가 참인 그 캐시 항목의 분류를 돌려준다 (호출자가 락을 쥔 상태).
+
+    첫 분류 기사를 담당자가 전부 숨기면 _find_partial은 빌려 올 게 없어 None이다. 그래도
+    「AI 기사 배정」으로 그 소제목에 넣은 기사가 보이면 소제목은 남아야 하므로, 되살릴
+    이름·요약은 이 항목에서 가져온다. → H: 첫 분류 기사를 다 숨기면 소제목이 사라지던 문제
+    """
+    from app.curation import load_hidden_urls
+
+    round_id, _, max_subheadings = key
+    hidden_urls = load_hidden_urls()
+    for (cached_round_id, cached_urls, cached_max), groups in _cache.items():
+        if cached_round_id == round_id and cached_max == max_subheadings and not (cached_urls - hidden_urls):
+            return groups
+    return None
 
 
 def cached_group_names(articles: list, max_subheadings: int = MAX_SUBHEADINGS, round_id: Optional[tuple] = None) -> set:
@@ -791,6 +890,10 @@ def classify_with_llm(
                 partial = _find_partial(key)
                 if partial is not None:
                     return _accept(_rebuild(partial, articles, keep_leftover=True))
+                # 이 회차 분류의 기사를 전부 숨긴 경우 — 전부 미분류로(_round_cache_emptied).
+                # 마감(app.classifier.classify_for_finalize)은 이 결과를 받으면 처음부터 분류한다.
+                if round_id is not None and _round_cache_emptied(key):
+                    return _accept([{"name": UNCLASSIFIED_GROUP_NAME, "articles": list(articles), "summary": ""}])
                 return None
 
     # [수정: 2026-08-14] force=True(담당자가 "🤖 전체 재분류" 버튼을 직접 누른 경우)는
@@ -896,9 +999,7 @@ def classify_with_llm(
     groups = _refine_etc_bucket(groups, len(articles), max_subheadings, system_prompt)
 
     with _cache_lock:
-        if len(_cache) >= _CACHE_MAX:
-            _cache.clear()
-        _cache[key] = [(g["name"], [a["url"] for a in g["articles"]], g.get("summary", "")) for g in groups]
+        _store_locked(key, groups)
         _last_names = [g["name"] for g in groups]
         _last_round_id = round_id
         _persist_cache_locked()
@@ -926,9 +1027,7 @@ def seed_cache(articles: list, groups: list, max_subheadings: int = MAX_SUBHEADI
     key = _cache_key(articles, max_subheadings, round_id)
     global _last_names, _last_round_id
     with _cache_lock:
-        if len(_cache) >= _CACHE_MAX:
-            _cache.clear()
-        _cache[key] = [(g["name"], [a["url"] for a in g["articles"]], g.get("summary", "")) for g in groups]
+        _store_locked(key, groups)
         _last_names = [g["name"] for g in groups]
         _last_round_id = round_id
         _persist_cache_locked()

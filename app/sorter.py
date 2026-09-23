@@ -15,7 +15,7 @@ def _priority_rank(outlet: str, priority_outlets: tuple) -> int:
 def _pub_desc_key(article: dict) -> float:
     """같은 언론사 안에서 "발행시각 최신 먼저"로 세우기 위한 값 — 최신일수록 작다.
 
-    pub_date가 없거나(실시간현황이 허용하는 파싱 실패 기사) 형식이 깨졌으면 맨 뒤로
+    pub_date가 없거나(실시간 현황이 허용하는 파싱 실패 기사) 형식이 깨졌으면 맨 뒤로
     보낸다(inf) — 없는 시각을 지어내 최신인 척 올리지 않는다.
     """
     raw = article.get("pub_date")
@@ -57,7 +57,7 @@ def sort_by_outlet_priority(articles: list[dict], priority_outlets: Optional[lis
 
     주의: 완전 동일 제목 중복 제거(app.filters.deduplicate_by_title)는
     이 정렬 이후에 호출해야 한다 — 그래야 우선순위 높은 언론사의 사본이
-    남는다 (DESIGN.md 데이터 흐름 참고).
+    남는다 (archive/DESIGN.md 데이터 흐름 참고).
 
     주의: 이 함수는 어디까지나 **수집 시점의 출발 순서**다 — 담당자가 ↑/↓로 정리한 순서
     (app.preview_order.apply_preview_order)와 [단독] 최상단 규칙(app.filters.

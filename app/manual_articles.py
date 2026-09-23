@@ -35,8 +35,11 @@ def _write(articles: list, now: Optional[datetime] = None) -> None:
     )
 
 
-def add_manual_article(article: dict, now: Optional[datetime] = None) -> bool:
+def add_manual_article(article: dict, now: Optional[datetime] = None, at_top: bool = False) -> bool:
     """실시간 기사 현황에서 고른 기사 하나를 "직접 추가한 기사" 목록 맨 뒤에 추가한다.
+
+    at_top=True면 맨 앞에 넣는다 — 초안 「+ 수기로 기사 추가」는 입력칸이 칸 맨 위에
+    있어서, 방금 넣은 기사가 입력칸 바로 밑에 떠야 결과를 찾으러 내려가지 않는다.
 
     이미 같은 URL이 들어있으면(중복 클릭 등) 아무 일도 하지 않고 False를 돌려준다.
     새로 추가하면 True. 자정이 지난 뒤 첫 추가라면 load_manual_articles가 빈 목록을
@@ -45,7 +48,10 @@ def add_manual_article(article: dict, now: Optional[datetime] = None) -> bool:
     articles = load_manual_articles(now)
     if any(a["url"] == article["url"] for a in articles):
         return False
-    articles.append(article)
+    if at_top:
+        articles.insert(0, article)
+    else:
+        articles.append(article)
     _write(articles, now)
     return True
 

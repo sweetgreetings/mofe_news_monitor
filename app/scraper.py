@@ -1,4 +1,4 @@
-# Design Ref: DESIGN.md §2 데이터 흐름 — 검색 -> 정렬 -> 필터 -> 저장을 한 회차로 이어 실행
+# Design Ref: archive/DESIGN.md §2 데이터 흐름 — 검색 -> 정렬 -> 필터 -> 저장을 한 회차로 이어 실행
 import logging
 import time
 from datetime import datetime, timedelta
@@ -15,8 +15,6 @@ from app.draft_articles import clear_draft_pending_articles
 from app.draft_seen import load_draft_seen, search_condition
 from app.filters import (
     deduplicate_by_title,
-    exclude_personnel_articles,
-    exclude_photo_articles,
     filter_by_outlet_whitelist,
     sort_scoop_first,
 )
@@ -78,11 +76,12 @@ def collect_run(
     groups: Optional[list[dict]] = None,
     outlet_order: Optional[list[str]] = None,
     run_at: Optional[str] = None,
+    supplied_articles: Optional[list] = None,
 ) -> dict:
     """
     한 회차의 기사를 수집해 로컬 JSON 파일로 저장하고, 저장된 회차 데이터를 반환한다.
 
-    처리 순서 (DESIGN.md §2):
+    처리 순서 (archive/DESIGN.md §2):
       1. search_articles_by_groups: 설정된 키워드 그룹으로, 이 회차의 시간창
          (window_start~run_slot)에 게시된 기사만 검색 (그룹간 OR·그룹내 OR/AND,
          PRD 규칙 2 — 회차별 시간창 수집·키워드 그룹). 키워드 하나가 재시도까지
@@ -91,12 +90,10 @@ def collect_run(
          일부 키워드가 조용히 빠진 채 저장되는 것보다 낫다.
       2. outlet_order가 있으면(PRD 규칙16) 그 언론사만 남기고(filter_by_outlet_whitelist)
          그 순서로 정렬, 없으면 기본 우선순위(PRD 규칙3)로 정렬
-      3. 사진기사 제외(looks_like_photo_caption — [포토] 말머리 + 표식 없는 기사 추정,
-         [속보] 예외) -> 인사 발령 기사 제외([인사]) ->
-         완전 동일 제목 중복 제거(정렬을 먼저 해야 중복 중 우선순위 높은 언론사 사본이
-         남는다). [수정: 2026-08-11] 사진기사·인사 발령 기사 제외는 각각 설정
-         (exclude_photo_in_scrap/exclude_personnel_in_scrap)을 켜둔 경우에만 적용한다 —
-         중복 제거는 이 옵션들과 무관하게 항상 적용한다(PRD 규칙4, 설정으로 끌 수 없는 고정 규칙).
+      3. 완전 동일 제목 중복 제거(정렬을 먼저 해야 중복 중 우선순위 높은 언론사 사본이
+         남는다, PRD 규칙4). [수정: 2026-09-18] 사진·인사 기사 제외 설정(수집 범위)은
+         없앴다 — 판정이 틀린 기사가 화면에 안 보이고 조용히 빠지기 때문이다. 사진 추정은
+         화면의 📷 배지·「사진 추정 모아 보기」에만 쓴다.
       4. save_run: 언론사·제목·URL·요약을 JSON 파일로 저장
 
     run_slot: 이 회차의 예정 끝 시각 (예: "09:00"). 헤더 "언론 모니터링 09:00 기준"에 쓰이고,
@@ -115,6 +112,10 @@ def collect_run(
     outlet_order: 선택된 언론사(화이트리스트) 및 그 순서. 생략하면 저장된 설정값을 쓰며,
                   빈 리스트면 화이트리스트 없이 기본 우선순위 동작을 그대로 따른다.
     run_at:   실제 실행 시각. 놓친 회차 보충 실행 시 run_slot과 달라질 수 있다.
+    supplied_articles: 네이버를 다시 검색하지 않고 이 기사 목록(검색 결과와 같은 모양)으로
+                  저장한다 — 「✂ 오늘만 여기서 끊기」가 초안이 들고 있는 기사를 그대로
+                  확정본으로 만들 때 쓴다(app.today_cuts, 서버 /cut-round). 뒤의 단계
+                  (이미 실림·선택 언론사·정렬·중복 제거·분류 재사용)는 그대로 거친다.
     """
     # [추가: 2026-08-20] 키가 아예 없으면 검색을 시도하지도 않고 바로 실패시킨다.
     # search_articles_by_groups를 그대로 불렀다면 실패가 failed_keywords를 거쳐 일반
@@ -123,10 +124,10 @@ def collect_run(
     # 여기서 바로 NaverNotConfiguredError(response.status_code=401)를 올리면
     # _is_retryable가 즉시 포기로 판단해 그 낭비를 막는다 — app.naver_api.
     # NaverNotConfiguredError 참고.
-    if not naver_is_configured():
+    if supplied_articles is None and not naver_is_configured():
         raise NaverNotConfiguredError()
-    # [수정: 2026-07-26] exclude_photo_in_scrap 플래그를 읽어야 해서, groups·outlet_order·
-    # window_start를 전부 명시적으로 넘긴 호출(테스트 등)이라도 설정은 항상 한 번 읽는다.
+    # groups·outlet_order·window_start를 전부 명시적으로 넘긴 호출(테스트 등)이라도 설정은
+    # 항상 한 번 읽는다(수집 시간표 등 다른 값도 여기서 읽는다).
     settings = load_settings()
     if groups is None:
         groups = active_search_groups(
@@ -158,13 +159,16 @@ def collect_run(
     # [추가: 2026-08-21] track_keyword_matches=True — 이 회차 기사가 어떤 검색어로
     # 걸렸는지를 기사마다 matched_keywords로 받아 회차 파일에 그대로 저장한다.
     # 네이버 추가 호출은 0회다(이미 손에 든 키워드별 검색 결과에서 뽑는 값). 확정본은
-    # 실시간현황과 달리 키워드별 원시 결과를 갖고 있지 않아 나중에 다시 계산할 방법이
+    # 실시간 현황과 달리 키워드별 원시 결과를 갖고 있지 않아 나중에 다시 계산할 방법이
     # 없으므로, 저장해두지 않으면 영영 못 보여준다. 저장된 값은 그 회차 수집 당시의
     # 검색어 기준이라, 나중에 검색어를 바꿔도 안 따라 바뀐다 — "이 회차가 왜 이렇게
     # 모였나"의 기록이므로 그게 맞는 동작이다.
-    articles, failed_keywords = search_articles_by_groups(
-        groups, after=after_dt, before=before_dt, track_keyword_matches=True
-    )
+    if supplied_articles is not None:
+        articles, failed_keywords = [dict(a) for a in supplied_articles], []
+    else:
+        articles, failed_keywords = search_articles_by_groups(
+            groups, after=after_dt, before=before_dt, track_keyword_matches=True
+        )
     if failed_keywords:
         # [추가: 2026-08-13] app.naver_api가 키워드별 재시도까지 다 쓰고도 실패를
         # 보고하면, 그 키워드의 기사는 이 회차에서 통째로 빠진 채 저장될 수 있다 —
@@ -236,10 +240,6 @@ def collect_run(
         articles = sort_by_outlet_priority(articles, priority_outlets=outlet_order)
     else:
         articles = sort_by_outlet_priority(articles)
-    if settings.get("exclude_photo_in_scrap", False):
-        articles = exclude_photo_articles(articles)
-    if settings.get("exclude_personnel_in_scrap", False):
-        articles = exclude_personnel_articles(articles)
     # [수정: 2026-09-11] prefer — 같은 제목이 여럿이면 초안에 먼저 보인 쪽이 대표를 지킨다
     # (app.draft_seen 규칙 ①). 초안과 같은 값을 넘겨야 두 화면의 대표가 같다.
     articles = deduplicate_by_title(articles, prefer=seen["seen_order"])
