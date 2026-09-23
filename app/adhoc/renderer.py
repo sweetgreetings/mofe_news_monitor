@@ -765,6 +765,13 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   h2.sub {{ color: {header}; font-size: var(--fs-base); margin: 20px 0 6px; display: flex; align-items: center; gap: 6px; }}
   h2.sub .cnt {{ font-size: var(--fs-sm); color: {muted}; font-weight: 400; }}
   h2.sub .sub-acts {{ margin-left: auto; display: flex; align-items: center; gap: 2px; }}
+  /* 「AI가 읽은 소제목별 주요 요약」 — 정기 확정본·초안(app/renderer.py
+     `.bottom-summary-item`)과 같은 값. 소제목 이름을 굵게·제목색으로 본문과 가르고,
+     요약 문단은 줄 간격을 띄운다. 한쪽만 고치지 않는다. */
+  .adhoc-summary .sum-item {{ padding: 12px 0; border-bottom: 1px solid {border}; }}
+  .adhoc-summary .sum-item:last-child {{ border-bottom: none; padding-bottom: 0; }}
+  .adhoc-summary .sum-item strong {{ display: block; color: {header}; font-weight: 700; margin-bottom: 5px; }}
+  .adhoc-summary .sum-item p {{ margin: 0; white-space: pre-line; line-height: 1.75; }}
   .order-btn {{ background: transparent; border: none; color: {muted}; font-size: 0.78rem; cursor: pointer;
     padding: 2px 4px; display: inline-flex; }}
   .order-btn:disabled {{ opacity: 0.35; cursor: default; }}
@@ -2768,13 +2775,17 @@ def render_card_page(
         summaries = card["group_summaries"]
         pairs = [(name, _adhoc_group_summary(name, arts, summaries)) for name, arts in _article_groups(card)]
         # 화면에 보이는 소제목 순서로, 「기타」는 제목 목록(줄바꿈 유지)
+        # <dl>의 브라우저 기본값은 소제목이 굵지 않고 요약만 40px 들여쓰기돼, 어디가
+        # 소제목이고 어디가 요약인지 구분이 안 되고 줄도 촘촘하다. 정기 확정본·초안의
+        # 같은 블록(app/renderer.py `_render_bottom`)과 같은 마크업을 쓴다.
         items = "".join(
-            f'<dt>{html.escape(name)}</dt><dd style="white-space:pre-line">{html.escape(text)}</dd>'
+            f'<div class="sum-item"><strong>{html.escape(name)}</strong>'
+            f'<p>{html.escape(text)}</p></div>'
             for name, text in pairs if text
         )
         summary_html = f"""<div class="card adhoc-summary" style="margin-top:20px">
   <h2 class="sub" style="margin-top:0">{icon("chat")} AI가 읽은 소제목별 주요 요약</h2>
-  <dl>{items}</dl>
+  {items}
 </div>"""
 
     # 목록 밖 기사는 두 종류다 — 담당자가 직접 숨긴 것(복구 버튼 있음)과, 지금 조건에서

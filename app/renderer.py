@@ -785,10 +785,13 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     font-size: var(--fs-sm); color: {accent}; background: transparent; border: 1px solid {border};
     border-radius: var(--r-md); padding: 3px 10px; cursor: pointer; font-family: inherit;
   }}
-  .bottom-summary-item {{ padding: 8px 0; border-bottom: 1px solid {border}; }}
+  /* 소제목 이름은 굵게·제목색으로 본문과 가르고, 요약 문단은 줄 간격을 띄운다.
+     수시 카드의 같은 블록(app/adhoc/renderer.py `.adhoc-summary`)에 같은 값이
+     복제돼 있으니 한쪽만 고치지 않는다. */
+  .bottom-summary-item {{ padding: 12px 0; border-bottom: 1px solid {border}; }}
   .bottom-summary-item:last-child {{ border-bottom: none; padding-bottom: 0; }}
-  .bottom-summary-item strong {{ display: block; color: {header}; margin-bottom: 3px; }}
-  .bottom-summary-item p {{ margin: 0; white-space: pre-line; }}
+  .bottom-summary-item strong {{ display: block; color: {header}; font-weight: 700; margin-bottom: 5px; }}
+  .bottom-summary-item p {{ margin: 0; white-space: pre-line; line-height: 1.75; }}
   .manual-divider {{
     display: flex; align-items: center; gap: 10px; margin: 32px 0 4px;
     color: {muted}; font-size: var(--fs-sm);
