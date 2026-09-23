@@ -21,6 +21,7 @@
 | [LLM_COST_USAGE.md](LLM_COST_USAGE.md) | Claude API 호출 지점·비용 |
 | [MULTIUSER_ROLLOUT_CHECKLIST.md](MULTIUSER_ROLLOUT_CHECKLIST.md) | 다중 사용자 확장 시 준비 항목 (현재 구조엔 해당 없음) |
 | [EXPERT_QUESTIONS.md](EXPERT_QUESTIONS.md) | 혼자 정하기 어려운 결정을 자문받기 위해 모아 둔 것 (상황·실측치·후보안·묻고 싶은 것). 결정되면 규칙은 CLAUDE.md로, 기각안은 HISTORY.md로 옮기고 항목은 지운다 |
+| [TEXT_AUDIT.md](TEXT_AUDIT.md) | 화면 설명 글(말풍선·툴팁·안내줄·빈 화면·배너·확인창) 점검표. **아직 고치지 않은 문구 목록**이고, 고친 줄은 지운다 |
 | [README.md](README.md) | 사용자용 소개·설치 |
 | `mockups/` | 결정된 화면 시안. 규칙 옆 「시안」 링크가 가리킨다 |
 
