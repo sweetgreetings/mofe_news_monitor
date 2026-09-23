@@ -628,7 +628,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .kw-add {{ border: none; background: none; color: {accent}; cursor: pointer; font-size: var(--fs-sm); font-weight: 600; padding: 3px 6px; flex: none; }}
   .kw-cnt {{ font-size: var(--fs-sm); color: {muted}; margin-left: auto; }}
   .tilde {{ color: {muted}; }}
-  .btn {{ font: inherit; font-size: var(--fs-md); height: var(--h-lg); padding: 0 16px; box-sizing: border-box; border-radius: var(--r-md); cursor: pointer; border: 1px solid {accent}; background: {accent}; color: {on_fill}; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }}
+  .btn {{ font: inherit; font-size: var(--fs-md); height: var(--h-md); padding: 0 14px; box-sizing: border-box; border-radius: var(--r-md); cursor: pointer; border: 1px solid {accent}; background: {accent}; color: {on_fill}; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }}
   .btn.ghost {{ background: {card}; color: {accent}; }}
   .btn.mute {{ background: {card}; color: {muted}; border-color: {border}; }}
   .btn.danger {{ background: {card}; color: {error}; border-color: {error}; }}
