@@ -124,6 +124,24 @@
 - 정기 보관함(history.html) 조회 — 저장된 스냅샷만 읽는다.
 - 규칙 기반 폴백 경로(소제목 묶기·소제목 요약) — API 미설정이거나 실패했을 때도 전부 무료로 계속 동작한다.
 
-## 실측 갱신 방법 (나중에 정확한 값 넣을 때)
+## 실측은 로그에 남는다
 
-`app/llm_classifier.py`의 `classify_with_llm()`이 `response = _get_client().messages.create(...)`를 부르는 지점에서, `response.usage.input_tokens`/`response.usage.output_tokens`를 한 번 로그로 찍어보면 정확한 값을 알 수 있다(Anthropic SDK가 모든 응답에 `usage` 필드를 함께 돌려준다). 지금 이 문서의 "미실측" 표시는 전부 이 방법으로 확인 가능하다 — 실제로 로그를 찍어보고 싶으면 별도로 요청. 홈 부정 추정 기사(6절)는 이미 `usage`를 INFO 로그로 남기므로 `data/logs/app.log`만 보면 된다.
+**API를 부르는 여섯 지점 중 다섯이 호출할 때마다 `usage`를 INFO 로그로 남긴다** — `app/llm_classifier.py`의 넷(`_log_usage()` 한 곳을 거친다: 소제목 분류 · 「기타」 재정리 · 미분류 배정 · 소제목 나누기)과 `app/negative_guess.py`. 「연결 확인」(8절)만 안 남긴다(비용 0).
+
+```
+LLM 호출[소제목 분류] 기사 76건 — 입력 13050 / 출력 1533 토큰 (모델 claude-haiku-4-5)
+```
+
+그래서 하루 비용은 추정하지 않고 `data/logs/app.log`에서 바로 잰다(로그는 14일 보관):
+
+```bash
+grep -h "LLM 호출\|부정 추정 판정" data/logs/app.log* | grep 입력
+```
+
+**호출 횟수만 보려면** httpx가 남기는 요청 줄을 센다 — 이 앱이 `api.anthropic.com`에 실제로 보낸 요청 수와 정확히 같다:
+
+```bash
+grep -c "api.anthropic.com" data/logs/app.log
+```
+
+실측(2026-09-16~23): **하루 2~28회**. 정기 회차가 6개인 날이 8~28회였다. 이 수를 넘는 지출이 Console에 찍히면 그건 이 앱이 쓴 게 아니다.

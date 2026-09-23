@@ -22,6 +22,25 @@ from app.credentials import llm_api_key, llm_is_configured, llm_model
 
 logger = logging.getLogger(__name__)
 
+
+def _log_usage(label: str, response, article_count: int) -> None:
+    """API 호출 한 번이 실제로 쓴 토큰을 INFO로 남긴다.
+
+    이 파일의 호출 지점은 넷이고 토큰량이 제각각이라(회차 전체 분류 vs 몇 건 배정),
+    추정으로는 하루 비용을 못 가른다. 실패해도 분류를 막으면 안 되므로 전부 감싼다.
+    LLM_COST_USAGE.md "실측 갱신 방법" 참고.
+    """
+    try:
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return
+        logger.info(
+            "LLM 호출[%s] 기사 %d건 — 입력 %s / 출력 %s 토큰 (모델 %s)",
+            label, article_count, usage.input_tokens, usage.output_tokens, llm_model(),
+        )
+    except Exception:
+        pass
+
 # 한 번에 모델에 넘길 기사 수 상한. 이보다 많으면 LLM 분류를 포기하고 규칙 기반으로 넘긴다.
 #
 # [수정: 2026-08-11] 60 → 150. 60은 근거 없이 보수적으로 잡은 값이었는데, 실제로 담당자가
@@ -796,6 +815,7 @@ def _refine_etc_bucket(groups: list, articles_total: int, max_subheadings: int, 
             messages=[{"role": "user", "content": _build_prompt(etc_articles, room) + avoid}],
             output_config={"format": {"type": "json_schema", "schema": _SCHEMA}},
         )
+        _log_usage("기타 재정리", response, len(etc_articles))
         text = next((b.text for b in response.content if b.type == "text"), None)
         refined = _parse_groups(json.loads(text), etc_articles, room) if text else None
     except Exception:
@@ -936,6 +956,7 @@ def classify_with_llm(
                 messages=[{"role": "user", "content": _build_prompt(articles, max_subheadings, carryover_names)}],
                 output_config={"format": {"type": "json_schema", "schema": _SCHEMA}},
             )
+            _log_usage("소제목 분류", response, len(articles))
             text = next((b.text for b in response.content if b.type == "text"), None)
             groups = _parse_groups(json.loads(text), articles, max_subheadings) if text else None
             if groups is None:
@@ -1208,6 +1229,7 @@ def assign_to_existing(articles: list, groups) -> Optional[dict]:
             messages=[{"role": "user", "content": prompt}],
             output_config={"format": {"type": "json_schema", "schema": _ASSIGN_SCHEMA}},
         )
+        _log_usage("미분류 배정", response, len(articles))
         text = next((b.text for b in response.content if b.type == "text"), None)
         payload = json.loads(text) if text else None
     except Exception:
@@ -1305,6 +1327,7 @@ def split_group_articles(articles: list, max_subheadings: int, current_name: str
                 messages=[{"role": "user", "content": _build_prompt(articles, max_subheadings) + request}],
                 output_config={"format": {"type": "json_schema", "schema": _SCHEMA}},
             )
+            _log_usage("소제목 나누기", response, len(articles))
             text = next((b.text for b in response.content if b.type == "text"), None)
             groups = _parse_groups(json.loads(text), articles, max_subheadings) if text else None
             if groups:
