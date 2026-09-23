@@ -1960,6 +1960,24 @@ def test_adhoc_raw_versions():
             assert card.version_suffix(card.load_card(third["id"])) == " #3", "가운데를 지웠더니 번호가 바뀜"
             fourth = card.new_card(issue["id"], "인사청문회", "09:00", "13:05", ["청문회"], now=now + timedelta(seconds=4))
             assert card.version_suffix(fourth) == " #4", "지운 번호를 다시 씀"
+
+            # 1-1) 이름을 고치면 번호가 떨어진다 — 가를 것이 없는데 남으면 없는 판을 가리킨다.
+            #      확정본 목록 이름도 같은 규칙을 따르고, 이름을 되돌리면 번호도 돌아온다.
+            bundle = card.new_bundle_card("인사청문회", now=now + timedelta(seconds=5),
+                                          issue_id=issue["id"], basis_time="13:05",
+                                          source_card_id=third["id"], source_version=3)
+            assert card.source_version_suffix(bundle) == " #3"
+            renamed = card.load_card(third["id"])
+            renamed["report_title"] = "의혹 따로"
+            card.save_card(renamed)
+            assert card.version_suffix(card.load_card(third["id"])) == "", "이름이 혼자인데 번호가 남음"
+            assert card.source_version_suffix(bundle) == "", "원본에서 떨어진 번호가 확정본 이름에 남음"
+            assert card.version_suffix(fourth) == " #4", "남의 이름을 고쳤는데 번호가 흔들림"
+            assert card.version_suffix(card.load_card(first["id"])) == ""
+            renamed["report_title"] = "인사청문회"
+            card.save_card(renamed)
+            assert card.version_suffix(card.load_card(third["id"])) == " #3", "이름을 되돌렸는데 번호가 안 돌아옴"
+            card.delete_card(bundle["id"])
             trashed = [c["_trash_name"] for c in card.list_deleted_cards() if c["id"] == second["id"]]
             assert card.restore_card(trashed[0]) == second["id"]
 
