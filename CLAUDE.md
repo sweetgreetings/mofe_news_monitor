@@ -59,7 +59,7 @@
 - 수시 화면에는 정기를 가리키는 말이 하나도 없다.
 - `사안`이라는 말은 카드가 다루는 대상의 이름(`사안명` 등)으로만 쓴다.
 - 「오늘의 수집 결과」 같은 일반 서술, 새 카드를 만드는 동작 버튼(`새 수집 시작`, `+ 새 수집`)은 화면 이름이 아니라서 위 표를 따르지 않는다.
-- 「정기 스크랩」이라는 말이 화면에 남는 곳은 `/breaking-alert`의 API 호출량 안내 한 곳뿐이다.
+- 「정기 스크랩」이라는 말은 화면에서 쓰지 않는다. 아직 남아 있는 곳은 `/breaking-alert`의 API 호출량 안내와 홈 흐름도 검색어 칸 말풍선(`app/landing_renderer.py`)이고, 말풍선 쪽은 스위치 둘 체제 이전 문구라 고칠 자리다(TEXT_AUDIT.md).
 - 기각한 이름: `정기함`/`수시함`·`결과`·`보고용`·`수집 원본`/`수집 확정본`(옛 이름), 정기의 `확정안`(초안과 짝을 맞춘 이름이었으나 두 흐름 보고서 이름을 같게 하려고 되돌림), 수시 ②의 `후보`(「후보자」와 겹침)·`재료`. → H: 화면 용어
 
 ## 구조
@@ -142,7 +142,7 @@ FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN
 - 각 회차는 `(start, end]`에 발행된 기사를 모은다. **실제로는 `start`보다 60분(`COLLECT_LOOKBACK_MIN`, 당일 0시가 바닥) 앞부터 훑는다** — 마감 순간 네이버가 아직 색인하지 않은 기사를 다음 회차가 줍기 위해서다.
 - **다시 딸려온 앞 회차 기사는 `_already_published_urls`(오늘 저장된 회차들의 URL)로 뺀다. 이 제외는 화이트리스트·정렬·중복제거보다 먼저 돈다.** 대조는 URL로만. 그래서 이 값은 넉넉할수록 안전하다(튜닝 노브가 아니다).
 - 회수된 기사에는 `late_pickup`/`late_pickup_slot`을 달아 저장하고, 1건이라도 있으면 INFO 로그.
-- 순서: 숨김 제외(`filter_hidden`) → 화이트리스트 → 정렬 → 제목 중복 제거 → `classify_for_finalize`.
+- 순서: 화이트리스트 → 정렬 → 제목 중복 제거 → `sort_scoop_first` → 예약 기사 합치기 → `filter_hidden` → `classify_for_finalize`. **`filter_hidden`은 맨 마지막이고 분류 입력에만 쓴다** — 회차 파일에는 숨긴 기사도 그대로 저장되고(숨김은 표시용 기록이다), 화이트리스트·정렬·중복 제거는 숨긴 기사를 **포함한** 목록 위에서 돈다.
 - **저장한 회차 파일을 다시 읽어 돌려준다.** 필드를 손으로 나열해 돌려주면 `confirm_run`이 파일을 덮어쓸 때 새 필드가 사라진다. → H: AI 분류 실패가 조용히 묻히던 3중 결함
 - `matched_keywords`(기사가 걸린 검색어 전부)를 기사에 저장한다. 그 회차 수집 당시 기준이고 나중에 안 바뀐다.
 - 오늘 최신 회차가 없으면 `index.html`은 「아직 스크랩 시간 전입니다」 안내(`generate_waiting_page`).
@@ -209,9 +209,9 @@ FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN
 - **툴바 「새로고침」**(확정본·초안 공용, `app/renderer.py` `refresh_link_style/html/script` 한 곳 — 동작을 바꾸면 두 화면이 같이 바뀐다): 툴바 **오른쪽 묶음 맨 뒤**(「보기 순서」 다음)에 세로선으로 가르고 `⟳ 새로고침` 글자 버튼. 내용을 하나도 바꾸지 않고 지금 화면을 다시 불러오기만 하므로 오른쪽이고, 높이·여백·색은 가져가기 글자와 같은 값이다(`--h-tb`·`text_soft`·굵기 500, hover는 accent + 밑줄). **세로선과 아이콘이 가져가기와 가른다** — 그냥 붙이면 「복사 · 텍스트 · 엑셀 · 새로고침」 넷으로 읽힌다.
   - 누르면 `⟳ 불러오는 중…`(아이콘 회전, 못 누름)으로 바뀌고 보던 자리를 `sessionStorage`(`screenRefreshScroll`, 10초 지난 값·다른 화면 값은 버림)로 지킨다. **이 둘이 브라우저 새로고침보다 나은 전부라, 하나라도 빼면 버튼도 뺀다.** 링크는 설정 서버 절대주소(file://로 열린 화면이 디스크의 옛 파일을 다시 읽지 않게).
   - **이 버튼은 초안·확정본에만 둔다** — 화면이 스스로 바뀌지 않는데 뒤에서 값이 변하는 자리가 그 둘뿐이다(초안은 회차가 진행 중이라 기사가 계속 들어오고, 확정본은 자동발송 카운트다운이 0에 닿아도 결과가 안 보인다). 수시 원본은 「지금까지 다시 수집」이 그 자리를 차지하고(더 강한 동작이라 나란히 두면 뜻이 겹친다), 수시 확정본·두 보관함은 담당자가 손댈 때만 바뀐다. 전체 기사의 본문 새로고침(`.refresh-btn`)은 그대로다. 시안 [mockups/TOOLBAR_REFRESH_MOCKUP.html](mockups/TOOLBAR_REFRESH_MOCKUP.html). → H: 새로고침 버튼 자리
-- **회차 마감 배너**: 0에 닿으면 `#round-over-banner`를 상단 고정(z-index 21)으로 — 「H시 M분 회차가 마감됐어요. …확정본에는 반영되지 않아요.」 + `스크랩 확정본 열기 →` + `나중에`(`sessionStorage` `roundOverDismissed:{ROUND_DEADLINE_MS}`). `body.round-over`가 `.topbar`를 `--round-banner-h`만큼 민다.
+- **회차 마감 배너**: 0에 닿으면 `#round-over-banner`를 상단 고정(z-index 21)으로 — 「H시 M분 회차가 마감됐어요. …확정본에는 반영되지 않아요.」 + `확정본 열기 →` + `나중에`(`sessionStorage` `roundOverDismissed:{ROUND_DEADLINE_MS}`). `body.round-over`가 `.topbar`를 `--round-banner-h`만큼 민다.
 - **미분류 배지**(제목 옆, 초안 전용, 0건이면 안 그림): **글자 없이 열린 폴더 아이콘 + 숫자**(`icon(UNCLASSIFIED_ICON)` = `folder_open`, 미분류 칸 제목과 같은 아이콘, 뜻은 툴팁, ↓ 없음). 누르면 누르는 시점 DOM의 `.subheading-unclassified`로 스크롤. 색은 그 칸의 `.unclassified-count`와 같다. 📌 뱃지와 같은 모양이다.
-- **규칙 기반 폴백 경고**(초안 전용): 분류 직후 `llm_classifier.last_classification_was_rule_based()`를 읽어 `.classify-degraded` 박스. 기사 5건 미만이면 안 띄운다. 문구는 원인별 셋(`_classify_degraded_html`, 이 순서로 우선): (1) 기사 150건 초과 → 몇 건 줄이라고 숫자로 (2) 이번 회차 직접 재분류가 연속 2회 이상 실패(`app/reclassify_attempts.py`, 메모리) → 이름을 직접 고치길 권하고 시도 이력 (3) 일반 → 두 줄. **배너에 실행 버튼을 두지 않는다** — 툴바 버튼을 `.btn-ref` 칩으로 가리킨다.
+- **규칙 기반 폴백 경고**(초안 전용): 분류 직후 `llm_classifier.last_classification_was_rule_based()`를 읽어 `.classify-degraded` 박스. 기사 5건 미만이면 안 띄운다. 문구는 원인별 넷(`_classify_degraded_html`, 이 순서로 우선): (1) 기사 150건 초과 → 몇 건 줄이라고 숫자로 (2) 크레딧 부족(`llm_last_credit_error()`) → 충전 전에는 다시 눌러도 같은 결과라고 (3) 이번 회차 직접 재분류가 연속 2회 이상 실패(`app/reclassify_attempts.py`, 메모리) → 이름을 직접 고치길 권하고 시도 이력 (4) 일반 → 두 줄. **배너에 실행 버튼을 두지 않는다** — 툴바 버튼을 `.btn-ref` 칩으로 가리킨다.
 - 폴백 상태에서 **복사·텍스트·엑셀은 한 번 더 묻는다**(나갈 소제목 이름을 보여줌). `CLASSIFY_DEGRADED`/`CLASSIFY_DEGRADED_NAMES`를 `PLAIN_TEXT`와 같은 자리에서 선언하고 `previewMoveArticle`이 갱신한다.
 - 새로 들어온 기사 노랑: 아래 "기사 행 상태색" 참고.
 - **「+ 수기로 기사 추가」**(📌 담아둔 기사 칸 머리, 초안·확정본): 네이버에서 직접 찾은 기사를 **주소만으로** 📌 담아둔 기사에 올린다. 검색어 화면을 안 거친다 — 일회용 키워드를 등록했다 지우는 우회로는 그 회차 확정본의 수집 조건까지 바꾼다. 네이버 검색 API를 부르지 않고 원문 페이지 하나만 받아 언론사·제목·요약·발행시각을 읽는다(`app/naver_api.py` `fetch_article_by_url`, 서버 `POST /add-article-by-url`).
@@ -235,7 +235,7 @@ FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN
 - **LLM 분류** (`app/llm_classifier.py` `classify_with_llm`, 모델 `LLM_MODEL`=`claude-haiku-4-5`): 쟁점 단위로 묶고 같은 호출에서 소제목 요약도 쓴다. 애매한 기사는 주저 없이 「기타」. 프롬프트 원본은 AI_RULES.md.
 - **폴백**: API 키 없음·패키지 없음·기사 수가 `[2, 150]` 밖·호출 실패 → 규칙 기반. 예외는 삼키고 경고 로그만.
 - 요약은 3문장·250자 이하, 문장 중간에서 자르지 않는다. 폴백이면 최우선 기사 요약을 같은 한도로 자른다(`summarize_group`). 요약은 `group_summary`로 회차 스냅샷에 저장된다. **「기타」는 요약 문단 대신 기사 제목 목록**(`- 제목` 앞 5건 + `외 N건`, `app/summarizer.py` `etc_titles_summary`) — 관계없는 기사를 한 문단으로 쓰면 문장이 뒤섞인다. 화면·복사·텔레그램·이메일, 수시도 같다.
-- 하단 블록은 `💬 AI가 읽은 소제목별 주요 요약` 하나(화면 전용). 「🤖 AI가 추출한 주요 키워드」 블록은 없앴다 — 검색어로 걸러진 기사의 빈도는 검색어 주변 단어만 돌려준다. 토크나이저(`app/tokenizer.py`)는 워드클라우드가 계속 쓴다.
+- 하단 블록은 `💬 AI가 읽은 소제목별 주요 요약` 하나(화면 전용). 한 항목은 `padding: 12px 0` + 아래 실선, 소제목 이름은 굵게·제목색(`strong`), 요약 문단은 `line-height: 1.75`. **CSS가 세 곳에 복제돼 있다** — 정기 `.bottom-summary-item`(`app/renderer.py`·`app/preview_renderer.py`), 수시 `.adhoc-summary .sum-item`(`app/adhoc/renderer.py`). 한쪽만 고치지 않는다. 「🤖 AI가 추출한 주요 키워드」 블록은 없앴다 — 검색어로 걸러진 기사의 빈도는 검색어 주변 단어만 돌려준다. 토크나이저(`app/tokenizer.py`)는 워드클라우드가 계속 쓴다.
 
 ### 언제 API를 부르나 (비용 통제)
 
@@ -262,7 +262,7 @@ FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN
 ### 캐시·재사용·마감
 
 - **마감 시 분류는 새 이름을 짓지 않는다.** `collect_run` → `classify_for_finalize`: `classify_with_llm(allow_call=False)`로 초안 분류를 재사용하고, 새 기사만 `assign_to_existing`으로 기존 소제목에 넣는다. 초안 분류가 아예 없을 때만 전체 분류. 결과를 `seed_cache()`로 확정본 기사 집합 키에 심어 첫 큐레이션도 캐시를 맞춘다.
-- **캐시** `{(frozenset(urls), max_subheadings): [(name, [urls])]}`, 최대 40, `data/llm_classification_cache.json`. **상한에 닿으면 오래된 항목부터 하나씩 빼고, 넣는 항목과 같은 회차는 끝까지 남긴다**(`_store_locked`) — 통째로 비우지 않는다(재시작 뒤 첫 분류가 앞 회차 분류를 지우면 확정본 재저장이 규칙 기반으로 덮인다). → H: 캐시 통째 비우기로 확정본 소제목이 규칙 기반으로 덮이던 문제 **저장은 파일을 읽어 병합한 뒤 쓴다**(같은 키는 메모리 우선, 파일 항목은 최근 80개까지). 파일 항목을 키로 되돌리는 식은 `_entry_key_of` 하나.
+- **캐시** `{(round_id, frozenset(urls), max_subheadings): [(name, [urls], summary)]}`, 최대 40, `data/llm_classification_cache.json`. **상한에 닿으면 오래된 항목부터 하나씩 빼고, 넣는 항목과 같은 회차는 끝까지 남긴다**(`_store_locked`) — 통째로 비우지 않는다(재시작 뒤 첫 분류가 앞 회차 분류를 지우면 확정본 재저장이 규칙 기반으로 덮인다). **저장은 파일을 읽어 병합한 뒤 쓴다**(같은 키는 메모리 우선, 파일 항목은 최근 80개까지). 파일 항목을 키로 되돌리는 식은 `_entry_key_of` 하나. → H: 캐시 통째 비우기로 확정본 소제목이 규칙 기반으로 덮이던 문제
 - `_find_reusable`: 기사가 줄기만 했으면 상위집합 재사용. `_find_partial`: 겹침이 가장 큰 캐시 재사용, **과반 판정의 분모는 캐시 기사 중 숨기지 않은 것**(`cached_urls - hidden_urls`), 새 기사는 「📂 소제목 미분류」로. 호출 실패 시 한 번 재시도 후 재사용 가능한 캐시로 물러선다.
 - **빈 응답도 실패로 보고 재시도**하고 `stop_reason`·블록 타입·앞부분을 WARNING으로 남긴다.
 - **「기타」 재정리**(`_refine_etc_bucket`): 1차 「기타」가 6건 이상이면서 25% 이상이면 그 기사만 다시 분류. 남은 칸만큼만 새로 만들고, 실패하면 1차 결과를 그대로 둔다.
@@ -353,7 +353,7 @@ FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN
 - **새로 들어온 기사 노랑**(`.is-new-arrival`, `#FFF9C4`): 확정본·초안에서 **같은 회차**의 이전 보기에 없던 기사. 기준선은 회차별 `localStorage`(`confirmedKnownUrls:{date}:{slot}` / `previewKnownUrls:{ROUND_DEADLINE_MS}`), 처음 여는 회차는 기록만. `.just-promoted`/`.just-moved`보다 먼저 선언.
 - **세이지**(`#E7EFE8`): `.just-moved`(↑↓·소제목 이동·일괄) 한 번, `.just-promoted`(📌 승격)도 같은 색. **"담당자가 방금 손댄 것만"** 칠한다.
 - **연보라** `.just-classified`: AI 배정·나누기 결과.
-- 펼쳐 본 기사(`<details open>`)는 제목·URL을 남색(`seen_color` `#3B5FA0`).
+- 펼쳐 본 기사(`<details open>`)는 제목 줄을 흐리게(`opacity: 0.62`) — **색이 아니라 밝기로만** 준다(색은 뜻을 가진 축이라 「읽은 것」에 새 색을 만들지 않는다).
 
 ## 정기 모니터링 — 출력·발송
 
@@ -389,7 +389,7 @@ URL
   - **옛 기록 읽기**: 새 키가 하나도 없는 기록만 `enabled` → 정기 기사, `notify` 없음 → 하루 종일. 새 키가 하나라도 있으면 없는 칸은 꺼짐. 저장할 땐 `enabled`를 `regular_articles` 값으로 같이 적는다(파생값).
   - **기사·요약**: 둘 다 켜면 **한 통**에 기사 목록 + 그 아래 요약. 요약만이면 보고서 머리(첫 빈 줄 앞 — 헤더·메모)만 남기고 요약. **요약이 없거나 AI 분류가 실패한 보고서면 요약만 켠 사람에게도 기사 목록을 보낸다.** 메시지 짓기는 `app/report_message.py` 한 곳(정기·수시 공용). 요약 텍스트는 정기 `app.renderer.build_summary_text`(화면 요약 복사 버튼과 같은 함수), 수시 `app.adhoc.renderer.build_adhoc_summary_text`.
   - **알림 시간** (`notify`): `always`(하루 종일) / `work`(업무 시간 = 월~금 09:00~18:00) / `custom`(`days`: `daily`|`weekday`, `start`·`end`는 30분 단위). **그 밖의 시간엔 `disable_notification`으로 조용히 보낸다** — 메시지는 그대로 가고 소리·진동만 없다. `send_text`가 받는 사람마다 판단하므로 [단독]·[속보]·정기·수시·호출 한도 경고 전부에 적용되고, 명단에 없는 chat id는 울린다. 자정을 넘는 구간(22:00~07:00)의 요일은 구간이 시작된 날 기준. 깨진 값·시작=끝은 하루 종일로 읽는다(틀려도 "울려야 할 때 조용함"이 되지 않게). **기존 사람은 하루 종일, 새로 추가하는 줄만 업무 시간으로 시작한다.** 공휴일은 모른다(창에 안내). 이메일엔 적용 안 됨.
-- **텔레그램 발송 계정** (`/telegram-sender`, 시안 [mockups/TELEGRAM_SENDER_MOCKUP.html](mockups/TELEGRAM_SENDER_MOCKUP.html)): 봇 토큰 + 봇 이름. 토큰은 `app/credentials.py` `telegram_bot_token()`(설정 화면 > `.env`) — **토큰을 읽는 곳은 모듈 상수가 아니라 이 함수를 부를 때마다 읽는다**(`app/telegram_bot.py`·`app/telegram_bot_name.py`). 토큰 칸이 비면 저장값 유지. 봇은 자기 자신에게 메시지를 보낼 수 없어 시험 발송 대신 [연결 확인](`check_bot_token`, `getMe`·`getMyName`, 메시지 안 보냄). 토큰만 새 봇으로 바꿔 저장하면 그 봇에 기본 이름을 한 번 건다(`apply_default_bot_name_once`). `/telegram`(받는 사람) 맨 위는 「보내는 봇: 이름 — 바꾸려면 …」 한 줄뿐이다.
+- **텔레그램 발송 계정** (`/telegram-sender`, 시안 [mockups/TELEGRAM_SENDER_MOCKUP.html](mockups/TELEGRAM_SENDER_MOCKUP.html)): 봇 토큰 + 봇 이름. 토큰은 `app/credentials.py` `telegram_bot_token()`(설정 화면 > `.env`) — **토큰을 읽는 곳은 모듈 상수가 아니라 이 함수를 부를 때마다 읽는다**(`app/telegram_bot.py`·`app/telegram_bot_name.py`). 토큰 칸이 비면 저장값 유지. 봇은 자기 자신에게 메시지를 보낼 수 없어 시험 발송 대신 「연결 확인」(`check_bot_token` — `getMe`·`getMyName`만 부르고 메시지는 안 보낸다). 토큰만 새 봇으로 바꿔 저장하면 그 봇에 기본 이름을 한 번 건다(`apply_default_bot_name_once`). `/telegram`(받는 사람) 맨 위는 「보내는 봇: 이름 — 바꾸려면 …」 한 줄뿐이다.
 - **텔레그램 봇 이름** (`app/telegram_bot_name.py`, `/telegram-sender`의 봇 이름 칸, 시안 [mockups/BOT_NAME_MOCKUP.html](mockups/BOT_NAME_MOCKUP.html)): 받는 사람 대화방에 보이는 이름. **이름은 텔레그램에 저장되고 앱엔 없다** — 화면을 열 때 `getMyName`으로 불러오고, 「저장」 때 **바뀌었을 때만** `setMyName`(자주 바꾸면 429). 비우면 기본 이름 `DEFAULT_TELEGRAM_BOT_NAME`(`🤖 재경부 AI 뉴스 알림(디지털소통팀)`), 64자까지. 실패해도 토큰은 저장되고 이유를 칸 아래에 띄운다. `data/telegram_bot_name.json`엔 「앱이 이 봇에 이름을 건 적 있는가」만 봇 id(토큰 `:` 앞)별로 적는다 — 없으면 앱을 켤 때 뒤에서 기본 이름을 한 번 걸고(`apply_default_bot_name_once`), 그 뒤로는 앱이 먼저 바꾸지 않는다(BotFather에서 바꾼 이름을 덮지 않게). 봇 하나를 모두가 쓰므로 바꾸면 모든 받는 사람에게 바뀐다.
 - **이메일** (`app/email_sender.py`): 보내는 계정(설정 화면 `이메일 발송 계정`)은 `app/credentials.py` `email_*`(설정 화면 > `.env`). 메일 서비스는 **네이버·Gmail 둘뿐**(`EMAIL_SERVICES`, 서버·포트는 서비스가 정함, 「직접 입력」 없음 — 기관 메일은 외부 발송을 막는 경우가 많다). 네이버는 `@naver.com` 주소만 저장된다(`check_sender_address`). 보내는 사람 이름(선택)이 있으면 `From: 이름 <주소>`. [시험 메일 보내기]는 보내는 주소 자신에게만(`send_test_mail`). 비밀번호 칸이 비면 저장값 유지. 시안 [mockups/EMAIL_SENDER_MOCKUP.html](mockups/EMAIL_SENDER_MOCKUP.html). SMTP 연결 하나로 받는 사람마다 따로(공유 `To:` 없음), `text/html`(`_linkify` + `<pre style="white-space: pre-wrap">`), 제목은 본문 첫 줄. 본문은 기사 목록 + 그 아래 요약(텔레그램 「기사·요약 둘 다」와 같은 모양, `report_message.email_message` — 요약이 없거나 AI 분류 실패면 기사 목록만). `data/email_recipients.json`.
 - 둘 다 `SendResult`(`ok`/`failures`/`delivered`, `bool()` 호환)를 돌려준다. `delivered`는 받은 사람(`target`, 텔레그램은 `silent`·`parts`까지).
@@ -463,7 +463,7 @@ URL
 - **확정본은 따로 만들지 않는다 — 처음 보낼 때 생긴다.** `[확정본으로]`의 `__auto__`를 `_handle_send_to_bundle`이 **같은 날·같은 사안·같은 원본 기준 시각·같은 원본 판**의 최신 확정본(`default_bundle_for`, 판은 확정본의 `source_card_id`)으로 풀고, 없으면 `new_bundle_card(사안명, issue_id, basis_time, source_card_id)`. 기준 시각이 같아도 #2는 #1의 확정본을 이어 쓰지 않는다(조건이 다른 기사가 섞인다). **「지금까지 다시 수집」마다 새 확정본**이 생긴다(같은 시각에서 나눠 보낸 건 한 확정본). 옛 확정본은 `bundle_basis_time`으로 맞춘다. **사안명에 번호·시각을 붙이지 않는다**(보고서 첫 줄). 목록에선 `bundle_label`(`인사청문회 15:05`), 보관함 줄은 `15:05 기준`. **「확정본으로 ▾」 메뉴는 칸 머리(`.mh`)로 「이 원본의 확정본」과 「오늘 다른 확정본」을 가른다**(확정본 「옮기기 ▾」의 `.move-h`와 같은 문법) — 목록엔 오늘 만든 확정본이 전부 들어와(다른 사안·다른 판 포함) 이름만으로는 어느 쪽인지 안 보인다. 맨 아래가 `+ 새 확정본 만들어 보내기`. 메뉴 줄엔 확정본 이름만 쓰고 설명 글자는 달지 않는다. **폴더 아이콘은 안 단다**(줄이 전부 확정본이라 아이콘이 가르는 게 없고, 「+ 새 확정본」 줄만 아이콘이 없어 들여쓰기가 어긋난다). 시각은 이름 뒤가 아니라 **오른쪽 끝 작은 회색**(`small`, 「옮기기 ▾」의 건수와 같은 자리)이고 이름은 한 줄 말줄임(`.nm` — `.more-menu`에 `max-width`가 있어야 걸린다). 시안 [mockups/ADHOC_SEND_MENU_MOCKUP.html](mockups/ADHOC_SEND_MENU_MOCKUP.html) A안. → H: 수시 「확정본으로 ▾」 메뉴
 - **확정본 머리줄**: `수시 모니터링 13시 05분 기준(사안명)` — 화면과 복사·txt 첫 줄이 같은 `report_header_text`. 시각은 보낼 때 기사에 적힌 `sent_from.window_end` 중 가장 늦은 것(`bundle_basis_time`, 숨긴 기사 제외, 비면 `basis_time`, 둘 다 없으면 시각 없이). 원본을 다시 불러와도 새로 보낸 게 없으면 안 바뀐다.
 - **정렬 축**: 원본은 표시할 때 최신순(`sort_by_pub_desc`), **확정본은 들어올 때** 같은 소제목 안 언론사 순위 자리에 끼워 넣는다(`send_to_bundle`, 키는 `outlet_sort_key` 공용). **확정본을 매 렌더링 재정렬하지 않는다**(담당자 ↑↓를 지운다). 원본엔 기사 ↑↓가 없다.
-- **「보기 순서」는 정기 확정본과 같은 것을 쓴다** — 툴바 오른쪽 가져가기 글자 뒤, 같은 네 가지·같은 기본값·**화면 전용**(카드 노드를 옮겼다 되돌릴 뿐 저장·복사·txt·엑셀·발송·소제목 구성·담당자 ↑↓는 하나도 안 바뀐다). 「언론사순」이 쓰는 `data-outlet-rank`는 확정본에 기사를 끼워 넣을 때(`card._insert_by_outlet`)와 **같은 `outlet_sort_key`·같은 설정 언론사 순서**로 센다 — 어긋나면 들어온 자리와 보기가 갈린다. 보이는 기사가 2건 미만이면 안 그린다. **원본엔 안 붙인다**(그 화면의 규칙이 「소제목 없이 한 목록, 최신순」이다). 사진 모아 보기를 켜면 소제목별로 되돌리고 잠근다. 코드는 정기 `app/renderer.py` `applyViewMode`, 수시 `app/adhoc/renderer.py` `_VIEW_MODE_JS` — **동작을 바꾸면 둘 다 바꾼다.** 시안 [mockups/ADHOC_BUNDLE_VIEW_ORDER_MOCKUP.html](mockups/ADHOC_BUNDLE_VIEW_ORDER_MOCKUP.html).
+- **「보기 순서」는 정기 확정본과 같은 것을 쓴다** — 툴바 오른쪽 가져가기 글자 뒤, 같은 네 가지·같은 기본값·**화면 전용**(카드 노드를 옮겼다 되돌릴 뿐 저장·복사·txt·엑셀·발송·소제목 구성·담당자 ↑↓는 하나도 안 바뀐다). 「언론사순」이 쓰는 `data-outlet-rank`는 확정본에 기사를 끼워 넣을 때(`card._insert_by_outlet`)와 **같은 `outlet_sort_key`·같은 설정 언론사 순서**로 센다 — 어긋나면 들어온 자리와 보기가 갈린다. 기사가 2건 미만이면 안 그린다(이 셈은 `_article_groups` 결과라 **숨긴 기사도 포함한다** — 5건 중 4건을 숨겨도 select가 남는다). **원본엔 안 붙인다**(그 화면의 규칙이 「소제목 없이 한 목록, 최신순」이다). 사진 모아 보기를 켜면 소제목별로 되돌리고 잠근다. 코드는 정기 `app/renderer.py` `applyViewMode`, 수시 `app/adhoc/renderer.py` `_VIEW_MODE_JS` — **동작을 바꾸면 둘 다 바꾼다.** 시안 [mockups/ADHOC_BUNDLE_VIEW_ORDER_MOCKUP.html](mockups/ADHOC_BUNDLE_VIEW_ORDER_MOCKUP.html).
 - **수시 보관함엔 확정본만**(`is_raw` 카드 제외). **옛 원본(raw 없음)은 보관함에 남고 예전 동작**(소제목·진짜 숨기기·칩)을 그대로 쓴다 — 옮겨 적지 않는다. 원본은 새 수집의 「지난 수집」에서 찾는다.
 - **원본 하나 = 검색 조건 하나.** 같은 날·같은 사안의 원본이 여럿이면 둘째부터 화면 이름 뒤에 `#2`·`#3`(`card.version_suffix`) — 탭(`인사청문회 #2`, 건수 대신, 검색어·시간·건수는 툴팁), 원본 머리줄 괄호 뒤 회색 `.ver-tag`, 브라우저 탭 제목, 확정본의 ← 원본 칩, 그 판에서 만든 확정본의 목록 이름(`bundle_label` → `오늘테스트 #2 17:17`, `source_version`, 옛 확정본은 보낸 원본으로 센다). **첫 원본엔 번호가 없다**(둘째가 생겨도 이미 보던 이름이 안 바뀐다). **번호가 하는 일은 이름이 같은 판을 가르는 것 하나뿐이라, 머리줄에서 이름을 고쳐 그 판만 다른 이름이 되면 번호를 떼고 보여준다**(`card._name_shared` — 확정본 목록 이름의 번호도 지금 원본 이름으로 같이 가른다. 적어 둔 `version`은 그대로라 이름을 되돌리면 번호도 돌아온다). 번호는 **만들 때 카드에 적는다**(`version`, 지금까지 가장 큰 번호 + 1) — 순서로 세면 가운데를 지웠을 때 뒤 번호가 바뀐다. 적힌 값이 없는 옛 카드는 만든 순서로 센다. **사안명·보고서 첫 줄·파일명엔 안 붙인다.** `(2)`는 건수로 읽혀 기각. → H: 수시 원본 검색어 편집 없앰
 - **탭 줄은 같은 종류끼리만**(원본 탭엔 원본, 확정본 탭엔 확정본). 반대 종류로는 `[→` 확정본 알약·`←]` 원본 칩(`to_raw`)·상단바.
@@ -511,14 +511,14 @@ URL
 - **선택 바 🗑 숨기기** (`/adhoc/card/bulk-hide`, `hide_articles`): 보이는 것만(`visible_urls_among`), 한 락, 숨길 게 없으면 되돌리기 안 쌓음, 확인창 없음(정기 일괄 숨김과 같은 안내).
 - **선택 바는 화면 맨 아래 흰 띠**(정기 `.bottombar`와 같은 모양), 체크했을 때만 올라온다. 두 동작은 세로선으로, `선택 해제`는 오른쪽 끝 글자. 좌하단 🗑·↩는 `z-index: 25`. 시안 [mockups/ADHOC_BULK_BAR_MOCKUP.html](mockups/ADHOC_BULK_BAR_MOCKUP.html).
 - **⋯ 더보기**: `복사하기`(정기와 같은 자리·같은 피드백) · `원문 다시 불러오기`(`/adhoc/card/refetch-summary`)·`기사제목 직접 수정`(`/adhoc/card/edit-summary`) — **정기와 같은 `summary_overrides` 저장소**(URL의 제목은 어디서 보든 같아야 한다). **화면에 입히는 곳은 `_article_groups` 한 곳**(+ 「목록 밖 기사」). 되돌리기 대상 아님. 실패는 오류 배너.
-- **기사 행 규격 = 정기 확정본과 같은 값**: 제목 `1rem`, 메타 `0.8rem`, 체크박스 16px·들여쓰기 31px, 여백 `6px 8px`/위아래 10px, 펼친 요약은 여백만. 사진 추정·말머리 색·`N분 전`(`.a-time-rel[data-pub-date]`)·`🔍 검색어`·`copyArticleIcon` 모두 정기와 같은 함수. 행 안 아이콘만 `.a-acts` 하위 선택자로 잡는다.
+- **기사 행 규격 = 정기 확정본과 같은 값**: 제목 `1rem`, 메타 `0.8rem`, 체크박스 16px·들여쓰기 31px, 여백 `padding: 4px 8px`·`margin: 6px 0`(정기 보관함만 `4px 6px`), 펼친 요약은 여백만. 사진 추정·말머리 색·`N분 전`(`.a-time-rel[data-pub-date]`)·`🔍 검색어`·`copyArticleIcon` 모두 정기와 같은 함수. 행 안 아이콘만 `.a-acts` 하위 선택자로 잡는다.
 - **폼 방식**: 모든 액션은 실제 `<form>` 제출(조회는 GET, 나머지 POST + 303). **스크롤 위치를 직접 기억한다** — 제출 직전 `sessionStorage` `adhocScroll:{카드id}`(시각 포함), 로드 시 한 번 쓰고 지움. 직접 적힌 form은 capture 단계 `submit` 리스너, `post()`/`bulkMove()`는 헬퍼 안에서 직접. 복원 안 하는 경우: `?error=` 화면, 10초 지난 값.
 - **액션 핸들러는 카드 id·URL·소제목 이름을 `onclick` 인자가 아니라 `data-*`에서 읽는다**(따옴표 하나에 버튼이 조용히 먹통).
 - 소제목 순서는 `card.ordered_group_names` 하나로 계산(렌더링과 ▲▼ 저장이 같은 결과).
 - **상단바** (`page_nav(current)` → `app/topnav.py` `adhoc_nav`, 아래 디자인 절 「상단바」): 모든 수시 화면이 `홈 │ 새 수집 · 원본 · 확정본 · 보관함`. 원본·확정본은 그 종류의 **가장 최근 카드**로 가고, 없으면 흐리게 자리를 지킨다(`is-empty`).
 - **출력**: 헤더 `수시 모니터링 {HH시 MM분} 기준(사안명)`(반올림 없음), 기사·소제목 형식은 **수시 전용 설정**(`adhoc_article_line_template`/`adhoc_subheading_format_template`, 화면 `/format-adhoc`·`/subheading-format-adhoc`, 읽기는 `_adhoc_line_template`/`_adhoc_subheading_format`). 키가 없으면 `load_settings`가 그때의 정기 값을 복사해 시작한다. `build_adhoc_plain_text` 공용(빈 커스텀 소제목 건너뜀). 카드 메모 칸은 없다(옛 `memo` 필드는 안 쓴다).
 - **발송 — 텔레그램만, 확정본에서 담당자가 누를 때만** (`app/adhoc/send.py` `send_bundle`, `POST /adhoc/card/send`): 수시엔 회차 마감이 없어 **자동발송이 없다.** 확정본 화면 오른쪽 아래 초록 원형 **(발송)**(`.send-fab`, 정기 확정본과 같은 자리·규격). 보이는 기사가 0건이면 버튼을 안 그리고 서버도 거부한다. 누르면 확인창에 수시 명단(`report_recipients("adhoc")`)이 체크된 채로 뜨고 사람마다 받는 것·지금 조용히 가는지(`🔕 알림 없이`)가 적힌다. **체크를 풀면 이번 발송에서만 빠진다**(`exclude`, 저장 안 함). 기사·요약 선택은 확인창에서 못 바꾼다. 두 번째 발송부터 `(수정)`. 카드에 `send_count`/`sent_at`/`send_log`를 남기고 머리줄 끝에 회색 `✔️ N시 M분 발송 완료 (N회)`. 결과는 초록 안내(`notice`) 또는 오류 배너(못 받은 사람 이름). 보내는 동안 카드 락을 쥐지 않는다(기록만 락 안에서). **수시 되돌리기는 발송 기록(`send_count`·`sent_at`·`send_log`)을 되돌리지 않는다.** 이메일로는 안 보낸다.
-- **수시 보관함** (`render_archive_page`, `GET /adhoc?q=&start=&end=&preset=&view=&sort=`): 정기 보관함처럼 **날짜 → 회차**, 날짜 최신순. **기본은 날짜별이고 사안 층을 끼우지 않는다** — 사안명은 회차 줄의 이름표라 예전 이름과 맞출 필요가 없다. 사안으로 묶어 보고 싶으면 아래 「보기」 스위치로 **축을 바꾼다**(층을 더하지 않는다). → H: 수시 보관함 — 사안별 묶기 날짜 줄은 카드(`details.date-block > summary`, **자식 선택자로만**), 오늘이면 청록 `오늘` 칩. 회차 줄은 그 밑 왼쪽 세로선(`.runs`)에 `HH:MM 기준 · 사안명 · 검색어 · N건 · 열기 · 🗑`, 날짜 안은 **기준 시각 최신순**(`_group_by_date`). 기준 시각은 확정본 `bundle_time`, 옛 원본은 수집 창의 끝 시각(`_run_time`) — 창(`11:00~13:05`)은 적지 않는다. 시각이 없는 옛 확정본만 청록 `확정본` 칩. 사안 정보가 없는 카드는 사안명 칸에 이탤릭 「이름 없는 사안」. 검색어는 사안의 `last_keywords`, 640px 이하에선 숨긴다. 처음엔 최근 두 날짜(`_OPEN_DATES`)만 펼치고, 사안명으로 검색하면 걸린 날짜 전부, 방금 지우거나 되살린 카드가 든 날짜도 펼친다. 건수는 `N건`만 가장 작은 옅은 회색(`.dcnt`/`.run-row .n`). 날짜 줄 복사·텍스트·엑셀은 올렸을 때만, 🗑는 늘. 시안 [mockups/ADHOC_ARCHIVE_BY_DATE_MOCKUP.html](mockups/ADHOC_ARCHIVE_BY_DATE_MOCKUP.html) A안. 조건은 사안명(부분일치, 회차 줄 사안명에 노란 강조)과 기간(1일/7일/1개월/전체는 서버가 KST로 계산, 안 맞으면 `직접 지정` 뱃지), AND. 0건이면 왜 없는지와 고치는 링크. 복사/텍스트/엑셀은 두 층(결과 전체·날짜), 미리 구워 공용 `/download-text`·`/download-excel`로(`build_plain_text_for_cards`). 날짜 파일명은 `{날짜}_수시모니터링.txt`, 결과 전체는 `_{사안명 검색어|전체}`.
+- **수시 보관함** (`render_archive_page`, `GET /adhoc?q=&start=&end=&preset=&view=&sort=`): 정기 보관함처럼 **날짜 → 회차**, 날짜 최신순. **기본은 날짜별이고 사안 층을 끼우지 않는다** — 사안명은 회차 줄의 이름표라 예전 이름과 맞출 필요가 없다. 사안으로 묶어 보고 싶으면 아래 「보기」 스위치로 **축을 바꾼다**(층을 더하지 않는다). 날짜 줄은 카드(`details.date-block > summary`, **자식 선택자로만**), 오늘이면 청록 `오늘` 칩. 회차 줄은 그 밑 왼쪽 세로선(`.runs`)에 `HH:MM 기준 · 사안명 · 검색어 · N건 · 열기 · 🗑`, 날짜 안은 **기준 시각 최신순**(`_group_by_date`). 기준 시각은 확정본 `bundle_time`, 옛 원본은 수집 창의 끝 시각(`_run_time`) — 창(`11:00~13:05`)은 적지 않는다. 시각이 없는 옛 확정본만 청록 `확정본` 칩. 사안 정보가 없는 카드는 사안명 칸에 이탤릭 「이름 없는 사안」. 검색어는 사안의 `last_keywords`, 640px 이하에선 숨긴다. 처음엔 최근 두 날짜(`_OPEN_DATES`)만 펼치고, 사안명으로 검색하면 걸린 날짜 전부, 방금 지우거나 되살린 카드가 든 날짜도 펼친다. 건수는 `N건`만 가장 작은 옅은 회색(`.dcnt`/`.run-row .n`). 날짜 줄 복사·텍스트·엑셀은 올렸을 때만, 🗑는 늘. 시안 [mockups/ADHOC_ARCHIVE_BY_DATE_MOCKUP.html](mockups/ADHOC_ARCHIVE_BY_DATE_MOCKUP.html) A안. 조건은 사안명(부분일치, 회차 줄 사안명에 노란 강조)과 기간(1일/7일/1개월/전체는 서버가 KST로 계산, 안 맞으면 `직접 지정` 뱃지), AND. 0건이면 왜 없는지와 고치는 링크. 복사/텍스트/엑셀은 두 층(결과 전체·날짜), 미리 구워 공용 `/download-text`·`/download-excel`로(`build_plain_text_for_cards`). 날짜 파일명은 `{날짜}_수시모니터링.txt`, 결과 전체는 `_{사안명 검색어|전체}`. → H: 수시 보관함 — 사안별 묶기
   - **「보기」 스위치**(조회 바 셋째 줄, `[날짜별 | 사안별]`): 사안별이면 **사안 → 회차** 2단으로 같은 결과를 다시 묶는다(`_group_by_issue`). 머리줄이 `사안명 · 검색어 · N건`(오늘 회차가 들었으면 `오늘` 칩)이고, 회차 줄 앞칸은 시각 대신 `9/17(목) 15:05 기준`(`.win.wd`). 두 보기가 같은 마크업·같은 CSS를 쓴다(`_render_group_block`, `details.date-block`에 `.issue-block`만 더 붙는다). 묶음 줄 🗑·선택 삭제 확인창의 단위 말(`날짜`/`사안`)은 `data-unit`에서 읽는다. 사안 줄 파일명은 `{날짜 범위}_수시모니터링_{사안명}`.
   - **사안 줄 정렬은 옆 칩 `[가나다순 | 최근순]`**(사안별일 때만 보인다). 가나다순은 한글을 먼저 세운다(`_name_sort_key` — 그냥 정렬하면 영문·숫자가 위로 올라온다). 「이름 없는 사안」은 두 정렬 모두 맨 뒤.
   - **고른 보기를 기억하지 않는다** — 화면을 열면 언제나 날짜별이고, 주소(`?view=issue&sort=recent`)로만 오간다. 사안명 검색·기간 조회는 보기를 유지한다(폼의 숨은 입력). 사안별은 처음엔 모두 접힌 채다(이름을 훑는 화면이라 「앞 두 개」가 최근이라는 뜻이 아니다).
@@ -533,7 +533,7 @@ URL
 - **기사 행**(`render_article`의 `show_label_control` 등, 기본 꺼짐): 액션 줄에 🏷(⋯ 밖), 붙은 라벨은 별도 줄 `.lab-row` 앰버 칩(0개면 줄 없음). 팝오버: 붙은 라벨(×) + 이미 쓴 라벨(건수순, 토글) + 새 입력(편집거리 1·접두 일치면 「비슷한 라벨 있어요」, 막지는 않음).
 - **「이미 쓴 라벨」 갱신**: 정기 `/add-label`·`/remove-label` 응답이 `{"labels", "known": known_label_chips_html()}`, 화면은 `KNOWN_CHIPS_HTML`에 담았다가 **팝오버를 열 때** 칠한다. **열려 있는 팝오버는 다시 그리지 않는다**(칩이 커서 밑에서 움직인다). `known`이 없으면 구운 목록 사용.
 - 팝오버 CSS·JS는 `label_popover_style()`/`label_popover_script(host, port)` 한 곳(확정본·초안·정기 보관함). 기사가 많은 화면은 `render_article(..., labels_lookup=)`으로 저장소를 회차마다 한 번만 읽는다.
-- 정기는 fetch+204, 수시는 form POST+303(`/adhoc/card/add-label`·`remove-label`).
+- 정기는 fetch+200(본문에 위 `{labels, known}` JSON), 수시는 form POST+303(`/adhoc/card/add-label`·`remove-label`).
 - **라벨 보관함** (`GET /labels`, `render_labels_page`): 칩 **다중 선택 + AND**(`articles_for_labels_and`). 숨긴 기사도 `🗑️ 숨김` 표시로 남긴다. 출처 태그 정기=`회차`, 수시=사안명. **발행 최신순**(`sort_by_pub_desc`, 시각 없으면 뒤). 머리줄 `복사 · 텍스트 · 엑셀`(보관함 `.exp`와 같은 값 — 가져가기 글자 버튼, `_LABEL_STYLE`에 복제), 텍스트는 평평한 목록 + 라벨 이름에 소제목 형식(`<세제 + 보고서>`), `build_group_copy_texts` 재사용. 파일명 `{뽑은 날}_라벨_{라벨명}.txt`. 0건이면 버튼 없음.
 - **라벨 관리** (`GET /label-manage`): 이름 변경·합치기·삭제를 **따로**. 이름 변경이 겹치면 거절(`LabelCollisionError`) + 「⇢ 합치기」 버튼. 합치기는 행마다 드롭다운. 삭제 확인창에 그 라벨이 유일한 기사 수(`orphan_count`).
 - **되돌리기** (`app/label_undo.py`, `data/label_undo.json`, `POST /undo-label`): 별개의 전역 스택, 자정에도 안 비움, 파일 전체 스냅샷 20단계. 대상 다섯(붙이기·떼기·이름 변경·합치기·삭제). ↩ 버튼은 `left 20 / 48×48 / bottom 88`(CSS는 `_LABEL_STYLE`, 컨테이너 밖).
@@ -556,29 +556,29 @@ URL
      - 세 문구 모두 「놓친」이 아니라 **「게시된」**.
 - **설정** (`/breaking-alert`, `app/breaking_alert.py`, `data/breaking_alert.json`): `enabled`, `group_names`(이름 목록), `start`/`end`, 주기 3~30분, `catch_up_enabled`. 감시 키워드는 그룹 OR/AND를 재현하지 않고 평평하게 모은다(`_watched_keywords`). 예상 호출량은 서버가 처음 계산하고 JS가 즉시 갱신. 설정 파일과 실행 상태 파일은 분리한다.
 - **받는 사람**: 텔레그램 수신자의 `alert_scoop`/`alert_flash`(`active_alert_chat_ids(kind)`) — 정기·수시 칸과 독립. 말머리별로 따로 보낸다. 사람마다 정한 알림 시간 밖이면 조용히 간다(위 발송 절).
-- **API 한도 감시** (`app/api_usage.py`, `data/api_usage.json`): 실제 요청 지점 `_search_one_keyword`에서 셈. 하루 25,000의 80%를 넘으면 **이 알림의 폴링만** 멈추고 경고 1회(`pause_notified_date`). 본업은 안 멈춘다.
+- **API 한도 감시** (`app/api_usage.py`, `data/api_usage.json`): 실제 요청 지점 `_search_one_keyword`에서 셈. 하루 25,000의 80%에 닿으면(`>=`) **이 알림의 폴링만** 멈추고 경고 1회(`pause_notified_date`). 본업은 안 멈춘다.
 - **메시지**: 기사 제목 형식 설정 + URL 줄 + **URL 다음 줄에 `HH:MM 게시`**(오늘이 아니면 `M/D HH:MM 게시`, 시각이 없으면 그 줄을 뺀다). AI 요약 없음. 같은 주기 여러 건은 한 메시지. 보고서 텍스트엔 영향 없음.
 - **[속보] 같은 사건 묶기** (`app/alert_event.py`, 순수 함수만 — 저장소·네트워크 없음): 한 사건을 여러 언론사가 동시에 [속보]로 내면 알림이 그 수만큼 쏟아진다. 판정은 제목(말머리 뗌)의 **두 글자 이상 낱말 자카드 ≥ `ALERT_EVENT_SIMILARITY`(0.4)** 이면서 게시 시각 차가 **`ALERT_EVENT_WINDOW_MIN`(60분)** 안. **게시 시각을 못 읽는 기사는 묶지 않는다**(창을 확인할 수 없으면 보내는 쪽이 안전하다). 쓰는 자리는 둘이고 역할이 다르다:
   - **한 통 안**(`group_by_event` → `_event_block`): 대표 블록 + `↳ 같은 사건: 언론사 · 언론사 …`(이름은 몰림 알림과 같은 상한 `BURST_MAX_OUTLET_NAMES`까지, 넘으면 `외 N곳`, 이름을 하나도 못 읽으면 `↳ 같은 사건 N건`). **대표는 가장 먼저 게시한 기사**이고, 묶음·후속 순서는 들어온 순서 그대로다. 창은 대표 기준이라 몰아보내기로 하루치가 한꺼번에 들어와도 아침·저녁 사건이 안 합쳐진다. **메시지 길이만 줄인다.**
-  - **통과 통 사이**(`folded_by_sent`): 오늘 이미 나간 사건의 후속 [속보]는 **새 통을 만들지 않는다**. **울리는 횟수가 줄어드는 건 이쪽이다** — 폴링이 3분마다 돌아 한 사건이 여러 통으로 갈라지므로 한 통 안 묶기만으로는 통수가 그대로다. → H: [속보] 같은 사건 묶기
+  - **통과 통 사이**(`folded_by_sent`): 오늘 이미 나간 사건의 후속 [속보]는 **새 통을 만들지 않는다**. **울리는 횟수가 줄어드는 건 이쪽이다** — 폴링이 몇 분마다(기본 5분, 3~30분) 돌아 한 사건이 여러 통으로 갈라지므로 한 통 안 묶기만으로는 통수가 그대로다. → H: [속보] 같은 사건 묶기
   - 접은 기사도 **`alerted_urls`에 `folded: True`로 남는다** — 홈 [속보] 목록엔 그대로 보이고, 같은 후보를 폴링마다 다시 검사하지 않는다. **몰림 판정은 접은 기사까지 세고, 접기만 한 통에서도 돈다** — 쏟아진 사실이 아무 데도 안 남으면 안 된다(개별은 한 통, 몰리면 몰림 알림이 전체 언론사 수를 알린다). 발송 기록엔 접힘 줄을 따로 만들지 않는다(어느 통에도 안 실렸을 뿐 그 사건은 이미 나갔다) — INFO 로그만.
   - **[단독]엔 적용하지 않는다**(`_FOLD_KIND`) — 효과 0, 오탐 위험만.
 - **[속보] 몰림 알림** (`app/breaking_burst.py` `check_and_alert_burst`, 시안 [mockups/BREAKING_BURST_MOCKUP.html](mockups/BREAKING_BURST_MOCKUP.html) A안): `detect_and_alert`가 [속보]를 새로 보낸 직후, 오늘 발송 기록(`alerted_items`)에서 게시 시각이 「지금 − N분 ~ 지금」인 [속보]의 **언론사 수**(같은 언론사 여러 건은 한 곳)가 기준 이상이면 개별 알림 **뒤에** 요약 한 통을 더 보낸다 — `🔥 [속보]가 몰리고 있어요` / `HH:MM~HH:MM 사이 N개 언론사` / 첫 기사 제목(말머리 뗌) / 언론사 이름(10곳 넘으면 `외 N곳`). 개별 알림은 그대로다.
-  - 기준은 설정 화면 `[20|30|60분] 안에 [3~10]개 언론사`(기본 30분·5곳, `burst_*`). 그 아래에 저장된 정기 회차 42일치에 대 본 결과(`burst_history`)를 JS가 바로 보여 준다.
+  - 기준은 설정 화면 `[20|30|60분] 안에 [3·4·5·6·8·10]개 언론사`(연속 범위가 아니라 여섯 선택지, 기본 30분·5곳, `burst_*`). 그 아래에 저장된 정기 회차 42일치에 대 본 결과(`burst_history`)를 JS가 바로 보여 준다.
   - 한 번 울리면 60분(`BURST_COOLDOWN_MIN`) 조용하다(상태 파일 `last_burst_at`). 앱을 켤 때 몰아 받은 지난 기사는 창 밖이라 안 센다.
   - **[단독]은 대상이 아니다**(몰리지 않는다). 받는 사람은 [속보] 받는 사람, **알림 시간 밖이면 개별 알림처럼 조용히 간다**. 감시 사용 스위치와 무관하게 `burst_enabled`만 본다(회차 「바닥」 검사도 [속보]를 보낸다). 네이버 추가 호출 없음. → H: [속보] 몰림 알림
 
 ## 홈 (`app/landing_renderer.py`, `home.html`)
 
 - **원칙**: API 호출 없음(저장된 파일만 읽는다 — 부정 추정 판정은 스케줄러가 따로 한다). 담당자가 명시적으로 고른 것만 지켜본다(건수 자동 TOP·급등 자동 채택 안 함).
-- **폭 960px**(앱에서 유일하게 800px보다 넓다). 위에서부터: 머리 한 줄 → 남색 카드(부정 추정 기사 · [단독]/[속보]) → **오늘의 쟁점 ∥ 정책 단어 추이** 1:1(`.pair`, `minmax(0, 1fr)`, 밑선 맞춤, 800px 이하에선 쌓이고 쟁점이 위) → 워드클라우드 한 줄 → 흐름도. 시안 [mockups/HOME_WIDTH_MOCKUP.html](mockups/HOME_WIDTH_MOCKUP.html).
+- **폭 960px**(800px인 다른 화면보다 넓다. `/trend`는 900px). 위에서부터: 머리 한 줄 → 남색 카드(부정 추정 기사 · [단독]/[속보]) → **오늘의 쟁점 ∥ 정책 단어 추이** 1:1(`.pair`, `minmax(0, 1fr)`, 밑선 맞춤, 800px 이하에선 쌓이고 쟁점이 위) → 워드클라우드 한 줄 → 흐름도. 시안 [mockups/HOME_WIDTH_MOCKUP.html](mockups/HOME_WIDTH_MOCKUP.html).
 - **머리** (`.hd`): 왼쪽에 작은 로고(높이 34px) + 세로선 + 제목 `AI 뉴스 모니터링`(로고 그림에 「재정경제부」가 있어 제목에서 뺐다)과 날짜 줄, **오른쪽 끝에 ⚙ 설정**(홈에 한 곳뿐). 가운데 정렬 큰 로고는 없다. 로고 파일이 없으면 세로선도 없다. 시안 [mockups/HOME_HEADER_COMPACT_MOCKUP.html](mockups/HOME_HEADER_COMPACT_MOCKUP.html) B안.
 - **남색 카드 — 부정 추정 기사** (`app/negative_guess.py` → `data/negative_guess.json`, 화면 `_board_card_html`, 시안 [mockups/HOME_NEGATIVE_GUESS_MOCKUP.html](mockups/HOME_NEGATIVE_GUESS_MOCKUP.html)): 머리 바로 아래 한 줄 `부정 추정 기사 N건 +M ▾ · HH:MM 회차까지` │ [단독]/[속보]. 흰 건수 줄(오늘 N건 · 어제 대비)과 매시 논조 전광판(비율·한 줄 요약)은 없앴다. → H: 홈 부정 추정 기사
   - **범위는 기관 전용**: 정기 회차 기사 중 제목·요약에 「재경부」·「재정경제부」(`NEGATIVE_GUESS_KEYWORDS`)가 나온 것만. 사진 기사 제외. 네이버를 따로 검색하지 않는다.
   - **회차마다 한 번**: 스케줄러 tick(`negative_guess_tick`)이 판정 안 한 오늘 회차를 오래된 것부터 AI에 보낸다(백그라운드 스레드). 회차끼리 기사가 안 겹쳐 같은 기사를 두 번 보내지 않는다. 대상이 0건이면 부르지 않고 판정한 것으로 적는다. 실패한 회차는 5분 뒤(회차마다 최대 3번). 자정에 새로 시작.
   - AI에겐 **부정 기사 번호와 근거만** 받는다. 기준은 "평가하는 말이 있는가" — 발표를 옮긴 기사·의견서 제출 사실만 전한 기사는 부정 아님, 업계·국회의 정책 보완 요구·후보자 의혹은 부정, 애매하면 부정. 프롬프트 원본 AI_RULES.md `NEGATIVE_GUESS_PROMPT`.
   - 회차 파일은 건드리지 않는다(결과는 별도 파일). 판정은 숨기기 전 목록으로 하고, **숨긴 기사는 화면이 그릴 때 뺀다**(`filter_hidden`).
-  - 목록(누르면 고정, 마우스를 올리면 열림 — 단독/속보 칩과 같은 값, 둘은 한 번에 하나만): 최신순, `시각 · 언론사 제목(누르면 원문) · new · 소제목 칩 · 복사` + 근거 한 줄. 따로 된 「원문 ↗」은 두지 않는다(제목 링크와 중복). 복사는 보고서 한 줄 형식(`article_line_template`) + URL. **소제목은 달지 않는다**(제목·근거만으로 충분하다).
+  - 목록(누르면 고정, 마우스를 올리면 열림 — 단독/속보 칩과 같은 값, 둘은 한 번에 하나만): 최신순, `시각 · 언론사 제목(누르면 원문) · new · 복사` + 근거 한 줄. 따로 된 「원문 ↗」은 두지 않는다(제목 링크와 중복). 복사는 보고서 한 줄 형식(`article_line_template`) + URL. **소제목은 달지 않는다**(제목·근거만으로 충분하다).
   - `+M`·`new` = 가장 최근 판정 회차에서 더해진 기사. **그날 첫 회차엔 안 단다.**
   - 판정 전: AI 키 없음 → `/llm` 링크, 오늘 회차 없음 → `첫 회차 뒤에 표시`, 그 밖 → `판정 중`. 부정 0건 → `부정 추정 기사 없음`. 보고서로 안 나간다. 색은 `COLOR_BOARD_*`.
 - **[단독]/[속보] 칩**(남색 카드 오른쪽): `alerted_urls.alerted_items()`(알림 기록)만 본다 — 회차 파일에서 다시 세지 않는다. 목록 줄 끝에 `복사`(부정 추정 기사와 같은 형식 `_copy_text`, 복사 JS도 공용). 글자만(알약 테두리 없음), hover로 펼침(`_ALERT_HOVER_JS`: 열기 120ms, 닫기 220ms, 6px 투명 다리, 한 번에 하나, 클릭은 고정). `<details>` 기반이라 JS 없이도 클릭으로 열린다. 옛 기록(`items` 없음)은 건수만.
@@ -586,9 +586,9 @@ URL
 - **정책 단어 추이** (`app.home_trend`, `data/home_trend_words.json`, 최대 8): 제목+요약 원문에 그 단어가 있는지 문자열 매칭. **숨긴 기사도 센다.** **홈·`/trend` 모두 어제에서 끝난다**(`last_complete_day`) — 종료일이 어제를 넘으면 당기고 날짜 칸에 `max`. "어제까지" 안내 문구는 안 붙인다(홈 카드는 부제의 날짜 범위가 그 일을 한다). 점선(`partial`) 판정은 `fill_bucket_status` 한 곳, 기준은 "그 칸의 원래 기간이 아직 안 끝났나".
   - **홈 카드**: 최근 7일 고정, 단어 **전부** 그림, 조작 없음, 그래프 어디든 누르면 `/trend`. 부제는 실제 범위 `정기 · 9/11(금) ~ 9/17(목)`(버킷의 `wd_label`). 단어 0개면 안내(부제 `정기`). 7일 안에 정기 회차가 하나도 없으면 빈 그래프 대신: 네이버 키 없음 → 쟁점 카드와 같은 키 안내, 오늘 회차가 있음 → `💤 내일부터 그려져요`, 그 밖 → `💤 정기 회차가 하루 치 쌓이면 다음 날부터 그려져요`. 시안 [mockups/HOME_CARD_SCOPE_MOCKUP.html](mockups/HOME_CARD_SCOPE_MOCKUP.html). **범례·각주 없음.** 공유 축(정량) 유지. `render_chart(width=412, hover=False)` — 칸 폭 그대로 그린다(페이지 폭을 바꾸면 이 값도).
   - **`/trend`** (`app.trend_renderer`): 단어 칩(×)·직접 입력·등록 검색어 칩, 최대 8(다 차면 입력 UI 없음). 기간 프리셋 7일/1개월/3개월/6개월/1년 + 직접 입력(`GET /trend?start=&end=`, 잘못되면 7일). 집계 단위 자동(~31일 일별, ~100일 주별, 이상 월별, `build_buckets`). **앱이 단어를 추천하지 않는다.** 추가/삭제 `POST /trend/add-word`·`remove-word`(현재 구간 유지). 표(`—` = 회차 없음) + 📋 복사(탭 구분) + ⬇ 엑셀(`app.trend_export`, 기사 8열과 별개).
-  - **그래프** (`app.trend_chart`): y축 최댓값 = 1·2·5 계열 눈금 × 3. 회차 없는 날은 배경을 칠하고 선을 끊는다. 일별 주말 음영은 날짜 라벨 줄까지. 일별 라벨은 10칸 이하면 전부(`13일(일)`, `short_label`), 넘으면 월요일마다(`9/7`, `label`). 표·복사·엑셀은 `wd_label`(`9/13(일)`). 일별이고 마지막 칸이 실제 어제면 그 밑에 회색 `어제`(`yesterday`, 아래 여백 +11px, 전체 높이 유지). 날짜마다 점을 찍지 않는다(집계 중 빈 원만). **오른쪽 끝 라벨 앞에 그 선 색의 짧은 막대**(글자는 본문색, 선→라벨 연결선은 안 긋는다). 오른쪽 여백은 가장 긴 라벨 길이로 정한다(고정값 아님). 크로스헤어·툴팁은 `/trend`에만(`data-buckets`/`data-series`). 색 `COLOR_TREND_1`~`8`, 두 화면 같은 슬롯 순서.
+  - **그래프** (`app.trend_chart`): y축 최댓값 = 1·2·5 계열 눈금 × 3. 회차 없는 날은 배경을 칠하고 선을 끊는다. 일별 주말 음영은 날짜 라벨 줄까지. 일별 라벨은 10칸 이하면 전부(`13일(일)`, `short_label`), 넘으면 월요일마다(`9/7`, `label`). 표·복사·엑셀은 일별일 때만 `wd_label`(`9/13(일)`)이고, 주별·월별은 `label`이다(그 버킷엔 `wd_label`이 없다). 일별이고 마지막 칸이 실제 어제면 그 밑에 회색 `어제`(`yesterday`, 아래 여백 +11px, 전체 높이 유지). 날짜마다 점을 찍지 않는다(집계 중 빈 원만). **오른쪽 끝 라벨 앞에 그 선 색의 짧은 막대**(글자는 본문색, 선→라벨 연결선은 안 긋는다). 오른쪽 여백은 가장 긴 라벨 길이로 정한다(고정값 아님). 크로스헤어·툴팁은 `/trend`에만(`data-buckets`/`data-series`). 색 `COLOR_TREND_1`~`8`, 두 화면 같은 슬롯 순서.
 - **흐름도** (시안 [mockups/HOME_FLOW_CLEAN_MOCKUP.html](mockups/HOME_FLOW_CLEAN_MOCKUP.html)·[mockups/HOME_FLOW_ADHOC4_MOCKUP.html](mockups/HOME_FLOW_ADHOC4_MOCKUP.html)·[mockups/HOME_FLOW_ROWLABEL_MOCKUP.html](mockups/HOME_FLOW_ROWLABEL_MOCKUP.html)):
-  - 칸에는 아이콘 + 이름만(1.02rem, 가운데 정렬), 설명은 말풍선(`.tip`).
+  - 칸에는 아이콘 + 이름만(`--fs-base`, 가운데 정렬), 설명은 말풍선(`.tip`).
   - 배치 4:4 — 정기 `🔍검색어 → ⛏️초안 → 💎확정본 → 🪎보관함`, 수시 `🔎새 수집 → 🍅원본 → 🥗확정본 → 🧺보관함`(정기는 캐서 깎아 보물상자에, 수시는 골라 모아 바구니에 — 시안 [mockups/FLOW_EMOJI_MOCKUP.html](mockups/FLOW_EMOJI_MOCKUP.html) A안), 맨 아래 `🏷️라벨 보관함` 한 줄 전체.
   - 두 줄 왼쪽 **줄 이름표 `정기`/`수시`**(`.rl`, 글자 + 왼쪽 3px 띠 `flow_row_reg_bar`/`flow_row_adhoc_bar`, 설명은 `title`만). 이름표 열 48px + 틈 10px.
   - 줄 맨 앞은 좁은 입구 칸(`.72fr`, 흰 바탕 점선 — `.t-regkw`, `.t-adnew`). **실시간은 흐름 단계가 아니다** — 초안 위 낮은 점선 칸(`.t-live.slim`) + `📌 담아두기` 점선 화살표(`.fl-conn`). 격자 셋(`.fl-top`·`.fl-conn`·`.fl`)이 같은 칸 폭. 열 머리는 안 붙인다.
@@ -617,7 +617,7 @@ URL
   - 흐름 밖 화면은 `홈 │ ← 돌아갈 곳` 하나 — 설정 하위 `← 설정`, 라벨 관리 `← 라벨 보관함`. 돌아갈 곳이 홈뿐이면 홈만(설정 메뉴·라벨 보관함·정책 단어 추이). 홈엔 상단바가 없다.
   - **왼쪽 붙임**(`space-between` 쓰지 않음). 모든 링크가 같은 상자(투명 테두리 1px)라 칩이 옮겨 다녀도 옆 링크가 안 밀리고, 높이 54px는 sticky 요소들의 `top` 값과 맞물려 있어 바꾸지 않는다. **간격**: 링크 사이 10px · 링크 좌우 14px · 홈 옆 세로선 양옆 16px, 480px 이하에선 링크 사이 2px · 좌우 8px · 세로선 양옆 8px(한 줄 유지). 시안 [mockups/TOPBAR_SPACING_MOCKUP.html](mockups/TOPBAR_SPACING_MOCKUP.html) B안.
   - 상단바엔 **가는 곳만** 둔다(대기 화면의 새로고침은 본문 버튼). 링크는 설정 서버 절대주소(정기 화면이 file://로 열릴 수 있다). 시안 [mockups/TOPBAR_NAV_MOCKUP.html](mockups/TOPBAR_NAV_MOCKUP.html).
-- **화면 폭**: 확정본·초안·설정 서버 화면(설정·숨긴 기사·라벨) 모두 **800px**, 홈만 960px. 설정 서버는 `.container`·`.topbar-inner`·`.save-bar-inner` 세 자리가 같은 값. 긴 설정 화면은 여러 칸 배치(메뉴 두 단·검색어 카드 두 장·형광펜 세 개·수집 시간 카드 두 장·언론사 체크 네 칸·알림 그룹 세 개), 640px 이하에선 한 줄. **새 그리드 칸은 `minmax(0, 1fr)`**. 시안 [mockups/SETTINGS_WIDTH_MOCKUP.html](mockups/SETTINGS_WIDTH_MOCKUP.html).
+- **화면 폭**: 확정본·초안·설정 서버 화면(설정·숨긴 기사·라벨) 모두 **800px**, 홈 960px·`/trend` 900px. 설정 서버는 `.container`·`.topbar-inner`·`.save-bar-inner` 세 자리가 같은 값. 긴 설정 화면은 여러 칸 배치(메뉴 두 단·검색어 카드 두 장·수집 시간 카드 두 장·언론사 체크 네 칸·알림 그룹 세 개). 한 줄로 돌아가는 폭은 화면마다 다르다 — 검색어 카드는 780px(머리줄 스위치 두 개가 들어와서), 나머지는 640px. **새 그리드 칸은 `minmax(0, 1fr)`**. 시안 [mockups/SETTINGS_WIDTH_MOCKUP.html](mockups/SETTINGS_WIDTH_MOCKUP.html).
 
 ### 모양 (`app/config.py` `RADIUS_*`·`CONTROL_H_*`·`FAB_*`·`SHADOW_*`)
 
@@ -667,7 +667,7 @@ URL
 - **계열은 뜻 하나씩**:
   - 파랑(accent) — 담당자의 동작, 확정 상태. 연한 톤은 `hover`/`accent_border`/`ghost_border_hover` 셋.
   - 연보라(`COLOR_AI_*`) — AI의 동작만, 채운 색.
-  - 초록(`COLOR_SEND`) — 발송 하나뿐.
+  - 초록 — 발송(`COLOR_SEND`)과 「잘 됐다」 안내(`COLOR_OK_*`, 수시 `.ok-note`) 둘. 둘 다 "끝났다"는 뜻이라 계열을 나누지 않는다.
   - 앰버 — 주의(`COLOR_WARN_*`)와 라벨(`COLOR_LABEL_*`).
   - 캐러멜(`COLOR_PINNED_*`) — 📌 담아둔 기사 칸(미분류 앰버의 다음 단계).
   - 빨강(`COLOR_ERROR_*`/`COLOR_SCOOP_TEXT`) — 오류, `[단독]`·`[속보]`.
