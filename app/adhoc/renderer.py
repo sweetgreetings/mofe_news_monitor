@@ -1888,7 +1888,10 @@ def _render_bundle_meta_chips(card: dict) -> str:
         for source_id, name, n in sources
         for label in [_source_name(source_id, name)]
     )
-    return f'<div class="meta-row">{chips}<span class="chip">전체 {total}건</span></div>'
+    # 「전체 N건」은 합계라서, 원본이 하나뿐이면 바로 왼쪽 칩과 같은 숫자를 되풀이한다 —
+    # 그럴 땐 안 그린다(본업 화면은 자기를 해명하지 않는다).
+    total_html = f'<span class="chip">전체 {total}건</span>' if len(sources) >= 2 else ""
+    return f'<div class="meta-row">{chips}{total_html}</div>'
 
 
 def _render_meta_chips(card: dict) -> str:
@@ -2295,6 +2298,74 @@ def _render_article_row(
 </div>"""
 
 
+# 툴바의 「보기 순서」 — 정기 확정본(app.renderer.applyViewMode)을 수시 DOM
+# (.group-block / .article / .a-time-rel[data-pub-date])에 그대로 옮긴 것이다. **화면 전용**이라
+# 서버로 아무것도 보내지 않는다: 이미 그려진 카드(.article) 노드를 옮겼다가 「소제목 내
+# 언론사순」으로 돌아올 때 원래 자리로 되돌린다(복제하면 🗑·↑↓가 가리키는 노드와 화면에
+# 보이는 노드가 갈린다). 동작을 바꾸면 정기 쪽도 같이 바꾼다.
+_VIEW_MODE_JS = """
+var _FLAT_VIEW_HOMES = null;
+function _vmRestore() {
+  if (_FLAT_VIEW_HOMES) {
+    // 뒤에서부터 되돌린다 — 앞 행의 next가 아직 flat-view 안에 있는 뒤 행을 가리킬 수 있다.
+    _FLAT_VIEW_HOMES.slice().reverse().forEach(function (home) {
+      if (!document.body.contains(home.el)) return;
+      if (home.next && home.next.parentNode === home.parent) home.parent.insertBefore(home.el, home.next);
+      else home.parent.appendChild(home.el);
+    });
+  }
+  document.querySelectorAll('.group-block').forEach(function (s) { s.style.display = ''; });
+  var flat = document.getElementById('flat-view');
+  if (flat) flat.remove();
+}
+function _vmPub(el) {
+  var t = el.querySelector('.a-time-rel[data-pub-date]');
+  return t ? (t.dataset.pubDate || '') : '';
+}
+function applyViewMode(mode) {
+  _vmRestore();
+  if (mode === 'subheading') return;
+  var first = document.querySelector('.group-block');
+  if (!first) return;
+  if (!_FLAT_VIEW_HOMES) {
+    _FLAT_VIEW_HOMES = Array.prototype.map.call(document.querySelectorAll('.group-block .article'), function (el) {
+      return {el: el, parent: el.parentElement, next: el.nextElementSibling};
+    });
+  }
+  // 「소제목 내 시간순」 — 소제목 경계는 그대로 두고 그 안에서만 다시 세운다.
+  if (mode === 'group-time') {
+    document.querySelectorAll('.group-block').forEach(function (section) {
+      var inGroup = Array.prototype.filter.call(section.children, function (el) {
+        return el.classList.contains('article');
+      });
+      inGroup.sort(function (a, b) {
+        var ad = _vmPub(a), bd = _vmPub(b);
+        return ad < bd ? 1 : ad > bd ? -1 : 0;
+      });
+      inGroup.forEach(function (el) { section.appendChild(el); });
+    });
+    return;
+  }
+  var articles = Array.prototype.slice.call(document.querySelectorAll('.group-block .article'));
+  if (mode === 'time') {
+    articles.sort(function (a, b) {
+      var ad = _vmPub(a), bd = _vmPub(b);
+      return ad < bd ? 1 : ad > bd ? -1 : 0;
+    });
+  } else if (mode === 'outlet') {
+    articles.sort(function (a, b) {
+      return (Number(a.dataset.outletRank) || 0) - (Number(b.dataset.outletRank) || 0);
+    });
+  }
+  document.querySelectorAll('.group-block').forEach(function (s) { s.style.display = 'none'; });
+  var flat = document.createElement('div');
+  flat.id = 'flat-view';
+  flat.className = 'group-block';
+  first.parentNode.insertBefore(flat, first);
+  articles.forEach(function (el) { flat.appendChild(el); });
+}
+"""
+
 # [추가: 2026-09-15] 📷 사진 추정 모아 보기 + 선택 바 「🗑 숨기기」 JS — 정기의
 # app.renderer.PHOTO_GATHER_SCRIPT와 같은 동작이되, 이 화면의 DOM(.group-block·.a-bot·
 # .bulk-chk)과 폼 제출 방식에 맞췄다. render_card_page의 스크립트에 **스크롤 복원보다
@@ -2322,6 +2393,13 @@ function _pgRefresh() {
 }
 function photoGatherOn() {
   if (document.body.classList.contains('photo-gather')) return;
+  // 「보기 순서」가 시간순·언론사순이면 먼저 소제목별로 돌려놓는다 — 두 보기가 같은 행을
+  // 서로 다른 자리로 옮기면 끌 때 제자리를 못 찾는다. 모아 보는 동안엔 잠근다(정기와 같다).
+  var vsel = document.querySelector('.view-mode-select');
+  if (vsel) {
+    if (vsel.value !== 'subheading') { vsel.value = 'subheading'; applyViewMode('subheading'); }
+    vsel.disabled = true;
+  }
   var rows = Array.prototype.slice.call(document.querySelectorAll('.group-block .article.is-photo'));
   // 옮기기 전 자리를 적어두고 끌 때 뒤에서부터 되돌린다(앞 행의 next가 아직 모인 목록 안에
   // 있는 뒤 행을 가리킬 수 있어서다 — 정기 flat-view와 같은 방식).
@@ -2374,6 +2452,8 @@ function photoGatherOff() {
   });
   document.body.classList.remove('photo-gather');
   document.querySelectorAll('.photo-gather-btn').forEach(function (b) { b.classList.remove('is-on'); });
+  var vsel = document.querySelector('.view-mode-select');
+  if (vsel) vsel.disabled = false;
   try { sessionStorage.removeItem(ADHOC_PHOTO_KEY); } catch (e) {}
   updateBulkBar();
   window.scrollTo(0, 0);
@@ -2629,11 +2709,16 @@ def render_card_page(
     # [추가: 2026-09-01] 소제목별 복사 텍스트에 쓸 설정 — 소제목마다 다시 읽지 않도록
     # 한 번만 읽어 넘긴다(기사 제목 형식·소제목 형식은 정기 설정을 그대로 상속).
     settings = load_settings()
-    # 「보기 순서」의 「언론사순」이 쓰는 자리 번호 — 정기 확정본과 같은 키(outlet_sort_key)로
-    # 화면 전체를 한 번만 세운다. 화면 전용이라 저장값·복사·txt·엑셀·발송엔 안 나간다.
+    # 「보기 순서」의 「언론사순」이 쓰는 자리 번호 — 화면 전체를 한 번만 세운다. 키는 확정본에
+    # 기사를 끼워 넣을 때(card._insert_by_outlet)와 **같은 함수·같은 언론사 순서**여야 한다 —
+    # 설정의 순서를 안 넘기면 담당자가 /outlets에서 바꾼 순서를 이 보기만 무시한다.
+    # 화면 전용이라 저장값·복사·txt·엑셀·발송엔 안 나간다.
+    _outlet_order = settings.get("outlet_order") or None
     rank_by_url = {
         a["url"]: i
-        for i, a in enumerate(sorted((a for _, arts in groups for a in arts), key=outlet_sort_key))
+        for i, a in enumerate(
+            sorted((a for _, arts in groups for a in arts), key=lambda a: outlet_sort_key(a, _outlet_order))
+        )
     }
     sections = []
     raw_sent_n = raw_hidden_n = raw_open_n = 0
@@ -3065,6 +3150,20 @@ def render_card_page(
         f'<button type="button" onclick="location.href=\'/adhoc/card/download-excel?id={card_id_attr}\'" title="엑셀 파일로 받기">엑셀</button>'
         "</span>"
     )
+    # 「보기 순서」 — 정기 확정본과 같은 네 가지·같은 기본값·같은 화면 전용 동작(applyViewMode).
+    # 소제목 구성·담당자가 ↑↓로 잡은 순서·복사·txt·엑셀·발송은 하나도 안 바뀐다.
+    # 원본(로데이터)엔 안 붙인다 — 그 화면의 규칙이 「소제목 없이 한 목록, 최신순」이다.
+    # 기사가 2건 미만이면 고를 게 없어 안 그린다(📷 사진 추정 알약과 같은 원칙).
+    view_mode_html = (
+        '<select class="view-mode-select" onchange="applyViewMode(this.value)" '
+        'title="소제목 구성은 그대로 두고 화면에 나열하는 순서만 바꿉니다">'
+        '<option value="subheading" selected>소제목 내 언론사순</option>'
+        '<option value="group-time">소제목 내 시간순</option>'
+        '<option value="time">시간순</option>'
+        '<option value="outlet">언론사순</option></select>'
+        if len(rank_by_url) >= 2
+        else ""
+    )
     if raw_mode:
         # 원본 툴바 — 청록 알약이 이 원본의 확정본으로 가는 길이다. 알약 시각은 원본 기준 시각이라
         # 다시 수집한 직후엔 새 확정본이 없어 알약도 없다(보내는 순간 생긴다 — 미리 안내하지 않는다).
@@ -3231,6 +3330,7 @@ var ADHOC_SCROLL_KEY = 'adhocScroll:' + {__import__("json").dumps(card["id"])};
 var ADHOC_HAS_ERROR = {"true" if error else "false"};
 var ADHOC_PHOTO_KEY = 'adhocPhotoGather:' + {__import__("json").dumps(card["id"])};
 var ADHOC_PHOTO_ICON = {__import__("json").dumps(icon("camera"))};
+{_VIEW_MODE_JS}
 {_PHOTO_GATHER_JS}
 {range_select_script('.bulk-chk', '.article', '.is-sent, .is-raw-hid')}
 function rememberScroll() {{
