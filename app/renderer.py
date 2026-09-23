@@ -714,6 +714,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      색·크기는 옆의 ✏️🗑️와 맞추려고 .rename-btn을 함께 걸었고, 여기서는 아이콘
      두 개를 겹쳐 두기 위한 display만 준다. */
   .copy-btn, .group-copy-btn {{ display: inline-flex; align-items: center; }}
+  .copy-btn .icon-default, .group-copy-btn .icon-default {{ display: inline-flex; }}
   .copy-btn .icon-done, .group-copy-btn .icon-done {{ display: none; }}
   .copy-btn.is-copied .icon-default, .group-copy-btn.is-copied .icon-default {{ display: none; }}
   .copy-btn.is-copied .icon-done, .group-copy-btn.is-copied .icon-done {{ display: inline-flex; }}

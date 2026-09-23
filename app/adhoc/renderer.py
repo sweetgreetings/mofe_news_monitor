@@ -1059,6 +1059,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .icon-btn.group-hide-btn:hover {{ color: {error}; }}
   /* [추가: 2026-09-01] 소제목 헤더의 📋 — 정기 화면(.group-copy-btn)과 같은 전환:
      누르면 1초간 ✓로 바뀐다. 색·크기는 옆 ▲▼·🗑과 같은 .icon-btn에서 물려받는다. */
+  .group-copy-btn .icon-default {{ display: inline-flex; }}
   .group-copy-btn .icon-done {{ display: none; }}
   .group-copy-btn.is-copied .icon-default {{ display: none; }}
   .group-copy-btn.is-copied .icon-done {{ display: inline-flex; }}
@@ -1719,11 +1720,9 @@ def _render_issue_tabs(card: dict, today_cards: list[dict]) -> str:
     [수정: 2026-08-25] "보관" 상태는 없앴다(카드 자체가 이미 항상 수시 보관함에
     있어 "보관 처리"할 게 없었고, 아무도 안 눌렀다 — HISTORY.md 같은 항목). 대신
     탭마다 × 로 그 카드를 바로 삭제할 수 있다 — × 를 브라우저 탭 닫기로 오인해
-    "치우기"를 기대하는 사용자는 없다고 보되(사용자 판단), deleteCard()의 확인창이
-    오클릭을 막는다([수정: 2026-09-11] 지운 카드는 수시 보관함에서 되살릴 수 있게 됐다 —
-    확인창 문구도 "되돌릴 수 없어요"에서 "거기서 되살릴 수 있어요"로 바뀌었다). 헤더 옆
-    안내 문구는 그 확인창을 보기도 전에 먼저 안심시키는 역할(둘이 같은 사실을
-    양쪽에서 말해줘야 "삭제 안 하면 다 남는다"가 직관적으로 읽힌다).
+    "치우기"를 기대하는 사용자는 없다고 보되(사용자 판단), 오클릭은 확인창이 아니라
+    되살리기가 받아낸다: 지운 직후 도착하는 수시 보관함 그 자리에 「삭제함 · 되살리기」
+    줄이 펼쳐져 있다(보관함 줄 끝 🗑와 같은 규칙 — 둘은 세트다).
 
     [수정: 2026-08-25] 예전엔 카드가 2개 이상일 때만 그렸는데(1개면 헛클릭이라),
     이제 1개여도 그린다 — 이 줄이 삭제(×)와 "+ 새 수집"이 사는 유일한 자리가 됐고,
@@ -3050,7 +3049,7 @@ def render_card_page(
     </form>
     <form method="POST" action="/adhoc/card/add-custom-group" style="display:inline-flex;gap:4px;align-items:center">
       <input type="hidden" name="id" value="{card_id_attr}">
-      <input type="text" name="name" placeholder="새 소제목 이름" maxlength="20" style="width:130px;height:var(--h-md);box-sizing:border-box;padding:0 9px;font-size: var(--fs-md)"
+      <input type="text" name="name" placeholder="새 소제목 이름" maxlength="20" style="width:130px;height:var(--h-tb);box-sizing:border-box;padding:0 9px;font-size: var(--fs-md)"
         {"disabled" if len(group_names) >= MAX_ADHOC_SUBHEADINGS else ""}>
       <button type="submit" class="btn mute sm" {"disabled" if len(group_names) >= MAX_ADHOC_SUBHEADINGS else ""}
         title="{f'소제목은 최대 {MAX_ADHOC_SUBHEADINGS}개까지 만들 수 있습니다' if len(group_names) >= MAX_ADHOC_SUBHEADINGS else ''}"><span class="plus-glyph">+</span>소제목 추가</button>
@@ -3569,10 +3568,10 @@ function applyUnsentFilter() {{
   }});
 }}
 function deleteCard(id) {{
-  // [수정: 2026-09-11] 「되돌릴 수 없어요」는 이제 사실이 아니다 — 지운 카드는 수시 보관함의
-  // 제자리 「삭제함」 줄과 맨 아래 「최근 삭제」에서 되살린다. 확인창은 그대로 둔다: 여기선
-  // 지운 직후 이 화면을 떠나 보관함으로 가므로, 되살리는 자리가 눈앞에 있지 않다.
-  if (confirm('삭제하면 수시 보관함으로 돌아가요. 지운 카드는 거기서 되살릴 수 있어요.\\n삭제할까요?')) post('/adhoc/card/delete', {{id: id}});
+  // 확인창 없이 바로 지운다 — 지운 직후 도착하는 수시 보관함의 그 자리에 「삭제함 ·
+  // 되살리기」 줄이 펼쳐진 채 뜬다(routes._handle_delete가 deleted= 로 실어 보낸다).
+  // 되살리는 자리가 눈앞에 있으면 확인창을 두지 않는다 — 보관함 줄 끝 🗑와 같은 규칙.
+  post('/adhoc/card/delete', {{id: id}});
 }}
 function toggleHiddenPanel() {{ document.getElementById('hidden-panel').classList.toggle('is-open'); }}
 document.addEventListener('click', function (e) {{

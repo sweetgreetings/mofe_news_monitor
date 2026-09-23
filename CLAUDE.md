@@ -426,7 +426,7 @@ URL
 - 선택 삭제 중엔 복사·내보내기·줄 끝 🗑가 숨고, 줄을 누르면 체크, 상위 체크 = 하위 전부(한 방향), 고른 게 있을 때만 파란 선택 바. `[빈 회차(0건) 모두 고르기 (N)]`은 오늘 것 제외.
 - **지우기 = trash로 옮기기.** 되살리면 파일째 돌아온다.
 - **정기** (`delete_run`/`restore_run`/`list_deleted_runs`, `data/articles_trash/{run_at 날짜}_{HH-MM}.deleted-{시각}.json`): **오늘 회차와 가장 최근 회차는 못 지운다**(`run_lock_reason`, 서버도 `RunLockedError`) — 가장 최근을 지우면 앞 회차가 `load_latest_run()`이 돼 자동발송될 수 있다(이 잠금을 풀려면 자동발송에 "오늘 회차만" 조건부터 넣는다). 지운 자리는 `HH:MM 기준 · 삭제함 · 지운 시각 · 되살리기`(`_render_deleted_slot`)로 계속 남는다. fetch(`/history/delete-runs`·`/history/restore-run`)로 줄만 갈아 끼운다. 선택 삭제 중에만 회차별 건수를 보인다.
-- **수시** (`delete_card(reason=)`/`list_deleted_cards`/`restore_card`, `/adhoc/archive/delete`·`/restore`): 파일명 가운데가 이유 — `.deleted-`(담당자) / `.expired-`(보관 기한). **되살리기 목록엔 `.deleted-`만.** 카드 id는 `_CARD_ID_RE`로 먼저 검증. form 제출 + 303, 방금 지운 id를 `deleted=`로 실어 그 화면에서만 제자리 줄로, 다시 열면 맨 아래 접힌 「최근 삭제」. 사안 정보가 없는 카드는 「이름 없는 사안」 묶음. 카드 화면의 삭제도 같은 trash.
+- **수시** (`delete_card(reason=)`/`list_deleted_cards`/`restore_card`, `/adhoc/archive/delete`·`/restore`): 파일명 가운데가 이유 — `.deleted-`(담당자) / `.expired-`(보관 기한). **되살리기 목록엔 `.deleted-`만.** 카드 id는 `_CARD_ID_RE`로 먼저 검증. form 제출 + 303, 방금 지운 id를 `deleted=`로 실어 그 화면에서만 제자리 줄로, 다시 열면 맨 아래 접힌 「최근 삭제」. 사안 정보가 없는 카드는 「이름 없는 사안」 묶음. **카드 화면의 삭제(탭 ×·「사안 목록에서 삭제」)도 같은 trash이고 확인창이 없다** — 지운 직후 도착하는 보관함 그 자리에 「삭제함 · 되살리기」 줄이 펼쳐진 채 뜬다(원본은 보관함 목록에 안 쌓이지만 이 줄로는 보인다).
 - 시안 [mockups/ARCHIVE_DELETE_MOCKUP.html](mockups/ARCHIVE_DELETE_MOCKUP.html).
 
 ## 데이터 보관
