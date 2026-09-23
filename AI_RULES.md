@@ -1,15 +1,19 @@
 # AI_RULES.md
 
-이 문서는 `app/llm_classifier.py`가 Claude API에 보내는 시스템 프롬프트의 **원본**이다.
-코드에 문자열이 따로 있는 게 아니라, 아래 두 섹션(START~END 사이) 텍스트를 그대로 읽어
-API에 전달한다 — 여기를 고치면 다음 호출부터 곧바로 반영된다. 마커 줄(`<!-- ... -->`)
-자체는 프롬프트에 포함되지 않는다.
+이 문서는 `app/llm_classifier.py`와 `app/negative_guess.py`가 Claude API에 보내는 시스템
+프롬프트의 **원본**이다. 코드에 문자열이 따로 있는 게 아니라, 아래 세 섹션(START~END 사이)
+텍스트를 그대로 읽어 API에 전달한다 — 여기를 고치면 다음 호출부터 곧바로 반영된다.
+마커 줄(`<!-- ... -->`) 자체는 프롬프트에 포함되지 않는다.
 
-두 프롬프트 모두 실패해도 앱은 멈추지 않는다 — 이 파일을 못 찾거나 섹션이 빠지면
-`app/llm_classifier.py`가 조용히 규칙 기반 분류로 폴백한다(CLAUDE.md "LLM 없이 동작"
-전제 참고).
+이 파일을 못 찾거나 섹션이 빠져도 앱은 멈추지 않는다(CLAUDE.md "LLM 없이 동작" 전제).
+다만 넘어가는 자리가 섹션마다 다르다 — 분류 두 섹션은 조용히 규칙 기반 분류로 폴백하고,
+`NEGATIVE_GUESS_PROMPT`는 폴백이 없어 그 회차 판정을 건너뛴다(홈은 「판정 중」으로 남는다).
 
 ## SYSTEM_PROMPT — 소제목 분류 (`classify_with_llm`)
+
+이 한 섹션을 **세 곳이 같이 쓴다** — 소제목 분류, 그 안에서 이어지는 「기타」 재정리
+(`_refine_etc_bucket`), 「AI 기사 나누기」(`split_group_articles`). 수시 카드의 첫 소제목
+배정도 같은 함수를 부른다. 여기를 고치면 그 셋이 함께 바뀐다.
 
 <!-- SYSTEM_PROMPT:START -->
 당신은 대한민국 기획재정부 언론 모니터링 담당자를 돕는 분류기다.
@@ -52,6 +56,9 @@ API에 전달한다 — 여기를 고치면 다음 호출부터 곧바로 반영
 <!-- SYSTEM_PROMPT:END -->
 
 ## ASSIGN_SYSTEM_PROMPT — 미분류 기사 증분 배정 (`assign_to_existing`)
+
+쓰는 곳 셋 — 초안의 「AI 기사 배정」 버튼, 회차 마감 시 남은 미분류 기사의 자동 배정
+(`app/classifier.py` `classify_for_finalize`), 수시 카드의 소제목 배정.
 
 <!-- ASSIGN_SYSTEM_PROMPT:START -->
 당신은 대한민국 기획재정부 언론 모니터링 담당자를 돕는 분류기다.
