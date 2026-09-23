@@ -18,6 +18,7 @@ import html
 from typing import Optional
 
 from app.config import (
+    PLUS_GLYPH_CSS,
     SHAPE_TOKENS_CSS,
     COLOR_ACCENT,
     COLOR_ACCENT_BORDER,
@@ -58,10 +59,12 @@ def topnav_style() -> str:
     1px도 밀리지 않고 상단바 높이도 예전과 같다(sticky 요소들의 top 값이 이 높이에 맞춰져 있다).
 
     모든 화면(홈 빼고)이 이 CSS를 한 번씩 끼워 넣으므로, 모양 토큰(`--r-md` 등 CSS 변수,
-    app.config SHAPE_TOKENS_CSS)도 여기서 함께 낸다. 홈은 상단바가 없어 따로 낸다.
+    app.config SHAPE_TOKENS_CSS)과 「+」 글리프 CSS(PLUS_GLYPH_CSS)도 여기서 함께 낸다.
+    홈은 상단바가 없어 따로 낸다.
     """
     return f"""
   {SHAPE_TOKENS_CSS}
+  {PLUS_GLYPH_CSS}
   .topbar {{
     position: fixed; top: 0; left: 0; right: 0; z-index: 20;
     background: {COLOR_CARD}; border-bottom: 1px solid {COLOR_BORDER}; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);

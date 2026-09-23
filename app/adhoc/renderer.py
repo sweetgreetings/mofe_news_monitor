@@ -635,7 +635,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* AI 버튼은 언제나 채운 연보라(정기 「AI 모든 기사 재분류」와 같은 값). */
   .btn.ai {{ background: {ai_bg}; color: {ai_text}; border-color: {ai_border}; }}
   .btn.ai:hover {{ background: {ai_bg_hover}; border-color: {ai_border_hover}; }}
-  .btn.sm {{ font-size: var(--fs-md); height: var(--h-md); padding: 0 11px; box-sizing: border-box; }}
+  .btn.sm {{ font-size: var(--fs-md); height: var(--h-tb); padding: 0 9px; box-sizing: border-box; }}
   .btn:disabled {{ opacity: 0.45; cursor: not-allowed; }}
   .adv {{ margin-top: 8px; border-top: 1px dashed {border}; padding-top: 13px; }}
   .adv-h {{ font-size: var(--fs-sm); color: {muted}; font-weight: 700; margin-bottom: 10px; }}
@@ -1431,7 +1431,7 @@ def render_new_card_page(
     <div class="field">
       <label>사안</label>
       <select id="issue-select" name="issue_id" onchange="onIssueChange()">
-        <option value="__new__">+ 새 사안 만들기</option>
+        <option value="__new__"><span class="plus-glyph">+</span>새 사안 만들기</option>
         {issue_options}
       </select>
       <input type="text" id="new-issue-name" name="new_issue_name" placeholder="새 사안 이름 (예: 재경위)"
@@ -1444,7 +1444,7 @@ def render_new_card_page(
         <input type="text" id="kw-input" placeholder="검색어 입력"
                style="border: none; flex: 1; min-width: 110px; padding: 3px 4px;"
                onkeydown="if(event.key==='Enter'){{event.preventDefault(); addKeyword();}}">
-        <button type="button" class="kw-add" id="kw-add-btn" onclick="addKeyword()">+ 추가</button>
+        <button type="button" class="kw-add" id="kw-add-btn" onclick="addKeyword()"><span class="plus-glyph">+</span>추가</button>
         <span class="kw-cnt" id="kw-cnt">0 / {MAX_ADHOC_KEYWORDS}</span>
       </div>
       <div class="kw-mode seg" id="kw-mode" title="검색어 중 하나라도 있는 기사 / 검색어가 모두 있는 기사">
@@ -1766,7 +1766,7 @@ def _render_issue_tabs(card: dict, today_cards: list[dict]) -> str:
     # [수정: 2026-08-25] 새 창에서 연다 — 지금 정리 중인 카드를 덮어쓰고 빈 입력
     # 화면으로 넘어가 버리는 게 어색하다는 사용자 지적. 다른 탭들은 "같은 자리에서
     # 갈아타기"라 그대로 두고, 이것만 성격이 달라(만들기) 새 창으로 뗀다.
-    tabs.append('<a class="tab add" href="/adhoc/new" target="_blank" rel="noopener">+ 새 수집</a>')
+    tabs.append('<a class="tab add" href="/adhoc/new" target="_blank" rel="noopener"><span class="plus-glyph">+</span>새 수집</a>')
     # 원본은 수시 보관함에 안 쌓인다(새 수집의 「지난 수집」에서 다시 찾는다) — 옛 문구
     # 「모든 수집은 수시 보관함에 저장돼요」는 확정본에만 맞는 말이 됐다.
     heading = (
@@ -2575,7 +2575,7 @@ def render_card_page(
                 f'<option value="{html.escape(b["id"])}">{html.escape(bundle_label(b))}</option>'
                 for b in today_bundles
             )
-            + '<option value="__new__">+ 새 확정본 만들기</option>'
+            + '<option value="__new__"><span class="plus-glyph">+</span>새 확정본 만들기</option>'
         )
         if can_send
         else ""
@@ -3053,7 +3053,7 @@ def render_card_page(
       <input type="text" name="name" placeholder="새 소제목 이름" maxlength="20" style="width:130px;height:var(--h-md);box-sizing:border-box;padding:0 9px;font-size: var(--fs-md)"
         {"disabled" if len(group_names) >= MAX_ADHOC_SUBHEADINGS else ""}>
       <button type="submit" class="btn mute sm" {"disabled" if len(group_names) >= MAX_ADHOC_SUBHEADINGS else ""}
-        title="{f'소제목은 최대 {MAX_ADHOC_SUBHEADINGS}개까지 만들 수 있습니다' if len(group_names) >= MAX_ADHOC_SUBHEADINGS else ''}">+ 소제목 추가</button>
+        title="{f'소제목은 최대 {MAX_ADHOC_SUBHEADINGS}개까지 만들 수 있습니다' if len(group_names) >= MAX_ADHOC_SUBHEADINGS else ''}"><span class="plus-glyph">+</span>소제목 추가</button>
     </form>
     {unsent_filter_html}
     <span style="flex:1"></span>

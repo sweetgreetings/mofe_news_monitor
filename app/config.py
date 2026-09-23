@@ -627,7 +627,8 @@ RADIUS_LG = "10px"       # 카드 · 배너 · 팝오버 · 창 · 흐름도 칸
 RADIUS_PILL = "999px"    # 칩 · 건수 · 상단바 지금 화면
 RADIUS_CIRCLE = "50%"    # 떠 있는 버튼 · 점
 CONTROL_H_SM = "24px"    # 기사 행 안
-CONTROL_H_MD = "30px"    # 툴바 · 입력칸 (기본)
+CONTROL_H_TB = "28px"    # 툴바 버튼(확정본·초안·수시) — 입력칸보다 한 단계 낮다
+CONTROL_H_MD = "30px"    # 입력칸 (기본)
 CONTROL_H_LG = "36px"    # 폼의 대표 버튼(수집 · 저장 · 조회), 설정 화면 버튼
 FAB_LG = "56px"          # 발송 · 휴지통
 FAB_SM = "48px"          # ↩ 되돌리기 · 목차
@@ -645,13 +646,20 @@ FONT_BASE = "1rem"       # 기사 제목 · 본문
 FONT_LG = "1.1rem"       # 소제목 · 카드 제목 · 날짜 줄 · 빈 화면 안내
 FONT_XL = "1.3rem"       # 화면 제목(모든 화면 같은 크기)
 
+# 「+ 새 소제목」류 단추의 글자 «+» — 폰트가 그리는 십자는 한글보다 얇고 낮아 혼자
+# 묻힌다. SVG 아이콘으로 바꿔도 1em 박스라 2px 커질 뿐이어서(실측), 글자 그대로 두고
+# 키우는 쪽을 골랐다. 이 CSS는 상단바(app.topnav.topnav_style)가 함께 낸다.
+PLUS_GLYPH_CSS = (
+    ".plus-glyph { font-size: 1.2em; font-weight: 600; line-height: 0; margin-right: 4px; }"
+)
+
 SHAPE_TOKENS_CSS = (
     ":root { "
     f"--fs-xs: {FONT_XS}; --fs-sm: {FONT_SM}; --fs-md: {FONT_MD}; "
     f"--fs-base: {FONT_BASE}; --fs-lg: {FONT_LG}; --fs-xl: {FONT_XL}; "
     f"--r-sm: {RADIUS_SM}; --r-md: {RADIUS_MD}; --r-lg: {RADIUS_LG}; "
     f"--r-pill: {RADIUS_PILL}; --r-circle: {RADIUS_CIRCLE}; "
-    f"--h-sm: {CONTROL_H_SM}; --h-md: {CONTROL_H_MD}; --h-lg: {CONTROL_H_LG}; "
+    f"--h-sm: {CONTROL_H_SM}; --h-tb: {CONTROL_H_TB}; --h-md: {CONTROL_H_MD}; --h-lg: {CONTROL_H_LG}; "
     f"--fab-lg: {FAB_LG}; --fab-sm: {FAB_SM}; "
     f"--sh-float: {SHADOW_FLOAT}; --sh-pop: {SHADOW_POP}; --sh-modal: {SHADOW_MODAL}; "
     "}"

@@ -366,7 +366,7 @@ URL
 - 전문 크롤링 안 함 — 네이버 `description`만. 형광펜 단어(최대 20, `HIGHLIGHT_COLORS` 5색 순환, 칩을 누르면 다음 색, 색은 단어별 전역). **편집은 확정본·초안·전체 기사 좌측 하단 🖍️ 한 곳뿐이다** — 설정 화면(`/highlight`)은 없앴고 옛 주소는 설정 메뉴로 보낸다. **형광펜은 정기 화면에만 칠한다** — 수시 원본·확정본은 칠하지 않는다.
 - 복사·txt에서 큐레이션 버튼·아이콘은 빠진다.
 - **다운로드는 실제 `<form method="POST" action="/download-text">`**(서버가 attachment로 응답). `data:` URI는 쓰지 않는다. 확정본·초안은 복사·발송과 같은 `PLAIN_TEXT`를 보낸다.
-- **확정본·초안 툴바는 왼쪽·오른쪽으로 가른다 — 박스는 내용을 바꾸는 버튼, 글자는 가져가거나 보기만 바꾸는 것.** 왼쪽 `+ 새 소제목 · + 한 줄 메모 │ AI 모든 기사 재분류`, 오른쪽(`.actions-right`) `(📷 사진 추정 알약) · 복사 · 텍스트 · 엑셀` + 「보기 순서」 select — **보기를 바꾸는 것은 전부 오른쪽이다.** 왼쪽에 테두리 버튼이 셋이면 뜻이 다른 것들이 한 덩어리로 뭉개진다. 글자 버튼(`.export-links`)은 테두리·배경 없이 `text_soft`, hover는 배경 없이 accent + 밑줄. **가져가기 버튼은 어느 화면이든 이 모양 하나다** — 확정본·초안·수시 원본·수시 확정본 툴바와 세 보관함(정기 `.exp`·`.slot-export-actions`, 수시 `.exp`, 라벨 `.exp`). CSS는 `app/renderer.py` `export_links_style()`과 그 세 파일에 복제돼 있어 한쪽을 바꾸면 나머지도 바꾼다. 좁은 창에선 오른쪽 묶음이 통째로 아랫줄로. 시안 [mockups/TOOLBAR_GROUPING_MOCKUP.html](mockups/TOOLBAR_GROUPING_MOCKUP.html) A안·[mockups/TOOLBAR_DEPTH_MOCKUP.html](mockups/TOOLBAR_DEPTH_MOCKUP.html) C안.
+- **확정본·초안 툴바는 왼쪽·오른쪽으로 가른다 — 박스는 내용을 바꾸는 버튼, 글자는 가져가거나 보기만 바꾸는 것.** 왼쪽 `+ 새 소제목 · + 한 줄 메모 │ AI 모든 기사 재분류`(높이 `--h-tb`), 오른쪽(`.actions-right`) `(📷 사진 추정 알약) · 복사 · 텍스트 · 엑셀` + 「보기 순서」 select — **보기를 바꾸는 것은 전부 오른쪽이다.** 왼쪽에 테두리 버튼이 셋이면 뜻이 다른 것들이 한 덩어리로 뭉개진다. 글자 버튼(`.export-links`)은 테두리·배경 없이 `text_soft`, hover는 배경 없이 accent + 밑줄. **가져가기 버튼은 어느 화면이든 이 모양 하나다** — 확정본·초안·수시 원본·수시 확정본 툴바와 세 보관함(정기 `.exp`·`.slot-export-actions`, 수시 `.exp`, 라벨 `.exp`). CSS는 `app/renderer.py` `export_links_style()`과 그 세 파일에 복제돼 있어 한쪽을 바꾸면 나머지도 바꾼다. 좁은 창에선 오른쪽 묶음이 통째로 아랫줄로. 시안 [mockups/TOOLBAR_GROUPING_MOCKUP.html](mockups/TOOLBAR_GROUPING_MOCKUP.html) A안·[mockups/TOOLBAR_DEPTH_MOCKUP.html](mockups/TOOLBAR_DEPTH_MOCKUP.html) C안.
 
 ### 한 줄 메모 (`app/manual_keyword_note.py`)
 
@@ -624,7 +624,8 @@ URL
   - **알약** = 상태·건수·분류를 알려 준다(누르면 켜고 끄기만). 화면 이름 칩·건수·검색어·시간 칩·📷 사진 추정(행의 칩과 이를 켜고 끄는 「📷 사진 추정 (N)」 스위치)·라벨·필터 칩·상단바의 지금 화면·빨간 건수 배지. `--r-pill`.
   - **동그라미** = 떠 있는 버튼과 점만. `--r-circle`. 크기는 둘: 발송·휴지통 `--fab-lg`(56px), ↩·목차 `--fab-sm`(48px).
   - 동작 버튼을 알약으로 만들지 않는다(「지금까지 다시 수집」·홈 ⚙ 설정·「더보기」도 네모). 칩을 네모로 만들지 않는다.
-- **높이 세 단계**: 기사 행 안 `--h-sm`(24px), 툴바·입력칸 `--h-md`(30px, 기본), 폼의 대표 버튼·설정 화면 `--h-lg`(36px).
+- **높이 네 단계**: 기사 행 안 `--h-sm`(24px), **툴바 버튼 `--h-tb`(28px)**, 입력칸 `--h-md`(30px, 기본), 폼의 대표 버튼·설정 화면 `--h-lg`(36px). 툴바 버튼은 좌우 여백 9px·굵기 500이고, **같은 줄의 「보기 순서」 select와 가져가기 글자도 같은 높이를 쓴다**(한 줄이 가지런해야 한다). 툴바를 28px로 내릴 때 입력칸까지 따라가지 않게 `--h-tb`를 따로 둔다 — 입력칸이 28px이면 글자 치기가 답답하다. 시안 [mockups/BUTTON_COMPACT_MOCKUP.html](mockups/BUTTON_COMPACT_MOCKUP.html) ②안.
+- **「+ …」 단추의 `+`는 글자를 키워 쓴다** — `<span class="plus-glyph">+</span>` + `PLUS_GLYPH_CSS`(`app/config.py` 한 곳, 상단바 CSS와 함께 나간다), 1.2em·굵기 600·오른쪽 여백 4px. 폰트가 그리는 십자는 한글보다 얇고 낮아 혼자 묻힌다. **SVG 아이콘으로 바꾸지 않는다** — `.ic`는 1em 박스라 십자가 2px 커질 뿐이다. ⊕처럼 동그라미·네모를 두른 `+`도 쓰지 않는다(동그라미는 떠 있는 버튼과 점만). 시안 [mockups/PLUS_ICON_MOCKUP.html](mockups/PLUS_ICON_MOCKUP.html) C안. → H: 「+」 단추
 - **누르는 것의 위계**: 채움은 한 화면의 대표 동작 하나만(저장·수집·조회·발송). 테두리는 보조 동작. 글자는 가져가기(복사·텍스트·엑셀 — 영문 소문자·대문자·「메모장」은 기각, 시안 [mockups/EXPORT_LABEL_MOCKUP.html](mockups/EXPORT_LABEL_MOCKUP.html))·보기 전환. **지우기는 채움 파랑으로 두지 않는다**(글자 버튼, 올리면 빨강). AI 버튼은 크기와 무관하게 채운 연보라. → H: 가져가기 버튼 이름
 - **그림자 셋**: 떠 있는 것 `--sh-float` · 팝오버·메뉴·말풍선 `--sh-pop` · 확인창·이름 고르기 창 `--sh-modal`. 상단바·하단바의 얇은 그림자, 입력칸 포커스 고리는 예외.
 - **값은 CSS 변수로만 쓴다**: CSS에 `border-radius: 6px`처럼 숫자를 적지 않고 `var(--r-md)`. 변수 정의 `SHAPE_TOKENS_CSS`는 `topnav_style()`이 함께 내고, 상단바가 없는 홈은 따로 낸다 — **새 화면이 상단바 CSS를 안 쓰면 `SHAPE_TOKENS_CSS`를 직접 넣는다.**

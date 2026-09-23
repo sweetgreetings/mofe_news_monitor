@@ -358,7 +358,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 {screen_tag_style}
   .actions .create-group-btn {{
     background: transparent; color: {accent}; border: 1px solid {ghost_border};
-    border-radius: var(--r-md); font-weight: 400;
+    border-radius: var(--r-md); font-weight: 500;
   }}
   .actions .create-group-btn:hover {{ background: {hover}; border-color: {ghost_border_hover}; }}
   /* [수정: 2026-08-12] 초안 툴바에 있던 "🤖 미분류 배정"을 📂 소제목 미분류 칸의
@@ -374,7 +374,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
   .assign-unclassified-btn:hover {{ background: {ai_bg_hover}; border-color: {ai_border_hover}; }}
   .assign-unclassified-btn:disabled {{ opacity: 0.5; cursor: progress; }}
-  .actions-divider {{ width: 1px; height: 26px; background: {border}; margin: 0 2px; }}
+  .actions-divider {{ width: 1px; height: 24px; background: {border}; margin: 0 2px; }}
   /* [추가: 2026-08-12] "🤖 전체 기사 재분류" — 기존 소제목 이름·구성을 전부 새로 짓는
      파괴적 동작이라, 안전한 "미분류 배정"과 달리 **테두리만**(고스트) 둬 한 발 물러나
      보이게 한다. 같은 연보라 계열이라 "AI가 하는 일"이라는 건 알 수 있으면서도, 채워
@@ -513,7 +513,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .group-move-select.promote-select {{ width: 114px; }}
   /* [추가: 2026-08-04] app.renderer와 동일 — 소제목별/시간순/언론사순 보기 전환 select. */
   .view-mode-select {{
-    border: 1px solid {accent}; border-radius: var(--r-md); padding: 6px 10px; font-size: var(--fs-md);
+    border: 1px solid {accent}; border-radius: var(--r-md); font-size: var(--fs-md);
+    height: var(--h-tb); padding: 0 9px; box-sizing: border-box;
     color: {text}; background: {card};
   }}
   /* [수정: 2026-08-04] app.renderer와 동일 — 사용자가 직접 만든 소제목은 기사가
@@ -554,7 +555,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [수정: 2026-08-03] app.renderer와 동일한 이유로 액션 툴바만 소프트 필로(시안 B) */
   .actions button, .actions a.btn {{
     background: {hover}; color: {accent}; font-weight: 600; border-radius: var(--r-md);
-    height: var(--h-md); padding-top: 0; padding-bottom: 0; box-sizing: border-box;
+    height: var(--h-tb); padding: 0 9px; box-sizing: border-box;
   }}
   .actions button:hover, .actions a.btn:hover {{ background: {accent_tonal}; }}
   /* scroll-margin-top — .topbar가 position:fixed라, 목차·"미분류 N건"으로 뛰어오면
@@ -3272,7 +3273,7 @@ def _actions_html(
     keyword_note_btn_html = (
         ""
         if load_manual_keyword_note()
-        else '<button class="create-group-btn" type="button" onclick="toggleKeywordNote(this)">+ 한 줄 메모</button>'
+        else '<button class="create-group-btn" type="button" onclick="toggleKeywordNote(this)"><span class="plus-glyph">+</span>한 줄 메모</button>'
     )
     # [수정: 2026-08-12] "🤖 미분류 기사 분류"(증분 배정)는 📂 소제목 미분류 칸의 헤더로
     # 옮겼다(_render_preview_groups 참고) — 미분류를 발견하는 자리에서 바로 누르도록,
@@ -3301,7 +3302,7 @@ def _actions_html(
     # 폴백 상태면 복사·텍스트·엑셀 모두 제출 전에 한 번 더 묻는다 — false를 돌려주면
     # <form> 제출 자체가 취소된다.
     return (
-        '<button class="create-group-btn" type="button" onclick="createCustomGroup()">+ 새 소제목</button>'
+        '<button class="create-group-btn" type="button" onclick="createCustomGroup()"><span class="plus-glyph">+</span>새 소제목</button>'
         f'{keyword_note_btn_html}'
         '<span class="actions-divider"></span>'
         f"{reclassify_btn_html}"

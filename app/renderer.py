@@ -329,7 +329,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      두고 화면에 나열하는 순서만 바꾸는 용도라, 다른 액션 버튼과 톤을 맞추되 select임을
      알 수 있게 테두리를 살짝 강조한다. */
   .view-mode-select {{
-    border: 1px solid {accent}; border-radius: var(--r-md); padding: 6px 10px; font-size: var(--fs-md);
+    border: 1px solid {accent}; border-radius: var(--r-md); font-size: var(--fs-md);
+    height: var(--h-tb); padding: 0 9px; box-sizing: border-box;
     color: {text}; background: {card};
   }}
   /* [수정: 2026-08-04] 기사가 없을 때만 걸리던 점선 테두리를, 사용자가 직접 만든
@@ -377,7 +378,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      이 툴바 안에서만 덮어쓰고, 🗑️/↑/↓ 등 다른 버튼은 그대로 원색 유지. */
   .actions button, .actions a.btn {{
     background: {hover}; color: {accent}; font-weight: 600; border-radius: var(--r-md);
-    height: var(--h-md); padding-top: 0; padding-bottom: 0; box-sizing: border-box;
+    height: var(--h-tb); padding: 0 9px; box-sizing: border-box;
   }}
   .actions button:hover, .actions a.btn:hover {{ background: {accent_tonal}; }}
   /* [수정: 2026-08-03] "+ 새 소제목 만들기"만 나머지 툴바 버튼과 기능이 달라(내용을
@@ -386,7 +387,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      덮어쓴다. */
   .actions .create-group-btn {{
     background: transparent; color: {accent}; border: 1px solid {ghost_border};
-    border-radius: var(--r-md); font-weight: 400;
+    border-radius: var(--r-md); font-weight: 500;
   }}
   .actions .create-group-btn:hover {{ background: {hover}; border-color: {ghost_border_hover}; }}
   /* [추가: 2026-08-11] 확정본 "🤖 전체 기사 재분류" 버튼 — 왼쪽 그룹 맨 끝(구분선 뒤)에 둔다.
@@ -395,7 +396,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      생겼다(사용자 지적, 스크린샷으로 비교) — **파괴적 동작은 어느 화면에서든 채우면
      안 된다**는 원칙에 맞춰 확정본도 고스트로 통일했다. 자세한 이유는
      app/preview_renderer.py의 같은 자리 주석 참고. */
-  .actions-divider {{ width: 1px; height: 26px; background: {border}; margin: 0 2px; }}
+  .actions-divider {{ width: 1px; height: 24px; background: {border}; margin: 0 2px; }}
   /* [수정: 2026-08-26] 고스트(테두리만) → "AI 기사 배정"과 같은 채운 연보라. 사용자 결정 —
      app/preview_renderer.py의 .reclassify-btn과 같은 이유·같은 배색이라 두 화면이 계속
      같은 모양을 유지한다. 파괴적이라는 신호는 아이콘(새로고침)과 항상 뜨는 confirm()이 맡는다. */
@@ -863,7 +864,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
       <h1><span class="screen-tag final">확정본</span>언론 모니터링 {run_slot} 기준{total_count_html}</h1>
     </div>
     <div class="actions">
-      <button class="create-group-btn" type="button" onclick="createCustomGroup()">+ 새 소제목</button>
+      <button class="create-group-btn" type="button" onclick="createCustomGroup()"><span class="plus-glyph">+</span>새 소제목</button>
       {keyword_note_btn_html}
       <span class="actions-divider"></span>
       {regen_btn_html}
@@ -3405,7 +3406,7 @@ def keyword_note_template_vars(run_key=None) -> dict:
         "keyword_note_btn_html": (
             ""
             if text
-            else '<button class="create-group-btn" type="button" onclick="toggleKeywordNote(this)">+ 한 줄 메모</button>'
+            else '<button class="create-group-btn" type="button" onclick="toggleKeywordNote(this)"><span class="plus-glyph">+</span>한 줄 메모</button>'
         ),
     }
 
@@ -4325,7 +4326,7 @@ EXPORT_LINKS_STYLE = """
   .actions .export-links {{ display: inline-flex; align-items: center; }}
   .actions .export-links button {{
     background: transparent; border: none; color: {text_soft}; font-weight: 500;
-    padding: 6px 8px; border-radius: var(--r-md);
+    height: var(--h-tb); padding: 0 8px; box-sizing: border-box; border-radius: var(--r-md);
   }}
   .actions .export-links button:hover {{
     background: transparent; color: {accent}; text-decoration: underline; text-underline-offset: 3px;
@@ -5197,7 +5198,7 @@ def pinned_jump_badge_html(count: int) -> str:
 URL_ADD_BUTTON_HTML = (
     '<button class="create-group-btn url-add-open-btn" type="button" id="url-add-open-btn" '
     'onclick="openUrlAdd()" title="네이버에서 직접 찾은 기사를 주소만으로 담아둡니다">'
-    "+ 수기로 기사 추가</button>"
+    '<span class="plus-glyph">+</span>수기로 기사 추가</button>'
 )
 URL_ADD_PANEL_HTML = (
     '<div class="url-add-zone" id="url-add-zone">'

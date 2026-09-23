@@ -112,7 +112,7 @@ def _word_card_html(words: list, totals: dict, start: str, end: str, settings: d
             f'{hidden_fields}'
             '<input type="text" name="word" list="trend-word-options" placeholder="단어를 직접 입력" required>'
             f'<datalist id="trend-word-options">{options}</datalist>'
-            '<button type="submit">+ 추가</button></form></div>'
+            '<button type="submit"><span class="plus-glyph">+</span>추가</button></form></div>'
         )
 
     quick_html = ""

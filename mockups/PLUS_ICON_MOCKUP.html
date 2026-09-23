@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>+ 버튼 시안 — 글자 vs SVG</title>
+<style>
+  :root{
+    --r-md:6px; --h-md:30px; --fs-md:0.88rem; --fs-sm:0.8rem; --fs-xs:0.72rem;
+    --accent:#2563EB; --ghost:#BFDBFE; --ghost-h:#A9C6F5; --hover:#EFF6FF;
+    --bg:#F8FAFC; --card:#FFFFFF; --text:#1F2937; --soft:#4B5563; --border:#E5E7EB;
+    --ai-bg:#F0EAFB; --ai-text:#4A3F8F; --ai-border:#DCD0F2;
+  }
+  body{margin:0;padding:28px 20px 60px;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI",sans-serif;}
+  .wrap{max-width:800px;margin:0 auto;}
+  h1{font-size:1.3rem;color:#1E3A5F;margin:0 0 6px;}
+  .sub{font-size:var(--fs-md);color:var(--soft);margin:0 0 22px;line-height:1.6;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;
+    padding:20px 22px;margin-bottom:16px;}
+  .card h2{font-size:1.1rem;margin:0 0 4px;color:#1E3A5F;display:flex;align-items:baseline;gap:8px;}
+  .tagname{font-size:var(--fs-xs);color:var(--soft);font-weight:400;
+    border:1px solid var(--border);border-radius:999px;padding:1px 8px;}
+  .why{font-size:var(--fs-sm);color:var(--soft);margin:0 0 14px;line-height:1.65;}
+  .why b{color:var(--text);}
+  /* ===== 실제 앱 툴바 그대로 ===== */
+  .actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .actions button{height:var(--h-md);padding:0 10px;font-size:var(--fs-md);
+    font-family:inherit;border-radius:var(--r-md);cursor:pointer;display:inline-flex;
+    align-items:center;gap:5px;line-height:1;}
+  .create-group-btn{background:transparent;color:var(--accent);
+    border:1px solid var(--ghost);font-weight:400;}
+  .create-group-btn:hover{background:var(--hover);border-color:var(--ghost-h);}
+  .regen-btn{background:var(--ai-bg);color:var(--ai-text);border:1px solid var(--ai-border);}
+  .divider{width:1px;height:26px;background:var(--border);margin:0 2px;}
+  .ic{width:1em;height:1em;stroke:currentColor;fill:none;stroke-width:1.9;
+    stroke-linecap:round;stroke-linejoin:round;vertical-align:-0.15em;flex-shrink:0;}
+  /* ===== 안 A: 지금 아이콘 규격 그대로 (M12 5v14 M5 12h14, sw 1.9) ===== */
+  /* ===== 안 B: 넓고 굵게 ===== */
+  .ic.plus-b{stroke-width:2.4;}
+  /* ===== 안 C: 글자 + 를 CSS로만 키우기 ===== */
+  .plus-glyph{font-size:1.2em;font-weight:600;line-height:0;position:relative;top:0.02em;}
+  /* 확대 비교 */
+  .zoom{margin-top:16px;padding:16px;background:var(--bg);border-radius:var(--r-md);
+    display:flex;align-items:center;gap:30px;flex-wrap:wrap;}
+  .zoom .z{transform:scale(3);transform-origin:left center;}
+  .zoomlabel{font-size:var(--fs-xs);color:var(--soft);margin:0 0 10px;}
+  .measure{font-size:var(--fs-xs);color:var(--soft);margin-top:12px;font-variant-numeric:tabular-nums;}
+  .measure b{color:var(--accent);}
+  .rowlab{font-size:var(--fs-xs);color:var(--soft);width:62px;flex-shrink:0;}
+  .side{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+  .note{font-size:var(--fs-sm);color:var(--soft);line-height:1.7;
+    border-left:3px solid var(--ghost);padding:2px 0 2px 12px;margin-top:16px;}
+  .warn{border-left-color:#F59E0B;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>「+」를 SVG로 바꾸면 커지나</h1>
+  <p class="sub">실측 — 지금 글자 <b>+</b>는 폭 7.66px(실제 십자는 약 6px)·획 1.1px, 옆 한글은 12.19px 네모꼴.
+  앱의 <code>.ic</code> 아이콘은 1em(14.08px) 박스라 십자로 그리면 약 8px. <b>그냥 바꾸면 2px 차이뿐입니다.</b>
+  아래 셋을 실제 툴바 규격 그대로 놓고 비교합니다.</p>
+
+  <!-- 지금 -->
+  <div class="card">
+    <h2>지금 <span class="tagname">글자 +</span></h2>
+    <p class="why">폰트가 정한 크기·굵기라 <b>우리가 손댈 수 없습니다.</b> 한글 옆에서 얇고 낮게 보입니다.</p>
+    <div class="actions">
+      <button class="create-group-btn">+ 새 소제목</button>
+      <button class="create-group-btn">+ 한 줄 메모</button>
+      <div class="divider"></div>
+      <button class="regen-btn">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/></svg>AI 모든 기사 재분류</button>
+    </div>
+    <div class="zoom"><span class="zoomlabel">300%</span><span class="z">+ 한 줄 메모</span></div>
+    <p class="measure">십자 약 <b>6px</b> · 획 <b>1.1px</b></p>
+  </div>
+
+  <!-- A -->
+  <div class="card">
+    <h2>A안 <span class="tagname">icon("plus") 기본 규격</span></h2>
+    <p class="why">다른 아이콘과 <b>똑같은 규격</b>(1em 박스, stroke 1.9). 체계에는 가장 잘 맞지만 — 보시다시피 <b>거의 안 커집니다.</b></p>
+    <div class="actions">
+      <button class="create-group-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg>새 소제목</button>
+      <button class="create-group-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg>한 줄 메모</button>
+      <div class="divider"></div>
+      <button class="regen-btn">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/></svg>AI 모든 기사 재분류</button>
+    </div>
+    <div class="zoom"><span class="zoomlabel">300%</span><span class="z"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg> 한 줄 메모</span></div>
+    <p class="measure">십자 <b>8.2px</b> · 획 <b>1.1px</b> — 글자보다 2px 큼</p>
+  </div>
+
+  <!-- B -->
+  <div class="card" style="border-color:#BFDBFE;">
+    <h2>B안 <span class="tagname">넓고 굵게 — 추천</span></h2>
+    <p class="why">SVG여서 할 수 있는 것. 십자를 박스에 꽉 채우고(<code>M12 4v16 / M4 12h16</code>) 획을 <b>2.4</b>로 굵힙니다.
+    옆 한글과 <b>시각 무게가 맞습니다.</b> 크기 규칙(1em)은 그대로라 툴바 높이도 안 변합니다.</p>
+    <div class="actions">
+      <button class="create-group-btn"><svg class="ic plus-b" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="M4 12h16"/></svg>새 소제목</button>
+      <button class="create-group-btn"><svg class="ic plus-b" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="M4 12h16"/></svg>한 줄 메모</button>
+      <div class="divider"></div>
+      <button class="regen-btn">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/></svg>AI 모든 기사 재분류</button>
+    </div>
+    <div class="zoom"><span class="zoomlabel">300%</span><span class="z"><svg class="ic plus-b" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="M4 12h16"/></svg> 한 줄 메모</span></div>
+    <p class="measure">십자 <b>9.4px</b> · 획 <b>1.4px</b> — 글자 대비 가로 +56%, 획 +27%</p>
+  </div>
+
+  <!-- C -->
+  <div class="card">
+    <h2>C안 <span class="tagname">글자 그대로, CSS로만</span></h2>
+    <p class="why">SVG 없이 <code>font-size:1.2em; font-weight:600</code>만. <b>한 줄로 끝납니다.</b>
+    다만 폰트마다 <b>+의 높이와 굵기가 달라</b> 맥·윈도우·폰트 fallback에서 제각각으로 보입니다.</p>
+    <div class="actions">
+      <button class="create-group-btn"><span class="plus-glyph">+</span> 새 소제목</button>
+      <button class="create-group-btn"><span class="plus-glyph">+</span> 한 줄 메모</button>
+      <div class="divider"></div>
+      <button class="regen-btn">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/></svg>AI 모든 기사 재분류</button>
+    </div>
+    <div class="zoom"><span class="zoomlabel">300%</span><span class="z"><span class="plus-glyph">+</span> 한 줄 메모</span></div>
+    <p class="measure">십자 약 <b>7.2px</b> · 획 <b>1.4px</b> — 폰트에 따라 달라짐</p>
+  </div>
+
+  <!-- 나란히 -->
+  <div class="card">
+    <h2>한자리에서</h2>
+    <p class="why">같은 버튼 네 벌. 아래로 훑으며 비교해 보세요.</p>
+    <div class="side"><span class="rowlab">지금</span><button class="create-group-btn">+ 한 줄 메모</button></div>
+    <div class="side"><span class="rowlab">A</span><button class="create-group-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg>한 줄 메모</button></div>
+    <div class="side"><span class="rowlab">B</span><button class="create-group-btn"><svg class="ic plus-b" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="M4 12h16"/></svg>한 줄 메모</button></div>
+    <div class="side"><span class="rowlab">C</span><button class="create-group-btn"><span class="plus-glyph">+</span> 한 줄 메모</button></div>
+  </div>
+
+  <div class="card">
+    <h2>동그라미·네모 두른 +는 왜 없나</h2>
+    <p class="why">모양 규칙이 막습니다 — <b>동그라미는 떠 있는 버튼(발송·휴지통·↩·목차)과 점에만</b> 씁니다.
+    ⊕를 툴바 버튼 안에 넣으면 그 규칙이 깨지고, 테두리 안에 테두리가 겹쳐 보입니다.</p>
+    <p class="note warn"><b>어느 안을 고르든 15곳이 함께 바뀝니다.</b>
+    + 새 소제목 · + 한 줄 메모 · + 수기로 기사 추가 · + 새 수집 · + 새 확정본 만들기 ·
+    + 키워드 그룹 추가 · + 시간대 추가 · + 받는 사람 추가 · + 소제목 추가 · + 새 사안 만들기 · + 추가 …
+    <br>한 곳만 바꾸면 같은 뜻의 버튼이 두 모양이 됩니다.</p>
+  </div>
+</div>
+</body>
+</html>

@@ -1088,7 +1088,7 @@ _KEYWORD_GROUPS_TEMPLATE = (
   <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg> 검색어</h1>
   <p class="kw-lead">키워드를 누르면 지우지 않고 잠시 빼고, 두 번 누르면 글자를 고칩니다.</p>
   <div id="kwGroups"></div>
-  <button type="button" class="add-group-btn" id="kwAddGroupBtn">+ 키워드 그룹 추가</button>
+  <button type="button" class="add-group-btn" id="kwAddGroupBtn"><span class="plus-glyph">+</span>키워드 그룹 추가</button>
 </div>
 
 <div class="save-bar">
@@ -1256,7 +1256,7 @@ def _render_schedule_group_block(
         + _render_time_inputs(group_index, times, slots)
         + '<p class="add-row add-time-row">'
         f'<button type="submit" formaction="/schedule/add-slot" name="group_index" '
-        f'value="{group_index}"{add_time_disabled}>+ 시간대 추가</button>'
+        f'value="{group_index}"{add_time_disabled}><span class="plus-glyph">+</span>시간대 추가</button>'
         "</p>"
         "</div>"
     )
@@ -2054,7 +2054,7 @@ _SCHEDULE_TEMPLATE = (
   {error_html}
   <form method="POST" action="/save-schedule" class="schedule-form">
     {group_blocks}
-    <p class="add-row"><button type="submit" formaction="/schedule/add-group"{add_group_disabled}>+ 그룹 추가</button></p>
+    <p class="add-row"><button type="submit" formaction="/schedule/add-group"{add_group_disabled}><span class="plus-glyph">+</span>그룹 추가</button></p>
     <div class="save-bar"><div class="save-bar-inner"><button type="submit">저장</button></div></div>
   </form>
 </div>
@@ -2621,7 +2621,7 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
     {recipient_rows}
     </div>
     <p class="add-row">
-      <button type="submit" formaction="/telegram/add-recipient-slot"{add_disabled}>+ 받는 사람 추가</button>
+      <button type="submit" formaction="/telegram/add-recipient-slot"{add_disabled}><span class="plus-glyph">+</span>받는 사람 추가</button>
     </p>
     <div class="note">
       "나"처럼 정기·수시는 다 끄고 [단독]·[속보]만 받을 수 있습니다 — 두 발송은 서로 독립적입니다
@@ -3280,7 +3280,7 @@ _EMAIL_SETTINGS_TEMPLATE = (
     <p class="caption">받는 사람 (최대 {max_recipients}명) — 꺼두면(OFF) 지우지 않고도 잠깐 전송 대상에서 뺄 수 있습니다.</p>
     {recipient_rows}
     <p class="add-row">
-      <button type="submit" formaction="/email/add-recipient-slot"{add_disabled}>+ 받는 사람 추가</button>
+      <button type="submit" formaction="/email/add-recipient-slot"{add_disabled}><span class="plus-glyph">+</span>받는 사람 추가</button>
     </p>
     <div class="save-bar"><div class="save-bar-inner"><button type="submit">저장</button></div></div>
   </form>

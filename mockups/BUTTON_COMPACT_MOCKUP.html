@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>툴바 단추 촘촘하게 — 시안</title>
+<style>
+  :root{
+    --r-md:6px; --fs-md:0.88rem; --fs-sm:0.8rem; --fs-xs:0.72rem;
+    --accent:#2563EB; --ghost:#BFDBFE; --ghost-h:#A9C6F5; --hover:#EFF6FF;
+    --bg:#F8FAFC; --card:#FFFFFF; --text:#1F2937; --soft:#4B5563; --border:#E5E7EB;
+    --ai-bg:#F0EAFB; --ai-text:#4A3F8F; --ai-border:#DCD0F2; --head:#1E3A5F;
+  }
+  body{margin:0;padding:26px 20px 70px;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI",sans-serif;}
+  .wrap{max-width:800px;margin:0 auto;}
+  h1{font-size:1.3rem;color:var(--head);margin:0 0 6px;}
+  .sub{font-size:var(--fs-md);color:var(--soft);margin:0 0 8px;line-height:1.7;}
+  .sub b{color:var(--text);}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;
+    padding:18px 20px 20px;margin-bottom:14px;}
+  .card.pick{border-color:var(--ghost);box-shadow:0 0 0 3px #EFF6FF;}
+  .card h2{font-size:1.1rem;margin:0 0 3px;color:var(--head);display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;}
+  .spec{font-size:var(--fs-xs);color:var(--soft);font-weight:400;border:1px solid var(--border);
+    border-radius:999px;padding:1px 9px;font-variant-numeric:tabular-nums;}
+  .why{font-size:var(--fs-sm);color:var(--soft);margin:0 0 14px;line-height:1.65;}
+  .why b{color:var(--text);}
+
+  /* ===== 실제 앱 툴바 ===== */
+  .actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+    padding:10px;background:var(--card);border-radius:var(--r-md);}
+  .actions button{font-family:inherit;font-size:var(--fs-md);border-radius:var(--r-md);
+    cursor:pointer;display:inline-flex;align-items:center;justify-content:center;
+    height:var(--bh);padding:0 var(--bp);box-sizing:border-box;line-height:1;appearance:none;}
+  .create-group-btn{background:transparent;color:var(--accent);
+    border:1px solid var(--ghost);font-weight:var(--bw);}
+  .create-group-btn:hover{background:var(--hover);border-color:var(--ghost-h);}
+  .reclassify-btn{background:var(--ai-bg);color:var(--ai-text);border:1px solid var(--ai-border);
+    gap:5px;font-weight:var(--bw);}
+  .actions-divider{width:1px;height:calc(var(--bh) - 4px);background:var(--border);margin:0 2px;}
+  .actions-right{margin-left:auto;display:inline-flex;align-items:center;gap:8px;}
+  .export-links{display:inline-flex;align-items:center;}
+  .export-links button{background:transparent;border:none;color:var(--soft);font-weight:500;
+    padding:0 8px;height:var(--bh);}
+  .export-links button:hover{color:var(--accent);text-decoration:underline;text-underline-offset:3px;}
+  .view-mode-select{border:1px solid var(--accent);border-radius:var(--r-md);
+    padding:0 8px;height:var(--bh);font-size:var(--fs-md);color:var(--text);background:var(--card);
+    font-family:inherit;box-sizing:border-box;}
+  .ic{width:1em;height:1em;stroke:currentColor;fill:none;stroke-width:1.9;
+    stroke-linecap:round;stroke-linejoin:round;vertical-align:-0.15em;flex-shrink:0;}
+  /* C안 + 글리프 (앞서 고르신 것) */
+  .plus-glyph{font-size:1.2em;font-weight:600;line-height:0;margin-right:4px;}
+
+  /* 안별 치수 */
+  .a-now  {--bh:30px;--bp:14px;--bw:400;}
+  .a-1    {--bh:30px;--bp:10px;--bw:400;}
+  .a-2    {--bh:28px;--bp:9px; --bw:500;}
+  .a-3    {--bh:26px;--bp:8px; --bw:500;}
+  .a-4    {--bh:24px;--bp:7px; --bw:500;}
+
+  .zoom{margin-top:12px;padding:14px 16px;background:var(--bg);border-radius:var(--r-md);overflow:hidden;}
+  .z{display:inline-block;transform:scale(2.4);transform-origin:left center;}
+  .zl{font-size:var(--fs-xs);color:var(--soft);margin-bottom:14px;}
+  .note{font-size:var(--fs-sm);color:var(--soft);line-height:1.75;
+    border-left:3px solid var(--ghost);padding:3px 0 3px 12px;margin:14px 0 0;}
+  .note.warn{border-left-color:#F59E0B;}
+  .note b{color:var(--text);}
+  code{font-size:0.92em;background:#F3F4F6;padding:1px 5px;border-radius:4px;}
+  .stack .actions{margin-bottom:7px;}
+  .rl{font-size:var(--fs-xs);color:var(--soft);display:inline-block;width:78px;flex-shrink:0;}
+  .stack .row{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>툴바 단추를 촘촘하게</h1>
+  <p class="sub">고르신 <b>C안 <span style="font-size:1.2em;font-weight:600">+</span> 글리프</b>가 모든 안에 이미 들어가 있습니다.
+  여기서 바뀌는 건 <b>높이와 좌우 여백</b>뿐입니다 — 스크린샷에서 촘촘해 보였던 것의 정체가 그 둘이었습니다.
+  각 안은 <b>툴바 통째로</b> 보여 줍니다(왼쪽 단추 · 구분선 · AI 단추 · 오른쪽 가져가기 글자 · 보기 순서).</p>
+
+  <div class="card a-now">
+    <h2>지금 <span class="spec">높이 30 · 좌우 14 · 굵기 400</span></h2>
+    <p class="why">좌우 14px이 글자를 양옆으로 밀어 <b>헐렁해 보입니다.</b> 단추가 넷 이상 서면 줄이 금세 꽉 찹니다.</p>
+    <div class="actions">
+      <button class="create-group-btn"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn"><span class="plus-glyph">+</span>한 줄 메모</button>
+      <span class="actions-divider"></span>
+      <button class="reclassify-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>AI 모든 기사 재분류</button>
+      <span class="actions-right">
+        <span class="export-links"><button>복사</button><button>텍스트</button><button>엑셀</button></span>
+        <select class="view-mode-select"><option>소제목 내 언론사순</option></select>
+      </span>
+    </div>
+  </div>
+
+  <div class="card a-1">
+    <h2>① 여백만 조이기 <span class="spec">높이 30 · 좌우 10 · 굵기 400</span></h2>
+    <p class="why">높이는 그대로라 <b>다른 화면과 아무것도 안 어긋납니다.</b> 가장 안전한 한 걸음.</p>
+    <div class="actions">
+      <button class="create-group-btn"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn"><span class="plus-glyph">+</span>한 줄 메모</button>
+      <span class="actions-divider"></span>
+      <button class="reclassify-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>AI 모든 기사 재분류</button>
+      <span class="actions-right">
+        <span class="export-links"><button>복사</button><button>텍스트</button><button>엑셀</button></span>
+        <select class="view-mode-select"><option>소제목 내 언론사순</option></select>
+      </span>
+    </div>
+  </div>
+
+  <div class="card a-2 pick">
+    <h2>② 촘촘 <span class="spec">높이 28 · 좌우 9 · 굵기 500</span> <span class="spec" style="border-color:var(--ghost);color:var(--accent)">추천</span></h2>
+    <p class="why">여백을 조이면 글자가 가벼워 보여 <b>굵기를 500으로</b> 함께 올렸습니다.
+    스크린샷의 촘촘함에 가까우면서 <b>클릭 표적이 안 답답합니다.</b></p>
+    <div class="actions">
+      <button class="create-group-btn"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn"><span class="plus-glyph">+</span>한 줄 메모</button>
+      <span class="actions-divider"></span>
+      <button class="reclassify-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>AI 모든 기사 재분류</button>
+      <span class="actions-right">
+        <span class="export-links"><button>복사</button><button>텍스트</button><button>엑셀</button></span>
+        <select class="view-mode-select"><option>소제목 내 언론사순</option></select>
+      </span>
+    </div>
+    <div class="zoom"><div class="zl">240%</div><span class="z">
+      <button class="create-group-btn"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn" style="margin-left:6px"><span class="plus-glyph">+</span>한 줄 메모</button>
+    </span></div>
+  </div>
+
+  <div class="card a-3">
+    <h2>③ 더 촘촘 <span class="spec">높이 26 · 좌우 8 · 굵기 500</span></h2>
+    <p class="why">스크린샷(20px)에 한 걸음 더 가깝습니다. 툴바가 눈에 덜 띄고 <b>기사 목록이 주인공이 됩니다.</b></p>
+    <div class="actions">
+      <button class="create-group-btn"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn"><span class="plus-glyph">+</span>한 줄 메모</button>
+      <span class="actions-divider"></span>
+      <button class="reclassify-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>AI 모든 기사 재분류</button>
+      <span class="actions-right">
+        <span class="export-links"><button>복사</button><button>텍스트</button><button>엑셀</button></span>
+        <select class="view-mode-select"><option>소제목 내 언론사순</option></select>
+      </span>
+    </div>
+  </div>
+
+  <div class="card a-4">
+    <h2>④ 스크린샷에 가장 가깝게 <span class="spec">높이 24 · 좌우 7 · 굵기 500</span></h2>
+    <p class="why">앱의 가장 작은 높이 단계(기사 행 안 단추와 같은 24px)입니다.
+    <b>여기서 더 줄이면 규칙 밖</b>이고, 마우스로 겨누기가 빡빡해집니다.</p>
+    <div class="actions">
+      <button class="create-group-btn"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn"><span class="plus-glyph">+</span>한 줄 메모</button>
+      <span class="actions-divider"></span>
+      <button class="reclassify-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>AI 모든 기사 재분류</button>
+      <span class="actions-right">
+        <span class="export-links"><button>복사</button><button>텍스트</button><button>엑셀</button></span>
+        <select class="view-mode-select"><option>소제목 내 언론사순</option></select>
+      </span>
+    </div>
+  </div>
+
+  <div class="card stack">
+    <h2>한자리에서</h2>
+    <p class="why">같은 두 단추를 위에서 아래로. 이번엔 CSS가 제대로 걸려 있습니다.</p>
+    <div class="row a-now"><span class="rl">지금 30·14</span>
+      <button class="create-group-btn"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn"><span class="plus-glyph">+</span>한 줄 메모</button></div>
+    <div class="row a-1"><span class="rl">① 30·10</span>
+      <button class="create-group-btn"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn"><span class="plus-glyph">+</span>한 줄 메모</button></div>
+    <div class="row a-2"><span class="rl">② 28·9</span>
+      <button class="create-group-btn"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn"><span class="plus-glyph">+</span>한 줄 메모</button></div>
+    <div class="row a-3"><span class="rl">③ 26·8</span>
+      <button class="create-group-btn"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn"><span class="plus-glyph">+</span>한 줄 메모</button></div>
+    <div class="row a-4"><span class="rl">④ 24·7</span>
+      <button class="create-group-btn"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn"><span class="plus-glyph">+</span>한 줄 메모</button></div>
+  </div>
+
+  <div class="card">
+    <h2>고르시면 함께 따라오는 것</h2>
+    <p class="note"><b>높이를 바꾸면(②③④) 툴바 전체가 같이 갑니다.</b>
+    오른쪽 「보기 순서」 드롭다운과 가져가기 글자도 같은 높이를 써야 한 줄이 가지런합니다 —
+    위 시안엔 이미 맞춰 두었습니다. AI 단추, 수시 화면 툴바도 같은 규칙을 씁니다.</p>
+    <p class="note warn"><b>입력칸은 따라가지 않습니다.</b>
+    앱의 <code>--h-md</code>(30px)는 툴바 단추와 <b>입력칸이 함께</b> 쓰는 값입니다.
+    단추만 줄이려면 툴바 전용 값을 새로 만들어야 합니다 — 입력칸까지 26px이 되면 글자 치기가 답답해집니다.</p>
+    <p class="note"><b>바뀌는 단추</b> — + 새 소제목 · + 한 줄 메모 · + 수기로 기사 추가 · + 새 수집 ·
+    + 새 확정본 만들기 · + 키워드 그룹 추가 · + 시간대 추가 · + 받는 사람 추가 · + 소제목 추가 ·
+    + 새 사안 만들기 · + 추가, 그리고 같은 툴바에 선 AI 단추와 가져가기 글자.</p>
+  </div>
+</div>
+</body>
+</html>
