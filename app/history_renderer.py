@@ -171,7 +171,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [수정: 2026-09-16] 두 줄(빠른 설정 / 직접 입력 + 사이 구분선)을 한 줄로 합쳤다 — 두 줄을 만들던 건
      안내 문구 둘(「날짜 기준으로 조회합니다」·「시작일 ~ 종료일을 직접 넣고 조회」)이었는데, 앞은
      「기간」 라벨이, 뒤는 날짜 칸 두 개와 ~가 이미 한 말이다. 컨트롤은 하나도 안 뺐다(101 → 52px).
-     수시 보관함(app/adhoc/archive_renderer.py)도 같은 규칙. 시안 HISTORY_PERIOD_BAR_MOCKUP.html B안. */
+     수시 보관함(app/adhoc/archive_renderer.py)도 같은 규칙. 시안 파일은 정리하며 없앴다(당시 B안). */
   .prow .pdiv {{ width: 1px; align-self: stretch; background: {border}; margin: 0 2px; }}
   .prow .jlab {{ color: {muted}; font-size: var(--fs-sm); font-weight: 600; width: 44px; flex: none; }}
   .prow input[type=date] {{ font: inherit; font-size: var(--fs-md); border: 1px solid {border}; border-radius: var(--r-md);
@@ -287,7 +287,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
   /* [수정: 2026-09-16] 행 여백 한 단계씩 축소 — padding은 원래 4px, 제목·메타 줄 사이 4→2px,
      행 사이 10→6px. 글자·버튼 크기는 그대로다(한 건 74 → 64px). 확정본·초안·정기 보관함·
-     수시 네 파일에 같은 값이 복제돼 있으니 한쪽만 고치지 않는다. 시안 ARTICLE_ROW_DENSITY_MOCKUP.html B안. */
+     수시 네 파일에 같은 값이 복제돼 있으니 한쪽만 고치지 않는다. 시안 파일은 정리하며 없앴다(당시 B안). */
   .article {{ margin: 6px 0 6px 20px; line-height: 1.5; padding: 4px 6px; border-radius: var(--r-md); }}
   /* [추가: 2026-08-20] app.renderer와 동일한 이유(위 finalize-added 주석 참고) —
      render_article이 [단독] 기사에 항상 붙이는 art-scoop/t-scoop, [속보]의 t-flash도
@@ -438,7 +438,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [수정: 2026-09-16] 카드 위 여백 60→44px — 60px은 상단 고정바(54px)를 피하려는 값인데 글자 위로
      30px이 비었다. 44px이면 16px 남는다. 확정본·초안·실시간·정기 보관함·설정·수시·정책 단어 추이
      일곱 화면이 같은 값을 써야 화면을 오갈 때 제목이 들썩이지 않는다(수시·추이는 84→68px 형태).
-     시안 SUBHEAD_SPACING_MOCKUP.html B안. */
+     시안 파일은 정리하며 없앴다(당시 B안). */
   .container {{ padding-top: 44px; }}
 {topnav_style}
   /* [추가: 2026-08-13] app.renderer와 동일 — 단색 SVG 아이콘(app.icons) 공통 크기·색. */

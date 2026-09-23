@@ -472,7 +472,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [수정: 2026-09-16] 카드 위 여백 60→44px — 60px은 상단 고정바(54px)를 피하려는 값인데 글자 위로
      30px이 비었다. 44px이면 16px 남는다. 확정본·초안·실시간·정기 보관함·설정·수시·정책 단어 추이
      일곱 화면이 같은 값을 써야 화면을 오갈 때 제목이 들썩이지 않는다(수시·추이는 84→68px 형태).
-     시안 SUBHEAD_SPACING_MOCKUP.html B안. */
+     시안 파일은 정리하며 없앴다(당시 B안). */
   .container {{ max-width: 800px; margin: 0 auto; padding: 68px 24px 80px; }}
   .card {{ background: {card}; border: 1px solid {border}; border-radius: var(--r-lg); padding: 22px 24px; margin-bottom: 14px; }}
   /* 상단바 CSS는 app/topnav.py 한 곳 — 모든 화면이 같은 값을 쓴다. */
@@ -791,7 +791,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      걸 없애도 목록이 안 뭉개지는 건, 늘어난 위아래 여백이 그 역할을 대신하기 때문이다. */
   /* [수정: 2026-09-16] 행 여백 한 단계씩 축소 — padding 6→4px, 제목·메타 줄 사이(.a-bot 위 여백) 4→2px,
      행 사이 10→6px. 글자·버튼 크기는 그대로다(한 건 74 → 64px). 확정본·초안·정기 보관함·
-     수시 네 파일에 같은 값이 복제돼 있으니 한쪽만 고치지 않는다. 시안 ARTICLE_ROW_DENSITY_MOCKUP.html B안. */
+     수시 네 파일에 같은 값이 복제돼 있으니 한쪽만 고치지 않는다. 시안 파일은 정리하며 없앴다(당시 B안). */
   .article {{ padding: 4px 8px; border-radius: var(--r-md); margin: 6px 0; line-height: 1.5; }}
   .article.art-scoop {{ background: {scoop_bg}; border-left: 3px solid {scoop_bar}; padding-left: 9px; }}
   .article:hover {{ background: {row_hover}; }}
@@ -1218,7 +1218,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .rrow .rnm {{ color: {text}; }}
   .rrow .noname {{ color: {muted}; }}
   /* [추가: 2026-08-18] 🏷 라벨(PRD.md 기능10) — app.renderer/app.preview_renderer의
-     라벨 CSS와 같은 앰버 값(MAIN_FLOW_MOCKUP.html --label-bg/--label-text). 이 화면은
+     라벨 CSS와 같은 앰버 값(당시 시안의 --label-bg/--label-text). 이 화면은
      실제 <form> 제출 방식(app/adhoc/renderer.py 상단 라우팅 계약 주석)이라 팝오버
      자체는 열고닫기만 JS로 하고, 붙이기/떼기는 페이지 전체를 새로고침한다. */
   .lab-pop-wrap {{ position: relative; display: inline-flex; }}

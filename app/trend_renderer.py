@@ -217,7 +217,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [수정: 2026-09-16] 카드 위 여백 60→44px — 60px은 상단 고정바(54px)를 피하려는 값인데 글자 위로
      30px이 비었다. 44px이면 16px 남는다. 확정본·초안·실시간·정기 보관함·설정·수시·정책 단어 추이
      일곱 화면이 같은 값을 써야 화면을 오갈 때 제목이 들썩이지 않는다(수시·추이는 84→68px 형태).
-     시안 SUBHEAD_SPACING_MOCKUP.html B안. */
+     시안 파일은 정리하며 없앴다(당시 B안). */
   .container {{ max-width: 900px; margin: 0 auto; padding: 68px 24px 60px; }}
   h1 {{ font-size: var(--fs-xl); color: {header}; margin: 0 0 4px; }}
   .page-sub {{ color: {muted}; font-size: var(--fs-md); margin: 0 0 20px; }}

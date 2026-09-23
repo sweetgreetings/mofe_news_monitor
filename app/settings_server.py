@@ -263,7 +263,7 @@ _BASE_STYLE = """
   /* [수정: 2026-09-16] 카드 위 여백 60→44px — 60px은 상단 고정바(54px)를 피하려는 값인데 글자 위로
      30px이 비었다. 44px이면 16px 남는다. 확정본·초안·실시간·정기 보관함·설정·수시·정책 단어 추이
      일곱 화면이 같은 값을 써야 화면을 오갈 때 제목이 들썩이지 않는다(수시·추이는 84→68px 형태).
-     시안 SUBHEAD_SPACING_MOCKUP.html B안. */
+     시안 파일은 정리하며 없앴다(당시 B안). */
   .container {{ padding-top: 44px; }}
   h1 {{ font-size: var(--fs-xl); color: {header}; }}
   .hint {{ color: {muted}; font-size: var(--fs-md); margin-bottom: 16px; }}
@@ -4616,7 +4616,7 @@ def render_hidden_page() -> str:
 
 # [추가: 2026-08-18] 🏷 라벨(PRD.md 기능10) — 정기·수시를 가로지르는 별도 축이라
 # 기존 팔레트(파랑=담당자 액션/보라=AI 액션)와 겹치지 않는 앰버로 확정했다
-# (MAIN_FLOW_MOCKUP.html --label-bg/--label-text 그대로, app.renderer의 라벨 CSS와
+# (당시 시안의 --label-bg/--label-text 그대로, app.renderer의 라벨 CSS와
 # 같은 값). 라벨 보관함(/labels)·라벨 관리(/label-manage) 두 화면이 공유한다.
 _LABEL_STYLE = """
   /* [추가: 2026-09-02] 좌하단 ↩ 되돌리기 — `_label_undo_fab_html`이 예전부터

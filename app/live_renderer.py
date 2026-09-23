@@ -71,7 +71,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [수정: 2026-09-16] 카드 위 여백 60→44px — 60px은 상단 고정바(54px)를 피하려는 값인데 글자 위로
      30px이 비었다. 44px이면 16px 남는다. 확정본·초안·실시간·정기 보관함·설정·수시·정책 단어 추이
      일곱 화면이 같은 값을 써야 화면을 오갈 때 제목이 들썩이지 않는다(수시·추이는 84→68px 형태).
-     시안 SUBHEAD_SPACING_MOCKUP.html B안. */
+     시안 파일은 정리하며 없앴다(당시 B안). */
   .container {{ padding-top: 44px; padding-bottom: 56px; }}
 {topnav_style}
   .bottombar {{
@@ -135,8 +135,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [수정: 2026-09-16] 체크박스 줄(.filter-row)과 검색·그룹 칩 줄(.live-filter-bar)이 각자 테두리를
      두른 두 상자였다(41 + 93px + 사이 여백 35px) — 둘 다 "목록을 좁히는" 같은 일이라 한 상자
      두 줄로 합쳤다. 1행 = 제목 검색 + 체크박스, 2행 = 그룹 칩 + 키워드별 건수. 등록된 검색어
-     그룹이 없으면 예전처럼 제목 검색·2행은 안 그리고 체크박스만 남는다. 시안
-     LIVE_TOP_COMPACT_MOCKUP.html B안. */
+     그룹이 없으면 예전처럼 제목 검색·2행은 안 그리고 체크박스만 남는다. 시안 파일은
+     정리하며 없앴다(당시 B안). */
   .filter-box {{
     margin: 14px 0 4px; padding: 10px 14px; background: {bg}; border: 1px solid {border};
     border-radius: var(--r-lg); display: flex; flex-direction: column; gap: 8px;
