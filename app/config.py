@@ -632,6 +632,12 @@ CONTROL_H_MD = "30px"    # 입력칸 (기본)
 CONTROL_H_LG = "36px"    # 폼의 대표 버튼(수집 · 저장 · 조회), 설정 화면 버튼
 FAB_LG = "56px"          # 발송 · 휴지통
 FAB_SM = "48px"          # ↩ 되돌리기 · 목차
+# 체크박스 두 단계 — 한 변은 그 줄 글자 크기의 px값에 맞춘다(시안 mockups/CHECKBOX_SIZE_MOCKUP.html).
+# 눈금을 따로 만들지 않고 글자에 매단 이유: 체크박스는 늘 어떤 줄에 얹혀 있고, 그 줄
+# 글자보다 크면 줄이 들썩이고 작으면 누를 자리가 안 보인다. 체크 색은 예외 없이 accent다
+# (체크는 담당자의 동작). 스위치·요일 칩 속에 숨긴 input은 이 단계 밖이다(알약 몫).
+CHECKBOX_MD = "16px"     # 본문 줄(--fs-base)에 선 것 — 기사 행 · 소제목 머리 · 「전체 선택」
+CHECKBOX_SM = "14px"     # 보조 줄(--fs-md · --fs-sm)에 선 것 — 필터 줄 · 휴지통 행 · 보관함 회차 줄
 SHADOW_FLOAT = "0 4px 12px rgba(15, 23, 42, 0.12)"   # 떠 있는 버튼 · 선택 바
 SHADOW_POP = "0 8px 24px rgba(15, 23, 42, 0.14)"     # 팝오버 · 드롭다운 메뉴 · 말풍선
 SHADOW_MODAL = "0 16px 40px rgba(15, 23, 42, 0.22)"  # 확인창 · 이름 고르기 창
@@ -661,6 +667,7 @@ SHAPE_TOKENS_CSS = (
     f"--r-pill: {RADIUS_PILL}; --r-circle: {RADIUS_CIRCLE}; "
     f"--h-sm: {CONTROL_H_SM}; --h-tb: {CONTROL_H_TB}; --h-md: {CONTROL_H_MD}; --h-lg: {CONTROL_H_LG}; "
     f"--fab-lg: {FAB_LG}; --fab-sm: {FAB_SM}; "
+    f"--chk-md: {CHECKBOX_MD}; --chk-sm: {CHECKBOX_SM}; "
     f"--sh-float: {SHADOW_FLOAT}; --sh-pop: {SHADOW_POP}; --sh-modal: {SHADOW_MODAL}; "
     "}"
 )

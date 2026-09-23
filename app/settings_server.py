@@ -1573,6 +1573,8 @@ _OUTLETS_TEMPLATE = (
   .filter-bar label {{
     font-size: var(--fs-md); color: {muted}; display: flex; align-items: center; gap: 4px; white-space: nowrap;
   }}
+  .filter-bar label input {{ width: var(--chk-sm); height: var(--chk-sm); margin: 0;
+    flex: none; accent-color: {accent}; cursor: pointer; }}
   .category {{ margin: 18px 0; }}
   .category.is-hidden {{ display: none; }}
   .category-name {{
@@ -1580,7 +1582,9 @@ _OUTLETS_TEMPLATE = (
     padding-bottom: 4px; border-bottom: 1px solid {border};
   }}
   .category-grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 12px; }}
-  .category-grid label {{ white-space: nowrap; }}
+  .category-grid label {{ white-space: nowrap; display: flex; align-items: center; gap: 6px; }}
+  .category-grid label input {{ width: var(--chk-md); height: var(--chk-md); margin: 0;
+    flex: none; accent-color: {accent}; cursor: pointer; }}
   .category-grid label.is-hidden {{ display: none; }}
   .order-list {{ margin-top: 16px; }}
   .order-row {{ display: flex; align-items: center; gap: 6px; margin: 4px 0; flex-wrap: wrap; }}
@@ -2295,6 +2299,8 @@ _AUTO_SEND_SETTINGS_TEMPLATE = (
     + """
   .checkbox-row {{ margin: 16px 0; display: flex; align-items: center; gap: 8px; }}
   .checkbox-row label {{ font-size: var(--fs-base); }}
+  .checkbox-row input[type=checkbox] {{ width: var(--chk-md); height: var(--chk-md); margin: 0;
+    flex: none; accent-color: {accent}; cursor: pointer; }}
   .grace-row {{ margin: 16px 0 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }}
   .grace-row input[type=number] {{ width: 70px; text-align: center; }}
   .grace-row label {{ font-size: var(--fs-base); }}
@@ -2545,7 +2551,8 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
   .npop .opt {{ display: flex; align-items: flex-start; gap: 7px; padding: 7px 8px; margin: 0 0 3px; border-radius: var(--r-md); cursor: pointer; line-height: 1.45; }}
   .npop .opt:hover {{ background: {bg}; }}
   .npop .opt:has(input:checked) {{ background: {hover}; }}
-  .npop .opt input {{ margin: 2px 0 0; accent-color: {accent}; }}
+  .npop .opt input {{ width: var(--chk-sm); height: var(--chk-sm); margin: 2px 0 0; flex: none;
+    accent-color: {accent}; cursor: pointer; }}
   .npop .opt b {{ display: block; font-weight: 600; color: {text}; }}
   .npop .opt small {{ display: block; color: {muted}; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }}
   .npop .custom {{ margin: 4px 0 0 29px; display: none; }}
@@ -2974,7 +2981,7 @@ _BREAKING_ALERT_SETTINGS_TEMPLATE = (
   .sec-t {{ font-size: var(--fs-md); font-weight: 700; color: {header}; margin: 0 0 4px; }}
   .sec-d {{ font-size: var(--fs-sm); color: {muted}; margin: 0 0 10px; line-height: 1.55; }}
   .grp {{ display: flex; align-items: center; gap: 8px; padding: 7px 0; font-size: var(--fs-md); }}
-  .grp input[type=checkbox] {{ width: 16px; height: 16px; accent-color: {accent}; flex-shrink: 0; margin: 0; }}
+  .grp input[type=checkbox] {{ width: var(--chk-sm); height: var(--chk-sm); accent-color: {accent}; flex-shrink: 0; margin: 0; }}
   .grp .cnt {{ color: {muted}; font-size: var(--fs-sm); }}
   .grp .warn {{
     margin-left: auto; font-size: var(--fs-xs); color: {warn_accent}; background: {warn_bg};
@@ -2989,7 +2996,7 @@ _BREAKING_ALERT_SETTINGS_TEMPLATE = (
   .est {{ background: {hover}; border-radius: var(--r-md); padding: 9px 12px; font-size: var(--fs-sm); color: {header}; line-height: 1.6; margin: 8px 0 4px; }}
   .est.hot {{ background: {error_bg}; color: {error_strong}; }}
   .sub {{ font-size: var(--fs-sm); color: {muted}; display: flex; align-items: center; gap: 7px; padding: 7px 0; }}
-  .sub input[type=checkbox] {{ width: 15px; height: 15px; accent-color: {accent}; margin: 0; }}
+  .sub input[type=checkbox] {{ width: var(--chk-sm); height: var(--chk-sm); accent-color: {accent}; margin: 0; }}
   .who {{
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
     background: {bg}; border: 1px solid {border}; border-radius: var(--r-md); padding: 10px 12px;
@@ -4268,7 +4275,8 @@ _HIDDEN_TEMPLATE = (
     stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }}
   /* 원문·복구 두 칸 묶음 — 행마다 같은 자리에 같은 것이 오도록 한 덩어리로 둔다. */
   .hidden-row .acts {{ flex: none; display: flex; align-items: center; gap: 6px; }}
-  .hid-check {{ flex: none; width: 14px; height: 14px; margin: 0; cursor: pointer; }}
+  .hid-check {{ flex: none; width: var(--chk-sm); height: var(--chk-sm); margin: 0;
+    accent-color: {accent}; cursor: pointer; }}
   /* 선택했을 때만 뜨는 일괄 복구 바 — 확정본·초안의 일괄이동 바와 같은 규칙(선택이
      없으면 자리 자체를 안 차지한다). */
   .bulk-restore {{

@@ -701,7 +701,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .kw-mode.off {{ opacity: 0.45; }}
   .mode-opt {{ display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm);
                color: {muted}; cursor: pointer; }}
-  .mode-opt input {{ margin: 0; }}
+  .mode-opt input {{ width: var(--chk-sm); height: var(--chk-sm); margin: 0; flex: none;
+    accent-color: {accent}; cursor: pointer; }}
   .mode-opt b {{ font-weight: 700; color: {text}; }}
   .mode-opt.on {{ color: {text}; }}
   .mode-opt.on.all, .mode-opt.on.all b {{ color: {must_text}; }}
@@ -737,6 +738,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   #new-card .n-last {{ margin: 12px 0 0; padding-top: 12px; border-top: 1px dashed {border}; }}
   #new-card .n-opts {{ display: flex; gap: 16px; flex-wrap: wrap; flex: 1; font-size: var(--fs-md); }}
   #new-card .n-opts label {{ display: flex; gap: 6px; align-items: center; cursor: pointer; color: {text}; }}
+  #new-card .n-opts label input {{ width: var(--chk-sm); height: var(--chk-sm); margin: 0;
+    flex: none; accent-color: {accent}; cursor: pointer; }}
   #new-card .btn:disabled {{ opacity: 0.45; cursor: not-allowed; }}
   @media (max-width: 640px) {{
     #new-card .field > label {{ width: 100%; }}
@@ -928,10 +931,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .send-done .when-hover {{ display: none; }}
   .send-done.raw-unsend:hover .when-rest, .send-done.raw-unhide:not(:disabled):hover .when-rest {{ display: none; }}
   .send-done.raw-unsend:hover .when-hover, .send-done.raw-unhide:not(:disabled):hover .when-hover {{ display: inline; }}
-  /* 원본 목록 머리의 「☐ 전체 선택」 — 행 체크박스(.bulk-chk)와 같은 16px·같은 세로줄. */
+  /* 원본 목록 머리의 「☐ 전체 선택」 — 행 체크박스(.bulk-chk)와 같은 --chk-md·같은 세로줄. */
   .sel-all {{ display: inline-flex; align-items: center; gap: 6px; margin: 0 4px 0 12px;
     font-size: var(--fs-sm); color: {muted}; font-weight: 500; cursor: pointer; }}
-  .sel-all input {{ width: 16px; height: 16px; margin: 0; accent-color: {accent}; cursor: pointer; }}
+  .sel-all input {{ width: var(--chk-md); height: var(--chk-md); margin: 0; accent-color: {accent}; cursor: pointer; }}
   /* 원본 툴바 오른쪽 「복사 · 텍스트 · 엑셀」 — 정기 초안·확정본의 글자 버튼(app.renderer
      EXPORT_LINKS_STYLE)과 같은 값. 박스는 내용을 바꾸는 버튼, 글자는 가져가는 것. */
   .toolbar .export-links {{ display: inline-flex; align-items: center; }}
@@ -949,6 +952,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .send-done.raw-unhide:not(:disabled) {{ cursor: pointer; }}
   .send-done.raw-unhide:not(:disabled):hover {{ border-color: {text_faint}; color: {text}; }}
   .sent-filter small {{ color: {text_faint}; font-size: var(--fs-sm); }}
+  .sent-filter input {{ width: var(--chk-sm); height: var(--chk-sm); margin: 0; flex: none;
+    accent-color: {accent}; cursor: pointer; }}
   /* 「처리 안 한 N건 전부 확정본으로」 — 원본의 보내기 버튼과 같은 청록, 테두리만. */
   .btn.send-all {{ background: {card}; color: {adhoc_text}; border-color: {adhoc_border_soft}; }}
   .btn.send-all:hover {{ background: {adhoc_bg}; }}
@@ -974,6 +979,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     padding: 9px 12px; margin: 4px 0 6px;
   }}
   .photo-gather-strip label {{ display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); cursor: pointer; }}
+  /* 「전체 선택」은 자기가 거느리는 기사 행의 체크와 같은 크기다 — 띠 글자가 한 단계
+     작아도 상위 체크가 하위보다 작아 보이면 안 된다(수시 원본 .sel-all과 같은 규칙). */
+  .photo-gather-strip label input {{ width: var(--chk-md); height: var(--chk-md); margin: 0;
+    accent-color: {accent}; cursor: pointer; }}
   .photo-gather-strip .pg-msg {{ font-size: var(--fs-md); color: {header}; }}
   .photo-gather-strip .pg-sp {{ flex: 1; }}
   .pg-done {{ text-align: center; color: {muted}; padding: 28px 0 16px; font-size: var(--fs-md); }}
@@ -1003,7 +1012,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .a-top {{ display: flex; align-items: flex-start; gap: 8px; }}
   /* [수정: 2026-09-18] 정기 확정본과 같은 16px 체크박스(시안 mockups/CHECKBOX_SIZE_MOCKUP.html B안).
      들여쓰기 28 → 31px(.a-bot·.edit-box)도 같이 — 왼쪽 여백 4 + 16 + 오른쪽 여백 3 + gap 8. */
-  .bulk-chk {{ width: 16px; height: 16px; margin: 3px 3px 0 4px; flex: none;
+  .bulk-chk {{ width: var(--chk-md); height: var(--chk-md); margin: 3px 3px 0 4px; flex: none;
     accent-color: {accent}; cursor: pointer; }}
   /* [수정: 2026-09-02] 제목 0.93 → 1rem, 메타 줄 0.78 → 0.8rem, 들여쓰기 25 → 28px.
      셋 다 정기 확정본의 실측값 그대로다(.title-line은 body 기본 크기를 그대로 쓰고,
@@ -1125,7 +1134,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .send-modal h3 {{ margin: 0 0 4px; font-size: var(--fs-base); color: {header}; }}
   .send-modal .sm-sub {{ margin: 0 0 12px; font-size: var(--fs-sm); color: {muted}; line-height: 1.6; }}
   .send-modal .sm-row {{ display: flex; align-items: center; gap: 9px; padding: 8px 4px; border-top: 1px solid {divider_soft}; font-size: var(--fs-md); cursor: pointer; }}
-  .send-modal .sm-row input {{ width: 16px; height: 16px; margin: 0; accent-color: {send}; }}
+  .send-modal .sm-row input {{ width: var(--chk-md); height: var(--chk-md); margin: 0; accent-color: {send}; }}
   .send-modal .sm-row .nm {{ font-weight: 600; color: {text}; }}
   .send-modal .sm-row .what {{ margin-left: auto; font-size: var(--fs-sm); color: {muted}; white-space: nowrap; }}
   .send-modal .sm-row:has(input:not(:checked)) .nm, .send-modal .sm-row:has(input:not(:checked)) .what {{ color: {text_faint}; text-decoration: line-through; }}
@@ -1166,8 +1175,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .run-line.just-restored {{ background: {row_moved}; }}
   /* 선택 삭제 모드 — body.arch-tidy일 때만 체크박스가 나오고, 꺼내는 동작(복사·txt·xlsx·
      열기)과 줄 끝 🗑는 숨는다. 고른 줄은 확정본에서 체크한 기사 행과 같은 옅은 파랑. */
-  input.pick {{ display: none; width: 15px; height: 15px; margin: 0; flex: none; cursor: pointer; }}
-  .pick-sp {{ display: none; width: 15px; flex: none; }}
+  input.pick {{ display: none; width: var(--chk-sm); height: var(--chk-sm); margin: 0; flex: none;
+    accent-color: {accent}; cursor: pointer; }}
+  .pick-sp {{ display: none; width: var(--chk-sm); flex: none; }}
   body.arch-tidy input.pick {{ display: inline-block; }}
   body.arch-tidy .pick-sp {{ display: inline-block; }}
   body.arch-tidy .row-del, body.arch-tidy .exp, body.arch-tidy .run-row .go, body.arch-tidy .normal-only {{ display: none; }}

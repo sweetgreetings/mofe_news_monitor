@@ -143,6 +143,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
   .fb-row {{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }}
   .fb-row label {{ font-size: var(--fs-md); display: flex; align-items: center; gap: 8px; cursor: pointer; white-space: nowrap; }}
+  .fb-row label input[type=checkbox] {{ width: var(--chk-sm); height: var(--chk-sm); margin: 0;
+    flex: none; accent-color: {accent}; cursor: pointer; }}
   .fb-row label:has(input:disabled) {{ color: {muted}; cursor: not-allowed; }}
   .live-row.is-hidden-by-filter {{ display: none; }}
   /* [추가: 2026-08-13] 실시간 현황 그룹 필터 바 — 제목 검색, 그룹 칩(OR), "아직 안

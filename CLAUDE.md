@@ -294,7 +294,7 @@ FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN
 - **기사 한 건 복사는 ⋯ 메뉴 첫 항목뿐이다** — 행에 복사 아이콘을 따로 달지 않는다(모든 행에 붙으면 어수선하다). 메뉴가 곧 닫히므로 **⋯ 아이콘이 1초간 ✓로 바뀐다**(`copyArticleIcon(btn, flashEl)`의 두 번째 인자, `.more-btn.is-copied`). 확정본·초안·정기 보관함·수시 원본·확정본 모두 같다. 예외: 전체 기사는 행에 `복사` 글자 버튼을 그대로 둔다. 소제목 📋도 그대로.
 - 액션 아이콘은 행 오른쪽 끝(`margin-left: auto`).
 - **검색어 표시**: 액션 줄에 `🔍 기재부, 정부`(회색 글자, 돋보기 `icon("search")`, 설명은 `title`). 확정본·초안만(`show_matched_keywords`). **남는 자리만큼만 보이고 `…`** — `flex: 1 1 0; min-width: 5em; max-width: max-content`, 잘린 행은 hover 순간에 판정해 툴팁(`kw_inline_style()`/`kw_inline_script()` 공용). 구분점은 `.kw-inline` 안. 값이 없으면 아무것도 안 그린다. **복사·txt·발송·엑셀에 안 나간다.** 시안 [mockups/KW_CHIP_MOCKUP.html](mockups/KW_CHIP_MOCKUP.html).
-- **체크박스는 16px**(기사 `.article-select`·소제목 머리 `.group-select-all`, 체크 색 accent). 아랫줄 들여쓰기는 그만큼 31px(여백 4 + 16 + 3 + gap 8). 수시 `.bulk-chk`도 같은 값. 시안 [mockups/CHECKBOX_SIZE_MOCKUP.html](mockups/CHECKBOX_SIZE_MOCKUP.html) B안.
+- **체크박스는 `--chk-md`(16px)**(기사 `.article-select`·소제목 머리 `.group-select-all`, 체크 색 accent). 아랫줄 들여쓰기는 그만큼 31px(여백 4 + 16 + 3 + gap 8). 수시 `.bulk-chk`도 같은 값. 두 단계 규칙은 아래 디자인 절 「체크박스 크기」. 시안 [mockups/CHECKBOX_SIZE_MOCKUP.html](mockups/CHECKBOX_SIZE_MOCKUP.html) B안.
 - **Shift+클릭 범위 선택**(확정본·초안·수시 원본/확정본·휴지통): 체크박스 하나를 누르고 Shift를 누른 채 다른 체크박스를 누르면 그 사이가 누른 쪽 상태(체크/해제)로 바뀐다. **안 보이는 행은 건너뛴다**(사진 모아 보기·필터·접힌 묶음 — 확인창 없는 🗑 일괄 숨김에 딸려 가면 안 된다). **수시 원본은 `✓ 보냄`·`🗑 숨김` 행도 건너뛴다**(체크해서 보내면 숨김 표시가 풀린다). 양 끝(직접 누른 기사)은 건너뛰지 않는다. **안내는 체크박스 툴팁뿐이다** — 선택 바에 안내 글자를 적지 않는다. 코드는 `app/renderer.py` `range_select_script(box, row, skip_row, each_js)` 한 곳. 시안 [mockups/SHIFT_RANGE_SELECT_MOCKUP.html](mockups/SHIFT_RANGE_SELECT_MOCKUP.html) A안. → H: Shift+클릭 범위 선택
 - **게시시각**: 화면에 `HH:MM 게시` + "N분 전"(화면 전용, 내보내기엔 없음).
 
@@ -631,6 +631,16 @@ URL
 - **그림자 셋**: 떠 있는 것 `--sh-float` · 팝오버·메뉴·말풍선 `--sh-pop` · 확인창·이름 고르기 창 `--sh-modal`. 상단바·하단바의 얇은 그림자, 입력칸 포커스 고리는 예외.
 - **값은 CSS 변수로만 쓴다**: CSS에 `border-radius: 6px`처럼 숫자를 적지 않고 `var(--r-md)`. 변수 정의 `SHAPE_TOKENS_CSS`는 `topnav_style()`이 함께 내고, 상단바가 없는 홈은 따로 낸다 — **새 화면이 상단바 CSS를 안 쓰면 `SHAPE_TOKENS_CSS`를 직접 넣는다.**
 - 예외: 한쪽 띠 칸(📂 미분류·📌 담아둔 기사 — 왼쪽 띠 + 오른쪽만 둥근 모서리), 수시 카드 탭(위쪽만 둥근), 여러 칸 버튼(바깥 틀만 둥글고 안쪽 칸은 각지게).
+
+### 체크박스 크기 (`app/config.py` `CHECKBOX_MD`·`CHECKBOX_SM`)
+
+- **두 단계뿐이고, 한 변은 그 체크박스가 선 줄 글자 크기의 px값이다.** CSS엔 `width: var(--chk-md)`처럼 적고 숫자를 적지 않는다(정의는 모양 토큰과 같은 `SHAPE_TOKENS_CSS`).
+  - `--chk-md` 16px — 본문 줄(`--fs-base`·`--fs-lg`)에 선 것: 기사 행·소제목 머리·수시 기사 행·수시 발송 확인창·정기 보관함 날짜/회차 줄·언론사 선택·자동발송 사용.
+  - `--chk-sm` 14px — 보조 줄(`--fs-md`·`--fs-sm`)에 선 것: 전체 기사 특수조건 필터 줄·휴지통 행·수시 보관함 날짜/회차 줄·수시 「남은 기사만 보기」·새 수집 「거르기」와 「하나라도 | 모두」·알림 감시 그룹과 하위 옵션·알림 시간 창.
+- **예외 하나 — 「전체 선택」은 자기가 거느리는 행의 체크와 같은 크기다.** 띠 글자가 한 단계 작아도 상위 체크가 하위보다 작아 보이면 안 된다(사진 모아 보기 띠 `.photo-gather-strip`, 수시 원본 `.sel-all` — 둘 다 `--chk-md`).
+- **체크 색은 예외 없이 `accent-color: {accent}`**(체크는 담당자의 동작이라 파랑). 초록은 수시 발송 확인창 하나뿐 — 「초록 = 발송」 규칙 그대로.
+- **flex 줄에 놓는 체크박스엔 `flex: none`을 준다** — 없으면 폭이 눌린다(소제목 머리에서 16 → 13px로 눌렸던 실측).
+- 스위치·요일 칩·검색 방식 칩 속에 `opacity: 0`으로 숨긴 `input`은 이 단계 밖이다(알약 규칙 몫).
 
 ### 글자 크기 (`app/config.py` `FONT_XS`~`FONT_XL`)
 

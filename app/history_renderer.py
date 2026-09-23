@@ -124,9 +124,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* 선택 삭제 모드(body.hist-tidy) — 체크박스·회차별 건수·잠금 안내가 나오고, 꺼내는
      동작(복사·txt·xlsx)과 줄 끝 🗑는 숨는다. 건수는 이때만 보인다: 평소엔 찾는 기준이
      아니라 뺐지만(2026-08-21), 지울지 판단할 땐 근거가 된다. 0건은 앰버 굵게. */
-  input.pick {{ display: none; width: 15px; height: 15px; margin: 0; flex: none; cursor: pointer; }}
+  input.pick {{ display: none; width: var(--chk-md); height: var(--chk-md); margin: 0; flex: none;
+    accent-color: {accent}; cursor: pointer; }}
   input.pick:disabled {{ cursor: not-allowed; opacity: 0.4; }}
-  .pick-sp {{ display: none; width: 15px; flex: none; }}
+  .pick-sp {{ display: none; width: var(--chk-md); flex: none; }}
   .slot-cnt, .lock-note, .tidy-only {{ display: none; }}
   .slot-cnt {{ flex: none; min-width: 34px; font-size: var(--fs-sm); color: {muted}; font-variant-numeric: tabular-nums; }}
   .slot-cnt.zero {{ color: {warn_accent}; font-weight: 700; }}

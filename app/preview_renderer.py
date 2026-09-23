@@ -499,10 +499,11 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [수정: 2026-09-18] 체크박스가 작아 누르기 어렵다는 지적 — 브라우저 기본 13px → 16px
      (시안 mockups/CHECKBOX_SIZE_MOCKUP.html B안). 소제목 머리 체크박스도 같은 크기,
      체크 색은 앱 파랑. 기사 체크박스는 커진 만큼 2px 내려 제목 첫 줄 가운데에 맞춘다. */
-  .article-select, .group-select-all {{ width: 16px; height: 16px; margin: 3px 3px 0 4px;
+  .article-select, .group-select-all {{ width: var(--chk-md); height: var(--chk-md); margin: 3px 3px 0 4px;
     accent-color: {accent}; cursor: pointer; }}
   .article-select {{ flex-shrink: 0; position: relative; top: 2px; }}
-  .group-select-all {{ vertical-align: -3px; }}
+  /* 소제목 머리는 flex 줄이라 flex: none이 없으면 체크박스 폭이 눌린다(실측 16 → 13px). */
+  .group-select-all {{ flex: none; vertical-align: -3px; }}
   .group-move-select {{
     flex-shrink: 0; width: 100px; height: var(--h-sm); box-sizing: border-box; border: 1px solid {border}; border-radius: var(--r-sm);
     padding: 0 4px; font-size: var(--fs-sm); color: {muted}; background: {card};
