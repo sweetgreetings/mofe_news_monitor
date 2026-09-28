@@ -12,7 +12,7 @@ from app.classifier import (
     classify_articles,
     forced_group_target_names,
     groups_for_confirmed_run,
-    run_looks_rule_based,
+    run_classification_failed,
 )
 from app.config import (
     COLOR_ACCENT,
@@ -5671,9 +5671,11 @@ def generate_screen(
         # [수정: 2026-08-27] run.get("classification_degraded")만 보면 2026-08-27 이전에
         # 저장된 회차는 그 필드 자체가 없어(app.scraper.collect_run이 저장 직후 날려먹고
         # 있었다 — HISTORY.md) 폴백 회차인데도 경고 없이 자동발송 카운트다운이 돈다.
-        # run_looks_rule_based는 저장된 값이 있으면 그걸 그대로 쓰고, 없을 때만 소제목
-        # 이름 모양으로 추정한다(app.classifier).
-        classification_degraded=run_looks_rule_based(run),
+        # run_classification_failed는 저장된 값이 있으면 그걸 그대로 쓰고, 없을 때만
+        # 소제목 이름 모양으로 추정한다(app.classifier). AI 키를 아예 안 쓰는 상태는
+        # 실패가 아니라 정상이라 거짓 — 안 그러면 확정본마다 빨간 배너가 뜨고
+        # 자동발송이 매번 막힌다.
+        classification_degraded=run_classification_failed(run),
         finalize_new_subheadings=run.get("finalize_new_subheadings", []),
         send_failure=run.get("send_failure"),
     )

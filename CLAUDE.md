@@ -275,7 +275,8 @@ FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN
 ### 분류 실패 표시
 
 - `llm_attempt_failed_without_fallback()`이 참이면 `collect_run`이 회차에 `classification_degraded`를 저장한다 → 자동발송 건너뜀, 확정본에 「⚠️ AI 분류 실패 — 확인 후 직접 발송해주세요」.
-- **소급 판정** `app/classifier.py` `looks_rule_based`/`run_looks_rule_based`: 「기타」·미분류를 뺀 소제목이 3개 이상이면서 **전부 한 어절**이면 폴백으로 본다. 저장된 `classification_degraded`가 있으면 그 값 우선. 이름 단위로 거르지 않는다. 쓰는 곳: 확정본 배너·카운트다운, 자동발송 차단, 정기 보관함 `AI 분류 실패` 칩(`.degraded-mark`).
+- **소급 판정** `app/classifier.py` `looks_rule_based`/`run_looks_rule_based`: 「기타」·미분류를 뺀 소제목이 3개 이상이면서 **전부 한 어절**이면 폴백으로 본다. 저장된 `classification_degraded`가 있으면 그 값 우선. 이름 단위로 거르지 않는다.
+- **사실 판정과 실패 판정을 가른다**: `run_looks_rule_based`는 「이름이 규칙 기반인가」라는 사실만 답하고, **경고·차단은 `run_classification_failed`만 쓴다** — 저장된 `classification_degraded`가 참이면 참(그때 실제로 실패했다), **AI 키가 아예 없으면 거짓**(규칙 기반이 정상 동작이다), 그 밖엔 이름 모양 추정. 키가 없는데 실패로 보면 확정본마다 빨간 배너가 뜨고 **자동발송이 매 회차 막히며** 보관함 칩이 모든 줄에 붙어 진짜 실패와 구분이 안 된다. `run_classification_failed`를 쓰는 곳: 확정본 배너·카운트다운(`app/renderer.py`), 자동발송 차단(`app/confirm_send.py`), 정기 보관함 `AI 분류 실패` 칩(`.degraded-mark`). `run_looks_rule_based` 그대로 두는 곳: 「요약만 켠 사람에게 기사 목록도 보낼까」(`send_confirmed_run`) — 키가 없으면 AI 요약 자체가 없어 기사 목록이 나가는 게 맞다.
 - 최신이 아닌 회차를 재분류할 방법은 없다(큐레이션 핸들러가 `load_latest_run()` 고정).
 
 ### 소제목 표시

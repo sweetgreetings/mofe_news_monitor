@@ -5,6 +5,7 @@ from typing import Optional
 from app.assigned_groups import load_assigned_groups
 from app.config import DEFAULT_KEYWORDS, MAX_SUBHEADINGS
 from app.custom_groups import load_custom_groups
+from app.llm_classifier import is_configured as llm_is_configured
 from app.llm_classifier import (
     UNCLASSIFIED_GROUP_NAME,
     assign_to_existing,
@@ -569,4 +570,31 @@ def run_looks_rule_based(run: Optional[dict]) -> bool:
         return False
     if run.get("classification_degraded"):
         return True
+    return looks_rule_based(run.get("articles") or [])
+
+
+def run_classification_failed(run: Optional[dict]) -> bool:
+    """이 회차의 규칙 기반 소제목이 **담당자에게 알려야 할 실패**인지.
+
+    run_looks_rule_based는 "이름이 규칙 기반인가"라는 사실만 답한다. 그런데 AI 키를
+    아예 등록하지 않은 상태에서는 규칙 기반이 고장이 아니라 **정상 동작**이다(설정
+    화면도 "이 기능을 안 쓰기로 한 상태로도 정상입니다"라고 말한다). 그 상태에서
+    사실 판정을 그대로 경고·차단에 쓰면 모든 회차가 「AI 분류 실패」가 되어
+    확정본마다 빨간 배너가 뜨고 자동발송이 매번 막힌다 — 그러면 진짜 실패(크레딧
+    부족·호출 실패)가 왔을 때 구분이 안 된다.
+
+    저장된 classification_degraded가 참이면 그때 실제로 실패한 것이므로 지금 키가
+    없어도 True다(나중에 키를 지워도 그 회차의 사실은 안 바뀐다).
+
+    쓰는 곳: 자동발송 차단(app.confirm_send), 확정본 경고 배너(app.renderer),
+    정기 보관함 「AI 분류 실패」 칩(app.history_renderer). 반대로 "요약만 켠 사람에게
+    기사 목록도 보낼까"(app.confirm_send)는 사실 판정이라 run_looks_rule_based 그대로다
+    — 키가 없으면 AI 요약 자체가 없으므로 기사 목록이 나가는 게 맞다.
+    """
+    if not run:
+        return False
+    if run.get("classification_degraded"):
+        return True
+    if not llm_is_configured():
+        return False
     return looks_rule_based(run.get("articles") or [])

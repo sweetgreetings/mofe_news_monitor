@@ -3017,6 +3017,34 @@ def test_download_filenames():
     print("42) 내려받기 파일 이름: 통과 (정기 확정본·초안·보관함 `14-00기준`, 초안 `_초안`, 수시 원본·확정본·보관함 세 층, 같은 날 여러 장은 하루로)")
 
 
+def test_no_ai_key_is_not_a_failure():
+    """AI 키를 아예 안 쓰는 상태에서는 규칙 기반 소제목이 「실패」로 취급되지 않는다.
+
+    초안 배너는 앰버 안내 한 줄로 바뀌고(재분류 칩을 안 가리킨다), 확정본 경고·정기
+    보관함 칩·자동발송 차단은 걸리지 않는다 — 안 그러면 모든 회차가 「AI 분류 실패」가
+    되어 자동발송이 매번 멈추고, 진짜 실패(크레딧 부족)와 구분이 안 된다.
+    저장된 classification_degraded가 있는 회차는 키가 없어져도 실패로 남는다.
+    """
+    from app import classifier
+
+    rule_based = {"articles": [{"group": "부총리"}, {"group": "기금"}, {"group": "환율"}]}
+    stored_fail = dict(rule_based, classification_degraded=True)
+
+    with patch.object(classifier, "llm_is_configured", return_value=False):
+        assert classifier.run_looks_rule_based(rule_based), "사실 판정은 그대로 규칙 기반이다"
+        assert not classifier.run_classification_failed(rule_based), "키가 없으면 실패가 아니다"
+        assert classifier.run_classification_failed(stored_fail), "그때 실제로 실패한 회차는 남는다"
+    with patch.object(classifier, "llm_is_configured", return_value=True):
+        assert classifier.run_classification_failed(rule_based), "키가 있는데 규칙 기반이면 실패다"
+
+    with patch.object(preview_renderer, "llm_is_configured", return_value=False):
+        banner = preview_renderer._classify_degraded_html(True, 12, ("2026-09-28", "09:30"))
+    assert "no-key" in banner and "크레딧을 채워" in banner, banner
+    assert "⚠️" not in banner and "btn-ref" not in banner, "키 없음은 경고가 아니라 안내다"
+
+    print("47) AI 키 없음은 실패가 아니다: 통과 (사실 판정과 실패 판정 분리, 저장된 실패는 유지, 배너는 앰버 안내)")
+
+
 def test_send_log():
     """발송 기록(2026-09-23, mockups/SEND_LOG_MOCKUP.html).
 
@@ -3304,7 +3332,7 @@ def test_auto_send_does_not_resend_forever():
         st.enter_context(patch.object(confirm_send, "load_email_recipients", lambda: []))
         st.enter_context(patch.object(confirm_send, "latest_confirmed_report",
                                       lambda: {"text": "언론 모니터링 11시 기준\n\n본문", "summary": ""}))
-        st.enter_context(patch.object(confirm_send, "run_looks_rule_based", lambda r: False))
+        st.enter_context(patch.object(confirm_send, "run_classification_failed", lambda r: False))
         st.enter_context(patch.object(confirm_send, "record_send", lambda r, auto=False: {
             **r, "send_count": r.get("send_count", 0) + 1, "sent_by": "auto" if auto else "manual"}))
         st.enter_context(patch.object(confirm_send, "record_send_failure", lambda r, f, auto=False: {
@@ -3356,7 +3384,7 @@ def test_auto_send_does_not_resend_forever():
         st.enter_context(patch.object(confirm_send, "is_auto_send_enabled", lambda s: True))
         st.enter_context(patch.object(confirm_send, "auto_send_grace_sec", lambda s: 300))
         st.enter_context(patch.object(confirm_send, "load_latest_run", lambda: dead_run))
-        st.enter_context(patch.object(confirm_send, "run_looks_rule_based", lambda r: False))
+        st.enter_context(patch.object(confirm_send, "run_classification_failed", lambda r: False))
         st.enter_context(patch.object(confirm_send, "generate_screen", lambda: None))
         for i in range(240):
             confirm_send.check_pending_confirm_and_send(start + timedelta(seconds=10 * i))
@@ -3455,6 +3483,7 @@ def test_undo_stack_dedupes_snapshots():
 
 if __name__ == "__main__":
     tests = [
+        test_no_ai_key_is_not_a_failure,
         test_draft_all_first_classified_hidden_shows_unclassified,
         test_assigned_articles_keep_subheading_after_ai_members_hidden,
         test_cache_store_keeps_other_rounds,

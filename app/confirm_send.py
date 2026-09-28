@@ -21,7 +21,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from app.classifier import run_looks_rule_based
+from app.classifier import run_classification_failed, run_looks_rule_based
 from app.email_recipients import active_recipient_emails, load_email_recipients
 from app.email_sender import send_text as send_email_text
 from app.history_renderer import generate_history_page
@@ -333,7 +333,9 @@ def check_pending_confirm_and_send(now: Optional[datetime] = None) -> None:
     # 상태(소제목이 '이를'·'한다'·'했다')로 아무 경고 없이 자동발송됐다.
     # 배선은 고쳤지만(그 회차부터 필드가 남는다) 이미 저장된 옛 회차는 필드가 없으므로,
     # 저장값이 있으면 그걸 쓰고 없을 때만 소제목 이름 모양으로 추정하는 쪽을 쓴다.
-    if run_looks_rule_based(run):
+    # AI 키를 아예 안 쓰는 상태는 여기서 막지 않는다(run_classification_failed) —
+    # 그러면 모든 회차의 자동발송이 매번 멈춘다.
+    if run_classification_failed(run):
         # 한 번도 안 보낸 회차만 적는다(보낸 뒤에도 이 분기는 tick마다 지나간다). 같은 줄은 한 번만.
         if run.get("send_count", 0) == 0:
             _record_send_log(run, True, [], note="자동발송 건너뜀 — AI 분류 실패, 확인 후 직접 발송해 주세요")

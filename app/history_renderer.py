@@ -23,7 +23,7 @@ from app.config import (
     SETTINGS_SERVER_PORT,
 )
 from app.atomic_write import atomic_write_text
-from app.classifier import run_looks_rule_based
+from app.classifier import run_classification_failed
 from app.curation import display_group_name, filter_hidden, load_group_labels
 from app.excel_export import date_range_label, format_pub_datetime
 from app.group_order import apply_group_order
@@ -228,8 +228,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [추가: 2026-08-27] 소제목이 규칙 기반(단어 빈도) 폴백으로 지어진 회차 표식.
      발송 점(.sent-dot)과 달리 "값"이 아니라 "주의"라 앰버 계열을 쓴다(CLAUDE.md
      "Design direction" — 주의는 앰버, 오류는 빨강). 판정은 app.classifier.
-     run_looks_rule_based이고, 저장된 classification_degraded가 없는 옛 회차도
-     소제목 이름 모양으로 소급 판정된다. */
+     run_classification_failed이고, 저장된 classification_degraded가 없는 옛 회차도
+     소제목 이름 모양으로 소급 판정된다. AI 키를 아예 안 쓰는 상태는 실패가 아니라
+     정상이라 칩을 안 단다(그 상태에선 모든 회차에 붙어 뜻이 없어진다). */
   .degraded-mark {{ display: inline-block; margin-left: 6px; font-size: var(--fs-xs);
     color: {warn_text}; background: {warn_chip_bg}; border: 1px solid {warn_border};
     border-radius: var(--r-sm); padding: 0 5px; line-height: 1.5; cursor: help; }}
@@ -1244,7 +1245,7 @@ def _render_slot(
     degraded_html = (
         '<span class="degraded-mark" title="AI가 소제목을 묶지 못해 단어 빈도수로 '
         '기계적으로 지어진 이름입니다.&#10;기사 내용과 무관할 수 있어요.">AI 분류 실패</span>'
-        if run_looks_rule_based(run)
+        if run_classification_failed(run)
         else ""
     )
     export_actions_html = _slot_export_actions_html(run, articles, labels, line_template, subheading_format)
