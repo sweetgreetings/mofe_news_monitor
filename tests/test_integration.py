@@ -13,7 +13,7 @@ import json
 import sys
 import tempfile
 from contextlib import ExitStack
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -2472,8 +2472,11 @@ def test_negative_guess_per_round():
             return None
         return [{"i": i + 1, "reason": "업계가 「불공정」 반발"} for i, a in enumerate(articles) if "반발" in a["title"]]
 
+    # 홈 카드를 그리는 쪽(landing_renderer)도 따로 키를 확인한다 — 여기를 같이 막지
+    # 않으면 예전처럼 실제 .env의 ANTHROPIC_API_KEY에 기대게 된다.
     with patch.object(negative_guess, "_judge", fake_judge), \
          patch.object(negative_guess, "llm_is_configured", lambda: True), \
+         patch.object(landing_renderer, "llm_is_configured", lambda: True), \
          patch.object(negative_guess, "_attempts", {}):
         card = landing_renderer._board_card_html({}, storage.load_today_runs(today))
         assert "판정 중" in card, "판정 전 안내가 없다"
@@ -3116,7 +3119,9 @@ def test_send_log():
             assert by_name["새사람"]["error"] == "받는 사람이 아직 봇과 대화를 시작하지 않았습니다(403)"
 
             # 3) 자동발송 되풀이 — 같은 결과면 한 줄
-            key = "2026-09-23|14:00"
+            # 회차 키의 날짜는 「오늘」이어야 한다 — send_log.record는 오늘 날짜 파일에
+            # 쌓고 latest_for_run은 키의 날짜 파일만 본다(날짜를 박아두면 그날만 통과한다).
+            key = f"{date.today().isoformat()}|14:00"
             for _ in range(3):
                 send_log.record("regular", "14:00 확정본", rows, auto=True, send_no=1, run_key=key,
                                 coalesce=f"regular-auto:{key}")
@@ -3499,9 +3504,96 @@ def test_undo_stack_dedupes_snapshots():
     print("46) 되돌리기 스택 중복 제거: 통과 (안 바뀐 조각은 한 번만, 복원·파일 없음 재현, 밀려난 blob 정리, 옛 형식 이관)")
 
 
+def test_env_key_transplant():
+    """.env 씨앗 옮겨심기 — 키가 사는 자리를 설정 파일 한 곳으로 모은다.
+
+    1) 설정에 없고 .env에만 있으면 옮겨 심고 .env의 그 줄을 지운다
+    2) 설정에도 있으면 설정값을 덮지 않고 .env의 옛 줄만 지운다
+    3) 메일 서버가 네이버·Gmail이 아니면 이메일만 그대로 둔다(지우면 메일을 못 보낸다)
+    4) 고치기 전에 .env 백업을 남기고, 두 번째 실행은 아무것도 하지 않는다
+    5) 키가 아닌 줄(TELEGRAM_CHAT_ID)·주석은 건드리지 않는다
+    """
+    _require_isolation()
+
+    env_text = (
+        "# 내가 적어둔 주석\n"
+        "NAVER_CLIENT_ID=naverid0001\n"
+        'NAVER_CLIENT_SECRET="naversec0002"\n'
+        "\n"
+        "TELEGRAM_BOT_TOKEN=111:AAAtoken\n"
+        "TELEGRAM_CHAT_ID=99887766\n"
+        "EMAIL_SMTP_HOST=smtp.naver.com\n"
+        "EMAIL_SMTP_PORT=587\n"
+        "EMAIL_SENDER_ADDRESS=me@naver.com\n"
+        "EMAIL_SENDER_PASSWORD=apppw0003\n"
+        "ANTHROPIC_API_KEY=sk-ant-0004\n"
+    )
+
+    def run(text, saved=None):
+        """임시 .env 하나를 만들어 옮겨심기를 돌린다 — 실제 .env는 건드리지 않는다."""
+        tmp_dir = Path(tempfile.mkdtemp())
+        env_file = tmp_dir / ".env"
+        env_file.write_text(text, encoding="utf-8")
+        cred_file = tmp_dir / "credentials.json"
+        if saved is not None:
+            cred_file.write_text(json.dumps(saved), encoding="utf-8")
+        with patch.object(credentials, "ENV_FILE", env_file), \
+             patch.object(credentials, "BASE_DIR", tmp_dir), \
+             patch.object(credentials, "CREDENTIALS_FILE", cred_file):
+            result = credentials.transplant_env_keys()
+            again = credentials.transplant_env_keys()
+            leftover = credentials.env_leftover_keys()
+            backups = [b.name for b in credentials.env_backup_files()]
+        saved_now = json.loads(cred_file.read_text(encoding="utf-8")) if cred_file.exists() else {}
+        return result, again, leftover, backups, env_file.read_text(encoding="utf-8"), saved_now
+
+    # 1) 전부 .env에만 있는 상태
+    result, again, leftover, backups, env_now, saved_now = run(env_text)
+    assert result["moved"] == ["네이버 검색 API", "Claude API 키", "텔레그램 봇 토큰", "이메일 보내는 계정"], result
+    assert result["cleared"] == [] and result["kept"] == []
+    assert saved_now["naver"] == {
+        "client_id": "naverid0001", "client_secret": "naversec0002",
+        "saved_at": saved_now["naver"]["saved_at"], "from_env": True,
+    }, saved_now["naver"]
+    assert saved_now["llm"]["api_key"] == "sk-ant-0004"
+    assert saved_now["telegram"]["bot_token"] == "111:AAAtoken"
+    assert saved_now["email"]["service"] == "naver" and saved_now["email"]["password"] == "apppw0003"
+    assert leftover == [], f".env에 키가 남았다: {leftover}"
+    # 5) 키가 아닌 줄·주석은 그대로
+    assert "# 내가 적어둔 주석" in env_now and "TELEGRAM_CHAT_ID=99887766" in env_now
+    assert "NAVER_CLIENT_ID" not in env_now and "ANTHROPIC_API_KEY" not in env_now
+    # 4) 백업 한 벌, 두 번째 실행은 아무것도 안 한다
+    assert backups == [".env.backup-" + date.today().isoformat()], backups
+    assert again == {"moved": [], "cleared": [], "kept": [], "backup": None}, again
+
+    # 2) 설정에 이미 있는 키는 덮지 않고 .env 줄만 지운다
+    result, _, leftover, _, _, saved_now = run(
+        env_text, saved={"llm": {"api_key": "sk-ant-NEW", "saved_at": "2026-09-28T10:00:00"}}
+    )
+    assert saved_now["llm"]["api_key"] == "sk-ant-NEW", "설정값을 .env 옛 값이 덮었다"
+    assert result["cleared"] == ["Claude API 키"] and "Claude API 키" not in result["moved"]
+    assert leftover == []
+
+    # 3) 모르는 메일 서버 — 이메일만 그대로 둔다
+    result, _, leftover, _, env_now, saved_now = run(env_text.replace("smtp.naver.com", "smtp.korea.kr"))
+    assert result["kept"] == ["이메일 보내는 계정"], result
+    assert "email" not in saved_now
+    assert leftover == ["EMAIL_SMTP_HOST", "EMAIL_SMTP_PORT", "EMAIL_SENDER_ADDRESS", "EMAIL_SENDER_PASSWORD"]
+    assert "EMAIL_SENDER_PASSWORD=apppw0003" in env_now, "옮기지 못한 키를 지워버리면 메일을 못 보낸다"
+    assert saved_now["llm"]["api_key"] == "sk-ant-0004", "이메일 때문에 나머지까지 멈추면 안 된다"
+
+    # .env가 없거나 값이 빈 줄뿐이면 백업조차 뜨지 않는다
+    _, _, _, backups, _, _ = run("NAVER_CLIENT_ID=\nANTHROPIC_API_KEY=\n")
+    assert backups == [], backups
+
+    print("47) 키 옮겨심기: 통과 (.env -> 설정 파일, 설정값 우선, 모르는 메일 서버는 그대로, 백업·두 번째 실행 no-op)")
+
+
+
 if __name__ == "__main__":
     tests = [
         test_no_ai_key_is_not_a_failure,
+        test_env_key_transplant,
         test_draft_all_first_classified_hidden_shows_unclassified,
         test_assigned_articles_keep_subheading_after_ai_members_hidden,
         test_cache_store_keeps_other_rounds,
@@ -3604,6 +3696,15 @@ if __name__ == "__main__":
                 # [추가: 2026-08-20] collect_run이 회차 저장 직전에 [단독]·[속보] 알림
                 # "바닥" 경로(app.breaking_alert_sender.detect_and_alert)를 항상 거치므로,
                 # 그 경로가 쓰는 파일도 임시 폴더로 옮겨야 이 테스트가 실제 data/를 안 건드린다.
+                # [추가: 2026-09-28] 네이버 키를 가짜로 심는다 — 예전엔 이 자리에서
+                # 실제 .env의 NAVER_CLIENT_ID로 폴백해 테스트가 개발자의 키에 기대고
+                # 있었다(.env에서 키를 옮겨 심자 드러났다). 네트워크는 어차피 전부
+                # mock이므로 값은 아무거나 되고, AI·텔레그램·이메일 키는 심지 않는다
+                # (「키 없음」 동작을 검증하는 테스트들이 있다).
+                (tmp_dir / "credentials.json").write_text(
+                    '{"naver": {"client_id": "test-id", "client_secret": "test-secret"}}',
+                    encoding="utf-8",
+                )
                 try:
                     test()
                 except AssertionError as e:

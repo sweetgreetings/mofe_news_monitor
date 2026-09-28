@@ -136,6 +136,9 @@ from app.credentials import (
     email_sender_password,
     email_service,
     email_source,
+    env_backup_files,
+    env_leftover_keys,
+    moved_from_env,
     save_email_credentials,
     delete_naver_credentials,
     llm_api_key,
@@ -424,6 +427,7 @@ _MENU_TEMPLATE = (
   <div class="category">
     <div class="category-name">연동</div>
     <div class="menu">
+      <a href="/keys">키 보관 상태<span class="menu-note">어디에 저장돼 있나</span><span class="menu-chev">›</span></a>
       <a href="/naver">네이버 뉴스 API 설정{naver_badge}<span class="menu-chev">›</span></a>
       <a href="/llm">LLM(AI) 연동{llm_badge}<span class="menu-chev">›</span></a>
       <a href="/telegram-sender">텔레그램 발송 계정{telegram_badge}<span class="menu-chev">›</span></a>
@@ -3736,6 +3740,169 @@ def render_llm_settings_page(error: str = "") -> str:
     )
 
 
+# ── 연동 › 키 보관 상태 ──────────────────────────────────────────────────
+# [추가: 2026-09-28] 다섯 키(네이버 둘·Claude·텔레그램·이메일)가 **지금 어디에 저장돼
+# 있는지**만 한 화면에 모아 보여준다. 값을 고치는 화면이 아니다(고치는 건 각 연동 화면).
+# 파일을 열지 않고 "키가 제대로 들어갔나 · 옛 키가 어딘가 남아 있나"를 확인하는 자리다.
+# 값 전체는 절대 안 보여준다 — 끝 4자리만(app.credentials.mask).
+
+_KEY_STATUS_TEMPLATE = (
+    """<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>키 보관 상태</title>
+<style>"""
+    + _BASE_STYLE
+    + """
+  .status {{ padding: 12px 14px; border-radius: var(--r-lg); font-size: var(--fs-md); margin: 0 0 6px; }}
+  .status-ok {{ background: {ok_bg}; color: {ok_text}; border: 1px solid {ok_border}; }}
+  .status-warn {{ background: {warn_bg}; color: {warn_text}; border: 1px solid {warn_border}; }}
+  .status .sub {{ display: block; margin-top: 4px; font-size: var(--fs-sm); opacity: 0.85; }}
+  .keys {{ margin: 18px 0 0; border-top: 1px solid {border}; }}
+  /* 한 줄 = 이름 · 어디에 · 끝 4자리 · 저장 시각 · 그 화면으로. 좁아지면 이름 아래로 접힌다. */
+  .keyrow {{
+    display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+    align-items: center; gap: 10px; padding: 12px 2px; border-bottom: 1px solid {border};
+  }}
+  .kname {{ font-size: var(--fs-base); font-weight: 500; min-width: 0; }}
+  .ksub {{ display: block; color: {muted}; font-size: var(--fs-sm); font-weight: 400; margin-top: 2px; }}
+  /* 알약 = 상태를 알려 준다(누르는 것이 아니다) */
+  /* justify-self: 좁은 화면에서 칸이 1fr이 되면 알약이 늘어나 버튼처럼 보인다 */
+  .kwhere {{ justify-self: start; font-size: var(--fs-xs); font-weight: 700;
+    border-radius: var(--r-pill); padding: 3px 9px; white-space: nowrap; }}
+  .kwhere.saved {{ background: {ok_bg}; color: {ok_text}; border: 1px solid {ok_border}; }}
+  .kwhere.env {{ background: {warn_chip_bg}; color: {warn_text}; border: 1px solid {warn_border}; }}
+  .kwhere.none {{ background: {bg}; color: {muted}; border: 1px solid {border}; }}
+  .kval {{ font-size: var(--fs-sm); color: {text_soft}; font-variant-numeric: tabular-nums; white-space: nowrap; }}
+  .kwhen {{ font-size: var(--fs-sm); color: {muted}; white-space: nowrap; }}
+  .kgo a {{ font-size: var(--fs-sm); color: {muted}; text-decoration: none; white-space: nowrap; }}
+  .kgo a:hover {{ color: {accent}; text-decoration: underline; }}
+  @media (max-width: 640px) {{
+    .keyrow {{ grid-template-columns: minmax(0, 1fr) auto; }}
+    .kname {{ grid-column: 1 / -1; }}
+  }}
+  .note {{ margin: 20px 0 0; padding: 14px; background: {bg}; border: 1px solid {border};
+    border-radius: var(--r-lg); color: {muted}; font-size: var(--fs-sm); line-height: 1.7; }}
+  .note b {{ color: {text}; font-weight: 600; }}
+  .note code {{ background: {card}; border: 1px solid {border}; border-radius: var(--r-sm); padding: 1px 5px; }}
+  .note ul {{ margin: 6px 0 0; padding-left: 18px; }}
+</style>
+</head>
+<body>
+{topnav_html}
+<div class="container">
+  <h1>🔑 키 보관 상태</h1>
+  <p class="hint">다섯 키가 지금 어디에 저장돼 있는지 한눈에 봅니다. 값을 고치는 건 각 연동 화면이고,
+  여기서는 <b>끝 4자리</b>만 보여줍니다.</p>
+  {summary_html}
+  <div class="keys">{rows_html}</div>
+  {backup_html}
+  <div class="note">
+    <b>키가 사는 자리</b>는 <code>data/credentials.json</code> 한 곳입니다 — 앱이 만들 때
+    본인만 읽을 수 있게 권한을 잠급니다.<br>
+    <code>.env</code>는 <b>처음 설치할 때 키를 한 번 넣어 주는 씨앗</b>입니다. 앱을 켤 때
+    거기 남은 키를 설정 파일로 옮겨 심고 <code>.env</code>의 그 줄은 지웁니다(지우기 전에
+    <code>.env.backup-날짜</code>로 한 벌 복사해 둡니다). 새 컴퓨터로 옮길 때
+    <code>.env</code>에 키를 적어 두면 첫 실행에 그대로 옮겨집니다.
+  </div>
+</div>
+</body>
+</html>
+"""
+)
+
+# 화면에 세우는 다섯 줄 — (이름, 설명, 출처, 지금 쓰는 값, 저장 시각, 묶음 키, 바꾸는 화면)
+def _key_status_rows() -> list:
+    email_label = EMAIL_SERVICES.get(email_service() or "", {}).get("label", "")
+    email_who = email_sender_address() or ""
+    email_sub = f"{email_label} · {email_who}".strip(" ·") if (email_label or email_who) else "보고서를 메일로 보낼 때 쓰입니다"
+    return [
+        ("네이버 Client ID", "뉴스 검색에 쓰입니다", naver_source(), naver_client_id(), naver_saved_at(), "naver", "/naver"),
+        ("네이버 Client Secret", "뉴스 검색에 쓰입니다", naver_source(), naver_client_secret(), naver_saved_at(), "naver", "/naver"),
+        ("Claude API 키", "소제목·요약을 AI가 짓는 데 쓰입니다", llm_source(), llm_api_key(), llm_saved_at(), "llm", "/llm"),
+        ("텔레그램 봇 토큰", "보고서·알림을 텔레그램으로 보낼 때 쓰입니다", telegram_source(), telegram_bot_token(), telegram_saved_at(), "telegram", "/telegram-sender"),
+        ("이메일 앱 비밀번호", email_sub, email_source(), email_sender_password(), email_saved_at(), "email", "/email-sender"),
+    ]
+
+
+_KEY_WHERE_LABEL = {
+    "saved": ("saved", "설정 파일"),
+    "env": ("env", ".env"),
+    "none": ("none", "없음"),
+}
+
+
+def render_key_status_page() -> str:
+    """연동 › 키 보관 상태 — 다섯 키의 저장 자리를 읽기만 하는 화면."""
+    from_env = moved_from_env()
+    rows = []
+    for name, sub, source, value, saved_at, group, href in _key_status_rows():
+        chip_class, chip_text = _KEY_WHERE_LABEL[source]
+        if source == "saved" and group in from_env:
+            # 담당자가 직접 저장한 게 아니라 앱이 .env에서 옮겨 심은 값이라는 사실을 적는다.
+            sub = f"{sub} · .env에서 옮겨옴"
+        value_html = html.escape(mask_credential(value)) if value else "—"
+        if source == "none":
+            when = ""
+        elif source == "env":
+            when = ".env에 남아 있음"
+        else:
+            when = f"{saved_at[:16].replace('T', ' ')} 저장" if saved_at else ""
+        rows.append(
+            '<div class="keyrow">'
+            f'<div class="kname">{html.escape(name)}<span class="ksub">{html.escape(sub)}</span></div>'
+            f'<div class="kwhere {chip_class}">{html.escape(chip_text)}</div>'
+            f'<div class="kval">{value_html}</div>'
+            f'<div class="kwhen">{html.escape(when)}</div>'
+            f'<div class="kgo"><a href="{href}">{"바꾸기" if value else "등록"} ›</a></div>'
+            "</div>"
+        )
+
+    leftover = env_leftover_keys()
+    if leftover:
+        names = ", ".join(html.escape(n) for n in leftover)
+        summary_html = (
+            '<div class="status status-warn">'
+            f'{icon("alert")} <b>.env에 아직 키가 남아 있습니다</b> — {names}'
+            '<span class="sub">설정 화면에서 그 키를 지우면 앱이 .env의 옛 값을 다시 집습니다. '
+            '메일 서버가 네이버·Gmail이 아니면 옮길 수가 없어 그대로 둔 것이니, '
+            '<a href="/email-sender">이메일 발송 계정</a>에서 둘 중 하나로 다시 등록하면 사라집니다.</span>'
+            "</div>"
+        )
+    else:
+        summary_html = (
+            '<div class="status status-ok">'
+            f'{icon("check")} <b>키가 사는 자리는 설정 파일 한 곳입니다</b>'
+            '<span class="sub">.env에는 키가 남아 있지 않습니다 — 설정 화면에서 바꾸면 그게 전부입니다.</span>'
+            "</div>"
+        )
+
+    backups = env_backup_files()
+    if backups:
+        items = "".join(f"<li><code>{html.escape(p.name)}</code></li>" for p in backups[:5])
+        backup_html = (
+            '<div class="note">'
+            "<b>.env 백업</b> — 앱이 <code>.env</code>에서 키 줄을 지우기 전에 남긴 사본입니다. "
+            "<b>안에 옛 키가 그대로 들어 있으니</b> 남이 볼 수 있는 곳에 올리지 마세요. "
+            "며칠 써 보고 문제가 없으면 지우셔도 됩니다."
+            f"<ul>{items}</ul>"
+            "</div>"
+        )
+    else:
+        backup_html = ""
+
+    return _KEY_STATUS_TEMPLATE.format(
+        **_theme(),
+        topnav_html=_TOP_BAR_HTML,
+        summary_html=summary_html,
+        rows_html="".join(rows),
+        backup_html=backup_html,
+    )
+
+
+
 # 연동 › 텔레그램 발송 계정 — 봇 토큰(설정 화면 값 > .env)과 봇 이름. 「이메일 발송 계정」과
 # 같은 틀이고, 봇은 자기 자신에게 메시지를 보낼 수 없어 시험 발송 대신 [연결 확인](getMe)이다.
 # 시안 mockups/TELEGRAM_SENDER_MOCKUP.html.
@@ -5583,6 +5750,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._respond(render_naver_settings_page())
         elif self.path == "/llm":
             self._respond(render_llm_settings_page())
+        elif self.path == "/keys":
+            self._respond(render_key_status_page())
         elif self.path == "/email-sender":
             self._respond(render_email_sender_page())
         elif self.path.startswith("/adhoc"):

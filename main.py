@@ -12,6 +12,7 @@ from app.adhoc.card import delete_expired_cards
 from app.breaking_alert_sender import catch_up_on_wake
 from app.config import LANDING_HTML_PATH, SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT
 from app.confirm_send import confirm_and_promote
+from app.credentials import transplant_env_keys
 from app.today_cuts import after_round_collected
 from app.curation import cleanup_group_overrides
 from app.history_renderer import generate_history_page
@@ -159,6 +160,16 @@ def main(open_browser: bool = True) -> None:
     # 원문으로 사진 기사를 가리는 뒤쪽 작업(app.photo_body) — 자물쇠 뒤에서만 켠다. 켜기 전엔
     # looks_like_photo_caption이 원문을 받으러 가지 않아 테스트·진단 스크립트가 안전하다.
     photo_body.start()
+
+    # [추가: 2026-09-28] 키가 사는 자리를 한 곳으로 모은다 — .env에 남은 키를 설정
+    # 파일(data/credentials.json)로 옮겨 심고 .env의 그 줄은 지운다(백업을 먼저 뜬다).
+    # 자물쇠 뒤에 둬야 두 프로세스가 같은 .env를 동시에 고치지 않는다. 아래 수집 단계가
+    # 네이버 키를 쓰므로 그보다 먼저 온다. 실패해도 앱은 예전처럼 .env를 읽어 정상으로 돈다
+    # (읽는 우선순위 "설정 > .env"는 안 바뀐다).
+    try:
+        transplant_env_keys()
+    except Exception:
+        logger.exception("키 옮겨심기 실패 — .env를 그대로 쓰며 앱은 정상 동작합니다")
 
     # 며칠 꺼뒀다 켠 경우, 정리(cleanup)는 스케줄 루프 안에서만 비동기로 도는데(scheduler.py)
     # 그걸 기다리면 아래에서 만들 "정기 보관함"이 보관 기간을 넘긴 회차까지 잠깐 보여줄 수 있다.

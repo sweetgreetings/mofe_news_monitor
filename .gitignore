@@ -1,4 +1,6 @@
 .env
+# 키 옮겨심기(app.credentials.transplant_env_keys)가 남기는 .env 백업 — 옛 키가 들어 있다
+.env.backup-*
 .venv/
 __pycache__/
 
