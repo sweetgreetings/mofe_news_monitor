@@ -16,6 +16,8 @@ from app.config import (
     DEFAULT_ARTICLE_LINE_TEMPLATE,
     FONT_STACK,
     HIGHLIGHT_COLORS,
+    LIVE_AUTO_REFRESH_CHOICES_SEC,
+    LIVE_AUTO_REFRESH_SEC,
     LIVE_HEAVY_KEYWORD_MIN_COUNT,
     LIVE_HEAVY_KEYWORD_RATIO,
     LIVE_HTML_PATH,
@@ -129,6 +131,55 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
   .loading-spin {{ animation: live-spin 1s linear infinite; }}
   @keyframes live-spin {{ to {{ transform: rotate(360deg); }} }}
+  /* [추가: 2026-09-28] 「자동 새로고침」 — 화면을 열어 둔 채 몇 분마다 뒤에서 새 기사가
+     들어왔는지만 보고, 있으면 아래 띠로 알린다(목록은 담당자가 누를 때만 갈아끼운다).
+     **켜고 끄는 스위치**라 모양도 스위치다 — 검색어 화면의 목적지 스위치(.dest-sw)와
+     같은 크기(30×18)·같은 색이고, 이름표 글자만 이 줄의 다른 버튼과 같은 --fs-md로
+     올린다. 앱에 이미 있는 스위치 언어를 쓰고 새 모양을 만들지 않는다. */
+  .live-head-actions {{ display: flex; align-items: center; gap: 10px; flex-shrink: 0; }}
+  .auto-sw {{
+    position: relative; display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+    cursor: pointer; white-space: nowrap; font-size: var(--fs-md); color: {muted};
+  }}
+  .auto-sw.on {{ color: {header}; font-weight: 600; }}
+  .auto-sw input {{ position: absolute; opacity: 0; width: 0; height: 0; }}
+  .pill {{
+    position: relative; width: 30px; height: 18px; border-radius: var(--r-pill);
+    background: {toggle_off}; transition: background .16s; flex-shrink: 0;
+  }}
+  .pill::after {{
+    content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px;
+    border-radius: var(--r-circle); background: {on_fill}; box-shadow: 0 1px 3px rgba(0,0,0,.25);
+    transition: transform .16s;
+  }}
+  .auto-sw input:checked ~ .pill {{ background: {accent}; }}
+  .auto-sw input:checked ~ .pill::after {{ transform: translateX(12px); }}
+  .auto-sw input:focus-visible ~ .pill {{ outline: 2px solid {accent}; outline-offset: 2px; }}
+  /* 확인하는 몇 초 동안 이름표 앞 아이콘이 돈다(지금 뒤에서 보고 있다는 표시). */
+  .auto-sw.is-checking .auto-ic {{ animation: live-spin 1s linear infinite; }}
+  /* 주기 드롭다운 — 스위치 바로 오른쪽. 값을 고르는 칸이라 네모(--r-md)다.
+     **꺼져 있으면 흐리게 잠그는 게 아니라 아예 없다** — 끈 것의 주기를 고를 일이 없다. */
+  .auto-int {{
+    height: 30px; padding: 0 6px; border: 1px solid {border}; border-radius: var(--r-md);
+    background: {card}; color: {text}; font-family: inherit; font-size: var(--fs-md); cursor: pointer;
+  }}
+  /* 새 기사 알림 띠 — 자동 새로고침이 새 기사를 찾으면 이 띠만 뜨고, 읽고 있는 목록은 한 줄도
+     안 움직인다. 상단바(54px) 아래에 붙고, 띠가 떠 있는 동안에는 시간대 머리줄을 띠
+     높이(--live-new-h, 화면이 재어 넣는다)만큼 더 내려 서로 겹치지 않게 한다. */
+  .live-new-strip {{
+    display: none; position: sticky; top: 54px; z-index: 6;
+    align-items: center; gap: 10px; margin: 10px 0 0; box-shadow: var(--sh-float);
+    background: {hover}; border: 1px solid {accent_border}; border-radius: var(--r-lg);
+    padding: 8px 12px; font-size: var(--fs-md); color: {header};
+  }}
+  body.has-new-live .live-new-strip {{ display: flex; }}
+  body.has-new-live .hour-group > summary {{ top: calc(54px + var(--live-new-h, 0px)); }}
+  .live-new-strip .lns-btn {{
+    display: inline-flex; align-items: center; gap: 6px; background: {accent}; color: {card};
+    border: 0; border-radius: var(--r-md); padding: 6px 12px; font-size: var(--fs-md);
+    font-weight: 600; cursor: pointer; white-space: nowrap;
+  }}
+  .live-new-strip .lns-note {{ color: {muted}; font-size: var(--fs-sm); }}
   /* [추가: 2026-07-26] '스크랩 언론사만 보기' — 서버 재검색 없이 이미 불러온 기사
      중에서 /outlets에 등록된 언론사만 화면에서 걸러 보여준다(노이즈 완화 목적).
      실시간 현황 자체의 "전체 언론사 라이브 미러" 성격은 그대로 유지된다. */
@@ -265,6 +316,11 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      뜻으로 사진 추정 배지와 같은 채도 낮은 호박색 계열을 왼쪽 색띠에 쓴다. */
   .live-row.is-undated {{ border-left-color: {undated_bar}; }}
   .pub-time-unknown {{ color: {photo_badge_text}; }}
+  /* [추가: 2026-09-28] 자동 새로고침으로 목록을 갈아끼운 뒤, 이번에 새로 들어온 행만 노랑 —
+     확정본·초안의 .is-new-arrival과 같은 뜻(지난번 보기에 없던 기사)이라 같은 색을
+     쓴다(새 색을 만들지 않는다). 위 상태 색보다 뒤에 둬서, 겹칠 때는 "방금 들어왔다"가
+     이긴다. */
+  .live-row.is-new-arrival {{ background: {row_new}; }}
   /* [추가] 시간대별 묶기 — 하루치가 200건 가까이 쌓이면 한 줄 목록으로는 훑을 수 없다.
      서버는 지금처럼 전부 내려주고(필터 없음 원칙), 묶기·접기는 화면에서만 한다. 머리줄은
      스크롤해도 상단바(54px) 아래에 붙어 지금 몇 시대를 보는지 놓치지 않게 한다. */
@@ -450,9 +506,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <div class="container">
   <div class="live-head">
     <span class="live-badge"><span class="pulse"></span> 실시간{head_stat_html}</span>
-    {refresh_button_html}
+    <div class="live-head-actions">{auto_refresh_html}{refresh_button_html}</div>
   </div>
-  {body}
+  {new_strip_html}
+  <div id="live-body"{live_body_attr}>{body}</div>
 </div>
 <div class="bottombar"><div class="bottombar-inner">
   <div class="highlight-wrap">
@@ -910,6 +967,246 @@ function restoreLiveFilterState() {{
   if (restored) applyLiveFilters();
 }}
 restoreLiveFilterState();
+// [추가: 2026-09-28] 자동 새로고침 — 화면을 열어 둔 채 주기마다 /live.html을 뒤에서 한 번
+// 받아와, 지금 목록에 없는 기사가 있으면 위 띠로 알리기만 한다. 목록을 조용히
+// 갈아끼우지 않는 게 규칙이다: 읽는 중에 새 기사가 위에 붙으면 보던 줄이 아래로 밀려
+// 어디를 읽고 있었는지 잃는다. 갈아끼우는 건 담당자가 띠를 누른 그 순간뿐이고, 그때도
+// 특수조건 체크박스·제목 검색어·그룹 칩·시간대 접힘을 그대로 되돌려 놓는다.
+var AUTO_REFRESH_KEY = "liveAutoRefresh";
+var AUTO_INTERVAL_KEY = "liveAutoRefreshSec";
+var AUTO_REFRESH_DEFAULT_SEC = {auto_refresh_sec};
+var LIVE_PAGE_URL = "http://{settings_host}:{settings_port}/live.html";
+var _autoTimer = null;       // setInterval 핸들 — 끄면 즉시 멈춘다
+var _autoChecking = false;   // 확인이 겹치지 않게(한 번이 몇 초 걸린다)
+var _autoPendingHtml = null; // 마지막으로 받아온 목록 HTML(누를 때 이걸로 갈아끼운다)
+var _autoNewUrls = [];       // 그 안에서 지금 화면에 없는 기사 — 갈아끼운 뒤 노랑 표시용
+var _autoLastCheck = 0;
+function autoSw() {{ return document.getElementById("auto-refresh-sw"); }}
+function autoChk() {{ return document.getElementById("auto-refresh-chk"); }}
+function autoIntSelect() {{ return document.getElementById("auto-refresh-int"); }}
+// 지금 고른 주기(ms) — 드롭다운이 진실이고, 드롭다운이 없으면 기본값을 쓴다.
+function autoIntervalMs() {{
+  var sel = autoIntSelect();
+  var sec = sel ? parseInt(sel.value, 10) : AUTO_REFRESH_DEFAULT_SEC;
+  if (!sec || isNaN(sec)) sec = AUTO_REFRESH_DEFAULT_SEC;
+  return sec * 1000;
+}}
+function autoIntervalLabel() {{
+  var sel = autoIntSelect();
+  if (sel && sel.selectedIndex >= 0) return sel.options[sel.selectedIndex].text;
+  return Math.round(AUTO_REFRESH_DEFAULT_SEC / 60) + "분";
+}}
+// 주기를 바꾸면 그 자리에서 타이머를 다시 건다(다음 확인은 새 주기만큼 뒤).
+function changeAutoInterval(sel) {{
+  try {{ localStorage.setItem(AUTO_INTERVAL_KEY, sel.value); }} catch (e) {{ }}
+  if (isAutoOn()) setAutoRefresh(true);
+  else setAutoRefresh(false);
+}}
+function isAutoOn() {{ var c = autoChk(); return !!(c && c.checked); }}
+// 체크박스가 스스로 바뀐 뒤 불린다(label 안에 든 input이라 라벨을 눌러도 같다).
+function toggleAutoRefresh(chk) {{
+  var on = chk.checked;
+  setAutoRefresh(on);
+  // 특수조건 체크박스와 같은 규칙 — 이 브라우저에 기억하고 설정 화면에 기본값을 안 만든다.
+  try {{ localStorage.setItem(AUTO_REFRESH_KEY, on ? "1" : "0"); }} catch (e) {{ }}
+}}
+function setAutoRefresh(on) {{
+  var sw = autoSw();
+  var chk = autoChk();
+  if (!sw || !chk) return;
+  chk.checked = on;
+  sw.classList.toggle("on", on);
+  var label = autoIntervalLabel();
+  sw.title = on
+    ? label + "마다 새 기사가 들어왔는지 뒤에서 확인해요 — 있으면 위에 알려주고, 목록은 눌러야 바뀝니다"
+    : "지금은 확인하지 않아요 — 켜면 새 기사가 들어왔을 때 위에 알려줍니다";
+  // 꺼져 있으면 주기 칸은 아예 없다 — 끈 것의 주기를 고를 일이 없다.
+  var sel = autoIntSelect();
+  if (sel) {{
+    sel.hidden = !on;
+    sel.title = label + "마다 확인해요";
+  }}
+  if (_autoTimer) {{ clearInterval(_autoTimer); _autoTimer = null; }}
+  if (on) {{
+    _autoTimer = setInterval(autoCheckTick, autoIntervalMs());
+  }} else {{
+    _autoPendingHtml = null;
+    _autoNewUrls = [];
+    hideNewStrip();
+  }}
+}}
+function autoCheckTick() {{
+  // 뒤에 있는 탭은 확인하지 않는다 — 안 보는 화면 때문에 네이버 호출을 쓸 이유가 없다.
+  if (document.hidden) return;
+  autoCheckNow();
+}}
+document.addEventListener("visibilitychange", function () {{
+  // 다시 보이는 순간, 주기가 이미 지나 있으면 그 자리에서 한 번 확인한다.
+  if (document.hidden || !isAutoOn()) return;
+  if (Date.now() - _autoLastCheck >= autoIntervalMs()) autoCheckNow();
+}});
+// 행의 기사 주소 — 📌 버튼의 data-url이 그 값이고, 없으면 원문 링크를 본다.
+function _rowUrl(row) {{
+  var el = row.querySelector("[data-url]");
+  if (el && el.dataset.url) return el.dataset.url;
+  var a = row.querySelector(".live-url a");
+  return a ? a.getAttribute("href") : "";
+}}
+function _hourKey(group) {{
+  var t = group.querySelector(".hg-time");
+  return t ? t.textContent : "";
+}}
+function autoCheckNow() {{
+  if (_autoChecking || !isAutoOn()) return;
+  _autoChecking = true;
+  _autoLastCheck = Date.now();
+  var sw = autoSw();
+  if (sw) sw.classList.add("is-checking");
+  fetch(LIVE_PAGE_URL, {{ cache: "no-store" }}).then(function (res) {{
+    return res.ok ? res.text() : null;
+  }}).then(function (text) {{
+    // 확인하는 몇 초 사이에 담당자가 스위치를 껐으면 결과를 버린다 — 껐는데 띠가 뜨면 안 된다.
+    if (!text || !isAutoOn()) return;
+    var doc = new DOMParser().parseFromString(text, "text/html");
+    var fresh = doc.getElementById("live-body");
+    // 대기 화면·오류 화면(data-ready 없음)은 그냥 버린다 — 다음 주기에 다시 본다.
+    if (!fresh || fresh.dataset.ready !== "1") return;
+    var here = {{}};
+    document.querySelectorAll("#live-body .live-row").forEach(function (row) {{
+      var u = _rowUrl(row);
+      if (u) here[u] = 1;
+    }});
+    var added = [];
+    fresh.querySelectorAll(".live-row").forEach(function (row) {{
+      var u = _rowUrl(row);
+      if (u && !here[u]) added.push(u);
+    }});
+    // 새 기사가 없으면 아무것도 알리지 않는다(상태만 바뀐 응답으로 담당자를 부르지 않는다).
+    if (!added.length) {{ _autoPendingHtml = null; _autoNewUrls = []; hideNewStrip(); return; }}
+    _autoPendingHtml = text;
+    _autoNewUrls = added;
+    showNewStrip(added.length);
+  }}).catch(function () {{
+    // 앱이 잠깐 안 떠 있어도 조용히 넘긴다 — 다음 주기에 다시 본다.
+  }}).then(function () {{
+    _autoChecking = false;
+    var w = autoSw();
+    if (w) w.classList.remove("is-checking");
+  }});
+}}
+function showNewStrip(count) {{
+  var strip = document.getElementById("live-new-strip");
+  var el = document.getElementById("lns-count");
+  if (!strip || !el) return;
+  el.textContent = count;
+  var note = document.getElementById("lns-note");
+  if (note) {{
+    var d = new Date();
+    note.textContent = ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2) + " 확인";
+  }}
+  document.body.classList.add("has-new-live");
+  // 시간대 머리줄을 이 띠 높이만큼 더 내려 붙이게 한다(CSS의 --live-new-h).
+  document.body.style.setProperty("--live-new-h", strip.offsetHeight + "px");
+}}
+function hideNewStrip() {{
+  document.body.classList.remove("has-new-live");
+  document.body.style.setProperty("--live-new-h", "0px");
+}}
+function applyNewArticles() {{
+  // 받아둔 게 없으면(자동 새로고침을 끈 뒤 등) 눌렀을 때 평소처럼 다시 불러온다.
+  if (!_autoPendingHtml) {{ location.reload(); return; }}
+  var doc = new DOMParser().parseFromString(_autoPendingHtml, "text/html");
+  var fresh = doc.getElementById("live-body");
+  var host = document.getElementById("live-body");
+  if (!fresh || !host) {{ location.reload(); return; }}
+  // 지금 화면 상태를 먼저 적어 둔다 — 서버가 보낸 HTML은 필터가 다 꺼진 처음 상태다.
+  var checks = {{}};
+  LIVE_FILTER_IDS.forEach(function (id) {{
+    var el = document.getElementById(id);
+    if (el) checks[id] = el.checked;
+  }});
+  var activeGroups = activeGroupFilters();
+  var searchBox = document.getElementById("live-title-search");
+  var query = searchBox ? searchBox.value : "";
+  var openState = {{}};
+  document.querySelectorAll(".hour-group").forEach(function (g) {{
+    var key = _hourKey(g);
+    if (key) openState[key] = {{ open: g.open, was: g.dataset.wasOpen }};
+  }});
+  var list = document.getElementById("live-list");
+  var ungrouped = !!(list && list.classList.contains("is-ungrouped"));
+  var breakdownOpen = !!document.querySelector("#keyword-breakdown.is-open");
+
+  host.innerHTML = fresh.innerHTML;
+  // 머리줄의 「0시~HH:MM 누적」도 같이 갈아끼운다(건수는 아래 applyLiveFilters가 다시 센다).
+  var oldStat = document.querySelector(".head-stat");
+  var newStat = doc.querySelector(".head-stat");
+  if (oldStat && newStat) oldStat.replaceWith(newStat.cloneNode(true));
+  // 이번에 새로 들어온 행만 노랑 — 갈아끼운 목록에서 무엇이 새 기사인지 바로 보이게.
+  var newSet = {{}};
+  _autoNewUrls.forEach(function (u) {{ newSet[u] = 1; }});
+  document.querySelectorAll("#live-body .live-row").forEach(function (row) {{
+    var u = _rowUrl(row);
+    if (u && newSet[u]) row.classList.add("is-new-arrival");
+  }});
+  // 적어 둔 화면 상태를 되돌린다.
+  LIVE_FILTER_IDS.forEach(function (id) {{
+    var el = document.getElementById(id);
+    if (el && !el.disabled && checks[id]) el.checked = true;
+  }});
+  var newSearch = document.getElementById("live-title-search");
+  if (newSearch && query) newSearch.value = query;
+  document.querySelectorAll(".group-chip").forEach(function (chip) {{
+    if (chip.dataset.group && activeGroups.indexOf(chip.dataset.group) !== -1) {{
+      chip.classList.add("is-active");
+    }}
+  }});
+  document.querySelectorAll(".hour-group").forEach(function (g) {{
+    var prev = openState[_hourKey(g)];
+    // 새로 생긴 시간대는 서버가 정한 대로 둔다(최근 두 시간대는 펼친 채).
+    if (!prev) return;
+    g.open = prev.open;
+    if (prev.was !== undefined) g.dataset.wasOpen = prev.was;
+  }});
+  if (ungrouped) {{
+    var newList = document.getElementById("live-list");
+    if (newList) newList.classList.add("is-ungrouped");
+    var tog = document.querySelector(".hg-bar .hg-toggle");
+    if (tog) {{ tog.classList.remove("is-on"); tog.setAttribute("aria-pressed", "false"); }}
+    document.querySelectorAll(".hour-group").forEach(function (g) {{
+      if (g.dataset.wasOpen === undefined) g.dataset.wasOpen = g.open ? "1" : "0";
+      g.open = true;
+    }});
+  }}
+  if (breakdownOpen) {{
+    var panel = document.getElementById("keyword-breakdown");
+    if (panel) panel.classList.add("is-open");
+  }}
+  renderRelativeTimes();
+  markTruncatedKeywords();
+  applyLiveFilters();
+  _autoPendingHtml = null;
+  _autoNewUrls = [];
+  hideNewStrip();
+  // 방금 받아온 내용이라 주기를 여기서 다시 센다(누른 직후 또 부르지 않게).
+  _autoLastCheck = Date.now();
+}}
+// 처음 열 때 — 기억한 값이 "0"(직접 끔)일 때만 꺼진 채로 시작한다.
+(function () {{
+  if (!autoChk()) return;
+  var savedSec = null;
+  try {{ savedSec = localStorage.getItem(AUTO_INTERVAL_KEY); }} catch (e) {{ savedSec = null; }}
+  var sel = autoIntSelect();
+  // 목록에 없는 값(옛 기록·손으로 고친 값)은 무시하고 기본 주기로 돌아간다.
+  if (sel && savedSec) {{
+    for (var i = 0; i < sel.options.length; i++) {{
+      if (sel.options[i].value === savedSec) {{ sel.selectedIndex = i; break; }}
+    }}
+  }}
+  var saved = null;
+  try {{ saved = localStorage.getItem(AUTO_REFRESH_KEY); }} catch (e) {{ saved = null; }}
+  setAutoRefresh(saved !== "0");
+}})();
 </script>
 </body>
 </html>
@@ -929,6 +1226,45 @@ _REFRESH_BUTTON_DISABLED = (
 )
 
 
+def _interval_label(seconds: int) -> str:
+    """자동 새로고침 주기를 말풍선용 한국어로 — 60초로 나눠떨어지면 「N분」, 아니면 「N초」."""
+    if seconds % 60 == 0:
+        return f"{seconds // 60}분"
+    return f"{seconds}초"
+
+
+# [추가: 2026-09-28] 「자동 새로고침」 스위치 — 실제 페이지(generate_live_page)에만 붙인다.
+# 대기·오류 화면에는 비교할 목록 자체가 없어 스위치를 둘 자리가 아니다.
+_AUTO_REFRESH_TOGGLE = (
+    '<label class="auto-sw" id="auto-refresh-sw">'
+    f'{icon("refresh", "ic auto-ic")} 자동 새로고침'
+    '<input type="checkbox" id="auto-refresh-chk" onchange="toggleAutoRefresh(this)">'
+    '<span class="pill"></span></label>'
+    # 주기는 화면에서 고르고 그 브라우저에 기억한다 — 설정 화면에 같은 값을 또 두면
+    # "설정에 적힌 값"과 "지금 이 화면이 쓰는 값"이라는 두 개의 진실이 생긴다(전체 기사
+    # 특수조건 체크박스와 같은 이유). 고른 값은 화면이 localStorage에서 되살린다.
+    # 처음엔 감춰 둔 채로 내보내고 화면이 켜져 있을 때만 드러낸다 — 스위치가 꺼진 화면에
+    # 주기 칸이 잠깐이라도 비쳤다 사라지면 안 된다.
+    '<select class="auto-int" id="auto-refresh-int" onchange="changeAutoInterval(this)" '
+    'aria-label="자동 새로고침 주기" hidden>'
+    + "".join(
+        f'<option value="{sec}">{_interval_label(sec)}</option>'
+        for sec in LIVE_AUTO_REFRESH_CHOICES_SEC
+    )
+    + "</select>"
+)
+
+# 새 기사 알림 띠 — 자동 새로고침이 새 기사를 찾았을 때만 보인다(평소엔 CSS로 감춰져 있다).
+# 건수는 화면이 채우고, 누르면 그때 받아둔 목록으로 갈아끼운다(applyNewArticles).
+_NEW_STRIP_HTML = (
+    '<div class="live-new-strip" id="live-new-strip">'
+    '<button type="button" class="lns-btn" onclick="applyNewArticles()">'
+    f'{icon("refresh")} 새 기사 <span id="lns-count">0</span>건 보기</button>'
+    '<span class="lns-note" id="lns-note"></span>'
+    "</div>"
+)
+
+
 def _theme() -> dict:
     return {
         # [수정: 2026-08-21] 색 값은 전부 app.config.PALETTE에서 온다(scrap_green·
@@ -938,6 +1274,11 @@ def _theme() -> dict:
         # 값을 직접 적어야 했다.
         **PALETTE,
         "font_stack": FONT_STACK,
+        # 새 기사 알림 띠는 모든 화면에 같은 마크업으로 들어간다(보이는 건 자동 새로고침이
+        # 새 기사를 찾았을 때뿐이라, 대기·오류 화면에 있어도 눈에 띄지 않는다).
+        "new_strip_html": _NEW_STRIP_HTML,
+        # 기본 주기 — 화면이 기억한 값이 없거나 목록에 없는 값일 때 쓴다.
+        "auto_refresh_sec": LIVE_AUTO_REFRESH_SEC,
         "topnav_style": topnav_style(),
         "topnav_html": regular_nav("live"),
         # 숨긴 행 버튼 — 서버 렌더링(_render_row)과 hideFromLive가 같은 마크업을 쓴다.
@@ -1330,9 +1671,9 @@ def _render_row(
     )
 
 
-# [추가] 처음 열었을 때 펼쳐둘 시간대 수 — 최근 두 시간대. 새로 들어온 기사는 바로
-# 보이면서, 그 아래로는 열 줄 남짓으로 접혀 하루치가 한눈에 들어온다.
-HOUR_GROUPS_OPEN = 2
+# [추가] 처음 열었을 때 펼쳐둘 시간대 수 — 가장 최근 한 시간대. 새로 들어온 기사는 바로
+# 보이면서, 그 아래는 전부 접혀 하루치 시간대가 한눈에 들어온다.
+HOUR_GROUPS_OPEN = 1
 
 
 def _pub_hour(article: dict):
@@ -1660,6 +2001,10 @@ def render_live_page(
         **_theme(),
         body=body,
         refresh_button_html=_REFRESH_BUTTON_ENABLED,
+        auto_refresh_html=_AUTO_REFRESH_TOGGLE,
+        # data-ready — 자동 새로고침이 뒤에서 받아온 HTML이 "실제 목록"인지 판별하는 표식이다.
+        # 대기·오류 화면에는 없어서, 그런 응답은 화면이 그냥 버리고 다음 주기에 다시 본다.
+        live_body_attr=' data-ready="1"',
         head_stat_html=(
             f'<span class="head-stat"><span id="stat-count">{len(dated_articles)}건</span>'
             f' · 0시~{generated_at} 누적 · <span id="stat-scope">전체 언론사</span></span>'
@@ -1685,6 +2030,8 @@ def render_live_error_page() -> str:
         **_theme(),
         body=body,
         refresh_button_html=_REFRESH_BUTTON_ENABLED,
+        auto_refresh_html="",
+        live_body_attr="",
         head_stat_html="",
         extra_head_html="",
         home_href=_home_href(),
@@ -1715,6 +2062,8 @@ def render_live_not_configured_page() -> str:
         **_theme(),
         body=body,
         refresh_button_html=_REFRESH_BUTTON_ENABLED,
+        auto_refresh_html="",
+        live_body_attr="",
         head_stat_html="",
         extra_head_html="",
         home_href=_home_href(),
@@ -1755,6 +2104,8 @@ def render_live_loading_page(keyword_count: int) -> str:
         **_theme(),
         body=body,
         refresh_button_html=_REFRESH_BUTTON_DISABLED,
+        auto_refresh_html="",
+        live_body_attr="",
         head_stat_html="",
         extra_head_html='<meta http-equiv="refresh" content="3">',
         home_href=_home_href(),
