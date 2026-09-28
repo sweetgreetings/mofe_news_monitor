@@ -9,6 +9,7 @@
 # 원천적으로 막는다.
 #
 # 실행: python3 tests/test_integration.py
+import ast
 import json
 import os
 import sys
@@ -3612,10 +3613,82 @@ def test_env_key_transplant():
 
 
 
+def test_key_paths_stay_narrow():
+    """키를 쓰는 자리가 서비스마다 한 곳인지 지킨다 — 서버로 옮길 때의 이음매.
+
+    나중에 여러 사람이 쓰게 되면 키는 담당자 컴퓨터가 아니라 서버에 둬야 한다
+    (MULTIUSER_ROLLOUT_CHECKLIST.md §2). 그 작업이 기계적으로 끝나려면 「키를 읽는
+    곳」과 「그 키로 바깥을 부르는 곳」이 서비스마다 하나여야 한다. 지금은 그렇고,
+    이 테스트는 그 상태가 앞으로도 유지되는지만 본다 — 새 자리가 생기면 여기서 깨져
+    "이것도 같이 옮겨야 한다"가 그 자리에서 드러난다.
+
+    규칙을 늘릴 일이 생기면 허용 파일을 추가하지 말고 **왜 새 자리가 필요한지** 먼저
+    따진다. 대개는 기존 함수를 부르면 되는 경우다.
+    """
+    _require_isolation()
+    app_dir = Path(__file__).resolve().parent.parent
+    sources = sorted(app_dir.glob("app/**/*.py")) + [app_dir / "main.py"]
+
+    rules = [
+        ("Claude 클라이언트를 만드는 곳", "anthropic.Anthropic(", {"app/llm_classifier.py"}),
+        ("네이버 검색 API 주소", "openapi.naver.com", {"app/naver_api.py"}),
+        # 끝의 "/bot{"까지 봐야 실제 호출만 잡힌다 — 설정 화면에는 담당자에게 chat id
+        # 확인법을 알려주는 같은 주소가 글로 적혀 있다(부르는 자리가 아니다).
+        ("텔레그램 API 호출", "api.telegram.org/bot{", {"app/telegram_bot.py", "app/telegram_bot_name.py"}),
+        ("메일 서버 접속", "smtplib.SMTP(", {"app/email_sender.py"}),
+        # .env를 읽는 곳 — 키 이름은 app.config 한 곳에서만 os.getenv로 읽는다.
+        ("NAVER_CLIENT_ID를 .env에서 읽는 곳", 'os.getenv("NAVER_CLIENT_ID"', {"app/config.py"}),
+        ("ANTHROPIC_API_KEY를 .env에서 읽는 곳", 'os.getenv("ANTHROPIC_API_KEY"', {"app/config.py"}),
+        ("TELEGRAM_BOT_TOKEN을 .env에서 읽는 곳", 'os.getenv("TELEGRAM_BOT_TOKEN"', {"app/config.py"}),
+        ("EMAIL_SENDER_PASSWORD를 .env에서 읽는 곳", 'os.getenv("EMAIL_SENDER_PASSWORD"', {"app/config.py"}),
+        # .env 파일 자체를 건드리는 곳 — 옮겨심기 한 곳뿐이다.
+        (".env 파일을 고치는 곳", "ENV_FILE", {"app/credentials.py"}),
+    ]
+
+    for label, needle, allowed in rules:
+        found = {
+            str(path.relative_to(app_dir))
+            for path in sources
+            if needle in path.read_text(encoding="utf-8")
+        }
+        extra = found - allowed
+        assert not extra, (
+            f"{label}가 늘었습니다 — {sorted(extra)}. 키를 서버로 옮길 때 같이 고쳐야 할 "
+            f"자리가 하나 더 생겼다는 뜻입니다. 기존 함수를 부르는 길이 없는지 먼저 보세요 "
+            f"(지금 자리: {sorted(allowed)})"
+        )
+        assert found, f"{label}를 한 곳도 못 찾았습니다 — 규칙이 옛 이름을 보고 있습니다({needle})"
+
+    # .env 폴백 상수(app.config의 NAVER_CLIENT_SECRET 등)를 **실제로 가져다 쓰는** 모듈은
+    # app.credentials 하나다 — 거기가 「설정값 > .env」 우선순위를 정하는 자리이고, 서버로
+    # 옮길 때 고칠 자리도 거기다. 글자 대조가 아니라 import 구문을 본다(설정 화면 도움말에
+    # 같은 이름이 글로 적혀 있어 문자열로는 못 가른다).
+    env_constants = {
+        "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET", "ANTHROPIC_API_KEY",
+        "TELEGRAM_BOT_TOKEN", "EMAIL_SENDER_ADDRESS", "EMAIL_SENDER_PASSWORD",
+        "EMAIL_SMTP_HOST", "EMAIL_SMTP_PORT",
+    }
+    importers = set()
+    for path in sources:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module == "app.config":
+                if any(alias.name in env_constants for alias in node.names):
+                    importers.add(str(path.relative_to(app_dir)))
+    assert importers == {"app/credentials.py"}, (
+        f".env 폴백 상수를 가져다 쓰는 모듈이 늘었습니다 — {sorted(importers)}. "
+        "키를 읽는 자리는 app/credentials.py 하나여야 합니다(그 모듈의 함수를 부르세요)."
+    )
+
+    print("48) 키 이음매: 통과 (네이버·Claude·텔레그램·이메일 각 한 곳, .env를 읽고 고치는 곳도 한 곳)")
+
+
+
 if __name__ == "__main__":
     tests = [
         test_no_ai_key_is_not_a_failure,
         test_env_key_transplant,
+        test_key_paths_stay_narrow,
         test_draft_all_first_classified_hidden_shows_unclassified,
         test_assigned_articles_keep_subheading_after_ai_members_hidden,
         test_cache_store_keeps_other_rounds,
