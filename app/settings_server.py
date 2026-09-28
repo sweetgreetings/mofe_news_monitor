@@ -427,7 +427,7 @@ _MENU_TEMPLATE = (
   <div class="category">
     <div class="category-name">연동</div>
     <div class="menu">
-      <a href="/keys">키 보관 상태<span class="menu-note">어디에 저장돼 있나</span><span class="menu-chev">›</span></a>
+      <a href="/keys">키 보관 상태<span class="menu-note">등록됐는지 한눈에</span><span class="menu-chev">›</span></a>
       <a href="/naver">네이버 뉴스 API 설정{naver_badge}<span class="menu-chev">›</span></a>
       <a href="/llm">LLM(AI) 연동{llm_badge}<span class="menu-chev">›</span></a>
       <a href="/telegram-sender">텔레그램 발송 계정{telegram_badge}<span class="menu-chev">›</span></a>
@@ -3794,19 +3794,11 @@ _KEY_STATUS_TEMPLATE = (
 {topnav_html}
 <div class="container">
   <h1>🔑 키 보관 상태</h1>
-  <p class="hint">다섯 키가 지금 어디에 저장돼 있는지 한눈에 봅니다. 값을 고치는 건 각 연동 화면이고,
-  여기서는 <b>끝 4자리</b>만 보여줍니다.</p>
+  <p class="hint">등록해 둔 키 다섯 개가 제대로 들어가 있는지 한눈에 봅니다.
+  값은 <b>끝 4자리</b>만 보여주고, 고치는 건 줄 오른쪽 링크로 갑니다.</p>
   {summary_html}
   <div class="keys">{rows_html}</div>
   {backup_html}
-  <div class="note">
-    <b>키가 사는 자리</b>는 <code>data/credentials.json</code> 한 곳입니다 — 앱이 만들 때
-    본인만 읽을 수 있게 권한을 잠급니다.<br>
-    <code>.env</code>는 <b>처음 설치할 때 키를 한 번 넣어 주는 씨앗</b>입니다. 앱을 켤 때
-    거기 남은 키를 설정 파일로 옮겨 심고 <code>.env</code>의 그 줄은 지웁니다(지우기 전에
-    <code>.env.backup-날짜</code>로 한 벌 복사해 둡니다). 새 컴퓨터로 옮길 때
-    <code>.env</code>에 키를 적어 두면 첫 실행에 그대로 옮겨집니다.
-  </div>
 </div>
 </body>
 </html>
@@ -3827,29 +3819,26 @@ def _key_status_rows() -> list:
     ]
 
 
-_KEY_WHERE_LABEL = {
-    "saved": ("saved", "설정 파일"),
-    "env": ("env", ".env"),
+# 알약은 **담당자가 할 일이 있는가**로만 가른다 — 어느 파일에 들어 있는지는 앱 사정이라
+# 화면에 안 적는다(「본업 화면은 자기를 해명하지 않는다」).
+_KEY_CHIP = {
+    "saved": ("saved", "등록됨"),
+    "env": ("env", "정리 필요"),   # 아직 옛 자리에 있다 — 돌긴 하지만 다시 등록해 두는 게 낫다
     "none": ("none", "없음"),
 }
 
 
 def render_key_status_page() -> str:
-    """연동 › 키 보관 상태 — 다섯 키의 저장 자리를 읽기만 하는 화면."""
-    from_env = moved_from_env()
+    """연동 › 키 보관 상태 — 다섯 키가 등록돼 있는지만 읽는 화면.
+
+    **고칠 게 있을 때만 표시가 붙는다**(설정 화면 전체의 관례) — 다 정상이면 맨 위에
+    아무것도 안 그린다. `.env`·저장 파일 이름 같은 앱 사정은 화면에 적지 않는다.
+    """
     rows = []
     for name, sub, source, value, saved_at, group, href in _key_status_rows():
-        chip_class, chip_text = _KEY_WHERE_LABEL[source]
-        if source == "saved" and group in from_env:
-            # 담당자가 직접 저장한 게 아니라 앱이 .env에서 옮겨 심은 값이라는 사실을 적는다.
-            sub = f"{sub} · .env에서 옮겨옴"
+        chip_class, chip_text = _KEY_CHIP[source]
         value_html = html.escape(mask_credential(value)) if value else "—"
-        if source == "none":
-            when = ""
-        elif source == "env":
-            when = ".env에 남아 있음"
-        else:
-            when = f"{saved_at[:16].replace('T', ' ')} 저장" if saved_at else ""
+        when = f"{saved_at[:16].replace('T', ' ')} 등록" if (source == "saved" and saved_at) else ""
         rows.append(
             '<div class="keyrow">'
             f'<div class="kname">{html.escape(name)}<span class="ksub">{html.escape(sub)}</span></div>'
@@ -3860,33 +3849,26 @@ def render_key_status_page() -> str:
             "</div>"
         )
 
-    leftover = env_leftover_keys()
-    if leftover:
-        names = ", ".join(html.escape(n) for n in leftover)
-        summary_html = (
-            '<div class="status status-warn">'
-            f'{icon("alert")} <b>.env에 아직 키가 남아 있습니다</b> — {names}'
-            '<span class="sub">설정 화면에서 그 키를 지우면 앱이 .env의 옛 값을 다시 집습니다. '
-            '메일 서버가 네이버·Gmail이 아니면 옮길 수가 없어 그대로 둔 것이니, '
-            '<a href="/email-sender">이메일 발송 계정</a>에서 둘 중 하나로 다시 등록하면 사라집니다.</span>'
-            "</div>"
-        )
-    else:
-        summary_html = (
-            '<div class="status status-ok">'
-            f'{icon("check")} <b>키가 사는 자리는 설정 파일 한 곳입니다</b>'
-            '<span class="sub">.env에는 키가 남아 있지 않습니다 — 설정 화면에서 바꾸면 그게 전부입니다.</span>'
-            "</div>"
-        )
+    # 이메일 계정이 네이버·Gmail이 아니면 옛 자리에 그대로 남는다 — 담당자가 할 일이
+    # 하나 있는 유일한 경우라, 이때만 안내를 그린다.
+    summary_html = (
+        '<div class="status status-warn">'
+        f'{icon("alert")} <b>이메일 계정만 아직 정리가 덜 됐습니다</b>'
+        '<span class="sub">지금도 메일은 나갑니다. 다만 <a href="/email-sender">이메일 발송 계정</a>에서 '
+        '네이버나 Gmail로 다시 등록해 두시면, 나중에 계정을 바꿀 때 옛 값이 되살아나는 일이 없습니다.</span>'
+        "</div>"
+        if env_leftover_keys()
+        else ""
+    )
 
     backups = env_backup_files()
     if backups:
         items = "".join(f"<li><code>{html.escape(p.name)}</code></li>" for p in backups[:5])
         backup_html = (
             '<div class="note">'
-            "<b>.env 백업</b> — 앱이 <code>.env</code>에서 키 줄을 지우기 전에 남긴 사본입니다. "
-            "<b>안에 옛 키가 그대로 들어 있으니</b> 남이 볼 수 있는 곳에 올리지 마세요. "
-            "며칠 써 보고 문제가 없으면 지우셔도 됩니다."
+            "<b>옛 키가 든 파일</b> — 키를 지금 자리로 옮기기 전에, 되돌릴 수 있게 한 벌 복사해 둔 것입니다. "
+            "앱 폴더에 있고 앱은 쓰지 않습니다. <b>안에 옛 키가 그대로 들어 있으니</b> 남이 볼 수 있는 곳에 "
+            "올리지 마세요. 며칠 써 보고 문제가 없으면 지우셔도 됩니다."
             f"<ul>{items}</ul>"
             "</div>"
         )
