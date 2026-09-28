@@ -3425,6 +3425,13 @@ def _compute_preview_content(
         and len(articles) >= MIN_ARTICLES_FOR_AUTO
         and llm_last_classification_was_rule_based()
     )
+    # 복사·텍스트·엑셀의 확인창은 **진짜 실패일 때만** 묻는다(CLASSIFY_DEGRADED). AI 키를
+    # 아예 안 쓰는 상태에서는 규칙 기반이 고장이 아니라 정상 동작이라(배너도 앰버 안내 한
+    # 줄이다), 가져갈 때마다 "이 이름들이 이대로 나갑니다"를 물으면 늘 뜨는 확인창이 되어
+    # 곧 읽지 않고 누르게 된다 — 그러면 정작 진짜 폴백일 때 확인창이 일을 못 한다.
+    # 배너(classify_degraded)와 재분류 버튼의 data-degraded는 사실 판정 그대로다 —
+    # 이름이 단어 빈도로 지어진 건 키가 없든 있든 사실이기 때문이다.
+    confirm_degraded = classify_degraded and llm_is_configured()
 
     # [추가: 2026-07-30] "+ 새 소제목 만들기"로 미리 만들어둔, 아직 기사가 하나도 없는
     # 소제목도 화면에 같이 보여준다 — 실제 분류 결과(groups)와 합쳐서 한 번에 렌더링해야
@@ -3461,7 +3468,7 @@ def _compute_preview_content(
             apply_subheading_format(subheading_format, display_group_name(g["name"], labels))
             for g in groups
         ]
-        if classify_degraded
+        if confirm_degraded
         else []
     )
 
@@ -3535,7 +3542,7 @@ def _compute_preview_content(
         # 분류가 다시 계산되므로(위 classify_degraded), 복사·다운로드 확인창이 이동
         # 직후에도 최신 상태를 보게 하려면 페이지 전체를 새로고침하지 않는 이 경로도
         # 같은 값을 들고 있어야 한다.
-        "classify_degraded": classify_degraded,
+        "classify_degraded": confirm_degraded,
         "classify_degraded_names": degraded_names,
         # [추가: 2026-08-21] 건수 배지 옆에 "미분류 N건"을 같이 띄운다 — 📂 소제목
         # 미분류 칸은 늘 화면 맨 아래라 스크롤을 끝까지 내리기 전엔 있는 줄도 모른다는

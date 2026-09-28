@@ -3042,6 +3042,24 @@ def test_no_ai_key_is_not_a_failure():
     assert "no-key" in banner and "크레딧을 채워" in banner, banner
     assert "⚠️" not in banner and "btn-ref" not in banner, "키 없음은 경고가 아니라 안내다"
 
+    # 초안 한 판을 실제로 그려서, 배너는 뜨되 복사·텍스트·엑셀 확인창 플래그
+    # (CLASSIFY_DEGRADED)는 꺼지는지 본다 — 가져갈 때마다 묻는 확인창이 되면 안 된다.
+    slot = {"start": "08:00", "end": "09:30"}
+    articles = [
+        {"url": f"https://n.news.naver.com/a/{i}", "title": f"기재부 세수 대책 {i}",
+         "summary": "정부가 세수 대책을 내놨다.", "outlet": "연합뉴스",
+         "pub_date": f"2026-09-28T08:{10 + i:02d}:00"}
+        for i in range(6)
+    ]
+    with patch.object(preview_renderer, "llm_is_configured", return_value=False), \
+         patch.object(preview_renderer, "llm_last_classification_was_rule_based", return_value=True):
+        content = preview_renderer._compute_preview_content(
+            slot, articles, ["기재부"], [], "ㅇ ({outlet}) {title}", "09:18"
+        )
+    assert "no-key" in content["body"], "초안 배너는 앰버 안내로 뜬다"
+    assert content["classify_degraded"] is False, "키가 없으면 가져가기 확인창은 안 묻는다"
+    assert content["classify_degraded_names"] == [], content["classify_degraded_names"]
+
     print("47) AI 키 없음은 실패가 아니다: 통과 (사실 판정과 실패 판정 분리, 저장된 실패는 유지, 배너는 앰버 안내)")
 
 
