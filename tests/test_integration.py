@@ -10,6 +10,7 @@
 #
 # 실행: python3 tests/test_integration.py
 import json
+import os
 import sys
 import tempfile
 from contextlib import ExitStack
@@ -3585,6 +3586,27 @@ def test_env_key_transplant():
     # .env가 없거나 값이 빈 줄뿐이면 백업조차 뜨지 않는다
     _, _, _, backups, _, _ = run("NAVER_CLIENT_ID=\nANTHROPIC_API_KEY=\n")
     assert backups == [], backups
+
+    # 6) 백업은 보관 기간이 지나면 앱이 스스로 치운다(담당자가 지울 파일이 아니다).
+    #    시각은 「백업을 뜬 때」여야 한다 — copy2로 원본 .env의 시각을 물려받으면
+    #    몇 년 전 .env의 백업이 뜨자마자 지워진다.
+    tmp_dir = Path(tempfile.mkdtemp())
+    env_file = tmp_dir / ".env"
+    env_file.write_text(env_text, encoding="utf-8")
+    old_time = (datetime.now() - timedelta(days=400)).timestamp()
+    os.utime(env_file, (old_time, old_time))
+    with patch.object(credentials, "ENV_FILE", env_file), \
+         patch.object(credentials, "BASE_DIR", tmp_dir), \
+         patch.object(credentials, "CREDENTIALS_FILE", tmp_dir / "credentials.json"):
+        credentials.transplant_env_keys()
+        assert len(credentials.env_backup_files()) == 1
+        credentials.cleanup_env_backups()
+        assert len(credentials.env_backup_files()) == 1, "방금 뜬 백업을 지워버렸다"
+        fresh = credentials.env_backup_files()[0]
+        stale = (datetime.now() - timedelta(days=credentials.ENV_BACKUP_RETENTION_DAYS + 1)).timestamp()
+        os.utime(fresh, (stale, stale))
+        credentials.cleanup_env_backups()
+        assert credentials.env_backup_files() == [], "보관 기간이 지난 백업이 남았다"
 
     print("47) 키 옮겨심기: 통과 (.env -> 설정 파일, 설정값 우선, 모르는 메일 서버는 그대로, 백업·두 번째 실행 no-op)")
 

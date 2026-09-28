@@ -12,7 +12,7 @@ from app.adhoc.card import delete_expired_cards
 from app.breaking_alert_sender import catch_up_on_wake
 from app.config import LANDING_HTML_PATH, SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT
 from app.confirm_send import confirm_and_promote
-from app.credentials import transplant_env_keys
+from app.credentials import cleanup_env_backups, transplant_env_keys
 from app.today_cuts import after_round_collected
 from app.curation import cleanup_group_overrides
 from app.history_renderer import generate_history_page
@@ -178,6 +178,7 @@ def main(open_browser: bool = True) -> None:
         delete_expired_runs()
         cleanup_group_overrides()
         delete_expired_cards()
+        cleanup_env_backups()
     except Exception:
         logger.exception("시작 시 보관 기간 정리 실패 — 스케줄 루프가 이어서 재시도합니다")
 

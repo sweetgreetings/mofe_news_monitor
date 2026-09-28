@@ -29,6 +29,7 @@ from app.config import (
     EMAIL_SERVICES,
     EMAIL_SMTP_HOST,
     EMAIL_SMTP_PORT,
+    ENV_BACKUP_RETENTION_DAYS,
     LLM_MODEL,
     NAVER_CLIENT_ID,
     NAVER_CLIENT_SECRET,
@@ -388,6 +389,20 @@ def env_backup_files() -> list:
         return []
 
 
+def cleanup_env_backups() -> None:
+    """목적을 다한 .env 백업을 치운다 — 옮기다 잘못됐을 때 되돌리는 자리라 며칠이면 끝나는데,
+    안에는 아직 살아 있는 키가 들어 있어 남겨 두면 백업·공유에 딸려 갈 위험만 남는다.
+    이 앱의 다른 저장물(숨김 7일·로그 14일·회차 365일)과 같은 방식이다."""
+    cutoff = datetime.now().timestamp() - ENV_BACKUP_RETENTION_DAYS * 86400
+    for path in env_backup_files():
+        try:
+            if path.stat().st_mtime < cutoff:
+                path.unlink()
+                logger.info("보관 기간이 지난 .env 백업을 지웠습니다 — %s", path.name)
+        except OSError:
+            logger.exception(".env 백업을 지우지 못했습니다 — %s", path.name)
+
+
 def _backup_env() -> Optional[Path]:
     """.env를 고치기 전에 한 벌 복사해 둔다 — 앱이 .env를 건드리는 첫 사례라
     되돌릴 자리를 반드시 남긴다. 실패하면 None을 돌려 옮겨심기 자체를 취소시킨다."""
@@ -397,7 +412,10 @@ def _backup_env() -> Optional[Path]:
         # 같은 날 두 번째 — 먼저 뜬 백업을 덮지 않는다.
         target = BASE_DIR / f".env.backup-{stamp:%Y-%m-%d_%H%M%S}"
     try:
-        shutil.copy2(ENV_FILE, target)
+        # copy2가 아니라 copy — copy2는 원본 .env의 수정 시각까지 복사해, 보관 기간
+        # 시계(cleanup_env_backups)가 「백업을 뜬 때」가 아니라 「.env를 마지막에 고친 때」부터
+        # 돌게 된다(몇 년 전 .env면 뜨자마자 지워질 수 있다).
+        shutil.copy(ENV_FILE, target)
     except OSError:
         logger.exception(".env 백업에 실패해 키 옮겨심기를 건너뜁니다 — 앱은 예전대로 .env를 씁니다")
         return None

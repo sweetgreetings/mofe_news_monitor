@@ -136,7 +136,6 @@ from app.credentials import (
     email_sender_password,
     email_service,
     email_source,
-    env_backup_files,
     env_leftover_keys,
     moved_from_env,
     save_email_credentials,
@@ -3798,7 +3797,6 @@ _KEY_STATUS_TEMPLATE = (
   값은 <b>끝 4자리</b>만 보여주고, 고치는 건 줄 오른쪽 링크로 갑니다.</p>
   {summary_html}
   <div class="keys">{rows_html}</div>
-  {backup_html}
 </div>
 </body>
 </html>
@@ -3861,26 +3859,13 @@ def render_key_status_page() -> str:
         else ""
     )
 
-    backups = env_backup_files()
-    if backups:
-        items = "".join(f"<li><code>{html.escape(p.name)}</code></li>" for p in backups[:5])
-        backup_html = (
-            '<div class="note">'
-            "<b>옛 키가 든 파일</b> — 키를 지금 자리로 옮기기 전에, 되돌릴 수 있게 한 벌 복사해 둔 것입니다. "
-            "앱 폴더에 있고 앱은 쓰지 않습니다. <b>안에 옛 키가 그대로 들어 있으니</b> 남이 볼 수 있는 곳에 "
-            "올리지 마세요. 며칠 써 보고 문제가 없으면 지우셔도 됩니다."
-            f"<ul>{items}</ul>"
-            "</div>"
-        )
-    else:
-        backup_html = ""
-
+    # 옮기기 전 .env 백업은 화면에 적지 않는다 — 앱이 되돌리려고 만든 자리이지 담당자가
+    # 알거나 지워야 할 것이 아니다(app.credentials.cleanup_env_backups가 스스로 치운다).
     return _KEY_STATUS_TEMPLATE.format(
         **_theme(),
         topnav_html=_TOP_BAR_HTML,
         summary_html=summary_html,
         rows_html="".join(rows),
-        backup_html=backup_html,
     )
 
 
