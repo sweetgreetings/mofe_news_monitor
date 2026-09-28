@@ -3540,7 +3540,8 @@ _LLM_SETTINGS_TEMPLATE = (
   <h1>🤖 LLM(AI) 연동</h1>
   <p class="hint">
     소제목 자동 분류·요약에 쓰는 Claude API 키입니다. <b>없어도 앱은 그대로 돌아갑니다</b> —
-    규칙 기반(단어 빈도) 소제목으로 조용히 되돌아갑니다.
+    규칙 기반(단어 빈도) 소제목으로 조용히 되돌아갑니다.<br>
+    <b>키 등록과 크레딧 충전이 둘 다 필요합니다</b> — 키만 넣고 크레딧이 없으면 AI가 소제목을 묶지 못합니다.
   </p>
   {error_html}
   <div class="status {status_class}">{status_text}</div>
@@ -3680,8 +3681,11 @@ def render_llm_settings_page(error: str = "") -> str:
     source = llm_source()
     if source == "none":
         status_class = "status-warn"
-        status_text = f'{icon("alert")} 아직 키가 없습니다 — 소제목은 규칙 기반으로만 만들어집니다.'
-        status_caption = "이 기능을 안 쓰기로 한 상태로도 정상입니다."
+        status_text = (
+            f'{icon("alert")} 아직 키가 없습니다 — 소제목이 AI가 지은 이름 대신 '
+            "자주 나온 단어 하나가 됩니다."
+        )
+        status_caption = "이 기능을 안 쓰기로 한 상태로도 정상입니다. 초안 화면 맨 위에 안내 한 줄이 뜹니다."
     elif source == "env":
         status_class = "status-info"
         status_text = f'{icon("check")} .env의 키를 쓰고 있습니다 — 여기에 저장하면 그 값이 우선합니다.'

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>C안 — 마지막 문장 세 가지 (키·크레딧·토큰)</title>
+<style>
+  /* ── 아래 토큰·클래스는 실행 중인 앱의 preview.html에서 그대로 복사한 값 ── */
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+    --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%;
+    --h-sm: 24px; --h-tb: 28px; --h-md: 30px; --h-lg: 36px; --chk-md: 16px; --chk-sm: 14px;
+    --sh-float: 0 4px 12px rgba(15, 23, 42, 0.12); --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14); }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+
+  body { margin: 0; padding: 28px 24px 70px; background: #F8FAFC; color: #1F2937;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 8px; }
+  .lead { font-size: var(--fs-md); color: #4B5563; margin: 0 0 6px; line-height: 1.75; }
+  .lead b { color: #1E3A5F; }
+  h2 { font-size: var(--fs-lg); color: #1E3A5F; margin: 38px 0 4px; }
+  h2 .tag { font-size: var(--fs-xs); font-weight: 700; border-radius: var(--r-pill);
+    padding: 2px 9px; margin-left: 8px; vertical-align: 2px; border: 1px solid; }
+  h2 .tag.rec { color: #2563EB; background: #EFF6FF; border-color: #BFDBFE; }
+  h2 .tag.now { color: #6B7280; background: #F3F4F6; border-color: #E5E7EB; }
+  h2 .tag.warn { color: #92400E; background: #FFFBEB; border-color: #FDE68A; }
+  .why { font-size: var(--fs-md); color: #4B5563; margin: 0 0 14px; line-height: 1.75; }
+  .why b { color: #1E3A5F; }
+  .why .bad { color: #DC2626; font-weight: 700; }
+  .why .ok { color: #166534; font-weight: 700; }
+
+  /* 초안 화면 한 조각 — 실제 .container(800px) 안쪽 값 그대로, 위아래만 잘라냈다 */
+  .paper { max-width: 800px; padding: 18px 24px 20px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: var(--r-lg); }
+
+  /* 실제 .classify-degraded 값 그대로 */
+  .classify-degraded { background: #FEF2F2; border: 1px solid #FECACA; border-left: 4px solid #DC2626;
+    border-radius: var(--r-lg); padding: 12px 14px; margin-bottom: 14px; }
+  .classify-degraded .msg { font-size: var(--fs-md); color: #DC2626; line-height: 1.6; }
+  .classify-degraded .msg b { color: #DC2626; }
+  .classify-degraded .btn-ref { display: inline-flex; align-items: center; gap: 4px; background: #F0EAFB;
+    border: 1px solid #DCD0F2; border-radius: var(--r-sm); padding: 1px 8px 1px 6px;
+    font-weight: 700; color: #4A3F8F; white-space: nowrap; }
+  .classify-degraded .btn-ref .ic { width: 0.95em; height: 0.95em; }
+  /* C안 — 같은 상자에 「주의」 세트(앰버). 새 색은 만들지 않는다. */
+  .classify-degraded.soft { background: #FFFBEB; border-color: #FDE68A; border-left-color: #F59E0B; }
+  .classify-degraded.soft .msg { color: #92400E; }
+  .classify-degraded.soft .msg b { color: #92400E; }
+  .mark { background: #FEF08A; border-radius: 3px; padding: 0 2px; }
+
+  /* 소제목·기사 행 — 실제 값 그대로 */
+  .subheading h2 { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    font-size: var(--fs-lg); color: #1E3A5F; border-bottom: 1px solid #E5E7EB;
+    margin: 0 0 6px; padding-bottom: 6px; }
+  .subheading-title { display: flex; align-items: center; gap: 4px; min-width: 0; }
+  .subheading-title input { width: var(--chk-md); height: var(--chk-md); flex: none; accent-color: #2563EB; }
+  .subheading-count { margin-left: 6px; font-size: var(--fs-sm); font-weight: 700; color: #6B7280;
+    background: #F3F4F6; border-radius: var(--r-pill); padding: 1px 8px; }
+  .subheading-icons { display: flex; align-items: center; gap: 4px; flex-shrink: 0; color: #6B7280; font-size: 0.9rem; }
+  .article { margin: 6px 0; line-height: 1.5; padding: 4px 8px; border-radius: var(--r-md);
+    display: flex; gap: 8px; align-items: baseline; }
+  .article input { width: var(--chk-md); height: var(--chk-md); flex: none; accent-color: #2563EB; }
+  .title-line { min-width: 0; overflow-wrap: anywhere; color: #1F2937; }
+  .title-outlet { color: #6B7280; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  .a-meta { font-size: var(--fs-sm); color: #6B7280; }
+
+  /* 설정 › LLM(AI) 연동 조각 — 실제 _CREDENTIAL_PAGE_STYLE 값 */
+  .set-paper { max-width: 800px; padding: 20px 24px 22px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: var(--r-lg); }
+  .set-paper h3 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 10px; }
+  .hint { color: #6B7280; font-size: var(--fs-md); margin: 0 0 16px; line-height: 1.7; }
+  .hint b { color: #1F2937; }
+  .status { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: var(--r-md);
+    font-size: var(--fs-md); line-height: 1.5; margin-bottom: 4px; }
+  .status-warn { background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; }
+  .caption { color: #6B7280; font-size: var(--fs-sm); margin: 0 0 12px; }
+  .strike { text-decoration: line-through; color: #9CA3AF; }
+
+  .note { max-width: 800px; margin: 12px 0 0; font-size: var(--fs-sm); color: #6B7280; line-height: 1.7; }
+  .note b { color: #1E3A5F; }
+  .fact { max-width: 800px; margin: 16px 0 0; padding: 14px 16px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-left: 4px solid #6B7280; border-radius: var(--r-lg);
+    font-size: var(--fs-md); line-height: 1.8; color: #4B5563; }
+  .fact b { color: #1E3A5F; }
+  .pick { max-width: 800px; margin: 34px 0 0; padding: 14px 16px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-left: 4px solid #2563EB; border-radius: var(--r-lg);
+    font-size: var(--fs-md); line-height: 1.8; }
+  .pick h4 { margin: 0 0 6px; font-size: var(--fs-md); color: #1E3A5F; }
+  .pick ul { margin: 0; padding-left: 18px; color: #4B5563; }
+  .pick b { color: #1E3A5F; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>C안 — 마지막 문장 세 가지</h1>
+  <p class="lead">
+    C안(앰버)으로 정했고, <b>바뀌는 건 마지막 한 문장뿐</b>이다. 앞 두 문장은 셋 다 같다.
+    아래는 실제 초안 화면에 앉힌 모습이고, 노란 형광은 <b>다른 부분만</b> 표시한 것이다(화면에는 안 칠한다).
+  </p>
+
+  <div class="fact">
+    <b>말부터 정리:</b> 앤트로픽 콘솔에서 <b>충전하는 항목의 이름은 「크레딧(Credits)」</b>이고,
+    「토큰」은 충전하는 게 아니라 <b>쓴 양을 재는 단위</b>(글자 수 비슷)다. 담당자가 「토큰 충전」을 찾으러 가면 그 이름의 메뉴가 없다.<br>
+    또 이 앱 설정 메뉴에는 <b>이미 「봇 토큰」</b>(연동 › 텔레그램 발송 계정)이 있다 — AI 쪽에 같은 말을 쓰면 한 메뉴 안에서 「토큰」이 두 가지를 뜻하게 된다.
+  </div>
+
+  <h2>1안 — 키 + 크레딧<span class="tag rec">추천</span></h2>
+  <p class="why">할 일 둘을 <span class="ok">한 문장에서 다 말한다</span>. 콘솔 결제 화면 이름과 같은 말이라 찾아갈 수 있고, 「봇 토큰」과 안 겹친다.</p>
+  <div class="paper">
+    <div class="classify-degraded soft"><div class="msg">
+      <b>소제목은 단어 빈도로 뽑은 이름입니다.</b> AI 키를 등록하지 않아서 그렇고, 이대로 쓰셔도 됩니다.
+      AI가 쟁점으로 묶어 주길 원하면 설정 → LLM(AI) 연동에서 <span class="mark">키를 등록하고 크레딧을 채워</span>주세요.
+    </div></div>
+    <section class="subheading">
+      <h2><span class="subheading-title"><input type="checkbox"> &lt;부총리&gt;<span class="subheading-count">3</span></span><span class="subheading-icons">📋 ✏️ 🗑 ▲▼</span></h2>
+      <div class="article"><input type="checkbox"><span class="title-line"><span class="title-outlet">세계일보</span>반도체 호황 초과세수 50조+α… 미래대응기금 ‘200조’ 가능성<br><span class="a-meta">06:03 게시 · 원문보기</span></span></div>
+    </section>
+  </div>
+  <p class="note">한 단어 소제목(<b>&lt;부총리&gt;</b>)이 키가 없을 때 실제로 나오는 이름이다. 배너는 이걸 믿지 말라고 말하는 자리다.</p>
+
+  <h2>2안 — 키만, 크레딧은 설정 화면이 맡는다<span class="tag now">가장 짧다</span></h2>
+  <p class="why">배너는 <b>한 줄로 끝난다.</b> 크레딧 이야기는 키를 넣는 그 화면에서 한다(아래 설정 조각). 크레딧이 0이면 다음 회차에 기존 빨간 배너가 따로 알려 준다.</p>
+  <div class="paper">
+    <div class="classify-degraded soft"><div class="msg">
+      <b>소제목은 단어 빈도로 뽑은 이름입니다.</b> AI 키를 등록하지 않아서 그렇고, 이대로 쓰셔도 됩니다.
+      AI가 쟁점으로 묶어 주길 원하면 설정 → LLM(AI) 연동에서 <span class="mark">키를 등록해</span>주세요.
+    </div></div>
+    <section class="subheading">
+      <h2><span class="subheading-title"><input type="checkbox"> &lt;부총리&gt;<span class="subheading-count">3</span></span><span class="subheading-icons">📋 ✏️ 🗑 ▲▼</span></h2>
+      <div class="article"><input type="checkbox"><span class="title-line"><span class="title-outlet">세계일보</span>반도체 호황 초과세수 50조+α… 미래대응기금 ‘200조’ 가능성<br><span class="a-meta">06:03 게시 · 원문보기</span></span></div>
+    </section>
+  </div>
+  <p class="note">2안을 고르면 <b>키만 넣고 크레딧이 0일 때</b> 다음 회차에 아래 빨간 배너를 보게 된다(이미 있는 문구, 안 건드림):</p>
+  <div class="paper" style="margin-top:8px">
+    <div class="classify-degraded" style="margin-bottom:0"><div class="msg">
+      <b>⚠️ AI가 소제목을 묶지 못했어요.</b> 지금 보이는 소제목은 AI가 지은 이름이 아니라, 단어 빈도수에 따라 기계적으로 뽑은 단어입니다.<br>
+      <b>AI 사용 크레딧이 부족합니다.</b> 설정 → LLM(AI) 연동에서 결제 수단·남은 크레딧을 확인해주세요. 충전 전까지는 다시 눌러도 같은 결과라, 이번 회차는 소제목 이름을 직접 수기로 고쳐주세요.
+    </div></div>
+  </div>
+
+  <h2>3안 — 토큰 병기<span class="tag warn">뜻이 갈릴 위험</span></h2>
+  <p class="why">익숙한 말을 앞에 두고 괄호로 콘솔 용어를 적는다. 다만 <span class="bad">설정 메뉴 안에서 「토큰」이 봇 토큰과 겹치고</span>, 충전 항목 이름과도 어긋난다.</p>
+  <div class="paper">
+    <div class="classify-degraded soft"><div class="msg">
+      <b>소제목은 단어 빈도로 뽑은 이름입니다.</b> AI 키를 등록하지 않아서 그렇고, 이대로 쓰셔도 됩니다.
+      AI가 쟁점으로 묶어 주길 원하면 설정 → LLM(AI) 연동에서 <span class="mark">키를 등록하고 토큰(크레딧)을 충전해</span>주세요.
+    </div></div>
+    <section class="subheading">
+      <h2><span class="subheading-title"><input type="checkbox"> &lt;부총리&gt;<span class="subheading-count">3</span></span><span class="subheading-icons">📋 ✏️ 🗑 ▲▼</span></h2>
+      <div class="article"><input type="checkbox"><span class="title-line"><span class="title-outlet">세계일보</span>반도체 호황 초과세수 50조+α… 미래대응기금 ‘200조’ 가능성<br><span class="a-meta">06:03 게시 · 원문보기</span></span></div>
+    </section>
+  </div>
+
+  <h2>어느 안이든 함께 바꿀 자리 — 설정 › LLM(AI) 연동<span class="tag now">키를 넣는 화면</span></h2>
+  <p class="why">「키만 넣으면 끝이 아니다」가 지금은 접힌 <b>「키를 어디서 받나요?」</b> 3번째 줄에 묻혀 있다. 맨 위로 올린다.</p>
+  <div class="set-paper">
+    <h3>🤖 LLM(AI) 연동</h3>
+    <p class="hint">소제목 자동 분류·요약에 쓰는 Claude API 키입니다. <b>없어도 앱은 그대로 돌아갑니다</b> — 규칙 기반(단어 빈도) 소제목으로 조용히 되돌아갑니다.<br><span class="mark"><b>키 등록과 크레딧 충전이 둘 다 필요합니다</b> — 키만 넣고 크레딧이 없으면 AI가 소제목을 묶지 못합니다.</span></p>
+    <div class="status status-warn"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5"/><path d="M12 17.2h.01"/></svg> <span><span class="strike">아직 키가 없습니다 — 소제목은 규칙 기반으로만 만들어집니다.</span><br>아직 키가 없습니다 — 소제목이 AI가 지은 이름 대신 <b>자주 나온 단어 하나</b>가 됩니다.</span></div>
+    <p class="caption">이 기능을 안 쓰기로 한 상태로도 정상입니다. 초안 화면 맨 위에 안내 한 줄이 뜹니다.</p>
+  </div>
+
+  <div class="pick">
+    <h4>고를 것</h4>
+    <ul>
+      <li><b>1안</b> — 배너 한 곳에서 할 일을 다 알려 준다. 문장이 조금 길어진다.</li>
+      <li><b>2안</b> — 배너는 짧게, 크레딧은 설정 화면이 맡는다. 키만 넣은 담당자는 <b>다음 회차에 빨간 배너를 한 번 본다.</b></li>
+      <li><b>3안</b> — 「토큰」이 익숙하다면. 대신 봇 토큰과 뜻이 겹치고, 콘솔에 그 이름의 충전 메뉴가 없다.</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

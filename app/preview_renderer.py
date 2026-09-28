@@ -36,6 +36,7 @@ from app.llm_classifier import (
 from app.llm_classifier import (
     last_classification_failed_credit_error as llm_last_credit_error,
 )
+from app.llm_classifier import is_configured as llm_is_configured
 from app.reclassify_attempts import consecutive_failures as reclassify_consecutive_failures
 from app.reclassify_attempts import recent_attempts as reclassify_recent_attempts
 from app.config import (
@@ -194,6 +195,13 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
   .classify-degraded .msg {{ font-size: var(--fs-md); color: {degraded_text}; line-height: 1.6; }}
   .classify-degraded .msg b {{ color: {error}; }}
+  /* AI 키가 없을 때만 같은 상자를 「주의」 세트(앰버)로 한 단계 낮춘다 — 키를 안 쓰기로
+     한 담당자에게 매 회차 빨간 경고가 뜨면 진짜 실패(크레딧 부족·분류 실패)와 구분이
+     안 되고 곧 무뎌진다. 새 색 세트는 만들지 않고 COLOR_WARN_*를 그대로 쓴다. */
+  .classify-degraded.no-key {{
+    background: {warn_bg}; border-color: {warn_border}; border-left-color: {warn_dot};
+  }}
+  .classify-degraded.no-key .msg, .classify-degraded.no-key .msg b {{ color: {warn_text}; }}
   /* [추가: 2026-08-20] 문구 안에서 툴바 버튼을 가리키는 인라인 칩 — 실제 그 버튼과
      같은 색·같은 아이콘(app/icons.py "bot")을 써서 "이게 그 버튼이다"가 바로
      읽히게 한다(app.preview_renderer._actions_html의 .reclassify-btn과 배색 통일). */
@@ -3219,6 +3227,21 @@ def _classify_degraded_html(degraded: bool, article_count: int, round_id: Option
         return ""
 
     intro = "<b>⚠️ AI가 소제목을 묶지 못했어요.</b> 지금 보이는 소제목은 AI가 지은 이름이 아니라, 단어 빈도수에 따라 기계적으로 뽑은 단어입니다."
+
+    # AI 키가 아예 없는 상태는 "실패"가 아니라 담당자의 선택이다(설정 화면도 "안 쓰기로
+    # 한 상태로도 정상"이라고 말한다) — 그래서 여기만 빨강(오류) 대신 앰버(주의) 세트를
+    # 쓰고 ⚠️도 빼고, 재분류 칩을 가리키지 않는다(키가 없으면 눌러도 같은 결과다).
+    # 다른 원인보다 먼저 본다 — 키가 없는데 "기사를 N건 줄이세요"는 틀린 조언이다.
+    # 할 일은 키 등록과 크레딧 충전 둘 다다(키만 넣고 크레딧이 없으면 아래 크레딧 부족
+    # 문구로 넘어간다).
+    if not llm_is_configured():
+        return (
+            '<div class="classify-degraded no-key"><div class="msg">'
+            "<b>소제목은 단어 빈도로 뽑은 이름입니다.</b> AI 키를 등록하지 않아서 그렇고, "
+            "이대로 쓰셔도 됩니다. AI가 쟁점으로 묶어 주길 원하면 설정 → LLM(AI) 연동에서 "
+            "키를 등록하고 크레딧을 채워주세요."
+            "</div></div>"
+        )
 
     if llm_last_skipped_too_many_articles():
         over = article_count - MAX_ARTICLES_FOR_CLASSIFY
