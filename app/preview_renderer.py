@@ -900,10 +900,14 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 // 서버 동작·저장 규칙은 app.cut_round, 시간표 끼우기는 app.today_cuts.
 var CUT_NOTICE_KEY = "cutRoundNotice";
 var _cutSel = null, _cutIsNow = true;
+// 지금보다 이만큼 넘게 지난 시각으로 끊으려 하면 한 번 되묻는다(칩이 회차 시작까지 다 서 있어서
+// 두 시간 전 시각이 그대로 확정본이 된 사고가 있었다 — HISTORY.md 「회차 끊기 시각이 엉뚱하게 들어간 사고」).
+var CUT_LONG_AGO_MIN = 60;
 function _cutPad(n) {{ return String(n).padStart(2, "0"); }}
 function _cutNow() {{ var d = new Date(); return _cutPad(d.getHours()) + ":" + _cutPad(d.getMinutes()); }}
 function _cutMin(t) {{ var p = t.split(":"); return (+p[0]) * 60 + (+p[1]); }}
 function _cutKr(t) {{ var p = t.split(":").map(Number); return p[1] ? p[0] + "시 " + p[1] + "분" : p[0] + "시"; }}
+function _cutAgoKr(m) {{ var h = Math.floor(m / 60), mm = m % 60; return h ? h + "시간" + (mm ? " " + mm + "분" : "") : mm + "분"; }}
 function _cutEsc(t) {{ var d = document.createElement("div"); d.textContent = t; return d.innerHTML; }}
 function _cutPubTimes() {{
   // 보고서에 들어가는 기사만(📌 담아둔 기사 칸은 소제목 section 밖이라 안 센다). 숨긴 기사는 화면에 없다.
@@ -919,52 +923,100 @@ function openCutPop(e) {{
   _cutSel = _cutNow(); _cutIsNow = true;
   pop.hidden = false;
   var btn = document.querySelector(".cut-btn"); if (btn) btn.classList.add("is-open");
-  renderCutPop();
+  buildCutPop();
 }}
 function closeCutPop() {{
   var pop = document.getElementById("cut-pop");
   if (pop) pop.hidden = true;
   var btn = document.querySelector(".cut-btn"); if (btn) btn.classList.remove("is-open");
 }}
-function pickCut(t, isNow) {{ if (!t) return; _cutSel = t; _cutIsNow = !!isNow; renderCutPop(); }}
-function renderCutPop(errText) {{
+// 칩을 누르면 직접 입력칸 값도 따라간다. 입력칸을 칠 때는(fromInput) 값만 받고 칸은 건드리지 않는다.
+function pickCut(t, isNow, fromInput) {{ if (!t) return; _cutSel = t; _cutIsNow = !!isNow; syncCutPop(null, !fromInput); }}
+// 창 뼈대는 여는 순간 한 번만 그린다 — 값이 바뀔 때마다 통째로 다시 그리면 직접 입력칸이 글자를
+// 치는 도중에 사라져 반쯤 친 시각이 확정된다. 바뀌는 자리는 syncCutPop이 고쳐 쓴다.
+// 시각 칩 순서는 「지금 · 지난 시각 가까운 것부터 · 예약 가까운 것부터」 — 회차 시작 쪽 먼 시각이
+// 맨 앞에 서면 고르려던 시각 대신 그것을 누르게 된다.
+function buildCutPop() {{
   var pop = document.getElementById("cut-pop");
+  var start = pop.dataset.start, end = pop.dataset.end, now = _cutNow();
+  var past = [], future = [];
+  for (var m = Math.floor(_cutMin(start) / 30) * 30 + 30; m < _cutMin(end); m += 30) {{
+    var t = _cutPad(Math.floor(m / 60)) + ":" + _cutPad(m % 60);
+    if (t === now) continue;
+    (t > now ? future : past).push(t);
+  }}
+  past.reverse();
+  var chips = ['<button type="button" class="cut-tchip" id="cut-now-chip" data-t="' + now
+    + '" onclick="pickCut(this.dataset.t, true)">지금 ' + now + '</button>'];
+  past.concat(future).forEach(function (t) {{
+    chips.push('<button type="button" class="cut-tchip" data-t="' + t + '" onclick="pickCut(this.dataset.t, false)">'
+      + t + '<small hidden>예약</small></button>');
+  }});
+  pop.innerHTML =
+    '<h4>✂ 오늘만 이 시간까지 확정본으로</h4>'
+    + '<p class="sub">' + _cutKr(end) + ' 회차를 둘로 나눠요. 수집 시간 설정은 그대로이고, 자정이 지나면 원래대로 돌아가요.</p>'
+    + '<div class="cut-row">' + chips.join("")
+    + '<input class="cut-time" type="time" oninput="pickCut(this.value, false, true)" title="분 단위로 직접 고르기"></div>'
+    + '<div class="cut-split"><div class="top"><span class="k"></span><span class="v"></span></div>'
+    + '<div><span class="k"></span><span class="v"></span></div></div>'
+    + '<p class="cut-when"></p>'
+    + '<div class="cut-foot"><button type="button" class="no" onclick="closeCutPop()">닫기</button>'
+    + '<button type="button" class="ok" id="cut-ok" onclick="submitCut(this)"></button></div>';
+  syncCutPop(null, true);
+}}
+// 고른 시각에 따라 바뀌는 자리만 고쳐 쓴다. syncInput이 참일 때만 직접 입력칸 값을 맞춘다.
+function syncCutPop(errText, syncInput) {{
+  var pop = document.getElementById("cut-pop");
+  if (!pop || pop.hidden || !pop.querySelector(".cut-when")) return;
   var start = pop.dataset.start, end = pop.dataset.end, now = _cutNow();
   if (_cutIsNow) _cutSel = now;
   var sel = _cutSel;
   var valid = start < sel && sel < end;
   var future = sel > now;
-  var chips = ['<button type="button" class="cut-tchip' + (_cutIsNow ? " on" : "") + '" data-t="' + now + '" onclick="pickCut(this.dataset.t, true)">지금 ' + now + '</button>'];
-  for (var m = Math.floor(_cutMin(start) / 30) * 30 + 30; m < _cutMin(end); m += 30) {{
-    var t = _cutPad(Math.floor(m / 60)) + ":" + _cutPad(m % 60);
-    if (t === now) continue;
-    chips.push('<button type="button" class="cut-tchip' + (!_cutIsNow && t === sel ? " on" : "") + '" data-t="' + t + '" onclick="pickCut(this.dataset.t, false)">'
-      + t + (t > now ? "<small>예약</small>" : "") + '</button>');
-  }}
+  var nowChip = document.getElementById("cut-now-chip");
+  if (nowChip) {{ nowChip.dataset.t = now; nowChip.textContent = "지금 " + now; }}
+  Array.prototype.forEach.call(pop.querySelectorAll(".cut-tchip"), function (c) {{
+    var t = c.dataset.t, isNowChip = c.id === "cut-now-chip";
+    c.classList.toggle("on", isNowChip ? !!_cutIsNow : (!_cutIsNow && t === sel));
+    // 창을 열어 둔 채 시각이 흘러 「지금」과 겹친 칩은 숨긴다(같은 시각이 두 칸에 서지 않게).
+    if (!isNowChip) c.hidden = (t === now);
+    var tag = c.querySelector("small");
+    if (tag) tag.hidden = !(t > now);
+  }});
+  var input = pop.querySelector(".cut-time");
+  if (input && syncInput) input.value = sel;
   var pubs = _cutPubTimes();
   var upto = sel < now ? sel : now;
   var before = pubs.filter(function (t) {{ return t <= upto; }}).length;
   var after = pubs.filter(function (t) {{ return t > sel; }}).length;
-  var top = future
-    ? '<b>' + _cutKr(sel) + ' 확정본</b> — 지금까지 ' + before + '건 + ' + sel + '까지 더 들어올 기사'
-    : '<b>' + _cutKr(sel) + ' 확정본</b> — ' + before + '건';
-  var bottom = _cutKr(end) + ' 회차가 이어서 모아요' + (!future && after ? ' — 지금 ' + after + '건' : '');
-  var when = errText ? '<p class="cut-when err">' + _cutEsc(errText) + '</p>'
-    : !valid ? '<p class="cut-when err">' + start + ' 뒤, ' + end + ' 전 시각만 고를 수 있어요.</p>'
-    : future ? '<p class="cut-when">' + sel + '이 되면 확정본이 만들어져요. 그 전엔 제목 옆 칩에서 취소할 수 있어요.</p>'
-    : '<p class="cut-when warn">바로 확정본이 만들어져요. 오늘 회차라 지울 수 없어요.</p>';
-  pop.innerHTML =
-    '<h4>✂ 오늘만 이 시간까지 확정본으로</h4>'
-    + '<p class="sub">' + _cutKr(end) + ' 회차를 둘로 나눠요. 수집 시간 설정은 그대로이고, 자정이 지나면 원래대로 돌아가요.</p>'
-    + '<div class="cut-row">' + chips.join("")
-    + '<input class="cut-time" type="time" value="' + sel + '" onchange="pickCut(this.value, false)" title="분 단위로 직접 고르기"></div>'
-    + '<div class="cut-split"><div class="top"><span class="k">~ ' + sel + '</span><span class="v">' + top + '</span></div>'
-    + '<div><span class="k">' + sel + ' ~ ' + end + '</span><span class="v">' + bottom + '</span></div></div>'
-    + when
-    + '<div class="cut-foot"><button type="button" class="no" onclick="closeCutPop()">닫기</button>'
-    + '<button type="button" class="ok" id="cut-ok"' + (valid ? '' : ' disabled') + ' onclick="submitCut(this)">✂ ' + sel + '까지 확정본으로</button></div>';
+  var rows = pop.querySelectorAll(".cut-split > div");
+  rows[0].querySelector(".k").textContent = "~ " + sel;
+  rows[0].querySelector(".v").innerHTML = future
+    ? '<b>' + _cutEsc(_cutKr(sel)) + ' 확정본</b> — 지금까지 ' + before + '건 + ' + _cutEsc(sel) + '까지 더 들어올 기사'
+    : '<b>' + _cutEsc(_cutKr(sel)) + ' 확정본</b> — ' + before + '건';
+  rows[1].querySelector(".k").textContent = sel + " ~ " + end;
+  rows[1].querySelector(".v").textContent = _cutKr(end) + ' 회차가 이어서 모아요' + (!future && after ? ' — 지금 ' + after + '건' : '');
+  var ago = (valid && !future && !_cutIsNow) ? _cutMin(now) - _cutMin(sel) : 0;
+  var when = pop.querySelector(".cut-when");
+  when.className = "cut-when" + (errText || !valid ? " err" : future ? "" : " warn");
+  when.textContent = errText ? errText
+    : !valid ? start + ' 뒤, ' + end + ' 전 시각만 고를 수 있어요.'
+    : future ? sel + '이 되면 확정본이 만들어져요. 그 전엔 제목 옆 칩에서 취소할 수 있어요.'
+    : ago > CUT_LONG_AGO_MIN ? sel + '은 ' + _cutAgoKr(ago) + ' 전이에요 — 그 뒤에 나온 기사는 '
+        + _cutKr(end) + ' 회차로 넘어가요. 오늘 회차라 지울 수 없어요.'
+    : '바로 확정본이 만들어져요. 오늘 회차라 지울 수 없어요.';
+  var ok = document.getElementById("cut-ok");
+  ok.disabled = !valid;
+  ok.textContent = "✂ " + sel + "까지 확정본으로";
 }}
 function submitCut(btn) {{
+  var pop = document.getElementById("cut-pop"), now = _cutNow();
+  var ago = _cutIsNow ? 0 : _cutMin(now) - _cutMin(_cutSel);
+  // 한참 지난 시각은 되묻는다 — 그 뒤 기사가 통째로 다음 회차로 넘어가고 오늘 회차라 지울 수도 없다.
+  if (ago > CUT_LONG_AGO_MIN && !confirm(
+      _cutSel + "은 지금(" + now + ")보다 " + _cutAgoKr(ago) + " 전이에요.\\n\\n"
+      + _cutSel + " 뒤에 나온 기사는 이 확정본에 안 들어가고 " + _cutKr(pop.dataset.end) + " 회차로 넘어가요.\\n"
+      + "오늘 회차라 만든 뒤에는 지울 수 없어요.\\n\\n" + _cutSel + "까지로 확정본을 만들까요?")) return;
   var at = _cutIsNow ? "" : _cutSel;
   btn.disabled = true;
   btn.textContent = "만드는 중…";
@@ -973,10 +1025,10 @@ function submitCut(btn) {{
     headers: {{ "Content-Type": "application/x-www-form-urlencoded" }},
     body: "at=" + encodeURIComponent(at),
   }}).then(function (r) {{ return r.json(); }}).then(function (res) {{
-    if (!res.ok) {{ renderCutPop(res.reason || "끊지 못했어요."); return; }}
+    if (!res.ok) {{ syncCutPop(res.reason || "끊지 못했어요.", true); return; }}
     try {{ sessionStorage.setItem(CUT_NOTICE_KEY, JSON.stringify({{ mode: res.mode, end: res.end, t: Date.now() }})); }} catch (e) {{}}
     location.reload();
-  }}).catch(function () {{ renderCutPop("앱에 연결하지 못했어요. 잠시 뒤 다시 눌러 주세요."); }});
+  }}).catch(function () {{ syncCutPop("앱에 연결하지 못했어요. 잠시 뒤 다시 눌러 주세요.", true); }});
 }}
 function cancelCut(btn) {{
   btn.disabled = true;
