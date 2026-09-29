@@ -2696,6 +2696,7 @@ def test_keyword_note_history_and_time_select():
     """키워드 메모 「지난 회차 메모」 참고 목록 + 수시 시간 드롭다운.
 
       1) 이 회차보다 앞 회차 메모만, 메모 있는 최근 3개 날짜, 같은 날 같은 문구는 한 줄로
+      1-1) 자르는 축은 날짜가 아니라 줄 수 — 최신 5줄, 오늘 앞 회차가 먼저 차고 남는 자리만 어제
       2) 단어마다 data-w(앞뒤 문장부호 뗀 값) — 화면이 치는 단어와 똑같은 것만 파랗게 칠한다
       3) 시간 드롭다운 — 숨은 입력이 폼 값, 목록에 없는 분은 제자리에 끼운다
     """
@@ -2721,6 +2722,18 @@ def test_keyword_note_history_and_time_select():
         rows_mon = mkn.past_notes(("2026-09-21", "11:00"))
         assert rows_mon == [("2026-09-19", ["11:00"], "9/19 메모")], rows_mon
         html_out = keyword_note_history_html(("2026-09-22", "14:00"))
+        # 줄 수로 자른다 — 오늘 앞 회차가 먼저 차고 남는 자리만 어제가 채운다
+        many = {f"2026-09-21|{s}": f"어제 {s}" for s in ("09:30", "11:00", "14:00", "17:00")}
+        many.update({f"2026-09-22|{s}": f"오늘 {s}" for s in ("09:30", "11:00", "14:00")})
+        (Path(tmp) / "n.json").write_text(json.dumps({"notes": many}, ensure_ascii=False), encoding="utf-8")
+        first = mkn.past_notes(("2026-09-22", "09:30"))
+        assert [r[0] for r in first] == ["2026-09-21"] * 4, first  # 첫 회차엔 어제가 칸을 채운다
+        later = mkn.past_notes(("2026-09-22", "17:00"))
+        assert len(later) == 5 and [r[0] for r in later[:3]] == ["2026-09-22"] * 3, later
+        assert later[3:] == [
+            ("2026-09-21", ["17:00"], "어제 17:00"),
+            ("2026-09-21", ["14:00"], "어제 14:00"),
+        ], later  # 남은 두 자리만 어제가 채우고 9:30·11:00은 밀린다
     assert 'data-w="청문회"' in html_out and ">청문회,</span>" in html_out, "문장부호를 뗀 비교값이 없다"
     assert "9/19 메모" not in html_out, "직전 하루보다 더 거슬러 올라갔다"
     assert "지금 회차 메모" not in html_out and "뒤 회차 메모" not in html_out, "지금·뒤 회차 메모가 섞였다"
@@ -2733,7 +2746,7 @@ def test_keyword_note_history_and_time_select():
     assert '<option value="56" selected>56</option>' in sel and '<option value="14" selected>' in sel, sel
     assert '<option value="15"' not in sel, "지나지 않은 시각이 목록에 있다"
     assert sel.index('value="50"') < sel.index('value="56"'), "목록에 없는 분이 제자리에 안 들어갔다"
-    print("41) 지난 회차 메모 · 수시 시간 드롭다운: 통과 (앞 회차만·오늘+직전 하루·같은 문구 합침·비교값, 숨은 입력·분 끼우기)")
+    print("41) 지난 회차 메모 · 수시 시간 드롭다운: 통과 (앞 회차만·오늘+직전 하루·최신 5줄·같은 문구 합침·비교값, 숨은 입력·분 끼우기)")
 
 
 def test_telegram_bot_name():

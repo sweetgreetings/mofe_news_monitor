@@ -3342,7 +3342,8 @@ KEYWORD_NOTE_HISTORY_STYLE = """
   .kn-history {{ flex-basis: 100%; margin-top: 2px; padding-top: 8px; border-top: 1px dashed {border}; }}
   .keyword-note-zone:has(#keyword-note-input:disabled) .kn-history {{ display: none; }}
   .kn-h-head {{ font-size: var(--fs-xs); color: {text_faint}; margin-bottom: 4px; }}
-  .kn-h-list {{ max-height: 7.2em; overflow-y: auto; }}
+  /* 보이는 높이는 past_notes의 _MAX_PAST_ROWS(5줄)와 같은 값 — 한쪽을 바꾸면 다른 쪽도 바꾼다. */
+  .kn-h-list {{ max-height: calc(var(--fs-sm) * 1.6 * 5); overflow-y: auto; }}
   .kn-h-row {{ display: flex; gap: 10px; font-size: var(--fs-sm); line-height: 1.6; color: {text_soft}; cursor: text; }}
   .kn-h-when {{ flex: none; min-width: 7.5em; color: {text_faint}; font-variant-numeric: tabular-nums; }}
   .kn-h-text {{ min-width: 0; overflow-wrap: anywhere; }}
