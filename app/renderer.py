@@ -3383,7 +3383,7 @@ def keyword_note_history_script() -> str:
 """
 
 
-def keyword_note_template_vars(run_key=None) -> dict:
+def keyword_note_template_vars(run_key=None, has_round: bool = True) -> dict:
     """"+ 직접 키워드 작성" 메모 칸이 쓰는 템플릿 변수 묶음. 확정본(app.renderer)과
     초안(app.preview_renderer)이 같은 칸을 그리므로 계산을 한 곳에 둔다 — 예전엔 같은
     6줄이 두 파일 다섯 자리에 흩어져 있어 한쪽만 고치면 두 화면이 어긋났다.
@@ -3391,11 +3391,16 @@ def keyword_note_template_vars(run_key=None) -> dict:
     [수정: 2026-08-27] 다른 회차 메모를 끌어와 미리 채우던 동작(2026-08-26)은
     되돌렸다 — 화면은 그 회차에 실제로 저장된 메모(load_manual_keyword_note)만 본다.
     """
-    text = load_manual_keyword_note(run_key)
+    # 메모는 회차에 딸린 값이다 — 쓸 회차가 없는 화면(초안 「오늘 예정된 회차가 모두
+    # 끝났어요」)은 has_round=False로 칸을 비운 채 닫아둔다. 비우지 않으면 회차가 없는
+    # 화면이 load_latest_run 폴백(app.manual_keyword_note._current_round_key)으로
+    # **직전 회차 메모**를 끌어와 보여주고, 거기서 고치면 이미 확정·발송된 그 회차
+    # 보고서의 메모가 조용히 바뀐다.
+    text = load_manual_keyword_note(run_key) if has_round else ""
     saved = bool(text)
     return {
         # 지난 회차 메모 참고 목록(편집 중일 때만 CSS로 보인다) + 그 CSS·JS.
-        "note_history_html": keyword_note_history_html(run_key),
+        "note_history_html": keyword_note_history_html(run_key) if has_round else "",
         "note_history_style": keyword_note_history_style(),
         "note_history_script": keyword_note_history_script(),
         "note_open_class": " is-open" if text else "",

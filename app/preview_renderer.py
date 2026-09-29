@@ -3672,7 +3672,10 @@ def render_preview_done_page() -> str:
         actions_html="",
         # [수정: 2026-08-26] 메모 칸 변수는 확정본과 공용 함수 하나에서 만든다
         # (app.renderer.keyword_note_template_vars).
-        **keyword_note_template_vars(),
+        # 이 화면엔 회차가 없다(머리줄도 회차를 안 적는다) — has_round=False로 메모 칸을
+        # 비운다. 안 그러면 직전 회차 메모가 여기 그대로 떠서 회차가 바뀌어도 안 지워진
+        # 것처럼 보인다.
+        **keyword_note_template_vars(has_round=False),
         plain_text_json='""',
         classify_degraded_json="false",
         classify_degraded_names_json="[]",
