@@ -72,6 +72,11 @@ def all_registered_keywords(settings: dict) -> list:
     검색으로 들어온 기사 본문에 이미 51건이나 등장하고 있었다 — 수집 축(누구·어디를
     검색하나)과 주제 축(무슨 얘기인가)이 다르기 때문이다. 정책 단어 추이는
     주제 축이라 include_in_scrap을 안 본다. enabled=False(그룹 자체를 껐음)만 뺀다.
+
+    [추가] 조합 검색어(`가상자산+과세`)는 뺀다 — 네이버는 한 칸 안을 낱말로 쪼개 AND로
+    읽지만, 추이는 검색이 아니라 제목·요약 **글자 대조**라 그 글자가 통째로 든 기사만
+    센다. 그대로 두면 고를 수는 있는데 선이 0으로 깔려, 담당자는 "이 단어가 안 나왔나"로
+    읽는다(실제로는 셀 수 없는 단어다). 공백으로 적힌 옛 조합도 같이 뺀다.
     """
     flat, seen = [], set()
     for group in settings.get("keyword_groups", []):
@@ -79,6 +84,8 @@ def all_registered_keywords(settings: dict) -> list:
             continue
         for kw in group.get("keywords", []):
             word = kw["word"] if isinstance(kw, dict) else kw
+            if "+" in word or any(ch.isspace() for ch in word):
+                continue
             if word not in seen:
                 seen.add(word)
                 flat.append(word)
