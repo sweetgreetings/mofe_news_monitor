@@ -1054,7 +1054,7 @@ _KEYWORD_GROUPS_TEMPLATE = (
     + """
 <div class="container">
   <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg> 검색어</h1>
-  <p class="kw-lead">키워드를 누르면 지우지 않고 잠시 빼고, 두 번 누르면 글자를 고칩니다. 「가상자산 과세」처럼 한 칸 띄어 쓰면 둘 다 든 기사만 찾습니다.</p>
+  <p class="kw-lead">검색어는 하나씩 따로 걸립니다. 둘 다 든 기사만 찾으려면 「가상자산+과세」처럼 +로 묶으세요.<br>* 1번 클릭: 보류, 2번 클릭: 키워드 수정</p>
   <div id="kwGroups"></div>
   <button type="button" class="add-group-btn" id="kwAddGroupBtn"><span class="plus-glyph">+</span>키워드 그룹 추가</button>
 </div>

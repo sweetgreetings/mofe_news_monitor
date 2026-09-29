@@ -707,6 +707,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   #new-card .field input[type=text], #new-card .field select {{ height: 36px; box-sizing: border-box; }}
   #new-card #issue-select {{ flex: none; width: 170px; }}
   #new-card .kw-box {{ min-height: 36px; box-sizing: border-box; padding: 3px 8px; }}
+  #new-card .kw-note {{ font-size: var(--fs-sm); color: {text_faint}; margin: -4px 0 9px 72px; }}
   #new-card .kw-box input[type=text] {{ height: auto; }}
   #new-card select.hm-sel {{ width: 70px; }}
   #new-card .issue-warn {{ margin: -3px 0 9px 72px; }}
@@ -720,7 +721,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   @media (max-width: 640px) {{
     #new-card .field > label {{ width: 100%; }}
     #new-card #issue-select {{ width: 100%; }}
-    #new-card .issue-warn {{ margin-left: 0; }}
+    #new-card .kw-note, #new-card .issue-warn {{ margin-left: 0; }}
     #new-card .n-quick {{ margin-left: 0; }}
     #new-card .n-last .btn {{ width: 100%; justify-content: center; }}
   }}
@@ -1456,6 +1457,7 @@ def render_new_card_page(
       </div>
       <div id="kw-hidden-inputs"></div>
     </div>
+    <div class="kw-note">검색어는 하나씩 따로 걸립니다. 둘 다 든 기사만 찾으려면 「가상자산+과세」처럼 +로 묶으세요.</div>
     <div class="field">
       <label>수집시간</label>
       {_hm_select_html("win-start", "window_start", "00:00", now_hhmm)}
