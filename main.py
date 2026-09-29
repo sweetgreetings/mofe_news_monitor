@@ -9,6 +9,7 @@ import webbrowser
 
 from app import photo_body
 from app.adhoc.card import delete_expired_cards
+from app.agency_archive import collect_tick as agency_archive_tick
 from app.breaking_alert_sender import catch_up_on_wake
 from app.config import LANDING_HTML_PATH, SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT
 from app.confirm_send import confirm_and_promote
@@ -200,7 +201,11 @@ def main(open_browser: bool = True) -> None:
 
     threading.Thread(
         target=run_scheduler,
-        kwargs={"scrape": _scrape_and_render, "cleanup_adhoc_cards": delete_expired_cards},
+        kwargs={
+            "scrape": _scrape_and_render,
+            "cleanup_adhoc_cards": delete_expired_cards,
+            "collect_agency_archive": agency_archive_tick,
+        },
         daemon=True,
     ).start()
     # 위에서 이미 bind해둔 서버 객체를 그대로 돌린다(여기서 다시 열지 않는다 — 자물쇠를

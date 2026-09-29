@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 from app.config import (
+    AGENCY_ARCHIVE_TITLE,
     SHAPE_TOKENS_CSS,
     COLOR_TEXT_MUTED,
     COLOR_WORDCLOUD_TIERS,
@@ -301,6 +302,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .t-adarch {{ background: {card}; border-color: {adhoc_border_soft}; color: {adhoc_text}; }}
   .t-adarch:hover {{ background: {arch_adhoc_bg}; }}
   .t-lab {{ grid-column: 1 / -1; background: {label_bg}; color: {label_text}; }}
+  .t-agency {{ grid-column: 1 / -1; background: {card}; border-color: {border}; color: {arch_reg_text}; }}
+  .t-agency:hover {{ background: {bg}; border-color: {ghost_border_hover}; }}
   .t-lab:hover {{ border-color: {label_border}; }}
   /* 라벨 칸은 이름 + 칩을 한 덩어리로 가운데에 둔다 */
   .tagset {{ margin-left: 4px; display: flex; gap: 6px; flex-wrap: wrap; }}
@@ -1055,6 +1058,9 @@ _FLOW_TIPS = {
     "label": ("라벨 붙인 기사 모아보기",
               "정기·수시를 가리지 않고 모여요. 원래 회차가 지워져도 남아요.",
               None),
+    "agency": ("기관 기사를 날짜를 가로질러 찾기",
+               "회차가 안 덮는 저녁 시간까지 하루 종일 쌓여요. 보고서가 아니라 찾아보는 곳이라 지우지 않아요.",
+               None),
 }
 
 
@@ -1151,6 +1157,7 @@ def _flow_card_html(last_run: Optional[dict], settings: dict) -> str:
       {_flow_tile("t-adarch", f"{base}/adhoc", "🧺", "보관함", *tips["adarch"], edge="r")}
       <div class="gap"></div>
       {_flow_tile("t-lab", f"{base}/labels", "🏷️", "라벨 보관함", *tips["label"], extra=label_chips)}
+      {_flow_tile("t-agency", f"{base}/agency-archive", "🗄️", AGENCY_ARCHIVE_TITLE, *tips["agency"])}
     </div>
     </div>
   </div>'''

@@ -109,6 +109,7 @@ from app.history_renderer import (
     render_slot_fragment,
 )
 from app.home_trend import add_trend_word, remove_trend_word
+from app.agency_archive_renderer import render_agency_archive_page
 from app.trend_renderer import render_trend_page
 from app.trend_export import build_trend_workbook_bytes
 from app.landing_renderer import generate_landing_page, wordcloud_candidates
@@ -5650,6 +5651,16 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         elif self.path == "/labels" or self.path.startswith("/labels?"):
             query = parse_qs(urlsplit(self.path).query)
             self._respond(render_labels_page(query.get("label", [])))
+        elif self.path == "/agency-archive" or self.path.startswith("/agency-archive?"):
+            query = parse_qs(urlsplit(self.path).query)
+            self._respond(
+                render_agency_archive_page(
+                    word=(query.get("q") or [""])[0],
+                    preset=(query.get("preset") or [""])[0],
+                    start=(query.get("start") or [""])[0],
+                    end=(query.get("end") or [""])[0],
+                )
+            )
         elif self.path == "/label-manage" or self.path.startswith("/label-manage?"):
             query = parse_qs(urlsplit(self.path).query)
             self._respond(

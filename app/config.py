@@ -900,6 +900,18 @@ NEGATIVE_GUESS_FILE = DATA_DIR / "negative_guess.json"
 NEGATIVE_GUESS_KEYWORDS = ("재정경제부", "재경부")   # 제목·요약에 이 단어가 나온 정기 기사만(기관 전용)
 NEGATIVE_GUESS_RETRY_MIN = 5                         # 판정이 실패한 회차는 5분 뒤 다시(회차마다 최대 3번)
 NEGATIVE_GUESS_MAX_ATTEMPTS = 3
+
+# 「🗄️ 기관 기사 찾기」(app.agency_archive) — 기관 관련 기사를 회차와 무관하게
+# 24시간 쌓아 두는 원장. 회차는 하루를 다 덮지 않아(평일 17:00 이후·주말 16:00 이후)
+# 그 시간 기사가 자정에 사라지는데, 시간이 지나 다시 찾을 일이 있는 건 기관 기사다.
+# 보고서가 아니라 **책**이라 읽기 전용이고 나이로 지우지 않는다(실측 연 60MB).
+AGENCY_ARCHIVE_DIR = DATA_DIR / "agency_archive"
+# 기관명이 바뀌면 이 목록과 아래 화면 이름을 같이 고친다 — 「기관 전용」의 정의가
+# NEGATIVE_GUESS_KEYWORDS와 나란히 이 자리에만 있게 한다.
+# 사람 이름은 넣지 않는다 — 자리가 바뀌면 범위가 조용히 어긋난다(「이형일」을 뺀 이유).
+AGENCY_ARCHIVE_KEYWORDS = ("재정경제부", "재경부", "기획재정부", "기재부")
+AGENCY_ARCHIVE_TITLE = "기관 기사 찾기"
+AGENCY_ARCHIVE_INTERVAL_MIN = 30
 # [추가: 2026-08-20] 이미 알림을 보낸 기사 URL(app.alerted_urls) — 정기 회차 검사·수시
 # 폴링·밤사이 몰아보내기 세 경로가 같은 기사를 동시에 찾아도 한 번만 보내도록 막는다.
 # live_cache.json과 같은 "date 필드 불일치 = 자정 자동 리셋" 패턴.
