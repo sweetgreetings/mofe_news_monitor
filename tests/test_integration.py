@@ -3446,6 +3446,75 @@ def test_auto_send_does_not_resend_forever():
     print("45) 자동발송 무한 재발송 방지: 통과 (한 명이라도 받으면 한 번만, 실패는 남고, 전원 실패는 5번까지·포기 안내)")
 
 
+def test_trend_end_day_follows_today_completion():
+    """정책 단어 추이의 끝 날짜 — 오늘 예정 회차가 전부 저장되기 전까지는 어제다.
+
+    지키는 것:
+      1) 오늘 회차가 일부만 저장됐으면 끝 날짜는 어제 (덜 찬 오늘이 급락처럼 보이면 안 된다)
+      2) 오늘 예정 회차가 전부 저장되면 끝 날짜가 오늘로 올라오고, 그 칸은 점선이 아니다
+      3) 예정 회차를 모를 때(설정이 비었을 때)는 어제 — 없는 회차를 지어내지 않는다
+      4) 마지막 칸 밑 라벨이 「어제」/「오늘」로 갈린다(그래프 오른쪽 끝 값이 언제 것인지)
+    """
+    from app import trend_chart, trend_data
+
+    _require_isolation()
+    today = datetime.now().date()
+    today_s = today.isoformat()
+    yday_s = (today - timedelta(days=1)).isoformat()
+    windows = [
+        {"start": "09:00", "end": "11:00", "enabled": True},
+        {"start": "11:00", "end": "14:00", "enabled": True},
+    ]
+
+    # 3) 예정 회차를 모르는 상태 (schedule_groups가 비어 있음)
+    st = settings.load_settings()
+    st["schedule_groups"] = []
+    settings.SETTINGS_FILE.write_text(json.dumps(st, ensure_ascii=False), encoding="utf-8")
+    assert trend_data.todays_expected_slots(today_s) == []
+    assert trend_data.last_complete_day(today_s) == yday_s, "예정 회차를 모르는데 오늘까지 그렸다"
+
+    st["schedule_groups"] = [{"name": "매일", "times": windows, "enabled": True,
+                              "days": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]}]
+    settings.SETTINGS_FILE.write_text(json.dumps(st, ensure_ascii=False), encoding="utf-8")
+    assert trend_data.todays_expected_slots(today_s) == ["11:00", "14:00"]
+
+    # 1) 회차가 하나도 없을 때 · 일부만 있을 때
+    assert trend_data.last_complete_day(today_s) == yday_s
+    storage.save_run("11:00", [_article("추이-1")], run_at=f"{today_s}T11:01:00")
+    assert not trend_data.today_is_complete(today_s), "회차가 아직 남았는데 다 찬 날로 봤다"
+    assert trend_data.last_complete_day(today_s) == yday_s
+
+    buckets, unit = trend_data.build_buckets(yday_s, yday_s)
+    trend_data.fill_bucket_status(buckets, unit, {yday_s: []}, today_s)
+    assert buckets[-1]["yesterday"] and not buckets[-1]["is_today"]
+    assert not buckets[-1]["partial"], "어제 칸이 점선으로 찍혔다"
+    assert "어제" in trend_chart.render_chart(
+        "t", buckets, [{"word": "세제", "color": "#000", "values": [1]}], unit)
+
+    # 2) 남은 회차까지 저장되면 오늘이 끝 날짜가 된다
+    storage.save_run("14:00", [_article("추이-2")], run_at=f"{today_s}T14:01:00")
+    assert trend_data.today_is_complete(today_s)
+    assert trend_data.last_complete_day(today_s) == today_s, "오늘 회차가 다 찼는데 어제에서 끊겼다"
+
+    buckets, unit = trend_data.build_buckets(yday_s, today_s)
+    trend_data.fill_bucket_status(buckets, unit, {yday_s: [], today_s: []}, today_s)
+    assert buckets[-1]["is_today"] and not buckets[-1]["yesterday"]
+    assert not buckets[-1]["partial"], "다 찬 오늘 칸이 「집계 중」 점선으로 찍혔다"
+    svg = trend_chart.render_chart(
+        "t", buckets, [{"word": "세제", "color": "#000", "values": [1, 2]}], unit)
+    assert "오늘" in svg and "어제" not in svg, "마지막 칸 라벨이 오늘로 안 바뀌었다"
+
+    # 주별 칸은 이번 주가 안 끝났으면 오늘이 다 찼어도 여전히 점선이다
+    week_start = (today - timedelta(days=60)).isoformat()
+    buckets, unit = trend_data.build_buckets(week_start, today_s)
+    trend_data.fill_bucket_status(buckets, unit, {}, today_s)
+    assert unit == "week"
+    if today.weekday() != 6:  # 일요일이면 이번 주도 오늘로 끝난다
+        assert buckets[-1]["partial"], "덜 찬 이번 주 칸의 점선이 사라졌다"
+
+    print("✓ 추이 끝 날짜: 오늘 회차가 전부 저장된 뒤에만 오늘까지 그린다")
+
+
 def test_undo_stack_dedupes_snapshots():
     """되돌리기 스택이 같은 값을 반복 저장하지 않는다(2026-09-23).
 
@@ -3757,6 +3826,7 @@ if __name__ == "__main__":
         test_send_log,
         test_auto_send_does_not_resend_forever,
         test_undo_stack_dedupes_snapshots,
+        test_trend_end_day_follows_today_completion,
     ]
 
     failures = []

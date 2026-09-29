@@ -846,8 +846,9 @@ def _trend_card_html(today_str: str, trend_url: str, has_today_run: bool = False
             f'<a href="{html.escape(trend_url)}">더보기</a>에서 단어를 골라주세요.</p></div>'
         )
 
-    # [수정: 2026-09-11] 어제에서 끝나는 7일 — 오늘 칸은 하루치의 일부라 급락처럼
-    # 보였다(app.trend_data.last_complete_day 참고). 일별이라 점선 칸도 이제 안 생긴다.
+    # 끝은 "하루치가 다 찬 마지막 날"에서 7일 — 낮에는 어제, 오늘 예정 회차가 전부
+    # 저장된 저녁부터는 오늘이다(app.trend_data.last_complete_day 참고). 덜 찬 날을 그리면
+    # 급락처럼 보였다. 일별이라 점선 칸은 안 생긴다.
     end = last_complete_day(today_str)
     start = (datetime.strptime(end, "%Y-%m-%d") - timedelta(days=6)).strftime("%Y-%m-%d")
     by_date = articles_by_date_range(start, end)
@@ -884,8 +885,8 @@ def _trend_card_html(today_str: str, trend_url: str, has_today_run: bool = False
     # 해명하는 문장이다. 이 둘 때문에 추이 카드가 쟁점 카드보다 길어져 쟁점 밑이 비었다.
     # 합계·각주는 /trend(app.trend_renderer)에 그대로 남는다.
     return (
-        # 부제는 실제 범위 — 「정기」가 수시가 안 섞였음을, 어제에서 끝나는 날짜가 오늘이
-        # 아직 안 들어갔음을 설명 문장 없이 말한다(HOME_CARD_SCOPE_MOCKUP.html A안).
+        # 부제는 실제 범위 — 「정기」가 수시가 안 섞였음을, 끝 날짜가 오늘이 들어갔는지를
+        # 설명 문장 없이 말한다(HOME_CARD_SCOPE_MOCKUP.html A안).
         '<div class="card"><h2>정책 단어 추이 <span class="sub">'
         f'정기 · {buckets[0]["wd_label"]} ~ {buckets[-1]["wd_label"]}'
         f'</span>{more_html}</h2>'

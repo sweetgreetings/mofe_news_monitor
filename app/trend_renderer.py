@@ -41,8 +41,9 @@ def _today_str() -> str:
 
 
 def _preset_range(days: int, today: str) -> tuple:
-    """[수정: 2026-09-11] 빠른 설정은 전부 **어제에서 끝난다** — 홈 카드와 같은 규칙이라
-    같은 단어가 두 화면에서 같은 구간을 보여준다(app.trend_data.last_complete_day 참고)."""
+    """[수정: 2026-09-11] 빠른 설정은 전부 **하루치가 다 찬 마지막 날에서 끝난다**(낮에는
+    어제, 오늘 회차가 다 찬 저녁부터는 오늘) — 홈 카드와 같은 규칙이라 같은 단어가 두
+    화면에서 같은 구간을 보여준다(app.trend_data.last_complete_day 참고)."""
     end = datetime.strptime(last_complete_day(today), "%Y-%m-%d")
     start = end - timedelta(days=days - 1)
     return start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
@@ -64,9 +65,9 @@ def _resolve_range(query: dict) -> tuple:
     시작일이 종료일보다 늦으면 기본값(최근 7일)으로 조용히 되돌아간다 — 잘못된
     URL 하나 때문에 화면이 죽는 것보다는, 늘 보던 기본 구간을 보여주는 편이 낫다.
 
-    [수정: 2026-09-11] 직접 입력한 종료일도 어제를 넘으면 어제로 당긴다 — 빠른 설정만
-    어제에서 끝나고 직접 입력은 오늘까지 되면, 같은 화면 안에서 규칙이 두 개가 된다.
-    당긴 결과 시작일이 더 늦어지면(예: 오늘~오늘) 위와 같이 기본 구간으로 돌아간다."""
+    [수정: 2026-09-11] 직접 입력한 종료일도 그릴 수 있는 마지막 날을 넘으면 그 날로
+    당긴다 — 빠른 설정만 거기서 끝나고 직접 입력은 더 가면, 같은 화면 안에서 규칙이 두
+    개가 된다. 당긴 결과 시작일이 더 늦어지면 위와 같이 기본 구간으로 돌아간다."""
     today = _today_str()
     last_day = last_complete_day(today)
     start, end = query.get("start", [""])[0], query.get("end", [""])[0]
@@ -140,7 +141,7 @@ def _word_card_html(words: list, totals: dict, start: str, end: str, settings: d
 
 def _period_bar_html(start: str, end: str, unit: str) -> str:
     today = _today_str()
-    last_day = last_complete_day(today)  # 날짜 칸이 오늘을 아예 못 고르게 한다
+    last_day = last_complete_day(today)  # 날짜 칸이 덜 찬 날을 아예 못 고르게 한다
     current = _current_preset(start, end, today)
     on_attr = ' class="on"'
     seg = "".join(

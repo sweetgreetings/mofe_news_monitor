@@ -42,8 +42,13 @@ def render_chart(chart_id: str, buckets: list, series: list, unit: str,
     # 오른쪽 끝 값(`이형일 30`)이 오늘 값처럼 읽혀서다. 그만큼 아래 여백을 늘리고(그래프
     # 전체 높이는 그대로라 본체가 11px 낮아진다), 주말 띠는 원래 바닥까지 내려오므로 따라온다.
     # 주별·월별은 마지막 칸이 하루가 아니라 안 붙인다(yesterday가 늘 False).
+    # [추가: 2026-09-29] 오늘 회차가 다 찬 저녁부터는 마지막 칸이 오늘이라 같은 자리에
+    # 「오늘」을 쓴다(app.trend_data.last_complete_day) — 날짜만으로는 오른쪽 끝 값이
+    # 언제 것인지 안 읽히고, 그 한 줄이 어제와 오늘을 가르는 전부다.
     yday_last = unit == "day" and n > 0 and buckets[-1].get("yesterday", False)
-    two_line = yday_last or bool(today)  # 날짜 밑에 「어제」/「오늘 N/M회차」 한 줄을 더 쓴다
+    tday_last = unit == "day" and n > 0 and buckets[-1].get("is_today", False)
+    # 날짜 밑에 「어제」/「오늘」/「오늘 N/M회차」 한 줄을 더 쓴다
+    two_line = yday_last or tday_last or bool(today)
     PL, PT, PB = 34, 12, 26 + (11 if two_line else 0)
     # [수정: 2026-09-17] 오른쪽 여백은 끝 라벨의 실제 길이로 정한다 — 고정 138px은 짧은 단어뿐일 때
     # 카드 오른쪽이 텅 비었다(사용자 지적). 글자 폭은 어림값(한글 10.5px, 숫자·공백 6px).
@@ -142,9 +147,9 @@ def render_chart(chart_id: str, buckets: list, series: list, unit: str,
         out.append(f'<text x="{x_at(i):.1f}" y="{label_y}" text-anchor="middle" font-size="9.5" '
                    f'fill="{"#4B5563" if em else "#9CA3AF"}" font-weight="{600 if em else 400}">'
                    f'{html.escape(label)}</text>')
-        if yday_last and i == n - 1:
+        if (yday_last or tday_last) and i == n - 1:
             out.append(f'<text x="{x_at(i):.1f}" y="{height-7}" text-anchor="middle" font-size="9" '
-                       f'fill="{PALETTE["muted"]}">어제</text>')
+                       f'fill="{PALETTE["muted"]}">{"오늘" if tday_last else "어제"}</text>')
 
     if today:
         tx = x_at(tcol)
