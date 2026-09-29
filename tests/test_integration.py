@@ -2899,8 +2899,16 @@ def test_today_cut_round():
             return [{"name": "AI 이름", "articles": articles, "summary": ""}], {}, []
 
         # 화면을 다시 그리는 순간(confirm_and_promote)에 끊기가 이미 적혀 있어야 정기 보관함에 ✂가 붙는다.
-        promoted = MagicMock(side_effect=lambda run: seen_at_render.append(today_cuts.cut_origin(today_s, "15:30")))
+        # 확정본까지 실제로 저장되는지 보려고 화면 HTML 만들기만 빼고 confirm_and_promote가 하는
+        # 일(storage.confirm_run)을 그대로 돌린다 — 확정 표시를 흉내 내면 "끊었는데 확정본이
+        # 아니다"를 못 잡는다.
         seen_at_render = []
+
+        def _promote(run):
+            seen_at_render.append(today_cuts.cut_origin(today_s, "15:30"))
+            storage.confirm_run(run)
+
+        promoted = MagicMock(side_effect=_promote)
         now = datetime.combine(today, dt_time(15, 57))
         # 2) 지난 시각(15:30)으로 끊기 → 곧바로 확정본
         with patch.object(scraper, "search_articles_by_groups", side_effect=no_search), \
@@ -2914,6 +2922,17 @@ def test_today_cut_round():
         assert run and run["run_slot"] == "15:30", f"15:30 회차가 저장되지 않음: {run and run.get('run_slot')}"
         saved = {a["url"] for a in run["articles"]}
         assert saved == {pool[0]["url"], pool[1]["url"]}, f"끊은 시각 뒤 기사가 섞였거나 빠졌음: {saved}"
+        # 2-1) 확정본으로 저장됐나 — 확정본 화면이 읽는 값과 회차 파일이 모두 끊은 회차여야 한다
+        confirmed = storage.load_latest_confirmed_run()
+        assert confirmed and confirmed["run_slot"] == "15:30", (
+            f"끊은 회차가 확정본이 아님: {confirmed and confirmed.get('run_slot')}"
+        )
+        assert confirmed.get("confirmed") is True, "확정 표시가 안 붙었음"
+        on_disk = json.loads((storage.ARTICLES_DIR / f"{today_s}_15-30.json").read_text(encoding="utf-8"))
+        assert on_disk["confirmed"] is True and on_disk["run_slot"] == "15:30", on_disk.get("run_slot")
+        assert {a["url"] for a in on_disk["articles"]} == {pool[0]["url"], pool[1]["url"]}, (
+            "확정본 파일에 담긴 기사가 화면과 다름"
+        )
         times = [(w["start"], w["end"]) for w in settings.active_schedule_times(st, now)]
         assert ("14:00", "15:30") in times and ("15:30", "17:00") in times, times
         assert settings.active_schedule_times(st, now, with_cuts=False) == windows, "설정 시간표가 바뀌었음"
@@ -2964,7 +2983,7 @@ def test_today_cut_round():
         today_cuts.after_round_collected({"run_at": f"{today_s}T16:45:05", "run_slot": "16:45"})
         assert json.loads(labels_file.read_text())[f"{today_s}|17:00"] == {"AI 이름": "끊는 회차에서 고친 이름"}
 
-    print("오늘만 회차 끊기: 통과 (시간표 끼우기·초안 기사로 즉시 저장·예약·취소·기록 이어 쓰기)")
+    print("오늘만 회차 끊기: 통과 (시간표 끼우기·초안 기사로 즉시 확정본 저장·예약·취소·기록 이어 쓰기)")
 
 
 
