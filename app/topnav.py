@@ -1,7 +1,7 @@
 """상단바 — 모든 화면이 이 한 곳의 CSS·마크업을 쓴다.
 
 규칙(CLAUDE.md 「상단바」, 시안 mockups/TOPBAR_NAV_MOCKUP.html · 간격은 mockups/TOPBAR_SPACING_MOCKUP.html B안):
-- 정기 화면: 홈 │ 전체 기사 · 초안 · 확정본 · 보관함
+- 정기 화면: 홈 │ 오늘 전체 기사 · 초안 · 확정본 · 보관함
 - 수시 화면: 홈 │ 새 수집 · 원본 · 확정본 · 보관함
 - 지금 화면은 빼지 않고 흐름 색 칩으로 켜 둔다(누를 수 없음). 그래야 같은 링크가
   모든 화면에서 같은 자리에 온다.
@@ -40,7 +40,7 @@ HOME_HREF = f"{_BASE}/home.html"
 
 # (키, 라벨, 경로) — 홈 흐름도 정기 줄과 같은 순서
 REGULAR_ITEMS = (
-    ("live", "전체 기사", "/live.html"),
+    ("live", "오늘 전체 기사", "/live.html"),
     ("preview", "초안", "/preview.html"),
     ("final", "확정본", "/index.html"),
     ("archive", "보관함", "/history.html"),

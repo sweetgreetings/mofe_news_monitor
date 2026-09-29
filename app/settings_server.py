@@ -549,7 +549,7 @@ _KEYWORD_GROUPS_SCRIPT = "<script>\n" + r"""(function () {
         // [수정: 2026-09-15] "정기 스크랩엔 다음 회차부터"는 초안까지 뭉뚱그렸다 — 초안은
         // 요청마다 다시 그려져 새 검색어로 곧바로 다시 모으고(_preview_keywords_signature),
         // 확정본만 이번 회차 마감 때 모인다.
-        txt.innerHTML = "<b>아직 저장하지 않았습니다.</b> 저장하면 전체 기사·초안엔 바로, 확정본엔 이번 회차 마감부터 반영됩니다.";
+        txt.innerHTML = "<b>아직 저장하지 않았습니다.</b> 저장하면 오늘 전체 기사·초안엔 바로, 확정본엔 이번 회차 마감부터 반영됩니다.";
       }
       return;
     }
@@ -602,8 +602,8 @@ _KEYWORD_GROUPS_SCRIPT = "<script>\n" + r"""(function () {
     // 둘 다 끄면 그룹 꺼짐 — 따로 끄는 스위치가 없다.
     var dest = document.createElement("span");
     dest.className = "dest-pair";
-    dest.appendChild(destSwitch(g, "live", "전체 기사", box,
-      "전체 기사 화면에서 이 그룹을 검색합니다.\n언론사 선택·중복 제거 없이 걸린 기사를 전부 보여줍니다."));
+    dest.appendChild(destSwitch(g, "live", "오늘 전체 기사", box,
+      "오늘 전체 기사 화면에서 이 그룹을 검색합니다.\n언론사 선택·중복 제거 없이 걸린 기사를 전부 보여줍니다."));
     dest.appendChild(destSwitch(g, "scrap", "초안·확정본", box,
       "초안과 확정본(정기 회차)에 이 그룹을 넣습니다.\n저장하면 초안엔 바로, 확정본엔 이번 회차 마감부터 반영됩니다."));
 
@@ -3126,7 +3126,7 @@ _BREAKING_ALERT_SETTINGS_TEMPLATE = (
       calls.toLocaleString() + '회/일</b> (일일 한도 {daily_limit_fmt}의 <b>' + pct.toFixed(1) + '%</b>)' +
       (pct >= 70
         ? '<br>⚠️ 한도에 가깝습니다 — 확인 주기를 늘리거나 감시 그룹을 줄여주세요.'
-        : '<br>정기 스크랩·전체 기사가 쓰는 호출은 여기에 포함되지 않습니다.');
+        : '<br>정기 스크랩·오늘 전체 기사가 쓰는 호출은 여기에 포함되지 않습니다.');
   }}
   baCalc();
 
@@ -3441,7 +3441,7 @@ _NAVER_SETTINGS_TEMPLATE = (
 <div class="container">
   <h1>🔑 네이버 뉴스 API 설정</h1>
   <p class="hint">
-    기사를 가져오는 데 쓰는 키입니다. <b>이 키가 없으면 수집·전체 기사가 전부 멈춥니다</b>
+    기사를 가져오는 데 쓰는 키입니다. <b>이 키가 없으면 수집·오늘 전체 기사가 전부 멈춥니다</b>
     (AI 연동과 달리 이 키에는 대체 동작이 없습니다).
   </p>
   <div class="status {status_class}">{status_text}</div>

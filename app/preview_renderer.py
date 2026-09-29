@@ -1981,7 +1981,7 @@ function regenerateSubheadings(btn) {{
     var editsLine = edits > 0
       ? "소제목의 이름과 순서가 초기화되고, 「다른 소제목」으로 옮긴 기사 " + edits + "건은 새 소제목을 따라갑니다.\\n"
       : "소제목의 이름과 순서가 초기화됩니다.\\n";
-    msg = "전체 기사를 다시 분류합니다.\\n" + editsLine
+    msg = "모든 기사를 다시 분류합니다.\\n" + editsLine
         + "{reclassify_safe_note}\\n\\n계속할까요?";
   }}
   if (!confirm(msg)) {{
@@ -3385,7 +3385,7 @@ def _actions_html(
         f'<button class="create-group-btn reclassify-btn" type="button" data-manual-edits="{manual_edits}" '
         f'data-degraded="{"1" if degraded else "0"}" '
         'onclick="regenerateSubheadings(this)" '
-        f'title="전체 기사를 처음부터 다시 분류합니다">{icon("refresh")} AI 모든 기사 재분류</button>'
+        f'title="모든 기사를 처음부터 다시 분류합니다">{icon("refresh")} AI 모든 기사 재분류</button>'
     )
     # 「📷 사진 추정 (N)」 — app.renderer와 같은 함수(0건이면 안 그린다). 화면만 바꾸는
     # 보기라 왼쪽(내용을 바꾸는 네모)이 아니라 오른쪽 묶음에 알약으로 선다.

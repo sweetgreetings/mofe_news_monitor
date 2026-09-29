@@ -59,7 +59,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>전체 기사</title>
+<title>오늘 전체 기사</title>
 {extra_head_html}
 <style>
   body {{ margin: 0; background: {bg}; color: {text}; font-family: {font_stack}; }}

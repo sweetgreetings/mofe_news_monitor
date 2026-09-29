@@ -1024,8 +1024,8 @@ def _issues_card_html(settings: dict, articles: list, last_run: Optional[dict] =
 _FLOW_TIPS = {
     # [추가: 2026-09-15] 수시 4단 흐름(D안) — 두 줄 맨 앞의 입구 칸.
     "keywords": ("정기 스크랩 검색어",
-                 "켜 둔 그룹은 전체 기사에, 정기 스크랩을 체크한 그룹은 초안·확정본에도 들어가요.",
-                 ("저장", "전체 기사는 바로 · 정기는 다음 회차부터")),
+                 "켜 둔 그룹은 오늘 전체 기사에, 정기 스크랩을 체크한 그룹은 초안·확정본에도 들어가요.",
+                 ("저장", "오늘 전체 기사는 바로 · 정기는 다음 회차부터")),
     "adnew": ("사안·검색어·시간을 정해 모아요",
               "지난 1년 동안 한 수집이 조건째 목록으로 남아 있어, 골라서 다시 쓸 수 있어요.",
               ("수집", "원본")),
@@ -1129,7 +1129,7 @@ def _flow_card_html(last_run: Optional[dict], settings: dict) -> str:
     <div class="flow">
     <div class="fl fl-top">
       <span class="blank"></span><span class="blank"></span>
-      {_flow_tile("t-live slim side", f"{base}/live.html", "🔴", "전체 기사", *tips["live"])}
+      {_flow_tile("t-live slim side", f"{base}/live.html", "🔴", "오늘 전체 기사", *tips["live"])}
     </div>
     <div class="fl fl-conn"><span></span><span></span><span class="conn"><span class="cl">📌 담아두기</span></span></div>
     <div class="fl">

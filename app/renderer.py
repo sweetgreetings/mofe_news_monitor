@@ -1806,7 +1806,7 @@ function regenerateSubheadings(btn) {{
     ? "소제목의 이름과 순서가 초기화되고, 「다른 소제목」으로 옮긴 기사 " + edits + "건은 새 소제목을 따라갑니다.\\n"
     : "소제목의 이름과 순서가 초기화됩니다.\\n";
   if (!confirm(
-      "전체 기사를 다시 분류합니다.\\n" + editsLine +
+      "모든 기사를 다시 분류합니다.\\n" + editsLine +
       "{reclassify_safe_note}\\n\\n계속할까요?")) {{
     return;
   }}
@@ -3248,7 +3248,7 @@ def _render_manual_section(
         + (
             f'<span class="manual-zone-count">{len(manual_articles)}건</span>'
             if manual_articles
-            else '<span class="manual-zone-empty">전체 기사에서 📌 담아두거나, 직접 넣을 수 있어요</span>'
+            else '<span class="manual-zone-empty">오늘 전체 기사에서 📌 담아두거나, 직접 넣을 수 있어요</span>'
         )
         + f"{assign_btn_html}{add_button_html}"
         "</div>"
@@ -3789,7 +3789,7 @@ def render_page(
     regen_btn_html = (
         f'<button class="create-group-btn regen-btn" type="button" data-manual-edits="{manual_edits}" '
         'onclick="regenerateSubheadings(this)" '
-        f'title="전체 기사를 처음부터 다시 분류합니다">{icon("refresh")} AI 모든 기사 재분류</button>'
+        f'title="모든 기사를 처음부터 다시 분류합니다">{icon("refresh")} AI 모든 기사 재분류</button>'
     )
     # [수정: 2026-09-15] 「📷 사진 추정 전체 선택」 → 「📷 사진 추정 모아 보기」 — 흩어진
     # 사진 추정 행을 한 목록으로 모아 보여주고, 전체 선택은 모아 보는 중 띠가 맡는다
