@@ -589,6 +589,14 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      [수정: 2026-09-04] 승격(.just-promoted)도 이 색으로 합류했다 — 둘 다 "내가 방금
      만진 결과가 어디 갔나"라는 같은 질문에 답한다(위 주석 참고). */
   .article.just-moved {{ background: {row_moved}; }}
+  /* [추가] 미니 목차에서 순서를 옮겨 (적용)한 소제목 — 기사 세이지(.article.just-moved)와
+     같은 뜻·같은 색이고, 칠하는 건 머리줄뿐이다(그 밑 기사는 안 움직였다). 담당자가 직접
+     ▲▼를 누른 소제목만 칠하고 밀려난 이웃은 칠하지 않는다. 좌우 -8px는 기사 행처럼
+     글자가 색 가장자리에 붙지 않게 하려는 것이고, 제목 글자는 제자리에 그대로 있다. */
+  .subheading.just-moved > h2 {{
+    background: {row_moved}; border-radius: var(--r-sm) var(--r-sm) 0 0;
+    padding: 3px 8px 6px; margin: 0 -8px 6px;
+  }}
   /* [추가: 2026-09-15] 「AI 기사 나누기」가 방금 옮긴 기사 — 초안의 같은 클래스(「AI 기사 배정」
      결과)와 같은 연보라. 노랑(is-new-arrival)보다 뒤에 선언해 겹치면 이쪽이 이긴다(내가 시켜서
      AI가 옮긴 것이 "새로 왔다"보다 지금 묻는 질문에 가깝다). 다음 새로고침에 사라진다. */
@@ -1129,15 +1137,14 @@ var _tocBase = [];     // 팝오버를 열었을 때의 순서 = 지금 저장�
 // 초록이 두 개로 남았다 — 담당자에게 그건 "방금 뭘 만졌는지"가 아니라 "그동안 만진 목록"이라
 // 지금 커서가 어디 있는지를 오히려 흐렸다(2026-08-26에 고친 "밀려난 이웃까지 초록" 증상과
 // 겉모습이 똑같아서 같은 버그가 되살아난 것처럼 보이기까지 했다).
-// 그래서 초록의 출처는 둘뿐이다 — "이번 팝오버에서 마지막으로 옮긴 행"(_tocMovedIdx, 이름이
-// 아니라 **위치**로 기억한다: 같은 이름의 소제목이 둘 있어도 엉뚱한 행이 같이 켜지지 않게)과
-// "직전 (적용)에서 옮겨 방금 저장된 행"(_tocJustApplied, 새로고침 뒤 한 번만 보여주는 1회성
-// 신호). 밀려난 이웃은 예나 지금이나 초록이 아니다. 이용자가 이번 팝오버에서 처음 조작하는
-// 순간(_tocSwap) _tocJustApplied를 통째로 비워 옛 초록이 겹쳐 남는 것도 막는다.
+// 그래서 초록의 출처는 하나뿐이다 — "이번 팝오버에서 마지막으로 옮긴 행"(_tocMovedIdx, 이름이
+// 아니라 **위치**로 기억한다: 같은 이름의 소제목이 둘 있어도 엉뚱한 행이 같이 켜지지 않게).
+// 밀려난 이웃은 예나 지금이나 초록이 아니다. **이 초록은 아직 확정 안 한 상태의 표시뿐**이고,
+// (적용) 뒤의 표시는 팝오버가 아니라 화면의 소제목 머리줄이 맡는다(justMovedGroups →
+// .subheading.just-moved) — 적용하면 팝오버는 닫힌다.
 // _tocTouched는 이제 초록과 무관하다 — 하단 "N개 위치 바뀜"이 쓰는 **개수 세기 전용**이다.
 var _tocTouched = {{}};      // 이번 팝오버에서 이용자가 ▲▼를 누른 소제목 (제자리로 돌아오면 지움) — 개수 세기 전용
 var _tocMovedIdx = -1;      // 초록으로 칠할 단 하나 = 마지막에 옮긴 행의 지금 위치 (-1이면 없음)
-var _tocJustApplied = {{}};  // 직전 (적용) 직후 새로고침에서만 보여주는 1회성 초록
 var _tocBusy = false;  // (적용) 요청 진행 중
 // 화면에 이미 그려진 .subheading[data-toc-name]을 그대로 읽는다 — 서버에 새로 묻지 않는다.
 function _tocReadSections() {{
@@ -1180,18 +1187,7 @@ function buildTocPopover() {{
   _tocBase = _tocItems.map(function(item) {{ return item.raw; }});
   _tocTouched = {{}};
   _tocMovedIdx = -1;
-  _tocJustApplied = {{}};
   _tocBusy = false;
-  // 직전 (적용)에서 옮긴 소제목이 있으면 새로고침 후 한 번만 초록으로 보여준다
-  // (_tocApply가 남겨둔 값 — 한 번 쓰고 지운다). 이용자가 다시 ▲▼를 누르는 순간
-  // _tocSwap이 이 값을 통째로 비운다.
-  var justMoved = sessionStorage.getItem("tocJustMovedNames");
-  if (justMoved) {{
-    sessionStorage.removeItem("tocJustMovedNames");
-    try {{
-      JSON.parse(justMoved).forEach(function(name) {{ _tocJustApplied[name] = true; }});
-    }} catch (err) {{ /* 저장된 값이 깨졌으면 표시만 생략한다 */ }}
-  }}
   _tocRender();
 }}
 function _tocRender() {{
@@ -1205,9 +1201,8 @@ function _tocRender() {{
   scroll.className = "toc-scroll";
   _tocItems.forEach(function(item, idx) {{
     var row = document.createElement("div");
-    // 초록 = 마지막에 옮긴 행 하나이거나, 직전 적용 직후 1회성으로 보여주는 행.
-    // 앞서 옮긴 행도, 밀려난 이웃도 초록이 아니다 — 초록은 항상 한 칸이다.
-    row.className = "toc-row" + (idx === _tocMovedIdx || _tocJustApplied[item.raw] ? " toc-row-moved" : "");
+    // 초록 = 마지막에 옮긴 행 하나. 앞서 옮긴 행도, 밀려난 이웃도 초록이 아니다.
+    row.className = "toc-row" + (idx === _tocMovedIdx ? " toc-row-moved" : "");
     var a = document.createElement("a");
     a.href = "#";
     a.textContent = item.label;
@@ -1270,10 +1265,6 @@ function _tocBuildFoot() {{
 function _tocSwap(i, j) {{
   if (_tocBusy || j < 0 || j >= _tocItems.length) {{ return; }}
   if (!_tocOrderable(_tocItems[i]) || !_tocOrderable(_tocItems[j])) {{ return; }}  // 순서 대상이 아닌 칸은 안 건드린다
-  // 이용자가 이번 팝오버에서 처음으로 뭔가 만지는 순간 — 직전 적용의 1회성 초록은
-  // 더는 "지금 상태"가 아니므로 통째로 지운다. 안 지우면 이번에 옮긴 자리 초록과
-  // 예전 자리 초록이 동시에 남아 블럭이 여러 개로 보인다.
-  _tocJustApplied = {{}};
   var moving = _tocItems[i].raw;  // ▲▼를 누른 그 소제목만 초록 대상 (밀려난 이웃은 아니다)
   var tmp = _tocItems[i]; _tocItems[i] = _tocItems[j]; _tocItems[j] = tmp;
   _tocTouched[moving] = true;   // 개수 세기용 (초록과 무관)
@@ -1293,8 +1284,12 @@ function _tocApply() {{
   _tocRender();  // ▲▼·취소·적용 전부 잠근다 — 연타로 순서가 엇갈리지 않도록
   // 순서 대상이 아닌 칸(raw === "")은 빼고 보낸다 — 예전 moveTocOrder가 보내던 목록과 같다.
   var order = _tocItems.filter(_tocOrderable).map(function(item) {{ return item.raw; }});
-  // 새로고침 뒤 초록으로 되짚어줄 이름 = 마지막에 옮긴 그 하나뿐 (화면의 초록은 항상 한 칸).
-  var moved = _tocMovedIdx >= 0 ? [_tocItems[_tocMovedIdx].raw] : [];
+  // 적용 뒤 화면에서 세이지로 되짚어줄 이름 = **담당자가 실제로 ▲▼를 누른 소제목 전부**다
+  // (밀려난 이웃은 빼고, 제자리로 돌아온 것도 _tocTouched에서 이미 빠져 있다). 팝오버 안
+  // 초록이 한 칸인 것과 뜻이 다르다 — 그건 "아직 확정 안 한 상태에서 방금 어느 줄이 뛰었나"고,
+  // 이건 "저장된 결과에서 내가 옮긴 게 어디로 갔나"다(기사 .just-moved와 같은 규칙).
+  var moved = _tocItems.filter(function(item) {{ return _tocTouched[item.raw]; }})
+                       .map(function(item) {{ return item.raw; }});
   // [수정: 2026-08-14] moveGroupOrder와 같은 이유 — 회차(run_slot)를 같이 실어 보낸다.
   var runSlot = document.getElementById("keyword-note-zone").dataset.runSlot;
   fetch("http://{settings_host}:{settings_port}/save-group-order", {{
@@ -1303,8 +1298,13 @@ function _tocApply() {{
     body: new URLSearchParams({{order: JSON.stringify(order), run_slot: runSlot}})
   }}).then(function(res) {{
     if (res.ok) {{
-      sessionStorage.setItem("tocJustMovedNames", JSON.stringify(moved));
-      sessionStorage.setItem("tocPopoverReopen", "1");
+      // 팝오버는 다시 열지 않는다 — (적용)으로 끝난 동작이라 결과는 화면에 남아야 하고,
+      // 적용 전후로 팝오버 모습이 같으면 "저장됐다"가 아무 데도 안 보인다. 보던 자리를
+      // 들고 가서(justMovedScroll) 칠한 소제목이 거기서 하나도 안 보일 때만 첫 칸으로
+      // 옮긴다 — 되돌리기(↩)와 같은 규칙.
+      sessionStorage.setItem("justMovedGroups", JSON.stringify(moved));
+      sessionStorage.setItem("justMovedScroll", String(window.scrollY));
+      history.scrollRestoration = "manual";
       location.reload();
     }} else {{
       _tocBusy = false; _tocRender();
@@ -2232,6 +2232,7 @@ renderRelativeTimes();
 // 새로 온 게 아니다(위 기준선 코드가 먼저 돌아 노랑을 붙인 뒤라 여기서 떼면 된다).
 (function() {{
   var raw = sessionStorage.getItem("justMovedUrls");
+  var rawGroups = sessionStorage.getItem("justMovedGroups");
   var savedY = sessionStorage.getItem("justMovedScroll");
   sessionStorage.removeItem("justMovedScroll");
   // undoLastAction이 이번 새로고침만 꺼둔 스크롤 복원은 **이 페이지를 떠날 때** 되돌린다
@@ -2240,10 +2241,11 @@ renderRelativeTimes();
   if (savedY !== null) {{
     window.addEventListener("pagehide", function() {{ history.scrollRestoration = "auto"; }});
   }}
-  if (!raw) {{ return; }}
+  if (!raw && !rawGroups) {{ return; }}
   sessionStorage.removeItem("justMovedUrls");
+  sessionStorage.removeItem("justMovedGroups");
   var marked = [];
-  JSON.parse(raw).forEach(function(u) {{
+  JSON.parse(raw || "[]").forEach(function(u) {{
     var el = document.querySelector('.article[data-url="' + CSS.escape(u) + '"]');
     if (el) {{
       el.classList.add("just-moved");
@@ -2251,6 +2253,24 @@ renderRelativeTimes();
       marked.push(el);
     }}
   }});
+  // 미니 목차 (적용)이 남긴 소제목 — 머리줄만 같은 세이지로 칠한다(그 밑 기사는 안 움직였다).
+  // 어느 칸인지 고르는 기준은 _tocReadSections와 같은 자리(이름 바꾸기 버튼의 data-name =
+  // 서버로 보낸 원래 이름)를 쓴다 — data-toc-name은 이름표를 붙이면 달라지는 표시 이름이다.
+  // DOM 순서대로 훑으므로 marked[0]은 화면에서 가장 위에 있는 소제목이 된다.
+  var movedGroups = JSON.parse(rawGroups || "[]");
+  if (movedGroups.length) {{
+    Array.prototype.forEach.call(document.querySelectorAll(".subheading[data-toc-name]"), function(sec) {{
+      var btn = sec.querySelector(".rename-btn[data-current]");
+      var name = btn ? btn.dataset.name : "";
+      if (name && movedGroups.indexOf(name) >= 0) {{
+        sec.classList.add("just-moved");
+        // 보였는지 판정하고 스크롤할 대상은 **머리줄(h2)**이다 — 소제목 칸은 기사까지 품은
+        // 큰 상자라, 그 칸 한가운데를 읽고 있으면 머리줄이 화면 위로 한참 벗어나 있어도
+        // "보인다"로 판정돼 정작 칠한 자리를 못 보게 된다.
+        marked.push(sec.querySelector("h2") || sec);
+      }}
+    }});
+  }}
   if (savedY === null) {{ return; }}
   // 되돌리기 전 위치로 먼저 돌려놓고, 칠한 기사가 거기서 하나라도 보이면 그대로 둔다
   // (숨기기·↑↓를 되돌린 경우 대개 눈앞에 있다). 하나도 안 보일 때만 첫 기사로 옮긴다.
@@ -2271,16 +2291,6 @@ renderRelativeTimes();
   }}
   if (document.readyState === "complete") {{ scrollIfHidden(); }}
   else {{ window.addEventListener("load", scrollIfHidden); }}
-}})();
-// [추가: 2026-08-05] 남겨둔 신호가 있으면 목차 팝오버를 다시 열어둔다 — ☰ 버튼을 매번
-// 다시 누르지 않아도 되게.
-// [수정: 2026-08-18] 이제 신호를 남기는 쪽은 _tocApply뿐이라, 여기서 다시 열리는 팝오버는
-// "방금 적용한 결과"를 보여주는 자리다(옮긴 소제목이 초록으로 한 번 표시된다).
-(function() {{
-  if (!sessionStorage.getItem("tocPopoverReopen")) {{ return; }}
-  sessionStorage.removeItem("tocPopoverReopen");
-  document.getElementById("toc-popover").classList.add("is-open");
-  buildTocPopover();
 }})();
 </script>
 </body>

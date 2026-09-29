@@ -327,6 +327,7 @@ FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN
   7. 이름 바꾸기는 지금 이름을 채워 전체 선택으로 열고, 첫 타이핑 전까지(`_npPristine`) 그 값을 검색어로 쓰지 않는다. 만들기는 빈 칸.
   - 목록은 렌더링 시점에 구워 넣는다. 시안 [mockups/NAME_PICKER_RANGE_MOCKUP.html](mockups/NAME_PICKER_RANGE_MOCKUP.html).
 - **미니 목차** (`.toc-toggle-btn`, 오른쪽 아래): 여는 순간의 DOM을 읽는다. 행마다 ▲▼, 직접 만든 소제목 굵게. **초록(`.toc-row-moved`)은 마지막으로 옮긴 한 칸뿐**(`_tocMovedIdx`, 인덱스로 기억). 하단 「N개 위치 바뀜」(`_tocTouched`)은 개수이고 초록 수와 일부러 다르다. 확정본·초안에 같은 코드가 복제돼 있다 — 둘 다 고친다.
+- **「적용」을 누르면 팝오버는 닫히고, 표시는 화면의 소제목 머리줄이 맡는다** — 담당자가 ▲▼를 누른 소제목 **전부**를 세이지로 칠하고(`justMovedGroups` → `.subheading.just-moved > h2`), 밀려난 이웃은 안 칠한다. 칠한 머리줄이 하나도 안 보일 때만 첫 칸으로 스크롤한다(되돌리기와 같은 규칙·같은 `justMovedScroll`). **보였는지 판정하는 대상은 소제목 칸이 아니라 머리줄이다** — 칸은 기사까지 품은 큰 상자라 한가운데를 읽고 있으면 머리줄이 화면 밖인데도 「보인다」가 된다. 팝오버 안 초록과 뜻이 다르다: 초록은 아직 확정 안 한 상태라 마지막 한 칸, 세이지는 저장된 결과라 옮긴 것 전부. → H: 목차 「적용」 뒤 표시
 - **맨 위로 ↑** (`.top-fab`, 확정본·초안): 목차 ☰ 바로 **왼쪽**(`right 80 / bottom 20 / 48px`), ☰과 같은 중립색 동그라미, 아이콘은 막대 달린 ↑(`icon("to_top")` — 기사 ↑↓·소제목 ▲▼와 다른 모양). **한 화면 이상 내려갔을 때만** 보인다. ☰ 위에 쌓지 않는다(확정본은 그 자리에 발송이 있다 — 두 화면에서 같은 자리여야 한다). 코드 `app/renderer.py` `scroll_top_style/html/script` 한 곳. 시안 [mockups/SCROLL_TOP_MOCKUP.html](mockups/SCROLL_TOP_MOCKUP.html) A안.
 - **글리프**: 소제목 순서 ▲▼(`.order-btn`, `.toc-order-btn`), 기사 순서 ↑↓(`.move-btn`).
 - **소제목별 복사 📋** (`.group-copy-btn`, 확정본·초안·수시): 헤더 아이콘 묶음 맨 앞(`📋 → ✏️🗑️ → ▲▼`). **소제목 이름 + 기사만**(회차 헤더·메모 줄 없음). **전용 빌더를 만들지 않는다** — 전체 복사와 같은 함수에 소제목 하나만 넘기고 `header` 인자로만 가른다(정기는 `build_group_copy_texts`/`_build_preview_group_copy_texts`가 `data-copy-text`로 굽는다). 미분류·빈 커스텀 소제목엔 안 붙인다. 폴백이어도 확인창 없음. 피드백은 `.is-copied`·`copyArticleIcon`(수시는 `copyGroupText`).
@@ -357,7 +358,7 @@ FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN
 - **상단 고정 요소를 새로 만들 때**: `.keyword-note-zone`의 `top`처럼 `--finalize-banner-h`(확정본 마감 후 자동 배정 배너)와 `--round-banner-h`(초안 마감 배너)를 더한다.
 - **hover**: 회색 `#F3F4F6`, 상태색보다 먼저 선언.
 - **새로 들어온 기사 노랑**(`.is-new-arrival`, `#FFF9C4`): 확정본·초안에서 **같은 회차**의 이전 보기에 없던 기사. 기준선은 회차별 `localStorage`(`confirmedKnownUrls:{date}:{slot}` / `previewKnownUrls:{ROUND_DEADLINE_MS}`), 처음 여는 회차는 기록만. `.just-promoted`/`.just-moved`보다 먼저 선언.
-- **세이지**(`#E7EFE8`): `.just-moved`(↑↓·소제목 이동·일괄) 한 번, `.just-promoted`(📌 승격)도 같은 색. **"담당자가 방금 손댄 것만"** 칠한다.
+- **세이지**(`#E7EFE8`): `.just-moved`(↑↓·소제목 이동·일괄, 미니 목차에서 순서를 옮긴 소제목 머리줄도 같은 클래스) 한 번, `.just-promoted`(📌 승격)도 같은 색. **"담당자가 방금 손댄 것만"** 칠한다.
 - **연보라** `.just-classified`: AI 배정·나누기 결과.
 - 펼쳐 본 기사(`<details open>`)는 제목 줄을 흐리게(`opacity: 0.62`) — **색이 아니라 밝기로만** 준다(색은 뜻을 가진 축이라 「읽은 것」에 새 색을 만들지 않는다).
 
