@@ -238,7 +238,7 @@ FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN
 
 - 회차마다 기사 **요약**(제목 아님)에서 새로 만든다. 최대 15개(`MAX_SUBHEADINGS`), 기사 하나는 소제목 하나. 담당자의 수동 배정이 이긴다. 밀도 규칙(묶음당 평균 2건 이상)은 AI_RULES.md.
 - **LLM 분류** (`app/llm_classifier.py` `classify_with_llm`, 모델 `LLM_MODEL`=`claude-haiku-4-5`): 쟁점 단위로 묶고 같은 호출에서 소제목 요약도 쓴다. 애매한 기사는 주저 없이 「기타」. 프롬프트 원본은 AI_RULES.md.
-- **폴백**: API 키 없음·패키지 없음·기사 수가 `[1, 150]` 밖(**1건짜리 회차도 AI가 분류한다**)·호출 실패 → 규칙 기반. 예외는 삼키고 경고 로그만.
+- **폴백**: API 키 없음·패키지 없음·기사 수가 `[1, 150]` 밖·호출 실패 → 규칙 기반. 예외는 삼키고 경고 로그만. **기사가 1건뿐인 회차도 AI가 분류한다** — 하한은 1이고, 자동 분류 문턱(5건)·「회차당 1회」는 그대로다. → H: 1건짜리 회차도 AI가 분류한다
 - 요약은 3문장·250자 이하, 문장 중간에서 자르지 않는다. 폴백이면 최우선 기사 요약을 같은 한도로 자른다(`summarize_group`). 요약은 `group_summary`로 회차 스냅샷에 저장된다. **「기타」는 요약 문단 대신 기사 제목 목록**(`- 제목` 앞 5건 + `외 N건`, `app/summarizer.py` `etc_titles_summary`) — 관계없는 기사를 한 문단으로 쓰면 문장이 뒤섞인다. 화면·복사·텔레그램·이메일, 수시도 같다.
 - 하단 블록은 `💬 AI가 읽은 소제목별 주요 요약` 하나(화면 전용). 한 항목은 `padding: 12px 0` + 아래 실선, 소제목 이름은 굵게·제목색(`strong`), 요약 문단은 `line-height: 1.75`. **CSS가 세 곳에 복제돼 있다** — 정기 `.bottom-summary-item`(`app/renderer.py`·`app/preview_renderer.py`), 수시 `.adhoc-summary .sum-item`(`app/adhoc/renderer.py`). 한쪽만 고치지 않는다. 「🤖 AI가 추출한 주요 키워드」 블록은 없앴다 — 검색어로 걸러진 기사의 빈도는 검색어 주변 단어만 돌려준다. 토크나이저(`app/tokenizer.py`)는 워드클라우드가 계속 쓴다.
 

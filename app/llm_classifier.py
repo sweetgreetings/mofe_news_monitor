@@ -860,7 +860,7 @@ def classify_with_llm(
     None을 돌려주는 경우:
       - .env에 ANTHROPIC_API_KEY가 없음 (정상 — 이 기능을 안 쓰기로 한 선택)
       - anthropic 패키지 미설치 (정상)
-      - 기사가 너무 적거나(2건 미만) 너무 많음(MAX_ARTICLES_FOR_CLASSIFY 초과) (정상)
+      - 기사가 없거나(0건) 너무 많음(MAX_ARTICLES_FOR_CLASSIFY 초과) (정상)
       - allow_call=False인데 쓸 만한 캐시가 하나도 없음 (정상 — 초안의 의도된 동작)
       - [수정: 2026-08-12] API 호출 실패(네트워크·인증·rate limit 등) — **진짜 실패**인
         경우만 여기 남는다. 예전엔 실패하면 곧바로 규칙 기반(단어 빈도)으로 떨어졌는데,
@@ -885,17 +885,21 @@ def classify_with_llm(
     # [추가: 2026-08-11] 기사 수 때문에 건너뛰는 경우는 로그를 남긴다. 예전엔 이 분기가
     # 조용히 None을 돌려줘서, 실제로 3개 회차가 이 문턱에 걸려 규칙 기반으로 폴백했는데도
     # 담당자가 "소제목이 갑자기 이상해졌다"는 증상만 보고 원인을 알 수 없었다.
-    if not 2 <= len(articles) <= MAX_ARTICLES_FOR_CLASSIFY:
+    # [수정: 2026-09-29] 하한 2 -> 1. 기사가 1건뿐인 회차(주말·심야)는 이 문턱에 걸려
+    # 초안·확정본 어디에서도 AI를 못 부르고 규칙 기반 한 어절 이름으로 떨어졌다. 실측
+    # (2026-09-29 회차 기사 4건을 각각 "1건짜리 회차"로 돌림): 4건 모두 제대로 된
+    # 소제목 이름 + 요약이 나왔고 "기타"로 던진 경우는 없었다 — 프롬프트에 이미
+    # "한 묶음에 기사가 1건뿐이어도 뚜렷이 다른 사안이면 그대로 둔다"가 있다(AI_RULES.md).
+    if not 1 <= len(articles) <= MAX_ARTICLES_FOR_CLASSIFY:
         logger.warning(
-            "기사 %d건은 LLM 소제목 분류 범위(2~%d건) 밖이라 규칙 기반으로 대체합니다",
+            "기사 %d건은 LLM 소제목 분류 범위(1~%d건) 밖이라 규칙 기반으로 대체합니다",
             len(articles),
             MAX_ARTICLES_FOR_CLASSIFY,
         )
-        # [추가: 2026-08-20] 기사가 너무 적어서(2건 미만) 건너뛴 경우는 이 함수 호출부
-        # 어디에서도 화면에 도달하지 않는다 — 초안 배너 조건(MIN_ARTICLES_FOR_AUTO=5,
-        # app.preview_renderer._compute_preview_content)이 이미 그보다 크다. 그래서
-        # 이 플래그는 사실상 "너무 많아서"만 의미하고, 문구도 그렇게 고정해도 안전하다.
-        _last_skipped_too_many_articles = True
+        # 0건은 호출부(app.classifier)가 미리 걸러 여기 오지 않으므로 이 분기는 사실상
+        # "너무 많아서"만 의미한다. 그래도 0건에 "기사를 몇 건 줄이세요"라고 말하지
+        # 않도록, 플래그는 실제로 상한을 넘었을 때만 세운다.
+        _last_skipped_too_many_articles = len(articles) > MAX_ARTICLES_FOR_CLASSIFY
         return None
 
     key = _cache_key(articles, max_subheadings, round_id)
