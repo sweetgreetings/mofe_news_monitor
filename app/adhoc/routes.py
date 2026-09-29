@@ -291,11 +291,11 @@ def _handle_collect(handler, form: dict) -> None:
     issue_id = _field(form, "issue_id")
     new_issue_name = _field(form, "new_issue_name").strip()
     keywords = form.get("keywords", [])
-    # "검색어가 모두 있는 기사만" — 같은 목록을 must_keywords에도 그대로 넣는다.
-    # 일부만(예: 첫 단어는 빼고) 넣으면 1,000건 상한 검사(§6.4b, must_keywords만 본다)가
-    # 그 단어를 안 덮어, 잘린 검색 결과의 교집합에서 기사가 조용히 빠진다.
-    match_all = _field(form, "match_mode") == "all"
-    must_keywords = list(keywords) if match_all else []
+    # [수정] 「하나라도 | 모두」 두 칸은 없앴다 — 검색어끼리는 언제나 OR이고, "둘 다 든
+    # 기사"는 검색어 하나 안에서 `가상자산+과세`처럼 묶어 네이버에 그대로 넘긴다(공백도
+    # 같은 뜻이다). 새 카드는 must_keywords를 안 쓴다. 이미 만들어진 옛 카드의
+    # must_keywords는 그대로 읽어 화면에 「모두」로 보여준다(card.is_match_all).
+    must_keywords: list = []
     window_start = _field(form, "window_start")
     window_end = _field(form, "window_end")
     options = {

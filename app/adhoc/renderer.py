@@ -55,7 +55,6 @@ from app.topnav import adhoc_nav, topnav_style
 from app.adhoc import undo
 from app.adhoc.card import (
     MAX_ADHOC_KEYWORDS,
-    MAX_ADHOC_MUST_KEYWORDS,
     MAX_ADHOC_SUBHEADINGS,
     bundle_label,
     bundle_sources,
@@ -697,25 +696,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .edit-panel .kw-fixed a {{ margin-left: auto; color: {accent}; font-size: var(--fs-sm); font-weight: 600; text-decoration: none; }}
   .edit-panel .kw-fixed a:hover {{ text-decoration: underline; }}
   .ver-tag {{ margin-left: 6px; color: {muted}; font-weight: 600; }}
-  /* 새 수집 화면의 검색 방식 선택 — 라벨 폭이 78px이라 편집 패널(104px)과 들여쓰기가
-     다르다. 경고 문구에 .warn을 쓰면 페이지에 이미 있는 빨간 오류 상자와 이름이 겹쳐
-     오류처럼 보이므로(색 규칙: 빨강=오류, 앰버=주의) .is-over로 따로 둔다. */
-  .kw-mode {{ margin: -4px 0 0 88px; display: flex; flex-direction: column; gap: 3px; }}
-  .kw-mode.off {{ opacity: 0.45; }}
-  .mode-opt {{ display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm);
-               color: {muted}; cursor: pointer; }}
-  .mode-opt input {{ width: var(--chk-sm); height: var(--chk-sm); margin: 0; flex: none;
-    accent-color: {accent}; cursor: pointer; }}
-  .mode-opt b {{ font-weight: 700; color: {text}; }}
-  .mode-opt.on {{ color: {text}; }}
-  .mode-opt.on.all, .mode-opt.on.all b {{ color: {must_text}; }}
-  .mode-note {{ font-size: var(--fs-sm); color: {text_faint}; margin: 2px 0 0 20px; }}
-  .mode-note:empty {{ display: none; }}
-  .mode-note.is-over {{ color: {warn_accent}; font-weight: 600; }}
-  /* 새 수집 폼 — 줄 간격을 좁히고 한 줄에 모은다. 검색 방식은 두 줄 라디오 대신 검색어 칸 옆
-     [하나라도 | 모두] 한 칸(라디오를 감싼 label이라 폼 값·JS는 그대로), 빠른 시간 칩은 시간 입력
-     옆, 거르기 체크 셋은 한 줄, 수집 버튼은 맨 아래 오른쪽. 검색어 편집 패널(.edit-panel)의
-     .kw-mode는 건드리지 않게 전부 #new-card 아래로 묶는다. 시안 mockups/ADHOC_NEW_COMPACT_MOCKUP.html. */
+  /* 새 수집 폼 — 줄 간격을 좁히고 한 줄에 모은다. 빠른 시간 칩은 시간 입력
+     옆, 거르기 체크 셋은 한 줄, 수집 버튼은 맨 아래 오른쪽. 전부 #new-card 아래로 묶는다. 시안 mockups/ADHOC_NEW_COMPACT_MOCKUP.html. */
   #new-card {{ padding: 18px 24px 16px; }}
   #new-card .n-head {{ display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }}
   #new-card .n-head .page-title {{ margin: 0; }}
@@ -728,15 +710,6 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   #new-card .kw-box input[type=text] {{ height: auto; }}
   #new-card select.hm-sel {{ width: 70px; }}
   #new-card .issue-warn {{ margin: -3px 0 9px 72px; }}
-  #new-card .seg {{ display: inline-flex; flex: none; margin: 0; flex-direction: row; gap: 0; height: 36px; box-sizing: border-box;
-    border: 1px solid {border}; border-radius: var(--r-md); overflow: hidden; }}
-  #new-card .seg .mode-opt {{ position: relative; padding: 0 12px; font-size: var(--fs-sm); color: {muted}; background: {card}; }}
-  #new-card .seg .mode-opt + .mode-opt {{ border-left: 1px solid {border}; }}
-  #new-card .seg .mode-opt input {{ position: absolute; opacity: 0; pointer-events: none; }}
-  #new-card .seg .mode-opt.on {{ background: {hover}; color: {accent}; font-weight: 700; }}
-  #new-card .seg .mode-opt.on.all {{ background: {adhoc_bg}; color: {must_text}; }}
-  #new-card .seg .mode-opt:has(input:focus-visible) {{ outline: 2px solid {accent}; outline-offset: -2px; }}
-  #new-card .mode-note {{ margin: -4px 0 9px 72px; }}
   #new-card .n-quick {{ display: inline-flex; gap: 5px; margin-left: 6px; flex-wrap: wrap; }}
   #new-card .n-last {{ margin: 12px 0 0; padding-top: 12px; border-top: 1px dashed {border}; }}
   #new-card .n-opts {{ display: flex; gap: 16px; flex-wrap: wrap; flex: 1; font-size: var(--fs-md); }}
@@ -747,7 +720,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   @media (max-width: 640px) {{
     #new-card .field > label {{ width: 100%; }}
     #new-card #issue-select {{ width: 100%; }}
-    #new-card .mode-note, #new-card .issue-warn {{ margin-left: 0; }}
+    #new-card .issue-warn {{ margin-left: 0; }}
     #new-card .n-quick {{ margin-left: 0; }}
     #new-card .n-last .btn {{ width: 100%; justify-content: center; }}
   }}
@@ -893,8 +866,6 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .hist .h-is {{ font-weight: 700; color: {text}; flex-shrink: 0; max-width: 40%; overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap; }}
   .hist .h-kw {{ color: {muted}; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-  .hist .h-all {{ font-size: var(--fs-xs); color: {adhoc_text}; background: {adhoc_bg}; border-radius: var(--r-pill);
-    padding: 0 6px; margin-left: 5px; font-weight: 600; }}
   .hist .h-x {{ font-size: var(--fs-xs); color: {text_faint}; flex-shrink: 0; }}
   .hist .h-open {{ margin-left: auto; font-size: var(--fs-xs); color: {accent}; text-decoration: none; flex-shrink: 0;
     opacity: 0; }}
@@ -1401,8 +1372,6 @@ def _history_html(entries: list[dict]) -> str:
             rows.append(f'<div class="hm">{label}</div>')
             last_month = month
         kw_html = html.escape(" · ".join(e["keywords"]))
-        if e["all"]:
-            kw_html += '<span class="h-all" title="검색어가 모두 있는 기사만 가져왔어요">모두</span>'
         hay = f'{e["title"]} {" ".join(e["keywords"])}'
         count_html = (
             f'<span class="h-x" title="같은 조건으로 {e["count"]}번 모았어요">×{e["count"]}</span>'
@@ -1485,13 +1454,8 @@ def render_new_card_page(
         <button type="button" class="kw-add" id="kw-add-btn" onclick="addKeyword()"><span class="plus-glyph">+</span>추가</button>
         <span class="kw-cnt" id="kw-cnt">0 / {MAX_ADHOC_KEYWORDS}</span>
       </div>
-      <div class="kw-mode seg" id="kw-mode" title="검색어 중 하나라도 있는 기사 / 검색어가 모두 있는 기사">
-        <label class="mode-opt"><input type="radio" name="match_mode" value="any" checked onchange="onModeChange()"><span>하나라도</span></label>
-        <label class="mode-opt"><input type="radio" name="match_mode" value="all" onchange="onModeChange()"><span>모두</span></label>
-      </div>
       <div id="kw-hidden-inputs"></div>
     </div>
-    <div class="mode-note" id="mode-note"></div>
     <div class="field">
       <label>수집시간</label>
       {_hm_select_html("win-start", "window_start", "00:00", now_hhmm)}
@@ -1526,54 +1490,10 @@ def render_new_card_page(
         ensure_ascii=False,
     ).replace("</", "<\\/")
     script = f"""<script>
-var MAX_ANY = {MAX_ADHOC_KEYWORDS};   // keywords 상한
-var MAX_ALL = {MAX_ADHOC_MUST_KEYWORDS};   // must_keywords 상한 — "모두" 모드는 이쪽에 묶인다
-var MAX_KEYWORDS = MAX_ANY;
+var MAX_KEYWORDS = {MAX_ADHOC_KEYWORDS};   // 검색어 상한 — 「하나라도 | 모두」를 없애 하나뿐이다
 var keywords = [];
 
-function currentMode() {{
-  var el = document.querySelector('input[name=match_mode]:checked');
-  return el ? el.value : 'any';
-}}
-
-function onModeChange() {{
-  renderKeywords();
-}}
-
-function renderMatchMode() {{
-  var mode = currentMode();
-  var row = document.getElementById('kw-mode');
-  var note = document.getElementById('mode-note');
-  var opts = row.querySelectorAll('.mode-opt');
-
-  // 검색어가 1개 이하면 두 선택지가 같은 뜻이라 고를 이유가 없다.
-  var usable = keywords.length >= 2;
-  row.classList.toggle('off', !usable);
-  row.querySelectorAll('input[type=radio]').forEach(function (r) {{ r.disabled = !usable; }});
-  opts.forEach(function (o, i) {{
-    o.classList.toggle('on', usable && ((i === 0) === (mode === 'any')));
-    o.classList.toggle('all', i === 1);
-  }});
-
-  // "모두"는 must_keywords로 저장되므로 그쪽 상한(MAX_ALL)에 묶인다. 저장 단계에서
-  // 튕기는 대신 누르기 전에 막는다 — 카드가 만들어진 뒤에 실패하면 되돌릴 자리가
-  // 화면에 없다.
-  var over = mode === 'all' && keywords.length > MAX_ALL;
-  note.classList.toggle('is-over', over);
-  if (over) {{
-    note.textContent = '\u2018모두 있는\u2019은 검색어 ' + MAX_ALL + '개까지예요 \u2014 '
-      + (keywords.length - MAX_ALL) + '개를 빼주세요';
-  }} else if (usable && mode === 'all') {{
-    note.textContent = '예: ' + keywords.slice(0, 2).join(' + ') + ' \u2192 둘 다 들어간 기사만';
-  }} else {{
-    note.textContent = '';
-  }}
-  document.querySelector('.btn[type=submit]').disabled = over;
-  return over;
-}}
-
 function renderKeywords() {{
-  MAX_KEYWORDS = currentMode() === 'all' ? MAX_ALL : MAX_ANY;
   document.querySelectorAll('.kw-chip').forEach(function (el) {{ el.remove(); }});
   var box = document.getElementById('kw-box');
   var input = document.getElementById('kw-input');
@@ -1596,7 +1516,6 @@ function renderKeywords() {{
     hidden.appendChild(h);
   }});
 
-  renderMatchMode();
 }}
 
 function addKeyword() {{
@@ -1686,10 +1605,6 @@ document.getElementById('new-card-form').addEventListener('submit', function (e)
     alert('검색어를 하나 이상 입력해주세요.');
     return;
   }}
-  if (renderMatchMode()) {{  // "모두"인데 상한을 넘음 — 버튼 말고 엔터 제출도 막는다
-    e.preventDefault();
-    return;
-  }}
   if (!validWindow('win-start', 'win-end')) {{
     e.preventDefault();
   }}
@@ -1708,9 +1623,7 @@ function pickHistory(row) {{
   select.value = known ? h.issue_id : '__new__';
   onIssueChange();
   if (!known) document.getElementById('new-issue-name').value = h.title;
-  var mode = document.querySelector('input[name=match_mode][value=' + (h.all ? 'all' : 'any') + ']');
-  if (mode) mode.checked = true;
-  keywords = h.keywords.slice(0, h.all ? MAX_ALL : MAX_ANY);
+  keywords = h.keywords.slice(0, MAX_KEYWORDS);
   renderKeywords();
   document.querySelectorAll('#hist .hr.picked').forEach(function (r) {{ r.classList.remove('picked'); }});
   row.classList.add('picked');

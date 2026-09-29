@@ -472,7 +472,6 @@ _KEYWORD_GROUPS_SCRIPT = "<script>\n" + r"""(function () {
       name: g.name || "",
       live: g.include_in_live !== false,   // 「실시간 현황」
       scrap: !!g.include_in_scrap,          // 「초안·확정본」
-      mode: g.mode === "AND" ? "AND" : "OR",
       kws: (g.keywords || []).map(function (w) { return { w: w, on: !disabled[w] }; })
     };
   }
@@ -673,39 +672,14 @@ _KEYWORD_GROUPS_SCRIPT = "<script>\n" + r"""(function () {
 
     box.appendChild(body);
 
-    // 카드 아랫줄 — 검색 방식(작은 두 칸 버튼, "검색 방식" 글자는 툴팁) ↔ 키워드 수.
+    // 카드 아랫줄 — 키워드 수만. 검색 방식(「1개라도 포함 | 모두 포함」) 두 칸 버튼은
+    // 없앴다 — 그룹 안 키워드는 언제나 OR이고, "둘 다 든 기사"는 키워드 하나 안에서
+    // `가상자산+과세`처럼 +로 묶어 네이버에 그대로 넘긴다(app.naver_api).
     // [수정: 2026-09-15] 오른쪽에 있던 「☑ 정기 스크랩」은 머리줄 「초안·확정본」 스위치가
-    // 됐다. 그룹이 꺼지면(두 스위치 다 끔) 검색 방식·개수만 CSS가 흐리게 잠근다.
+    // 됐다. 그룹이 꺼지면(두 스위치 다 끔) 키워드 수만 CSS가 흐리게 잠근다.
     var foot = document.createElement("div");
     foot.className = "kw-foot";
 
-    var mode = document.createElement("div");
-    mode.className = "kw-mode";
-    mode.setAttribute("role", "group");
-    mode.setAttribute("aria-label", "검색 방식");
-    mode.title = "검색 방식 — 키워드 중 1개라도 들어간 기사 / 모두 들어간 기사";
-    [["OR", "1개라도 포함"], ["AND", "모두 포함"]].forEach(function (pair) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.textContent = pair[1];
-      b.dataset.mode = pair[0];
-      var on = g.mode === pair[0];
-      b.className = on ? "on" : "";
-      b.setAttribute("aria-pressed", on ? "true" : "false");
-      b.onclick = function () {
-        if (g.mode === pair[0]) return;
-        g.mode = pair[0]; markDirty();
-        // 전체를 다시 그리지 않고 이 두 칸만 바꾼다 — 키보드 포커스가 그대로 남는다
-        mode.querySelectorAll("button").forEach(function (x) {
-          var sel = x.dataset.mode === g.mode;
-          x.className = sel ? "on" : "";
-          x.setAttribute("aria-pressed", sel ? "true" : "false");
-        });
-        refreshSaveBar();
-      };
-      mode.appendChild(b);
-    });
-    foot.appendChild(mode);
     foot.appendChild(cnt);
     box.appendChild(foot);
 
@@ -877,7 +851,6 @@ _KEYWORD_GROUPS_SCRIPT = "<script>\n" + r"""(function () {
         addHidden(form, "group" + gi + "_keyword" + (ki + 1), k.w);
         if (k.on) addHidden(form, "group" + gi + "_keyword" + (ki + 1) + "_on", "1");
       });
-      addHidden(form, "group" + gi + "_mode", g.mode);
       if (g.live) addHidden(form, "group" + gi + "_include_in_live", "1");
       if (g.scrap) addHidden(form, "group" + gi + "_include_in_scrap", "1");
     });
@@ -926,7 +899,6 @@ _KEYWORD_GROUPS_TEMPLATE = (
   }}
   .group-block.off {{ background: {surface_off}; }}
   .group-block.off .group-body,
-  .group-block.off .kw-mode,
   .group-block.off .kw-count {{ opacity: .5; pointer-events: none; }}
   .group-head {{ display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-bottom: 8px; }}
   /* [수정: 2026-09-11] 앞에 .group-head를 붙여 명시도를 올렸다 — 예전엔 _BASE_STYLE의
@@ -1036,13 +1008,6 @@ _KEYWORD_GROUPS_TEMPLATE = (
   .kw-foot {{ display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
     margin-top: 10px; padding-top: 8px; border-top: 1px solid {border}; }}
   /* 검색 방식 — 라디오 두 개 대신 작은 두 칸 버튼. _BASE_STYLE의 파란 button을 덮는다 */
-  .kw-mode {{ display: inline-flex; border: 1px solid {border}; border-radius: var(--r-md); overflow: hidden; }}
-  .kw-mode button {{ background: {card}; color: {muted}; border: 0; border-radius: 0;
-    font-size: var(--fs-sm); padding: 3px 9px; line-height: 1.4; }}
-  .kw-mode button + button {{ border-left: 1px solid {border}; }}
-  .kw-mode button:hover {{ background: {hover}; color: {header}; }}
-  .kw-mode button.on {{ background: {accent_tonal}; color: {header}; font-weight: 600; }}
-  .kw-mode button:focus-visible {{ outline: 2px solid {accent}; outline-offset: -2px; }}
 
   .add-group-btn {{
     width: 100%; background: {card}; color: {accent}; border: 1px dashed {accent};
@@ -1129,7 +1094,8 @@ def _group_to_chip_dict(group: dict) -> dict:
         # 옮기기 전 형식이 섞여 와도 옛 규칙으로 읽게 app.settings 헬퍼를 거친다
         "include_in_live": group_in_live(group),
         "include_in_scrap": group_in_scrap(group),
-        "mode": "AND" if group.get("mode") == "AND" else "OR",
+        # 그룹 안은 언제나 OR이다 — 「모두 포함」은 없앴고, 조합은 키워드 하나 안의 +로 한다.
+        "mode": "OR",
         "keywords": list(keywords),
         "disabled_keywords": [k for k in keywords if k in disabled],
     }

@@ -32,7 +32,6 @@ from app.config import (
 )
 from app.naver_api import ALL_OUTLET_NAMES
 
-VALID_MODES = ("OR", "AND")
 VALID_DIRECTIONS = ("up", "down", "jumpup", "jumpdown")
 _TIME_PATTERN = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
 
@@ -320,7 +319,12 @@ def validate_keyword_groups(groups: list) -> list:
     - 그룹명·키워드가 전부 비어 있으면 그 그룹은 그냥 무시한다(칸을 지운 것으로 간주).
     - 이름이 있는데 키워드가 하나도 없거나, 반대로 키워드는 있는데 이름이 없으면 에러.
     - 그룹당 키워드는 MAX_KEYWORDS_PER_GROUP개까지, 그룹은 MAX_KEYWORD_GROUPS개까지.
-    - mode는 "OR" 또는 "AND"만 허용하며, 키워드가 1개뿐이면 강제로 "OR"로 맞춘다.
+    - [수정] mode는 언제나 "OR"로 저장한다 — 화면의 「1개라도 포함 | 모두 포함」 두 칸
+      버튼을 없앴다. "둘 다 든 기사"는 그룹 전체를 AND로 돌리는 대신 키워드 하나 안에서
+      `가상자산+과세`처럼 묶어 네이버에 그대로 넘긴다(공백도 같은 뜻이다). 그쪽이 그룹
+      8칸을 안 쓰고, 같은 그룹에 낱개 키워드와 섞을 수 있으며, 실측상 기사도 더 잡는다
+      (두 검색 결과를 URL로 교차시키는 그룹 AND는 네이버가 검색어마다 같은 사건의 다른
+      기사를 대표로 내줄 때 그걸 놓친다). 저장된 옛 "AND"도 여기서 "OR"로 눕힌다.
     - [수정: 2026-07-25] "기관 정보" 그룹도 다른 그룹과 완전히 동등하게 여기서 다룬다 —
       더는 특별 취급하지 않는다(이름·키워드 수정, 그룹 자체 삭제까지 전부 허용). 대신
       그룹이 하나도 안 남으면 에러로 막는다 — 전부 지우면 수집이 조용히 매번 0건이
@@ -361,7 +365,7 @@ def validate_keyword_groups(groups: list) -> list:
                 seen_kw.add(k)
                 deduped_keywords.append(k)
         keywords = deduped_keywords
-        mode = group.get("mode", "OR")
+        mode = "OR"
         include_in_live = group_in_live(group)
         include_in_scrap = group_in_scrap(group)
         disabled_keywords = [k for k in group.get("disabled_keywords", []) if k in keywords]
@@ -373,13 +377,11 @@ def validate_keyword_groups(groups: list) -> list:
             raise SettingsError(f'"{name}" 그룹에는 키워드를 최소 1개 입력해야 합니다.')
         if len(keywords) > MAX_KEYWORDS_PER_GROUP:
             raise SettingsError(f'"{name}" 그룹의 키워드는 최대 {MAX_KEYWORDS_PER_GROUP}개까지 가능합니다.')
-        if mode not in VALID_MODES:
-            raise SettingsError(f"검색 방식은 OR 또는 AND만 가능합니다: {mode!r}")
         cleaned.append(
             {
                 "name": name,
                 "keywords": keywords,
-                "mode": mode if len(keywords) >= 2 else "OR",
+                "mode": mode,
                 "include_in_live": include_in_live,
                 "include_in_scrap": include_in_scrap,
                 "disabled_keywords": disabled_keywords,
