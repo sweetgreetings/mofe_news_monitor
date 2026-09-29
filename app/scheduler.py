@@ -6,10 +6,11 @@ from typing import Callable, List, Optional
 
 from app.breaking_alert_sender import poll_and_alert_tick
 from app.negative_guess import negative_guess_tick
-from app.config import LAST_SLOT_COLLECT_DELAY_MIN, MAX_RETRIES
-from app.confirm_send import check_pending_confirm_and_send
+from app.config import MAX_RETRIES
+from app.confirm_send import check_pending_confirm_and_send, refresh_confirmed_screens
 from app.renderer import generate_waiting_page
-from app.scraper import collect_run_with_retry
+from app.last_slot_topup import last_window, topup_due_at
+from app.scraper import collect_run_with_retry, top_up_last_run
 from app.settings import active_schedule_times, load_settings
 from app.curation import cleanup_group_overrides
 from app.storage import delete_expired_runs, run_exists
@@ -111,37 +112,6 @@ def _record_slot_failure(now: datetime, run_slot: str) -> int:
     return count
 
 
-def _last_slot_is_waiting(
-    now: datetime, window: dict, schedule_times: Optional[List[dict]] = None
-) -> bool:
-    """하루 마지막 회차인데 아직 LAST_SLOT_COLLECT_DELAY_MIN이 안 지났으면 True(= 더 기다린다).
-
-    [추가: 2026-09-03] 마감 순간 네이버 검색이 아직 안 준 기사는 다음 회차가 하한을
-    물려 주워오는데(app.scraper.collect_run), **마지막 회차만은 주워갈 다음 회차가
-    없다** — 다음날 첫 회차는 전날 기사를 안 본다. 그래서 마지막 회차만 수집 실행을
-    이 분 수만큼 늦춘다. 시간창(start/end)도 회차 이름(run_slot)도 그대로이고 수집하는
-    시각만 뒤로 미는 것이라, 저장 파일·헤더·보고서 텍스트에는 아무 티가 안 난다.
-
-    늦추는 건 "아직 이르다"일 때뿐이라 보충 실행(앱이 꺼져 있다 켜진 경우)은 그대로
-    즉시 돈다 — 그때는 이미 지연 시각을 한참 지났기 때문이다.
-
-    지연 시각이 자정을 넘기면(예: 마지막 회차가 23:50) 그날 안에 그 시각이 오지 않아
-    회차가 통째로 누락된다 — 그 경우엔 늦추지 않는다(늦추는 건 부가 기능이고, 회차를
-    거르는 건 본업 실패다).
-    """
-    schedule_times = _resolve_schedule_times(schedule_times)
-    if not schedule_times:
-        return False
-    if window["end"] != max(w["end"] for w in schedule_times):
-        return False  # 마지막 회차가 아니면 예전 그대로 정시 실행
-    hour, minute = map(int, window["end"].split(":"))
-    total = hour * 60 + minute + LAST_SLOT_COLLECT_DELAY_MIN
-    if total >= 24 * 60:
-        return False  # 자정을 넘기면 늦추지 않는다
-    due_hm = f"{total // 60:02d}:{total % 60:02d}"
-    return now.strftime("%H:%M") < due_hm
-
-
 def find_slots_to_run(
     now: datetime,
     schedule_times: Optional[List[dict]] = None,
@@ -166,9 +136,10 @@ def find_slots_to_run(
     schedule_times = _resolve_schedule_times(schedule_times)
     now_hm = now.strftime("%H:%M")
     passed = [w for w in schedule_times if w["end"] <= now_hm and not already_run(w["end"])]
-    # 하루 마지막 회차만은 아직 지연 시각 전이면 남겨둔다(_last_slot_is_waiting) — 그 판단은
-    # "마지막 회차인가"까지 함수 안에서 하므로 여기서 따로 가려낼 필요가 없다.
-    passed = [w for w in passed if not _last_slot_is_waiting(now, w, schedule_times)]
+    # 하루 마지막 회차도 다른 회차와 똑같이 정시에 돈다 — 예전엔 여기서 30분 늦췄는데
+    # (옛 _last_slot_is_waiting) 하루의 마지막 보고서만 30~45분 늦게 보이는 게 실제로
+    # 문제였다. 마감 뒤 늦게 색인되는 기사는 늦추기 대신 「보충 훑기」가 그 회차에 덧붙인다
+    # (app.last_slot_topup, 아래 run_topup_if_due).
     # 오늘 이미 여러 번 실패한 회차는 더 붙들지 않는다(_MAX_SLOT_ATTEMPTS 주석 참고).
     passed = [w for w in passed if not _give_up_on(now, w["end"])]
     return sorted(passed, key=lambda window: window["end"])
@@ -215,6 +186,57 @@ def run_due_slot(
     return last_done
 
 
+def run_topup_if_due(
+    now: Optional[datetime] = None,
+    schedule_times: Optional[List[dict]] = None,
+    topup: Callable[..., int] = top_up_last_run,
+    refresh: Callable[[], None] = refresh_confirmed_screens,
+) -> int:
+    """보충 훑기 시각이 됐으면 하루 마지막 회차에 늦게 색인된 기사를 덧붙인다.
+
+    왜 보충이 필요한지는 app.last_slot_topup의 모듈 설명 참고 — 마지막 회차는 늦게 색인된
+    기사를 주워갈 다음 회차가 없어서, 예전엔 수집 자체를 30분 늦췄고 그 탓에 하루의 마지막
+    보고서만 한참 뒤에 보였다. 지금은 정시에 확정본을 내고 이 함수가 뒤에서 덧붙인다.
+
+    덧붙인 게 있으면 확정본·정기 보관함·홈을 다시 그린다(확정 상태·발송 기록은 안 건드린다).
+    한 건도 없으면 화면을 다시 그리지 않는다 — 바뀐 게 없다.
+
+    실패하면 회차 파일에 topup_at이 안 남으므로 다음 tick에서 자연히 다시 시도되고,
+    _MAX_SLOT_ATTEMPTS번 실패하면 오늘은 더 붙들지 않는다(회차 수집과 같은 제동을 쓴다 —
+    없으면 계속 실패하는 보충이 10초마다 네이버를 다시 부른다).
+    """
+    now = now or datetime.now()
+    times = _resolve_schedule_times(schedule_times)
+    due = topup_due_at(times)
+    window = last_window(times)
+    if due is None or window is None or now.strftime("%H:%M") < due:
+        return 0
+    # 회차 수집 실패 카운터와 같은 저장소를 쓰되 키를 갈라 둔다 — 「17:00 회차 수집」과
+    # 「17:00 회차 보충」은 다른 일이라 한쪽 실패가 다른 쪽을 막으면 안 된다.
+    failure_key = f"{window['end']}#topup"
+    if _give_up_on(now, failure_key):
+        return 0
+    try:
+        added = topup(now=now, schedule_times=times)
+    except Exception:
+        count = _record_slot_failure(now, failure_key)
+        if count >= _MAX_SLOT_ATTEMPTS:
+            logger.exception(
+                "%s 회차 보충 훑기가 %d번 실패해 오늘은 더 시도하지 않습니다 — 마감 뒤 늦게"
+                " 색인된 기사는 이 회차에 안 담깁니다",
+                window["end"], count,
+            )
+        else:
+            logger.exception(
+                "%s 회차 보충 훑기 실패(%d/%d) — 다음 tick에서 다시 시도합니다",
+                window["end"], count, _MAX_SLOT_ATTEMPTS,
+            )
+        return 0
+    if added:
+        refresh()
+    return added
+
+
 def run_scheduler(
     poll_interval_sec: int = POLL_INTERVAL_SEC,
     now_fn: Callable[[], datetime] = datetime.now,
@@ -229,6 +251,9 @@ def run_scheduler(
     cleanup_adhoc_cards: Callable[[], list] = lambda: [],
     render_waiting: Callable[[], None] = generate_waiting_page,
     check_confirm_send: Callable[[datetime], None] = check_pending_confirm_and_send,
+    # 하루 마지막 회차의 보충 훑기(run_topup_if_due) — 그 함수가 보충 시각·이미 보충했는지를
+    # 다 확인하고 그 외엔 즉시 반환하므로(비용 0) 매 tick 그대로 불러도 된다.
+    check_topup: Callable[..., int] = run_topup_if_due,
     # [추가: 2026-08-20] [단독]·[속보] 알림의 "폴링" 경로 — app.breaking_alert_sender.
     # poll_and_alert_tick 자체가 감시 켜짐 여부·시간대·주기를 다 확인하고 그 외엔
     # 즉시 반환하므로(비용 0), cleanup_adhoc_cards처럼 기본값을 빈 람다로 둘 필요 없이
@@ -237,6 +262,12 @@ def run_scheduler(
     # 홈 「부정 추정 기사」 — 판정 안 한 오늘 회차가 있을 때만 백그라운드 스레드로 판정하고
     # 바로 돌아온다(없으면 비용 0, app.negative_guess).
     check_negative_guess: Callable[[datetime], None] = negative_guess_tick,
+    # 「🗄️ 기관 기사 찾기」의 원장 채우기(app.agency_archive) — 회차와 무관하게
+    # 24시간 돈다. **기본값을 아무 일도 안 하는 람다로 두고 main.py가 실제 함수를
+    # 주입한다**(cleanup_adhoc_cards와 같은 방식) — 기본값이 진짜 함수면 run_scheduler를
+    # 부르는 테스트가 전부 실제 data/agency_archive/를 쓰고 네이버까지 부른다. 실제로
+    # 그랬다(CODING_CONVENTIONS §1 — 재봤더니 엉뚱한 날짜 파일이 생겼다).
+    collect_agency_archive: Callable[[datetime], int] = lambda _now: 0,
     should_continue: Callable[[], bool] = lambda: True,
 ) -> None:
     """앱이 켜져 있는 동안 poll_interval_sec마다 실행할 회차가 있는지 확인하고 수집한다.
@@ -267,8 +298,14 @@ def run_scheduler(
     data/adhoc/ 두 폴더만 지워도 정기 쪽에 흔적이 안 남는다(CLAUDE.md "수시 모니터링" 절).
     그래서 기본값은 아무 일도 안 하는 람다이고, main.py가 실제 함수를 주입한다.
 
+    [추가] collect_agency_archive — 「🗄️ 기관 기사 찾기」의 원장(app.agency_archive)을
+    회차와 무관하게 24시간 채운다. 회차가 하루를 다 덮지 않아(평일 17:00 이후·주말 16:00
+    이후) 그 시간 기관 기사가 매일 밤 사라지던 자리다. 보고서가 아니라 읽기 전용 원장이라
+    확정·발송·집계 어디에도 얹히지 않는다. cleanup_adhoc_cards와 같은 이유로 **기본값은
+    빈 람다이고 main.py가 실제 함수를 주입한다**(위 인자 주석 참고).
+
     now_fn/sleep/scrape/cleanup/render_waiting/check_confirm_send/check_breaking_alert/check_negative_guess/
-    should_continue는 테스트에서 주입할 수 있다.
+    collect_agency_archive/should_continue는 테스트에서 주입할 수 있다.
 
     [추가: 2026-08-10] 매 tick마다 확정·전송 유예 시간 경과도 함께 확인한다
     (app.confirm_send.check_pending_confirm_and_send) — 담당자가 (확정)/(전송)을 직접
@@ -285,9 +322,13 @@ def run_scheduler(
             if current_active_slot(now, schedule_times) is None:
                 render_waiting()
             run_due_slot(now=now, schedule_times=schedule_times, scrape=scrape)
+            # 하루 마지막 회차의 「보충 훑기」 — 보충 시각이 아니거나 이미 보충했으면 즉시
+            # 돌아온다(비용 0). 수집(run_due_slot) 뒤에 둬야 방금 저장된 회차를 본다.
+            check_topup(now, schedule_times)
             check_confirm_send(now)
             check_breaking_alert(now)
             check_negative_guess(now)
+            collect_agency_archive(now)
             cleanup()
             cleanup_overrides()
             cleanup_adhoc_cards()

@@ -119,12 +119,25 @@ def today_is_complete(today_str: str) -> bool:
     제보를 남겼는데, 2026-09-11 결정 때 이미 「감수한 것」으로 적어 둔 자리다 — 마지막
     회차가 끝나면 오늘치도 사실 다 찼는데 자정까지는 안 보였다. 그 몇 시간만 되돌린다.
 
-    저장 여부로 판단하고 시계로 판단하지 않는다 — 하루 마지막 회차는 수집을 30분 늦추고
-    (LAST_SLOT_COLLECT_DELAY_MIN) 실패한 회차는 재시도로 늦게 들어오므로, 끝 시각이
-    지났다고 세면 아직 안 들어온 기사를 뺀 채 오늘을 "다 찬 날"로 그린다.
+    저장 여부로 판단하고 시계로 판단하지 않는다 — 실패한 회차는 재시도로 늦게 들어오므로,
+    끝 시각이 지났다고 세면 아직 안 들어온 기사를 뺀 채 오늘을 "다 찬 날"로 그린다.
+
+    마지막 회차가 저장된 것만으로는 아직 다 찬 게 아니다 — 그 회차는 마감 뒤 늦게 색인된
+    기사를 「보충 훑기」로 한 번 더 덧붙인다(app.last_slot_topup). 보충 전에 오늘을 그리면
+    그린 직후 오늘 칸이 한 번 올라가, "점끼리 비교가 성립하는 완결된 값"이라는 이 판정의
+    전제가 깨진다. 그래서 보충이 남아 있으면 아직 어제에서 끝낸다.
     """
     slots = todays_expected_slots(today_str)
-    return bool(slots) and all(run_exists(slot, today_str) for slot in slots)
+    if not (slots and all(run_exists(slot, today_str) for slot in slots)):
+        return False
+    try:
+        # 순환 임포트 회피 + 이 판정은 부가 기능이라 실패하면 조용히 보수적으로 판단한다
+        # (todays_expected_slots가 빈 목록으로 실패하는 것과 같은 방향).
+        from app.last_slot_topup import topup_pending
+
+        return not topup_pending()
+    except Exception:
+        return False
 
 
 def last_complete_day(today_str: str) -> str:

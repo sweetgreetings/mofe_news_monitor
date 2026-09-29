@@ -2181,7 +2181,8 @@ renderRelativeTimes();
     }}
   }}
 }})();
-// [추가: 2026-09-03] 상단 "앞 회차 기사 N건" 배너의 [N건] 버튼 — 누르면 첫 해당 기사로
+// [추가: 2026-09-03] 상단 「늦게 들어온 기사」 배너(.late-banner)의 [N건 보기] 버튼 —
+// 누르면 첫 해당 기사로
 // 간다(초안의 [미분류 N건] 배지와 같은 동작). 여러 번 누르면 다음 것으로 순서대로 넘어가
 // 흩어져 있어도 다 찾을 수 있다 — jumpToNextFinalizeAdded와 같은 방식.
 // 대상은 서버가 구운 번호가 아니라 **누르는 시점의 DOM**에서 찾는다(소제목 순서가 바뀌거나
@@ -2661,13 +2662,19 @@ def render_article(
     # 이름 문자열에 안 섞고 별도 <span>이라 복사/다운로드/발송 텍스트엔 안 나간다
     # (다른 배지들과 같은 원칙 — CODING_CONVENTIONS.md §4).
     late_slot = article.get("late_pickup_slot") or ""
+    # 보충 훑기로 들어온 기사(app.scraper.top_up_last_run)는 **이 회차 시간대** 기사다 —
+    # 회차 이름을 적으면 툴팁이 자기 회차를 남처럼 가리킨다. 그래서 문구를 따로 둔다.
+    late_tip_text = (
+        "이 회차 시간대 기사인데 마감 순간 검색 결과에 아직 없어, 마감 뒤 보충 수집으로 담겼습니다"
+        if article.get("topup_pickup")
+        else (
+            (f"{format_slot_time_kr(late_slot)} 회차 시간대 기사인데 " if late_slot else "앞 회차 시간대 기사인데 ")
+            + "그때 수집되지 않아 이번 회차에 담겼습니다"
+        )
+    )
     late_badge_html = (
         '<span class="late-badge" title="'
-        + html.escape(
-            (f"{format_slot_time_kr(late_slot)} 회차 시간대 기사인데 " if late_slot else "앞 회차 시간대 기사인데 ")
-            + "그때 수집되지 않아 이번 회차에 담겼습니다",
-            quote=True,
-        )
+        + html.escape(late_tip_text, quote=True)
         # [수정: 2026-09-11] 칩 글자 「앞 회차 기사」 → 「늦게 들어온 기사」(사용자 결정) —
         # 옛 이름이 "이 기사는 앞 회차 소속"으로 읽혀 앞 회차로 옮겨질 것처럼 보였다.
         # 실제로는 이번 회차에 담기는 기사다. 툴팁·배너 문구는 그대로다.
@@ -3844,24 +3851,54 @@ def render_page(
     late_articles = [a for a in articles if a.get("late_pickup")]
     if late_articles:
         late_slots = {a.get("late_pickup_slot") for a in late_articles if a.get("late_pickup_slot")}
-        # 회수된 기사가 전부 같은 회차 것일 때만 그 회차 이름을 쓴다 — 섞였거나 값이
-        # 없으면 "앞 회차"로만 말한다(없는 값을 지어내지 않는다).
-        late_label = (
-            f"{format_slot_time_kr(next(iter(late_slots)))} 회차 기사"
-            if len(late_slots) == 1
-            else "앞 회차 기사"
-        )
+        # 「보충 훑기」로 들어온 기사(app.scraper.top_up_last_run)는 앞 회차 기사가 아니라
+        # **이 회차 마감 뒤에 색인된** 기사다 — 그걸 "앞 회차 기사"로 말하면 담당자가 앞
+        # 회차를 찾아보게 된다. 전부 보충분이면 그대로 말하고, 섞였으면 둘을 아우르는
+        # 말("늦게 들어온 기사")로 내려간다(없는 값을 지어내지 않는 것과 같은 원칙).
+        topup_count = sum(1 for a in late_articles if a.get("topup_pickup"))
+        if topup_count == len(late_articles):
+            late_label = "마감 뒤에 들어온 기사"
+        elif topup_count:
+            late_label = "늦게 들어온 기사"
+        else:
+            late_label = (
+                f"{format_slot_time_kr(next(iter(late_slots)))} 회차 기사"
+                if len(late_slots) == 1
+                else "앞 회차 기사"
+            )
         late_tip = (
             "네이버가 앱에 주는 검색 결과에는 기사가 몇 분~수십 분 늦게 올라오는 경우가 있습니다.\n"
             "네이버 뉴스 화면에는 이미 보이더라도 검색 결과에는 아직 없을 수 있습니다.\n"
-            "그래서 앞 회차에 담기지 못한 기사를 다음 회차에서 함께 담습니다."
+            + (
+                # 하루 마지막 회차는 주워갈 다음 회차가 없어 이 회차에 직접 덧붙인다
+                # (app.last_slot_topup) — 그 사정을 툴팁에서 그대로 말한다. 마지막 회차의
+                # 평소 모습은 **섞인 경우**다(앞 회차 회수 + 이 회차 보충이 함께 일어난다).
+                "하루 마지막 회차는 그 기사를 넘길 다음 회차가 없어서,\n"
+                "마감 뒤에 한 번 더 찾아 이 회차에 함께 담습니다."
+                if topup_count == len(late_articles)
+                else (
+                    "그래서 앞 회차에 담기지 못한 기사를 다음 회차에서 함께 담습니다."
+                    + (
+                        "\n이 회차 마감 뒤에 찾아낸 기사도 함께 들어 있습니다."
+                        if topup_count
+                        else ""
+                    )
+                )
+            )
+        )
+        # 보충분만 있을 때는 "뒤늦게 수집돼"가 라벨과 겹친다(마감 뒤에 들어온 기사가
+        # 뒤늦게 수집돼…) — 그때만 뒷말을 바꾼다.
+        late_tail = (
+            "를 보충 수집으로 함께 담았어요."
+            if topup_count == len(late_articles)
+            else "가 뒤늦게 수집돼 함께 담겼어요."
         )
         late_pickup_banner_html = (
             '<div class="late-banner">'
             # 건수 버튼을 문장 한가운데 두지 않는다 — 조사("2건이")가 버튼 경계로 끊겨
             # "2건 이"처럼 벌어져 보인다(실측). 초안의 [미분류 N건] 배지처럼 문장 끝에
             # 독립된 버튼으로 두고, 라벨에 동작("보기")을 적어 누를 수 있음을 알린다.
-            f'<span class="msg">📥 <b>{html.escape(late_label)}</b>가 뒤늦게 수집돼 함께 담겼어요.</span>'
+            f'<span class="msg">📥 <b>{html.escape(late_label)}</b>{html.escape(late_tail)}</span>'
             '<button type="button" class="cnt" onclick="jumpToLatePickup()">'
             f'{len(late_articles)}건 보기</button>'
             f'<button type="button" class="q" title="{html.escape(late_tip, quote=True)}">&#8505;</button>'

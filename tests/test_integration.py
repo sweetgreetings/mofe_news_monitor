@@ -3459,16 +3459,164 @@ def test_auto_send_does_not_resend_forever():
     print("45) 자동발송 무한 재발송 방지: 통과 (한 명이라도 받으면 한 번만, 실패는 남고, 전원 실패는 5번까지·포기 안내)")
 
 
+def test_last_slot_topup_adds_late_articles():
+    """하루 마지막 회차 — 정시에 확정본을 내고, 마감 뒤 늦게 색인된 기사를 덧붙인다.
+
+    예전엔 마지막 회차만 수집을 30분 늦췄다(옛 LAST_SLOT_COLLECT_DELAY_MIN). 기사는 많이
+    담겼지만 하루의 마지막 보고서만 30~45분 뒤에 보여, 실사용에서 "왜 17시 확정본이 안
+    나오나"로 되풀이됐다(2026-09-29). 이 테스트가 보는 것:
+
+      1) 보충 시각 규칙 — 마감 + 30분, 23:50에서 잘림, 23:50 이후 마감이면 보충 없음
+      2) 마지막 회차도 **정시에** 수집 대상이 된다(지연이 사라졌다)
+      3) 보충은 **새 기사만 덧붙인다** — 기존 기사·순서·숨김·소제목은 그대로
+      4) 새 기사엔 late_pickup + topup_pickup이 붙고 late_pickup_slot은 **안 붙는다**
+         (앞 회차 기사가 아니라 이 회차 시간대 기사라 회차 이름을 적으면 안 된다)
+      5) 이미 있는 제목과 같은 기사는 안 붙는다(담당자가 보던 기사가 밀려나지 않는다)
+      6) 한 번 보충하면 그날 다시 안 돈다(topup_at) — 실패했을 때만 다시 시도된다
+      7) 확정본 배너·칩이 "마감 뒤에 들어온 기사"로 말한다(앞 회차라고 하지 않는다)
+    """
+    from app import last_slot_topup, scheduler, undo
+
+    _require_isolation()
+    today = datetime.now().date().isoformat()
+    windows = [
+        {"start": "09:00", "end": "14:00", "enabled": True},
+        {"start": "14:00", "end": "17:00", "enabled": True},
+    ]
+
+    # 1) 보충 시각 규칙
+    assert last_slot_topup.topup_due_at(windows) == "17:30", "마감 + 30분이어야 함"
+    assert last_slot_topup.topup_due_at(
+        [{"start": "20:00", "end": "23:40", "enabled": True}]
+    ) == "23:50", "자정을 넘기는 대신 23:50으로 당겨야 함"
+    for end in ("23:50", "23:59"):
+        assert last_slot_topup.topup_due_at(
+            [{"start": "20:00", "end": end, "enabled": True}]
+        ) is None, f"{end} 마감엔 벌 시간이 없어 보충을 건너뛰어야 함"
+    assert last_slot_topup.topup_due_at([]) is None
+
+    # 2) 마지막 회차도 정시에 돈다 — 17:00 마감 직후 tick에서 바로 후보가 된다
+    due = scheduler.find_slots_to_run(
+        datetime.strptime(f"{today} 17:00", "%Y-%m-%d %H:%M"),
+        schedule_times=windows,
+        already_run=lambda slot: False,
+    )
+    assert [w["end"] for w in due] == ["14:00", "17:00"], (
+        f"마지막 회차가 정시에 수집 대상이 아니다: {[w['end'] for w in due]}"
+    )
+
+    # --- 17:00 회차가 정시에 저장된 상태를 만든다 ---
+    kept = {**_article("담당자가-보던-기사"), "pub_date": f"{today}T16:10:00+09:00",
+            "group": "세제개편", "group_summary": "세제 관련 요약"}
+    hidden_one = {**_article("숨긴-기사"), "pub_date": f"{today}T16:20:00+09:00",
+                  "group": "세제개편", "group_summary": "세제 관련 요약"}
+    storage.save_run("17:00", [kept, hidden_one], run_at=f"{today}T17:00:06")
+    curation.hide_article(hidden_one["url"], outlet=hidden_one["outlet"], title=hidden_one["title"])
+
+    # 마감 뒤 네이버가 뒤늦게 준 기사들
+    late_new = {**_article("마감뒤-들어온-기사"), "pub_date": f"{today}T16:55:00+09:00"}
+    same_title = {**_article("다른-주소"), "title": kept["title"],
+                  "pub_date": f"{today}T16:58:00+09:00"}
+    captured = {}
+
+    def fake_search(groups, after=None, before=None, track_keyword_matches=False):
+        captured["after"] = after
+        captured["before"] = before
+        # 보충 훑기도 같은 창을 그대로 다시 훑으므로 기존 기사까지 딸려 온다.
+        return [dict(kept), dict(hidden_one), dict(late_new), dict(same_title)], []
+
+    now = datetime.strptime(f"{today} 17:30", "%Y-%m-%d %H:%M")
+    # 보충 전에 쌓인 되돌리기 기록은 보충 뒤에 남아 있으면 안 된다 — ↩ 한 번이 최신 회차
+    # 파일을 통째로 되돌려 방금 덧붙인 기사를 말없이 지운다(끊기와 같은 이유).
+    undo.push("숨기기")
+    assert undo.peek_label() == "숨기기"
+    with patch.object(scraper, "search_articles_by_groups", side_effect=fake_search), \
+         patch.object(scraper, "naver_is_configured", return_value=True), \
+         patch.object(scraper, "detect_and_alert", return_value=None), \
+         patch.object(scraper, "assign_to_existing", return_value={late_new["url"]: "세제개편"}):
+        added = scraper.top_up_last_run(now=now, schedule_times=windows)
+
+    assert added == 1, f"덧붙인 건수가 1이어야 하는데 {added}"
+    assert undo.peek_label() is None, (
+        "보충 뒤에도 되돌리기 기록이 남았다 — ↩ 한 번이 덧붙인 기사를 지운다"
+    )
+    # 창은 그 회차 그대로 — 하한만 60분 물리고 상한은 마감이다(마감 뒤 게시분은 안 담는다)
+    assert captured["after"].strftime("%H:%M") == "13:00", f"하한이 13:00이어야 하는데 {captured['after']}"
+    assert captured["before"].strftime("%H:%M") == "17:00", "상한은 회차 마감 그대로여야 함"
+
+    run = last_slot_topup.find_run(today, "17:00")
+    urls = [a["url"] for a in run["articles"]]
+    # 3) 기존 기사는 그대로, 새 기사는 맨 뒤
+    assert urls[:2] == [kept["url"], hidden_one["url"]], f"기존 기사 순서가 바뀌었다: {urls}"
+    assert urls[-1] == late_new["url"], "새 기사가 목록 맨 뒤에 붙지 않았다"
+    assert run["run_slot"] == "17:00" and run["run_at"] == f"{today}T17:00:06", (
+        "보충이 회차 이름·시각을 바꿨다 — 보고서는 여전히 그 회차의 보고서여야 한다"
+    )
+    # 5) 같은 제목은 안 붙는다
+    assert same_title["url"] not in urls, "이미 있는 제목과 같은 기사가 덧붙었다"
+
+    fresh = run["articles"][-1]
+    # 4) 표식
+    assert fresh.get("late_pickup") and fresh.get("topup_pickup"), "보충 표식이 안 붙었다"
+    assert not fresh.get("late_pickup_slot"), (
+        "보충분에 회차 이름이 붙었다 — 배너가 자기 회차를 남처럼 가리키게 된다"
+    )
+    assert fresh["group"] == "세제개편", "기존 소제목에 배정되지 않았다"
+    assert fresh["group_summary"] == "세제 관련 요약", "그 소제목의 요약을 물려받지 않았다"
+    # 6) 두 번째 호출은 아무것도 안 한다
+    assert run.get("topup_at"), "보충 기록(topup_at)이 안 남았다"
+    with patch.object(scraper, "search_articles_by_groups", side_effect=fake_search), \
+         patch.object(scraper, "naver_is_configured", return_value=True):
+        assert scraper.top_up_last_run(now=now, schedule_times=windows) == 0, (
+            "이미 보충한 회차를 또 훑었다"
+        )
+
+    # 7) 확정본 화면 — 앞 회차라고 말하지 않는다
+    storage.confirm_run(run)
+    html_text = renderer.generate_screen().read_text(encoding="utf-8")
+    assert "late-banner" in html_text, "보충 안내 배너가 안 그려짐"
+    assert "마감 뒤에 들어온 기사" in html_text, "배너가 보충분을 마감 뒤 기사로 말하지 않음"
+    banner = html_text[html_text.index('<div class="late-banner">'):]
+    banner = banner[: banner.index("</div>")]
+    assert "앞 회차" not in banner, f"보충분을 앞 회차 기사라고 말했음: {banner}"
+    assert "보충 수집으로 함께 담았어요" in banner, "보충 문장이 아니라 회수 문장을 썼음"
+    assert "⏱ 늦게 들어온 기사" in html_text, "보충분에 칩이 안 붙음"
+    plain_start = html_text.index("const PLAIN_TEXT = ") + len("const PLAIN_TEXT = ")
+    plain_text = json.loads(html_text[plain_start:html_text.index(";\n", plain_start)])
+    assert "늦게 들어온 기사" not in plain_text, "화면 전용 표시가 복사/내보내기 텍스트로 샜음"
+
+    # 시각 전에는 돌지 않고, 23:59 마감이면 아예 돌지 않는다(run_topup_if_due 쪽 판단)
+    calls = []
+    early = datetime.strptime(f"{today} 17:05", "%Y-%m-%d %H:%M")
+    assert scheduler.run_topup_if_due(
+        now=early, schedule_times=windows,
+        topup=lambda **kw: calls.append("불렀다") or 1, refresh=lambda: None,
+    ) == 0, "보충 시각 전인데 훑었다"
+    assert not calls, "보충 시각 전인데 수집 함수를 불렀다"
+    refreshed = []
+    assert scheduler.run_topup_if_due(
+        now=now, schedule_times=windows,
+        topup=lambda **kw: 2, refresh=lambda: refreshed.append(True),
+    ) == 2 and refreshed, "보충 시각인데 안 훑거나 화면을 다시 안 그렸다"
+    assert scheduler.run_topup_if_due(
+        now=now, schedule_times=[{"start": "20:00", "end": "23:59", "enabled": True}],
+        topup=lambda **kw: 1, refresh=lambda: None,
+    ) == 0, "23:59 마감인데 보충을 시도했다"
+
+    print("47) 마지막 회차 보충 훑기: 통과 (정시 확정본 + 마감 뒤 덧붙이기, 23:50 마감선, 표식·배너, 한 번만)")
+
+
 def test_trend_end_day_follows_today_completion():
     """정책 단어 추이의 끝 날짜 — 오늘 예정 회차가 전부 저장되기 전까지는 어제다.
 
     지키는 것:
       1) 오늘 회차가 일부만 저장됐으면 끝 날짜는 어제 (덜 찬 오늘이 급락처럼 보이면 안 된다)
-      2) 오늘 예정 회차가 전부 저장되면 끝 날짜가 오늘로 올라오고, 그 칸은 점선이 아니다
+      2) 오늘 예정 회차가 전부 저장되고 **마지막 회차 보충까지 끝나면** 끝 날짜가 오늘로
+         올라오고, 그 칸은 점선이 아니다 (보충 전엔 아직 어제 — 그리자마자 값이 올라간다)
       3) 예정 회차를 모를 때(설정이 비었을 때)는 어제 — 없는 회차를 지어내지 않는다
       4) 마지막 칸 밑 라벨이 「어제」/「오늘」로 갈린다(그래프 오른쪽 끝 값이 언제 것인지)
     """
-    from app import trend_chart, trend_data
+    from app import last_slot_topup, trend_chart, trend_data
 
     _require_isolation()
     today = datetime.now().date()
@@ -3504,8 +3652,16 @@ def test_trend_end_day_follows_today_completion():
     assert "어제" in trend_chart.render_chart(
         "t", buckets, [{"word": "세제", "color": "#000", "values": [1]}], unit)
 
-    # 2) 남은 회차까지 저장되면 오늘이 끝 날짜가 된다
+    # 2) 남은 회차까지 저장되면 — 단 마지막 회차의 「보충 훑기」까지 끝나야 오늘이 된다
     storage.save_run("14:00", [_article("추이-2")], run_at=f"{today_s}T14:01:00")
+    assert not trend_data.today_is_complete(today_s), (
+        "마지막 회차 보충이 남았는데 다 찬 날로 봤다 — 그리자마자 오늘 칸이 올라간다"
+    )
+    assert trend_data.last_complete_day(today_s) == yday_s
+    last_run = last_slot_topup.find_run(today_s, "14:00")
+    storage.update_run_articles(
+        {**last_run, "topup_at": f"{today_s}T14:31:00"}, last_run["articles"]
+    )
     assert trend_data.today_is_complete(today_s)
     assert trend_data.last_complete_day(today_s) == today_s, "오늘 회차가 다 찼는데 어제에서 끊겼다"
 
@@ -3839,6 +3995,7 @@ if __name__ == "__main__":
         test_send_log,
         test_auto_send_does_not_resend_forever,
         test_undo_stack_dedupes_snapshots,
+        test_last_slot_topup_adds_late_articles,
         test_trend_end_day_follows_today_completion,
     ]
 

@@ -95,6 +95,18 @@ def confirm_and_promote(run: dict) -> None:
     generate_landing_page()
 
 
+def refresh_confirmed_screens() -> None:
+    """확정본·정기 보관함·홈을 다시 그린다 — **확정 상태·발송 기록은 건드리지 않는다.**
+
+    이미 확정된 회차의 내용이 뒤에서 바뀌었을 때 쓴다(지금은 하루 마지막 회차의 「보충
+    훑기」 하나 — app.scraper.top_up_last_run). confirm_and_promote를 대신 부르면
+    confirm_run이 confirmed_at을 지금 시각으로 다시 써서 "언제 확정됐나"가 거짓이 된다.
+    """
+    generate_screen()
+    generate_history_page()
+    generate_landing_page()
+
+
 def _channel_failures(channel_label: str, result, name_by_target: dict) -> list:
     """SendResult.failures(chat_id/이메일 기준)를 사람 이름으로 바꿔 회차 파일에 남길
     모양({"channel", "target", "error"})으로 정리한다.

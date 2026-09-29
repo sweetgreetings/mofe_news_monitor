@@ -6,11 +6,17 @@ from typing import Callable, Optional
 
 import requests
 
+from app import undo
 from app.breaking_alert_sender import detect_and_alert
-from app.classifier import classify_for_finalize, forced_group_target_names
-from app.llm_classifier import llm_attempt_failed_without_fallback, round_id_for_run
-from app.config import COLLECT_LOOKBACK_MIN, MAX_RETRIES, RETRY_INTERVAL_SEC
-from app.curation import filter_hidden, load_group_overrides, set_group_override
+from app.classifier import classify_for_finalize, forced_group_target_names, groups_from_snapshot
+from app.llm_classifier import (
+    assign_to_existing,
+    build_assign_candidates,
+    llm_attempt_failed_without_fallback,
+    round_id_for_run,
+)
+from app.config import COLLECT_LOOKBACK_MIN, MAX_RETRIES, MAX_SUBHEADINGS, RETRY_INTERVAL_SEC
+from app.curation import filter_hidden, load_group_labels, load_group_overrides, set_group_override
 from app.draft_articles import clear_draft_pending_articles
 from app.draft_seen import load_draft_seen, search_condition
 from app.filters import (
@@ -23,7 +29,9 @@ from app.naver_api import NaverNotConfiguredError, kst_today_at, search_articles
 from app.preview_order import apply_preview_order, clear_preview_order, load_preview_order
 from app.settings import active_schedule_times, active_search_groups, all_search_keywords, group_in_scrap, load_settings
 from app.sorter import sort_by_outlet_priority
-from app.storage import load_run_file, load_today_runs, save_run
+from app.custom_groups import load_custom_groups
+from app.last_slot_topup import find_run, last_window, schedule_times_now, topup_due_at
+from app.storage import load_run_file, load_today_runs, save_run, update_run_articles
 
 logger = logging.getLogger(__name__)
 
@@ -373,6 +381,177 @@ def collect_run(
     # 예전처럼 동작하지 않는다).
     logger.warning("방금 저장한 회차 파일을 다시 읽지 못했습니다 (%s) — 최소 정보만 돌려줍니다", path)
     return {"run_slot": run_slot, "run_at": run_at, "articles": articles}
+
+
+def _topup_groups_for(fresh: list[dict], run: dict) -> None:
+    """보충으로 들어온 기사에 소제목을 붙인다 — **기존 소제목 중 하나, 아니면 「기타」**.
+
+    이 단계는 담당자가 안 보는 사이 저절로 도는 자리라, 「AI 기사 배정」(/assign-unclassified)
+    과 달리 **새 소제목을 만들지 않는다** — 보고서에 새 이름이 조용히 늘어나는 건 담당자가
+    누른 결과여야 한다. 모델이 새 이름을 제안하거나 응답에서 기사를 빠뜨리면 「기타」로
+    보낸다(그 함수의 "응답에 없는 URL은 전부 기타" 규칙과 같다). 「기타」는 언제나 열려
+    있는 칸이라 MAX_SUBHEADINGS와 무관하다.
+
+    기존 소제목의 이름·구성·순서는 하나도 안 건드린다 — 후보 목록을 주고 "골라라"만 시키니
+    이름을 바꿀 방법 자체가 없다. 담당자가 직접 만든 소제목은 후보에서 뺀다(특정 기사만
+    넣으려고 만든 칸일 수 있는데 모델은 그 의도를 모른다 — /assign-unclassified와 같은 이유).
+
+    소제목별 요약(group_summary)은 그 소제목의 첫 기사에 붙어 있는 값을 그대로 물려받는다.
+    덧붙는 기사는 목록 맨 뒤로 가므로 첫 기사가 바뀌지 않아 요약은 보존된다 — 다만 그
+    요약에 이 기사 내용은 안 들어 있다(「AI 기사 나누기」의 요약 한계와 같은 자리다).
+    """
+    # group 필드가 없는 옛 회차 파일(이 스냅샷 기능이 생기기 전 저장된 것)도 안전하게
+    # 지나가게 한다 — groups_from_snapshot은 그 필드를 당연히 있는 것으로 읽는다.
+    visible_existing = [a for a in filter_hidden(run.get("articles", [])) if a.get("group")]
+    snapshot = groups_from_snapshot(visible_existing) if visible_existing else []
+    summary_by_name = {g["name"]: g.get("summary", "") for g in snapshot}
+    candidates = build_assign_candidates(
+        snapshot, load_custom_groups(), load_group_labels(round_id_for_run(run))
+    )
+    existing_names = [c["name"] for c in candidates]
+    # 숨긴 기사는 모델에 보내지 않는다(화면에 안 보이는 기사에 토큰을 쓰지 않는다) —
+    # 대신 아래에서 「기타」로 떨어진다. 되살리면 그 칸에 보인다.
+    to_assign = filter_hidden(fresh)
+    assigned = assign_to_existing(to_assign, candidates) if (candidates and to_assign) else None
+    if assigned is None:
+        # 후보가 없다(이 회차에 소제목이 아예 없다)·호출 실패·모델이 맞는 곳이 없다고 답함.
+        # 전부 「기타」로 둔다 — 기사를 잃거나 엉뚱한 데 넣는 것보다 안전하다.
+        assigned = {}
+        logger.info("보충 훑기 소제목 배정을 건너뜀 — 새 기사 %d건을 「기타」로 담습니다", len(fresh))
+    for article in fresh:
+        name = assigned.get(article["url"])
+        if not name or name not in existing_names:
+            name = "기타"
+        article["group"] = name
+        article["group_summary"] = summary_by_name.get(name, "")
+
+
+def top_up_last_run(
+    now: Optional[datetime] = None,
+    schedule_times: Optional[list[dict]] = None,
+) -> int:
+    """하루 마지막 회차에 **마감 뒤 늦게 색인된 기사만 덧붙인다.** 덧붙인 건수를 돌려준다.
+
+    왜 이 함수가 있는지(정시 확정본 + 보충)는 app.last_slot_topup의 모듈 설명 참고.
+    부르는 자리는 app.scheduler.run_topup_if_due 하나다 — 보충 시각이 됐는지·이미
+    보충했는지의 판단은 거기서 한다. 이 함수를 직접 불러도 안전하게 한 번만 돌도록
+    같은 조건을 다시 확인한다.
+
+    **덧붙이기다, 다시 수집이 아니다.** 이미 저장된 기사·순서·숨김·이름표·소제목 구성은
+    하나도 안 건드리고 새 기사를 목록 **맨 뒤**에 붙인다(그래서 각 소제목 안에서도 맨 뒤에
+    선다). 회차 이름·run_at·헤더 시각도 그대로다 — 보고서는 여전히 그 회차의 보고서다.
+
+    새 기사에 붙는 표식:
+      - late_pickup: 확정본의 앰버 배너·⏱ 칩이 읽는 기존 표식을 그대로 쓴다.
+      - topup_pickup: 그 배너·툴팁 문구를 "앞 회차 기사"가 아니라 "마감 뒤에 들어온 기사"로
+        가르기 위한 표식. **late_pickup_slot은 안 적는다** — 이 기사들은 앞 회차가 아니라
+        이 회차 시간대 기사라, 회차 이름을 적으면 배너가 자기 회차 이름을 말하게 된다.
+
+    보충에 성공하면(0건이어도) 회차 파일에 topup_at을 적어 그날 다시 돌지 않는다. 실패하면
+    안 적으므로 다음 tick에서 다시 시도된다(그 횟수 제한은 스케줄러가 본다).
+    """
+    now = now or datetime.now()
+    settings = load_settings()
+    if schedule_times is None:
+        # 스케줄러는 이미 걸러낸 목록을 넘긴다. 직접 부른 경우만 여기서 읽는다 —
+        # 꺼둔 시간대를 빼는 규칙이 두 군데로 갈리지 않게 그 한 곳을 거친다.
+        schedule_times = schedule_times_now(now)
+    window = last_window(schedule_times)
+    if window is None or topup_due_at(schedule_times) is None:
+        return 0
+    date_str = now.strftime("%Y-%m-%d")
+    run = find_run(date_str, window["end"])
+    if run is None or run.get("topup_at"):
+        return 0
+    if not naver_is_configured():
+        raise NaverNotConfiguredError()
+
+    groups = active_search_groups(
+        settings, [g for g in settings.get("keyword_groups", []) if group_in_scrap(g)]
+    )
+    outlet_order = settings.get("outlet_order", [])
+    # 창은 그 회차 그대로다 — 마감 뒤에 **게시된** 기사는 어느 회차에도 속하지 않으므로
+    # 여기서 담지 않는다(before는 회차 마감). 하한만 collect_run과 똑같이 물려, 같은 창을
+    # 같은 폭으로 다시 훑는다.
+    window_start_dt = kst_today_at(window["start"]) if window.get("start") else None
+    after_dt = window_start_dt
+    if window_start_dt is not None:
+        after_dt = max(
+            window_start_dt - timedelta(minutes=COLLECT_LOOKBACK_MIN),
+            window_start_dt.replace(hour=0, minute=0, second=0, microsecond=0),
+        )
+    before_dt = kst_today_at(window["end"])
+    articles, failed_keywords = search_articles_by_groups(
+        groups, after=after_dt, before=before_dt, track_keyword_matches=True
+    )
+    if failed_keywords:
+        # collect_run과 같은 판단 — 일부 키워드가 조용히 빠진 채 "보충 끝"으로 적히면
+        # 그 기사들은 영영 안 들어온다. 예외를 올려 topup_at을 안 남기고 다음 tick에 맡긴다.
+        raise requests.exceptions.ConnectionError(
+            f"보충 훑기 키워드 검색 실패(재시도 소진): {failed_keywords}"
+        )
+
+    # 오늘 이미 어느 회차에든 실린 기사는 전부 뺀다(이 회차 자신의 기사도 여기 들어 있다) —
+    # collect_run이 쓰는 것과 같은 함수라 판정이 갈릴 수 없다.
+    published = _already_published_urls(date_str)
+    fresh = [a for a in articles if a["url"] not in published]
+    if fresh:
+        if outlet_order:
+            fresh = filter_by_outlet_whitelist(fresh, outlet_order)
+            fresh = sort_by_outlet_priority(fresh, priority_outlets=outlet_order)
+        else:
+            fresh = sort_by_outlet_priority(fresh)
+        # 제목 중복 제거는 **이미 저장된 기사까지 함께** 판정한다 — 저장된 기사를 앞에 두면
+        # 같은 제목의 대표 자리를 그쪽이 지키므로(deduplicate_by_title은 먼저 나온 것을
+        # 남긴다), 담당자가 보던 기사가 늦게 온 같은 제목 기사에 밀려나지 않는다.
+        survived = {a["url"] for a in deduplicate_by_title(run.get("articles", []) + fresh)}
+        fresh = sort_scoop_first([a for a in fresh if a["url"] in survived])
+
+    if not fresh:
+        _mark_topped_up(run, now)
+        logger.info("보충 훑기 — 새 기사 없음 (회차=%s)", window["end"])
+        return 0
+
+    for article in fresh:
+        article["late_pickup"] = True
+        article["topup_pickup"] = True
+    _topup_groups_for(fresh, run)
+
+    # [단독]·[속보] 알림 — 마지막 회차 마감 뒤에 색인된 기사는 이 경로가 없으면 「바닥」
+    # 검사를 영영 못 받는다(그 회차 수집은 이미 끝났다). 중복은 app.alerted_urls가 막는다.
+    # 알림 실패가 보충 저장을 막으면 안 된다(collect_run과 같은 fail-open).
+    try:
+        detect_and_alert(fresh)
+    except Exception:
+        logger.exception("[단독]·[속보] 알림(보충 훑기 경로) 실패 — 보충 저장은 정상 진행됩니다")
+
+    merged = run.get("articles", []) + fresh
+    updated = {**run, "articles": merged, "topup_at": now.isoformat(timespec="seconds")}
+    if not update_run_articles(updated, merged):
+        logger.warning("보충 훑기 결과를 저장할 회차 파일을 못 찾았습니다 (회차=%s)", window["end"])
+        return 0
+    # 되돌리기 스택을 비운다 — 「✂ 오늘만 여기서 끊기」와 **똑같은 이유**다(app.undo.clear).
+    # 되돌리기는 최신 회차 파일을 통째로 복원하므로, 보충 전에 쌓인 기록으로 뒤로 건너가면
+    # 방금 덧붙인 기사가 아무 말 없이 사라진다(담당자는 숨기기 하나를 되돌린 줄 안다).
+    try:
+        undo.clear()
+    except Exception:
+        logger.exception("보충 훑기 뒤 되돌리기 스택을 비우지 못했습니다 — 덧붙인 기사는 저장됐습니다")
+    logger.info(
+        "보충 훑기 — 새 기사 %d건을 %s 회차에 덧붙임 (마감 뒤 늦게 색인된 기사)",
+        len(fresh), window["end"],
+    )
+    return len(fresh)
+
+
+def _mark_topped_up(run: dict, now: datetime) -> None:
+    """이 회차의 보충이 끝났음을 회차 파일에 적는다(덧붙일 게 없었어도 적는다).
+
+    메모리가 아니라 파일에 적는 이유: 앱을 다시 켜도 같은 회차를 또 훑지 않는다. 훑어도
+    결과는 같지만 네이버 호출을 키워드 수만큼 한 번 더 쓴다.
+    """
+    articles = run.get("articles", [])
+    update_run_articles({**run, "topup_at": now.isoformat(timespec="seconds")}, articles)
 
 
 def collect_run_with_retry(
