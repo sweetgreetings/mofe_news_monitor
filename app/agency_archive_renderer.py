@@ -76,29 +76,53 @@ def _apply_override(article: dict, overrides: dict) -> dict:
     return merged
 
 
+def _split_terms(word: str) -> list:
+    """낱말 칸을 `+`로 가른 조각들.
+
+    **띄어쓰기는 가르지 않는다** — 「가상자산 과세」처럼 띄어 쓴 말은 붙어 있는 그대로 찾는
+    한 덩어리다. 이 화면은 네이버 검색이 아니라 쌓인 원장의 글자 대조라, 정기 검색어의
+    공백(=네이버가 낱말로 쪼개 AND)과 뜻이 반대다. 그 차이는 칸 아래 안내줄이 적는다.
+    """
+    return [t for t in (part.strip() for part in (word or "").split("+")) if t]
+
+
 def _matches(article: dict, word: str) -> bool:
-    if not word:
+    """`+`로 묶은 조각이 **전부** 든 기사만. 조각 하나하나는 글자 그대로 부분일치다."""
+    terms = _split_terms(word)
+    if not terms:
         return True
     haystack = f"{article.get('title') or ''} {article.get('summary') or ''}".lower()
-    return word.lower() in haystack
+    return all(t.lower() in haystack for t in terms)
 
 
 def _highlight(text: str, word: str) -> str:
-    """찾은 낱말만 노랑. 이 화면에서 노랑은 **찾은 낱말 하나**를 뜻한다(형광펜은 안 칠한다)."""
+    """찾은 낱말만 노랑. 이 화면에서 노랑은 **찾은 낱말**을 뜻한다(형광펜은 안 칠한다).
+
+    `+`로 여러 조각을 넣었으면 조각마다 칠한다. 한 자리에서 여러 조각이 걸리면 긴 쪽을
+    칠한다 — 짧은 조각이 긴 조각을 가운데서 자르면 안 된다(`가상자산+가상자산 과세`).
+    """
     escaped = html.escape(text)
-    if not word:
+    needles = [html.escape(t).lower() for t in _split_terms(word)]
+    if not needles:
         return escaped
-    needle = html.escape(word)
-    out, low_out, low_needle = [], escaped.lower(), needle.lower()
-    i = 0
-    while True:
-        j = low_out.find(low_needle, i)
-        if j < 0:
-            out.append(escaped[i:])
-            return "".join(out)
-        out.append(escaped[i:j])
-        out.append(f"<mark>{escaped[j:j + len(needle)]}</mark>")
-        i = j + len(needle)
+    low = escaped.lower()
+    out, i, n = [], 0, len(escaped)
+    while i < n:
+        hit = max((x for x in needles if low.startswith(x, i)), key=len, default="")
+        if hit:
+            out.append(f"<mark>{escaped[i:i + len(hit)]}</mark>")
+            i += len(hit)
+            continue
+        # 걸리는 조각이 없는 자리에서 `&amp;` 같은 실체 참조를 가운데서 쪼개지 않는다.
+        if escaped[i] == "&":
+            end = escaped.find(";", i, i + 10)
+            if end > 0:
+                out.append(escaped[i:end + 1])
+                i = end + 1
+                continue
+        out.append(escaped[i])
+        i += 1
+    return "".join(out)
 
 
 def _collect(date_from: str, date_to: str, word: str, overrides: dict) -> tuple:
@@ -221,10 +245,19 @@ def render_agency_archive_page(
         )
     elif not days:
         span = f"{_kr(date_from)} ~ {_kr(date_to)}"
-        what = f"「{html.escape(word)}」이(가) 든 " if word else ""
+        terms = _split_terms(word)
+        if len(terms) > 1:
+            what = "·".join(f"「{html.escape(t)}」" for t in terms) + "가 다 든 "
+            how = "기간을 넓히거나 +로 묶은 낱말을 줄여 보세요."
+        elif terms:
+            what = f"「{html.escape(terms[0])}」이(가) 든 "
+            how = "기간을 넓히거나 낱말을 지워 보세요."
+        else:
+            what = ""
+            how = "기간을 넓혀 보세요."
         body = (
             f'<div class="empty">💤 {html.escape(span)}에 {what}기관 기사가 없어요'
-            '<span class="sm">기간을 넓히거나 낱말을 지워 보세요.<br />'
+            f'<span class="sm">{how}<br />'
             f'이 화면엔 {html.escape("·".join(AGENCY_ARCHIVE_KEYWORDS))}가 든 기사만 쌓입니다.</span></div>'
         )
     else:
@@ -295,6 +328,8 @@ _TEMPLATE = """<!DOCTYPE html>
   .qrow {{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }}
   .qrow + .qrow {{ margin-top: 10px; }}
   .qlabel {{ font-size: var(--fs-sm); color: {text_soft}; font-weight: 600; width: 46px; flex: none; }}
+  .qnote {{ margin: -2px 0 2px 54px; font-size: var(--fs-sm); color: {text_soft}; line-height: 1.6; }}
+  @media (max-width: 640px) {{ .qnote {{ margin-left: 0; }} }}
   .qbar input[type="text"], .qbar input[type="date"] {{ height: var(--h-md); border: 1px solid {border};
     border-radius: var(--r-md); padding: 0 10px; font-size: var(--fs-md); font-family: inherit; background: {card};
     color: {text}; }}
@@ -360,6 +395,8 @@ _TEMPLATE = """<!DOCTYPE html>
         <input type="text" name="q" value="{word}" placeholder="제목·요약에서 찾을 낱말" />
         <button type="submit" class="btn-go">찾기</button>
       </div>
+      <div class="qnote">띄어 쓴 말은 붙어 있는 그대로 찾습니다.
+        두 낱말이 다 든 기사는 「가상자산 과세+국회」처럼 +로 묶으세요.</div>
       <div class="qrow">
         <span class="qlabel">기간</span>
         <span class="preset">{preset_html}</span>
