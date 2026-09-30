@@ -329,7 +329,6 @@ COLOR_WORDCLOUD_TIERS = (COLOR_HEADER, COLOR_ACCENT, "#3B7DDB", "#7AA5E8", "#A9C
 COLOR_LABEL_TEXT = "#8A5A14"
 COLOR_LABEL_BG = "#FBF0DA"
 COLOR_LABEL_BORDER = "rgba(138, 90, 20, 0.28)"
-COLOR_LABEL_BORDER_SOFT = "rgba(138,90,20,0.22)"
 # 📷 사진 추정 배지 — 라벨과 같은 앰버 축이지만 뜻이 달라 이름을 나눠 둔다.
 # [수정: 2026-08-21] 앰버 제거 — 이 배지가 붙는 행은 이미 opacity로 흐려져 있어(§확정
 # 본·초안의 .is-photo) 앰버까지 얹을 이유가 없었다. 중립 회색으로 낮춘다.
@@ -531,7 +530,6 @@ PALETTE = {
     "label_text": COLOR_LABEL_TEXT,
     "label_bg": COLOR_LABEL_BG,
     "label_border": COLOR_LABEL_BORDER,
-    "label_chip_border": COLOR_LABEL_BORDER_SOFT,
     "trend_1": COLOR_TREND_1,
     "trend_2": COLOR_TREND_2,
     "trend_3": COLOR_TREND_3,

@@ -41,7 +41,6 @@ from app.curation import filter_hidden
 from app.filters import is_schedule_listing
 from app.home_trend import load_trend_words
 from app.icons import icon
-from app.labels import label_stats
 from app.settings import all_search_keywords, load_settings
 from app.storage import list_run_dates, list_runs_for_date, load_today_runs
 from app.trend_chart import chart_css, render_chart
@@ -305,11 +304,6 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .t-agency {{ grid-column: 1 / -1; background: {card}; border-color: {border}; color: {arch_reg_text}; }}
   .t-agency:hover {{ background: {bg}; border-color: {ghost_border_hover}; }}
   .t-lab:hover {{ border-color: {label_border}; }}
-  /* 라벨 칸은 이름 + 칩을 한 덩어리로 가운데에 둔다 */
-  .tagset {{ margin-left: 4px; display: flex; gap: 6px; flex-wrap: wrap; }}
-  .tag-chip {{ font-size: var(--fs-xs); font-weight: 600; color: {label_text};
-    background: rgba(255,255,255,0.75); border: 1px solid {label_chip_border};
-    border-radius: var(--r-pill); padding: 3px 10px; }}
   /* 말풍선 — 칸 가운데 아래에 뜬다. 칸 위를 스치듯 지나갈 때 툭툭 뜨지 않게 0.15초 뒤에
      연다([단독]/[속보] 칩과 같은 이유). 안에 누를 것이 없어 pointer-events를 끈다. */
   .tip {{ position: absolute; top: calc(100% + 8px); left: 50%; z-index: 10; width: 280px;
@@ -555,29 +549,6 @@ def _todays_adhoc_state() -> dict:
             else "/adhoc/new"
         ),
     }
-
-
-_LANDING_LABEL_CHIPS = 3
-
-
-def _label_chips_html() -> str:
-    """[추가: 2026-08-18] 라벨 보관함 칸에 얹는 상위 라벨 칩 — 들어가 보지 않아도
-    무엇이 쌓였는지 알 수 있게 한다(2026-08-18 목업 대화에서 정했다 — 시안 파일은 없앴다).
-
-    label_stats()가 이미 건수 내림차순으로 정렬해 돌려주므로 앞에서 몇 개만 자른다.
-    라벨이 하나도 없으면 칩 영역 자체를 안 그린다 — 빈 껍데기를 보여주느니 없는 게 낫다.
-
-    [수정: 2026-09-15] 칩에서 건수를 뺐다(이름만) — 흐름도의 다른 칸에서 절대 건수를
-    뺀 것과 같은 이유. 순서(많이 쓴 라벨 먼저)는 그대로라 무엇이 많은지는 여전히 읽힌다.
-    """
-    stats = label_stats()
-    if not stats:
-        return ""
-    chips = "".join(
-        f'<span class="tag-chip">{html.escape(name)}</span>'
-        for name in list(stats)[:_LANDING_LABEL_CHIPS]
-    )
-    return f'<span class="tagset">{chips}</span>'
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -1065,7 +1036,7 @@ _FLOW_TIPS = {
 
 
 def _flow_tile(cls: str, href: str, emoji: str, name: str, head: str, body: str,
-               nxt: Optional[tuple] = None, edge: str = "", extra: str = "") -> str:
+               nxt: Optional[tuple] = None, edge: str = "") -> str:
     """흐름도 칸 하나 + 말풍선. head·body는 이미 이스케이프된 HTML이어야 한다(body엔 <br>이 들어간다).
 
     말풍선은 칸 가운데 아래에 뜬다. edge="l"/"r"은 맨 왼쪽·오른쪽 칸 표시다 — 창이
@@ -1077,7 +1048,7 @@ def _flow_tile(cls: str, href: str, emoji: str, name: str, head: str, body: str,
     )
     return (
         f'<a class="tile {cls}" href="{href}">'
-        f'<span class="nm"><span class="e">{emoji}</span>{html.escape(name)}</span>{extra}'
+        f'<span class="nm"><span class="e">{emoji}</span>{html.escape(name)}</span>'
         f'<span class="tip{" " + edge if edge else ""}"><b>{head}</b><span class="tb">{body}</span>{nx}</span>'
         "</a>"
     )
@@ -1124,7 +1095,6 @@ def _flow_card_html(last_run: Optional[dict], settings: dict) -> str:
         tips["bundle"][1] = "원본에서 보낸 기사를 언론사 순으로 정리해요. 소제목·숨기기는 여기서 해요."
 
     arrow = f'<span class="ar">{icon("flow_next")}</span>'
-    label_chips = _label_chips_html()  # 이미 .tagset으로 감싸져 있다(없으면 빈 문자열)
     # [수정: 2026-09-15, 3차] D안 — 정기 🔍검색어 → ⛏️초안 → 💎확정본 → 🗄️정기 보관함 (실시간은
     # 초안 위 부록) / 수시 🔎새 수집 → 📃원본 → 🗂️확정본 → 📚수시 보관함.
     # [수정: 2026-09-15, 5차] 수시 칸 이름에서 「수집」을 뗐다 — 줄 이름표가 정기와 가르므로
@@ -1156,7 +1126,7 @@ def _flow_card_html(last_run: Optional[dict], settings: dict) -> str:
       {arrow}
       {_flow_tile("t-adarch", f"{base}/adhoc", "🧺", "보관함", *tips["adarch"], edge="r")}
       <div class="gap"></div>
-      {_flow_tile("t-lab", f"{base}/labels", "🏷️", "라벨 보관함", *tips["label"], extra=label_chips)}
+      {_flow_tile("t-lab", f"{base}/labels", "🏷️", "라벨 보관함", *tips["label"])}
       {_flow_tile("t-agency", f"{base}/agency-archive", "🗄️", AGENCY_ARCHIVE_TITLE, *tips["agency"])}
     </div>
     </div>
