@@ -45,6 +45,7 @@ from app.trend_data import (
     build_buckets,
     fill_bucket_status,
     last_complete_day,
+    today_partial_column,
     word_hits,
 )
 from app.negative_guess import load_state as load_negative_guess
@@ -715,8 +716,15 @@ def _trend_card_html(today_str: str, trend_url: str, has_today_run: bool = False
             values.append(sum(word_hits(word, by_date[d] or []) for d in b["dates"]))
         series.append({"word": word, "color": color, "values": values})
 
+    # 낮에는 선 오른쪽에 점선으로 떼어 「오늘(집계 중)」 칸을 하나 더 그린다 — 선에 안
+    # 잇고 빈 원만 찍으므로 오전의 덜 찬 값이 급락으로 읽히지 않는다(app.trend_data
+    # today_partial_column). 오늘이 다 찬 저녁부터는 None이고 오늘이 마지막 버킷으로 선다.
+    # 오른쪽 끝 라벨 숫자는 계속 **다 찬 마지막 날** 값이다(label_today=False) — 홈 카드엔
+    # 툴팁이 없어, 라벨에 덜 찬 숫자를 쓰면 그게 하루치처럼 읽힌다.
     chart_html = render_chart("home-trend-chart", buckets, series, unit,
-                              width=_HOME_CHART_WIDTH, hover=False)
+                              width=_HOME_CHART_WIDTH, hover=False,
+                              today=today_partial_column(today_str, words),
+                              label_today=False)
     # [수정: 2026-09-11] 범례(단어 · 7일 합계)와 각주를 뺐다 — 단어 이름은 그래프 오른쪽
     # 끝 라벨이 이미 말하고, 각주("숨긴 기사 포함 · 옅은 띠는 주말")는 본업 화면이 자기를
     # 해명하는 문장이다. 이 둘 때문에 추이 카드가 주제 카드보다 길어져 주제 밑이 비었다.

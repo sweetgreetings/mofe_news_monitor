@@ -75,7 +75,7 @@ def render_chart(chart_id: str, buckets: list, series: list, unit: str,
     # 45%가 비었다(HISTORY.md "정책 단어 추이 축 맞춤"). 한 칸을 1·2·5 계열에서 고르면
     # 54 → 60, 120 → 150처럼 데이터에 붙고 눈금 글자도 늘 정수다.
     numeric = [v for s in series for v in s["values"] if v is not None]
-    if today:
+    if today and today.get("record", True):
         numeric += list(today["values"].values())
     peak = max(1, max(numeric) if numeric else 1)
     ticks = (1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000)
@@ -192,7 +192,10 @@ def render_chart(chart_id: str, buckets: list, series: list, unit: str,
                 _, x, y = seg[-1]
                 out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="#FFFFFF" '
                            f'stroke="{s["color"]}" stroke-width="2"/>')
-        if today:
+        # 오늘 칸의 빈 원 — 오늘 저장된 회차가 **하나라도 있을 때만** 찍는다. 아직 첫 회차
+        # 전이면 0이 아니라 "모른다"라서, 바닥에 점을 찍으면 0건이라고 거짓말하게 된다
+        # (버킷의 record와 같은 원칙). 그때는 축 밑 `0/6회차`가 그 사실을 말한다.
+        if today and today.get("record", True):
             tv = today["values"].get(s["word"], 0)
             out.append(f'<circle cx="{x_at(tcol):.1f}" cy="{y_at(tv):.1f}" r="3.5" fill="#FFFFFF" '
                        f'stroke="{s["color"]}" stroke-width="2"/>')
@@ -238,6 +241,12 @@ def render_chart(chart_id: str, buckets: list, series: list, unit: str,
         "record": b["record"], "partial": b["partial"],
     } for b in buckets]
     series_data = [{"word": s["word"], "color": s["color"], "values": s["values"]} for s in series]
+    # 「오늘」 칸도 크로스헤어가 읽을 칸으로 같이 넘긴다 — 아래 HOVER_JS의 step은 칸 수에서
+    # 거꾸로 계산하므로(= (W-PL-PR)/(칸-1)), 이 칸을 빼면 선과 크로스헤어의 x가 어긋난다.
+    if today:
+        tip_data.append({"label": today["tip_label"], "record": today["record"], "partial": True})
+        for sd in series_data:
+            sd["values"] = list(sd["values"]) + [today["values"].get(sd["word"], 0)]
 
     return (
         f'<div class="trend-chart-wrap" id="{html.escape(chart_id)}" '

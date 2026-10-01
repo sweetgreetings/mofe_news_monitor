@@ -194,6 +194,39 @@ def fill_bucket_status(buckets: list, unit: str, by_date: dict, today_str: str) 
         b["is_today"] = unit == "day" and b["dates"] == [today_str]
 
 
+def today_partial_column(today_str: str, words: list):
+    """낮에 그래프 오른쪽에 **점선으로 떼어** 붙이는 「오늘(집계 중)」 칸, 또는 None.
+
+    오늘이 아직 다 안 찼을 때만 값이 있다 — 다 찬 저녁부터는 오늘이 마지막 버킷으로
+    들어가므로(last_complete_day) 이 칸까지 그리면 같은 날이 두 번 선다.
+
+    **선에 잇지 않고 빈 원만 찍는 칸이다**(app.trend_chart render_chart의 today 인자).
+    오늘 칸은 그 시각까지 저장된 회차만 담은 하루치의 일부라, 선으로 이으면 오전마다
+    모든 단어가 급락한 것처럼 보인다 — 그래서 선에서 떼고 아래에 `4/6회차`를 적어
+    "아직 덜 찬 칸"임을 그 자리에서 말한다(HISTORY.md "정책 단어 추이 — 낮의 오늘 칸").
+
+    회차 수는 today_is_complete와 같은 근거(오늘 예정 회차 중 저장된 것)로 센다.
+    예정 회차를 모르면 숫자를 지어내지 않고 「집계 중」이라고만 적는다.
+    """
+    if today_is_complete(today_str):
+        return None
+    articles = articles_by_date_range(today_str, today_str).get(today_str)
+    dt = datetime.strptime(today_str, "%Y-%m-%d")
+    slots = todays_expected_slots(today_str)
+    done = sum(1 for s in slots if run_exists(s, today_str))
+    sub = f"{done}/{len(slots)}회차" if slots else "집계 중"
+    return {
+        "label": "오늘",
+        "sub": sub,
+        "weekend": dt.weekday() >= 5,
+        "record": articles is not None,
+        # 툴팁 머리줄은 날짜만 — 크로스헤어가 「· 집계 중」을 붙이고, 회차 수는 축 밑에
+        # 이미 적혀 있다(셋을 다 쓰면 머리줄이 두 줄로 접힌다).
+        "tip_label": f"오늘 {dt.month}/{dt.day}({_KRDAY[dt.weekday()]})",
+        "values": {w: word_hits(w, articles or []) for w in words},
+    }
+
+
 _KRDAY = ("월", "화", "수", "목", "금", "토", "일")  # datetime.weekday() 0=월 순서
 
 

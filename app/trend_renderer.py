@@ -29,6 +29,7 @@ from app.trend_data import (
     build_buckets,
     fill_bucket_status,
     last_complete_day,
+    today_partial_column,
     word_hits,
 )
 
@@ -164,7 +165,13 @@ def _period_bar_html(start: str, end: str, unit: str) -> str:
 # 표 + 복사/엑셀
 # ══════════════════════════════════════════════════════════════════════════
 
-def _table_and_export_html(buckets: list, series: list, unit: str, start: str, end: str) -> str:
+def _table_and_export_html(buckets: list, series: list, unit: str, start: str, end: str,
+                           has_today: bool = False) -> str:
+    # 표·복사·엑셀은 **다 찬 날만** 담는다 — 덜 찬 오늘을 한 칸 끼우면 합계가 하루치
+    # 아닌 값을 품고, 복사·엑셀로 나간 뒤엔 「집계 중」이라는 표시가 남지 않는다.
+    # 그래서 그래프에만 있는 칸이라는 사실을 캡션 한 줄로 밝힌다.
+    today_note = (" 그래프 오른쪽 점선 「오늘」 칸은 아직 집계 중이라 표에는 빠집니다."
+                  if has_today else "")
     labels = [b["wd_label"] if unit == "day" else b["label"] for b in buckets]
     header = "<tr><th>단어</th>" + "".join(f"<th>{html.escape(l)}</th>" for l in labels) + "<th>합계</th></tr>"
     body_rows = []
@@ -199,7 +206,7 @@ def _table_and_export_html(buckets: list, series: list, unit: str, start: str, e
   </span></h2>
   <div class="table-scroll"><table>{header}{"".join(body_rows)}</table></div>
   <p class="caption">보고서에 붙이는 건 그림이 아니라 숫자라, 그래프와 같은 집계 단위로 표를 같이 둡니다.
-  “—”는 그 구간에 저장된 회차가 없다는 뜻(0건과 다름).</p>
+  “—”는 그 구간에 저장된 회차가 없다는 뜻(0건과 다름).{today_note}</p>
 </div>"""
 
 
@@ -316,9 +323,17 @@ def render_trend_page(query: dict) -> str:
     settings = load_settings()
     words = load_trend_words()
 
+    today = _today_str()
     by_date = articles_by_date_range(start, end)
     buckets, unit = build_buckets(start, end)
-    fill_bucket_status(buckets, unit, by_date, _today_str())
+    fill_bucket_status(buckets, unit, by_date, today)
+
+    # 낮의 「오늘(집계 중)」 칸 — 선 오른쪽에 점선으로 떼어 빈 원만 찍는다(홈 카드와 같은
+    # 규칙·같은 함수). **일별이고 구간 끝이 그릴 수 있는 마지막 날일 때만** 붙인다 —
+    # 지난 구간을 직접 지정했으면 그 끝은 오늘과 상관이 없고, 주별·월별 칸 옆에 하루치
+    # 칸을 세우면 높이가 애초에 비교되지 않는다.
+    today_col = (today_partial_column(today, words)
+                 if unit == "day" and end == last_complete_day(today) else None)
 
     colors = [PALETTE[f"trend_{i+1}"] for i in range(len(words))]
     series = []
@@ -335,7 +350,7 @@ def render_trend_page(query: dict) -> str:
 
     if series:
         chart_html = (
-            f'{render_chart("trend-detail-chart", buckets, series, unit, width=860, height=280)}'
+            f'{render_chart("trend-detail-chart", buckets, series, unit, width=860, height=280, today=today_col, label_today=False)}'
             '<div class="trend-legend">'
             + "".join(
                 f'<span class="li"><span class="dot" style="background:{s["color"]}"></span>'
@@ -347,7 +362,7 @@ def render_trend_page(query: dict) -> str:
     else:
         chart_html = '<p class="empty">지켜보는 단어를 골라주세요 — 위에서 직접 입력하거나 등록 검색어에서 고를 수 있습니다.</p>'
 
-    table_html = _table_and_export_html(buckets, series, unit, start, end) if series else ""
+    table_html = _table_and_export_html(buckets, series, unit, start, end, bool(today_col)) if series else ""
 
     return _PAGE_TEMPLATE.format(
         font_stack=FONT_STACK,

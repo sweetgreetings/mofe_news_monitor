@@ -3684,6 +3684,73 @@ def test_trend_end_day_follows_today_completion():
     print("✓ 추이 끝 날짜: 오늘 회차가 전부 저장된 뒤에만 오늘까지 그린다")
 
 
+def test_trend_today_partial_column():
+    """낮의 「오늘(집계 중)」 칸 — 선에서 떼어 점선으로 그리는 칸.
+
+    지키는 것:
+      1) 오늘이 덜 찼을 때만 칸이 생긴다 (다 찬 저녁부터는 오늘이 마지막 버킷이라 None —
+         둘 다 그리면 같은 날이 두 번 선다)
+      2) 칸 값은 오늘 저장된 회차에서 센다 · 축 밑에 `1/2회차`를 적는다
+      3) 오늘 회차가 하나도 없으면 빈 원을 안 찍는다 (0건이 아니라 "모른다")
+      4) 크로스헤어가 읽는 data-buckets에 이 칸이 함께 들어간다 — 빠지면 JS가 거꾸로
+         계산하는 step이 어긋나 선과 크로스헤어의 x가 갈린다
+    """
+    import re
+
+    from app import last_slot_topup, trend_chart, trend_data
+
+    _require_isolation()
+    today = datetime.now().date()
+    today_s = today.isoformat()
+    yday_s = (today - timedelta(days=1)).isoformat()
+
+    st = settings.load_settings()
+    st["schedule_groups"] = [{"name": "매일", "enabled": True,
+                              "days": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+                              "times": [{"start": "09:00", "end": "11:00", "enabled": True},
+                                        {"start": "11:00", "end": "14:00", "enabled": True}]}]
+    settings.SETTINGS_FILE.write_text(json.dumps(st, ensure_ascii=False), encoding="utf-8")
+
+    # 3) 아직 오늘 회차가 하나도 없는 상태
+    col = trend_data.today_partial_column(today_s, ["세제"])
+    assert col and col["label"] == "오늘" and col["sub"] == "0/2회차"
+    assert col["record"] is False
+    buckets, unit = trend_data.build_buckets(yday_s, yday_s)
+    trend_data.fill_bucket_status(buckets, unit, {yday_s: []}, today_s)
+    series = [{"word": "세제", "color": "#000", "values": [1]}]
+    svg = trend_chart.render_chart("t", buckets, series, unit, today=col, label_today=False)
+    assert "오늘" in svg and "0/2회차" in svg
+    assert svg.count("<circle") == 0, "오늘 회차가 없는데 빈 원을 찍어 0건이라고 말했다"
+
+    # 1)·2) 한 회차가 저장되면 그 회차 기사에서 센다
+    storage.save_run("11:00", [_article("세제 개편안 발표")], run_at=f"{today_s}T11:01:00")
+    col = trend_data.today_partial_column(today_s, ["세제", "없는말"])
+    assert col["sub"] == "1/2회차" and col["record"] is True
+    assert col["values"] == {"세제": 1, "없는말": 0}
+
+    svg = trend_chart.render_chart("t", buckets, series, unit, today=col, label_today=False)
+    assert svg.count("<circle") == 1, "오늘 칸의 빈 원이 안 찍혔다"
+    assert 'stroke-dasharray="3 3"' in svg, "오늘 칸을 가르는 점선이 없다"
+    tip = json.loads(re.search(r"data-buckets='(\[.*?\])' data-series", svg).group(1))
+    assert len(tip) == len(buckets) + 1 and tip[-1]["partial"], (
+        "크로스헤어가 읽는 칸 목록에 오늘 칸이 빠졌다 — step이 어긋난다"
+    )
+
+    # 4) 라벨 숫자는 계속 다 찬 마지막 날 값이다(label_today=False)
+    assert ">1</tspan>" in svg
+
+    # 1) 오늘이 다 차면 칸이 사라진다 — 그때는 오늘이 마지막 버킷으로 선다
+    storage.save_run("14:00", [_article("세제 추가")], run_at=f"{today_s}T14:01:00")
+    last_run = last_slot_topup.find_run(today_s, "14:00")
+    storage.update_run_articles({**last_run, "topup_at": f"{today_s}T14:31:00"}, last_run["articles"])
+    assert trend_data.today_is_complete(today_s)
+    assert trend_data.today_partial_column(today_s, ["세제"]) is None, (
+        "오늘이 다 찼는데 집계 중 칸까지 그려 같은 날이 두 번 섰다"
+    )
+
+    print("✓ 추이 오늘 칸: 덜 찬 낮에만 점선으로 떼어 그리고, 회차가 없으면 점을 안 찍는다")
+
+
 def test_undo_stack_dedupes_snapshots():
     """되돌리기 스택이 같은 값을 반복 저장하지 않는다(2026-09-23).
 
@@ -3997,6 +4064,7 @@ if __name__ == "__main__":
         test_undo_stack_dedupes_snapshots,
         test_last_slot_topup_adds_late_articles,
         test_trend_end_day_follows_today_completion,
+        test_trend_today_partial_column,
     ]
 
     failures = []
