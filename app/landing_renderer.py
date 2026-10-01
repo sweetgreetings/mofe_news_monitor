@@ -1,7 +1,8 @@
 # Design Ref: archive/DESIGN.md §0 진입 화면 (home.html — 앱이 브라우저로 맨 처음 여는 화면), PRD.md 기능3
 #
 # [수정: 2026-08-26] 홈 화면 재구성 — 예전엔 "실시간/정기/수시/라벨 4갈래 흐름도 +
-# 워드클라우드"가 전부였다. 그 위에 "오늘 무슨 일이 있었나"를 답하는 층을 새로 얹었다:
+# 워드클라우드"가 전부였다(워드클라우드는 2026-10-01에 없앴다 — HISTORY.md "빈도로 뽑은
+# 단어"). 그 위에 "오늘 무슨 일이 있었나"를 답하는 층을 새로 얹었다:
 # 오늘 건수·[단독]/[속보], 담당자가 고른 정책 단어의 7~30일 추이, 오늘의 주요 주제 순위.
 # 배경·시행착오는 HISTORY.md "홈 화면 재구성" 참고. 핵심 설계 원칙 셋:
 #   1) 전부 "정기 수집" 기준이다 — 수시 카드는 조건이 카드마다 달라 정기와 같은 잣대로
@@ -21,14 +22,9 @@ from typing import Optional
 from app.config import (
     AGENCY_ARCHIVE_TITLE,
     SHAPE_TOKENS_CSS,
-    COLOR_TEXT_MUTED,
-    COLOR_WORDCLOUD_TIERS,
-    CUTE_FONT_BASE64,
     DEFAULT_ARTICLE_LINE_TEMPLATE,
-    CUTE_FONT_NAME,
     FONT_STACK,
     LANDING_HTML_PATH,
-    LANDING_KEYWORD_COUNT,
     LOGO_PATH,
     PALETTE,
     SETTINGS_SERVER_HOST,
@@ -41,7 +37,7 @@ from app.curation import filter_hidden
 from app.filters import is_schedule_listing
 from app.home_trend import load_trend_words
 from app.icons import icon
-from app.settings import all_search_keywords, load_settings
+from app.settings import load_settings
 from app.storage import list_run_dates, list_runs_for_date, load_today_runs
 from app.trend_chart import chart_css, render_chart
 from app.trend_data import (
@@ -51,7 +47,6 @@ from app.trend_data import (
     last_complete_day,
     word_hits,
 )
-from app.summarizer import extract_keyword_frequencies
 from app.negative_guess import load_state as load_negative_guess
 
 # [추가: 2026-08-18] home.html이 app.adhoc.card를 참조한다 — app/adhoc/* → app/* 단방향
@@ -59,13 +54,6 @@ from app.negative_guess import load_state as load_negative_guess
 # 이번 화면 재구성은 애초에 "결국 하나로 합쳐질 기능"이라는 전제로 설계됐다(사용자
 # 결정) — home은 앱 전체의 진입점이라 정기·수시 어느 한쪽에 속하지 않는 상위 레이어다.
 from app.adhoc import card as adhoc_card
-
-# [추가: 2026-07-26] "구름이 잠잠" 빈 상태 문구용 손글씨체 — app.renderer와 동일 규칙(오프라인
-# 대비 base64 내장). 파일별로 독립적인 이 앱의 렌더러 구조를 따라 여기서도 따로 정의한다.
-_CUTE_FONT_FACE_CSS = (
-    f"@font-face {{ font-family: '{CUTE_FONT_NAME}'; "
-    f"src: url(data:font/woff2;base64,{CUTE_FONT_BASE64}) format('woff2'); font-display: swap; }}"
-)
 
 _PAGE_TEMPLATE = """<!DOCTYPE html>
 <html lang="ko">
@@ -75,7 +63,6 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <title>재경부 AI 뉴스 모니터링</title>
 <style>
   {shape_tokens}
-  {cute_font_face}
   * {{ box-sizing: border-box; }}
   body {{
     margin: 0; background: {bg}; color: {text}; font-family: {font_stack};
@@ -352,42 +339,6 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     .fl-top .tile {{ order: -1; }}
   }}
 
-  /* ── 워드클라우드 ── */
-  /* 주제·추이 아래 한 줄. 왼쪽부터 크기순, 한 줄에 안 들어가는 단어는 _WORDCLOUD_JS가
-     통째로 숨기고 끝에 +N(숨은 단어는 title)을 단다. 머리줄 대신 카드 위 말풍선(.wc-tip). */
-  .wc-card {{ position: relative; }}
-  .wordcloud {{ display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: baseline;
-    gap: 2px 7px; max-width: 100%; }}
-  .wc-word.wc-cut {{ display: none; }}
-  .wc-more {{ color: {text_faint}; font-size: var(--fs-sm); align-self: center; white-space: nowrap; cursor: default; }}
-  .wc-tip {{ position: absolute; bottom: calc(100% + 8px); left: 20px; z-index: 10;
-    background: {card}; border: 1px solid {border}; border-radius: var(--r-lg);
-    box-shadow: var(--sh-pop); padding: 9px 14px 10px;
-    display: flex; flex-direction: column; gap: 2px; white-space: nowrap;
-    opacity: 0; visibility: hidden; transform: translateY(4px); pointer-events: none;
-    transition: opacity .12s, transform .12s, visibility 0s linear .12s; }}
-  .wc-tip::after {{ content: ""; position: absolute; bottom: -6px; left: 22px;
-    width: 10px; height: 10px; background: {card}; border-right: 1px solid {border};
-    border-bottom: 1px solid {border}; transform: rotate(45deg); }}
-  .wc-card:hover .wc-tip {{ opacity: 1; visibility: visible; transform: translateY(0);
-    transition: opacity .12s .15s, transform .12s .15s, visibility 0s .15s; }}
-  .wc-tip b {{ font-size: var(--fs-md); font-weight: 700; color: {header}; }}
-  .wc-tip .tb {{ font-size: var(--fs-sm); color: {muted}; }}
-  .wc-word {{ white-space: nowrap; line-height: 1.3; font-family: {font_stack}; display: inline-block; }}
-  .wc-word:hover {{ animation: wc-jitter 0.35s ease-in-out; }}
-  @media (prefers-reduced-motion: reduce) {{ .wc-word:hover {{ animation: none; }} }}
-  @keyframes wc-jitter {{
-    0%   {{ transform: translate(0, 0) rotate(0deg); }}
-    20%  {{ transform: translate(-1px, 0.5px) rotate(-2deg); }}
-    40%  {{ transform: translate(1px, -0.5px) rotate(2deg); }}
-    60%  {{ transform: translate(-1px, 0.5px) rotate(-1.5deg); }}
-    80%  {{ transform: translate(1px, 0) rotate(1deg); }}
-    100% {{ transform: translate(0, 0) rotate(0deg); }}
-  }}
-  .empty {{ color: {muted}; font-size: var(--fs-lg); text-align: center; }}
-  .cute-caption-sm {{ font-family: '{cute_font_name}', sans-serif; font-size: 0.85rem;
-    color: {muted}; margin-top: 4px; }}
-
   .contact {{ color: {muted}; font-size: var(--fs-md); text-align: center; margin-top: 22px; }}
   .contact a {{ color: {accent}; }}
   .ic {{ width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
@@ -403,10 +354,6 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     {issues_html}
     {trend_html}
   </div>
-  <div class="card wc-card">
-    <span class="wc-tip"><b>주요 언급어</b><span class="tb">{wordcloud_scope}</span></span>
-    {wordcloud_html}
-  </div>
   {flow_html}
 
   <p class="contact">문의 {mail_icon} <a href="mailto:sweetgreetings@naver.com">sweetgreetings@naver.com</a></p>
@@ -414,94 +361,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <script>
 {alert_hover_js}
 {board_js}
-{wordcloud_js}
 </script>
 </body>
 </html>
 """
-
-# [수정: 2026-07-26] 실제 언급 횟수(값) 기준 연속 보간 대신 등수(rank) 기준 5단계
-# 티어로 바꿨다 — 그날 언급 횟수 분포가 한쪽에 몰리면(예: 대부분 2~3회, 소수만 7회)
-# 값 기준 보간은 크기가 양극단으로만 쏠려 "중간이 없어 보이는" 문제가 있었다.
-# 등수로 5등분하면 단어 수가 몇 개든 각 티어에 고르게 배정되어 중간 단계가 항상 존재한다.
-# 한 줄에 넣으려고 다섯 단계 차이는 두고 전체를 줄였다(HOME_WORDCLOUD_ROW_MOCKUP.html).
-_TIER_SIZES_REM = (1.3, 1.12, 0.98, 0.86, 0.76)
-_TIER_COLORS = COLOR_WORDCLOUD_TIERS
-# [추가: 2026-07-25] 검색 키워드(예: 등록해둔 인물명)도 워드클라우드 집계에 포함하되
-# (app.summarizer.extract_keyword_frequencies), "이건 검색어라 나온 거구나"를 한눈에
-# 구분할 수 있도록 muted 회색으로 눈에 띄지 않게 표시한다.
-_KEYWORD_ORIGIN_COLOR = COLOR_TEXT_MUTED
-
-
-def render_word_cloud(freqs: list, search_keywords: Optional[list] = None) -> str:
-    """(단어, 빈도) 목록을 등수 기준 5단계 크기·색 티어로 태그 클라우드를 렌더링한다
-    (PRD.md 기능3 규칙 3).
-
-    통계적으로 정확할 필요는 없는 눈요기용이다. freqs는 이미 빈도 내림차순이므로,
-    등수를 5등분해 티어를 매긴다(1티어=가장 진하고 큼 ~ 5티어=가장 옅고 작음).
-    검색 키워드 자체는(등록해둔 인물명 등) 티어와 무관하게 muted 회색으로 표시해,
-    언급량이 많아서 뜬 실제 화제어와 구분되게 한다.
-
-    언급 횟수는 보여주지 않는다 — 정량이 아니라 오늘의 맥락을 훑는 칸이다.
-    """
-    if not freqs:
-        return '<div class="empty">💤<div class="cute-caption-sm">구름이 잠잠</div></div>'
-
-    keyword_set = {k.lower() for k in (search_keywords or [])}
-    total = len(freqs)
-
-    spans = []
-    for rank, (word, _freq) in enumerate(freqs):
-        tier = min(4, rank * 5 // total)
-        size = _TIER_SIZES_REM[tier]
-        if word.lower() in keyword_set:
-            color, weight = _KEYWORD_ORIGIN_COLOR, 500
-        else:
-            color = _TIER_COLORS[tier]
-            weight = 700 if tier == 0 else 500
-        spans.append(
-            f'<span class="wc-word" style="font-size:{size:.2f}rem; color:{color}; '
-            f'font-weight:{weight};">{html.escape(word)}</span>'
-        )
-    return f'<div class="wordcloud">{"".join(spans)}</div>'
-
-
-# 워드클라우드를 한 줄로 자른다. baseline 정렬이라 같은 줄도 offsetTop이 달라서,
-# 앞 줄 바닥보다 아래에서 시작하는 단어를 새 줄로 센다. 넘친 단어는 뒤에서부터 숨기고
-# 끝에 +N(숨은 단어 이름만 title)을 붙인다 — +N 자리가 없으면 한 단어 더 숨긴다.
-_WORDCLOUD_JS = """
-(function(){
-  var box = document.querySelector('.wc-card .wordcloud');
-  if (!box) return;
-  var words = [].slice.call(box.querySelectorAll('.wc-word'));
-  function rows(els){ var n = 0, bottom = -1;
-    els.forEach(function(w){ var t = w.offsetTop, b = t + w.offsetHeight;
-      if (t >= bottom - 2) { n++; bottom = b; } else if (b > bottom) { bottom = b; } });
-    return n; }
-  function shown(){ return words.filter(function(w){ return !w.classList.contains('wc-cut'); }); }
-  function fit(){
-    var old = box.querySelector('.wc-more'); if (old) old.remove();
-    words.forEach(function(w){ w.classList.remove('wc-cut'); });
-    while (rows(shown()) > 1) { var s = shown(); s[s.length - 1].classList.add('wc-cut'); }
-    if (shown().length === words.length) return;
-    var more = document.createElement('span'); more.className = 'wc-more'; box.appendChild(more);
-    while (true) {
-      var cut = words.filter(function(w){ return w.classList.contains('wc-cut'); });
-      more.textContent = '+' + cut.length;
-      more.title = cut.map(function(w){ return w.textContent; }).join(' · ');
-      var s2 = shown();
-      if (s2.length <= 1 || rows(s2.concat([more])) <= 1) break;
-      s2[s2.length - 1].classList.add('wc-cut');
-    }
-  }
-  var timer = null;
-  window.addEventListener('resize', function(){ clearTimeout(timer); timer = setTimeout(fit, 80); });
-  fit();
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
-})();
-"""
-
-
 def _render_logo() -> str:
     """LOGO_PATH 파일이 있으면 보여주고, 없으면 자리를 아예 만들지 않는다 (깨진 이미지 아이콘 방지)."""
     if LOGO_PATH.exists():
@@ -1134,8 +997,6 @@ def _flow_card_html(last_run: Optional[dict], settings: dict) -> str:
 
 
 def render_landing_page(
-    freqs: list,
-    search_keywords: Optional[list] = None,
     *,
     settings: Optional[dict] = None,
     today_str: Optional[str] = None,
@@ -1152,8 +1013,6 @@ def render_landing_page(
     return _PAGE_TEMPLATE.format(
         font_stack=FONT_STACK,
         shape_tokens=SHAPE_TOKENS_CSS,
-        cute_font_face=_CUTE_FONT_FACE_CSS,
-        cute_font_name=CUTE_FONT_NAME,
         logo_html=_render_logo(),
         gear_html=f'<a class="gearlink" href="http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/">{icon("gear")} 설정</a>',
         today_label=today_label,
@@ -1165,9 +1024,6 @@ def render_landing_page(
         board_js=_BOARD_JS,
         issues_html=_issues_card_html(settings, issue_articles, last_run),
         flow_html=_flow_card_html(last_run, settings),
-        wordcloud_html=render_word_cloud(freqs, search_keywords),
-        wordcloud_scope=(f"정기 · 오늘 0시 ~ {last_run['run_slot']} 회차까지" if last_run else "정기"),
-        wordcloud_js=_WORDCLOUD_JS,
         mail_icon=icon("mail"),
         # [수정: 2026-08-21] 색 값은 전부 app.config.PALETTE 하나에서 온다.
         **PALETTE,
@@ -1186,7 +1042,7 @@ def _today_label(last_run: Optional[dict]) -> str:
 
 
 def _report_articles(runs: list) -> list:
-    """회차들의 기사를 숨김 제외·URL 중복 제거해 한 목록으로 모은다(워드클라우드·오늘의 주요 주제 입력)."""
+    """회차들의 기사를 숨김 제외·URL 중복 제거해 한 목록으로 모은다(오늘의 주요 주제 입력)."""
     seen_urls: set = set()
     articles: list = []
     for run in runs:
@@ -1197,28 +1053,8 @@ def _report_articles(runs: list) -> list:
     return articles
 
 
-def wordcloud_candidates(settings: dict, extra: int) -> list:
-    """제외어를 **하나도 안 뺐을 때** 오늘 홈 워드클라우드의 순위를 (단어, 횟수, 검색어인가)로 돌려준다.
-
-    [추가: 2026-09-11] 설정 화면 "☁️ 워드클라우드 제외어"의 「오늘 워드클라우드에 뜬
-    단어」 목록용. 홈과 **같은 기사 목록·같은 집계 함수**를 거치므로, 화면 JS가 여기서
-    지금 칩에 있는 단어만 빼고 앞에서부터 LANDING_KEYWORD_COUNT개를 보여주면 그게 곧
-    저장 뒤 홈에 뜰 워드클라우드다(단어별 횟수는 서로 독립이라 제외해도 순위가 안
-    바뀐다). 제외어 하나가 자기 자신과 "단어+가" 잔재까지 두 자리를 비울 수 있어
-    (app.tokenizer.tokenize) `extra`만큼 넉넉히 더 뽑는다. 저장된 회차만 읽는다 — API 호출 0회.
-    """
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    articles = _report_articles(load_today_runs(today_str))
-    keywords = all_search_keywords(settings)
-    keyword_set = {k.lower() for k in keywords}
-    freqs = extract_keyword_frequencies(
-        articles, keywords, top_n=LANDING_KEYWORD_COUNT + extra, exclude_words=[]
-    )
-    return [(word, count, word.lower() in keyword_set) for word, count in freqs]
-
-
-def generate_landing_page(keywords: Optional[list] = None) -> Path:
-    """오늘 저장된 모든 회차를 합쳐, 당일 누적 주요 키워드로 home.html을 렌더링한다.
+def generate_landing_page() -> Path:
+    """오늘 저장된 모든 회차를 합쳐 home.html을 렌더링한다.
 
     기사 스크랩(수집)과는 별개 파이프라인이다 — 이미 저장된 회차 데이터를 읽어
     집계만 할 뿐, 새로 수집하지 않는다(네이버 호출도, LLM 호출도 없다). 아직 저장된
@@ -1229,18 +1065,12 @@ def generate_landing_page(keywords: Optional[list] = None) -> Path:
     특히), url 기준으로 중복 제거한 뒤 집계한다.
     """
     settings = load_settings()
-    keywords = keywords if keywords is not None else all_search_keywords(settings)
-    exclude_words = settings.get("wordcloud_exclude_words", [])
-
     today_str = datetime.now().strftime("%Y-%m-%d")
     runs_today = load_today_runs(today_str)
     articles = _report_articles(runs_today)
     last_run = runs_today[-1] if runs_today else None
 
-    freqs = extract_keyword_frequencies(articles, keywords, top_n=LANDING_KEYWORD_COUNT, exclude_words=exclude_words)
     html_text = render_landing_page(
-        freqs,
-        keywords,
         settings=settings,
         today_str=today_str,
         issue_articles=articles,

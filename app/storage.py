@@ -209,12 +209,12 @@ def list_runs_for_date(date_str: str, metas: Optional[list] = None) -> list[dict
 
 
 def load_today_runs(date_str: Optional[str] = None) -> list[dict]:
-    """오늘(또는 지정한 날짜) 저장된 모든 회차를 시간순으로 돌려준다 (진입 화면 워드클라우드 당일 누적용).
+    """오늘(또는 지정한 날짜) 저장된 모든 회차를 시간순으로 돌려준다 (홈 당일 누적 집계용).
 
     파일명이 아니라 run_at의 날짜로 판단한다 (자정 넘겨 보충 실행해도 정확히 걸러진다).
 
     [수정: 2026-08-18] 예전엔 전 회차를 파싱한 뒤 오늘 것만 골라냈다 — 진입 화면(home.html)이
-    요청마다 부르는 자리라, 보관 기간을 1년으로 늘리면 워드클라우드 한 번에 22.8MB를 읽게 된다.
+    요청마다 부르는 자리라, 보관 기간을 1년으로 늘리면 한 번 그릴 때 22.8MB를 읽게 된다.
     list_runs_for_date(인덱스로 날짜를 먼저 거름)를 쓰고 시간 오름차순으로만 다시 세운다.
     """
     date_str = date_str or datetime.now().strftime("%Y-%m-%d")

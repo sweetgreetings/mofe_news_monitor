@@ -20,7 +20,6 @@ from app.config import (
     LANDING_HTML_PATH,
     LOGO_PATH,
     MAX_AUTO_SEND_GRACE_MIN,
-    LANDING_KEYWORD_COUNT,
     EMAIL_SERVICES,
     MAX_EMAIL_RECIPIENTS,
     MAX_KEYWORDS_PER_GROUP,
@@ -29,7 +28,6 @@ from app.config import (
     MAX_SCHEDULE_TIMES,
     MAX_SUBHEADINGS,
     MAX_TELEGRAM_RECIPIENTS,
-    MAX_WORDCLOUD_EXCLUDE_WORDS,
     MIN_SCHEDULE_TIMES,
     NAVER_DAILY_CALL_LIMIT,
     OUTLET_ORDER_JUMP_STEP,
@@ -112,7 +110,7 @@ from app.home_trend import add_trend_word, remove_trend_word
 from app.agency_archive_renderer import render_agency_archive_page
 from app.trend_renderer import render_trend_page
 from app.trend_export import build_trend_workbook_bytes
-from app.landing_renderer import generate_landing_page, wordcloud_candidates
+from app.landing_renderer import generate_landing_page
 from app.live_renderer import generate_live_page_or_wait
 from app.manual_articles import add_manual_article, load_manual_articles, pop_manual_article
 from app.manual_keyword_note import save_manual_keyword_note
@@ -197,7 +195,6 @@ from app.settings import (
     save_schedule_groups,
     save_auto_send_settings,
     is_auto_send_enabled,
-    save_wordcloud_exclude_words,
     toggle_highlight_keyword,
 )
 from app.telegram_bot import is_configured as telegram_is_configured
@@ -411,12 +408,6 @@ _MENU_TEMPLATE = (
       <a href="/telegram">텔레그램<span class="menu-chev">›</span></a>
       <a href="/email">이메일<span class="menu-note">정기 확정본만</span><span class="menu-chev">›</span></a>
       <a href="/send-log">발송 기록<span class="menu-note">누가 받았는지</span><span class="menu-chev">›</span></a>
-    </div>
-  </div>
-  <div class="category">
-    <div class="category-name">홈</div>
-    <div class="menu">
-      <a href="/wordcloud-exclude">워드클라우드 제외어<span class="menu-chev">›</span></a>
     </div>
   </div>
   <!-- [추가: 2026-08-20] "연동"은 일부러 맨 아래에 둔다(사용자 지정 위치) — 검색어
@@ -1300,7 +1291,7 @@ def _render_outlet_order(order: list) -> str:
 
 # [복구: 2026-08-20] 아래 세 스크립트 상수와 이어지는 설정 화면 템플릿들이 편집 도중
 # 통째로 사라져 있었다(참조만 남고 정의가 없어 /outlets·/schedule·/highlight·/format·
-# /subheading-format·/scrap-page·/auto-send·/telegram·/email·/wordcloud-exclude 열 화면이
+# /subheading-format·/scrap-page·/auto-send·/telegram·/email 아홉 화면이
 # 전부 NameError로 죽는 상태였다). 커밋 시점 정의를 되살리되, 그 뒤 바뀐 동작
 # (언론사 5개 점프 버튼·시간대 그룹 요일·자동발송 통합)에 맞춰 고쳤다.
 
@@ -1436,7 +1427,7 @@ def _theme() -> dict:
 _STATIC_HTML_ROUTES = {
     "/index.html": lambda: OUTPUT_HTML_PATH,
     "/history.html": lambda: HISTORY_HTML_PATH,
-    # home.html은 다른 둘과 달리, 열 때마다 당일 누적 워드클라우드를 새로 집계해 보여준다
+    # home.html은 다른 둘과 달리, 열 때마다 당일 누적분을 새로 집계해 보여준다
     # (사용자 요청) — 접속 시점에 매번 generate_landing_page()를 다시 실행한 뒤 그 결과를 서빙.
     "/home.html": generate_landing_page,
     # [추가: 2026-07-25] 실시간 기사 현황 — 열 때마다(새로고침 포함) 당일 0시~현재를
@@ -1630,299 +1621,6 @@ def render_outlets_page(settings: dict, error: str = "") -> str:
         outlet_order_html=_render_outlet_order(outlet_order),
         outlet_order_script=_OUTLET_ORDER_SCRIPT,
         outlet_filter_script=_OUTLET_FILTER_SCRIPT,
-        index_href=_home_href(),
-    )
-
-
-# [수정: 2026-09-11] 입력칸 + del 버튼 줄 목록 → 칩 한 상자 + 「오늘 워드클라우드에 뜬
-# 단어」에서 눌러 빼기(사용자 결정, 시안 WORDCLOUD_EXCLUDE_MOCKUP.html의 B안). 칩 모양·×·
-# 점선 입력칩은 검색어 화면(`/keywords`)과 같고 색만 중립 회색이다 — 그 화면 칩의 파랑은
-# "검색 ON"이라는 뜻인데 제외어엔 ON/OFF가 없다. 편집은 전부 화면 메모리에서만 벌어지고
-# 저장(POST /save-wordcloud-exclude, 진짜 <form> + 303)을 눌러야 반영된다 — 그 전까지는
-# 저장 바 안내가 "아직 저장하지 않았습니다"를 알린다(검색어 화면과 같은 규칙). 예전
-# "+ 제외어 추가"(칸을 하나 늘리려고 폼 전체를 POST해 다시 그리던 /wordcloud-exclude/
-# add-slot)는 칩 입력으로 대체돼 없앴다.
-_WORDCLOUD_EXCLUDE_TEMPLATE = (
-    """<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>워드클라우드 제외어</title>
-<style>"""
-    + _BASE_STYLE
-    + """
-  .container {{ padding-bottom: 120px; }}
-  .wc-box {{ border: 1px solid {border}; border-radius: var(--r-lg); padding: 14px; background: {card}; }}
-  .chips {{ display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }}
-  .chip {{
-    display: inline-flex; align-items: center; border-radius: var(--r-pill); font-size: var(--fs-md); line-height: 1;
-    max-width: 100%; background: {bg}; border: 1px solid {wc_exclude_chip_border}; color: {text};
-  }}
-  .chip-body {{ padding: 7px 3px 7px 12px; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-  /* _BASE_STYLE의 button 기본값(파란 배경·패딩)을 지운다 — 검색어 화면 .chip-x와 같은 값. */
-  .chip-x {{
-    border: none; background: transparent; color: inherit; font-size: 1rem; line-height: 1;
-    padding: 7px 10px 7px 6px; cursor: pointer; opacity: .55; border-radius: 0 var(--r-pill) var(--r-pill) 0;
-  }}
-  .chip-x:hover {{ opacity: 1; color: {error}; background: rgba(220,38,38,.08); }}
-  .chip.just-added {{ animation: kwpop .55s ease-out; }}
-  .chip.bump {{ animation: kwbump .6s ease-out; }}
-  @keyframes kwpop {{ 0% {{ transform: scale(.85); background: {kwpop_flash}; }} 100% {{ transform: scale(1); }} }}
-  @keyframes kwbump {{
-    0%, 100% {{ transform: translateX(0); }}
-    20% {{ transform: translateX(-3px); background: {kwpop_flash}; }}
-    60% {{ transform: translateX(3px); background: {kwpop_flash}; }}
-  }}
-  .chip-add {{ display: inline-flex; align-items: center; gap: 4px; border: 1px dashed {dash_border}; background: {card}; border-radius: var(--r-pill); padding: 5px 12px; color: {muted}; }}
-  .chip-add:focus-within {{ border-color: {accent}; border-style: solid; background: {hover}; }}
-  .chip-add input {{ border: none; outline: none; background: transparent; font: inherit; font-size: var(--fs-md); width: 110px; color: {text}; padding: 0; }}
-  .chip-add input::placeholder {{ color: {placeholder}; }}
-  .chip-add .plus {{ font-size: .95rem; color: {accent}; font-weight: 700; }}
-  .wc-meta {{ display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; font-size: var(--fs-sm); color: {muted}; }}
-  .wc-count {{ font-variant-numeric: tabular-nums; }}
-  .wc-count.full {{ color: {error}; font-weight: 600; }}
-
-  .wc-sect {{ font-size: var(--fs-sm); font-weight: 700; color: {muted}; margin: 22px 0 9px; }}
-  .wc-sect span {{ font-weight: 500; }}
-  .sugglist {{ display: flex; flex-wrap: wrap; gap: 6px; }}
-  .sugg {{
-    background: {card}; color: {text}; border: 1px solid {border}; border-radius: var(--r-pill);
-    padding: 5px 11px; font-size: var(--fs-sm);
-  }}
-  .sugg:hover {{ background: {error_bg}; border-color: {error_border}; color: {error}; }}
-  .sugg:hover::before {{ content: "− "; }}
-  .sugg.kw {{ color: {muted}; }}
-  .sugg:disabled {{ opacity: .4; cursor: not-allowed; background: {card}; border-color: {border}; color: {text}; }}
-  .sugg:disabled:hover::before {{ content: ""; }}
-
-  .save-msg {{ display: none; align-items: flex-start; gap: 8px; font-size: var(--fs-sm); line-height: 1.5; border-radius: var(--r-md); padding: 9px 11px; margin-bottom: 10px; text-align: left; }}
-  .save-msg.show {{ display: flex; }}
-  .save-msg .dot {{ width: 8px; height: 8px; border-radius: var(--r-circle); flex-shrink: 0; margin-top: 5px; }}
-  .save-msg.dirty {{ background: {warn_bg}; border: 1px solid {warn_border}; color: {warn_text}; }}
-  .save-msg.dirty .dot {{ background: {warn_dot}; }}
-  .save-bar button.idle {{ background: {toggle_off}; color: {toggle_off_text}; cursor: default; }}
-</style>
-</head>
-<body>
-"""
-    + _TOP_BAR_HTML
-    + """
-<div class="container">
-  <h1>☁️ 워드클라우드 제외어</h1>
-  <p class="hint">진입 화면 워드클라우드에서 빼고 싶은 단어를 등록하세요. 검색어·형광펜 단어와는 별개입니다.</p>
-  {error_html}
-  <div class="wc-box">
-    <div class="chips" id="wcChips"></div>
-    <div class="wc-meta"><span>Enter 또는 쉼표로 추가 · ×로 빼기</span><span class="wc-count" id="wcCount"></span></div>
-  </div>
-  {suggest_html}
-</div>
-
-<form method="POST" action="/save-wordcloud-exclude" id="wcForm">
-  <div id="wcHidden"></div>
-  <div class="save-bar">
-    <div class="save-bar-inner">
-      <div class="save-msg" id="wcSaveMsg"><span class="dot"></span><span id="wcSaveMsgText"></span></div>
-      <button type="submit" id="wcSaveBtn">저장</button>
-    </div>
-  </div>
-</form>
-
-<script>
-window.__WC_INIT__ = {{
-  max: {max_exclude},
-  show: {show_count},
-  words: {words_json},
-  saved: {saved_json},
-  candidates: {candidates_json}
-}};
-</script>
-{wc_script}
-</body>
-</html>
-"""
-)
-
-# 제외어 화면 JS — .format()을 거치는 템플릿 밖에 두는 이유는 _KEYWORD_GROUPS_SCRIPT와 같다.
-_WORDCLOUD_EXCLUDE_SCRIPT = "<script>\n" + r"""(function () {
-  "use strict";
-  var INIT = window.__WC_INIT__ || {};
-  var MAX = INIT.max || 15;
-  var SHOW = INIT.show || 20;
-  var words = (INIT.words || []).slice();
-  var savedSnap = (INIT.saved || []).join("\n");
-  var CANDS = INIT.candidates || [];   // [단어, 횟수, 검색어인가] — 제외어 없이 뽑은 오늘 순위
-
-  var chipsEl = document.getElementById("wcChips");
-  var countEl = document.getElementById("wcCount");
-  var suggEl = document.getElementById("wcSugg");
-
-  function esc(s) {
-    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  }
-  function has(w) {
-    var lw = w.toLowerCase();
-    return words.some(function (v) { return v.toLowerCase() === lw; });
-  }
-
-  // 홈이 실제로 거르는 규칙(app.tokenizer.tokenize)을 그대로 따른다 — 제외어와 같은 단어,
-  // 그리고 "제외어+가" 잔재. 그래서 이 목록이 곧 저장 뒤 홈 워드클라우드다.
-  function excludedByChips(w) {
-    var set = {};
-    words.forEach(function (v) { set[v.toLowerCase()] = true; });
-    var lw = w.toLowerCase();
-    if (set[lw]) return true;
-    return lw.length > 2 && lw.charAt(lw.length - 1) === "가" && set[lw.slice(0, -1)] === true;
-  }
-
-  function render(focusInput, addedWord) {
-    var h = words.map(function (w) {
-      return '<span class="chip' + (w === addedWord ? " just-added" : "") + '" data-word="' + esc(w) + '">' +
-        '<span class="chip-body" title="' + esc(w) + '">' + esc(w) + '</span>' +
-        '<button type="button" class="chip-x" title="제외어에서 빼기" aria-label="' + esc(w) + ' 빼기">×</button></span>';
-    }).join("");
-    if (words.length < MAX) {
-      h += '<span class="chip-add"><span class="plus">+</span>' +
-        '<input type="text" id="wcInput" placeholder="단어 입력" maxlength="30" autocomplete="off"></span>';
-    }
-    chipsEl.innerHTML = h;
-    countEl.textContent = words.length + " / " + MAX + (words.length >= MAX ? " · 가득 참" : "");
-    countEl.className = "wc-count" + (words.length >= MAX ? " full" : "");
-
-    chipsEl.querySelectorAll(".chip").forEach(function (chip) {
-      chip.querySelector(".chip-x").onclick = function () {
-        var w = chip.getAttribute("data-word");
-        words = words.filter(function (v) { return v !== w; });
-        render(false);
-      };
-    });
-    var inp = document.getElementById("wcInput");
-    if (inp) {
-      // 한글 조합 중 Enter는 조합이 끝난 뒤에 읽는다 — 안 그러면 Enter를 두 번 눌러야
-      // 하거나 마지막 글자가 새 입력칸에 딸려 들어간다. 두 번 불려도 첫 번째가 칸을
-      // 비우므로 두 번째는 빈 값이라 아무 일도 안 한다(그래서 늘 "지금" 입력칸을 읽는다).
-      inp.onkeydown = function (e) {
-        if (e.key !== "Enter" && e.keyCode !== 13) return;
-        e.preventDefault();   // 폼 제출(저장) 막기 — Enter는 칩 추가다
-        var composing = e.isComposing || e.keyCode === 229;
-        setTimeout(function () {
-          var cur = document.getElementById("wcInput");
-          if (cur && cur.value.trim()) add(cur.value, true);
-        }, composing ? 30 : 0);
-      };
-      inp.oninput = function () { if (inp.value.indexOf(",") >= 0) add(inp.value, true); };
-      if (focusInput) inp.focus();
-    }
-    renderSuggestions();
-    refreshSaveBar();
-  }
-
-  function renderSuggestions() {
-    if (!suggEl) return;
-    var full = words.length >= MAX;
-    var shown = CANDS.filter(function (c) { return !excludedByChips(c[0]); }).slice(0, SHOW);
-    suggEl.innerHTML = shown.map(function (c) {
-      return '<button type="button" class="sugg' + (c[2] ? " kw" : "") + '" data-word="' + esc(c[0]) + '"' +
-        (full ? " disabled" : "") + (c[2] ? ' title="등록 검색어"' : "") + '>' +
-        esc(c[0]) + '</button>';
-    }).join("");
-    suggEl.querySelectorAll(".sugg").forEach(function (b) {
-      b.onclick = function () { add(b.getAttribute("data-word"), false); };
-    });
-  }
-
-  function add(raw, fromInput) {
-    var last = null;
-    raw.split(",").map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (w) {
-      if (has(w)) { bump(w); return; }   // 같은 단어는 새로 안 만들고 있던 칩을 흔든다
-      if (words.length >= MAX) return;
-      words.push(w); last = w;
-    });
-    render(fromInput, last);
-  }
-
-  function bump(w) {
-    setTimeout(function () {
-      var lw = w.toLowerCase();
-      chipsEl.querySelectorAll(".chip").forEach(function (c) {
-        if (c.getAttribute("data-word").toLowerCase() === lw) {
-          c.classList.remove("bump"); void c.offsetWidth; c.classList.add("bump");
-        }
-      });
-    }, 0);
-  }
-
-  function refreshSaveBar() {
-    var msg = document.getElementById("wcSaveMsg");
-    var txt = document.getElementById("wcSaveMsgText");
-    var btn = document.getElementById("wcSaveBtn");
-    var dirty = words.join("\n") !== savedSnap;
-    msg.className = "save-msg" + (dirty ? " dirty show" : "");
-    btn.className = dirty ? "" : "idle";
-    if (dirty) txt.innerHTML = "<b>아직 저장하지 않았습니다.</b> 아래 저장을 눌러야 홈 워드클라우드에 반영됩니다.";
-  }
-
-  document.getElementById("wcForm").addEventListener("submit", function (e) {
-    // 입력칸에 쳐두고 Enter를 안 누른 단어도 같이 저장한다 — 치다 만 글자가 저장을
-    // 눌렀는데 조용히 사라지면 안 된다.
-    var inp = document.getElementById("wcInput");
-    if (inp && inp.value.trim()) {
-      inp.value.split(",").map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (w) {
-        if (!has(w) && words.length < MAX) words.push(w);
-      });
-    }
-    if (words.join("\n") === savedSnap) { e.preventDefault(); return; }
-    var box = document.getElementById("wcHidden");
-    box.innerHTML = "";
-    words.forEach(function (w, i) {
-      var h = document.createElement("input");
-      h.type = "hidden"; h.name = "exclude" + (i + 1); h.value = w;
-      box.appendChild(h);
-    });
-  });
-
-  render(false);
-})();
-</script>"""
-
-
-def _render_wordcloud_suggest_html(candidates: list) -> str:
-    """「오늘 워드클라우드에 뜬 단어」 자리. 오늘 회차가 아직 없어 뽑을 게 없으면 통째로 안 그린다."""
-    if not candidates:
-        return ""
-    return (
-        '<div class="wc-sect">오늘 워드클라우드에 뜬 단어 '
-        "<span>— 누르면 위로 올라가요</span></div>"
-        '<div class="sugglist" id="wcSugg"></div>'
-    )
-
-
-def render_wordcloud_exclude_page(settings: dict, error: str = "") -> str:
-    """워드클라우드 제외어 설정 화면을 렌더링한다.
-
-    error가 있으면(저장 실패) settings의 wordcloud_exclude_words는 담당자가 방금 저장하려던
-    값이다 — 그 값을 칩으로 되살려 두고, "저장된 값"은 파일에서 다시 읽어 저장 바가
-    "아직 저장하지 않았습니다"를 계속 띄우게 한다.
-    """
-    words = settings.get("wordcloud_exclude_words", [])
-    saved = load_settings().get("wordcloud_exclude_words", []) if error else words
-    candidates = wordcloud_candidates(settings, extra=2 * MAX_WORDCLOUD_EXCLUDE_WORDS)
-    error_html = f'<p class="error">{html.escape(error)}</p>' if error else ""
-
-    def _js(value) -> str:
-        return json.dumps(value, ensure_ascii=False).replace("</", "<\\/")
-
-    return _WORDCLOUD_EXCLUDE_TEMPLATE.format(
-        **_theme(),
-        max_exclude=MAX_WORDCLOUD_EXCLUDE_WORDS,
-        show_count=LANDING_KEYWORD_COUNT,
-        error_html=error_html,
-        suggest_html=_render_wordcloud_suggest_html(candidates),
-        words_json=_js(words),
-        saved_json=_js(saved),
-        candidates_json=_js([list(c) for c in candidates]),
-        wc_script=_WORDCLOUD_EXCLUDE_SCRIPT,
         index_href=_home_href(),
     )
 
@@ -5670,8 +5368,6 @@ class _SettingsHandler(BaseHTTPRequestHandler):
                     error_new=query.get("new", [""])[0],
                 )
             )
-        elif self.path == "/wordcloud-exclude" or self.path.startswith("/wordcloud-exclude?"):
-            self._respond(render_wordcloud_exclude_page(load_settings()))
         elif self.path == "/auto-send":
             self._respond(render_auto_send_settings(load_settings()))
         elif self.path == "/format-adhoc":
@@ -5824,8 +5520,6 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_hide_article(form)
         elif self.path == "/unhide-article":
             self._handle_unhide_article(form)
-        elif self.path == "/save-wordcloud-exclude":
-            self._handle_save_wordcloud_exclude(form)
         elif self.path == "/save-auto-send":
             self._handle_save_auto_send_settings(form)
         elif self.path == "/save-format-adhoc":
@@ -6047,16 +5741,6 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             return
         self._regenerate_screens()
         self._respond_json({"color_hex": color_hex})
-
-    def _handle_save_wordcloud_exclude(self, form: dict) -> None:
-        words = [form.get(f"exclude{i + 1}", [""])[0] for i in range(MAX_WORDCLOUD_EXCLUDE_WORDS)]
-        try:
-            save_wordcloud_exclude_words(words)
-        except SettingsError as error:
-            attempted = {**load_settings(), "wordcloud_exclude_words": [w for w in words if w.strip()]}
-            self._respond(render_wordcloud_exclude_page(attempted, error=str(error)))
-            return
-        self._redirect("/wordcloud-exclude")
 
     def _handle_save_auto_send_settings(self, form: dict) -> None:
         """자동발송 설정 화면의 "저장" — 사용 여부와 유예 시간(분)을 함께 저장한다.

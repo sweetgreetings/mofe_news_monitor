@@ -322,8 +322,6 @@ COLOR_FLOW_ENTRY_ADHOC_BORDER = "rgba(20, 107, 94, 0.45)"  # COLOR_ADHOC_TEXT의
 # 입구 칸 점선(#BFDBFE)은 3px 띠로 칠하면 너무 옅어 정기만 한 단계 진하게 둔다.
 COLOR_FLOW_ROW_REG_BAR = "#93C5FD"
 COLOR_FLOW_ROW_ADHOC_BAR = COLOR_FLOW_ENTRY_ADHOC_BORDER
-# 워드클라우드 빈도 5단계 — 진할수록 많이 나온 단어.
-COLOR_WORDCLOUD_TIERS = (COLOR_HEADER, COLOR_ACCENT, "#3B7DDB", "#7AA5E8", "#A9C3EF")
 
 # ── 라벨 (앰버, 정기·수시를 가로지르는 별도 축) ───────────────────────────
 COLOR_LABEL_TEXT = "#8A5A14"
@@ -443,9 +441,6 @@ COLOR_SCREEN_TAG_REG_BORDER = COLOR_ACCENT_BORDER
 COLOR_SCREEN_TAG_REG_TEXT = COLOR_ACCENT
 COLOR_NOTIFY_CHIP_TEXT = COLOR_TEXT_SOFT
 COLOR_KWPOP_FLASH = COLOR_ROW_NEW       # 키워드 칩 추가 순간 반짝임 — "방금 바뀜" 노랑 재사용
-# [추가: 2026-09-11] 워드클라우드 제외어 칩 테두리 — 값은 꺼진 키워드 칩과 같지만 뜻이
-# 다르다(제외어엔 ON/OFF가 없다 — 검색어 칩의 파랑 "검색 ON"을 안 빌리려고 중립 회색).
-COLOR_WC_EXCLUDE_CHIP_BORDER = COLOR_TOGGLE_OFF
 
 # ── 홈 남색 카드(「부정 추정 기사」 + [단독]/[속보], app.landing_renderer) ──
 # 홈에서 유일하게 짙은 바탕을 쓰는 카드(시안 mockups/HOME_NEGATIVE_GUESS_MOCKUP.html).
@@ -612,7 +607,6 @@ PALETTE = {
     "placeholder": COLOR_PLACEHOLDER,
     "chip_off_border": COLOR_CHIP_OFF_BORDER,
     "kwpop_flash": COLOR_KWPOP_FLASH,
-    "wc_exclude_chip_border": COLOR_WC_EXCLUDE_CHIP_BORDER,
     "scoop_chip_border": COLOR_SCOOP_CHIP_BORDER,
     "adhoc_border_strong": COLOR_ADHOC_BORDER_STRONG,
     "notify_chip_bg": COLOR_NOTIFY_CHIP_BG,
@@ -649,7 +643,7 @@ SHADOW_MODAL = "0 16px 40px rgba(15, 23, 42, 0.22)"  # 확인창 · 이름 고�
 
 # 글자 크기 여섯 단계(CLAUDE.md 디자인 「글자 크기」, 시안 mockups/TYPE_SCALE_MOCKUP.html).
 # CSS엔 `font-size: var(--fs-md)`처럼 적는다. 아이콘 크기를 font-size로 정하는 곳(↩·⋯·✏️·▲▼·×)과
-# 홈 머리 제목·워드클라우드·손글씨 캡션은 이 단계 밖이다.
+# 홈 머리 제목·손글씨 캡션은 이 단계 밖이다.
 FONT_XS = "0.72rem"      # 숫자 배지 · 작은 칩 안 보조 글자 · 캡션
 FONT_SM = "0.8rem"       # 메타 줄 · 칩 · 행 안 컨트롤 · 작은 안내
 FONT_MD = "0.88rem"      # 버튼 · 툴바 · 입력칸 · 배너 · 안내문 · 펼친 기사 요약
@@ -772,8 +766,6 @@ LLM_MODEL = "claude-haiku-4-5"
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 # PRD.md 기능2 규칙 5 — 소제목별 요약 길이 제한
-# [수정: 2026-09-10] MAIN_KEYWORD_COUNT(하단 "AI가 추출한 주요 키워드" 개수)는 그 블록을
-# 없애면서 함께 지웠다 — 워드클라우드는 예전부터 LANDING_KEYWORD_COUNT를 쓴다.
 SUMMARY_MAX_SENTENCES = 3
 # [수정: 2026-08-12] 150 -> 250. AI_RULES.md 참고 — 실제 요약(app.llm_classifier)이
 # 도입되며 150자로는 문장이 자주 중간에 잘렸다.
@@ -991,7 +983,7 @@ OUTPUT_HTML_PATH = BASE_DIR / "index.html"
 HISTORY_HTML_PATH = BASE_DIR / "history.html"
 LANDING_HTML_PATH = BASE_DIR / "home.html"
 # [추가: 2026-07-25] 실시간 기사 현황 — 예정된 회차와 무관하게, 요청이 올 때마다 당일
-# 0시~현재까지 라이브로 다시 검색해 만드는 화면 (home.html의 워드클라우드 갱신과 같은
+# 0시~현재까지 라이브로 다시 검색해 만드는 화면 (home.html의 당일 누적 집계와 같은
 # "요청마다 새로 생성" 패턴).
 LIVE_HTML_PATH = BASE_DIR / "live.html"
 # [추가: 2026-07-27] 다음 예정 회차 미리보기 — 아직 회차가 끝나기 전에, 지금까지의
@@ -1012,10 +1004,6 @@ SETTINGS_SERVER_PORT = 8765
 # "설정을 안 건드리면 예전처럼 이 컴퓨터에서만 접속 가능"이라는 안전한 기본 동작이
 # 그대로 유지된다.
 SETTINGS_SERVER_HOST = os.getenv("SERVER_HOST", "127.0.0.1").strip() or "127.0.0.1"
-
-# [추가: 2026-07-25] 워드클라우드에서 직접 빼고 싶은 단어(검색 키워드와 별개, 최소
-# 개수 제한 없음 — 하나도 안 넣는 것도 유효). 검색 키워드 설정과 같은 방식·최대 개수.
-MAX_WORDCLOUD_EXCLUDE_WORDS = 15
 
 # [추가: 2026-08-06] 이메일 받는 사람 최대 인원 — 담당자 한 명이 여러 동료에게 전달하는
 # 용도라 팀 규모를 넘어설 일이 거의 없다고 보고 넉넉히 잡았다.
@@ -1162,11 +1150,6 @@ DEFAULT_ARTICLE_LINE_TEMPLATE = "ㅇ ({outlet}) {title}"
 # 있다"는 이유로 강제 적용을 없앴는데, 이번엔 사용자가 직접 켜고 고를 수 있는
 # 설정값이라 같은 이유로 막을 필요가 없다(강제냐 선택이냐의 차이).
 DEFAULT_SUBHEADING_FORMAT_TEMPLATE = "<{section}>"
-
-# PRD.md 기능3 규칙 3 — [추가: 2026-07-23] 진입 화면 워드클라우드에 뽑을 최대 키워드 개수
-# [수정: 2026-07-26] 12 -> 20 (사용자 요청) — 마우스 오버 시 실제 언급 횟수를 툴팁으로
-# 보여주게 되면서, 크기만으로 헷갈리던 하위권 단어도 늘려서 보여줄 여지가 생겼다.
-LANDING_KEYWORD_COUNT = 20
 
 DATA_DIR.mkdir(exist_ok=True)
 ARTICLES_DIR.mkdir(exist_ok=True)

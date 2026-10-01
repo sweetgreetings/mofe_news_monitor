@@ -219,7 +219,7 @@ def main(open_browser: bool = True) -> None:
     except RuntimeError:
         # 오늘 첫 회차 이전에 앱을 켠 경우, 또는 자정이 지나 어제 회차만 남아있는 경우.
         generate_waiting_page()
-    # 아래 둘은 회차가 하나도 없어도 예외를 내지 않으므로(빈 목록/빈 워드클라우드로 처리),
+    # 아래 둘은 회차가 하나도 없어도 예외를 내지 않으므로(빈 목록으로 처리),
     # generate_screen의 성공 여부와 무관하게 항상 만든다.
     generate_history_page()
     generate_landing_page()

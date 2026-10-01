@@ -23,7 +23,6 @@ from app.config import (
     MAX_SCHEDULE_GROUPS,
     MAX_SCHEDULE_TIMES,
     OUTLET_ORDER_JUMP_STEP,
-    MAX_WORDCLOUD_EXCLUDE_WORDS,
     MIN_SCHEDULE_TIMES,
     SCHEDULE_TIMES,
     SETTINGS_FILE,
@@ -83,7 +82,6 @@ def _default_settings() -> dict:
                 "days": [],
             }
         ],
-        "wordcloud_exclude_words": [],
         "auto_send_enabled": DEFAULT_AUTO_SEND_ENABLED,
         "auto_send_grace_min": DEFAULT_AUTO_SEND_GRACE_MIN,
     }
@@ -146,11 +144,12 @@ def load_settings() -> dict:
     settings.setdefault("highlight_keywords", [dict(item) for item in DEFAULT_HIGHLIGHT_KEYWORDS])
     settings.setdefault("article_line_template", DEFAULT_ARTICLE_LINE_TEMPLATE)
     settings.setdefault("subheading_format_template", DEFAULT_SUBHEADING_FORMAT_TEMPLATE)
-    settings.setdefault("wordcloud_exclude_words", [])
     # [수정: 2026-09-18] 사진·인사 기사 제외 설정(수집 범위 화면)은 없앴다 — 켜두면 판정이
     # 틀린 기사가 화면에 안 보이고 조용히 빠진다. 남아 있던 값(옛 include_* 포함)은 버린다.
+    # 홈 워드클라우드를 없애면서 그 제외어(wordcloud_exclude_words)도 같이 버린다.
     for key in ("include_photo_in_scrap", "include_personnel_in_scrap",
-                "exclude_photo_in_scrap", "exclude_personnel_in_scrap"):
+                "exclude_photo_in_scrap", "exclude_personnel_in_scrap",
+                "wordcloud_exclude_words"):
         settings.pop(key, None)
     # [추가: 2026-09-18] 수시 보고서 형식 — 정기와 따로 둔다. 처음엔 지금 정기 값을 복사해
     # 시작한다(바꾼 첫날 수시 복사·발송 텍스트가 갑자기 달라지지 않게). 다른 설정을 한 번이라도
@@ -411,7 +410,7 @@ def save_keyword_groups(groups: list) -> dict:
 
 def all_search_keywords(settings: dict) -> list:
     """예정된 회차 스크랩(정식 수집)에 실제로 쓰이는 모든 키워드를 순서 유지한 채 평평하게
-    합친다. 소제목 분류 제외어, 워드클라우드 색 구분처럼 "저장된 회차
+    합친다. 소제목 분류 제외어처럼 "저장된 회차
     데이터가 어떤 검색어로 모였는지"가 필요한 곳에서 쓴다 — 저장된 회차는 항상
     include_in_scrap 그룹으로만 모이므로(app.scraper.collect_run), 이 함수도 그
     그룹들만 본다. 실시간 기사 현황(전체 그룹 OR)은 이 함수를 쓰지 않고
@@ -549,24 +548,6 @@ def cycle_highlight_color(word: str) -> str:
     settings["highlight_keywords"] = items
     _write(settings)
     return HIGHLIGHT_COLORS[next_color]
-
-
-def save_wordcloud_exclude_words(words: list) -> dict:
-    """진입 화면 워드클라우드에서 빼고 싶은 단어를 저장한다.
-
-    검색 키워드·형광펜 단어와는 완전히 별개 필드다. 0개~MAX_WORDCLOUD_EXCLUDE_WORDS개까지
-    허용하며(최소 개수 제한 없음), 빈 문자열은 버리고 앞뒤 공백은 지운다. AND/OR 같은
-    검색 방식 개념은 없다 — 그냥 단어 목록일 뿐이다.
-    """
-    cleaned = [w.strip() for w in words if w.strip()]
-    if len(cleaned) > MAX_WORDCLOUD_EXCLUDE_WORDS:
-        raise SettingsError(
-            f"워드클라우드 제외어는 최대 {MAX_WORDCLOUD_EXCLUDE_WORDS}개까지 가능합니다 (현재 {len(cleaned)}개)."
-        )
-    settings = load_settings()
-    settings["wordcloud_exclude_words"] = cleaned
-    _write(settings)
-    return settings
 
 
 def save_auto_send_settings(enabled: bool, grace_min) -> dict:
