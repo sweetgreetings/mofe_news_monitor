@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>기관 기사 찾기 — 낱말 칸·거르기·날짜 접기 시안</title>
+<style>
+  
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem; --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%; --h-sm: 24px; --h-tb: 28px; --h-md: 30px; --h-lg: 36px; --fab-lg: 56px; --fab-sm: 48px; --chk-md: 16px; --chk-sm: 14px; --sh-float: 0 4px 12px rgba(15, 23, 42, 0.12); --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14); --sh-modal: 0 16px 40px rgba(15, 23, 42, 0.22); }
+  .plus-glyph { font-size: 1.2em; font-weight: 600; line-height: 0; margin-right: 4px; }
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    background: #FFFFFF; border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .topbar-inner {
+    max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: flex-start; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .topbar-inner > .tn { color: #2563EB; text-decoration: none; font-size: var(--fs-md); font-weight: 600;
+    padding: 5px 14px; border: 1px solid transparent; border-radius: var(--r-pill); white-space: nowrap; }
+  .topbar-inner > a.tn:hover { background: #EFF6FF; }
+  .topbar-inner > .tn-sep { width: 1px; height: 18px; background: #E5E7EB; margin: 0 16px; }
+  .topbar-inner > .tn.is-current { cursor: default; background: #EFF6FF;
+    border-color: #BFDBFE; color: #2563EB; }
+  .topbar.adhoc .topbar-inner > .tn.is-current { background: #E3F1EE;
+    border-color: rgba(20, 107, 94, 0.45); color: #146B5E; }
+  .topbar-inner > .tn.is-empty { color: #6B7280; opacity: 0.55; cursor: not-allowed; }
+  .topbar-inner > a.tn.back { color: #4B5563; }
+  .topbar-inner > a.tn.back:hover { color: #2563EB; }
+  @media (max-width: 480px) {
+    .topbar-inner { padding: 12px 12px; gap: 2px; }
+    .topbar-inner > .tn { padding: 5px 8px; }
+    .topbar-inner > .tn-sep { margin: 0 8px; }
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  /* 위 여백 24 + 안쪽 44 — 상단 고정바(54px)를 피하는 값이고, 확정본·초안·오늘 전체 기사·
+     정기 보관함·설정·라벨 일곱 화면이 같은 값을 쓴다(화면을 오갈 때 제목이 안 들썩이게). */
+  .container { max-width: 800px; margin: 24px auto 80px; background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: var(--r-lg); padding: 44px 24px 26px; }
+  h1 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 6px; }
+  .hint { color: #4B5563; font-size: var(--fs-md); margin: 0 0 18px; line-height: 1.7; }
+
+  .qbar { border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 12px 14px; margin-bottom: 18px;
+    background: #F8FAFC; }
+  .qrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .qrow + .qrow { margin-top: 10px; }
+  .qlabel { font-size: var(--fs-sm); color: #4B5563; font-weight: 600; width: 46px; flex: none; }
+  .qnote { margin: -2px 0 2px 54px; font-size: var(--fs-sm); color: #4B5563; line-height: 1.6; }
+  @media (max-width: 640px) { .qnote { margin-left: 0; } }
+  .qbar input[type="text"], .qbar input[type="date"] { height: var(--h-md); border: 1px solid #E5E7EB;
+    border-radius: var(--r-md); padding: 0 10px; font-size: var(--fs-md); font-family: inherit; background: #FFFFFF;
+    color: #1F2937; }
+  .qbar input[type="text"] { flex: 1 1 240px; min-width: 180px; }
+  .qbar input[type="date"] { font-size: var(--fs-sm); }
+  .btn-go { height: var(--h-md); background: #2563EB; color: #FFFFFF; border: none; border-radius: var(--r-md);
+    padding: 0 16px; font-size: var(--fs-md); font-weight: 600; font-family: inherit; cursor: pointer; }
+  .preset { display: inline-flex; border: 1px solid #E5E7EB; border-radius: var(--r-md); overflow: hidden;
+    background: #FFFFFF; }
+  .preset button { border: none; background: transparent; color: #4B5563; font-size: var(--fs-sm);
+    font-family: inherit; padding: 0 11px; height: var(--h-md); cursor: pointer; }
+  .preset button + button { border-left: 1px solid #E5E7EB; }
+  .preset button.on { background: #EFF6FF; color: #1E3A5F; font-weight: 700; }
+  .qsep { color: #4B5563; font-size: var(--fs-sm); }
+
+  /* 거르기 줄 — 오늘 전체 기사의 특수조건 줄과 같은 모양(보조 줄이라 체크는 --chk-sm).
+     사진 칸만 「빼고」 방향이라 세로선으로 갈라 둔다. */
+  .frow label { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-sm);
+    color: #1F2937; cursor: pointer; }
+  .frow input[type="checkbox"] { flex: none; width: var(--chk-sm); height: var(--chk-sm); margin: 0;
+    accent-color: #2563EB; cursor: pointer; }
+  .frow .n { font-size: var(--fs-xs); color: #4B5563; }
+  .fsep { width: 1px; height: 14px; background: #E5E7EB; margin: 0 2px; }
+
+  /* 사진 추정 — 확정본과 같은 값(행 흐리게 + 알약, 마우스를 올리면 또렷). */
+  .art.is-photo { opacity: 0.55; }
+  .art.is-photo:hover { opacity: 1; }
+  .photo-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-pill);
+    font-size: var(--fs-xs); font-weight: 600; color: #4B5563; background: #F8FAFC;
+    border: 1px solid #E5E7EB; white-space: nowrap; }
+  /* 말머리는 배지 없이 제목 글자색(확정본·오늘 전체 기사와 같은 값). */
+  .t-scoop { color: #B91C1C; font-weight: 800; }
+  .t-flash { color: #B91C1C; font-weight: 600; }
+
+  .rhead { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; flex-wrap: wrap; }
+  .rhead .n { font-size: var(--fs-md); color: #1E3A5F; font-weight: 700; flex: none; white-space: nowrap; }
+  .rhead .sub { font-size: var(--fs-sm); color: #4B5563; min-width: 0; }
+  .rhead .cap { font-size: var(--fs-sm); color: #92400E; }
+  .exp { display: inline-flex; gap: 2px; flex: none; margin-left: auto; }
+  .exp button { border: none; background: transparent; color: #4B5563; font-weight: 500;
+    border-radius: var(--r-md); padding: 4px 8px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; }
+  .exp button:hover { background: transparent; color: #2563EB; text-decoration: underline; }
+
+  .dblock { margin-top: 16px; }
+  .dhead { display: flex; align-items: center; gap: 8px; font-size: var(--fs-lg); color: #1E3A5F;
+    font-weight: 700; padding: 6px 0; border-bottom: 1px solid #E5E7EB; }
+  .dhead .dcnt { font-size: var(--fs-sm); color: #4B5563; font-weight: 500; }
+  .chip-today { font-size: var(--fs-xs); font-weight: 700; color: #1E3A5F; background: #EFF6FF;
+    border: 1px solid #BFDBFE; border-radius: var(--r-pill); padding: 1px 8px; }
+
+  .art { padding: 4px 8px; margin: 6px 0; border-radius: var(--r-md); }
+  .art:hover { background: #F3F4F6; }
+  .a-title { font-size: var(--fs-base); line-height: 1.55; }
+  .a-title .outlet { color: #4B5563; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  .a-title a { color: #1F2937; text-decoration: none; }
+  .a-title a:hover { text-decoration: underline; }
+  .a-meta { margin-top: 2px; font-size: var(--fs-sm); color: #4B5563; display: flex; align-items: center;
+    gap: 6px; flex-wrap: wrap; }
+  .a-meta a { color: #4B5563; text-decoration: none; }
+  .a-meta a:hover { color: #2563EB; text-decoration: underline; }
+  .a-meta .hid { color: #4B5563; }
+  .a-meta .lab { font-size: var(--fs-xs); font-weight: 600; color: #8A5A14; background: #FBF0DA;
+    border: 1px solid rgba(138, 90, 20, 0.28); border-radius: var(--r-pill); padding: 1px 8px; }
+  /* 제목 줄 = 제목(왼쪽) + 아이콘 두 칸(오른쪽 끝) */
+  .title-row { display: flex; align-items: flex-start; gap: 8px; }
+  .a-title { flex: 1 1 auto; min-width: 0; }
+  /* 원문·복사 — 휴지통 행과 같은 30×26 테두리 상자 + 13px 아이콘. **테두리가 핵심이다**:
+     맨 아이콘만 두면 ↗와 복사가 같은 실루엣으로 보인다(확정본에서 ↗를 뺐던 이유). */
+  .acts { flex: none; display: flex; align-items: center; gap: 6px; }
+  .acts .ib { flex: none; display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 26px; color: #4B5563; text-decoration: none; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: var(--r-md); cursor: pointer; padding: 0; }
+  .acts .ib:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .acts .ib svg { width: 13px; height: 13px; fill: none; stroke: currentColor;
+    stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .acts .ib .icon-done { display: none; }
+  .acts .ib.is-copied .icon-default { display: none; }
+  .acts .ib.is-copied .icon-done { display: inline-flex; color: #166534; }
+  /* 스니펫 — 접힌 채로도 「왜 걸렸는지」가 보이게 낱말 주변만 한 줄. 넘치면 여기서 자른다. */
+  .snip { margin-top: 2px; font-size: var(--fs-md); color: #4B5563; line-height: 1.6;
+    overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical; }
+  /* 요약은 접혀 있다(확정본과 같은 규칙). 펼친 동안 제목은 색이 아니라 밝기로만 흐려진다. */
+  .art details > summary { cursor: pointer; list-style: none; }
+  .art details > summary::-webkit-details-marker { display: none; }
+  .art details[open] .a-title { opacity: 0.62; }
+  .a-sum { margin-top: 3px; font-size: var(--fs-md); color: #4B5563; line-height: 1.7; }
+  mark { background: #FFF9C4; color: inherit; padding: 0 1px; border-radius: 2px; }
+
+  .empty { border: 1px dashed #E5E7EB; border-radius: var(--r-lg); padding: 28px 20px; text-align: center;
+    color: #4B5563; font-size: var(--fs-lg); }
+  .empty .sm { display: block; margin-top: 8px; font-size: var(--fs-md); color: #4B5563; line-height: 1.8; }
+</style>
+
+<style>
+  /* 시안에서 더한 것 — 날짜 묶음을 접고, 거르기 줄 아이콘을 글자 크기에 맞춘다. */
+  details.dblock > summary { cursor: pointer; list-style: none; }
+  details.dblock > summary::-webkit-details-marker { display: none; }
+  details.dblock > summary::before { content: "\25B8"; color: #9CA3AF; font-size: 0.8rem; font-weight: 400; }
+  details.dblock[open] > summary::before { content: "\25BE"; }
+  details.dblock > summary:hover { background: #F3F4F6; }
+  .frow .ic { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.8;
+    stroke-linecap: round; stroke-linejoin: round; margin-right: 1px; }
+  .mk { max-width: 800px; margin: 18px auto 0; font-size: 0.8rem; color: #6B7280; line-height: 1.9; }
+  .mk b { color: #1E3A5F; }
+</style>
+
+</head>
+<body>
+
+<div class="topbar"><div class="topbar-inner">
+  <a class="tn" href="http://127.0.0.1:8765/home.html">홈</a>
+</div></div>
+
+<div class="container">
+  <h1>🗄️ 기관 기사 찾기</h1>
+  <p class="hint">재정경제부·재경부·기획재정부·기재부 관련 기사를 하루 종일 모아 둡니다. 지우지 않습니다.</p>
+
+  <form method="GET" action="/agency-archive">
+    <div class="qbar">
+      <div class="qrow">
+        <span class="qlabel">낱말</span>
+        <input type="text" name="q" value="" placeholder="예: 비상경제본부 회의+전기차" />
+        <button type="submit" class="btn-go">찾기</button>
+      </div>
+      <div class="qrow">
+        <span class="qlabel">기간</span>
+        <span class="preset"><button type="submit" name="preset" value="7d" class="">7일</button><button type="submit" name="preset" value="1m" class="on">1개월</button><button type="submit" name="preset" value="3m" class="">3개월</button><button type="submit" name="preset" value="1y" class="">1년</button><button type="submit" name="preset" value="all" class="">전체</button></span>
+        <input type="date" name="start" value="2026-09-02" />
+        <span class="qsep">~</span>
+        <input type="date" name="end" value="2026-10-01" />
+        
+      </div>
+      <div class="qrow frow">
+        <span class="qlabel">거르기</span>
+        <label title="KBS·MBC·조선·중앙·동아·한경·매경·서울경제·한국일보·머니투데이·이데일리·연합·뉴시스 13곳"><input type="checkbox" name="major" value="1" onchange="this.form.submit()" />주요 언론사만<span class="n">321</span></label><label title="제목 맨 앞에 [단독]이 붙은 기사만"><input type="checkbox" name="scoop" value="1" onchange="this.form.submit()" />[단독]<span class="n">10</span></label><label title="제목 맨 앞에 [속보]가 붙은 기사만"><input type="checkbox" name="flash" value="1" onchange="this.form.submit()" />[속보]<span class="n">3</span></label><span class="fsep"></span><label title="사진과 설명 한 문장뿐인 것으로 보이는 기사를 목록에서 뺍니다"><input type="checkbox" name="nophoto" value="1" onchange="this.form.submit()" /><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="3.6"/></svg>사진 추정 제외<span class="n">222</span></label>
+      </div>
+    </div>
+  </form>
+
+  
+<div class="rhead"><span class="n">1345건</span><span class="sub">9월 2일 ~ 10월 1일</span><span class="cap">최근 300건만 보입니다 · 낱말이나 기간으로 좁혀 보세요</span><span class="exp"><button type="button" onclick="copyArchiveText(this)" data-copy-text="(시안)">복사</button><form method="POST" action="/download-text" style="display:contents"><input type="hidden" name="filename" value="2026-09-02~2026-10-01_기관기사.txt"><input type="hidden" name="text" value="(시안)"><button type="submit">텍스트</button></form><form method="POST" action="/download-excel" style="display:contents"><input type="hidden" name="filename" value="2026-09-02~2026-10-01_기관기사.xlsx"><input type="hidden" name="rows" value="(시안)"><button type="submit">엑셀</button></form></span></div>
+<details class="dblock" open><summary class="dhead">10월 1일 (목) <span class="chip-today">오늘</span><span class="dcnt">269건</span></summary><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">dailypop.kr</span>서울 아파트 전세 올해 7.35%↑, 평균 월세 131만원…내일부터 일시적 2주택 처분기한 2년 - 데일리팝</div><span class="acts"><a class="ib" href="http://www.dailypop.kr/news/articleView.html?idxno=103011" target="_blank" rel="noopener" title="원문 보기" onclick="event.stopPropagation()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사" data-copy-text="(시안)" onclick="copyArchiveRow(event, this)"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button></span></div><div class="a-meta"><span>10:20 게시</span></div></summary><div class="a-sum">재정경제부가 지난 29일 국무회의에서 확정한 소득세법·법인세법·종합부동산세법·상속세 및 증여세법 시행령 개정안이 10월 1일 공포와 함께 시행된다. 8월 3일 발표한 2026년 세제개편안의 후속 조치다. 바뀌는... </div></details></div><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">tokenpost.kr</span>국채 3년물 4.011%…금융위, 금리 상승 점검</div><span class="acts"><a class="ib" href="https://www.tokenpost.kr/news/economy/416824" target="_blank" rel="noopener" title="원문 보기" onclick="event.stopPropagation()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사" data-copy-text="(시안)" onclick="copyArchiveRow(event, this)"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button></span></div><div class="a-meta"><span>10:18 게시</span></div></summary><div class="a-sum">금융위원회는 1일 오전 10시 정부서울청사에서 이억원 금융위원장 주재로 재정경제부·금융감독원·금융연구원과 신용평가사·증권사 전문가들이 참석한 금융시장 상황점검회의를 열었다. 금융위원회는 회의에서... </div></details></div><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">헤럴드경제</span>이억원 금융위원장 “금융환경 전환기…채권시장 변동성 확대 대비해야”</div><span class="acts"><a class="ib" href="https://n.news.naver.com/mnews/article/016/0002704158" target="_blank" rel="noopener" title="원문 보기" onclick="event.stopPropagation()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사" data-copy-text="(시안)" onclick="copyArchiveRow(event, this)"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button></span></div><div class="a-meta"><span>10:17 게시</span></div></summary><div class="a-sum">금융위원회는 이날 정부서울청사에서 이 위원장 주재로 재정경제부·금융감독원과 금융연구원, 신용평가사·증권사 등 금융시장 전문가들이 참석한 가운데 금융시장 상황점검회의를 열었다. 회의에서는 주요국 기준금리... </div></details></div><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">한국경제</span>이억원 &quot;금융환경 전환기…불안 시 시장안정조치 적기 시행&quot;</div><span class="acts"><a class="ib" href="https://n.news.naver.com/mnews/article/015/0005338035" target="_blank" rel="noopener" title="원문 보기" onclick="event.stopPropagation()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사" data-copy-text="(시안)" onclick="copyArchiveRow(event, this)"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button></span></div><div class="a-meta"><span>10:15 게시</span></div></summary><div class="a-sum">금융위원회는 1일 이 위원장 주재로 재정경제부·금융감독원·금융연구원과 신용평가사·증권사 등 금융시장 전문가들이 참석한 가운데 &#x27;금융시장 상황점검회의&#x27;를 개최했다. 이번 회의에서는 한국을 포함한 주요국... </div></details></div><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">한국일보</span>이형일 &quot;올해 수출 1조 달러 전망…국민소득 4만 달러 가시화&quot;</div><span class="acts"><a class="ib" href="https://n.news.naver.com/mnews/article/469/0000957045" target="_blank" rel="noopener" title="원문 보기" onclick="event.stopPropagation()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사" data-copy-text="(시안)" onclick="copyArchiveRow(event, this)"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button></span></div><div class="a-meta"><span>10:15 게시</span></div></summary><div class="a-sum">이형일 부총리 겸 재정경제부 장관이 &quot;올해 수출이 사상 처음으로 1조 달러를 넘어설 것으로 전망된다&quot;고 밝혔다. 이 부총리는 1일 정부서울청사에서 취임 후 첫 비상경제본부회의 겸 경제관계장관회의를 주재하며 수출... </div></details></div><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">metroseoul.co.kr</span>금리 상승에 차환 부담…금융위, 채권시장 안전판 강화</div><span class="acts"><a class="ib" href="http://www.metroseoul.co.kr/article/20261001500101" target="_blank" rel="noopener" title="원문 보기" onclick="event.stopPropagation()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사" data-copy-text="(시안)" onclick="copyArchiveRow(event, this)"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button></span></div><div class="a-meta"><span>10:14 게시</span></div></summary><div class="a-sum">금융위원회는 1일 정부서울청사에서 이억원 금융위원장 주재로 재정경제부·금융감독원과 금융시장 전문가들이 참석한 &#x27;금융시장 상황점검회의&#x27;를 열었다. 주요국의 잇따른 기준금리 인상이 금융시장에 미치는 영향과... </div></details></div></details><details class="dblock"><summary class="dhead">9월 30일 (수) <span class="dcnt">31건</span></summary><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">세계일보</span>[사설] 명절 할인 지원에 ‘초과 세수’ 쓰겠다니… ‘미래 대응’ 맞나</div><span class="acts"><a class="ib" href="https://n.news.naver.com/mnews/article/022/0004163127" target="_blank" rel="noopener" title="원문 보기" onclick="event.stopPropagation()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사" data-copy-text="(시안)" onclick="copyArchiveRow(event, this)"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button></span></div><div class="a-meta"><span>23:05 게시</span></div></summary><div class="a-sum">최근 재정경제부는 올해 국세 수입을 재추계한 결과 478조6000억원에 달할 것으로 전망했다. 종전 역대 최대인 2022년 395조9000억원을 훌쩍 뛰어넘는 수치다. 지난 3월 추가경정예산 편성 당시 추계한 규모보다 63조2000억원... </div></details></div><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">betanews.net</span>&#x27;환율 관리&#x27; 외환당국, 2분기 96억달러 순매도...7분기 연속</div><span class="acts"><a class="ib" href="https://www.betanews.net/article/view/beta202609300093" target="_blank" rel="noopener" title="원문 보기" onclick="event.stopPropagation()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사" data-copy-text="(시안)" onclick="copyArchiveRow(event, this)"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button></span></div><div class="a-meta"><span>22:16 게시</span></div></summary><div class="a-sum">외환당국인 한은과 재정경제부는 2019년 3분기부터 분기별로 외환당국의 달러 총매수와 총매도 차액을 공개하고 있다. 30일 한국은행이 공개한 &#x27;2026년 2분기 외환당국 순거래&#x27;에 따르면 외환당국은 올해 2분기 시장... </div></details></div><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">경향신문</span>세수 63조 초과 전망…올 국세 478조 ‘최대’</div><span class="acts"><a class="ib" href="https://n.news.naver.com/mnews/article/032/0003473548" target="_blank" rel="noopener" title="원문 보기" onclick="event.stopPropagation()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사" data-copy-text="(시안)" onclick="copyArchiveRow(event, this)"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button></span></div><div class="a-meta"><span>21:53 게시</span></div></summary><div class="a-sum">재정경제부가 30일 발표한 ‘2026년 국세수입 재추계’를 보면, 올해 국세수입 전망치는 478조6000억원이다. 이는 지난해 말 2026년도 본예산 편성 당시 예상한 390조2000억원보다 88조4000억원, 올해 3월 편성한... </div></details></div><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">KBS</span>올해 초과 세수 63.2조 역대 최대…미래대응기금 200조 넘나</div><span class="acts"><a class="ib" href="https://n.news.naver.com/mnews/article/056/0012265812" target="_blank" rel="noopener" title="원문 보기" onclick="event.stopPropagation()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사" data-copy-text="(시안)" onclick="copyArchiveRow(event, this)"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button></span></div><div class="a-meta"><span>21:44 게시</span></div></summary><div class="a-sum">[이형일/경제부총리 겸 재정경제부 장관/지난 28일 : &quot;최선을 다해서 (세수) 추계를 하고 있다는 말씀을 드리고요. 예상하지 못했던 반도체 호황으로 인해서….&quot;] 초과 세수의 절반 이상은 법인세입니다. 반도체 기업의... </div></details></div><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">조선일보</span>정부, 주택 공급 상황 2주마다 공개… 韓총리 “주택 공급된다는 신뢰 회복해야”</div><span class="acts"><a class="ib" href="https://n.news.naver.com/mnews/article/023/0004001360" target="_blank" rel="noopener" title="원문 보기" onclick="event.stopPropagation()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사" data-copy-text="(시안)" onclick="copyArchiveRow(event, this)"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button></span></div><div class="a-meta"><span>21:15 게시</span></div></summary><div class="a-sum">국무총리실에 따르면, 한성숙 국무총리는 30일 오후 정부서울청사에서 이형일 부총리 겸 재정경제부 장관, 홍지선 국토교통부 장관, 박홍근 기획예산처 장관, 하준경 청와대 경제성장수석 등과 함께 제3차 범부처 주택 신속... </div></details></div><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">부산일보</span>한수원, ‘혁신제품 공공조달’-‘재난극복·상생협력’ 유공 장관표창</div><span class="acts"><a class="ib" href="https://n.news.naver.com/mnews/article/082/0001400621" target="_blank" rel="noopener" title="원문 보기" onclick="event.stopPropagation()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사" data-copy-text="(시안)" onclick="copyArchiveRow(event, this)"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button></span></div><div class="a-meta"><span>21:12 게시</span></div></summary><div class="a-sum">한국수력원자력(한수원)이 ‘혁신제품 공공조달’ 및 ‘재난극복·상생협력’ 성과를 인정받아 재정경제부장관 표창 및 국토교통부장관 상을 각각 수상했다. 한수원은 30일 대전컨벤션센터에서 개최된 ‘제6회 조달의... </div></details></div></details>
+</div>
+<div class="mk">
+  <b>1</b> 낱말 칸 — 아래 안내줄을 빼고 칸 안 예시 한 줄로(<code>예: 비상경제본부 회의+전기차</code>). 띄어쓰기=덩어리와 +=AND가 한 예시에 다 들어간다.<br />
+  <b>2</b> 거르기 — <code>📷 사진 추정 빼고</code> → 카메라 SVG + <code>사진 추정 제외</code>.<br />
+  <b>3</b> 날짜 묶음 — 접을 수 있게 하고 <b>오늘만</b> 펼친 채로 연다(정기 보관함·휴지통과 같은 ▸/▾).
+</div>
+</body>
+</html>
