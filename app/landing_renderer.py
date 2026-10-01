@@ -2,7 +2,7 @@
 #
 # [수정: 2026-08-26] 홈 화면 재구성 — 예전엔 "실시간/정기/수시/라벨 4갈래 흐름도 +
 # 워드클라우드"가 전부였다. 그 위에 "오늘 무슨 일이 있었나"를 답하는 층을 새로 얹었다:
-# 오늘 건수·[단독]/[속보], 담당자가 고른 정책 단어의 7~30일 추이, 오늘의 쟁점 순위.
+# 오늘 건수·[단독]/[속보], 담당자가 고른 정책 단어의 7~30일 추이, 오늘의 주요 주제 순위.
 # 배경·시행착오는 HISTORY.md "홈 화면 재구성" 참고. 핵심 설계 원칙 셋:
 #   1) 전부 "정기 수집" 기준이다 — 수시 카드는 조건이 카드마다 달라 정기와 같은 잣대로
 #      못 잰다(화면에도 그렇게 밝힌다). 흐름도의 수시 칸에서만 별도로 보여준다.
@@ -81,10 +81,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     margin: 0; background: {bg}; color: {text}; font-family: {font_stack};
   }}
   /* [수정: 2026-09-11] 640 → 960. 확정본·초안·설정(800)보다 넓은 유일한 화면이다 —
-     목록이 아니라 대시보드라, 오늘의 쟁점 ∥ 정책 단어 추이를 한 줄에 두려면 두 칸
-     안쪽이 각각 410px대는 돼야 쟁점 이름·칩·막대가 한 줄에 들어온다(800이면 330px대). */
+     목록이 아니라 대시보드라, 오늘의 주요 주제 ∥ 정책 단어 추이를 한 줄에 두려면 두 칸
+     안쪽이 각각 410px대는 돼야 주제 이름·칩·막대가 한 줄에 들어온다(800이면 330px대). */
   .page {{ max-width: 960px; margin: 0 auto; padding: 24px 20px 40px; }}
-  /* 쟁점(왼쪽) ∥ 추이(오른쪽). 두 카드 밑선을 맞추고, 좁은 창에선 쟁점이 위로 쌓인다. */
+  /* 주제(왼쪽) ∥ 추이(오른쪽). 두 카드 밑선을 맞추고, 좁은 창에선 주제가 위로 쌓인다. */
   .pair {{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 13px; margin-bottom: 13px; align-items: stretch; }}
   .pair > .card {{ margin-bottom: 0; }}
@@ -207,7 +207,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .empty-trend a:hover {{ text-decoration: underline; }}
   {trend_chart_css}
 
-  /* ── 오늘의 쟁점 ── */
+  /* ── 오늘의 주요 주제 ── */
   .irow {{ border-bottom: 1px solid {border}; padding: 10px 0; }}
   .irow:last-of-type {{ border-bottom: none; }}
   .rowhead {{ display: flex; align-items: center; gap: 9px; }}
@@ -353,7 +353,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
 
   /* ── 워드클라우드 ── */
-  /* 쟁점·추이 아래 한 줄. 왼쪽부터 크기순, 한 줄에 안 들어가는 단어는 _WORDCLOUD_JS가
+  /* 주제·추이 아래 한 줄. 왼쪽부터 크기순, 한 줄에 안 들어가는 단어는 _WORDCLOUD_JS가
      통째로 숨기고 끝에 +N(숨은 단어는 title)을 단다. 머리줄 대신 카드 위 말풍선(.wc-tip). */
   .wc-card {{ position: relative; }}
   .wordcloud {{ display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: baseline;
@@ -802,7 +802,7 @@ _HOME_CHART_WIDTH = 412
 
 
 def _naver_key_empty_html() -> str:
-    """네이버 검색 키가 없어 정기 회차가 한 번도 못 돈 상태 — 쟁점·추이 두 카드가 같은 문구를 쓴다
+    """네이버 검색 키가 없어 정기 회차가 한 번도 못 돈 상태 — 주제·추이 두 카드가 같은 문구를 쓴다
     (원인도 할 일도 하나라서, HOME_CARD_SCOPE_MOCKUP.html)."""
     url = f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/naver"
     return ('<p class="empty-trend">정기 회차가 돌아야 채워져요.<br>'
@@ -830,7 +830,7 @@ def _trend_card_html(today_str: str, trend_url: str, has_today_run: bool = False
     fill_bucket_status(buckets, unit, by_date, today_str)
 
     # 지난 7일에 정기 회차가 하나도 없으면 빈 그래프 대신 까닭을 말한다 — 키가 없으면
-    # 쟁점 카드와 같은 문구, 키가 있고 오늘 회차가 돌았으면 내일(어제가 차는 날)부터 그려진다.
+    # 주제 카드와 같은 문구, 키가 있고 오늘 회차가 돌았으면 내일(어제가 차는 날)부터 그려진다.
     if not any(b["record"] for b in buckets):
         if not naver_is_configured():
             empty = _naver_key_empty_html()
@@ -856,7 +856,7 @@ def _trend_card_html(today_str: str, trend_url: str, has_today_run: bool = False
                               width=_HOME_CHART_WIDTH, hover=False)
     # [수정: 2026-09-11] 범례(단어 · 7일 합계)와 각주를 뺐다 — 단어 이름은 그래프 오른쪽
     # 끝 라벨이 이미 말하고, 각주("숨긴 기사 포함 · 옅은 띠는 주말")는 본업 화면이 자기를
-    # 해명하는 문장이다. 이 둘 때문에 추이 카드가 쟁점 카드보다 길어져 쟁점 밑이 비었다.
+    # 해명하는 문장이다. 이 둘 때문에 추이 카드가 주제 카드보다 길어져 주제 밑이 비었다.
     # 합계·각주는 /trend(app.trend_renderer)에 그대로 남는다.
     return (
         # 부제는 실제 범위 — 「정기」가 수시가 안 섞였음을, 끝 날짜가 오늘이 들어갔는지를
@@ -870,7 +870,7 @@ def _trend_card_html(today_str: str, trend_url: str, has_today_run: bool = False
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# 오늘의 쟁점 (정기, "기타"·일정 나열 기사 제외 · 회차마다 갱신)
+# 오늘의 주요 주제 (정기, "기타"·일정 나열 기사 제외 · 회차마다 갱신)
 # ══════════════════════════════════════════════════════════════════════════
 
 _ISSUE_TOP_N = 5
@@ -883,7 +883,7 @@ def _name_tokens(name: str) -> set:
 
 
 def _issue_streams(articles: list) -> list:
-    """오늘 하루 여러 회차에 흩어진 소제목을 이름 겹침 기준으로 하나의 "쟁점"으로 묶는다.
+    """오늘 하루 여러 회차에 흩어진 소제목을 이름 겹침 기준으로 하나의 "주제"로 묶는다.
 
     회차마다 소제목을 **새로 분류**하므로(HISTORY.md "담당자 > AI" — carryover 이름
     힌트는 같은 회차를 다시 부를 때만 적용되고, 다른 슬롯으로 넘어가면 끊긴다) 같은
@@ -891,7 +891,7 @@ def _issue_streams(articles: list) -> list:
     이전 계획"→"공공기관 2차 이전 추진", "2027년 예산안 당정협의"→"2027년 정부예산안
     당정협의" — 이름 완전일치만으로 세면 이런 쌍이 갈라져 순위가 실제보다 잘게 쪼개진다.
 
-    토큰(2글자 이상 한글/영숫자) Jaccard 겹침이 0.4 이상이면 같은 쟁점으로 합친다 —
+    토큰(2글자 이상 한글/영숫자) Jaccard 겹침이 0.4 이상이면 같은 주제로 합친다 —
     2026-08-25 실측 데이터(그날 소제목 39개) 전수로 이 문턱을 확인했고, 오탐(관계
     없는 두 소제목이 잘못 합쳐짐) 없이 정확히 이어져야 할 쌍만 합쳐졌다. **화면
     표시용 집계일 뿐**이고 group_order.json·group_overrides.json 등 저장 데이터는
@@ -923,7 +923,7 @@ def _issue_streams(articles: list) -> list:
 
 
 def _dominant_tags(articles: list, kw2g: dict) -> list:
-    """이 쟁점 기사의 과반이 걸린 검색어 그룹만 — 소수 매칭까지 다 붙이면 칩이
+    """이 주제 기사의 과반이 걸린 검색어 그룹만 — 소수 매칭까지 다 붙이면 칩이
     "어디서 왔나"라는 뜻을 잃는다(예: 대법관 인선 기사 5건 중 1건만 예결위에 우연히
     걸렸다고 [예결위] 칩을 달면 오해를 준다)."""
     counts: Counter = Counter()
@@ -934,14 +934,14 @@ def _dominant_tags(articles: list, kw2g: dict) -> list:
 
 
 def _issues_empty_html(settings: dict, last_run: Optional[dict]) -> str:
-    """쟁점이 없을 때 — 왜 비었는지에 따라 문구가 셋이다(HOME_CARD_SCOPE_MOCKUP.html B안).
+    """주제가 없을 때 — 왜 비었는지에 따라 문구가 셋이다(HOME_CARD_SCOPE_MOCKUP.html B안).
 
     회차가 돌았는데 비었으면 기사가 전부 「기타」·일정 나열에 모였다는 뜻이라 담담하게
-    「특별한 쟁점은 없다」로 푼다. 회차가 아직 없으면 언제 채워지는지를 말한다.
+    「특이사항은 없어보입니다」로 푼다. 회차가 아직 없으면 언제 채워지는지를 말한다.
     """
     if last_run:
         return ('<p class="empty-issues">💤 '
-                f'{html.escape(last_run["run_slot"])} 회차까지 특별한 쟁점은 없는 것으로 보여요</p>')
+                f'{html.escape(last_run["run_slot"])} 회차까지 특이사항은 없어보입니다.</p>')
     if not naver_is_configured():
         return _naver_key_empty_html()
     # 순환 import 회피 — _flow_card_html과 같은 이유.
@@ -956,7 +956,7 @@ def _issues_empty_html(settings: dict, last_run: Optional[dict]) -> str:
 def _issues_card_html(settings: dict, articles: list, last_run: Optional[dict] = None) -> str:
     # 부제는 실제 범위 — 회차가 저장될 때마다 끝 시각이 늘어난다(A안).
     sub = f'정기 · {html.escape(last_run["run_slot"])} 회차까지' if last_run else "정기"
-    head = f'<div class="card"><h2>오늘의 쟁점 <span class="sub">{sub}</span></h2>'
+    head = f'<div class="card"><h2>오늘의 주요 주제 <span class="sub">{sub}</span></h2>'
     kw2g: dict = {}
     for group in settings.get("keyword_groups", []):
         for kw in group.get("keywords", []):
@@ -1186,7 +1186,7 @@ def _today_label(last_run: Optional[dict]) -> str:
 
 
 def _report_articles(runs: list) -> list:
-    """회차들의 기사를 숨김 제외·URL 중복 제거해 한 목록으로 모은다(워드클라우드·오늘의 쟁점 입력)."""
+    """회차들의 기사를 숨김 제외·URL 중복 제거해 한 목록으로 모은다(워드클라우드·오늘의 주요 주제 입력)."""
     seen_urls: set = set()
     articles: list = []
     for run in runs:
