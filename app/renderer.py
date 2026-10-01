@@ -659,6 +659,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   }}
   .late-banner .msg {{ flex: 1; min-width: 220px; font-size: var(--fs-md); line-height: 1.5; }}
+  .late-banner .msg .ic {{ width: 1em; height: 1em; vertical-align: -0.15em; margin-right: 2px; }}
   .late-banner .cnt {{
     font-family: inherit; font-weight: 800; font-size: var(--fs-md); cursor: pointer;
     border: 1px solid {warn_border}; border-radius: var(--r-md); padding: 2px 9px;
@@ -3920,7 +3921,7 @@ def render_page(
             # 건수 버튼을 문장 한가운데 두지 않는다 — 조사("2건이")가 버튼 경계로 끊겨
             # "2건 이"처럼 벌어져 보인다(실측). 초안의 [미분류 N건] 배지처럼 문장 끝에
             # 독립된 버튼으로 두고, 라벨에 동작("보기")을 적어 누를 수 있음을 알린다.
-            f'<span class="msg">📥 <b>{html.escape(late_label)}</b>{html.escape(late_tail)}</span>'
+            f'<span class="msg">{icon("in")} <b>{html.escape(late_label)}</b>{html.escape(late_tail)}</span>'
             '<button type="button" class="cnt" onclick="jumpToLatePickup()">'
             f'{len(late_articles)}건 보기</button>'
             f'<button type="button" class="q" title="{html.escape(late_tip, quote=True)}">&#8505;</button>'

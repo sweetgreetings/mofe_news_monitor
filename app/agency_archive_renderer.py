@@ -302,11 +302,12 @@ def _row_html(article: dict, word: str, labels: dict, line_template: str) -> str
         f'<span class="icon-done">{icon("check")}</span></button>'
         "</span>"
     )
-    # 사진 추정 — 확정본과 같은 값(행 흐리게 + 📷 알약, 마우스를 올리면 또렷해진다).
-    # 라벨은 표식이든 추정이든 「📷 사진 추정」 하나이고 차이는 툴팁뿐이다.
+    # 사진 추정 — 확정본과 같은 값(행 흐리게 + 알약, 마우스를 올리면 또렷해진다).
+    # 라벨은 표식이든 추정이든 「사진 추정」 하나이고 차이는 툴팁뿐이다. 카메라는
+    # 이모지가 아니라 SVG다(확정본·초안·오늘 전체 기사·수시가 모두 `icon("camera")`).
     photo = bool(article.get("_photo"))
     badge = (
-        f'<span class="photo-badge" title="{html.escape(photo_badge_tip(raw_title, url, fetch_body=False))}">📷 사진 추정</span>'
+        f'<span class="photo-badge" title="{html.escape(photo_badge_tip(raw_title, url, fetch_body=False))}">{icon("camera")} 사진 추정</span>'
         if photo
         else ""
     )
@@ -574,7 +575,7 @@ _TEMPLATE = """<!DOCTYPE html>
   /* 사진 추정 — 확정본과 같은 값(행 흐리게 + 알약, 마우스를 올리면 또렷). */
   .art.is-photo {{ opacity: 0.55; }}
   .art.is-photo:hover {{ opacity: 1; }}
-  .photo-badge {{ display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-pill);
+  .photo-badge {{ display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-pill);
     font-size: var(--fs-xs); font-weight: 600; color: {text_soft}; background: {bg};
     border: 1px solid {border}; white-space: nowrap; }}
   /* 말머리는 배지 없이 제목 글자색(확정본·오늘 전체 기사와 같은 값). */

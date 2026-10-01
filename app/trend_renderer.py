@@ -162,7 +162,7 @@ def _period_bar_html(start: str, end: str, unit: str) -> str:
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# 표 + 복사/엑셀
+# 표 + 가져가기(복사·엑셀)
 # ══════════════════════════════════════════════════════════════════════════
 
 def _table_and_export_html(buckets: list, series: list, unit: str, start: str, end: str,
@@ -194,14 +194,14 @@ def _table_and_export_html(buckets: list, series: list, unit: str, start: str, e
     ]
 
     return f"""<div class="card">
-  <h2>📊 {_UNIT_LABEL[unit]} 건수 <span class="right">
-    <button type="button" class="ghost" onclick="copyTrendTable(this)"
-      data-copy-text="{html.escape(copy_text)}">📋 복사</button>
-    <form method="POST" action="/trend/download-excel" style="display:inline">
+  <h2>📊 {_UNIT_LABEL[unit]} 건수 <span class="exp">
+    <button type="button" onclick="copyTrendTable(this)"
+      data-copy-text="{html.escape(copy_text)}">복사</button>
+    <form method="POST" action="/trend/download-excel" style="display:contents">
       <input type="hidden" name="labels" value='{json.dumps(labels, ensure_ascii=False)}'>
       <input type="hidden" name="rows" value='{json.dumps(rows_for_excel, ensure_ascii=False)}'>
       <input type="hidden" name="filename" value="{html.escape(filename_base)}_정책단어추이.xlsx">
-      <button type="submit" class="ghost">⬇ 엑셀</button>
+      <button type="submit">엑셀</button>
     </form>
   </span></h2>
   <div class="table-scroll"><table>{header}{"".join(body_rows)}</table></div>
@@ -242,6 +242,13 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }}
   button:hover, a.btn:hover {{ background: {header}; }}
   button.ghost {{ background: transparent; color: {accent}; border: 1px solid {accent_border}; }}
+  /* 가져가기 — 확정본·초안·세 보관함과 같은 글자 버튼(app.renderer.export_links_style 복제). */
+  .exp {{ display: inline-flex; gap: 2px; margin-left: auto; }}
+  .exp button {{ border: none; background: transparent; color: {text_soft}; font-weight: 500;
+    border-radius: var(--r-md); padding: 4px 8px; font-size: var(--fs-sm); cursor: pointer;
+    font-family: inherit; white-space: nowrap; }}
+  .exp button:hover {{ background: transparent; color: {accent};
+    text-decoration: underline; text-underline-offset: 3px; }}
   button.ghost:hover {{ background: {hover}; color: {header}; }}
   input[type=text], input[type=date] {{ background: {bg}; color: {text}; border: 1px solid {border};
     border-radius: var(--r-md); padding: 7px 10px; font-size: var(--fs-md); font-family: inherit; }}

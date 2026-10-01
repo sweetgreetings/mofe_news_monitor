@@ -4490,8 +4490,13 @@ _LABEL_STYLE = """
   .snap-tag.src-reg {{ background: {bg}; color: {muted}; }}
   .snap-tag.src-adhoc {{ background: {adhoc_bg}; color: {adhoc_text}; }}
   .snap-tag.gone {{ background: {snap_gone_bg}; color: {snap_gone_text}; border-color: {snap_gone_border}; }}
-  .hid-mark {{ font-size: var(--fs-xs); color: {muted}; }}
-  .arc-meta a.origin-link {{ color: {accent}; text-decoration: none; }}
+  /* 정기 보고서에 있나 — 「스크랩됨」/「숨김」 한 칸. 오늘 전체 기사의 행 상태와 같은 말. */
+  .snap-tag.state {{ display: inline-flex; align-items: center; gap: 3px; }}
+  .snap-tag.state .ic {{ width: 0.95em; height: 0.95em; stroke-width: 2; }}
+  .snap-tag.state.is-hid {{ color: {muted}; }}
+  .arc-meta a.origin-link {{ color: {accent}; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 3px; }}
+  .arc-meta a.origin-link .ic {{ width: 0.9em; height: 0.9em; }}
   .arc-labels {{ display: inline-flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }}
   .lab-chip {{
     display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs); font-weight: 700;
@@ -4516,9 +4521,11 @@ _LABEL_STYLE = """
   table.manage td.act {{ text-align: right; white-space: nowrap; }}
   table.manage td.act form {{ display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; }}
   .mini {{
+    display: inline-flex; align-items: center; gap: 3px;
     font-size: var(--fs-xs); padding: 4px 9px; border-radius: var(--r-sm); cursor: pointer;
     background: {card}; border: 1px solid {border}; color: {muted};
   }}
+  .mini .ic {{ width: 0.95em; height: 0.95em; }}
   .mini:hover {{ background: {hover}; color: {accent}; }}
   .mini.danger:hover {{ background: {error_bg}; color: {error}; border-color: {error_border_soft}; }}
   select.merge-sel {{
@@ -4598,13 +4605,16 @@ def _render_label_archive_row(
     title = html.escape(override_title or entry.get("title") or url)
     outlet = entry.get("outlet", "")
     outlet_html = outlet_display_label(outlet, url) if outlet else ""
-    group = entry.get("group", "")
-    group_html = (
-        f'<span class="snap-tag sub">{apply_subheading_format(html.escape(subheading_format), html.escape(group))}</span>'
-        if group
-        else ""
-    )
-    hidden_html = '<span class="hid-mark">🗑️ 숨김</span>' if url in hidden_urls else ""
+    # 소제목 대신 **「이 기사가 지금 정기 보고서에 있나」 한 칸**이다 — 숨겼으면 「숨김」,
+    # 아니면 「스크랩됨」(둘 중 하나). 오늘 전체 기사의 행 상태와 같은 말·같은 아이콘을 쓴다.
+    # 수시에서 붙인 라벨엔 안 그린다 — 전역 숨김 기록(`hidden_urls`)은 정기 것이라
+    # 수시 확정본에 있는지 없는지를 답하지 못한다(출처 태그의 사안명이 그 일을 한다).
+    if (entry.get("source") or {}).get("kind", "regular") != "regular":
+        state_html = ""
+    elif url in hidden_urls:
+        state_html = f'<span class="snap-tag state is-hid">{icon("trash")} 숨김</span>'
+    else:
+        state_html = f'<span class="snap-tag state">{icon("check")} 스크랩됨</span>'
     pub_date = entry.get("pub_date", "")
     pub_html = html.escape(pub_date.replace("T", " ")[:16]) if pub_date else ""
     scrap_date = html.escape(entry.get("scrap_date", ""))
@@ -4628,10 +4638,10 @@ def _render_label_archive_row(
         meta_parts.append(f"<span>·</span><span>{pub_html} 발행</span>")
     if outlet_html:
         meta_parts.append(f"<span>·</span><span>{outlet_html}</span>")
-    meta_parts.append(group_html)
-    meta_parts.append(hidden_html)
+    meta_parts.append(state_html)
     meta_parts.append(
-        f'<a class="origin-link" href="{escaped_url}" target="_blank" rel="noopener noreferrer">원문보기 ↗</a>'
+        f'<a class="origin-link" href="{escaped_url}" target="_blank" rel="noopener noreferrer">'
+        f'원문보기{icon("external_link")}</a>'
     )
     meta_parts.append(f'<span class="arc-labels">{label_chips}</span>')
     return (
@@ -5110,7 +5120,7 @@ def render_labels_page(selected: Optional[list] = None) -> str:
             body_html = (
                 f'<div class="lab-listhead">{names_display} · {len(rows)}건 {export_form_html}</div>'
                 + "".join(
-                    _render_label_archive_row(r, hidden_urls, overrides, subheading_format, return_qs)
+                    _render_label_archive_row(r, hidden_urls, overrides, return_qs)
                     for r in rows
                 )
             )
@@ -5155,13 +5165,13 @@ def _render_label_manage_row(name: str, entry_stats: dict, stats: dict) -> str:
         f'<form method="POST" action="/rename-label" style="display:inline-flex;gap:3px;">'
         f'<input type="hidden" name="old" value="{esc_name}">'
         f'<input type="text" name="new_name" value="{esc_name}" required>'
-        '<button type="submit" class="mini">✏️ 이름 변경</button>'
+        f'<button type="submit" class="mini">{icon("pencil")} 이름 변경</button>'
         "</form>"
         f"{merge_html}"
         f'<form method="POST" action="/delete-label" data-count="{entry_stats["count"]}" '
         f'data-orphan="{entry_stats["orphan_count"]}" onsubmit="return confirmDelete(this, \'{esc_name}\')">'
         f'<input type="hidden" name="name" value="{esc_name}">'
-        '<button type="submit" class="mini danger">🗑 삭제</button>'
+        f'<button type="submit" class="mini danger">{icon("trash")} 삭제</button>'
         "</form>"
         "</td>"
         "</tr>"

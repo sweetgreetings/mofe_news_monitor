@@ -902,13 +902,15 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   body.unsent-only .article.is-raw-hid {{ display: none; }}
   .article.is-raw-hid .a-title {{ opacity: 0.5; text-decoration: line-through; }}
   .article.is-raw-hid .a-bot > :not(.a-acts) {{ opacity: 0.5; }}
-  /* 「✓ 보냄」 다시 누르기 = 보냄 취소 — 전체 기사의 「🗑 숨김 → ↩ 되살리기」와 같은 문법:
+  /* 「✓ 보냄」 다시 누르기 = 보냄 취소 — 전체 기사의 「숨김 → 되살리기」와 같은 문법:
      마우스를 올리면 글자가 누르면 일어날 일로 바뀐다. 취소는 빼는 동작이라 빨강 계열. */
   .send-done.raw-unsend {{ color: {adhoc_text}; border-color: {adhoc_border_soft}; cursor: pointer; }}
   .send-done.raw-unsend:hover {{ color: {error}; border-color: {error_border}; background: {error_bg}; }}
-  .send-done .when-hover {{ display: none; }}
+  .send-done .when-rest {{ display: inline-flex; align-items: center; gap: 3px; }}
+  .send-done .when-hover {{ display: none; align-items: center; gap: 3px; }}
+  .send-done .when-rest .ic, .send-done .when-hover .ic {{ width: 0.95em; height: 0.95em; }}
   .send-done.raw-unsend:hover .when-rest, .send-done.raw-unhide:not(:disabled):hover .when-rest {{ display: none; }}
-  .send-done.raw-unsend:hover .when-hover, .send-done.raw-unhide:not(:disabled):hover .when-hover {{ display: inline; }}
+  .send-done.raw-unsend:hover .when-hover, .send-done.raw-unhide:not(:disabled):hover .when-hover {{ display: inline-flex; }}
   /* 원본 목록 머리의 「☐ 전체 선택」 — 행 체크박스(.bulk-chk)와 같은 --chk-md·같은 세로줄. */
   .sel-all {{ display: inline-flex; align-items: center; gap: 6px; margin: 0 4px 0 12px;
     font-size: var(--fs-sm); color: {muted}; font-weight: 500; cursor: pointer; }}
@@ -1359,7 +1361,7 @@ def _history_entries() -> list[dict]:
 
 def _history_html(entries: list[dict]) -> str:
     """「지난 수집」 카드 — 줄마다 날짜 · 사안명 · 검색어(단어만). 누르면 폼이 채워지고,
-    올리면 오른쪽에 「원본 열기 ↗」. 달이 바뀌면 옅은 구분선. 목록이 비면 카드째 안 그린다."""
+    올리면 오른쪽에 「원본 열기 →」. 달이 바뀌면 옅은 구분선. 목록이 비면 카드째 안 그린다."""
     if not entries:
         return ""
     this_year = datetime.now().year
@@ -1389,7 +1391,7 @@ def _history_html(entries: list[dict]) -> str:
             f'<span class="h-is">{html.escape(e["title"])}</span>'
             f'<span class="h-kw">{kw_html}</span>{count_html}'
             f'<a class="h-open" href="/adhoc/card?id={quote(e["card_id"])}" onclick="event.stopPropagation();">'
-            f"원본 열기 ↗</a></div>"
+            f"원본 열기 →</a></div>"
         )
     return f"""
 <div class="card hist-card">
@@ -2105,7 +2107,7 @@ def _render_article_row(
                 f'title="「{html.escape(sent_to)}」 확정본으로 보낸 기사예요 — 누르면 보냄을 취소해요" '
                 f'onclick="event.stopPropagation(); rawUnsend(this)">'
                 f'<span class="when-rest">{icon("check")} 보냄</span>'
-                f'<span class="when-hover">↩ 보냄 취소</span></button>'
+                f'<span class="when-hover">{icon("undo")} 보냄 취소</span></button>'
             )
         elif sent_to:
             # 잠긴(어제) 카드 — 보냄을 취소해도 다시 보낼 수 없어 표시만 한다.
@@ -2120,7 +2122,7 @@ def _render_article_row(
                 f'title="{html.escape(raw_hidden_tip)}" '
                 + ('onclick="event.stopPropagation(); rawUnhide(this)"' if raw_menu_html else "disabled")
                 + f'><span class="when-rest">{icon("trash")} 숨김</span>'
-                f'<span class="when-hover">↩ 되살리기</span></button>'
+                f'<span class="when-hover">{icon("undo")} 되살리기</span></button>'
             )
         elif raw_menu_html:
             bundle_select_html = (

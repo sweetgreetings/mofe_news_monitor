@@ -2099,7 +2099,8 @@ def test_adhoc_raw_trash_and_rounds():
                 "숨김 표시한 기사까지 보냄"
             p = page()
             assert "보냄 3 · 숨김 1" in p and 'onclick="sendAllOpen(this)"' not in p, "처리할 게 없는데 전부 보내기가 남음"
-            assert "rawUnsend(this)" in p and "↩ 보냄 취소" in p, "보낸 기사에 보냄 취소가 없음"
+            # ↩는 글자가 아니라 오늘 전체 기사와 같은 `icon("undo")` SVG다.
+            assert "rawUnsend(this)" in p and "보냄 취소</span>" in p, "보낸 기사에 보냄 취소가 없음"
 
             # 2b) 「✓ 보냄」 다시 누르기 = 보냄 취소 → 처리 안 함(숨김 아님), ↩ 한 번이면 다시 보냄
             adhoc_routes._handle_raw_unsend(_Handler(), {"id": [rid], "url": ["https://r.x/3"]})
