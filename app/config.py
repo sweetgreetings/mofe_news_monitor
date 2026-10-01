@@ -844,6 +844,14 @@ GROUP_ORDER_FILE = DATA_DIR / "group_order.json"
 # 덮어쓴다. {url: {"title": ..., "summary": ...}} 형태 — 두 필드 중 실제로 더 나은 값을
 # 찾은 쪽만 저장한다(app.summary_overrides).
 SUMMARY_OVERRIDES_FILE = DATA_DIR / "summary_overrides.json"
+# [추가: 2026-10-01] 담당자가 ⋯ 더보기에서 「사진 추정 해제」를 누른 기사 — 사진 판정이
+# 틀렸을 때 그 기사 하나만 끈다. summary_overrides.json과 **같은 성격**이라 나란히 둔다:
+# 둘 다 "이 URL이 가리키는 기사에 관한 사실"이고(어느 보고서에 넣고 뺄지가 아니다),
+# 그래서 URL 키 전역이며 나이로 지우지 않는다. 사진 판정의 원문 층이 쓰는
+# photo_body_verdicts.json에 섞지 않는 이유는 그쪽이 90일 만료라서다 — 담당자가 내린
+# 결정이 90일 뒤 조용히 되살아난다. 값은 {url: {"photo": false, "at": ISO}}
+# (app.photo_overrides).
+PHOTO_OVERRIDES_FILE = DATA_DIR / "photo_overrides.json"
 # PRD.md 기능10(라벨) — [추가: 2026-08-18] 담당자가 기사 한 건에 직접 붙이는 자유 입력
 # 태그. URL 키 전역 저장소로, 정기(확정본·초안)·수시(수집 확정본) 어느 화면에서 붙였든
 # 같은 항목을 함께 본다 — summary_overrides.json과 같은 이유로 app/adhoc/ 밖, 이

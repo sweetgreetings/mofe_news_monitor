@@ -75,6 +75,7 @@ from app.icons import icon
 from app.labels import label_stats, labels_for_url, snapshot_source
 from app.manual_articles import load_manual_articles
 from app.naver_api import outlet_display_label
+from app import photo_overrides
 from app.settings import all_search_keywords, auto_send_grace_sec, is_auto_send_enabled, load_settings
 from app.storage import is_today, load_latest_confirmed_run
 from app.summarizer import summarize_groups
@@ -500,7 +501,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      깔리든 그 위에 흐림만 얹힌다. 마우스 오버·체크 상태에선 다시 또렷해져, "지금
      내가 보고 있거나 고른 것"까지 흐려 보이지 않게 한다. */
   .article.is-photo {{ opacity: 0.55; }}
-  .article.is-photo:hover, .article.is-photo:has(.article-select:checked) {{ opacity: 1; }}
+  .article.is-photo:hover, .article.is-photo:has(.article-select:checked),
+  /* ⋯ 메뉴를 연 행도 또렷하게 — 그 메뉴 안에 「사진 추정 해제」가 있다. 판정이 맞는지
+     보면서 누르는 자리라 흐린 채로 두면 안 된다(마우스가 없는 화면엔 hover가 없다). */
+  .article.is-photo:has(.more-wrap.is-open) {{ opacity: 1; }}
   /* [추가: 2026-08-03] 일괄 이동용 체크박스를 켠 기사는 연한 배경으로 표시해 "지금
      뭘 골랐는지" 스크롤하면서도 바로 보이게 한다 (디자인 시안 A, 사용자 선택) —
      자바스크립트 변경 없이 :has()만으로 동작. */
@@ -951,6 +955,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 {scroll_top_script}
 {refresh_link_script}
 {hide_batch_script}
+{photo_override_script}
 {range_select_script}
 {url_add_script}
 {note_history_script}
@@ -2562,6 +2567,23 @@ def render_article(
         f'<a class="origin-link-text" href="{url}" target="_blank" rel="noopener noreferrer" '
         f'title="{url}">원문보기{icon("external_link", "ic origin-link-icon")}</a>'
     )
+    # [추가: 2026-10-01] 사진 판정은 ⋯ 메뉴 글자를 고르는 데도 쓰이므로 메뉴보다 먼저 센다
+    # (예전엔 아래 배지 자리에서 쟀다). 담당자가 끈 기사면 looks_like_photo_caption이
+    # 이미 거짓을 돌려주므로, 「되돌리기」를 보여줄지는 저장소에 직접 묻는다.
+    is_photo = looks_like_photo_caption(article)
+    # 저장소는 **escape 안 한 원래 주소**로 묻는다(위 url은 속성에 넣으려고 escape한 값이다).
+    photo_cleared = photo_overrides.is_photo_cleared(article["url"])
+    # ⋯ 메뉴의 「사진 추정 해제」는 **사진으로 잡힌 행과 담당자가 끈 행에만** 붙는다 —
+    # 사진과 무관한 기사에까지 달면 모든 행의 메뉴가 한 줄씩 길어지고, 그 줄은 누를 일이
+    # 없다. 끈 기사에서는 같은 자리가 되돌리는 자리가 된다(새 자리를 만들지 않는다).
+    photo_menu_html = ""
+    if is_photo or photo_cleared:
+        photo_menu_html = (
+            f'<button type="button" data-url="{url}" '
+            f'data-photo-action="{"restore" if photo_cleared else "clear"}" '
+            'onclick="event.stopPropagation(); closeArticleMenus(); setPhotoOverride(this);">'
+            f'{"사진 추정 되돌리기" if photo_cleared else "사진 추정 해제"}</button>'
+        )
     # 복사하기는 "⋯ 더보기" 메뉴 첫 항목이다 — 한 건만 복사하는 건 가끔 하는 일인데
     # 모든 행에 아이콘이 붙어 있으면 목록이 어수선하다. 메뉴는 누르는 순간 닫히므로
     # 피드백은 ⋯ 아이콘 자체가 1초간 ✓로 바뀌는 것으로 준다(copyArticleIcon의 두 번째
@@ -2583,6 +2605,7 @@ def render_article(
         f'<button type="button" data-url="{url}" '
         f'data-title="{title_attr}" data-summary="{html.escape(article.get("summary", ""))}" '
         'onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사제목 직접 수정</button>'
+        f"{photo_menu_html}"
         "</span>"
         "</span>"
     )
@@ -2633,8 +2656,7 @@ def render_article(
     # "아이콘+문구" 칩으로 바꿨다. 예전엔 "이 배지는 평소 거의 안 보인다"는 전제로
     # 아이콘만 쓰고 설명은 툴팁으로 뺐는데, 사진기사 제외 설정을 기본 끔으로 바꾸면서
     # (아래 article_class의 is-photo 참고) 그 전제가 깨졌다 — 목록의 절반 가까이가
-    # 이 배지를 달 수 있는 상황에서는 문구가 바로 보여야 한다.
-    is_photo = looks_like_photo_caption(article)
+    # 이 배지를 달 수 있는 상황에서는 문구가 바로 보여야 한다(is_photo는 ⋯ 메뉴 쪽에서 쟀다).
     # [추가: 2026-09-03] 같은 배지가 두 층을 겸하게 되면서(표식 / 추정) 툴팁만 갈라
     # 놓는다 — "표식은 없지만 추정"이라는 옛 문구는 [포토]가 붙은 기사에는 거짓말이다.
     # [수정: 2026-09-15] 문구는 app.filters.photo_badge_tip 한 곳에서 — 실제 붙은 표식을 적는다.
@@ -3999,6 +4021,7 @@ def render_page(
         refresh_link_script=refresh_link_script(),
         hide_batch_style=hide_batch_style(),
         hide_batch_script=hide_batch_script(),
+        photo_override_script=photo_override_script(),
         range_select_script=range_select_script(".article-select", ".article"),
         url_add_style=url_add_style(),
         url_add_script=url_add_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT, "confirmed"),
@@ -5666,6 +5689,36 @@ def hide_batch_style() -> str:
 def hide_batch_script() -> str:
     """여러 기사 한 번에 숨기기 JS — 중괄호 홑겹 완성 문자열."""
     return HIDE_BATCH_SCRIPT % {"host": SETTINGS_SERVER_HOST, "port": SETTINGS_SERVER_PORT}
+
+
+# ⋯ 더보기 > 「사진 추정 해제」·「사진 추정 되돌리기」 — 확정본·초안·정기 보관함 공용이다.
+# **동작을 바꾸면 세 화면이 같이 바뀐다**(JS를 화면마다 복제하지 않는다 — refetchSummary가
+# 세 벌로 늘어난 전례를 따라가지 않으려고 처음부터 한 곳에 둔다). 수시는 이 화면들과 달리
+# 모든 액션이 실제 <form> 제출이라 따로다(app/adhoc/renderer.py).
+# 확인창이 없는 이유: 되돌리는 자리가 같은 메뉴 안에 바로 생긴다(「기사제목 직접 수정」과 같다).
+PHOTO_OVERRIDE_SCRIPT = """
+function setPhotoOverride(btn) {
+  var url = btn.dataset.url;
+  var action = btn.dataset.photoAction;
+  btn.disabled = true;
+  fetch("http://%(host)s:%(port)s/set-photo-override", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({url: url, action: action})
+  }).then(function (res) {
+    if (res.ok) { location.reload(); }
+    else { alert("사진 추정을 바꾸지 못했습니다. 다시 시도해주세요."); btn.disabled = false; }
+  }).catch(function () {
+    alert("사진 추정을 바꾸지 못했습니다 — 앱이 실행 중인지 확인해주세요.");
+    btn.disabled = false;
+  });
+}
+"""
+
+
+def photo_override_script() -> str:
+    """사진 추정 해제 JS — 중괄호 홑겹 완성 문자열(확정본·초안·정기 보관함 공용)."""
+    return PHOTO_OVERRIDE_SCRIPT % {"host": SETTINGS_SERVER_HOST, "port": SETTINGS_SERVER_PORT}
 
 
 def generate_waiting_page() -> Path:

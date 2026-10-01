@@ -42,6 +42,7 @@ from app.renderer import (
     known_label_chips_html,
     label_popover_script,
     label_popover_style,
+    photo_override_script,
     render_article,
 )
 from app.today_cuts import cut_origin
@@ -501,6 +502,7 @@ function copySlotText(btn) {{
 }}
 // [추가: 2026-09-16] 🏷 라벨 — 확정본·초안과 같은 코드(app.renderer.label_popover_script).
 {label_popover_script}
+{photo_override_script}
 function hideArticle(btn) {{
   var url = btn.dataset.url;
   var article = btn.closest(".article");
@@ -1377,6 +1379,7 @@ def _theme() -> dict:
         # [추가: 2026-09-16] 🏷 라벨 팝오버 — 확정본·초안과 한 곳에서 온다.
         "label_popover_style": label_popover_style(),
         "label_popover_script": label_popover_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
+        "photo_override_script": photo_override_script(),
         "topnav_style": topnav_style(),
         "topnav_html": regular_nav("archive"),
     }

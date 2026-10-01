@@ -114,6 +114,7 @@ from app.renderer import (
     refresh_link_script,
     refresh_link_style,
     hide_batch_script,
+    photo_override_script,
     hide_batch_style,
     range_select_script,
     pinned_jump_badge_html,
@@ -619,7 +620,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      설정이 항상 켜져 있던 전제라 이 배지가 뜰 일이 실질적으로 없었음) — 설정 기본값을
      끔으로 바꾸며 처음으로 실제 렌더링 대상이 됐다. */
   .article.is-photo {{ opacity: 0.55; }}
-  .article.is-photo:hover, .article.is-photo:has(.article-select:checked) {{ opacity: 1; }}
+  .article.is-photo:hover, .article.is-photo:has(.article-select:checked),
+  /* ⋯ 메뉴를 연 행도 또렷하게 — 확정본(app/renderer.py)과 같은 값이다. */
+  .article.is-photo:has(.more-wrap.is-open) {{ opacity: 1; }}
   /* [추가: 2026-08-03] app.renderer와 동일한 이유 — 체크된 기사만 연한 배경으로
      표시한다 (디자인 시안 A). */
   .article:has(.article-select:checked) {{ background: {hover}; }}
@@ -1072,6 +1075,7 @@ document.addEventListener("keydown", function (e) {{ if (e.key === "Escape") clo
 {scroll_top_script}
 {refresh_link_script}
 {hide_batch_script}
+{photo_override_script}
 {range_select_script}
 {name_picker_script}
 {kw_inline_script}
@@ -2512,6 +2516,7 @@ def _theme() -> dict:
         "refresh_link_script": refresh_link_script(),
         "hide_batch_style": hide_batch_style(),
         "hide_batch_script": hide_batch_script(),
+        "photo_override_script": photo_override_script(),
         "range_select_script": range_select_script(".article-select", ".article"),
         "url_add_style": url_add_style(),
         "url_add_script": url_add_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT, "preview"),

@@ -21,7 +21,7 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app import alerted_urls, config, credentials, api_usage, breaking_alert, breaking_alert_sender, breaking_alert_state, confirm_send, curation, custom_groups, draft_articles, draft_seen, history_renderer, landing_renderer, llm_classifier, naver_api, preview_cache, preview_order, preview_renderer, renderer, scheduler, scraper, settings, storage, telegram_bot, telegram_recipients, negative_guess, today_cuts, auto_classify_turn, photo_body, breaking_burst, send_log  # noqa: E402
+from app import alerted_urls, config, credentials, api_usage, breaking_alert, breaking_alert_sender, breaking_alert_state, confirm_send, curation, custom_groups, draft_articles, draft_seen, history_renderer, landing_renderer, llm_classifier, naver_api, preview_cache, preview_order, preview_renderer, renderer, scheduler, scraper, settings, storage, telegram_bot, telegram_recipients, negative_guess, today_cuts, auto_classify_turn, photo_body, breaking_burst, send_log, photo_overrides  # noqa: E402
 import main  # noqa: E402
 
 _FIXTURE_BY_KEYWORD = {
@@ -2804,6 +2804,72 @@ def test_telegram_bot_name():
             assert not record_file.exists(), "실패하면 기록을 안 남긴다(다음에 켤 때 다시 시도)"
 
 
+def test_photo_override_is_one_place():
+    """사진 추정 해제 — **입히는 자리가 `looks_like_photo_caption()` 맨 앞 한 곳**인지.
+
+    이게 이 테스트의 핵심이다. 판정을 한 곳에만 두면 화면 여섯·「📷 사진 추정 (N)」 건수·
+    수시 「사진 제외」·홈 부정 추정 범위가 코드를 더 안 고쳐도 따라온다. 화면마다 따로
+    걸러내는 식으로 새면 "흐림은 사라졌는데 건수엔 남아 있는" 어긋남이 생긴다 —
+    숨김 판정(is_hidden)·exclude_photo_articles에서 이미 같은 이유로 세워둔 규칙이다.
+
+    나머지: 표식([포토])까지 이긴다 · 되돌리면 앱의 추정으로 돌아간다 ·
+    ⋯ 메뉴 줄은 사진으로 잡힌 행과 끈 행에만 붙는다.
+    """
+    # 원문 층은 `photo_body.start()`를 안 부른 테스트에선 네트워크를 안 탄다(_started가 거짓)
+    # — 그래서 이 테스트는 판정 인자를 따로 넘기지 않고 기본값 그대로 부른다.
+    _require_isolation()
+    from app.filters import looks_like_photo_caption, exclude_photo_articles
+    from app.photo_overrides import set_photo_override, is_photo_cleared, photo_override
+
+    guessed = {"url": "https://n.news.naver.com/mnews/article/001/11",
+               "title": "발언하는 이형일 부총리", "outlet": "뉴스1", "summary": "재경부"}
+    tagged = {"url": "https://n.news.naver.com/mnews/article/001/12",
+              "title": "[포토] 답변하는 후보자", "outlet": "뉴스1", "summary": "재경부"}
+    plain = {"url": "https://n.news.naver.com/mnews/article/001/13",
+             "title": "재경부 예산 설명", "outlet": "뉴스1", "summary": "재경부"}
+
+    # (1) 끄기 전 — 앱의 추정 그대로.
+    assert looks_like_photo_caption(guessed), "제목 추정이 안 걸렸습니다"
+    assert looks_like_photo_caption(tagged), "[포토] 표식이 안 걸렸습니다"
+    assert not looks_like_photo_caption(plain), "일반 기사가 사진으로 잡혔습니다"
+    assert photo_override(guessed["url"]) is None, "끄기 전엔 적어 둔 값이 없어야 합니다"
+
+    # (2) 끄면 **추정도 표식도** 이긴다 — 담당자는 그 기사를 보고 누른 것이다.
+    set_photo_override(guessed["url"], False)
+    set_photo_override(tagged["url"], False)
+    assert not looks_like_photo_caption(guessed), "해제가 제목 추정을 못 이겼습니다"
+    assert not looks_like_photo_caption(tagged), \
+        "해제가 [포토] 표식을 못 이겼습니다 — 담당자 판단이 표식보다 우선입니다"
+    assert is_photo_cleared(guessed["url"]), "해제 기록이 안 남았습니다"
+
+    # (3) 판정을 읽는 **다른 길**도 같이 따라온다(한 곳에서 입히므로).
+    kept = [a["url"] for a in exclude_photo_articles([guessed, tagged, plain])]
+    assert kept == [guessed["url"], tagged["url"], plain["url"]], \
+        "exclude_photo_articles가 해제를 못 봤습니다 — 판정이 두 벌로 갈렸습니다"
+
+    # (4) 화면: 흐림·칩이 사라지고 ⋯ 메뉴 줄이 「되돌리기」로 바뀐다.
+    from app.renderer import render_article
+    html_cleared = render_article(guessed, [])
+    assert "is-photo" not in html_cleared and "사진 추정</span>" not in html_cleared, \
+        "해제했는데 화면이 아직 흐리게 그립니다"
+    assert "사진 추정 되돌리기" in html_cleared, "해제한 행에 되돌리는 자리가 없습니다"
+    assert "사진 추정 해제" not in html_cleared, "되돌리는 행에 「해제」가 같이 떠 있습니다"
+
+    html_photo = render_article({**guessed, "url": "https://n.news.naver.com/mnews/article/001/14"}, [])
+    assert "사진 추정 해제" in html_photo, "사진으로 잡힌 행에 해제하는 자리가 없습니다"
+    assert "is-photo" in html_photo, "해제 안 한 사진 행이 안 흐려집니다"
+
+    html_plain = render_article(plain, [])
+    assert "사진 추정 해제" not in html_plain and "사진 추정 되돌리기" not in html_plain, \
+        "사진과 무관한 행에까지 메뉴 줄이 붙었습니다 — 누를 일 없는 줄로 모든 메뉴가 길어집니다"
+
+    # (5) 되돌리면 앱의 추정으로 돌아간다(끈 적 없는 상태와 같아야 한다).
+    set_photo_override(guessed["url"], None)
+    assert photo_override(guessed["url"]) is None, "되돌렸는데 기록이 남았습니다"
+    assert looks_like_photo_caption(guessed), "되돌렸는데 추정이 안 살아났습니다"
+    print("48) 사진 추정 해제: 통과 (판정 한 곳, 표식까지 이김, 사진 행에만 메뉴 줄, 되돌리면 추정 복귀)")
+
+
 def test_draft_all_first_classified_hidden_shows_unclassified():
     """초안 첫 분류의 기사를 전부 숨기면, 규칙 기반 대신 남은 기사를 전부 📂 미분류로 보여주는지 확인한다.
 
@@ -4013,6 +4079,7 @@ if __name__ == "__main__":
         test_no_ai_key_is_not_a_failure,
         test_env_key_transplant,
         test_key_paths_stay_narrow,
+        test_photo_override_is_one_place,
         test_draft_all_first_classified_hidden_shows_unclassified,
         test_assigned_articles_keep_subheading_after_ai_members_hidden,
         test_cache_store_keeps_other_rounds,
@@ -4110,6 +4177,11 @@ if __name__ == "__main__":
                     (send_log, "SEND_LOG_DIR", tmp_dir / "send_log"),
                     (photo_body, "_verdicts", {}),
                     (photo_body, "_index", {}),
+                    # 담당자가 직접 끈 사진 추정 — 경로와 함께 메모리 캐시도 비운다
+                    # (서명으로 캐시하므로 앞 테스트의 값이 남으면 다음 테스트가 그걸 읽는다).
+                    (photo_overrides, "PHOTO_OVERRIDES_FILE", tmp_dir / "photo_overrides.json"),
+                    (photo_overrides, "_cache", None),
+                    (photo_overrides, "_cache_sig", None),
                 ):
                     more_patches.enter_context(patch.object(target, name, value))
                 # [추가: 2026-09-17] LLM 분류 캐시도 임시 폴더로 — 예전엔 회차를 저장하는

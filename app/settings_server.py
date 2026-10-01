@@ -160,6 +160,7 @@ from app.credentials import (
     save_naver_credentials,
 )
 from app.summary_overrides import load_summary_overrides, set_summary_override
+from app.photo_overrides import set_photo_override
 from app.scheduler import next_pending_slot
 from app.preview_renderer import (
     _compute_preview_articles,
@@ -5550,6 +5551,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_refetch_summary(form)
         elif self.path == "/edit-summary":
             self._handle_edit_summary(form)
+        elif self.path == "/set-photo-override":
+            self._handle_set_photo_override(form)
         elif self.path == "/save-manual-keyword-note":
             self._handle_save_manual_keyword_note(form)
         elif self.path == "/assign-unclassified":
@@ -6843,6 +6846,29 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         set_summary_override(url, title or None, summary or None)
+        self._regenerate_screens()
+        self.send_response(204)
+        self.end_headers()
+
+    def _handle_set_photo_override(self, form: dict) -> None:
+        """⋯ 더보기 > 「사진 추정 해제」·「사진 추정 되돌리기」가 fetch로 호출한다
+        (setPhotoOverride — 확정본·초안·정기 보관함 공용).
+
+        사진 판정이 틀린 기사를 담당자가 한 건씩 끈다. 저장은 app.photo_overrides
+        (URL 키 전역)이고, 판정에 입히는 자리는 looks_like_photo_caption() 맨 앞
+        한 곳이라 화면·건수·수시 「사진 제외」가 저절로 따라온다.
+
+        되돌리기(app.undo) 대상이 아니다 — 「기사제목 직접 수정」과 같은 성격이고
+        (보고서 편집이 아니라 기사에 관한 사실), 되돌리는 자리는 같은 ⋯ 메뉴 안에
+        바로 생긴다. 확정본은 정적 파일이라 다시 그려야 다음 접속에도 반영된다.
+        """
+        url = form.get("url", [""])[0]
+        action = form.get("action", [""])[0]
+        if not url or action not in ("clear", "restore"):
+            self.send_response(400)
+            self.end_headers()
+            return
+        set_photo_override(url, False if action == "clear" else None)
         self._regenerate_screens()
         self.send_response(204)
         self.end_headers()

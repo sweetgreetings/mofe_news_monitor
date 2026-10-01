@@ -103,6 +103,7 @@ from app.filters import HEADLINE_TAG_RE, headline_kind, looks_like_photo_caption
 from app.sorter import outlet_sort_key, sort_by_pub_desc
 from app.icons import icon
 from app.labels import labels_for_url
+from app import photo_overrides
 from app.llm_classifier import MAX_ARTICLES_FOR_CLASSIFY
 from app.renderer import (
     AI_SUMMARY_HEADING,
@@ -789,7 +790,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      .art-scoop을 hover/out보다 **먼저** 선언해 가장 낮은 우선순위를 준다(정기의 같은
      주석 참고 — "지금 이 순간의 정보"가 "원래 중요하다"를 항상 이긴다). */
   .article.is-photo {{ opacity: 0.55; }}
-  .article.is-photo:hover, .article.is-photo:has(.bulk-chk:checked) {{ opacity: 1; }}
+  .article.is-photo:hover, .article.is-photo:has(.bulk-chk:checked),
+  /* ⋯ 메뉴를 연 행도 또렷하게 — 정기(app/renderer.py)와 같은 값이다. */
+  .article.is-photo:has(.more-wrap.is-open) {{ opacity: 1; }}
   /* ADHOC_DESIGN.md §6.13 「보낸 기사 표시」 — 내용 흐리기 + 「✓ 보냄」.
      ① 왼쪽 청록 띠는 없앴다 — 「✓ 보냄」 자리와 흐림이 이미 같은 말을 한다
         (ADHOC_RAW_CLEANUP_MOCKUP.html).
@@ -1933,6 +1936,21 @@ def _render_article_row(
 
     copy_text = f'{apply_line_template(_adhoc_line_template(settings), article["outlet"], article["title"])}\n{article["url"]}'
     card_id = html.escape(card["id"])
+    # [추가: 2026-10-01] ⋯ 더보기 > 「사진 추정 해제」 — 판정이 틀린 기사를 한 건씩 끈다.
+    # **원본·확정본 둘 다** 붙는다(라벨과 달리 원본에도 둔다 — 오탐을 가장 먼저 만나는
+    # 자리가 원본이라, 여기서 못 끄면 확정본으로 보낸 뒤에야 끌 수 있다). 저장은 정기와
+    # 같은 전역 저장소(app.photo_overrides)이고, 사진으로 잡힌 행과 끈 행에만 그린다.
+    photo_cleared = photo_overrides.is_photo_cleared(article["url"])
+    photo_menu_html = ""
+    if is_photo or photo_cleared:
+        photo_menu_html = (
+            '<form method="POST" action="/adhoc/card/photo-override">'
+            f'<input type="hidden" name="id" value="{card_id}">'
+            f'<input type="hidden" name="url" value="{html.escape(article["url"])}">'
+            f'<input type="hidden" name="action" value="{"restore" if photo_cleared else "clear"}">'
+            f'<button type="submit">{"사진 추정 되돌리기" if photo_cleared else "사진 추정 해제"}</button>'
+            "</form>"
+        )
     url = html.escape(article["url"])
 
     # [추가: 2026-08-18] 🏷 라벨 — PRD.md 기능10 규칙8, 라벨을 붙이는 세 화면(확정본·
@@ -2047,6 +2065,7 @@ def _render_article_row(
         "</form>"
         f'<button type="button" data-target="{edit_id}" '
         'onclick="event.stopPropagation(); openEditSummary(this)">기사제목 직접 수정</button>'
+        f"{photo_menu_html}"
         "</span>"
         "</span>"
     )

@@ -20,6 +20,7 @@ from app.label_undo import push as label_undo_push
 from app.labels import attach_label, detach_label, snapshot_source
 from app.naver_api import fetch_full_title_and_summary
 from app.summary_overrides import set_summary_override
+from app.photo_overrides import set_photo_override
 
 _NEW_ISSUE_SENTINEL = "__new__"
 # 수집 원본의 「확정본으로」가 싣는 값 — 「이 원본의 확정본(없으면 새로)」을 서버가 고른다.
@@ -236,7 +237,29 @@ def handle_post(handler, path: str, form: dict) -> bool:
     if path == "/adhoc/card/edit-summary":
         _handle_edit_summary(handler, form)
         return True
+    if path == "/adhoc/card/photo-override":
+        _handle_photo_override(handler, form)
+        return True
     return False
+
+
+def _handle_photo_override(handler, form: dict) -> None:
+    """⋯ 더보기 > 「사진 추정 해제」·「사진 추정 되돌리기」 — 사진 판정이 틀린 기사를
+    한 건씩 끈다(원본·확정본 둘 다).
+
+    저장은 정기와 같은 전역 저장소(app.photo_overrides)다 — summary_overrides와 같은
+    이유로 흐름을 가로질러 공유한다: 담기는 값이 「이 URL이 가리키는 기사가 사진기사인가」
+    라는 사실 하나뿐이다. 수시 되돌리기(app.adhoc.undo)는 카드 JSON 전체를 담는데 이
+    값은 카드 밖에 있어 대상이 아니다 — 되돌리는 자리는 같은 ⋯ 메뉴 안에 바로 생긴다.
+    """
+    card_id = _field(form, "id")
+    url = _field(form, "url")
+    action = _field(form, "action")
+    if not url or action not in ("clear", "restore"):
+        _card_redirect(handler, card_id, error="사진 추정을 바꾸지 못했습니다.")
+        return
+    set_photo_override(url, False if action == "clear" else None)
+    _card_redirect(handler, card_id)
 
 
 def _handle_refetch_summary(handler, form: dict) -> None:

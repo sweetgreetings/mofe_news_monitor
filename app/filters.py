@@ -94,6 +94,13 @@ def photo_tag_text(title: str) -> Optional[str]:
     return match.group(0).strip() if match else None
 
 
+def _manual_verdict(url: str) -> Optional[bool]:
+    """담당자가 ⋯ 더보기에서 직접 적어 둔 판정(없으면 None). `_body_verdict`과 같은 이유로
+    늦게 읽는다 — 순수 도구인 이 모듈이 import 시점에 저장소를 끌어오지 않게."""
+    from app import photo_overrides
+    return photo_overrides.photo_override(url)
+
+
 def _body_verdict(url: str) -> Optional[bool]:
     """원문 판정 결과(없으면 None). app.photo_body는 naver_api 쪽을 거쳐 이 모듈을 부르지
     않지만, 순수 도구인 이 모듈이 import 시점에 네트워크 모듈을 끌어오지 않도록 늦게 읽는다."""
@@ -410,8 +417,10 @@ def _looks_like_truncated_position_caption(title: str, summary: str) -> bool:
 def looks_like_photo_caption(article: dict) -> bool:
     """사진기사인지 판정한다 (아래 신호 중 하나라도 걸리면 True).
 
-    두 층이다: (1) 제목의 [포토] 말머리 — 언론사가 붙인 **표식**이라 추정이 아니다,
-    (2) 표식이 없는 통신사 사진기사 **추정**(요약·제목 모양 신호들).
+    맨 앞에 담당자가 직접 적어 둔 판정(app.photo_overrides)이 있고, 없을 때만 앱이
+    알아맞힌다. 알아맞히는 건 두 층이다: (1) 제목의 [포토] 말머리 — 언론사가 붙인
+    **표식**이라 추정이 아니다, (2) 표식이 없는 통신사 사진기사 **추정**(요약·제목 모양
+    신호들). 그 사이에 원문 층(app.photo_body)이 들어간다.
 
     [수정: 2026-09-03] (1)이 여기 없어서, `[포토]`가 대놓고 붙은 기사가 화면에서
     흐려지지도 "📷 사진 추정" 배지가 붙지도 "📷 사진 추정 전체 선택" 카운트에 잡히지도
@@ -424,6 +433,13 @@ def looks_like_photo_caption(article: dict) -> bool:
     (2)는 어디까지나 추정이라 실시간 현황에서는 지우지 않고 "📷 사진 추정" 배지로만
     보여주고, 정기 스크랩·초안에서만 (설정이 켜져 있을 때) 실제로 걸러낸다.
     """
+    # [추가: 2026-10-01] 담당자가 직접 끈 기사가 가장 먼저다 — 표식([포토])까지 이긴다.
+    # 담당자는 그 기사를 **보고** 누른 것이라, 앱의 어떤 층보다 정확하다(담당자 > AI
+    # 우선순위 그대로). 여기 한 곳에 두면 화면 여섯·「📷 사진 추정 (N)」 건수·수시
+    # 「사진 제외」·홈 부정 추정 범위가 저절로 따라온다(app.photo_overrides).
+    manual = _manual_verdict(article.get("url", ""))
+    if manual is not None:
+        return manual
     title = article.get("title", "").strip()
     if BREAKING_NEWS_MARK in title:
         return False
