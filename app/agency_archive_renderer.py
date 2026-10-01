@@ -25,7 +25,6 @@ from app.config import (
     FONT_STACK,
     PALETTE,
 )
-from app.curation import load_hidden_urls
 from app.filters import HEADLINE_TAG_RE, headline_kind, looks_like_photo_caption, photo_badge_tip
 from app.excel_export import sanitize_filename_part
 from app.icons import icon
@@ -256,9 +255,11 @@ def _snippet(summary: str, title: str, word: str) -> str:
     return f'<div class="snip">{_highlight(cut, word)}</div>'
 
 
-def _row_html(article: dict, word: str, hidden_urls: set, labels: dict, line_template: str) -> str:
-    """기사 한 줄. **요약은 접혀 있고 제목 줄을 누르면 펼쳐진다**(확정본과 같은 규칙 —
-    펼친 동안 제목은 `opacity`로만 흐려진다). 원문·복사는 행 오른쪽 끝 아이콘 두 칸이다."""
+def _row_html(article: dict, word: str, labels: dict, line_template: str) -> str:
+    """기사 한 줄 = **한 줄짜리 제목 줄 하나**. 게시 시각은 아이콘 왼쪽 끝에 서고
+    메타 줄은 없다 — 시각 한 조각 때문에 행마다 줄이 하나씩 더 생기던 자리다.
+    요약은 접혀 있고 제목 줄을 누르면 펼쳐진다(확정본과 같은 규칙 — 펼친 동안
+    제목은 `opacity`로만 흐려진다). 원문·복사는 행 오른쪽 끝 아이콘 두 칸이다."""
     url = article.get("url") or ""
     escaped_url = html.escape(url)
     # 한 건 복사는 보고서와 같은 한 줄 + 다음 줄 URL(홈 목록의 `_copy_text`와 같은 모양).
@@ -281,12 +282,13 @@ def _row_html(article: dict, word: str, hidden_urls: set, labels: dict, line_tem
     outlet = article.get("outlet") or ""
     outlet_html = f'<span class="outlet">{outlet_display_label(outlet, url)}</span>' if outlet else ""
     pub = article.get("pub_date") or ""
-    meta = [f"<span>{html.escape(pub[11:16])} 게시</span>"] if len(pub) >= 16 else []
-    if url in hidden_urls:
-        meta.append('<span class="hid">🗑️ 숨김</span>')
-    meta += [
+    # 게시 시각은 아이콘 왼쪽(`.a-when`). **숨김 표시는 안 그린다** — 보고서에서 뺐다는
+    # 담당자의 편집 결정이라 「그날 무엇이 있었나」를 묻는 이 화면의 일이 아니다.
+    when = f'<span class="a-when">{html.escape(pub[11:16])} 게시</span>' if len(pub) >= 16 else ""
+    # 라벨은 드물어 제목 끝에 붙인다(붙이는 건 다른 화면 몫, 여기선 보여주기만).
+    labs = "".join(
         f'<span class="lab">{html.escape(name)}</span>' for name in (labels.get(url, {}).get("labels") or [])
-    ]
+    )
     summary = article.get("summary") or ""
     # 아이콘 두 칸 — 테두리 상자로 가른다. 맨 아이콘만 두면 ↗와 복사가 같은 실루엣으로
     # 보인다(2026-08-14에 확정본에서 ↗를 뺐던 이유). 휴지통 행과 같은 30×26 규격.
@@ -311,10 +313,9 @@ def _row_html(article: dict, word: str, hidden_urls: set, labels: dict, line_tem
     cls = "art is-photo" if photo else "art"
     head = (
         '<div class="title-row">'
-        f'<div class="a-title">{outlet_html}{title}{badge}</div>'
-        f"{acts}</div>"
+        f'<div class="a-title">{outlet_html}{title}{badge}{labs}</div>'
+        f"{when}{acts}</div>"
         f"{_snippet(summary, article.get('title') or '', word)}"
-        f'<div class="a-meta">{"".join(meta)}</div>'
     )
     if not summary:
         return f'<div class="{cls}">{head}</div>'
@@ -405,7 +406,6 @@ def render_agency_archive_page(
 
     overrides = load_summary_overrides()
     days, total, counts, raw_total = _collect(date_from, date_to, word, overrides, on)
-    hidden_urls = load_hidden_urls()
     labels = load_labels()
     # 한 건 복사는 보고서와 같은 한 줄 형식을 쓴다(정기 설정 `/format`).
     line_template = load_settings().get("article_line_template", DEFAULT_ARTICLE_LINE_TEMPLATE)
@@ -477,15 +477,17 @@ def render_agency_archive_page(
         )
         # 날짜 묶음은 접는다 — **오늘만 펼친 채로** 연다(정기 보관함·휴지통과 같은 규칙·
         # 같은 ▸/▾). 한 달을 조회하면 날짜가 수십이라 전부 펼쳐 두면 훑을 수가 없다.
+        # **낱말로 찾았으면 걸린 날짜를 전부 펼친다** — 찾은 결과가 접혀 있으면 찾은 게
+        # 아니라 건수만 본 셈이다(수시 보관함의 사안명 검색과 같은 규칙).
         today = datetime.now().strftime("%Y-%m-%d")
         blocks = []
         for date_str, rows in days:
             today_chip = '<span class="chip-today">오늘</span>' if date_str == today else ""
             blocks.append(
-                f'<details class="dblock"{" open" if date_str == today else ""}>'
+                f'<details class="dblock"{" open" if (word or date_str == today) else ""}>'
                 f'<summary class="dhead">{_kr(date_str, weekday=True)} {today_chip}'
                 f'<span class="dcnt">{len(rows)}건</span></summary>'
-                + "".join(_row_html(a, word, hidden_urls, labels, line_template) for a in rows)
+                + "".join(_row_html(a, word, labels, line_template) for a in rows)
                 + "</details>"
             )
         body = (
@@ -608,13 +610,19 @@ _TEMPLATE = """<!DOCTYPE html>
   .a-title .outlet {{ color: {text_soft}; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }}
   .a-title a {{ color: {text}; text-decoration: none; }}
   .a-title a:hover {{ text-decoration: underline; }}
-  .a-meta {{ margin-top: 2px; font-size: var(--fs-sm); color: {text_soft}; display: flex; align-items: center;
-    gap: 6px; flex-wrap: wrap; }}
-  .a-meta a {{ color: {text_soft}; text-decoration: none; }}
-  .a-meta a:hover {{ color: {accent}; text-decoration: underline; }}
-  .a-meta .hid {{ color: {text_soft}; }}
-  .a-meta .lab {{ font-size: var(--fs-xs); font-weight: 600; color: {label_text}; background: {label_bg};
-    border: 1px solid {label_border}; border-radius: var(--r-pill); padding: 1px 8px; }}
+  /* 게시 시각 — 제목 줄 오른쪽 끝, 아이콘 바로 왼쪽. 제목 첫 줄에 맞춰 위로 붙인다. */
+  .a-when {{ flex: none; font-size: var(--fs-sm); color: {text_soft}; white-space: nowrap;
+    padding-top: 3px; }}
+  /* 좁은 화면에선 제목이 한 줄을 다 쓰고 시각·아이콘이 아랫줄 오른쪽으로 내려간다 —
+     폰에서 제목 폭을 시각에 150px 내주면 한 제목이 세 줄이 된다. */
+  @media (max-width: 640px) {{
+    .title-row {{ flex-wrap: wrap; }}
+    .a-title {{ flex: 1 1 100%; }}
+    .a-when {{ margin-left: auto; padding-top: 0; }}
+  }}
+  .a-title .lab {{ margin-left: 6px; font-size: var(--fs-xs); font-weight: 600; color: {label_text};
+    background: {label_bg}; border: 1px solid {label_border}; border-radius: var(--r-pill);
+    padding: 1px 8px; white-space: nowrap; }}
   /* 제목 줄 = 제목(왼쪽) + 아이콘 두 칸(오른쪽 끝) */
   .title-row {{ display: flex; align-items: flex-start; gap: 8px; }}
   .a-title {{ flex: 1 1 auto; min-width: 0; }}
