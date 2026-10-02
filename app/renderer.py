@@ -5588,10 +5588,22 @@ def url_add_script(settings_host: str, settings_port: int, screen: str) -> str:
 # 숨김·보냄 행 — 체크해서 보내면 숨김 표시가 풀리므로 범위로 쓸려 들어가면 안 된다).
 # 양 끝(직접 누른 기사)은 건너뛰지 않고 누른 쪽 상태를 따른다. 안내는 체크박스 툴팁뿐이다(선택 바엔 안 적는다). 시안 mockups/SHIFT_RANGE_SELECT_MOCKUP.html A안.
 RANGE_SELECT_SCRIPT = """
+// 「지금 화면에 보이는가」 판정 한 곳 — 범위 선택과 화면별 선택 바가 같은 답을 봐야
+// 「고른 건수」와 「실제로 처리되는 기사」가 어긋나지 않는다.
+//
+// checkVisibility()를 먼저 쓴다: **접힌 <details> 안의 요소는 레이아웃 상자가 그대로 남아**
+// offsetHeight·getClientRects로는 「보인다」가 나온다(실측 — 오늘 전체 기사의 접힌 시간대
+// 묶음 안 체크박스가 16px로 잡혔다). 휴지통의 날짜 묶음도 같은 모양이다. 그 함수가 없는
+// 브라우저에서만 상자 검사로 물러서되, 접힌 묶음은 따로 한 번 더 본다.
+window.isShownEl = window.isShownEl || function (el) {
+  if (el.checkVisibility) { return el.checkVisibility(); }
+  return !el.closest("details:not([open])")
+    && !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+};
 (function () {
   var BOX = %(box)s, SKIP = %(skip)s, ROW = %(row)s;
   var anchor = null;
-  function visible(el) { return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length); }
+  var visible = window.isShownEl;
   function skipped(cb) { if (!SKIP) { return false; } var row = cb.closest(ROW); return !!(row && row.matches(SKIP)); }
   // capture 단계 — 체크박스 자신의 onclick(stopPropagation)보다 먼저 돈다. 이 시점엔
   // 누른 체크박스의 checked가 이미 바뀌어 있다.

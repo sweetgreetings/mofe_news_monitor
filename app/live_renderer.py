@@ -47,12 +47,17 @@ from app.naver_api import (
     outlet_display_label,
     search_keywords,
 )
-from app.renderer import apply_line_template
+from app.renderer import apply_line_template, range_select_script
 from app.scheduler import next_pending_slot
 from app.settings import active_schedule_times, active_search_groups, group_in_scrap, load_settings
 from app.storage import load_latest_run, load_today_runs
 
 logger = logging.getLogger(__name__)
+
+# Shift+클릭 범위 선택 — 확정본·초안·수시와 같은 함수(app.renderer.range_select_script).
+# skip_row를 안 준다: 고를 수 없는 행(스크랩됨·자동 선별·숨김)은 체크박스 자체가 없어
+# 범위 목록에 들어오지 않는다. 필터에 걸려 안 보이는 행은 그 함수가 이미 건너뛴다.
+_BULK_SELECT_SCRIPT = range_select_script(".live-select", ".live-row")
 
 _PAGE_TEMPLATE = """<!DOCTYPE html>
 <html lang="ko">
@@ -82,8 +87,23 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
   .bottombar-inner {{
     max-width: 800px; margin: 0 auto; padding: 10px 24px;
-    display: flex; justify-content: flex-end;
+    display: flex; justify-content: flex-end; align-items: center; gap: 10px;
   }}
+  /* 선택 바 — 체크한 게 있을 때만 하단바 **왼쪽**에 나타난다(margin-right: auto). 🖍️·🗑는
+     오른쪽에 그대로 있고, 선택 바가 없을 때 화면도 예전 그대로다. 모양은 확정본·초안의
+     일괄이동 바와 같은 값이다 — 고르고 한 번에 처리하는 띠는 앱 어디서나 같게 보인다. */
+  .live-bulk-bar {{ display: none; align-items: center; gap: 8px; font-size: var(--fs-md); margin-right: auto; }}
+  .live-bulk-bar.is-active {{ display: flex; }}
+  .live-bulk-bar .bulk-count {{ font-weight: 600; color: {header}; white-space: nowrap; }}
+  .live-bulk-bar button {{
+    display: inline-flex; align-items: center; gap: 5px; height: var(--h-tb); padding: 0 12px;
+    background: {card}; color: {text}; border: 1px solid {border}; border-radius: var(--r-md);
+    font-size: var(--fs-md); cursor: pointer; white-space: nowrap;
+  }}
+  .live-bulk-bar button:hover {{ background: {hover}; border-color: {accent}; color: {accent}; }}
+  .live-bulk-bar button:disabled {{ color: {muted}; border-color: {border}; background: {card}; cursor: progress; }}
+  .live-bulk-bar .clear-btn {{ background: transparent; border-color: transparent; color: {muted}; }}
+  .live-bulk-bar .clear-btn:hover {{ background: {hover}; border-color: transparent; color: {muted}; }}
   .bottombar a {{ color: {accent}; text-decoration: none; font-size: 1.1rem; padding: 6px 10px; border-radius: var(--r-md); }}
   .bottombar a:hover {{ background: {live_bg}; }}
   /* [추가: 2026-08-03, 정리: 2026-08-21] 하단바 🖍️ 형광펜 편집 팝오버 — 다른 화면과
@@ -367,7 +387,19 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .live-undated-section {{ margin-top: 22px; padding-top: 14px; border-top: 1px solid {border}; }}
   .live-undated-heading {{ font-size: var(--fs-base); color: {header}; margin: 0 0 4px; }}
   .live-undated-desc {{ font-size: var(--fs-sm); color: {muted}; line-height: 1.6; margin: 0 0 8px; }}
-  .live-row-text {{ min-width: 0; }}
+  /* flex: 1 — .live-row는 space-between으로 텍스트와 버튼 묶음을 양끝에 붙이는데, 체크박스가
+     자식으로 하나 더 들어오면 그 틈이 사이사이로 나뉜다(2026-07-29에 같은 자리에서 났던 버그).
+     텍스트가 남는 폭을 다 가져가면 나눌 틈 자체가 없어진다. */
+  .live-row-text {{ flex: 1 1 auto; min-width: 0; }}
+  /* 행 체크박스 — 「담아두기」로 만들 수 있는 행(평범·이미 담아둠)에만 그린다. 체크박스가
+     있는 행 = 골라서 담아둘 수 있는 행이고, 스크랩됨·자동 선별·숨김은 골라도 할 일이 없어
+     같은 폭 빈칸으로 왼쪽 줄만 맞춘다(누를 일 없는 죽은 체크박스를 두지 않는다).
+     크기는 이 줄 글자가 본문(--fs-base)이라 --chk-md, 체크 색은 담당자의 동작이라 파랑. */
+  .live-select {{
+    width: var(--chk-md); height: var(--chk-md); flex: none; align-self: flex-start;
+    margin: 2px 0 0; accent-color: {accent}; cursor: pointer;
+  }}
+  .live-select-gap {{ width: var(--chk-md); flex: none; }}
   /* [수정: 2026-07-29] 버그 수정 — 📌 버튼 옆에 🗑️ 아이콘을 추가하면서 .live-row의
      자식이 2개(텍스트+버튼)에서 3개(텍스트+버튼+아이콘)로 늘었는데, justify-content:
      space-between이 자식 "사이사이"에 남는 공간을 나눠 넣다 보니 버튼과 아이콘 사이가
@@ -512,6 +544,12 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   <div id="live-body"{live_body_attr}>{body}</div>
 </div>
 <div class="bottombar"><div class="bottombar-inner">
+  <div class="live-bulk-bar" id="live-bulk-bar">
+    <span class="bulk-count" id="live-bulk-count"></span>
+    <button type="button" id="live-bulk-pin" onclick="bulkPinSelected(this)"
+      title="고른 기사를 초안·확정본의 「담아둔 기사」에 담아요"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 2h6l-1 6 3 3v2H7v-2l3-3-1-6Z"/></svg> 담아두기</button>
+    <button type="button" class="clear-btn" onclick="clearLiveSelection()">선택 해제</button>
+  </div>
   <div class="highlight-wrap">
     <button type="button" class="highlight-toggle" onclick="toggleHighlightPopover()" title="형광펜 단어 편집"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3.2 20.8 9l-8.2 8.2H6.8V11.4Z"/><path d="m11.4 6.8 5.8 5.8"/><path d="M3.5 21h17"/></svg></button>
     <div class="highlight-popover" id="highlight-popover">
@@ -766,6 +804,69 @@ function unhideFromLive(btn) {{
     alert("숨기기를 취소하지 못했습니다 — 앱이 실행 중인지 확인해주세요.");
   }});
 }}
+{bulk_select_script}
+// [추가] 여러 건 한 번에 담아두기 — 회차 작업 중에 "이 기사들 지금 회차에 넣자"가
+// 뭉텅이로 생기는데, 행 버튼만 있으면 건수만큼 눌러야 했다. 고르는 문법(체크박스·선택 바·
+// Shift+클릭)은 확정본·초안·수시가 쓰는 것을 그대로 가져온다.
+//
+// 세는 것도 담는 것도 **지금 보이는 체크**만이다 — 필터에 걸려 사라진 행은 건수에서도
+// 빠지고 담기지도 않는다. 안 보이는 기사가 조용히 담기면 담당자는 그게 왜 왔는지 알 길이
+// 없고, 필터를 껐다 켜도 체크는 그대로라 선택을 잃지도 않는다.
+function liveSelectedBoxes() {{
+  // 보이는지는 범위 선택과 같은 판정(isShownEl)을 쓴다 — 접힌 시간대 묶음 안의 체크박스는
+  // 레이아웃 상자가 남아 있어 offsetHeight로는 「보인다」가 나온다.
+  return Array.prototype.filter.call(document.querySelectorAll(".live-select:checked"), function (cb) {{
+    var row = cb.closest(".live-row");
+    return !!(row && window.isShownEl(row));
+  }});
+}}
+function updateLiveBulkBar() {{
+  var bar = document.getElementById("live-bulk-bar");
+  if (!bar) return;
+  var n = liveSelectedBoxes().length;
+  bar.classList.toggle("is-active", n > 0);
+  var count = document.getElementById("live-bulk-count");
+  if (count) count.textContent = n + "개 선택됨";
+}}
+function clearLiveSelection() {{
+  document.querySelectorAll(".live-select:checked").forEach(function (cb) {{ cb.checked = false; }});
+  updateLiveBulkBar();
+}}
+function bulkPinSelected(btn) {{
+  var boxes = liveSelectedBoxes();
+  if (!boxes.length || btn.disabled) return;
+  // 기사마다 다섯 값을 같은 순서로 되풀이해 한 요청에 싣는다(postHideBatch와 같은 모양).
+  // 값은 그 행의 담아두기 버튼이 이미 들고 있다 — 체크박스엔 url밖에 없다.
+  // keepalive를 안 쓴다: 그 본문 상한(64KB)을 기사 100건이면 넘는다.
+  var body = new URLSearchParams();
+  boxes.forEach(function (cb) {{
+    var add = cb.closest(".live-row").querySelector(".add-btn[data-url]");
+    if (!add) return;
+    body.append("outlet", add.dataset.outlet || "");
+    body.append("title", add.dataset.title || "");
+    body.append("url", add.dataset.url || "");
+    body.append("summary", add.dataset.summary || "");
+    body.append("pubDate", add.dataset.pubDate || "");
+  }});
+  // 누르는 순간 잠그고 「N건 담는 중…」 — 끝날 때까지 다시 못 누르게(여러 기사 숨기기와 같은 규칙).
+  var label = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = boxes.length + "건 담는 중…";
+  function restore() {{ btn.disabled = false; btn.innerHTML = label; }}
+  fetch("http://{settings_host}:{settings_port}/add-manual-article", {{
+    method: "POST",
+    headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
+    body: body
+  }}).then(function (res) {{
+    // 담은 뒤 각 행이 어떤 상태인지는 서버가 다시 정확히 판단한다(unhideFromLive와 같은 이유) —
+    // 여러 행의 상태를 JS에서 재현하면 우선순위 규칙이 두 군데가 된다.
+    if (res.ok) {{ location.reload(); }}
+    else {{ restore(); alert("담아두지 못했습니다. 다시 시도해주세요."); }}
+  }}).catch(function () {{
+    restore();
+    alert("담아두지 못했습니다 — 앱이 실행 중인지 확인해주세요.");
+  }});
+}}
 var SCRAP_OUTLETS = {outlet_order_json};
 // [수정: 2026-08-13] 언론사 체크박스 하나만 보던 applyOutletFilter를, 그룹 칩·제목
 // 검색·"아직 처리 안 한 기사만"까지 전부 함께 고려하는 applyLiveFilters로 합쳤다 — 필터가
@@ -835,6 +936,7 @@ function applyLiveFilters() {{
   var statScope = document.getElementById("stat-scope");
   if (statScope) statScope.textContent = onlyScrap ? "스크랩 언론사만" : "전체 언론사";
   syncHourGroups();
+  updateLiveBulkBar();
   saveLiveFilterState();
 }}
 // [추가] 시간대 묶음 — 필터가 돌 때마다 머리줄 건수를 보이는 만큼으로 고쳐 쓰고, 0건이
@@ -967,6 +1069,9 @@ function restoreLiveFilterState() {{
   if (restored) applyLiveFilters();
 }}
 restoreLiveFilterState();
+// 뒤로 가기로 돌아오면 브라우저가 체크 상태를 되살리는데, 선택 바는 그 사실을 모른 채
+// 닫혀 있다 — 체크는 돼 있는데 「담아두기」가 없는 화면이 된다. 열 때 한 번 맞춰 둔다.
+updateLiveBulkBar();
 // [추가: 2026-09-28] 자동 새로고침 — 화면을 열어 둔 채 주기마다 /live.html을 뒤에서 한 번
 // 받아와, 지금 목록에 없는 기사가 있으면 위 띠로 알리기만 한다. 목록을 조용히
 // 갈아끼우지 않는 게 규칙이다: 읽는 중에 새 기사가 위에 붙으면 보던 줄이 아래로 밀려
@@ -1651,10 +1756,24 @@ def _render_row(
     # 달라서다. 실측상 둘이 한 제목에 같이 붙는 경우는 0건이지만, 그 우연에 기대면
     # 언젠가 한쪽이 다른 쪽을 덮어쓴다.
     data_editorial_attr = "1" if _is_editorial(raw_title) else ""
+    # [추가] 선택 바용 체크박스 — 「담아두기」로 만들 수 있는 행에만 그린다. 평범한 행과
+    # 이미 담아둔 행 둘이고, 둘 다 고른 뒤의 끝 상태가 "담아둠"이라 건수와 실제 결과가
+    # 어긋나지 않는다(이미 담아둔 건 서버가 조용히 건너뛴다). 스크랩됨·자동 선별·숨김은
+    # 이미 보고서 안이거나 뺀 기사라 고를 일이 없어 같은 폭 빈칸만 둔다 — 누를 일 없는
+    # 체크박스를 모든 행에 달면 "고를 수 있다"는 거짓말이 된다. can_add가 거짓이면(오늘
+    # 첫 회차 전) 담을 데가 없으므로 행 버튼과 같은 판정으로 체크박스도 안 그린다.
+    # 툴팁은 range_select_script가 달아준다(Shift+클릭 안내) — 여기서 title을 적지 않는다.
+    selectable = can_add and data_status in ("normal", "pinned")
+    select_html = (
+        f'<input class="live-select" type="checkbox" data-url="{url}" onchange="updateLiveBulkBar()">'
+        if selectable
+        else '<span class="live-select-gap" aria-hidden="true"></span>'
+    )
     return (
         f'<div class="{row_class}" data-outlet="{outlet}" data-status="{data_status}" '
         f'data-groups="{data_groups_attr}" data-headline="{data_headline_attr}" '
         f'data-editorial="{data_editorial_attr}">'
+        f'{select_html}'
         f'<div class="live-row-text"><span class="outlet-tag">{outlet_display}</span>{group_tags_html}{pub_time_html}{kw_inline_html}{photo_badge_html}'
         '<details class="live-title">'
         f"<summary>{title_html}</summary>"
@@ -2016,6 +2135,7 @@ def render_live_page(
         hidden_href=_hidden_href(),
         settings_host=SETTINGS_SERVER_HOST,
         settings_port=SETTINGS_SERVER_PORT,
+        bulk_select_script=_BULK_SELECT_SCRIPT,
         outlet_order_json=json.dumps(outlet_order, ensure_ascii=False),
         highlight_words_json=_highlight_words_json(highlight_words),
     )
@@ -2040,6 +2160,7 @@ def render_live_error_page() -> str:
         hidden_href=_hidden_href(),
         settings_host=SETTINGS_SERVER_HOST,
         settings_port=SETTINGS_SERVER_PORT,
+        bulk_select_script=_BULK_SELECT_SCRIPT,
         outlet_order_json="[]",
         highlight_words_json=_highlight_words_json(load_settings().get("highlight_keywords", [])),
     )
@@ -2072,6 +2193,7 @@ def render_live_not_configured_page() -> str:
         hidden_href=_hidden_href(),
         settings_host=SETTINGS_SERVER_HOST,
         settings_port=SETTINGS_SERVER_PORT,
+        bulk_select_script=_BULK_SELECT_SCRIPT,
         outlet_order_json="[]",
         highlight_words_json=_highlight_words_json(load_settings().get("highlight_keywords", [])),
     )
@@ -2114,6 +2236,7 @@ def render_live_loading_page(keyword_count: int) -> str:
         hidden_href=_hidden_href(),
         settings_host=SETTINGS_SERVER_HOST,
         settings_port=SETTINGS_SERVER_PORT,
+        bulk_select_script=_BULK_SELECT_SCRIPT,
         outlet_order_json="[]",
         highlight_words_json=_highlight_words_json(load_settings().get("highlight_keywords", [])),
     )

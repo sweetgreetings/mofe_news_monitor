@@ -35,8 +35,34 @@ def _write(articles: list, now: Optional[datetime] = None) -> None:
     )
 
 
+def add_manual_articles(articles: list, now: Optional[datetime] = None, at_top: bool = False) -> int:
+    """기사 여러 건을 한 번에 "직접 추가한 기사" 목록에 넣고, 새로 담긴 건수를 돌려준다.
+
+    오늘 전체 기사의 선택 바 「담아두기」가 쓴다. 기사 수만큼 add_manual_article을
+    되풀이하면 그 수만큼 파일을 다시 읽고 쓴다 — 여러 기사 숨기기(app.curation의
+    hide_articles)와 같은 규칙이다: 한 번에 고른 것은 읽기-수정-쓰기도 한 번이다.
+
+    이미 담아둔 URL과 이번 묶음 안의 중복은 건너뛴다(그래서 이미 담아둔 기사가 섞여
+    있어도 그냥 넘어간다 — 고른 행의 끝 상태는 어느 쪽이든 "담아둠"이다). 넣는 순서는
+    받은 순서 그대로고, at_top=True면 그 순서를 지킨 채 목록 맨 앞에 놓는다.
+    """
+    stored = load_manual_articles(now)
+    seen = {a["url"] for a in stored}
+    fresh = []
+    for article in articles:
+        url = article.get("url")
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        fresh.append(article)
+    if not fresh:
+        return 0
+    _write(fresh + stored if at_top else stored + fresh, now)
+    return len(fresh)
+
+
 def add_manual_article(article: dict, now: Optional[datetime] = None, at_top: bool = False) -> bool:
-    """실시간 기사 현황에서 고른 기사 하나를 "직접 추가한 기사" 목록 맨 뒤에 추가한다.
+    """기사 하나를 "직접 추가한 기사" 목록 맨 뒤에 추가한다(여러 건은 add_manual_articles).
 
     at_top=True면 맨 앞에 넣는다 — 초안 「+ 수기로 기사 추가」는 입력칸이 칸 맨 위에
     있어서, 방금 넣은 기사가 입력칸 바로 밑에 떠야 결과를 찾으러 내려가지 않는다.
@@ -45,15 +71,7 @@ def add_manual_article(article: dict, now: Optional[datetime] = None, at_top: bo
     새로 추가하면 True. 자정이 지난 뒤 첫 추가라면 load_manual_articles가 빈 목록을
     돌려주므로 자연히 오늘치로 새로 시작된다.
     """
-    articles = load_manual_articles(now)
-    if any(a["url"] == article["url"] for a in articles):
-        return False
-    if at_top:
-        articles.insert(0, article)
-    else:
-        articles.append(article)
-    _write(articles, now)
-    return True
+    return add_manual_articles([article], now, at_top) == 1
 
 
 def pop_manual_article(url: str, now: Optional[datetime] = None) -> Optional[dict]:

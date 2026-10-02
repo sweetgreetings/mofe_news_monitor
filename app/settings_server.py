@@ -112,7 +112,12 @@ from app.trend_renderer import render_trend_page
 from app.trend_export import build_trend_workbook_bytes
 from app.landing_renderer import generate_landing_page
 from app.live_renderer import generate_live_page_or_wait
-from app.manual_articles import add_manual_article, load_manual_articles, pop_manual_article
+from app.manual_articles import (
+    add_manual_article,
+    add_manual_articles,
+    load_manual_articles,
+    pop_manual_article,
+)
 from app.manual_keyword_note import save_manual_keyword_note
 from app.naver_api import (
     OUTLET_CATEGORIES,
@@ -6441,22 +6446,38 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def _handle_add_manual_article(self, form: dict) -> None:
-        """live.html의 "→ 스크랩" 버튼이 fetch로 호출한다 (실시간 기사 현황 → 스크랩).
+        """오늘 전체 기사의 「담아두기」 — 행 버튼이면 한 건, 선택 바면 고른 만큼.
+
+        **여러 건이어도 요청은 하나다**(여러 기사 숨기기와 같은 규칙) — 기사마다 다섯 값을
+        같은 순서로 되풀이해 싣고, 저장도 화면 재생성도 한 번씩만 한다. 기사 수만큼 요청을
+        나누면 그만큼 파일을 다시 쓰고 네 화면을 다시 그린다.
 
         live.html은 http://127.0.0.1:{port}/live.html로(같은 출처) 서빙되므로, index.html/
         history.html의 hide-article과 달리 CORS 헤더가 필요 없다.
         """
-        outlet = form.get("outlet", [""])[0]
-        title = form.get("title", [""])[0]
-        url = form.get("url", [""])[0]
-        summary = form.get("summary", [""])[0]
-        pub_date = form.get("pubDate", [""])[0]
-        if outlet and title and url:
-            article = {"outlet": outlet, "title": title, "url": url, "summary": summary}
+        outlets = form.get("outlet", [])
+        titles = form.get("title", [])
+        urls = form.get("url", [])
+        summaries = form.get("summary", [])
+        pub_dates = form.get("pubDate", [])
+
+        def _at(values: list, i: int) -> str:
+            return values[i] if i < len(values) else ""
+
+        articles = []
+        for i, url in enumerate(urls):
+            outlet, title = _at(outlets, i), _at(titles, i)
+            if not (outlet and title and url):
+                continue
+            article = {"outlet": outlet, "title": title, "url": url, "summary": _at(summaries, i)}
+            pub_date = _at(pub_dates, i)
             if pub_date:
                 article["pub_date"] = pub_date
-            add_manual_article(article)
+            articles.append(article)
+        added = add_manual_articles(articles)
+        if added:
             self._regenerate_screens()
+            logger.info("담아두기 — %d건 담음 (요청 %d건)", added, len(articles))
         self.send_response(204)
         self.end_headers()
 

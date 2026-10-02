@@ -216,6 +216,11 @@ FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN
 - 발행시각을 못 읽은 기사는 목록·누적 건수에서 빼고 맨 아래 「⚠️ 발행시각을 못 읽은 기사」 구역에 모은다(추정 시각 안 씀). 0건이면 배너·구역 모두 안 그린다. 그 행도 `.live-row`라 필터에 걸린다.
 - **행 버튼 상태** (`_render_row`, 우선순위 hidden > scrapped > pinned > auto-drafted > normal): `📌 담아두기`(오늘 회차 ≥1일 때 활성) / `📌 담아둠`(다시 누르면 해제, `unpinFromLive`) / `✔️ 스크랩됨`(비활성) / `🗑️ 숨김`(다시 누르면 숨김만 해제, `unhideFromLive` — 마우스를 올리면 라벨이 `↩ 되살리기`로 바뀐다(`.unhide-btn`, 마크업은 `unhide_btn_label()` 하나를 서버 렌더링·`hideFromLive`가 같이 쓴다). 숨긴 행의 흐림·취소선은 `.live-row-text`에만 — 버튼까지 흐리면 누를 수 있는 버튼으로 안 보인다. 시안 [mockups/LIVE_UNHIDE_BUTTON_MOCKUP.html](mockups/LIVE_UNHIDE_BUTTON_MOCKUP.html)) / `🤖 자동 선별`(비활성, `_auto_drafted_urls` 근사치 — 규칙 기반이라 AI가 아니다). 상태 버튼(`.add-btn`) `min-width: 84px`(가장 긴 라벨 폭 — 옆 버튼이 흔들리지 않는 하한). 그 오른쪽에 `복사` 글자 버튼(`.copy-btn`, `copyArticleIcon`), `⋯`(🔄/✏️), 🗑.
 - **숨김 여부는 `is_hidden()`으로만 판정한다**(확정본 필터와 판정이 갈리면 안 된다).
+- **행 체크박스 + 선택 바 「📌 담아두기」**(`.live-select`, 하단바 왼쪽 `.live-bulk-bar`): 여러 건을 한 번에 담는다. **체크박스는 담아둘 수 있는 행에만 그린다** — 평범한 행과 이미 담아둔 행 둘이고(둘 다 끝 상태가 「담아둠」이라 건수와 결과가 안 어긋난다), 스크랩됨·자동 선별·숨김은 같은 폭 빈칸(`.live-select-gap`)으로 왼쪽 줄만 맞춘다. 누를 일 없는 체크박스를 모든 행에 달면 「고를 수 있다」는 거짓말이 된다. 오늘 회차가 아직 없으면(`can_add` 거짓) 행 버튼과 같이 안 그린다.
+  - **세는 것도 담는 것도 「지금 보이는 체크」만이다** — 필터·접힌 시간대에 가린 행은 건수에서 빠지고 담기지도 않는다(안 보이는 기사가 조용히 담기면 왜 왔는지 알 길이 없다). 체크 자체는 남아 있어 필터를 껐다 켜도 선택을 잃지 않는다.
+  - **보이는지 판정은 `window.isShownEl` 한 곳**(`range_select_script`가 함께 낸다) — `checkVisibility()`를 먼저 본다. **접힌 `<details>` 안의 요소는 레이아웃 상자가 그대로 남아 `offsetHeight`·`getClientRects`로는 「보인다」가 나온다**(이 화면의 시간대 묶음·휴지통의 날짜 묶음). 범위 선택과 선택 바가 같은 답을 봐야 한다.
+  - **여러 건이어도 요청은 하나다**(여러 기사 숨기기와 같은 규칙) — 기사마다 다섯 값(`outlet`·`title`·`url`·`summary`·`pubDate`)을 같은 순서로 되풀이해 싣고, 서버 `POST /add-manual-article`은 `add_manual_articles`로 파일을 한 번만 쓰고 화면도 한 번만 다시 그린다. 이미 담아둔 URL은 조용히 건너뛴다. 담은 뒤에는 새로고침한다 — 행 상태의 우선순위를 JS에서 재현하지 않는다.
+  - 되돌리기 대상이 아니다(📌 담아두기 그대로 — 보고서 밖이고 담아둠 해제로 뺀다).
 - 📌 담아두기 → 확정본·초안의 「📌 담아둔 기사」 구획(당일만, 자체 ↑↓, 복사·txt에서 제외, 자정에 비움). 승격은 화면별 소제목 드롭다운(`초안에 넣기…`/`확정본에 넣기…`), 고를 소제목이 없으면 📥 버튼으로 서버 자동 분류.
 - **승격 드롭다운은 기사 액션 줄 맨 앞**(`render_article`의 `extra_buttons_html` → `.article-actions`) — 「다른 소제목」과 같은 자리·같은 모양이고 폭만 114px(`.promote-select`, 「확정본에 넣기…」가 100px에선 잘린다). 기사 아래 별도 줄(`.article-footer`)은 없앴다 — 담아둔 기사만 행이 3줄이 되던 유일한 이유였고, 다른 화면에선 늘 비어 있었다.
 - **「📌 담아둔 기사」 칸은 「📂 소제목 미분류」와 같은 문법을 쓰고 색으로만 가른다** — 왼쪽 4px 띠 + 옅은 바탕 + 오른쪽만 둥근 모서리, 미분류는 앰버(담당자가 아직 모르는 것), 담아둔 기사는 그보다 한 단계 어두운 캐러멜(`COLOR_PINNED_*`, 한 번은 보고 골라둔 것). **파랑을 쓰지 않는다**(파랑은 담당자의 동작이다). 건수 칩·칸 안 「+ 수기로 기사 추가」 버튼도 캐러멜(`.manual-zone-count`) — 미분류의 앰버 칩(`.unclassified-count`)을 빌려 쓰지 않는다. CSS는 `app/renderer.py`·`app/preview_renderer.py` 두 곳이라 한쪽을 바꾸면 다른 쪽도 바꾼다. 시안 [mockups/PINNED_ICON_BADGE_MOCKUP.html](mockups/PINNED_ICON_BADGE_MOCKUP.html).
@@ -327,7 +332,7 @@ FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN
 - 액션 아이콘은 행 오른쪽 끝(`margin-left: auto`).
 - **검색어 표시**: 액션 줄에 `🔍 기재부, 정부`(회색 글자, 돋보기 `icon("search")`, 설명은 `title`). 확정본·초안만(`show_matched_keywords`). **남는 자리만큼만 보이고 `…`** — `flex: 1 1 0; min-width: 5em; max-width: max-content`, 잘린 행은 hover 순간에 판정해 툴팁(`kw_inline_style()`/`kw_inline_script()` 공용). 구분점은 `.kw-inline` 안. 값이 없으면 아무것도 안 그린다. **복사·txt·발송·엑셀에 안 나간다.** 시안 [mockups/KW_CHIP_MOCKUP.html](mockups/KW_CHIP_MOCKUP.html).
 - **체크박스는 `--chk-md`(16px)**(기사 `.article-select`·소제목 머리 `.group-select-all`, 체크 색 accent). 아랫줄 들여쓰기는 그만큼 31px(여백 4 + 16 + 3 + gap 8). 수시 `.bulk-chk`도 같은 값. 두 단계 규칙은 아래 디자인 절 「체크박스 크기」. 시안 [mockups/CHECKBOX_SIZE_MOCKUP.html](mockups/CHECKBOX_SIZE_MOCKUP.html) B안.
-- **Shift+클릭 범위 선택**(확정본·초안·수시 원본/확정본·휴지통): 체크박스 하나를 누르고 Shift를 누른 채 다른 체크박스를 누르면 그 사이가 누른 쪽 상태(체크/해제)로 바뀐다. **안 보이는 행은 건너뛴다**(사진 모아 보기·필터·접힌 묶음 — 확인창 없는 🗑 일괄 숨김에 딸려 가면 안 된다). **수시 원본은 `✓ 보냄`·`🗑 숨김` 행도 건너뛴다**(체크해서 보내면 숨김 표시가 풀린다). 양 끝(직접 누른 기사)은 건너뛰지 않는다. **안내는 체크박스 툴팁뿐이다** — 선택 바에 안내 글자를 적지 않는다. 코드는 `app/renderer.py` `range_select_script(box, row, skip_row, each_js)` 한 곳. 시안 [mockups/SHIFT_RANGE_SELECT_MOCKUP.html](mockups/SHIFT_RANGE_SELECT_MOCKUP.html) A안. → H: Shift+클릭 범위 선택
+- **Shift+클릭 범위 선택**(확정본·초안·수시 원본/확정본·휴지통·오늘 전체 기사): 체크박스 하나를 누르고 Shift를 누른 채 다른 체크박스를 누르면 그 사이가 누른 쪽 상태(체크/해제)로 바뀐다. **안 보이는 행은 건너뛴다**(사진 모아 보기·필터·접힌 묶음 — 확인창 없는 🗑 일괄 숨김에 딸려 가면 안 된다). **수시 원본은 `✓ 보냄`·`🗑 숨김` 행도 건너뛴다**(체크해서 보내면 숨김 표시가 풀린다). 양 끝(직접 누른 기사)은 건너뛰지 않는다. **안내는 체크박스 툴팁뿐이다** — 선택 바에 안내 글자를 적지 않는다. 코드는 `app/renderer.py` `range_select_script(box, row, skip_row, each_js)` 한 곳이고, 「보이는가」 판정도 그 함수가 내는 `window.isShownEl` 한 곳이다(오늘 전체 기사 절 참고). **오늘 전체 기사는 `skip_row`를 안 준다** — 고를 수 없는 행은 체크박스 자체가 없어 범위 목록에 안 들어온다. 시안 [mockups/SHIFT_RANGE_SELECT_MOCKUP.html](mockups/SHIFT_RANGE_SELECT_MOCKUP.html) A안. → H: Shift+클릭 범위 선택
 - **게시시각**: 화면에 `HH:MM 게시` + "N분 전"(화면 전용, 내보내기엔 없음).
 
 ### 소제목
@@ -712,7 +717,7 @@ URL
 ### 체크박스 크기 (`app/config.py` `CHECKBOX_MD`·`CHECKBOX_SM`)
 
 - **두 단계뿐이고, 한 변은 그 체크박스가 선 줄 글자 크기의 px값이다.** CSS엔 `width: var(--chk-md)`처럼 적고 숫자를 적지 않는다(정의는 모양 토큰과 같은 `SHAPE_TOKENS_CSS`).
-  - `--chk-md` 16px — 본문 줄(`--fs-base`·`--fs-lg`)에 선 것: 기사 행·소제목 머리·수시 기사 행·수시 발송 확인창·정기 보관함 날짜/회차 줄·언론사 선택·자동발송 사용.
+  - `--chk-md` 16px — 본문 줄(`--fs-base`·`--fs-lg`)에 선 것: 기사 행·소제목 머리·수시 기사 행·오늘 전체 기사 기사 행·수시 발송 확인창·정기 보관함 날짜/회차 줄·언론사 선택·자동발송 사용.
   - `--chk-sm` 14px — 보조 줄(`--fs-md`·`--fs-sm`)에 선 것: 오늘 전체 기사 특수조건 필터 줄·휴지통 행·수시 보관함 날짜/회차 줄·수시 「남은 기사만 보기」·새 수집 「거르기」·알림 감시 그룹과 하위 옵션·알림 시간 창.
 - **예외 하나 — 「전체 선택」은 자기가 거느리는 행의 체크와 같은 크기다.** 띠 글자가 한 단계 작아도 상위 체크가 하위보다 작아 보이면 안 된다(사진 모아 보기 띠 `.photo-gather-strip`, 수시 원본 `.sel-all` — 둘 다 `--chk-md`).
 - **체크 색은 예외 없이 `accent-color: {accent}`**(체크는 담당자의 동작이라 파랑). 초록은 수시 발송 확인창 하나뿐 — 「초록 = 발송」 규칙 그대로.
