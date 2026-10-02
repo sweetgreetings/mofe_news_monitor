@@ -107,7 +107,11 @@ from app.history_renderer import (
     render_slot_fragment,
 )
 from app.home_trend import add_trend_word, remove_trend_word
-from app.agency_archive_renderer import render_agency_archive_page
+from app.agency_archive_renderer import (
+    AGENCY_ARCHIVE_FILTERS,
+    render_agency_archive_day_fragment,
+    render_agency_archive_page,
+)
 from app.trend_renderer import render_trend_page
 from app.trend_export import build_trend_workbook_bytes
 from app.landing_renderer import generate_landing_page
@@ -5365,6 +5369,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         elif self.path == "/labels" or self.path.startswith("/labels?"):
             query = parse_qs(urlsplit(self.path).query)
             self._respond(render_labels_page(query.get("label", [])))
+        elif self.path.startswith("/agency-archive/day?"):
+            self._handle_agency_archive_day()
         elif self.path == "/agency-archive" or self.path.startswith("/agency-archive?"):
             query = parse_qs(urlsplit(self.path).query)
             self._respond(
@@ -5435,6 +5441,27 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             highlight_words=settings["highlight_keywords"],
             line_template=settings["article_line_template"],
             subheading_format=settings.get("subheading_format_template", DEFAULT_SUBHEADING_FORMAT_TEMPLATE),
+        )
+        if fragment is None:
+            self.send_response(404)
+            self.end_headers()
+            return
+        self._respond(fragment)
+
+    def _handle_agency_archive_day(self) -> None:
+        """기관 기사 찾기의 지연 로딩 — 날짜 머리줄은 처음부터 다 있고, 실제로 펼칠 때만
+        그 하루치 기사 줄을 렌더링해 돌려준다(app.agency_archive_renderer의
+        render_agency_archive_day_fragment, JS loadAgencyDay가 fetch로 부른다).
+
+        **낱말·거르기를 같이 받는다** — 안 받으면 펼친 날짜만 조건이 풀려 한 화면에서
+        위 날짜와 아래 날짜가 서로 다른 목록이 된다. 걸린 기사가 없으면 404 — holder가
+        그대로 남아 담당자가 다시 펼쳐볼 수 있다(정기 보관함과 같은 규칙).
+        """
+        query = parse_qs(urlsplit(self.path).query)
+        fragment = render_agency_archive_day_fragment(
+            (query.get("date") or [""])[0],
+            word=(query.get("q") or [""])[0],
+            filters={key: bool(query.get(key)) for key in AGENCY_ARCHIVE_FILTERS},
         )
         if fragment is None:
             self.send_response(404)

@@ -1880,9 +1880,16 @@ def _heavy_keyword_warning(articles: list) -> str:
     섹션 참고 — 실측: 등록 키워드 21개 중 '코스피' 하나가 그날 결과 1,968건 중
     33.3%(656건)를 차지해 화면 무게·새로고침 대기시간의 상당 부분을 만들고 있었다,
     2위와도 10%p 넘게 벌어진 뚜렷한 이상치였다). 그래서 코드가 강제로 걸러내지 않고,
-    담당자가 스스로 알아채고(설정 > 키워드 화면에서 더 좁은 말로 바꾸거나 그룹을
-    '모두 포함'으로 묶는 등) 조치할 수 있도록 안내만 한다 — 문턱은
+    담당자가 스스로 알아채고(검색어 화면에서 더 좁은 말로 바꾸거나 `+`로 묶는 등)
+    조치할 수 있도록 안내만 한다 — 문턱은
     app.config.LIVE_HEAVY_KEYWORD_RATIO/LIVE_HEAVY_KEYWORD_MIN_COUNT.
+
+    [수정] 문구에서 「그룹의 검색 방식을 '모두 포함'으로」를 뺐다 — 「1개라도 포함 |
+    모두 포함」 두 칸 버튼은 없앴고(validate_keyword_groups가 mode를 늘 "OR"로 눕힌다)
+    그 일을 지금은 **키워드 한 칸 안의 `+`**가 한다. 할 수 없는 일을 시키던 자리다.
+    화면 이름도 「키워드」가 아니라 「검색어」다. 「너무 넓은 말일 수 있어요」도 뺐다 —
+    65%라는 숫자와 앰버 ⚠가 이미 그 말이라, 한 번 더 적으면 화면이 자기를 해명한다.
+    그만큼이 줄어 배너가 한 줄에 들어간다(800px 실측).
 
     matched_keywords 집계는 _filter_bar_html의 "키워드별 건수"와 같은 방식(기사가
     여러 키워드에 걸리면 각각 센다)이라, 배지에 적힌 건수·비율이 그 disclosure를
@@ -1902,12 +1909,15 @@ def _heavy_keyword_warning(articles: list) -> str:
     ratio = heaviest_count / len(articles)
     if ratio < LIVE_HEAVY_KEYWORD_RATIO:
         return ""
+    # 「~로 묶거나」가 앞에 선다 — 담당자가 바로 할 수 있는 일이 그쪽이고, 화면을 옮겨야
+    # 하는 「검색어 화면에서 바꾸기」가 뒤에 선다. 예시는 그 검색어로 직접 만들어, 「+로
+    # 묶으라」는 말이 지금 이 키워드에 어떻게 적용되는지를 바로 보여준다.
     return (
         f'<div class="live-heavy-kw-warning">{icon("alert")} 검색어 \'{html.escape(heaviest_kw)}\'가 '
-        f"전체 결과의 {round(ratio * 100)}%({heaviest_count}/{len(articles)}건)를 차지하고 "
-        "있습니다 — 너무 넓은 검색어일 수 있어요. 설정 > 키워드 화면에서 더 구체적인 "
-        "말로 바꾸거나, 그룹의 검색 방식을 '모두 포함'으로 바꿔 다른 검색어와 함께 좁히는 "
-        "걸 고려해보세요.</div>"
+        f"결과의 {round(ratio * 100)}%({heaviest_count}/{len(articles)}건)예요 — "
+        f"「{html.escape(heaviest_kw)}+예산」처럼 <b>+</b>로 묶거나 "
+        f'<a href="http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/keywords">검색어</a> 화면에서 '
+        "더 좁은 말로 바꿔 보세요.</div>"
     )
 
 

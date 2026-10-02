@@ -36,10 +36,13 @@ from app.settings import load_settings
 from app.summary_overrides import load_summary_overrides
 from app.topnav import plain_nav, topnav_style
 
-# 화면에 한 번에 그리는 기사 수 상한. 낱말 없이 기간만 조회하면 한 달이 수천 건이라
-# 페이지가 수 MB가 된다. 넘으면 최근 것부터 이만큼만 그리고 머리줄이 그렇다고 말한다
-# (내보내기도 「지금 화면에 보이는 것」이라 같은 목록을 쓴다 — CLAUDE.md 엑셀 절).
-MAX_ROWS = 300
+# 처음 페이지에 구워 넣을 기사 수 예산. **자르는 값이 아니라 미루는 값이다** — 예산을
+# 넘는 날짜는 줄을 잘라내지 않고 머리줄(참 건수)만 남겨 두고, 펼칠 때 그 하루치를 받아온다
+# (정기 보관함의 EAGER_HISTORY_DAYS와 같은 문법 · `GET /agency-archive/day?`).
+#
+# 예전엔 이 값이 **전체 상한**이라 넘친 날짜가 통째로 사라졌다 — 나흘 2,657건을 조회해도
+# 오늘 하루가 300건을 다 써서 나머지 사흘 2,023건이 접힌 줄조차 없이 없는 날이 됐다.
+EAGER_ROWS = 1000
 
 # 기간 빠른 설정. 「전체」는 쌓인 가장 오래된 날짜까지.
 _PRESETS = [("7d", "7일", 7), ("1m", "1개월", 30), ("3m", "3개월", 91), ("1y", "1년", 365), ("all", "전체", None)]
@@ -186,20 +189,41 @@ def _passes(hits: dict, on: dict) -> bool:
     return True
 
 
-def _collect(date_from: str, date_to: str, word: str, overrides: dict, on: dict) -> tuple:
-    """(날짜 → 기사 목록, 걸린 총 건수, 필터별 건수, 필터 걸기 전 건수). 날짜 최신순.
+def _opens_by_default(date_str: str, word: str, today: str) -> bool:
+    """그 날짜를 펼친 채로 여는가 — 오늘, 그리고 낱말로 찾았으면 걸린 날짜 전부.
 
-    **필터는 서버에서 걸고 그다음에 `MAX_ROWS`로 자른다.** 화면에서 숨기는 방식이면
-    자른 300건 안에서만 줄어들어 건수가 거짓이 되고, 「지금 화면에 보이는 것」을 담는
-    가져가기에도 걸러낸 기사가 실린다.
+    접힌 날짜는 어차피 안 그리던 것이라, 이 판정이 곧 「처음부터 그릴 날짜」다.
+    """
+    return bool(word) or date_str == today
+
+
+def _collect(
+    date_from: str, date_to: str, word: str, overrides: dict, on: dict,
+    eager_budget: Optional[int] = EAGER_ROWS, only_date: Optional[str] = None,
+) -> tuple:
+    """(날짜 → (참 건수, 기사 목록 또는 None), 걸린 총 건수, 필터별 건수, 필터 걸기 전 건수).
+    날짜 최신순.
+
+    **걸린 날짜는 하나도 빠지지 않는다.** 건수는 언제나 그 날짜의 참값이고, 예산
+    (`eager_budget`)을 넘는 날짜는 줄을 **잘라내는 게 아니라** `None`으로 두어 화면이
+    펼칠 때 받아오게 한다 — 그러니 머리줄 건수와 맨 위 총 건수가 같은 뜻이다.
+
+    **필터는 서버에서 걸고 그다음에 미룬다.** 화면에서 숨기는 방식이면 건수가 거짓이 되고,
+    「지금 화면에 보이는 것」을 담는 가져가기에도 걸러낸 기사가 실린다.
 
     필터별 건수는 **낱말·기간까지만 걸러낸 목록** 기준이다(다른 체크와 겹쳐 세지 않는다)
     — 겹쳐 세면 칸을 누를 때마다 옆 칸 숫자가 따라 움직여 무엇을 고르는지 알 수 없다.
+
+    `only_date`를 주면 그 하루만 읽는다(지연 로딩 조각 · 예산 없음).
     """
-    days, total, shown, raw_total = [], 0, 0, 0
+    days, total, spent, raw_total = [], 0, 0, 0
     counts = {"major": 0, "scoop": 0, "flash": 0, "photo": 0}
+    today = datetime.now().strftime("%Y-%m-%d")
     for date_str in available_dates():
-        if not (date_from <= date_str <= date_to):
+        if only_date is not None:
+            if date_str != only_date:
+                continue
+        elif not (date_from <= date_str <= date_to):
             continue
         rows = []
         for article in load_day(date_str).get("articles", []):
@@ -214,12 +238,18 @@ def _collect(date_from: str, date_to: str, word: str, overrides: dict, on: dict)
             if not _passes(hits, on):
                 continue
             total += 1
-            if shown < MAX_ROWS:
-                merged = dict(merged, _photo=hits["photo"])
-                rows.append(merged)
-                shown += 1
-        if rows:
-            days.append((date_str, rows))
+            rows.append(dict(merged, _photo=hits["photo"]))
+        if not rows:
+            continue
+        # 날짜는 통째로 그리거나 통째로 미룬다 — 반만 그리면 그게 곧 예전의 「잘림」이다.
+        defer = eager_budget is not None and (
+            not _opens_by_default(date_str, word, today) or spent + len(rows) > eager_budget
+        )
+        if defer:
+            days.append((date_str, len(rows), None))
+            continue
+        spent += len(rows)
+        days.append((date_str, len(rows), rows))
     return days, total, counts, raw_total
 
 
@@ -328,22 +358,22 @@ def _row_html(article: dict, word: str, labels: dict, line_template: str) -> str
     )
 
 
-def _export_html(days: list, word: str, date_from: str, date_to: str) -> str:
-    """복사·텍스트·엑셀 — 다른 화면과 같은 글자 버튼 묶음(.exp), 「지금 화면에 보이는 것」."""
-    settings = load_settings()
-    line_template = settings.get("article_line_template", DEFAULT_ARTICLE_LINE_TEMPLATE)
-    flat = [a for _date, rows in days for a in rows]
-    if not flat:
-        return ""
-    group_name = f"기관 기사 {date_from} ~ {date_to}" + (f" · {word}" if word else "")
-    copy_text = build_group_copy_texts(
+def _day_payload(date_str: str, rows: list, line_template: str) -> tuple:
+    """한 날짜 몫의 가져가기 재료 — (기사 줄 텍스트, 엑셀 행들).
+
+    기사 줄은 **전용 빌더를 만들지 않고** 다른 화면과 같은 `build_group_copy_texts`를
+    쓴다(기사 줄 형식·기사 사이 빈 줄이 자동으로 같아진다). 머리줄은 범위 전체에 하나만
+    붙으므로 여기선 첫 줄을 떼고 본문만 넘긴다 — 붙이는 건 화면의 `archiveExportText`다.
+    """
+    name = f"기관 기사 {date_str}"
+    text = build_group_copy_texts(
         "",
-        [{"name": group_name, "articles": [
-            {"outlet": a.get("outlet", ""), "title": a.get("title", ""), "url": a.get("url", "")} for a in flat
+        [{"name": name, "articles": [
+            {"outlet": a.get("outlet", ""), "title": a.get("title", ""), "url": a.get("url", "")} for a in rows
         ]}],
         line_template,
         {},
-    )[group_name]
+    )[name]
     excel_rows = [
         {
             "스크랩일자": date_str,
@@ -355,23 +385,46 @@ def _export_html(days: list, word: str, date_from: str, date_to: str) -> str:
             "소제목": "",
             "라벨명": "",
         }
-        for date_str, rows in days
         for a in rows
     ]
+    return text.split("\n", 1)[1], excel_rows
+
+
+def _day_rows_html(date_str: str, rows: list, word: str, labels: dict, line_template: str) -> str:
+    """한 날짜의 기사 줄 + 그 날짜 몫의 가져가기 재료. **즉시 렌더링과 지연 조각이 같은
+    함수를 쓴다** — 한쪽만 고치면 펼쳐 본 날짜와 처음부터 있던 날짜가 조용히 달라진다."""
+    text, excel_rows = _day_payload(date_str, rows, line_template)
+    return (
+        f'<div class="dbody" data-copy-text="{html.escape(text)}"'
+        f' data-rows="{html.escape(json.dumps(excel_rows, ensure_ascii=False))}">'
+        + "".join(_row_html(a, word, labels, line_template) for a in rows)
+        + "</div>"
+    )
+
+
+def _export_html(word: str, date_from: str, date_to: str) -> str:
+    """복사·텍스트·엑셀 — 다른 화면과 같은 글자 버튼 묶음(.exp), 「지금 화면에 보이는 것」.
+
+    날짜를 펼칠 때 받아오는 구조라 담을 거리는 **펼쳐 본 날짜**에만 있다. 그래서 서버가
+    미리 굽지 않고 누를 때 DOM에서 모은다 — 정기 보관함의 `historyDayIsLoaded`와 같은
+    규칙이다(한 번 펼치면 접어도 DOM에 남으므로 「열려 있나」가 아니라 「불러왔나」).
+    """
+    head = f"<기관 기사 {date_from} ~ {date_to}" + (f" · {word}" if word else "") + ">"
     base = sanitize_filename_part(
         f"{date_from}~{date_to}_기관기사" + (f"_{word}" if word else "")
     )
-    attr = html.escape(copy_text)
     return (
-        '<span class="exp">'
-        f'<button type="button" onclick="copyArchiveText(this)" data-copy-text="{attr}">복사</button>'
-        '<form method="POST" action="/download-text" style="display:contents">'
+        f'<span class="exp" data-head="{html.escape(head)}">'
+        '<button type="button" onclick="copyArchiveAll(this)">복사</button>'
+        '<form method="POST" action="/download-text" style="display:contents"'
+        ' onsubmit="return fillArchiveText(this)">'
         f'<input type="hidden" name="filename" value="{html.escape(base)}.txt">'
-        f'<input type="hidden" name="text" value="{attr}">'
+        '<input type="hidden" name="text" value="" />'
         '<button type="submit">텍스트</button></form>'
-        '<form method="POST" action="/download-excel" style="display:contents">'
+        '<form method="POST" action="/download-excel" style="display:contents"'
+        ' onsubmit="return fillArchiveRows(this)">'
         f'<input type="hidden" name="filename" value="{html.escape(base)}.xlsx">'
-        f'<input type="hidden" name="rows" value="{html.escape(json.dumps(excel_rows, ensure_ascii=False))}">'
+        '<input type="hidden" name="rows" value="" />'
         '<button type="submit">엑셀</button></form>'
         "</span>"
     )
@@ -471,29 +524,34 @@ def render_agency_archive_page(
         picked = [label for key, label, _c in _FILTER_LABELS if on[key]]
         if picked:
             sub += " · " + html.escape(" · ".join(picked))
-        capped = (
-            f'<span class="cap">최근 {MAX_ROWS}건만 보입니다 · 낱말이나 기간으로 좁혀 보세요</span>'
-            if total > MAX_ROWS
-            else ""
-        )
         # 날짜 묶음은 접는다 — **오늘만 펼친 채로** 연다(정기 보관함·휴지통과 같은 규칙·
         # 같은 ▸/▾). 한 달을 조회하면 날짜가 수십이라 전부 펼쳐 두면 훑을 수가 없다.
         # **낱말로 찾았으면 걸린 날짜를 전부 펼친다** — 찾은 결과가 접혀 있으면 찾은 게
         # 아니라 건수만 본 셈이다(수시 보관함의 사안명 검색과 같은 규칙).
+        #
+        # 접힌 날짜·예산 밖 날짜는 머리줄만 그리고 내용은 펼칠 때 받아온다. 「최근 N건만
+        # 보입니다」 캡션은 없앴다 — 더 숨기는 게 없다.
         today = datetime.now().strftime("%Y-%m-%d")
         blocks = []
-        for date_str, rows in days:
+        for date_str, count, rows in days:
             today_chip = '<span class="chip-today">오늘</span>' if date_str == today else ""
+            opens = " open" if _opens_by_default(date_str, word, today) else ""
+            inner = (
+                _day_rows_html(date_str, rows, word, labels, line_template)
+                if rows is not None
+                else '<div class="lazy-day-holder">'
+                     '<p class="lazy-day-hint">펼치면 불러옵니다…</p></div>'
+            )
             blocks.append(
-                f'<details class="dblock"{" open" if (word or date_str == today) else ""}>'
+                f'<details class="dblock" data-date="{date_str}"{opens}>'
                 f'<summary class="dhead">{_kr(date_str, weekday=True)} {today_chip}'
-                f'<span class="dcnt">{len(rows)}건</span></summary>'
-                + "".join(_row_html(a, word, labels, line_template) for a in rows)
+                f'<span class="dcnt">{count}건</span></summary>'
+                + inner
                 + "</details>"
             )
         body = (
             f'<div class="rhead"><span class="n">{total}건</span><span class="sub">{sub}</span>'
-            f"{capped}{_export_html(days, word, date_from, date_to)}</div>" + "".join(blocks)
+            f"{_export_html(word, date_from, date_to)}</div>" + "".join(blocks)
         )
 
     return _TEMPLATE.format(
@@ -511,6 +569,27 @@ def render_agency_archive_page(
         filter_html=filter_html,
         body_html=body,
     )
+
+
+def render_agency_archive_day_fragment(
+    date_str: str, word: str = "", filters: Optional[dict] = None
+) -> Optional[str]:
+    """하루치 기사 줄만 렌더링한다 — `/agency-archive/day?`가 지연 로딩용으로 부른다.
+
+    낱말·거르기를 **그대로 같이 받는다** — 안 받으면 펼친 날짜만 조건이 풀려, 한 화면에서
+    위 날짜와 아래 날짜가 서로 다른 목록이 된다. 그 날짜에 걸린 기사가 없으면 None(404) —
+    holder가 그대로 남아 담당자가 다시 펼쳐볼 수 있다.
+    """
+    on = {key: bool((filters or {}).get(key)) for key in _FILTERS}
+    days, _total, _counts, _raw = _collect(
+        "", "", (word or "").strip(), load_summary_overrides(), on,
+        eager_budget=None, only_date=date_str,
+    )
+    if not days:
+        return None
+    _date, _count, rows = days[0]
+    line_template = load_settings().get("article_line_template", DEFAULT_ARTICLE_LINE_TEMPLATE)
+    return _day_rows_html(date_str, rows, (word or "").strip(), load_labels(), line_template)
 
 
 def _kr(date_str: str, weekday: bool = False) -> str:
@@ -602,6 +681,7 @@ _TEMPLATE = """<!DOCTYPE html>
   details.dblock[open] > summary::before {{ content: "▾"; }}
   details.dblock > summary:hover {{ background: {row_hover}; }}
   .dhead .dcnt {{ font-size: var(--fs-sm); color: {text_soft}; font-weight: 500; }}
+  .lazy-day-hint {{ color: {text_soft}; font-size: var(--fs-md); padding: 8px 4px; margin: 0; }}
   .chip-today {{ font-size: var(--fs-xs); font-weight: 700; color: {header}; background: {hover};
     border: 1px solid {accent_border}; border-radius: var(--r-pill); padding: 1px 8px; }}
 
@@ -696,13 +776,87 @@ function copyArchiveRow(e, btn) {{
     btn._copyTimer = setTimeout(function () {{ btn.classList.remove('is-copied'); }}, 1000);
   }}).catch(function () {{ alert('복사에 실패했습니다.'); }});
 }}
-function copyArchiveText(btn) {{
-  const text = btn.getAttribute('data-copy-text') || '';
+
+/* 날짜 지연 로딩 — 머리줄은 처음부터 다 있고 내용만 펼칠 때 받아온다(정기 보관함의
+   loadHistoryDay와 같은 문법). 열렸을 때만 동작하고, 이미 불러왔으면(.lazy-day-holder가
+   없어짐) 아무 일도 안 한다 — 같은 날짜를 여러 번 열고 닫아도 요청은 한 번이다.
+   낱말·거르기를 같이 넘겨야 펼친 날짜가 다른 날짜와 같은 조건이 된다.
+
+   **인라인 ontoggle은 쓰지 않는다** — 이 스크립트가 페이지 맨 아래라, 펼친 채로 열리는
+   날짜에서는 핸들러가 정의되기 **전에** 불려 ReferenceError가 난다. toggle은 거품이
+   올라오지 않으므로 캡처 단계로 받는다. */
+function loadAgencyDay(details) {{
+  if (!details.open) {{ return; }}
+  var holder = details.querySelector('.lazy-day-holder');
+  if (!holder || holder.dataset.loading) {{ return; }}
+  holder.dataset.loading = '1';
+  holder.innerHTML = '<p class="lazy-day-hint">불러오는 중…</p>';
+  var q = new URLSearchParams(window.location.search);
+  var p = new URLSearchParams();
+  p.set('date', details.dataset.date);
+  if (q.get('q')) {{ p.set('q', q.get('q')); }}
+  ['major', 'scoop', 'flash', 'nophoto'].forEach(function (k) {{
+    if (q.get(k)) {{ p.set(k, '1'); }}
+  }});
+  fetch('/agency-archive/day?' + p.toString())
+    .then(function (res) {{ return res.ok ? res.text() : Promise.reject(); }})
+    .then(function (rowsHtml) {{ holder.outerHTML = rowsHtml; }})
+    .catch(function () {{
+      delete holder.dataset.loading;
+      holder.innerHTML = '<p class="lazy-day-hint">불러오지 못했습니다 — 다시 펼쳐보세요.</p>';
+    }});
+}}
+document.addEventListener('toggle', function (e) {{
+  if (e.target && e.target.classList && e.target.classList.contains('dblock')) {{
+    loadAgencyDay(e.target);
+  }}
+}}, true);
+/* 예산 밖이라 **펼친 채로 비어 있는** 날짜는 토글된 적이 없어 위 리스너가 안 걸린다. */
+document.addEventListener('DOMContentLoaded', function () {{
+  Array.prototype.forEach.call(document.querySelectorAll('details.dblock[open]'), loadAgencyDay);
+}});
+
+/* 가져가기 — 「지금 화면에 보이는 것」이라 **펼쳐 본 날짜**에서 모은다. 한 번 펼치면
+   접어도 DOM에 남으므로 「열려 있나」가 아니라 「불러왔나」로 본다. */
+function archiveLoadedBodies() {{
+  return Array.prototype.slice.call(document.querySelectorAll('details.dblock .dbody'));
+}}
+function archiveExportText(exp) {{
+  var parts = archiveLoadedBodies().map(function (b) {{ return b.dataset.copyText || ''; }});
+  if (!parts.length) {{ return ''; }}
+  return [exp.dataset.head].concat(parts).join('\\n');
+}}
+function archiveExportRows() {{
+  var out = [];
+  archiveLoadedBodies().forEach(function (b) {{
+    try {{ out = out.concat(JSON.parse(b.dataset.rows || '[]')); }} catch (e) {{}}
+  }});
+  return out;
+}}
+function archiveNothingLoaded() {{
+  alert('날짜를 먼저 펼쳐주세요.');
+  return false;
+}}
+function copyArchiveAll(btn) {{
+  var text = archiveExportText(btn.closest('.exp'));
+  if (!text) {{ archiveNothingLoaded(); return; }}
   navigator.clipboard.writeText(text).then(function () {{
-    const before = btn.textContent;
+    var before = btn.textContent;
     btn.textContent = '복사됨';
     setTimeout(function () {{ btn.textContent = before; }}, 1000);
-  }});
+  }}).catch(function () {{ alert('복사에 실패했습니다.'); }});
+}}
+function fillArchiveText(form) {{
+  var text = archiveExportText(form.closest('.exp'));
+  if (!text) {{ return archiveNothingLoaded(); }}
+  form.querySelector('input[name="text"]').value = text;
+  return true;
+}}
+function fillArchiveRows(form) {{
+  var rows = archiveExportRows();
+  if (!rows.length) {{ return archiveNothingLoaded(); }}
+  form.querySelector('input[name="rows"]').value = JSON.stringify(rows);
+  return true;
 }}
 </script>
 </body>
