@@ -259,7 +259,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      자리를 내준다(사용자 요청, 이유는 _render_row 주석 참고). */
   .more-wrap {{ position: relative; display: inline-flex; flex-shrink: 0; }}
   .more-btn {{
-    background: transparent; border: none; color: {muted}; font-size: 1.05rem; line-height: 1;
+    background: transparent; border: none; color: {muted}; font-size: 1rem; line-height: 1;
     cursor: pointer; padding: 3px 7px; border-radius: var(--r-sm);
   }}
   .more-btn:hover {{ background: {hover}; color: {accent}; }}
@@ -406,6 +406,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      텅 비면서 핀이 화면 한가운데로 떠밀려 보였다. 두 버튼을 이 래퍼 하나로 묶어 다시
      "텍스트 vs 버튼 묶음" 2개짜리 레이아웃으로 되돌린다. */
   .live-row-actions {{ display: flex; align-items: center; gap: 6px; flex-shrink: 0; }}
+  /* [수정: 2026-10-02] 한 줄에 선 아이콘은 전부 16px로 그린다 — 📌·복사는 글자가 붙은 버튼이라
+     --fs-sm(12.8px)이고, 🗑·⋯·🔄는 아이콘만이라 --fs-base(16px)여서 같은 줄에서
+     아이콘만 크기가 갈렸다. 글자는 그대로 두고 아이콘만 1.25em으로 맞춘다. */
+  .live-row-actions .add-btn .ic, .live-row-actions .copy-btn .ic {{ width: 1.25em; height: 1.25em; }}
   .outlet-tag {{ color: {muted}; font-size: var(--fs-sm); }}
   /* [추가: 2026-08-11] 표식 없는 사진기사 추정 배지 — 기존 상태색(노랑=새 기사, 초록=이동,
      파랑=선택)과 겹치지 않게, 채도 낮은 모래색 테두리 알약으로 "행 강조"가 아니라 "작은

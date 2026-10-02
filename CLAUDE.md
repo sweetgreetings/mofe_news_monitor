@@ -324,7 +324,7 @@ FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN
 - **숨김 대조는 URL 하나뿐이다 — 담당자가 🗑️를 누른 그 기사만 사라진다.** 판정은 `app/curation.py` `filter_hidden`/`is_hidden`만 거친다. 제목·언론사 대조는 쓰지 않는다(제목이 같은 별개 기사가 조용히 사라진다). 저장되는 outlet/title/group은 표시용이다. 화면 세 경로(단건·체크박스 일괄·소제목 통째)는 `hideArticleBody(btn)` 하나를 쓰고, 빠진 값은 서버 `_hide_meta_fallbacks`가 채운다. 숨김 쓰기는 모듈 잠금으로 직렬화. → H: 숨김 제목 대조 되돌림
 - **↑↓는 소제목 경계를 넘지 않는다**(`move_article`, 끝에서 비활성). 다른 소제목으로 옮기는 건 「다른 소제목」 드롭다운(`bulk_reassign_group`)만.
 - **담당자의 ↑↓가 언론사 순서를 항상 이긴다.**
-- 체크박스 일괄이동 바: 같은 소제목 안 ↑↓(`bulk_move_articles`), 다른 소제목으로 이동, 🗑 일괄 숨김.
+- **체크박스 선택 바**: 같은 소제목 안 ↑↓(`bulk_move_articles`), 다른 소제목으로 이동, 🗑 일괄 숨김. **고르고 한 번에 처리하는 띠는 앱 어디서나 같게 보인다** — 정기 확정본·초안(`.bulk-move-bar`)·오늘 전체 기사(`.live-bulk-bar`)·수시(`.btn.sm`) 셋 다 **버튼 높이가 `--h-tb`(28px) 하나**이고, 모양이 뜻을 말한다: 그 띠의 대표 동작(옮기기)만 채운 파랑, ↑↓는 흰 바탕 테두리, **🗑은 흰 바탕 + 빨강 글자·테두리**(hover면 옅은 빨강 바탕) — 기사 행 🗑(`.hide-btn:hover`)·소제목 머리 🗑(`.group-hide-btn:hover`)과 같은 빨강이다. **지우는 버튼을 채움 파랑으로 두지 않는다.** 사진 모아 보기 띠(`.photo-gather-strip`) 버튼도 같은 높이다. 정기 두 화면의 마크업은 `app/renderer.py` `bulk_move_bar_html()` 한 곳이고 CSS는 두 파일에 복제돼 있다 — 한쪽만 고치지 않는다. 시안 [mockups/ICON_SIZE_MOCKUP.html](mockups/ICON_SIZE_MOCKUP.html). → H: 아이콘 크기·선택 바
 - **여러 기사 숨기기는 요청 하나다**(소제목 🗑 `hideGroup`·선택 바 🗑 `bulkHideSelected`, 확정본·초안): `postHideBatch`가 기사마다 `url·outlet·title·pubDate·group`을 같은 순서로 되풀이해 싣고, 서버 `_handle_hide_article`은 되돌리기 기록·`hide_articles`·화면 재생성을 한 번씩만 한다. 기사 수만큼 요청을 나눠 보내지 않는다(요청마다 되돌리기 스택 쓰기·화면 재생성이 되풀이된다). 누르는 순간 그 기사 줄을 흐리게(`.is-hiding`, 머리줄은 안 흐림) 하고 🗑 앞에 파랑 `N건 숨기는 중…`, 끝날 때까지 다시 못 누른다. 코드 `app/renderer.py` `hide_batch_style()/hide_batch_script()` 한 곳. → H: 여러 기사 한 번에 숨기기 — 소제목 🗑가 느리던 문제
 - **선택 바 🗑 일괄 숨김은 확인창도, 숨긴 뒤 안내(「N건 숨김 · ↩ 되돌리기」)도 없다**(확정본·초안·사진 모아 보기·수시 선택 바) — 되살리는 길은 좌하단 ↩와 🗑 팝오버다. 보관함 선택 삭제·카드 삭제·맨 위 층 🗑는 확인창을 유지한다(되살리는 자리가 눈앞에 없다).
 - **⋯ 더보기**(항상 보임, 한 번에 하나): 복사하기 / 원문 다시 불러오기(`/refetch-summary`, `og:title`·`<title>` 중 긴 쪽) / 기사제목 직접 수정(`/edit-summary`). 뒤의 둘은 `app/summary_overrides.py`(`data/summary_overrides.json`, URL 키 전역). 🗑·↑↓는 메뉴 밖.
@@ -713,6 +713,16 @@ URL
 - **그림자 셋**: 떠 있는 것 `--sh-float` · 팝오버·메뉴·말풍선 `--sh-pop` · 확인창·이름 고르기 창 `--sh-modal`. 상단바·하단바의 얇은 그림자, 입력칸 포커스 고리는 예외.
 - **값은 CSS 변수로만 쓴다**: CSS에 `border-radius: 6px`처럼 숫자를 적지 않고 `var(--r-md)`. 변수 정의 `SHAPE_TOKENS_CSS`는 `topnav_style()`이 함께 내고, 상단바가 없는 홈은 따로 낸다 — **새 화면이 상단바 CSS를 안 쓰면 `SHAPE_TOKENS_CSS`를 직접 넣는다.**
 - 예외: 한쪽 띠 칸(📂 미분류·📌 담아둔 기사 — 왼쪽 띠 + 오른쪽만 둥근 모서리), 수시 카드 탭(위쪽만 둥근), 여러 칸 버튼(바깥 틀만 둥글고 안쪽 칸은 각지게).
+
+### 아이콘 크기 (`app/icons.py`)
+
+아이콘이 같아 보이려면 **틀**(버튼 `font-size` — `.ic`가 1em이라 그대로 따라간다)과 **글리프가 24 틀 안에서 차지하는 넓이** 둘 다 맞아야 한다. 틀만 맞추면 ↑↓(14×14)가 🗑(18×16) 옆에서 25% 작아 보인다. 시안 [mockups/ICON_SIZE_MOCKUP.html](mockups/ICON_SIZE_MOCKUP.html). → H: 아이콘 크기·선택 바
+
+- **한 줄에 나란히 선 아이콘은 틀 크기가 같다.** 기사 행(🏷·⋯·🗑·↑↓)은 `1rem`, 소제목 머리(📋·✏️·🗑·▲▼)는 `0.9rem`, 오늘 전체 기사 행은 전부 16px — 📌·복사처럼 **글자가 붙은 버튼은 글자(`--fs-sm`)를 그대로 두고 아이콘만 `1.25em`으로 올린다**(`.live-row-actions .add-btn .ic`).
+- **글리프 넓이는 16~18/24에 모은다.** 🗑 18×16 · ⟳ 18×18 · ✏️ 18×17 · 🏷 19×19 · ↑↓ 16×16 · ▲▼ 16×8. **새 아이콘을 더하거나 고칠 때 이 범위 밖으로 나가지 않는다** — 혼자 작으면 안 눌러도 되는 것처럼, 혼자 크면 위험한 것처럼 보인다.
+- **떠 있는 동그라미 버튼(↩·🗑·☰·↑ 맨 위로, 수시 `.fab`)의 아이콘은 `1.3rem` 하나다.** 원은 두 크기(56·48px)지만 아이콘까지 제각각이면 가장 큰 원에 가장 작은 아이콘이 들어간다. 코드는 정기 `app/renderer.py`, 수시 `app/adhoc/renderer.py` `.fab`, 라벨 보관함 `app/settings_server.py` — 한 곳을 바꾸면 나머지도 바꾼다.
+- 단계 밖: `<select>` 오른쪽 ▾(`_select_chevron_css`, 배경 그림이라 버튼 아이콘이 아니다), 홈 흐름도 칸 사이 화살표(`flow_next`, 16px 고정), 언론사 순서 화면 `5↑ ↑ ↓ 5↓`(17px 고정).
+- **아이콘 SVG를 화면 파일에 복붙하지 않는다** — `icon("…")` 하나에서 온다. 복붙해 두면 글리프를 고쳐도 그 화면만 옛 모양으로 남는다(선택 바가 그랬다).
 
 ### 체크박스 크기 (`app/config.py` `CHECKBOX_MD`·`CHECKBOX_SM`)
 

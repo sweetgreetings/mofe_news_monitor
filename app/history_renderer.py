@@ -399,7 +399,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      복사하기는 다시 메뉴에서 빠져나가 상시 노출 아이콘(.copy-btn)이 됐다. */
   .more-wrap {{ position: relative; display: inline-flex; flex-shrink: 0; }}
   .more-btn {{
-    background: transparent; border: none; color: {muted}; font-size: 1.05rem; line-height: 1;
+    background: transparent; border: none; color: {muted}; font-size: 1rem; line-height: 1;
     cursor: pointer; padding: 3px 7px; border-radius: var(--r-sm);
     user-select: none; -webkit-user-select: none;
   }}

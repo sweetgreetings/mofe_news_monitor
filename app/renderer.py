@@ -157,7 +157,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      헷갈린다는 피드백 — 눈에 안 튀는 중립색(카드 배경+테두리)으로 바꿨다. */
   .toc-toggle-btn {{
     position: fixed; right: 20px; bottom: 20px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
-    background: {card}; color: {muted}; border: 1px solid {border}; font-size: 1.2rem; cursor: pointer;
+    background: {card}; color: {muted}; border: 1px solid {border}; font-size: 1.3rem; cursor: pointer;
     box-shadow: var(--sh-float); z-index: 200;
     display: flex; align-items: center; justify-content: center;
   }}
@@ -172,6 +172,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      위가 ↩ 되돌리기. 수시 수집 결과 화면(.fab.left / .fab.left.upper)과 같은 배치라
      두 흐름을 오갈 때 같은 자리에 같은 것이 있다. 휴지통이 0건이라 안 그려질 때도 ↩는
      제자리(위 칸)에 둔다 — 숨기기 한 번에 버튼이 아래에서 위로 뛰면 그게 더 불안하다. */
+  /* 떠 있는 동그라미 버튼(↩ · 🗑 · ☰ · ↑ 맨 위로, 수시 .fab도 같다)의 아이콘은 1.3rem
+     하나다 — 원 크기는 둘(56·48px)이지만 아이콘까지 제각각이면 가장 큰 원에 가장 작은
+     아이콘이 들어간다(휴지통이 그랬다). 한 곳을 바꾸면 나머지도 바꾼다. */
   .undo-fab {{
     position: fixed; left: 20px; bottom: 88px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
     background: {card}; color: {muted}; border: 1px solid {border}; font-size: 1.3rem;
@@ -302,16 +305,35 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .bulk-move-bar.is-active {{ display: flex; }}
   .bulk-move-bar .bulk-move-count {{ font-weight: 600; color: {header}; white-space: nowrap; }}
   #bulk-move-select {{
-    border: 1px solid {accent}; border-radius: var(--r-md); padding: 5px 8px; font-size: var(--fs-md);
-    color: {text}; background: {card};
+    border: 1px solid {accent}; border-radius: var(--r-md); height: var(--h-tb); padding: 0 8px;
+    box-sizing: border-box; font-size: var(--fs-md); color: {text}; background: {card};
   }}
-  .bulk-move-bar button {{ padding: 5px 12px; font-size: var(--fs-md); }}
+  /* [수정: 2026-10-02] 선택 바 버튼은 높이 하나(--h-tb)로 서고, 모양이 뜻을 말한다 — 「옮기기」만
+     채운 파랑(이 띠의 대표 동작), ↑↓는 흰 바탕 테두리(보조), 🗑은 빨강(지우기).
+     오늘 전체 기사(.live-bulk-bar)·수시(.btn.sm)와 같은 값이다 — 고르고 한 번에
+     처리하는 띠는 앱 어디서나 같게 보여야 해서, 한쪽만 고치지 않는다. */
+  .bulk-move-bar button {{
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    height: var(--h-tb); padding: 0 12px; box-sizing: border-box;
+    background: {card}; color: {text}; border: 1px solid {border}; border-radius: var(--r-md);
+    font-size: var(--fs-md); cursor: pointer; white-space: nowrap;
+  }}
+  .bulk-move-bar button:hover {{ background: {hover}; border-color: {accent}; color: {accent}; }}
+  .bulk-move-bar .bulk-go {{ background: {accent}; color: {on_fill}; border-color: {accent}; font-weight: 600; }}
+  .bulk-move-bar .bulk-go:hover {{ background: {header}; border-color: {header}; color: {on_fill}; }}
+  /* 🗑은 기사 행·소제목 머리의 🗑(.hide-btn:hover / .group-hide-btn:hover)과 같은 빨강이다 —
+     이 버튼만 빨강이 없어서 「지우는 버튼」으로 안 읽혔다. */
+  .bulk-move-bar .bulk-hide {{ color: {error}; border-color: {error}; }}
+  .bulk-move-bar .bulk-hide:hover {{ background: {error_bg}; color: {error}; border-color: {error}; }}
   /* [추가: 2026-08-04] 일괄 위/아래 이동 버튼 — 선택한 기사가 서로 다른 소제목에
      걸쳐 있거나 소제목의 맨 위/아래에 닿으면 비활성화된다(updateBulkMoveBar). */
-  #bulk-move-up, #bulk-move-down {{ padding: 5px 10px; }}
+  .bulk-move-bar button:disabled {{ opacity: 0.45; cursor: progress; }}
   #bulk-move-up:disabled, #bulk-move-down:disabled {{ opacity: 0.35; cursor: not-allowed; }}
-  .bulk-move-bar .clear-btn {{ background: transparent; color: {muted}; }}
-  .bulk-move-bar .clear-btn:hover {{ background: {hover}; }}
+  #bulk-move-up:disabled:hover, #bulk-move-down:disabled:hover {{
+    background: {card}; border-color: {border}; color: {text};
+  }}
+  .bulk-move-bar .clear-btn {{ background: transparent; color: {muted}; border-color: transparent; }}
+  .bulk-move-bar .clear-btn:hover {{ background: {hover}; color: {muted}; border-color: transparent; }}
   /* [수정: 2026-09-18] 체크박스가 작아 누르기 어렵다는 지적 — 브라우저 기본 13px → 16px
      (시안 mockups/CHECKBOX_SIZE_MOCKUP.html B안). 소제목 머리 체크박스도 같은 크기,
      체크 색은 앱 파랑. 기사 체크박스는 커진 만큼 2px 내려 제목 첫 줄 가운데에 맞춘다. */
@@ -469,8 +491,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      하는 목차 팝오버 버튼(.toc-order-btn)은 이미 ▲▼여서 오히려 그쪽과 어긋나 있었다.
      이제 삼각형=소제목 / 화살표=기사로 대상이 형태만 보고 구분된다.
      ▲▼는 같은 크기에서 ↑↓보다 크고 무겁게 보여 font-size를 1rem에서 낮춰 균형을 맞춘다. */
+  /* [수정: 2026-10-02] 틀 크기를 같은 묶음의 📋·✏️·🗑(.rename-btn, 0.9rem)과 맞춘다 — 0.78rem이면
+     혼자 12.5px로 그려져 나란히 보면 ▲▼만 작았다. 글리프 자체도 16×8로 키웠다(app.icons). */
   .order-btn {{
-    background: transparent; border: none; color: {muted}; font-size: 0.78rem; cursor: pointer;
+    background: transparent; border: none; color: {muted}; font-size: 0.9rem; cursor: pointer;
     vertical-align: middle; padding: 2px 6px; user-select: none; -webkit-user-select: none;
   }}
   .order-btn:disabled {{ opacity: 0.35; cursor: default; }}
@@ -752,7 +776,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      클립보드로 가는 유일한 경로가 됐기 때문. */
   .more-wrap {{ position: relative; display: inline-flex; flex-shrink: 0; }}
   .more-btn {{
-    background: transparent; border: none; color: {muted}; font-size: 1.05rem; line-height: 1;
+    background: transparent; border: none; color: {muted}; font-size: 1rem; line-height: 1;
     cursor: pointer; padding: 3px 7px; border-radius: var(--r-sm);
     user-select: none; -webkit-user-select: none;
   }}
@@ -930,16 +954,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <button type="button" class="toc-toggle-btn" onclick="toggleTocPopover()" title="소제목 목차"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
 <div class="toc-popover" id="toc-popover"></div>
 <div class="bottombar"><div class="bottombar-inner">
-  <div class="bulk-move-bar" id="bulk-move-bar">
-    <span class="bulk-move-count" id="bulk-move-count"></span>
-    <select id="bulk-move-select"></select>
-    <button type="button" onclick="bulkMoveSelected()">옮기기</button>
-    <button type="button" id="bulk-move-up" onclick="bulkMoveOrder('up')" title="선택한 기사들을 통째로 위로 이동(같은 소제목 안에서만)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
-    <button type="button" id="bulk-move-down" onclick="bulkMoveOrder('down')" title="선택한 기사들을 통째로 아래로 이동(같은 소제목 안에서만)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
-    <button type="button" onclick="bulkHideSelected(this)" title="선택한 기사 전부 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
-    {split_button_html}
-    <button class="clear-btn" type="button" onclick="clearSelection()">선택 해제</button>
-  </div>
+  {bulk_move_bar_html}
   <div class="highlight-wrap">
     <button type="button" class="highlight-toggle" onclick="toggleHighlightPopover()" title="형광펜 단어 편집"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3.2 20.8 9l-8.2 8.2H6.8V11.4Z"/><path d="m11.4 6.8 5.8 5.8"/><path d="M3.5 21h17"/></svg></button>
     <div class="highlight-popover" id="highlight-popover">
@@ -1217,13 +1232,13 @@ function _tocRender() {{
     var btns = document.createElement("span");
     btns.className = "toc-row-btns";
     var up = document.createElement("button");
-    up.type = "button"; up.className = "toc-order-btn"; up.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>'; up.title = "위로";
+    up.type = "button"; up.className = "toc-order-btn"; up.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16 8-8 8 8"/></svg>'; up.title = "위로";
     var prevIdx = _tocReorderNeighbor(idx, -1);
     var nextIdx = _tocReorderNeighbor(idx, 1);
     up.disabled = prevIdx < 0 || _tocBusy;
     up.onclick = function() {{ _tocSwap(idx, prevIdx); }};
     var down = document.createElement("button");
-    down.type = "button"; down.className = "toc-order-btn"; down.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>'; down.title = "아래로";
+    down.type = "button"; down.className = "toc-order-btn"; down.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 8 8 8 8-8"/></svg>'; down.title = "아래로";
     down.disabled = nextIdx < 0 || _tocBusy;
     down.onclick = function() {{ _tocSwap(idx, nextIdx); }};
     btns.appendChild(up);
@@ -4031,7 +4046,7 @@ def render_page(
         # [추가: 2026-09-15] 「AI 기사 나누기」 — 초안과 같은 버튼, 보내는 곳만 확정본용.
         split_button_style=split_button_style(),
         screen_tag_style=screen_tag_style(),
-        split_button_html=split_button_html(),
+        bulk_move_bar_html=bulk_move_bar_html(split_button_html()),
         split_button_script=split_button_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT, "/split-group-final"),
         name_picker_style=name_picker_style(),
         name_picker_html=name_picker_html(),
@@ -4117,7 +4132,7 @@ HIDDEN_TRASH_STYLE = """
   /* 좌하단 휴지통 — 수시 화면(.fab.left)과 같은 규격. ↩ 되돌리기가 위로 올라간다. */
   .trash-fab {{
     position: fixed; left: 20px; bottom: 20px; width: var(--fab-lg); height: var(--fab-lg); border-radius: var(--r-circle);
-    background: {card}; color: {muted}; border: 1px solid {border};
+    background: {card}; color: {muted}; border: 1px solid {border}; font-size: 1.3rem;
     box-shadow: var(--sh-float); cursor: pointer; z-index: 200;
     display: flex; align-items: center; justify-content: center;
   }}
@@ -4544,7 +4559,11 @@ PHOTO_GATHER_STYLE = """
     accent-color: {accent}; cursor: pointer; }}
   .photo-gather-strip .pg-msg {{ font-size: var(--fs-md); color: {header}; }}
   .photo-gather-strip .pg-sp {{ flex: 1; }}
-  .photo-gather-strip button {{ padding: 5px 12px; font-size: var(--fs-md); }}
+  /* 띠 위 버튼도 선택 바와 같은 높이 한 값(--h-tb)으로 선다. */
+  .photo-gather-strip button {{
+    display: inline-flex; align-items: center; justify-content: center;
+    height: var(--h-tb); padding: 0 12px; box-sizing: border-box; font-size: var(--fs-md);
+  }}
   .pg-done {{ text-align: center; color: {muted}; padding: 28px 0 16px; font-size: var(--fs-md); }}
   /* 원래 소제목 이름표 — 보고서에 나갈 자리. 📂 미분류 칸에서 온 기사엔 안 붙인다. */
   .pg-from {{
@@ -4727,7 +4746,7 @@ def hidden_trash_style() -> str:
 SCROLL_TOP_STYLE = """
   .top-fab {{
     position: fixed; right: 80px; bottom: 20px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
-    background: {card}; color: {muted}; border: 1px solid {border}; font-size: 1.2rem; cursor: pointer;
+    background: {card}; color: {muted}; border: 1px solid {border}; font-size: 1.3rem; cursor: pointer;
     box-shadow: var(--sh-float); z-index: 200;
     display: flex; align-items: center; justify-content: center;
   }}
@@ -5106,12 +5125,14 @@ def label_popover_script(host: str, port: int) -> str:
 # 때는 숨기지 않고 흐리게 두고 누르면 이유를 알린다(aria-disabled — disabled면 클릭이 안 와서
 # 이유를 말할 기회가 없다). 📂 미분류처럼 진짜 소제목이 아닌 칸의 기사가 섞이면 아예 안 그린다.
 SPLIT_BUTTON_STYLE = """
-  .bulk-move-bar .bulk-split-divider {{ width: 1px; height: 24px; background: {border}; margin: 0 2px; }}
+  .bulk-move-bar .bulk-split-divider {{ width: 1px; height: 20px; background: {border}; margin: 0 2px; }}
   .bulk-move-bar .split-btn {{
     display: inline-flex; align-items: center; gap: 5px; font-weight: 600; border-radius: var(--r-md);
     background: {ai_bg}; color: {ai_text}; border: 1px solid {ai_border};
   }}
-  .bulk-move-bar .split-btn:hover {{ background: {ai_bg_hover}; border-color: {ai_border_hover}; }}
+  /* color를 다시 적는 이유 — .bulk-move-bar button:hover가 글자를 파랑으로 바꾸는데,
+     AI 버튼은 hover해도 연보라를 지켜야 한다. */
+  .bulk-move-bar .split-btn:hover {{ background: {ai_bg_hover}; border-color: {ai_border_hover}; color: {ai_text}; }}
   .bulk-move-bar .split-btn[aria-disabled="true"] {{ opacity: 0.45; cursor: not-allowed; }}
   .bulk-move-bar .split-btn[aria-disabled="true"]:hover {{ background: {ai_bg}; border-color: {ai_border}; }}
   .bulk-move-bar .split-btn:disabled {{ opacity: 0.7; cursor: progress; }}
@@ -5150,6 +5171,33 @@ def split_button_html() -> str:
         '<span class="bulk-split-divider" id="bulk-split-divider"></span>'
         '<button type="button" class="split-btn" id="bulk-split-btn" onclick="splitSelected(this)">'
         f'{icon("split")} AI 기사 나누기</button>'
+    )
+
+
+def bulk_move_bar_html(split_html: str) -> str:
+    """확정본·초안 공용 일괄 선택 바 — 두 화면이 같은 마크업·같은 CSS를 쓴다.
+
+    버튼의 뜻이 모양으로 갈린다: 「옮기기」만 채운 파랑(이 띠의 대표 동작), ↑↓는 흰 바탕
+    테두리(보조), 🗑은 흰 바탕 + 빨강(지우기) — 수시 선택 바(.btn.sm / .btn.sm.danger)와
+    같은 규칙이다. 아이콘은 app.icons 하나에서 온다(예전엔 두 파일에 SVG가 복붙돼 있었다).
+    """
+    return (
+        '<div class="bulk-move-bar" id="bulk-move-bar">\n'
+        '    <span class="bulk-move-count" id="bulk-move-count"></span>\n'
+        '    <select id="bulk-move-select"></select>\n'
+        '    <button type="button" class="bulk-go" onclick="bulkMoveSelected()">옮기기</button>\n'
+        '    <button type="button" id="bulk-move-up" onclick="bulkMoveOrder(\'up\')" '
+        'title="선택한 기사들을 통째로 위로 이동(같은 소제목 안에서만)">'
+        f'{icon("up")}</button>\n'
+        '    <button type="button" id="bulk-move-down" onclick="bulkMoveOrder(\'down\')" '
+        'title="선택한 기사들을 통째로 아래로 이동(같은 소제목 안에서만)">'
+        f'{icon("down")}</button>\n'
+        '    <button type="button" class="bulk-hide" onclick="bulkHideSelected(this)" '
+        'title="선택한 기사 전부 숨기기 (되돌리기 가능)">'
+        f'{icon("trash")}</button>\n'
+        f'    {split_html}\n'
+        '    <button class="clear-btn" type="button" onclick="clearSelection()">선택 해제</button>\n'
+        '  </div>'
     )
 
 

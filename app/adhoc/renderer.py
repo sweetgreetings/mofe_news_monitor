@@ -1090,9 +1090,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      그렇게 적혀 있었지만 실제 값이 4px씩 어긋나 있었다(16↔20, 52↔56, 46↔50,
      78↔88, 320↔336). 두 흐름을 오갈 때 같은 버튼이 조금씩 움직이면 안 되므로
      정기 값으로 통일한다. */
-  .fab {{ position: fixed; z-index: 25; box-sizing: border-box; width: var(--fab-sm); height: var(--fab-sm); padding: 0; border-radius: var(--r-circle); background: {card}; color: {muted}; border: 1px solid {border}; box-shadow: var(--sh-float); display: flex; align-items: center; justify-content: center; cursor: pointer; font: inherit; }}
+  .fab {{ position: fixed; z-index: 25; box-sizing: border-box; width: var(--fab-sm); height: var(--fab-sm); padding: 0; border-radius: var(--r-circle); background: {card}; color: {muted}; border: 1px solid {border}; box-shadow: var(--sh-float); display: flex; align-items: center; justify-content: center; cursor: pointer; font: inherit; font-size: 1.3rem; }}
   .fab.left {{ left: 20px; bottom: 20px; width: var(--fab-lg); height: var(--fab-lg); }}
-  .fab.left.upper {{ bottom: 88px; width: var(--fab-sm); height: var(--fab-sm); font-size: 1.3rem; }}
+  .fab.left.upper {{ bottom: 88px; width: var(--fab-sm); height: var(--fab-sm); }}
   .fab.left.upper:hover {{ background: {hover}; color: {accent}; border-color: {accent}; }}
   .fab .badge {{ position: absolute; top: -3px; right: -3px; background: {error}; color: {on_fill}; font-size: var(--fs-xs); font-weight: 700; border-radius: var(--r-pill); padding: 0 5px; line-height: 1.55; }}
   .fab-pop {{ display: none; position: fixed; left: 20px; bottom: 88px; width: 336px; max-height: 60vh; overflow-y: auto; background: {card}; border: 1px solid {border}; border-radius: var(--r-lg); box-shadow: var(--sh-pop); padding: 12px 14px; z-index: 30; }}

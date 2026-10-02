@@ -128,6 +128,7 @@ from app.renderer import (
     name_picker_script,
     name_picker_style,
     split_button_html,
+    bulk_move_bar_html,
     split_button_script,
     split_button_style,
     screen_tag_style,
@@ -270,7 +271,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      (확정본·수시 화면과 같은 배치). 휴지통이 0건이라 안 그려질 때도 ↩는 제자리에 둔다. */
   .undo-fab {{
     position: fixed; left: 20px; bottom: 88px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
-    background: {card}; color: {muted}; border: 1px solid {border}; font-size: 1.4rem;
+    background: {card}; color: {muted}; border: 1px solid {border}; font-size: 1.3rem;
     cursor: pointer; box-shadow: var(--sh-float); z-index: 200;
     display: flex; align-items: center; justify-content: center;
   }}
@@ -283,7 +284,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 {name_picker_style}
   .toc-toggle-btn {{
     position: fixed; right: 20px; bottom: 20px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
-    background: {card}; color: {muted}; border: 1px solid {border}; font-size: 1.2rem; cursor: pointer;
+    background: {card}; color: {muted}; border: 1px solid {border}; font-size: 1.3rem; cursor: pointer;
     box-shadow: var(--sh-float); z-index: 200;
     display: flex; align-items: center; justify-content: center;
   }}
@@ -357,15 +358,34 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .bulk-move-bar.is-active {{ display: flex; }}
   .bulk-move-bar .bulk-move-count {{ font-weight: 600; color: {header}; white-space: nowrap; }}
   #bulk-move-select {{
-    border: 1px solid {accent}; border-radius: var(--r-md); padding: 5px 8px; font-size: var(--fs-md);
-    color: {text}; background: {card};
+    border: 1px solid {accent}; border-radius: var(--r-md); height: var(--h-tb); padding: 0 8px;
+    box-sizing: border-box; font-size: var(--fs-md); color: {text}; background: {card};
   }}
-  .bulk-move-bar button {{ padding: 5px 12px; font-size: var(--fs-md); }}
+  /* [수정: 2026-10-02] 선택 바 버튼은 높이 하나(--h-tb)로 서고, 모양이 뜻을 말한다 — 「옮기기」만
+     채운 파랑(이 띠의 대표 동작), ↑↓는 흰 바탕 테두리(보조), 🗑은 빨강(지우기).
+     오늘 전체 기사(.live-bulk-bar)·수시(.btn.sm)와 같은 값이다 — 고르고 한 번에
+     처리하는 띠는 앱 어디서나 같게 보여야 해서, 한쪽만 고치지 않는다. */
+  .bulk-move-bar button {{
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    height: var(--h-tb); padding: 0 12px; box-sizing: border-box;
+    background: {card}; color: {text}; border: 1px solid {border}; border-radius: var(--r-md);
+    font-size: var(--fs-md); cursor: pointer; white-space: nowrap;
+  }}
+  .bulk-move-bar button:hover {{ background: {hover}; border-color: {accent}; color: {accent}; }}
+  .bulk-move-bar .bulk-go {{ background: {accent}; color: {on_fill}; border-color: {accent}; font-weight: 600; }}
+  .bulk-move-bar .bulk-go:hover {{ background: {header}; border-color: {header}; color: {on_fill}; }}
+  /* 🗑은 기사 행·소제목 머리의 🗑(.hide-btn:hover / .group-hide-btn:hover)과 같은 빨강이다 —
+     이 버튼만 빨강이 없어서 「지우는 버튼」으로 안 읽혔다. */
+  .bulk-move-bar .bulk-hide {{ color: {error}; border-color: {error}; }}
+  .bulk-move-bar .bulk-hide:hover {{ background: {error_bg}; color: {error}; border-color: {error}; }}
   /* [추가: 2026-08-04] app.renderer와 동일 — 일괄 위/아래 이동 버튼. */
-  #bulk-move-up, #bulk-move-down {{ padding: 5px 10px; }}
+  .bulk-move-bar button:disabled {{ opacity: 0.45; cursor: progress; }}
   #bulk-move-up:disabled, #bulk-move-down:disabled {{ opacity: 0.35; cursor: not-allowed; }}
-  .bulk-move-bar .clear-btn {{ background: transparent; color: {muted}; }}
-  .bulk-move-bar .clear-btn:hover {{ background: {hover}; }}
+  #bulk-move-up:disabled:hover, #bulk-move-down:disabled:hover {{
+    background: {card}; border-color: {border}; color: {text};
+  }}
+  .bulk-move-bar .clear-btn {{ background: transparent; color: {muted}; border-color: transparent; }}
+  .bulk-move-bar .clear-btn:hover {{ background: {hover}; color: {muted}; border-color: transparent; }}
   /* [추가: 2026-09-15] 「AI 기사 나누기」 — 확정본과 같은 값(app.renderer.split_button_style). */
 {split_button_style}
 {screen_tag_style}
@@ -599,8 +619,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [수정: 2026-08-05] app.renderer와 동일 — 기사 ↑/↓(.move-btn)과 가로폭 통일. */
   /* [수정: 2026-08-13] app.renderer와 동일 — 소제목은 ▲▼(목차 팝오버와 같은 기호),
      기사는 ↑↓로 대상을 형태로 구분한다. 두 화면이 갈리면 안 되므로 같이 바꾼다. */
+  /* [수정: 2026-10-02] 틀 크기를 같은 묶음의 📋·✏️·🗑(.rename-btn, 0.9rem)과 맞춘다 — 0.78rem이면
+     혼자 12.5px로 그려져 나란히 보면 ▲▼만 작았다. 글리프 자체도 16×8로 키웠다(app.icons). */
   .order-btn {{
-    background: transparent; border: none; color: {muted}; font-size: 0.78rem; cursor: pointer;
+    background: transparent; border: none; color: {muted}; font-size: 0.9rem; cursor: pointer;
     vertical-align: middle; padding: 2px 6px; user-select: none; -webkit-user-select: none;
   }}
   .order-btn:disabled {{ opacity: 0.35; cursor: default; }}
@@ -740,7 +762,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      복사하기는 다시 메뉴에서 빠져나가 상시 노출 아이콘(.copy-btn)이 됐다. */
   .more-wrap {{ position: relative; display: inline-flex; flex-shrink: 0; }}
   .more-btn {{
-    background: transparent; border: none; color: {muted}; font-size: 1.05rem; line-height: 1;
+    background: transparent; border: none; color: {muted}; font-size: 1rem; line-height: 1;
     cursor: pointer; padding: 3px 7px; border-radius: var(--r-sm);
     user-select: none; -webkit-user-select: none;
   }}
@@ -885,16 +907,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <button type="button" class="toc-toggle-btn" onclick="toggleTocPopover()" title="소제목 목차"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
 <div class="toc-popover" id="toc-popover"></div>
 <div class="bottombar"><div class="bottombar-inner">
-  <div class="bulk-move-bar" id="bulk-move-bar">
-    <span class="bulk-move-count" id="bulk-move-count"></span>
-    <select id="bulk-move-select"></select>
-    <button type="button" onclick="bulkMoveSelected()">옮기기</button>
-    <button type="button" id="bulk-move-up" onclick="bulkMoveOrder('up')" title="선택한 기사들을 통째로 위로 이동(같은 소제목 안에서만)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
-    <button type="button" id="bulk-move-down" onclick="bulkMoveOrder('down')" title="선택한 기사들을 통째로 아래로 이동(같은 소제목 안에서만)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
-    <button type="button" onclick="bulkHideSelected(this)" title="선택한 기사 전부 숨기기 (되돌리기 가능)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
-    {split_button_html}
-    <button class="clear-btn" type="button" onclick="clearSelection()">선택 해제</button>
-  </div>
+  {bulk_move_bar_html}
   <div class="highlight-wrap">
     <button type="button" class="highlight-toggle" onclick="toggleHighlightPopover()" title="형광펜 단어 편집"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3.2 20.8 9l-8.2 8.2H6.8V11.4Z"/><path d="m11.4 6.8 5.8 5.8"/><path d="M3.5 21h17"/></svg></button>
     <div class="highlight-popover" id="highlight-popover">
@@ -1328,13 +1341,13 @@ function _tocRender() {{
     var btns = document.createElement("span");
     btns.className = "toc-row-btns";
     var up = document.createElement("button");
-    up.type = "button"; up.className = "toc-order-btn"; up.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>'; up.title = "위로";
+    up.type = "button"; up.className = "toc-order-btn"; up.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16 8-8 8 8"/></svg>'; up.title = "위로";
     var prevIdx = _tocReorderNeighbor(idx, -1);
     var nextIdx = _tocReorderNeighbor(idx, 1);
     up.disabled = prevIdx < 0 || _tocBusy;
     up.onclick = function() {{ _tocSwap(idx, prevIdx); }};
     var down = document.createElement("button");
-    down.type = "button"; down.className = "toc-order-btn"; down.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>'; down.title = "아래로";
+    down.type = "button"; down.className = "toc-order-btn"; down.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 8 8 8 8-8"/></svg>'; down.title = "아래로";
     down.disabled = nextIdx < 0 || _tocBusy;
     down.onclick = function() {{ _tocSwap(idx, nextIdx); }};
     btns.appendChild(up);
@@ -2487,7 +2500,7 @@ def _theme() -> dict:
         # 만든 값(휴지통과 같은 이유). 초안은 /split-group, 확정본은 /split-group-final로 보낸다.
         "split_button_style": split_button_style(),
         "screen_tag_style": screen_tag_style(),
-        "split_button_html": split_button_html(),
+        "bulk_move_bar_html": bulk_move_bar_html(split_button_html()),
         "split_button_script": split_button_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT, "/split-group"),
         # [추가: 2026-09-04] "앞 회차 기사" 칩 CSS — 확정본(app.renderer)과 한 곳에서
         # 만든 값을 그대로 받는다. 초안도 확정본과 같은 창을 보게 되면서 이 칩이 여기에도

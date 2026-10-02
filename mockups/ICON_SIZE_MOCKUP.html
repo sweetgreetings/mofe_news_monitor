@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8">
+<title>아이콘 크기 통일 시안</title>
+<style>
+  :root{
+    --fs-xs:.72rem; --fs-sm:.8rem; --fs-md:.88rem; --fs-base:1rem; --fs-lg:1.1rem;
+    --r-sm:4px; --r-md:6px; --r-lg:10px; --r-pill:999px; --r-circle:50%;
+    --h-tb:28px; --fab-sm:48px; --fab-lg:56px;
+    --card:#fff; --bg:#F8FAFC; --text:#1F2937; --header:#1E3A5F; --muted:#6B7280;
+    --border:#E5E7EB; --accent:#2563EB; --hover:#EFF6FF; --error:#DC2626; --error-bg:#FEF2F2;
+    --ai-bg:#F0EAFB; --ai-text:#4A3F8F; --ai-border:#DCD0F2;
+  }
+  body{margin:0;background:var(--bg);color:var(--text);
+       font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+       font-size:var(--fs-md);padding:28px 24px 60px}
+  .wrap{max-width:800px;margin:0 auto}
+  h1{font-size:var(--fs-lg);color:var(--header);margin:0 0 4px}
+  .lead{color:var(--muted);font-size:var(--fs-sm);margin:0 0 26px;line-height:1.7}
+  h2{font-size:var(--fs-base);color:var(--header);margin:30px 0 8px}
+  .note{color:var(--muted);font-size:var(--fs-sm);line-height:1.7;margin:0 0 10px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px 16px;margin:8px 0}
+  .tag{display:inline-block;font-size:var(--fs-xs);border-radius:var(--r-pill);padding:1px 8px;margin-bottom:8px}
+  .before{background:#FEF2F2;color:#B91C1C}
+  .after{background:#ECFDF5;color:#047857}
+  .ic{width:1em;height:1em;stroke:currentColor;fill:none;stroke-width:1.9;
+      stroke-linecap:round;stroke-linejoin:round;vertical-align:-.15em;flex-shrink:0}
+  .row{display:flex;align-items:center;gap:2px}
+  .row .lbl{width:150px;font-size:var(--fs-sm);color:var(--muted)}
+  .iconbtn{background:transparent;border:none;color:var(--muted);cursor:pointer;padding:2px 6px;font-size:var(--fs-base)}
+  .sub .iconbtn{font-size:.9rem}
+  .big .iconbtn{font-size:3rem}
+  .big.sub .iconbtn{font-size:2.7rem}
+
+  /* 선택 바 — 확정본·초안 */
+  .bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--fs-md);
+       background:var(--card);border-top:1px solid var(--border);padding:10px 14px;border-radius:var(--r-md)}
+  .bar .cnt{font-weight:600;color:var(--header);white-space:nowrap}
+  .bar select{border:1px solid var(--accent);border-radius:var(--r-md);height:var(--h-tb);padding:0 8px;
+              box-sizing:border-box;font-size:var(--fs-md);color:var(--text);background:var(--card);max-width:150px}
+  .bar button{display:inline-flex;align-items:center;justify-content:center;gap:5px;
+              height:var(--h-tb);padding:0 12px;box-sizing:border-box;background:var(--card);color:var(--text);
+              border:1px solid var(--border);border-radius:var(--r-md);font-size:var(--fs-md);
+              cursor:pointer;white-space:nowrap}
+  .bar button:hover{background:var(--hover);border-color:var(--accent);color:var(--accent)}
+  .bar .go{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+  .bar .go:hover{background:var(--header);border-color:var(--header);color:#fff}
+  .bar .del{color:var(--error);border-color:var(--error)}
+  .bar .del:hover{background:var(--error-bg);color:var(--error);border-color:var(--error)}
+  .bar .ai{background:var(--ai-bg);color:var(--ai-text);border-color:var(--ai-border);font-weight:600}
+  .bar .ai:hover{background:var(--ai-bg);border-color:var(--ai-border);color:var(--ai-text)}
+  .bar .div{width:1px;height:20px;background:var(--border);margin:0 2px}
+  .bar .clear{background:transparent;color:var(--muted);border-color:transparent}
+  /* 고치기 전 모습 재현 */
+  .bar.old button{height:auto;padding:5px 12px;background:var(--accent);color:#fff;border:none}
+  .bar.old button.up,.bar.old button.down{padding:5px 10px}
+  .bar.old select{height:auto;padding:5px 8px}
+  .bar.old .clear{background:transparent;color:var(--muted)}
+
+  /* 떠 있는 동그라미 */
+  .fabs{display:flex;align-items:flex-end;gap:14px}
+  .fab{border-radius:var(--r-circle);background:var(--card);color:var(--muted);border:1px solid var(--border);
+       box-shadow:0 2px 10px rgba(15,23,42,.12);display:flex;align-items:center;justify-content:center;
+       width:var(--fab-sm);height:var(--fab-sm);font-size:1.3rem}
+  .fab.lg{width:var(--fab-lg);height:var(--fab-lg)}
+  .fabs.old .fab.lg{font-size:var(--fs-md)}
+  .fabs.old .fab.toc{font-size:1.2rem}
+  .cap{font-size:var(--fs-xs);color:var(--muted);text-align:center;margin-top:4px}
+</style>
+<div class="wrap">
+<h1>아이콘 크기 통일 — 결정 시안</h1>
+<p class="lead">
+  한 줄에 나란히 선 아이콘은 <b>틀 크기</b>(버튼 font-size)와 <b>글리프가 차지하는 넓이</b>(24 틀 안의 ink) 둘 다 맞아야 같아 보인다.
+  화살표만 14×14라 🗑(18×16) 옆에서 작게 보였고, 선택 바는 버튼 높이가 네 가지였다.
+</p>
+
+<h2>1. 기사 행 ↑↓ 글리프 — 14×14 → 16×16</h2>
+<p class="note">🗑(18×16)과 높이를 맞춘 A안. 18×18(C안)은 🗑보다 커져 이번엔 화살표가 튄다.</p>
+<div class="card"><span class="tag before">지금 — ↑↓ 14×14</span>
+  <div class="row big">
+    <button class="iconbtn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+    <button class="iconbtn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+    <button class="iconbtn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+  </div>
+</div>
+<div class="card"><span class="tag after">A안 — ↑↓ 16×16 (채택)</span>
+  <div class="row big">
+    <button class="iconbtn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+    <button class="iconbtn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20V4"/><path d="m4 12 8-8 8 8"/></svg></button>
+    <button class="iconbtn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="m20 12-8 8-8-8"/></svg></button>
+  </div>
+</div>
+
+<h2>2. 소제목 머리 ▲▼ — 12×6 → 16×8, 틀 0.78rem → 0.9rem</h2>
+<div class="card"><span class="tag before">지금</span>
+  <div class="row big sub">
+    <button class="iconbtn"><svg class="ic" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+    <button class="iconbtn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+    <button class="iconbtn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+    <button class="iconbtn" style="font-size:2.34rem"><svg class="ic" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg></button>
+    <button class="iconbtn" style="font-size:2.34rem"><svg class="ic" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+  </div>
+</div>
+<div class="card"><span class="tag after">새</span>
+  <div class="row big sub">
+    <button class="iconbtn"><svg class="ic" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+    <button class="iconbtn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+    <button class="iconbtn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+    <button class="iconbtn"><svg class="ic" viewBox="0 0 24 24"><path d="m4 16 8-8 8 8"/></svg></button>
+    <button class="iconbtn"><svg class="ic" viewBox="0 0 24 24"><path d="m4 8 8 8 8-8"/></svg></button>
+  </div>
+</div>
+
+<h2>3. 확정본·초안 선택 바</h2>
+<p class="note">
+  높이가 24.1 / 26.5 / 28.5 / 29.5px 네 가지였고 🗑까지 채운 파랑이라 「지우는 버튼」으로 안 읽혔다.
+  전부 <code>--h-tb</code>(28px) 하나로 세우고, 모양이 뜻을 말하게 한다 — 옮기기만 채운 파랑, ↑↓는 흰 바탕 테두리, 🗑은 빨강.
+</p>
+<div class="card"><span class="tag before">지금</span>
+  <div class="bar old">
+    <span class="cnt">☑️ 4개 선택됨</span>
+    <select><option>이동할 소제목</option></select>
+    <button>옮기기</button>
+    <button class="up"><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+    <button class="down"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
+    <button><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+    <span class="div"></span>
+    <button class="ai"><svg class="ic" viewBox="0 0 24 24"><path d="M12 21v-7"/><path d="M12 14 5.5 6.5"/><path d="M12 14l6.5-7.5"/><path d="M12 14V5"/><circle cx="5" cy="5.2" r="1.6"/><circle cx="19" cy="5.2" r="1.6"/><circle cx="12" cy="3.4" r="1.6"/></svg> AI 기사 나누기</button>
+    <button class="clear">선택 해제</button>
+  </div>
+</div>
+<div class="card"><span class="tag after">새 — 높이 28px 하나 · 🗑 빨강</span>
+  <div class="bar">
+    <span class="cnt">☑️ 4개 선택됨</span>
+    <select><option>이동할 소제목</option></select>
+    <button class="go">옮기기</button>
+    <button><svg class="ic" viewBox="0 0 24 24"><path d="M12 20V4"/><path d="m4 12 8-8 8 8"/></svg></button>
+    <button><svg class="ic" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="m20 12-8 8-8-8"/></svg></button>
+    <button class="del"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+    <span class="div"></span>
+    <button class="ai"><svg class="ic" viewBox="0 0 24 24"><path d="M12 21v-7"/><path d="M12 14 5.5 6.5"/><path d="M12 14l6.5-7.5"/><path d="M12 14V5"/><circle cx="5" cy="5.2" r="1.6"/><circle cx="19" cy="5.2" r="1.6"/><circle cx="12" cy="3.4" r="1.6"/></svg> AI 기사 나누기</button>
+    <button class="clear">선택 해제</button>
+  </div>
+</div>
+
+<h2>4. 떠 있는 동그라미 — 아이콘은 1.3rem 하나</h2>
+<p class="note">원 크기는 둘(56·48px)이지만 아이콘까지 제각각이면 가장 큰 원에 가장 작은 아이콘이 들어간다(휴지통이 그랬다).</p>
+<div class="card"><span class="tag before">지금 — 🗑 14.1 · ↩ 20.8 · ☰ 19.2</span>
+  <div class="fabs old">
+    <div><div class="fab lg"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></div><div class="cap">휴지통 56</div></div>
+    <div><div class="fab"><svg class="ic" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg></div><div class="cap">되돌리기 48</div></div>
+    <div><div class="fab toc"><svg class="ic" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></div><div class="cap">목차 48</div></div>
+  </div>
+</div>
+<div class="card"><span class="tag after">새 — 전부 20.8px</span>
+  <div class="fabs">
+    <div><div class="fab lg"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></div><div class="cap">휴지통 56</div></div>
+    <div><div class="fab"><svg class="ic" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg></div><div class="cap">되돌리기 48</div></div>
+    <div><div class="fab"><svg class="ic" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></div><div class="cap">목차 48</div></div>
+  </div>
+</div>
+</div>
