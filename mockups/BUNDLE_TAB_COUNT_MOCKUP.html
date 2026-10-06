@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>확정본 건수 자리 — 시안</title>
+<style>
+:root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+  --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; }
+body { margin: 0; padding: 28px 20px 70px; background: #F8FAFC; color: #1F2937;
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+.wrap { max-width: 800px; margin: 0 auto; }
+h1 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 6px; }
+.lead { font-size: var(--fs-md); color: #6B7280; margin: 0 0 26px; line-height: 1.7; }
+.lead b { color: #1F2937; }
+.opt { margin: 0 0 34px; }
+.opt-h { font-size: var(--fs-lg); font-weight: 700; color: #1E3A5F; margin: 0 0 4px; }
+.opt-h .badge { font-size: var(--fs-xs); font-weight: 700; color: #146B5E; background: #E3F1EE;
+  border: 1px solid rgba(20,107,94,0.24); border-radius: var(--r-pill); padding: 2px 9px; margin-left: 8px; vertical-align: 2px; }
+.opt-d { font-size: var(--fs-md); color: #6B7280; margin: 0 0 12px; line-height: 1.7; }
+.opt-d .ok { color: #146B5E; font-weight: 600; }
+.opt-d .no { color: #DC2626; font-weight: 600; }
+.sub { font-size: var(--fs-sm); color: #9CA3AF; margin: 14px 0 7px; font-weight: 600; }
+
+/* ── 실제 화면 값 그대로 ──────────────────────────────────────── */
+.card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 22px 24px; }
+.ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+  stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+.tabwrap { background: #E3F1EE; margin: -22px -24px 18px; padding: 12px 18px 0; border-radius: var(--r-lg) var(--r-lg) 0 0; }
+.tabwrap-h { font-size: var(--fs-xs); font-weight: 700; color: #146B5E; margin-bottom: 9px; }
+.tabs { display: flex; gap: 4px; align-items: flex-end; overflow-x: auto; scrollbar-width: none; }
+.tab { font-size: var(--fs-sm); padding: 8px 15px; border-radius: var(--r-md) var(--r-md) 0 0; background: rgba(255,255,255,0.5);
+  color: #146B5E; font-weight: 600; border: 1px solid transparent; border-bottom: none;
+  white-space: nowrap; text-decoration: none; position: relative; top: 1px; display: inline-block; cursor: pointer; }
+.tab:hover { background: rgba(255,255,255,0.8); }
+.tab.on { background: #FFFFFF; font-weight: 700; border-color: #E5E7EB; color: #1E3A5F; padding-bottom: 9px; }
+.tab .n { color: #6B7280; font-weight: 500; font-size: var(--fs-xs); margin-left: 5px; }
+.tab .del { margin-left: 7px; color: #6B7280; font-weight: 400; padding: 1px 3px; border-radius: var(--r-sm); }
+.tab .del:hover { color: #DC2626; background: rgba(0,0,0,0.06); }
+.tab.add { background: rgba(20,107,94,0.08); color: #146B5E; font-weight: 500;
+  border: 1px dashed #146B5E; margin-left: 8px; }
+.plus-glyph { font-size: 1.2em; font-weight: 600; margin-right: 4px; }
+.report-head { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; font-size: var(--fs-xl); font-weight: 700; color: #1E3A5F; }
+.chip { background: #F1F5F9; border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 3px 11px; color: #6B7280; font-size: var(--fs-sm); }
+.chip.bundle-tag { font-weight: 700; margin-right: 10px; background: #E3F1EE; border-color: rgba(20,107,94,0.24); color: #146B5E; }
+.chip.src { background: #E3F1EE; border-color: rgba(20,107,94,0.24); color: #146B5E; font-weight: 600; text-decoration: none; }
+.meta-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-size: var(--fs-sm); }
+.body-stub { margin-top: 16px; font-size: var(--fs-sm); color: #9CA3AF; border-top: 1px solid #F1F5F9; padding-top: 12px; }
+/* 정기 초안·확정본의 제목 옆 건수 배지 — 값 그대로 */
+.total-count-badge { margin-left: 8px; font-size: var(--fs-sm); font-weight: 700; color: #6B7280;
+  background: #F3F4F6; border-radius: var(--r-pill); padding: 2px 10px; vertical-align: middle; }
+/* A안에서 정한 이름 칸 */
+.name-field { display: inline-flex; align-items: center; background: #EFF6FF; border-bottom: 2px dashed #2563EB;
+  border-radius: var(--r-sm) var(--r-sm) 0 0; padding-right: 6px; }
+.name-field input { font: inherit; font-size: var(--fs-base); font-weight: 700; color: #1E3A5F;
+  border: none; background: transparent; padding: 2px 8px; width: 150px; }
+.name-field .pen { color: #2563EB; font-size: var(--fs-md); display: inline-flex; padding: 2px; cursor: pointer; }
+.name-field:hover { background: #E0ECFE; }
+.name-field:focus-within { border-bottom-style: solid; }
+.ref { background: #FFFFFF; border: 1px dashed #E5E7EB; border-radius: var(--r-lg); padding: 14px 16px; margin-bottom: 18px; }
+.ref .t { font-size: var(--fs-sm); color: #9CA3AF; margin-bottom: 8px; font-weight: 600; }
+.ref .h1like { font-size: var(--fs-xl); font-weight: 700; color: #1E3A5F; }
+.screen-tag { background: #F1F5F9; border: 1px solid #E5E7EB; color: #6B7280; font-weight: 700;
+  font-size: var(--fs-sm); border-radius: var(--r-pill); padding: 3px 11px; margin-right: 10px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>확정본의 「N건」을 어디에 둘까</h1>
+<p class="lead">
+탭에서 건수를 떼면 탭은 <b>사안명 + 시각</b>만 남는다(원본 탭이 이미 그렇게 섰다 — 건수는 툴팁).
+뗀 숫자를 본문 어디에 놓을지 두 안.
+</p>
+
+<div class="ref">
+  <div class="t">참고 — 정기 초안·확정본은 이미 이렇게 한다</div>
+  <div class="h1like"><span class="screen-tag">초안</span>언론 모니터링 14시 기준<span class="total-count-badge">12건</span></div>
+</div>
+
+<!-- ───────── 1안 ───────── -->
+<div class="opt">
+  <div class="opt-h">1안 — 머리줄 끝에 건수 배지 <span class="badge">추천</span></div>
+  <p class="opt-d">
+    정기 초안·확정본과 <b>같은 자리·같은 모양</b>(회색 알약). 탭에서 뗀 숫자가 바로 밑 머리줄로 내려온다.
+    <span class="ok">머리줄이 「전체 몇 건」을 말하므로 아래 <code>전체 N건</code> 칩은 없앤다</span> —
+    출처별 내역은 <code>←] 원본 N건</code> 칩이 그대로 맡는다.
+  </p>
+
+  <div class="sub">원본이 하나일 때</div>
+  <div class="card">
+    <div class="tabwrap">
+      <div class="tabwrap-h"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg> 오늘의 확정본 · 수시 보관함에 저장돼요</div>
+      <div class="tabs">
+        <span class="tab" title="4건">6일테스트 14:44<span class="del" title="이 카드 삭제">×</span></span>
+        <span class="tab on" title="1건">테스트3 14:45<span class="del" title="이 카드 삭제">×</span></span>
+        <span class="tab add"><span class="plus-glyph">+</span>새 수집</span>
+      </div>
+    </div>
+    <div class="report-head">
+      <span class="chip bundle-tag">확정본</span>수시 모니터링 14시 45분 기준(<span class="name-field"><input value="테스트3"><span class="pen" title="사안 이름 고치기"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span></span>)<span class="total-count-badge" title="이 확정본에 담긴 기사 1건 — 숨긴 기사 제외">1건</span>
+    </div>
+    <div class="meta-row"><a class="chip src" href="#"><svg class="ic" viewBox="0 0 24 24"><path d="M10 8V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-2"/><path d="M3 12h11"/><path d="m7 8-4 4 4 4"/></svg> 종부세 1건</a></div>
+    <div class="body-stub">… 기사 목록 …</div>
+  </div>
+
+  <div class="sub">원본이 둘일 때 — <code>전체 7건</code> 칩이 머리줄로 올라간 모습</div>
+  <div class="card">
+    <div class="tabwrap">
+      <div class="tabwrap-h"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg> 오늘의 확정본 · 수시 보관함에 저장돼요</div>
+      <div class="tabs">
+        <span class="tab" title="4건">6일테스트 14:44<span class="del">×</span></span>
+        <span class="tab on" title="7건">테스트3 14:45<span class="del">×</span></span>
+        <span class="tab add"><span class="plus-glyph">+</span>새 수집</span>
+      </div>
+    </div>
+    <div class="report-head">
+      <span class="chip bundle-tag">확정본</span>수시 모니터링 14시 45분 기준(<span class="name-field"><input value="테스트3"><span class="pen"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span></span>)<span class="total-count-badge" title="이 확정본에 담긴 기사 7건 — 숨긴 기사 제외">7건</span>
+    </div>
+    <div class="meta-row">
+      <a class="chip src" href="#"><svg class="ic" viewBox="0 0 24 24"><path d="M10 8V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-2"/><path d="M3 12h11"/><path d="m7 8-4 4 4 4"/></svg> 종부세 4건</a>
+      <a class="chip src" href="#"><svg class="ic" viewBox="0 0 24 24"><path d="M10 8V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-2"/><path d="M3 12h11"/><path d="m7 8-4 4 4 4"/></svg> 재산세 3건</a>
+    </div>
+    <div class="body-stub">… 기사 목록 …</div>
+  </div>
+</div>
+
+<!-- ───────── 2안 ───────── -->
+<div class="opt">
+  <div class="opt-h">2안 — 아무 데도 안 붙인다</div>
+  <p class="opt-d">
+    탭에서 떼고 그걸로 끝. 건수는 지금도 <code>←] 종부세 1건</code> 칩이 말하고, 원본이 둘 이상이면 <code>전체 7건</code> 칩이 선다.
+    <span class="ok">새로 만드는 게 없다</span>는 게 장점.
+    <span class="no">다만 출처가 늘어 칩이 서너 개 늘어서면 「이 보고서 전부 몇 건」이 칩 줄 맨 끝까지 눈이 가야 보인다</span> —
+    정기 두 화면과 서 있는 자리도 달라진다.
+  </p>
+  <div class="card">
+    <div class="tabwrap">
+      <div class="tabwrap-h"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg> 오늘의 확정본 · 수시 보관함에 저장돼요</div>
+      <div class="tabs">
+        <span class="tab" title="4건">6일테스트 14:44<span class="del">×</span></span>
+        <span class="tab on" title="7건">테스트3 14:45<span class="del">×</span></span>
+        <span class="tab add"><span class="plus-glyph">+</span>새 수집</span>
+      </div>
+    </div>
+    <div class="report-head">
+      <span class="chip bundle-tag">확정본</span>수시 모니터링 14시 45분 기준(<span class="name-field"><input value="테스트3"><span class="pen"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span></span>)
+    </div>
+    <div class="meta-row">
+      <a class="chip src" href="#"><svg class="ic" viewBox="0 0 24 24"><path d="M10 8V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-2"/><path d="M3 12h11"/><path d="m7 8-4 4 4 4"/></svg> 종부세 4건</a>
+      <a class="chip src" href="#"><svg class="ic" viewBox="0 0 24 24"><path d="M10 8V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-2"/><path d="M3 12h11"/><path d="m7 8-4 4 4 4"/></svg> 재산세 3건</a>
+      <span class="chip">전체 7건</span>
+    </div>
+    <div class="body-stub">… 기사 목록 …</div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

@@ -676,7 +676,23 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     border: 1px dashed {adhoc_text}; margin-left: 8px; }}
   .tab.add:hover {{ background: rgba(20,107,94,0.14); }}
   .report-head {{ display: flex; align-items: center; gap: 2px; flex-wrap: wrap; font-size: var(--fs-xl); font-weight: 700; color: {header}; }}
-  .issue-input {{ font: inherit; font-size: var(--fs-base); font-weight: 700; color: {header}; border: none; border-bottom: 2px dashed {accent}; background: {hover}; padding: 2px 8px; border-radius: var(--r-sm) var(--r-sm) 0 0; width: 180px; }}
+  /* 사안명 칸 — 이름을 고치는 자리는 이 한 곳뿐이라(탭엔 연필을 안 단다) 연필이 칸 안
+     오른쪽 끝에 붙어 「여기가 고치는 칸」이라고 말한다. 칸 폭은 180px 고정이 아니라 글자
+     폭에 맞춘다(fitIssueWidth) — 고정이면 짧은 이름 뒤에 빈 밑줄이 길게 남아 연필이
+     이름에서 멀찍이 떨어져 선다. */
+  .name-field {{ display: inline-flex; align-items: center; background: {hover};
+    border-bottom: 2px dashed {accent}; border-radius: var(--r-sm) var(--r-sm) 0 0; padding-right: 6px; }}
+  .name-field:hover {{ filter: brightness(0.98); }}
+  .name-field:focus-within {{ border-bottom-style: solid; }}
+  .issue-input {{ font: inherit; font-size: var(--fs-base); font-weight: 700; color: {header};
+    border: none; background: transparent; padding: 2px 4px 2px 8px; width: 6em; min-width: 0;
+    box-sizing: border-box; }}
+  .issue-input:focus {{ outline: none; }}
+  .name-field .pen {{ display: inline-flex; color: {accent}; font-size: var(--fs-md); padding: 2px; cursor: pointer; }}
+  /* 머리줄 끝 건수 — 정기 초안·확정본의 제목 옆 배지와 같은 자리·같은 값
+     (app.renderer / app.preview_renderer의 .total-count-badge). */
+  .total-count-badge {{ margin-left: 8px; font-size: var(--fs-sm); font-weight: 700; color: {muted};
+    background: {pill_bg}; border-radius: var(--r-pill); padding: 2px 10px; vertical-align: middle; }}
   .meta-row {{ display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-size: var(--fs-sm); }}
   .chip {{ background: {divider_soft}; border: 1px solid {border}; border-radius: var(--r-pill); padding: 3px 11px; color: {muted}; }}
   /* ADHOC_DESIGN.md §6.4a — 검색어 편집 패널. 평소엔 접혀 있고, 접힌 상태가 곧 위
@@ -883,8 +899,11 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   h2.sub.raw-head .raw-order {{ font-size: var(--fs-sm); color: {muted}; font-weight: 500; }}
   .sel-sm.to-bundle {{ border-color: {adhoc_border_soft}; color: {adhoc_text}; }}
   .sel-sm.to-bundle:disabled {{ color: {text_faint}; border-color: {border}; }}
-  .chip.src {{ background: {adhoc_bg}; border-color: {adhoc_border_soft}; color: {adhoc_text};
-    font-weight: 600; text-decoration: none; }}
+  /* 칩 색은 **그 칩이 가리키는 화면의 색**이다 — 원본은 회색(.raw-tag), 확정본은 청록
+     (.bundle-tag). 원본으로 가는 이 칩까지 청록이면 바로 왼쪽 「확정본」 이름 칩과 배색이
+     똑같아 어느 쪽이 이 화면인지 구별이 안 된다(원본 화면의 .pair-link가 청록인 것과 짝). */
+  .chip.src {{ background: {screen_tag_work_bg}; border-color: {screen_tag_work_border};
+    color: {screen_tag_work_text}; font-weight: 600; text-decoration: none; }}
   .chip.src:hover {{ filter: brightness(0.97); }}
   /* 화면 이름 칩 — 머리줄 맨 앞(정기 초안·확정본과 같은 자리·모양, app.renderer.screen_tag_style).
      원본은 다듬기 전 화면이라 중립 회색, 확정본은 수시 청록. 화면 전용(복사·txt엔 없다). */
@@ -1703,8 +1722,10 @@ def _render_issue_tabs(card: dict, today_cards: list[dict]) -> str:
         # 원본은 같은 사안이 여럿이면 「#2」로 가른다(card.version_suffix) — 건수로 가르면 숨기거나
         # 다시 수집할 때마다 이름이 바뀌고, 무엇이 다른지도 말해 주지 않는다. 다른 점(검색어·시간)은 툴팁.
         if is_bundle(c):
-            tab_label = f'{html.escape(bundle_label(c))} <span class="n">{visible_count}건</span>'
-            tab_tip = ""
+            # 건수는 탭에서 떼고 툴팁으로 — 머리줄 끝 건수 배지가 그 말을 한다(정기 초안·
+            # 확정본과 같은 자리). 원본 탭이 이미 같은 규칙이다.
+            tab_label = html.escape(bundle_label(c))
+            tab_tip = f' title="{visible_count}건"'
         else:
             tab_label = html.escape(c["report_title"] + version_suffix(c, today_cards))
             _win = window_of(c)
@@ -1822,10 +1843,9 @@ def _render_bundle_meta_chips(card: dict) -> str:
         for source_id, name, n in sources
         for label in [_source_name(source_id, name)]
     )
-    # 「전체 N건」은 합계라서, 원본이 하나뿐이면 바로 왼쪽 칩과 같은 숫자를 되풀이한다 —
-    # 그럴 땐 안 그린다(본업 화면은 자기를 해명하지 않는다).
-    total_html = f'<span class="chip">전체 {total}건</span>' if len(sources) >= 2 else ""
-    return f'<div class="meta-row">{chips}{total_html}</div>'
+    # 「전체 N건」 칩은 없앴다 — 합계는 머리줄 끝 건수 배지가 말한다(정기 초안·확정본과
+    # 같은 자리). 여기 칩들은 출처별 내역만 맡는다.
+    return f'<div class="meta-row">{chips}</div>'
 
 
 def _render_meta_chips(card: dict) -> str:
@@ -2965,9 +2985,13 @@ def render_card_page(
 
     # 헤더 — 모음은 시각을 안 붙인다(수집 시간창이 없어 "N시 기준"이 가리킬 대상이 없다).
     _title_input = (
+        f'<span class="name-field">'
         f'<input class="issue-input" id="report-title-input" '
         f'value="{html.escape(card["report_title"])}" '
+        f'oninput="fitIssueWidth(this)" '
         f"onblur=\"renameCard('{card_id_esc}', this.value)\">"
+        f'<span class="pen" title="사안 이름 고치기" onclick="focusIssueInput()">{icon("pencil")}</span>'
+        f'</span>'
     )
     if bundle_mode:
         # [수정: 2026-09-15] 가장 늦은 원본 시각을 붙인다(report_header_text와 같은 규칙 —
@@ -2979,9 +3003,17 @@ def render_card_page(
             if _basis
             else ""
         )
+        # 머리줄 끝 건수 — 정기 초안·확정본과 같은 자리. 탭에서 뗀 숫자가 여기로 내려왔다.
+        _visible_n = sum(1 for a in card["articles"] if not a.get("hidden"))
+        _count_html = (
+            f'<span class="total-count-badge" '
+            f'title="이 확정본에 담긴 기사 {_visible_n}건 — 숨긴 기사 제외">{_visible_n}건</span>'
+            if _visible_n
+            else ""
+        )
         report_head_html = (
             f'<div class="report-head"><span class="chip bundle-tag">확정본</span>'
-            f'수시 모니터링 {_basis_html}({_title_input}){_sent_done_html(card)}</div>'
+            f'수시 모니터링 {_basis_html}({_title_input}){_count_html}{_sent_done_html(card)}</div>'
         )
     else:
         # [추가: 2026-09-15] 「지금까지 다시 수집」 — 시작은 그대로, 끝만 지금으로 한 번에
@@ -3472,6 +3504,26 @@ function knownChipClick(el) {{
 }}
 
 function renameCard(id, title) {{ post('/adhoc/card/rename', {{id: id, report_title: title}}); }}
+// 사안명 칸은 글자 폭에 맞춰 늘었다 줄었다 한다 — 고정 폭이면 짧은 이름 뒤에 빈 밑줄이
+// 길게 남아 연필이 이름에서 멀찍이 떨어져 선다. 재는 방식은 검색어 화면 fitNameWidth와 같다.
+var _issueCanvas = document.createElement('canvas').getContext('2d');
+function fitIssueWidth(input) {{
+  var cs = getComputedStyle(input);
+  _issueCanvas.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+  var extra = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 2;
+  var px = Math.ceil(_issueCanvas.measureText(input.value || '사안').width + extra + 4);
+  input.style.width = 'min(22em, max(3.5em, ' + px + 'px))';
+}}
+// 칸 안 연필은 새 동작이 아니라 「여기가 고치는 칸」이라는 표시다 — 누르면 칸에 들어가
+// 글자를 통째로 잡아 준다.
+function focusIssueInput() {{
+  var i = document.getElementById('report-title-input');
+  if (i) {{ i.focus(); i.select(); }}
+}}
+(function () {{
+  var i = document.getElementById('report-title-input');
+  if (i) fitIssueWidth(i);
+}})();
 // [수정: 2026-09-02] 이 화면의 액션 핸들러는 카드 id·기사 URL·소제목 이름을 onclick
 // **인자**로 받지 않고, 누른 요소의 data-* 속성에서 읽는다. 인자로 넘기면 그 값에
 // 작은따옴표가 하나만 섞여도(html.escape가 &#x27;로 바꾸고 브라우저가 다시 '로

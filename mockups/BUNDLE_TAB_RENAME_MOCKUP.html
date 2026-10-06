@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>확정본 탭 이름 바꾸기 — 시안</title>
+<style>
+:root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+  --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --h-tb: 28px; }
+body { margin: 0; padding: 28px 20px 70px; background: #F8FAFC; color: #1F2937;
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+.wrap { max-width: 800px; margin: 0 auto; }
+h1 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 6px; }
+.lead { font-size: var(--fs-md); color: #6B7280; margin: 0 0 26px; line-height: 1.7; }
+.lead b { color: #1F2937; }
+.opt { margin: 0 0 34px; }
+.opt-h { font-size: var(--fs-lg); font-weight: 700; color: #1E3A5F; margin: 0 0 4px; }
+.opt-h .badge { font-size: var(--fs-xs); font-weight: 700; color: #146B5E; background: #E3F1EE;
+  border: 1px solid rgba(20,107,94,0.24); border-radius: var(--r-pill); padding: 2px 9px; margin-left: 8px; vertical-align: 2px; }
+.opt-d { font-size: var(--fs-md); color: #6B7280; margin: 0 0 12px; line-height: 1.7; }
+.opt-d .ok { color: #146B5E; font-weight: 600; }
+.opt-d .no { color: #DC2626; font-weight: 600; }
+
+/* ── 실제 화면에서 그대로 가져온 값 ───────────────────────────── */
+.card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 22px 24px; }
+.ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+  stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+.tabwrap { background: #E3F1EE; margin: -22px -24px 18px; padding: 12px 18px 0; border-radius: var(--r-lg) var(--r-lg) 0 0; }
+.tabwrap-h { font-size: var(--fs-xs); font-weight: 700; color: #146B5E; margin-bottom: 9px; }
+.tabs { display: flex; gap: 4px; align-items: flex-end; overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { font-size: var(--fs-sm); padding: 8px 15px; border-radius: var(--r-md) var(--r-md) 0 0; background: rgba(255,255,255,0.5);
+  color: #146B5E; font-weight: 600; border: 1px solid transparent; border-bottom: none;
+  white-space: nowrap; text-decoration: none; position: relative; top: 1px; display: inline-block; cursor: pointer; }
+.tab:hover { background: rgba(255,255,255,0.8); }
+.tab.on { background: #FFFFFF; font-weight: 700; border-color: #E5E7EB; color: #1E3A5F; padding-bottom: 9px; }
+.tab.on:hover { background: #FFFFFF; }
+.tab .n { color: #6B7280; font-weight: 500; font-size: var(--fs-xs); margin-left: 5px; }
+.tab .del { margin-left: 7px; color: #6B7280; font-weight: 400; padding: 1px 3px; border-radius: var(--r-sm); }
+.tab .del:hover { color: #DC2626; background: rgba(0,0,0,0.06); }
+.tab.add { background: rgba(20,107,94,0.08); color: #146B5E; font-weight: 500;
+  border: 1px dashed #146B5E; margin-left: 8px; }
+.tab.add:hover { background: rgba(20,107,94,0.14); }
+.plus-glyph { font-size: 1.2em; font-weight: 600; margin-right: 4px; }
+.report-head { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; font-size: var(--fs-xl); font-weight: 700; color: #1E3A5F; }
+.chip { background: #F1F5F9; border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 3px 11px; color: #6B7280; font-size: var(--fs-sm); }
+.chip.bundle-tag { font-weight: 700; margin-right: 10px; background: #E3F1EE; border-color: rgba(20,107,94,0.24); color: #146B5E; }
+.issue-input { font: inherit; font-size: var(--fs-base); font-weight: 700; color: #1E3A5F; border: none;
+  border-bottom: 2px dashed #2563EB; background: #EFF6FF; padding: 2px 8px; border-radius: var(--r-sm) var(--r-sm) 0 0; width: 180px; }
+.meta-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-size: var(--fs-sm); }
+.body-stub { margin-top: 16px; font-size: var(--fs-sm); color: #9CA3AF; border-top: 1px solid #F1F5F9; padding-top: 12px; }
+
+/* ── A안: 머리줄 칸 안에 연필 ─────────────────────────────────── */
+.name-field { display: inline-flex; align-items: center; background: #EFF6FF; border-bottom: 2px dashed #2563EB;
+  border-radius: var(--r-sm) var(--r-sm) 0 0; padding-right: 6px; }
+.name-field .issue-input { background: transparent; border-bottom: none; width: 150px; }
+.name-field .pen { color: #2563EB; font-size: var(--fs-md); display: inline-flex; padding: 2px; cursor: pointer; }
+.name-field:hover { background: #E0ECFE; }
+.name-field:focus-within { border-bottom-style: solid; }
+
+/* ── B·C안: 탭 안 연필 ────────────────────────────────────────── */
+.tab .pen { margin-left: 6px; color: #2563EB; font-size: var(--fs-sm); padding: 1px 3px; border-radius: var(--r-sm);
+  display: inline-flex; vertical-align: -0.1em; }
+.tab .pen:hover { background: #EFF6FF; }
+.tab-edit { font: inherit; font-size: var(--fs-sm); font-weight: 700; color: #1E3A5F; border: 1px solid #2563EB;
+  background: #FFFFFF; border-radius: var(--r-sm); padding: 1px 6px; width: 120px; }
+.flash { animation: flash 1.1s ease-out; }
+@keyframes flash { 0%,45% { background: #FEF3C7; } 100% { background: #EFF6FF; } }
+.note { font-size: var(--fs-sm); color: #6B7280; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>확정본 탭 이름, 어디서 바꾸나</h1>
+<p class="lead">
+탭 이름은 <b>사안명 + 기준 시각</b>으로 앱이 만든다(「테스트3 14:45」). 시각은 앱 몫이라,
+담당자가 바꿀 수 있는 건 <b>사안명</b> 하나다 — 지금도 <b>머리줄 괄호 안 점선 칸</b>에서 고칠 수 있고,
+고치면 탭 이름이 따라 바뀐다. 아래 셋은 <b>그 자리를 어떻게 더 잘 보이게 할지</b>의 선택지다.
+직접 눌러 보세요.
+</p>
+
+<!-- ───────── A안 ───────── -->
+<div class="opt">
+  <div class="opt-h">A안 — 머리줄 칸에 연필을 단다 <span class="badge">추천</span></div>
+  <p class="opt-d">
+    탭은 지금 그대로(건수 유지). 머리줄 이름 칸 안 오른쪽 끝에 연필이 서서 「여기가 고치는 칸」이라고 말한다.
+    <span class="ok">이름을 고치는 자리가 끝까지 한 곳</span>이라 어느 탭에서 눌렀는지 헷갈릴 일이 없다.
+  </p>
+  <div class="card">
+    <div class="tabwrap">
+      <div class="tabwrap-h"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg> 오늘의 확정본 · 수시 보관함에 저장돼요</div>
+      <div class="tabs">
+        <span class="tab">6일테스트 14:44 <span class="n">4건</span><span class="del" title="이 카드 삭제">×</span></span>
+        <span class="tab on">테스트3 14:45 <span class="n">1건</span><span class="del" title="이 카드 삭제">×</span></span>
+        <span class="tab add"><span class="plus-glyph">+</span>새 수집</span>
+      </div>
+    </div>
+    <div class="report-head">
+      <span class="chip bundle-tag">확정본</span>수시 모니터링 14시 45분 기준(<span class="name-field" id="nfA"><input class="issue-input" id="inA" value="테스트3"><span class="pen" title="사안 이름 고치기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span></span>)
+    </div>
+    <div class="meta-row"><span class="chip">←] 종부세 1건</span></div>
+    <div class="body-stub">… 기사 목록 …</div>
+  </div>
+  <p class="note">※ 칸에서 이름을 고치면 위 탭 이름도 같이 바뀐다(눌러서 고쳐 보세요).</p>
+</div>
+
+<!-- ───────── B안 ───────── -->
+<div class="opt">
+  <div class="opt-h">B안 — 켜진 탭의 연필은 길잡이</div>
+  <p class="opt-d">
+    <b>지금 보고 있는 탭에만</b> 연필을 달고, 누르면 머리줄 이름 칸으로 데려가 글자를 통째로 잡아 준다(노랗게 반짝).
+    고치는 자리는 여전히 머리줄 한 곳이고, 탭의 연필은 <span class="ok">「이름은 저기서 바꾼다」는 안내</span>만 한다.
+    <span class="no">다만 연필이 둘</span>이라 처음엔 어느 쪽이 진짜인지 한 번 눌러 봐야 안다.
+  </p>
+  <div class="card">
+    <div class="tabwrap">
+      <div class="tabwrap-h"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg> 오늘의 확정본 · 수시 보관함에 저장돼요</div>
+      <div class="tabs">
+        <span class="tab">6일테스트 14:44 <span class="n">4건</span><span class="del" title="이 카드 삭제">×</span></span>
+        <span class="tab on">테스트3 14:45 <span class="n">1건</span><span class="pen" id="penB" title="사안 이름 고치기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span><span class="del" title="이 카드 삭제">×</span></span>
+        <span class="tab add"><span class="plus-glyph">+</span>새 수집</span>
+      </div>
+    </div>
+    <div class="report-head">
+      <span class="chip bundle-tag">확정본</span>수시 모니터링 14시 45분 기준(<input class="issue-input" id="inB" value="테스트3">)
+    </div>
+    <div class="meta-row"><span class="chip">←] 종부세 1건</span></div>
+    <div class="body-stub">… 기사 목록 …</div>
+  </div>
+  <p class="note">※ 켜진 탭의 연필을 눌러 보세요.</p>
+</div>
+
+<!-- ───────── C안 ───────── -->
+<div class="opt">
+  <div class="opt-h">C안 — 탭에서 바로 고친다(건수 자리를 연필로)</div>
+  <p class="opt-d">
+    물어보신 그대로의 모양. 켜진 탭의 <b>건수를 빼고 그 자리에 연필</b>을 두고, 누르면 탭이 입력칸이 된다(건수는 툴팁으로).
+    <span class="no">이름을 고치는 자리가 둘</span>이 되고(머리줄 칸은 그대로 남는다),
+    <span class="no">확정본에 몇 건 들었는지가 탭에서 사라진다</span> — 확정본 탭이 서로 다른 건 시각뿐이라 건수는 「얼마나 담겼나」를 말해 주던 유일한 숫자다.
+  </p>
+  <div class="card">
+    <div class="tabwrap">
+      <div class="tabwrap-h"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg> 오늘의 확정본 · 수시 보관함에 저장돼요</div>
+      <div class="tabs">
+        <span class="tab">6일테스트 14:44 <span class="n">4건</span><span class="del" title="이 카드 삭제">×</span></span>
+        <span class="tab on" id="tabC" title="1건">테스트3 14:45<span class="pen" id="penC" title="사안 이름 고치기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span><span class="del" title="이 카드 삭제">×</span></span>
+        <span class="tab add"><span class="plus-glyph">+</span>새 수집</span>
+      </div>
+    </div>
+    <div class="report-head">
+      <span class="chip bundle-tag">확정본</span>수시 모니터링 14시 45분 기준(<input class="issue-input" id="inC" value="테스트3">)
+    </div>
+    <div class="meta-row"><span class="chip">←] 종부세 1건</span></div>
+    <div class="body-stub">… 기사 목록 …</div>
+  </div>
+  <p class="note">※ 켜진 탭의 연필을 눌러 보세요 — 탭 자체가 입력칸이 됩니다.</p>
+</div>
+
+</div>
+
+<script>
+// A안 — 칸에서 고치면 탭 이름이 따라온다
+var inA = document.getElementById('inA');
+var tabAon = document.querySelectorAll('.tab.on')[0];
+inA.addEventListener('input', function () {
+  tabAon.childNodes[0].nodeValue = (inA.value || '이름 없는 사안') + ' 14:45 ';
+});
+document.querySelector('#nfA .pen').onclick = function () { inA.focus(); inA.select(); };
+
+// B안 — 탭 연필이 머리줄 칸으로 데려간다
+var inB = document.getElementById('inB');
+document.getElementById('penB').onclick = function (e) {
+  e.stopPropagation();
+  inB.focus(); inB.select();
+  inB.classList.remove('flash'); void inB.offsetWidth; inB.classList.add('flash');
+};
+inB.addEventListener('input', function () {
+  var t = document.querySelectorAll('.tab.on')[1];
+  t.childNodes[0].nodeValue = (inB.value || '이름 없는 사안') + ' 14:45 ';
+});
+
+// C안 — 탭이 그 자리에서 입력칸이 된다
+var tabC = document.getElementById('tabC');
+var inC = document.getElementById('inC');
+var PEN = '<span class="pen" title="사안 이름 고치기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true">'
+  + '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>';
+var DEL = '<span class="del" title="이 카드 삭제">×</span>';
+function drawTabC() {
+  tabC.innerHTML = inC.value + ' 14:45' + PEN + DEL;
+  tabC.querySelector('.pen').onclick = openTabC;
+}
+function openTabC(e) {
+  e.stopPropagation();
+  tabC.innerHTML = '<input class="tab-edit" value="' + inC.value + '"> '
+    + '<span style="color:#6B7280;font-weight:500">14:45</span>';
+  var box = tabC.querySelector('.tab-edit');
+  box.focus(); box.select();
+  box.onblur = function () { inC.value = box.value.trim() || '이름 없는 사안'; drawTabC(); };
+  box.onkeydown = function (ev) { if (ev.key === 'Enter') box.blur(); };
+}
+document.getElementById('penC').onclick = openTabC;
+inC.addEventListener('input', function () {
+  if (!tabC.querySelector('.tab-edit')) drawTabC();
+});
+</script>
+</body>
+</html>
