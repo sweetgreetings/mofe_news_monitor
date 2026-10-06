@@ -540,23 +540,36 @@ def _find_partial(key: tuple) -> Optional[list]:
     (2026-08-20 09:30 회차 사고 — 캐시 57건 중 29건을 숨긴 시점에 발생, 실측 재현:
     겹침 26 × 2 = 52 < 57로 탈락. HISTORY.md 참고).
 
-    숨긴 기사는 어차피 모든 화면에서 filter_hidden으로 빠지므로 "이 분류를 아직 써도
-    되는가"를 판단하는 분모에 낄 이유가 없다 — 분모는 "캐시에 담긴 기사 중 지금도
-    화면에 나올 수 있는 것"이어야 한다. app.curation을 지연 임포트하는 이유는
-    _build_prompt와 같다(app.curation -> app.classifier -> 이 모듈 순환 방지).
-    """
-    from app.curation import load_hidden_urls
+    [수정: 2026-10-06] **과반 조건을 아예 없앴다 — round_id가 맞고 겹치는 기사가
+    1건이라도 있으면 재사용한다.** 분모에서 숨긴 기사를 빼는 것만으로는 부족했다:
+    분모는 숨김만 빼 주는데 **분자는 모든 이유로 깎인다**. 숨김 말고도 앞 회차에 이미
+    실림(_already_published_urls)·언론사 화이트리스트 변경·검색어 변경·제목 중복 대표
+    교체가 전부 분자만 줄이므로, 기울어진 비교가 남아 있었다. 깨지는 조건은
+    "숨김 외의 이유로 빠진 기사 > (캐시 기사 − 숨긴 기사) ÷ 2".
 
+    (2026-10-06 09:30 회차 사고 — 새벽에 맥북이 잠들어 06:00 회차가 09:11에야 저장되자
+    09:09에 분류해 둔 캐시 33건 중 15건이 "앞 회차에 이미 실림"으로 초안에서 빠졌다.
+    기사를 13건 숨긴 09:16:53 시점에 겹침 11 × 2 = 22 < 23으로 탈락해 소제목이
+    「특히」·「lng」·「임명」으로 뭉개졌다. 실측 재현 확인. HISTORY.md 참고.)
+
+    과반 조건이 원래 막으려던 "전혀 다른 회차의 캐시"는 2026-08-14부터 round_id가
+    맡고 있다. 남아 있던 역할은 "같은 회차인데 겹침이 적으면 안 쓴다"뿐인데, **안 쓰면
+    대안이 규칙 기반 한 어절 이름이다** — 겹치는 기사엔 제 AI 이름을 주고 나머지를
+    📂 미분류로 보내는 쪽이 언제나 정직하다(_round_cache_emptied에 적어 둔 것과 같은
+    판단). 겹침이 0이면 여기선 여전히 None이고, 그 경우는 _round_cache_emptied가 받는다.
+
+    마감(app.classifier.classify_for_finalize)은 이렇게 이어 쓴 분류가 **기사 과반을
+    📂 미분류로 남기면 처음부터 다시 분류한다** — 그 보호장치가 없으면 겹침이 아주 적을 때
+    assign_to_existing이 기사를 소제목 한두 칸에 몰아넣는다(실측: 겹침 1 + 새 기사 20건이면
+    확정본이 2칸으로 뭉개졌다). 이 함수를 느슨하게 둘 수 있는 건 그쪽이 받쳐 주기 때문이다.
+    """
     round_id, urls, max_subheadings = key
-    hidden_urls = load_hidden_urls()
     best = None
     for (cached_round_id, cached_urls, cached_max), groups in _cache.items():
         if cached_round_id != round_id or cached_max != max_subheadings:
             continue
         overlap = len(cached_urls & urls)
-        # 분모: 캐시된 기사 중 숨겨지지 않은 것만(위 [수정: 2026-08-20] 참고).
-        live_cached = len(cached_urls - hidden_urls)
-        if overlap == 0 or overlap * 2 < live_cached:
+        if overlap == 0:
             continue
         if best is None or overlap > best[0]:
             best = (overlap, groups)

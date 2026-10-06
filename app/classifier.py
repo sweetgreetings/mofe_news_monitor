@@ -296,11 +296,23 @@ def classify_for_finalize(
             custom_group_names,
             cached_group_layout(articles, max_subheadings, round_id),
         )
-    # 초안 분류의 기사를 담당자가 전부 숨겼고 배정된 기사로 되살아난 소제목도 없으면 전부
-    # 미분류다 — 끼워 넣을 기존 소제목이 없으니 분류가 아예 없던 회차와 같이 처음부터 분류한다.
-    # 배정으로 소제목이 하나라도 남으면 초안 화면 그대로 이어 간다.
-    if llm_groups is not None and all(g["name"] == UNCLASSIFIED_GROUP_NAME for g in llm_groups):
-        llm_groups = None
+    # [수정: 2026-10-06] 이어 쓸 초안 분류가 **너무 얇으면**(기사 과반이 📂 미분류) 처음부터
+    # 분류한다. 예전엔 "전부 미분류일 때"만 이 길로 보냈는데, llm_classifier._find_partial이
+    # 과반 조건을 버린 뒤로는 겹침이 1건이어도 분류를 돌려주므로 그 조건만으론 모자란다 —
+    # 소제목 1칸에 기사 20건이 미분류로 딸려 오면 아래 assign_to_existing이 그 1칸(+「기타」)에
+    # 전부 몰아넣어 확정본이 2칸으로 뭉개졌다(실측: 겹침 1 + 새 기사 20건). 담당자가 보는
+    # 초안은 📂 미분류로 두는 게 정직하지만, 마감은 아무도 안 보는 자리라 여기서 받아야 한다.
+    #
+    # "전부 미분류"(초안 첫 분류 기사를 담당자가 다 숨기고 배정으로 되살아난 소제목도 없는
+    # 회차)는 이 조건의 특수형이다 — 끼워 넣을 소제목이 없으니 분류가 아예 없던 회차와 같이
+    # 취급한다. 배정으로 소제목이 남고 미분류가 과반이 아니면 초안 화면 그대로 이어 간다.
+    # 판정은 _apply_forced_groups 뒤에서 한다(배정으로 되살아난 소제목까지 센 뒤라야 맞다).
+    if llm_groups is not None:
+        unclassified = sum(
+            len(g["articles"]) for g in llm_groups if g["name"] == UNCLASSIFIED_GROUP_NAME
+        )
+        if not llm_groups or unclassified * 2 > len(articles):
+            llm_groups = None
     if llm_groups is None:
         # [수정: 2026-08-14] 여기서만 allow_llm_call=True를 명시한다 — 초안에서 한 번도
         # 분류된 적 없는 회차(예: 아무도 열어보지 않은 심야 06:00 회차)라 재사용할 캐시가
