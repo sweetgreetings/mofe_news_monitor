@@ -1060,9 +1060,9 @@ function revertCut(btn) {{
   // (보관함 「선택 삭제」와 같은 기준). 치운 회차는 정기 보관함의 「삭제함 · 되살리기」로 남는다.
   var end = btn.getAttribute("data-end"), n = btn.getAttribute("data-count");
   var start = btn.getAttribute("data-start"), restored = btn.getAttribute("data-restored");
-  if (!confirm(end + " 끊기를 되돌릴까요?\n\n"
-      + "· " + end + " 확정본(" + n + "건)을 휴지통으로 치웁니다.\n"
-      + "· 오늘 시간표가 " + start + "~" + restored + "으로 돌아갑니다.\n"
+  if (!confirm(end + " 끊기를 되돌릴까요?\\n\\n"
+      + "· " + end + " 확정본(" + n + "건)을 휴지통으로 치웁니다.\\n"
+      + "· 오늘 시간표가 " + start + "~" + restored + "으로 돌아갑니다.\\n"
       + "· 그 " + n + "건은 " + _cutKr(restored) + " 회차가 다시 모아요.")) return;
   btn.disabled = true;
   btn.textContent = "되돌리는 중…";

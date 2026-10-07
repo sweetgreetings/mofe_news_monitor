@@ -4677,12 +4677,138 @@ def test_key_paths_stay_narrow():
 
 
 
+def test_screen_js_strings_are_not_cut_by_newlines():
+    """화면 JS의 문자열이 줄바꿈으로 끊기지 않는지 지킨다 — 한 줄이 화면을 통째로 먹통으로 만든다.
+
+    렌더러가 내는 JS는 화면마다 **블록 하나**다. 그래서 문자열 리터럴 하나가 줄바꿈으로
+    끊기면 그 블록 전체가 파싱에 실패하고, 그 화면의 버튼이 **전부** 죽는다(숨기기·↑↓·
+    소제목·재분류·확인창까지). 사고 당시 초안 화면이 그랬다 — 되돌리기 확인창 문구를
+    파이썬 템플릿에 `\\n`으로 적어(`\\\\n`이어야 한다) 파이썬이 진짜 줄바꿈을 박아 넣었다.
+
+    **서버 로그에 아무것도 남지 않는 종류라 이 테스트가 유일한 그물이다.** 수집·발송은
+    멀쩡히 돌고 화면도 열리므로, 담당자가 "클릭이 안 돼"라고 말해 주기 전까지 아무도
+    모른다. 바로 위 줄의 같은 문구들은 `\\\\n`으로 멀쩡했고 이 함수만 한 겹이 빠져 있었다.
+
+    JS를 따로 파싱하지 않고(린터·node를 쓰지 않는 저장소다) 문자열 리터럴만 훑는다 —
+    `'…'`와 `"…"` 안에서 줄바꿈을 만나면 그 자리를 집는다. 주석·정규식 리터럴·백틱
+    템플릿은 건너뛴다(`replace(/"/g, …)`의 따옴표를 문자열 시작으로 읽으면 안 된다).
+    """
+    _require_isolation()
+    root = Path(__file__).resolve().parent.parent
+    # 화면 JS로 나갈 글만 고른다 — CSS·HTML 조각에는 이 규칙이 없다.
+    js_hints = ("function ", "addEventListener", "document.querySelector",
+                "document.getElementById", "=>")
+    word = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_$")
+
+    def cut_literals(js):
+        """줄바꿈으로 끊긴 문자열 리터럴이 시작된 줄 번호들."""
+        bad, i, line, n, prev = [], 0, 1, len(js), ""
+        while i < n:
+            c = js[i]
+            if c == "\n":
+                line += 1
+                i += 1
+            elif c in " \t\r":
+                i += 1
+            elif c == "/" and i + 1 < n and js[i + 1] == "/":        # 한 줄 주석
+                while i < n and js[i] != "\n":
+                    i += 1
+            elif c == "/" and i + 1 < n and js[i + 1] == "*":        # 여러 줄 주석
+                i += 2
+                while i + 1 < n and not (js[i] == "*" and js[i + 1] == "/"):
+                    line += js[i] == "\n"
+                    i += 1
+                i += 2
+            elif c == "/" and prev not in word and prev not in ")]":  # 정규식 리터럴
+                i += 1
+                while i < n and js[i] not in "/\n":
+                    i += 2 if js[i] == "\\" else 1
+                if i < n and js[i] == "/":   # 줄바꿈은 세지 않고 겉 루프에 맡긴다
+                    i += 1
+                prev = "/"
+            elif c == "`":                                           # 백틱은 줄바꿈 허용
+                i += 1
+                while i < n and js[i] != "`":
+                    if js[i] == "\\":
+                        i += 1
+                    else:
+                        line += js[i] == "\n"
+                    i += 1
+                i += 1
+                prev = "`"
+            elif c in "\"'":
+                quote, start, i = c, line, i + 1
+                while i < n:
+                    if js[i] == "\\":
+                        i += 2
+                    elif js[i] == quote:
+                        i += 1
+                        break
+                    elif js[i] == "\n":
+                        bad.append(start)
+                        line += 1
+                        i += 1
+                        break
+                    else:
+                        i += 1
+                prev = quote
+            else:
+                prev = c
+                i += 1
+        return bad
+
+    def screen_js(tree):
+        """f-string은 통째로 이어 붙여 본다 — 조각만 보면 리터럴이 반쪽만 들어와
+        멀쩡한 코드가 걸린다(`f"… '{icon('refresh')}불러오는 중…';"`)."""
+        in_fstring = {
+            id(part)
+            for node in ast.walk(tree) if isinstance(node, ast.JoinedStr)
+            for part in ast.walk(node) if isinstance(part, ast.Constant)
+        }
+        for node in ast.walk(tree):
+            if isinstance(node, ast.JoinedStr):
+                # {…} 자리는 값 하나로 바꿔 둔다 — 무엇이 들어오든 리터럴을 열거나 닫지 않는다.
+                yield node.lineno, "".join(
+                    p.value if isinstance(p, ast.Constant) and isinstance(p.value, str) else "0"
+                    for p in node.values
+                )
+            elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+                if id(node) not in in_fstring:
+                    yield node.lineno, node.value
+
+    broken = []
+    scanned = 0
+    for path in sorted(root.glob("app/**/*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for lineno, js in screen_js(tree):
+            if not any(hint in js for hint in js_hints):
+                continue
+            scanned += 1
+            for ln in cut_literals(js):
+                broken.append(
+                    f"{path.relative_to(root)} 상수(줄 {lineno})의 JS {ln}행 — "
+                    f"{js.splitlines()[ln - 1].strip()[:90]}"
+                )
+
+    assert not broken, (
+        "화면 JS의 문자열이 줄바꿈으로 끊겼습니다 — 그 화면의 버튼이 전부 죽습니다:\n  "
+        + "\n  ".join(broken)
+        + "\n파이썬 템플릿 안에서는 줄바꿈을 `\\\\n`으로 적습니다(`\\n`은 진짜 줄바꿈이 됩니다)."
+    )
+    # 그물이 실제로 글을 보고 있는지 — 렌더러가 늘 수십 덩어리를 낸다. 0이면 js_hints가
+    # 옛 이름을 보고 있다는 뜻이고, 그때 이 테스트는 조용히 아무것도 안 지킨다.
+    assert scanned >= 20, f"화면 JS를 {scanned}덩어리밖에 못 찾았습니다 — js_hints가 헛돌고 있습니다"
+
+    print(f"53) 화면 JS 문자열: 통과 (JS {scanned}덩어리, 줄바꿈으로 끊긴 리터럴 없음)")
+
+
 if __name__ == "__main__":
     tests = [
         test_custom_group_with_taken_name_gets_its_own_box,
         test_no_ai_key_is_not_a_failure,
         test_env_key_transplant,
         test_key_paths_stay_narrow,
+        test_screen_js_strings_are_not_cut_by_newlines,
         test_login_lock,
         test_search_operator_is_one_rule,
         test_photo_override_is_one_place,
