@@ -8,6 +8,11 @@ from typing import Optional
 from urllib.parse import parse_qs, quote, urlsplit
 
 from app.config import (
+    AUTH_LOGIN_LOCK_MIN,
+    AUTH_MAX_LOGIN_FAILS,
+    AUTH_MAX_RECOVER_FAILS,
+    AUTH_RECOVER_LOCK_MIN,
+    SESSION_COOKIE_NAME,
     BURST_MIN_OUTLETS_CHOICES,
     BURST_WINDOW_CHOICES,
     DEFAULT_ARTICLE_LINE_TEMPLATE,
@@ -71,6 +76,16 @@ from app.icons import icon
 from app import send_log
 from app.config import SEND_LOG_RETENTION_DAYS
 from app.topnav import plain_nav, regular_nav, topnav_style
+from app import auth_session, users
+from app.auth_renderer import (
+    render_forgot_answer_page,
+    render_forgot_done_page,
+    render_forgot_page,
+    render_forgot_reset_page,
+    render_login_page,
+    render_my_info_page,
+    render_signup_page,
+)
 from app.curation import (
     active_hidden_dates,
     bulk_move_articles,
@@ -90,7 +105,7 @@ from app.curation import (
     set_group_override,
     unhide_articles,
 )
-from app.custom_groups import add_custom_group, load_custom_groups, remove_custom_group
+from app.custom_groups import add_custom_group, load_custom_groups, remove_custom_group, unique_key
 from app.email_recipients import active_recipient_emails, load_email_recipients, save_email_recipients
 from app.email_sender import is_configured as email_is_configured
 from app.email_sender import send_text as email_send_text
@@ -316,6 +331,13 @@ _BASE_STYLE = """
 # 상단바는 app/topnav.py 한 곳에서 만든다(시안 mockups/TOPBAR_NAV_MOCKUP.html).
 # 설정 하위 화면: 홈 │ ← 설정. 휴지통: 정기 묶음(켜진 칸 없음 — 초안·확정본에서 들어오는 곳).
 _TOP_BAR_HTML = plain_nav("설정", f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/")
+
+# 로그인이 켜져 있어도 통과시키는 주소. **정확히 일치하는 것만**이다 —
+# 앞글자로 재면 `/login-settings`(설정 화면)까지 열려 버린다.
+_AUTH_FREE_PATHS = {
+    "/login", "/signup", "/forgot", "/forgot-answer", "/forgot-reset",
+    f"/{LOGO_PATH.name}",
+}
 _LABELS_TOP_BAR_HTML = plain_nav()
 _LABEL_MANAGE_TOP_BAR_HTML = plain_nav("라벨 보관함", f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/labels")
 _HIDDEN_TOP_BAR_HTML = regular_nav(None)
@@ -418,6 +440,13 @@ _MENU_TEMPLATE = (
       <a href="/telegram">텔레그램<span class="menu-chev">›</span></a>
       <a href="/email">이메일<span class="menu-note">정기 확정본만</span><span class="menu-chev">›</span></a>
       <a href="/send-log">발송 기록<span class="menu-note">누가 받았는지</span><span class="menu-chev">›</span></a>
+    </div>
+  </div>
+  <div class="category">
+    <div class="category-name">계정</div>
+    <div class="menu">
+      <a href="/login-settings">로그인 사용<span class="menu-note">{login_note}</span><span class="menu-chev">›</span></a>
+      <a href="/me">나의 정보 관리<span class="menu-chev">›</span></a>
     </div>
   </div>
   <!-- [추가: 2026-08-20] "연동"은 일부러 맨 아래에 둔다(사용자 지정 위치) — 검색어
@@ -1056,7 +1085,7 @@ _KEYWORD_GROUPS_TEMPLATE = (
     + """
 <div class="container">
   <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg> 검색어</h1>
-  <p class="kw-lead">검색어는 하나씩 따로 걸립니다. 둘 다 든 기사만 찾으려면 「가상자산+과세」처럼 +로 묶으세요.<br>* 1번 클릭: 보류, 2번 클릭: 키워드 수정</p>
+  <p class="kw-lead">검색어는 하나씩 따로 걸립니다. 띄어 쓴 말은 붙어 있는 그대로 찾고, 두 낱말이 다 든 기사는 「가상자산+과세」처럼 +로 묶으세요.<br>* 1번 클릭: 보류, 2번 클릭: 키워드 수정</p>
   <div id="kwGroups"></div>
   <button type="button" class="add-group-btn" id="kwAddGroupBtn"><span class="plus-glyph">+</span>키워드 그룹 추가</button>
 </div>
@@ -1434,6 +1463,72 @@ def _theme() -> dict:
 # 브라우저(사파리 포함)는 보안상 http 페이지에서 file 경로로의 이동을 막아 버튼이
 # 먹통이었다. 그래서 설정 서버가 정적 화면 파일도 같은 127.0.0.1 출처로 함께 서빙하고,
 # 이 링크도 file:// 대신 그 http 주소를 가리키도록 바꿨다.
+# ── 설정: 로그인 사용 ───────────────────────────────────────────────────
+# 「각자 로그인해서 각자 데이터」의 첫 단계는 **자물쇠까지**다. 이 화면은 그 자물쇠를
+# 켜고 끄는 자리이고, 지금 무엇이 갈리고 무엇이 안 갈리는지를 숨기지 않고 적는다 —
+# 화면이 할 수 있는 것보다 더 약속하면 담당자가 안 갈린 데이터를 갈린 줄 안다.
+_LOGIN_SETTINGS_TEMPLATE = (
+    """<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>로그인 사용</title>
+<style>"""
+    + _BASE_STYLE
+    + """
+  .sw-row {{ display: flex; align-items: center; gap: 10px; margin: 0 0 10px; }}
+  .sw-row input {{ width: var(--chk-md); height: var(--chk-md); accent-color: {accent};
+    flex: none; margin: 0; }}
+  .sw-row label {{ font-size: var(--fs-base); }}
+  .links a {{ color: {accent}; text-decoration: none; }}
+  .links a:hover {{ text-decoration: underline; }}
+  .container {{ padding-bottom: 88px; }}
+</style>
+</head>
+<body>
+"""
+    + _TOP_BAR_HTML
+    + """
+<div class="container">
+  <h1>🔒 로그인 사용</h1>
+  <p class="hint">
+    켜면 이 컴퓨터에서 앱 화면을 열 때 로그인을 받습니다.
+    <strong>끄면 예전과 똑같이 돕니다.</strong><br>
+    수집과 자동발송은 로그인과 무관하게 계속 돕니다 — 로그인하지 않아도 회차는 정시에 모이고 보고서는 나갑니다.<br>
+    <strong>아직 데이터는 사람별로 갈리지 않습니다</strong> — 누가 로그인해도 같은 기사·같은 설정을 봅니다.
+  </p>
+  {error_html}
+  <form method="POST" action="/save-login-settings">
+    <div class="sw-row">
+      <input type="checkbox" id="login_required" name="login_required" value="1" {checked}>
+      <label for="login_required">앱을 열 때 로그인을 받습니다</label>
+    </div>
+    <p class="caption">{accounts_line}</p>
+    <div class="save-bar"><div class="save-bar-inner"><button type="submit">저장</button></div></div>
+  </form>
+  <p class="caption links"><a href="/signup">계정 추가</a> · <a href="/me">나의 정보 관리</a></p>
+</div>
+</body>
+</html>
+"""
+)
+
+
+def render_login_settings_page(error: str = "") -> str:
+    count = users.user_count()
+    if count == 0:
+        accounts_line = "등록된 계정이 없습니다 — 먼저 계정을 만들어야 켤 수 있습니다."
+    else:
+        accounts_line = f"등록된 계정 {count}개."
+    return _LOGIN_SETTINGS_TEMPLATE.format(
+        **_theme(),
+        error_html=f'<p class="error">{html.escape(error)}</p>' if error else "",
+        checked="checked" if auth_session.is_login_required() else "",
+        accounts_line=accounts_line,
+    )
+
+
 _STATIC_HTML_ROUTES = {
     "/index.html": lambda: OUTPUT_HTML_PATH,
     "/history.html": lambda: HISTORY_HTML_PATH,
@@ -1488,6 +1583,7 @@ def _credential_badge(source: str) -> str:
 def render_menu_page() -> str:
     """설정 메뉴 화면을 렌더링한다 (PRD.md 기능1 규칙 17)."""
     return _MENU_TEMPLATE.format(
+        login_note="켜짐" if auth_session.is_login_required() else "꺼짐",
         **_theme(),
         topnav_html=plain_nav(),
         naver_badge=_credential_badge(naver_source()),
@@ -4094,11 +4190,14 @@ _HIDDEN_TEMPLATE = (
   .hid-check {{ flex: none; width: var(--chk-sm); height: var(--chk-sm); margin: 0;
     accent-color: {accent}; cursor: pointer; }}
   /* 선택했을 때만 뜨는 일괄 복구 바 — 확정본·초안의 일괄이동 바와 같은 규칙(선택이
-     없으면 자리 자체를 안 차지한다). */
+     없으면 자리 자체를 안 차지한다). top은 상단 고정바(54px) 바로 아래다 — 0이면
+     고정바 뒤로 숨어, 아래쪽 기사를 고른 담당자가 복구 버튼을 누르러 맨 위까지 다시
+     올라가야 했다(오늘 전체 기사 시간대 머리줄과 같은 값). */
   .bulk-restore {{
-    display: none; position: sticky; top: 0; z-index: 5; align-items: center; gap: 8px;
+    display: none; position: sticky; top: 54px; z-index: 5; align-items: center; gap: 8px;
     background: {hover}; border: 1px solid {accent_border}; border-radius: var(--r-lg);
     padding: 8px 12px; font-size: var(--fs-md); color: {header}; margin-bottom: 12px;
+    box-shadow: var(--sh-float);
   }}
   .bulk-restore.on {{ display: flex; }}
   .bulk-restore .n {{ font-weight: 700; }}
@@ -4606,7 +4705,7 @@ def _label_source_tag_html(source: dict) -> str:
 
 
 def _render_label_archive_row(
-    entry: dict, hidden_urls: set, overrides: dict, subheading_format: str, return_qs: str = ""
+    entry: dict, hidden_urls: set, overrides: dict, return_qs: str = ""
 ) -> str:
     url = entry["url"]
     escaped_url = html.escape(url)
@@ -5339,6 +5438,8 @@ def _original_url_index() -> dict:
 
 class _SettingsHandler(BaseHTTPRequestHandler):
     def do_GET(self):
+        if self._auth_blocked():
+            return
         if self.path in _STATIC_HTML_ROUTES:
             self._respond_static_html(_STATIC_HTML_ROUTES[self.path]())
         elif self.path.startswith("/history/day?"):
@@ -5379,6 +5480,7 @@ class _SettingsHandler(BaseHTTPRequestHandler):
                     preset=(query.get("preset") or [""])[0],
                     start=(query.get("start") or [""])[0],
                     end=(query.get("end") or [""])[0],
+                    filters={key: bool(query.get(key)) for key in AGENCY_ARCHIVE_FILTERS},
                 )
             )
         elif self.path == "/label-manage" or self.path.startswith("/label-manage?"):
@@ -5423,9 +5525,277 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             if not adhoc_routes.handle_get(self, self.path):
                 self.send_response(404)
                 self.end_headers()
+        elif self.path == "/login":
+            self._handle_login_page()
+        elif self.path == "/signup":
+            self._handle_signup_page()
+        elif self.path == "/forgot":
+            self._respond(render_forgot_page())
+        elif self.path == "/me":
+            self._handle_my_info_page()
+        elif self.path == "/login-settings":
+            self._respond(render_login_settings_page())
         else:
             self.send_response(404)
             self.end_headers()
+
+    # ── 로그인(자물쇠) ───────────────────────────────────────────────────
+    # 「로그인 사용」이 꺼져 있으면 이 자리는 아무 일도 하지 않는다 — 켜기 전까지
+    # 앱은 예전과 한 글자도 다르지 않게 돈다. 스케줄러·발송은 서버를 거치지 않으므로
+    # 켜든 끄든 수집과 자동발송은 그대로 간다.
+    def _cookie_token(self) -> str:
+        for part in (self.headers.get("Cookie") or "").split(";"):
+            name, _, value = part.strip().partition("=")
+            if name == SESSION_COOKIE_NAME:
+                return value
+        return ""
+
+    def _current_user(self):
+        user_id = auth_session.user_id_for_token(self._cookie_token())
+        return users.get_user(user_id) if user_id else None
+
+    def _auth_blocked(self) -> bool:
+        """로그인이 필요한데 안 돼 있으면 응답까지 보내고 True를 돌려준다."""
+        if not auth_session.is_login_required():
+            return False
+        if urlsplit(self.path).path in _AUTH_FREE_PATHS:
+            return False
+        if self._current_user():
+            return False
+        if self.command == "POST":
+            # 화면의 fetch가 받는 자리라 리다이렉트 대신 401이다(로그인 HTML을
+            # 성공 응답으로 돌려주면 화면이 그걸 결과로 읽는다).
+            self._respond_json({"error": "login_required"}, status=401)
+        else:
+            self._redirect("/login")
+        return True
+
+    def _redirect_with_session(self, path: str, token: str, max_age: int) -> None:
+        self.send_response(303)
+        self.send_header("Location", path)
+        self.send_header(
+            "Set-Cookie",
+            f"{SESSION_COOKIE_NAME}={token}; Path=/; Max-Age={max_age}; HttpOnly; SameSite=Lax",
+        )
+        self.end_headers()
+
+    @staticmethod
+    def _one(form: dict, key: str) -> str:
+        return (form.get(key) or [""])[0].strip()
+
+    @staticmethod
+    def _lock_label(seconds: int) -> str:
+        minutes = max(1, (seconds + 59) // 60)
+        return f"{minutes}분"
+
+    # ── 로그인 ───────────────────────────────────────────────────────────
+    def _handle_login_page(self) -> None:
+        if users.user_count() == 0:
+            self._redirect("/signup")
+            return
+        self._respond(render_login_page())
+
+    def _handle_login(self, form: dict) -> None:
+        email = self._one(form, "email")
+        password = self._one(form, "password")
+        key = f"login:{users.normalize_email(email)}"
+
+        left = auth_session.lock_remaining_sec(key)
+        if left:
+            self._respond(render_login_page(
+                error=f"너무 여러 번 틀려 잠겼습니다. {self._lock_label(left)} 뒤에 다시 해주세요.",
+                email=email))
+            return
+
+        user = users.verify_login(email, password)
+        if not user:
+            # 어느 쪽이 틀렸는지 말하지 않는다 — 알려주면 「이 이메일은 가입돼 있다」를
+            # 확인해 주는 셈이다. 이메일 칸은 지우지 않고 남긴다.
+            remaining = auth_session.record_fail(key, AUTH_MAX_LOGIN_FAILS, AUTH_LOGIN_LOCK_MIN)
+            tail = (f"{remaining}번 더 틀리면 {AUTH_LOGIN_LOCK_MIN}분간 잠깁니다."
+                    if remaining else f"{AUTH_LOGIN_LOCK_MIN}분간 잠겼습니다.")
+            self._respond(render_login_page(
+                error=f"이메일 또는 비밀번호가 맞지 않습니다. {tail}", email=email))
+            return
+
+        auth_session.clear_fails(key)
+        token, max_age = auth_session.create_session(user["id"], bool(form.get("keep")))
+        self._redirect_with_session(_home_href(), token, max_age)
+
+    def _handle_logout(self) -> None:
+        auth_session.destroy_session(self._cookie_token())
+        self.send_response(303)
+        self.send_header("Location", "/login")
+        self.send_header("Set-Cookie", f"{SESSION_COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax")
+        self.end_headers()
+
+    # ── 회원가입 ─────────────────────────────────────────────────────────
+    def _handle_signup_page(self) -> None:
+        self._respond(render_signup_page(first=users.user_count() == 0))
+
+    def _handle_signup(self, form: dict) -> None:
+        first = users.user_count() == 0
+        if self._one(form, "password") != self._one(form, "password2"):
+            self._respond(render_signup_page("비밀번호 확인이 맞지 않습니다.", form, first))
+            return
+        try:
+            user = users.create_user(
+                email=self._one(form, "email"),
+                password=self._one(form, "password"),
+                display_name=self._one(form, "display_name"),
+                phone=self._one(form, "phone"),
+                question=self._one(form, "question"),
+                answer=self._one(form, "answer"),
+            )
+        except users.UserError as exc:
+            self._respond(render_signup_page(str(exc), form, first))
+            return
+        logger.info("계정 생성: %s (%s)", user["email"], user["role"])
+        token, max_age = auth_session.create_session(user["id"], False)
+        self._redirect_with_session(_home_href(), token, max_age)
+
+    # ── 비밀번호 찾기 ────────────────────────────────────────────────────
+    def _handle_forgot(self, form: dict) -> None:
+        email = self._one(form, "email")
+        key = f"recover:{users.normalize_email(email)}"
+        left = auth_session.lock_remaining_sec(key)
+        if left:
+            self._respond(render_forgot_page(
+                error=f"너무 여러 번 틀려 잠겼습니다. {self._lock_label(left)} 뒤에 다시 해주세요.",
+                email=email))
+            return
+
+        user = users.verify_recovery(email, self._one(form, "phone"))
+        if not user:
+            # 어느 칸이 틀렸는지 말하지 않는다 — 하나씩 좁혀 주면 둘을 차례로 맞혀 볼 수 있다.
+            remaining = auth_session.record_fail(key, AUTH_MAX_RECOVER_FAILS, AUTH_RECOVER_LOCK_MIN)
+            tail = (f"{remaining}번 더 틀리면 {AUTH_RECOVER_LOCK_MIN}분간 잠깁니다."
+                    if remaining else f"{AUTH_RECOVER_LOCK_MIN}분간 잠겼습니다.")
+            self._respond(render_forgot_page(
+                error=("입력한 정보가 가입할 때와 다릅니다. " + tail
+                       + " 기억이 안 나면 관리자에게 알려 주세요."), email=email))
+            return
+
+        auth_session.clear_fails(key)
+        ticket = auth_session.issue_ticket(user["id"], "answer")
+        self._respond(render_forgot_answer_page(ticket, user.get("security_question", "")))
+
+    def _handle_forgot_answer(self, form: dict) -> None:
+        ticket = self._one(form, "ticket")
+        user_id = auth_session.ticket_user_id(ticket, "answer")
+        user = users.get_user(user_id) if user_id else None
+        if not user:
+            self._respond(render_forgot_page(error="시간이 지나 처음부터 다시 해야 합니다."))
+            return
+
+        key = f"answer:{user_id}"
+        left = auth_session.lock_remaining_sec(key)
+        if left:
+            self._respond(render_forgot_page(
+                error=f"너무 여러 번 틀려 잠겼습니다. {self._lock_label(left)} 뒤에 다시 해주세요."))
+            return
+
+        if not users.verify_answer(user, self._one(form, "answer")):
+            remaining = auth_session.record_fail(key, AUTH_MAX_RECOVER_FAILS, AUTH_RECOVER_LOCK_MIN)
+            tail = (f"{remaining}번 더 틀리면 {AUTH_RECOVER_LOCK_MIN}분간 잠깁니다."
+                    if remaining else f"{AUTH_RECOVER_LOCK_MIN}분간 잠겼습니다.")
+            self._respond(render_forgot_answer_page(
+                ticket, user.get("security_question", ""), error=f"답이 맞지 않습니다. {tail}"))
+            return
+
+        auth_session.clear_fails(key)
+        auth_session.drop_ticket(ticket)
+        self._respond(render_forgot_reset_page(
+            auth_session.issue_ticket(user["id"], "reset"), user.get("email", "")))
+
+    def _handle_forgot_reset(self, form: dict) -> None:
+        ticket = self._one(form, "ticket")
+        user_id = auth_session.ticket_user_id(ticket, "reset")
+        user = users.get_user(user_id) if user_id else None
+        if not user:
+            self._respond(render_forgot_page(error="시간이 지나 처음부터 다시 해야 합니다."))
+            return
+
+        password = self._one(form, "password")
+        email = user.get("email", "")
+        if password != self._one(form, "password2"):
+            self._respond(render_forgot_reset_page(ticket, email, error="두 칸이 서로 다릅니다."))
+            return
+        try:
+            users.set_password(user_id, password)
+        except users.UserError as exc:
+            self._respond(render_forgot_reset_page(ticket, email, error=str(exc)))
+            return
+
+        # 옛 비밀번호로 열어 둔 창은 전부 닫는다(화면이 그렇게 약속한다).
+        auth_session.destroy_user_sessions(user_id)
+        auth_session.drop_ticket(ticket)
+        logger.info("비밀번호 재설정: %s", email)
+        self._respond(render_forgot_done_page(email))
+
+    # ── 나의 정보 관리 ───────────────────────────────────────────────────
+    def _handle_my_info_page(self, error: str = "", notice: str = "") -> None:
+        user = self._current_user()
+        if not user:
+            self._redirect("/login")
+            return
+        self._respond(render_my_info_page(user, error=error, notice=notice))
+
+    def _handle_my_info_save(self, form: dict) -> None:
+        user = self._current_user()
+        if not user:
+            self._redirect("/login")
+            return
+        if not users.verify_secret(self._one(form, "confirm"), user.get("password_hash", "")):
+            self._handle_my_info_page(error="지금 비밀번호가 맞지 않아 저장하지 않았습니다.")
+            return
+        try:
+            users.update_profile(
+                user["id"],
+                display_name=self._one(form, "display_name"),
+                phone=self._one(form, "phone"),
+                question=self._one(form, "question"),
+                answer=self._one(form, "answer"),
+            )
+        except users.UserError as exc:
+            self._handle_my_info_page(error=str(exc))
+            return
+        self._handle_my_info_page(notice="저장했습니다.")
+
+    def _handle_my_password(self, form: dict) -> None:
+        user = self._current_user()
+        if not user:
+            self._redirect("/login")
+            return
+        if not users.verify_secret(self._one(form, "current"), user.get("password_hash", "")):
+            self._handle_my_info_page(error="현재 비밀번호가 맞지 않습니다.")
+            return
+        password = self._one(form, "password")
+        if password != self._one(form, "password2"):
+            self._handle_my_info_page(error="새 비밀번호 두 칸이 서로 다릅니다.")
+            return
+        try:
+            users.set_password(user["id"], password)
+        except users.UserError as exc:
+            self._handle_my_info_page(error=str(exc))
+            return
+        # 전부 끊은 뒤 **이 브라우저만** 다시 들여보낸다 — 비밀번호를 바꾼 사람이
+        # 자기 화면에서 튕겨 나가면 안 된다.
+        auth_session.destroy_user_sessions(user["id"])
+        token, max_age = auth_session.create_session(user["id"], False)
+        self._redirect_with_session("/me", token, max_age)
+
+    # ── 설정: 로그인 사용 ────────────────────────────────────────────────
+    def _handle_save_login_settings(self, form: dict) -> None:
+        want_on = bool(form.get("login_required"))
+        if want_on and users.user_count() == 0:
+            # 계정이 하나도 없는데 켜면 아무도 못 들어온다.
+            self._respond(render_login_settings_page(
+                error="계정이 하나도 없어 켤 수 없습니다. 먼저 계정을 만들어 주세요."))
+            return
+        auth_session.set_login_required(want_on)
+        logger.info("로그인 사용: %s", "켬" if want_on else "끔")
+        self._redirect("/login-settings")
 
     def _handle_history_day(self) -> None:
         """지난 기사 화면의 지연 로딩 — 오래된 날짜(EAGER_HISTORY_DAYS 밖)를 실제로 펼칠
@@ -5518,6 +5888,9 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         # 구분할 수 없게 된다(예: "+ 추가" 핸들러들의 `f"...{i}..." in form` 존재 확인이
         # 빈 칸을 del로 지운 것처럼 잘못 판단함).
         form = parse_qs(self.rfile.read(length).decode("utf-8"), keep_blank_values=True)
+
+        if self._auth_blocked():
+            return
 
         if self.path == "/download-text":
             self._handle_download_text(form)
@@ -5679,6 +6052,24 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             if not adhoc_routes.handle_post(self, self.path, form):
                 self.send_response(404)
                 self.end_headers()
+        elif self.path == "/login":
+            self._handle_login(form)
+        elif self.path == "/logout":
+            self._handle_logout()
+        elif self.path == "/signup":
+            self._handle_signup(form)
+        elif self.path == "/forgot":
+            self._handle_forgot(form)
+        elif self.path == "/forgot-answer":
+            self._handle_forgot_answer(form)
+        elif self.path == "/forgot-reset":
+            self._handle_forgot_reset(form)
+        elif self.path == "/me":
+            self._handle_my_info_save(form)
+        elif self.path == "/me/password":
+            self._handle_my_password(form)
+        elif self.path == "/save-login-settings":
+            self._handle_save_login_settings(form)
         else:
             self.send_response(404)
             self.end_headers()
@@ -7504,6 +7895,25 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _existing_group_keys(self, active_names: set) -> set:
+        """이 회차에 이미 쓰이고 있는 소제목 **속이름** 전부 — 새 소제목이 피해 갈 자리.
+
+        화면이 보낸 것(active_names)만으로는 모자란다. 기사가 0건이라 안 그려진 칸,
+        배정 기록만 남은 이름, 회차 파일에 저장된 이름이 전부 나중에 되살아나 합쳐질 수
+        있어서다. 「기타」·「📂 소제목 미분류」는 지금 없어도 늘 넣는다 — AI가 분류할
+        때마다 다시 만드는 이름이라, 지금 비었다는 이유로 내주면 다음 분류에 합쳐진다.
+        """
+        keys = set(active_names) | set(forced_group_target_names())
+        keys |= {name for name in load_group_overrides().values() if name}
+        keys |= {ETC_GROUP_NAME, UNCLASSIFIED_GROUP_NAME}
+        try:
+            run = load_latest_run()
+        except Exception:
+            run = None
+        if run:
+            keys |= {a.get("group") for a in run.get("articles", []) if a.get("group")}
+        return keys
+
     def _handle_add_custom_group(self, form: dict) -> None:
         """"+ 새 소제목 만들기" 버튼이 fetch로 호출한다(createCustomGroup) — 자동
         분류로는 나오지 않는 이름을 미리 만들어, 기사가 없어도 화면에 띄워둔다.
@@ -7533,6 +7943,16 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._respond_conflict("이미 '%s'라는 이름의 소제목이 이 화면에 있습니다." % name)
             return
         else:
+            # [추가: 2026-10-02] 화면에 그 이름이 안 보여서 여기까지 왔더라도, **속이름이**
+            # 겹치면 새 칸이 안 생기고 기존 칸에 합쳐진다 — 소제목을 가르는 값이 이름
+            # 문자열 하나뿐이기 때문이다. 담당자가 「기타」를 만들었는데 AI의 「기타」 칸
+            # (이름표를 붙여 다른 이름으로 보이던)과 한 칸이 돼버린 사고가 그것이다.
+            # 그래서 겹치면 안 겹치는 속이름을 지어 저장하고 화면엔 친 이름을 보인다.
+            # taken은 넉넉하게 모은다 — 지금 화면에 안 보이는 칸(기사가 0건이라 안 그려진)
+            # 과 겹쳐도 나중에 기사가 들어오면 똑같이 합쳐지기 때문이고, 이건 막는 판정이
+            # 아니라 빈자리를 고르는 일이라 넉넉해도 담당자에게 달라 보이는 게 없다.
+            # ETC_GROUP_NAME은 지금 없어도 늘 뺀다 — AI가 분류할 때마다 다시 만드는 받이다.
+            key = unique_key(name, self._existing_group_keys(active_names)) if name else name
             # [추가: 2026-09-03] 새로 만드는 소제목은 **항상 빈 칸으로 시작한다** — 그
             # 이름을 가리키던 옛 배정 기록을 먼저 끊는다(clear_group_overrides_for).
             # 안 끊으면 _apply_forced_groups가 과거에 그 이름으로 옮겼던 기사를 전부
@@ -7542,12 +7962,12 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             # (custom_groups.json도 되돌리기 스냅샷 대상이라 ↩ 한 번이면 소제목 생성과
             # 배정 기록이 함께 되돌아간다.)
             # undo_push는 "동작 **전** 상태"를 찍으므로 반드시 지우기보다 먼저 부른다.
-            if name and name in load_group_overrides().values():
+            if key and key in load_group_overrides().values():
                 undo_push("소제목 만들기")
-                clear_group_overrides_for(name)
+                clear_group_overrides_for(key)
             # [수정: 2026-08-27] round_id는 위 중복 검사에만 쓴다 — add_custom_group은
             # 더 이상 group_order.json을 건드리지 않는다(새 소제목은 자연 순서대로 맨 아래).
-            add_custom_group(name)
+            add_custom_group(name, key=key)
             self._regenerate_screens()
             self.send_response(204)
         self.end_headers()

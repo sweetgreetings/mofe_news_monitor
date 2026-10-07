@@ -21,7 +21,7 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app import alerted_urls, config, credentials, api_usage, breaking_alert, breaking_alert_sender, breaking_alert_state, confirm_send, curation, custom_groups, draft_articles, draft_seen, history_renderer, landing_renderer, llm_classifier, naver_api, preview_cache, preview_order, preview_renderer, renderer, scheduler, scraper, settings, storage, telegram_bot, telegram_recipients, negative_guess, today_cuts, auto_classify_turn, photo_body, breaking_burst, send_log, photo_overrides  # noqa: E402
+from app import agency_archive, alerted_urls, config, credentials, api_usage, breaking_alert, breaking_alert_sender, breaking_alert_state, confirm_send, curation, custom_groups, draft_articles, draft_seen, history_renderer, landing_renderer, llm_classifier, naver_api, preview_cache, preview_order, preview_renderer, renderer, scheduler, scraper, settings, storage, telegram_bot, telegram_recipients, negative_guess, today_cuts, auto_classify_turn, photo_body, breaking_burst, send_log, photo_overrides  # noqa: E402
 import main  # noqa: E402
 
 _FIXTURE_BY_KEYWORD = {
@@ -2696,8 +2696,8 @@ def test_add_article_by_url():
 def test_keyword_note_history_and_time_select():
     """키워드 메모 「지난 회차 메모」 참고 목록 + 수시 시간 드롭다운.
 
-      1) 이 회차보다 앞 회차 메모만, 메모 있는 최근 3개 날짜, 같은 날 같은 문구는 한 줄로
-      1-1) 자르는 축은 날짜가 아니라 줄 수 — 최신 5줄, 오늘 앞 회차가 먼저 차고 남는 자리만 어제
+      1) **오늘** 이 회차보다 앞 회차 메모만(어제는 안 가져온다), 이어진 같은 문구는 한 줄로
+      1-1) 오늘 앞 회차가 없으면 빈 목록(첫 회차엔 칸이 통째로 안 그려진다)
       2) 단어마다 data-w(앞뒤 문장부호 뗀 값) — 화면이 치는 단어와 똑같은 것만 파랗게 칠한다
       3) 시간 드롭다운 — 숨은 입력이 폼 값, 목록에 없는 분은 제자리에 끼운다
     """
@@ -2714,32 +2714,27 @@ def test_keyword_note_history_and_time_select():
     }
     with tempfile.TemporaryDirectory() as tmp, patch.object(mkn, "MANUAL_KEYWORD_NOTE_FILE", Path(tmp) / "n.json"):
         (Path(tmp) / "n.json").write_text(json.dumps({"notes": notes}, ensure_ascii=False), encoding="utf-8")
+        # 오늘(9/22) 앞 회차만 — 어제(9/21)는 안 가져온다
         rows = mkn.past_notes(("2026-09-22", "14:00"))
-        assert rows == [
-            ("2026-09-22", ["11:00"], "유류세 인하 연장"),
-            ("2026-09-21", ["14:00", "17:00"], "부총리 후보자 청문회, 세제개편 등"),
-        ], rows
-        # 달력상 어제(9/19·9/20)가 비어도 메모가 있는 가장 최근 하루를 가져온다
-        rows_mon = mkn.past_notes(("2026-09-21", "11:00"))
-        assert rows_mon == [("2026-09-19", ["11:00"], "9/19 메모")], rows_mon
+        assert rows == [("2026-09-22", ["11:00"], "유류세 인하 연장")], rows
+        # 오늘 앞 회차가 없으면 빈 목록 — 어제 메모로 칸을 채우지 않는다
+        assert mkn.past_notes(("2026-09-22", "09:30")) == []
+        assert mkn.past_notes(("2026-09-21", "11:00")) == []
         html_out = keyword_note_history_html(("2026-09-22", "14:00"))
-        # 줄 수로 자른다 — 오늘 앞 회차가 먼저 차고 남는 자리만 어제가 채운다
-        many = {f"2026-09-21|{s}": f"어제 {s}" for s in ("09:30", "11:00", "14:00", "17:00")}
-        many.update({f"2026-09-22|{s}": f"오늘 {s}" for s in ("09:30", "11:00", "14:00")})
+        assert keyword_note_history_html(("2026-09-22", "09:30")) == "", "앞 회차가 없는데 칸을 그렸다"
+        # 이어진 같은 문구는 한 줄로 합치고, 줄 수 상한(5)까지만
+        many = {f"2026-09-22|{s}": f"오늘 {s}" for s in ("07:00", "08:00", "09:30", "11:00", "14:00", "15:00")}
+        many["2026-09-22|08:00"] = many["2026-09-22|07:00"]
         (Path(tmp) / "n.json").write_text(json.dumps({"notes": many}, ensure_ascii=False), encoding="utf-8")
-        first = mkn.past_notes(("2026-09-22", "09:30"))
-        assert [r[0] for r in first] == ["2026-09-21"] * 4, first  # 첫 회차엔 어제가 칸을 채운다
         later = mkn.past_notes(("2026-09-22", "17:00"))
-        assert len(later) == 5 and [r[0] for r in later[:3]] == ["2026-09-22"] * 3, later
-        assert later[3:] == [
-            ("2026-09-21", ["17:00"], "어제 17:00"),
-            ("2026-09-21", ["14:00"], "어제 14:00"),
-        ], later  # 남은 두 자리만 어제가 채우고 9:30·11:00은 밀린다
-    assert 'data-w="청문회"' in html_out and ">청문회,</span>" in html_out, "문장부호를 뗀 비교값이 없다"
-    assert "9/19 메모" not in html_out, "직전 하루보다 더 거슬러 올라갔다"
+        assert len(later) == 5 and later[-1] == ("2026-09-22", ["07:00", "08:00"], "오늘 07:00"), later
+    assert 'data-w="청문회"' not in html_out, "어제 메모(9/21)가 섞였다"
+    assert 'data-w="유류세"' in html_out and ">연장</span>" in html_out, "문장부호를 뗀 비교값이 없다"
+    assert "9/19 메모" not in html_out and "9/21" not in html_out, "오늘이 아닌 날짜가 보인다"
     assert "지금 회차 메모" not in html_out and "뒤 회차 메모" not in html_out, "지금·뒤 회차 메모가 섞였다"
     assert "<button" not in html_out and "onclick" not in html_out, "참고 목록인데 누르는 줄이 생겼다"
-    assert "9/21 14:00·17:00" in html_out, html_out
+    # 앞칸은 회차 시각만 — 모든 줄에 붙는 「오늘」은 적지 않는다
+    assert '<span class="kn-h-when">11:00</span>' in html_out, html_out
 
     from app.adhoc.renderer import _hm_select_html
     sel = _hm_select_html("win-end", "window_end", "14:56", "14:56")
@@ -2747,7 +2742,7 @@ def test_keyword_note_history_and_time_select():
     assert '<option value="56" selected>56</option>' in sel and '<option value="14" selected>' in sel, sel
     assert '<option value="15"' not in sel, "지나지 않은 시각이 목록에 있다"
     assert sel.index('value="50"') < sel.index('value="56"'), "목록에 없는 분이 제자리에 안 들어갔다"
-    print("41) 지난 회차 메모 · 수시 시간 드롭다운: 통과 (앞 회차만·오늘+직전 하루·최신 5줄·같은 문구 합침·비교값, 숨은 입력·분 끼우기)")
+    print("41) 지난 회차 메모 · 수시 시간 드롭다운: 통과 (오늘 앞 회차만·어제 안 가져옴·최신 5줄·같은 문구 합침·시각만 적음, 숨은 입력·분 끼우기)")
 
 
 def test_telegram_bot_name():
@@ -2805,72 +2800,6 @@ def test_telegram_bot_name():
             assert not record_file.exists(), "실패하면 기록을 안 남긴다(다음에 켤 때 다시 시도)"
 
 
-def test_photo_override_is_one_place():
-    """사진 추정 해제 — **입히는 자리가 `looks_like_photo_caption()` 맨 앞 한 곳**인지.
-
-    이게 이 테스트의 핵심이다. 판정을 한 곳에만 두면 화면 여섯·「📷 사진 추정 (N)」 건수·
-    수시 「사진 제외」·홈 부정 추정 범위가 코드를 더 안 고쳐도 따라온다. 화면마다 따로
-    걸러내는 식으로 새면 "흐림은 사라졌는데 건수엔 남아 있는" 어긋남이 생긴다 —
-    숨김 판정(is_hidden)·exclude_photo_articles에서 이미 같은 이유로 세워둔 규칙이다.
-
-    나머지: 표식([포토])까지 이긴다 · 되돌리면 앱의 추정으로 돌아간다 ·
-    ⋯ 메뉴 줄은 사진으로 잡힌 행과 끈 행에만 붙는다.
-    """
-    # 원문 층은 `photo_body.start()`를 안 부른 테스트에선 네트워크를 안 탄다(_started가 거짓)
-    # — 그래서 이 테스트는 판정 인자를 따로 넘기지 않고 기본값 그대로 부른다.
-    _require_isolation()
-    from app.filters import looks_like_photo_caption, exclude_photo_articles
-    from app.photo_overrides import set_photo_override, is_photo_cleared, photo_override
-
-    guessed = {"url": "https://n.news.naver.com/mnews/article/001/11",
-               "title": "발언하는 이형일 부총리", "outlet": "뉴스1", "summary": "재경부"}
-    tagged = {"url": "https://n.news.naver.com/mnews/article/001/12",
-              "title": "[포토] 답변하는 후보자", "outlet": "뉴스1", "summary": "재경부"}
-    plain = {"url": "https://n.news.naver.com/mnews/article/001/13",
-             "title": "재경부 예산 설명", "outlet": "뉴스1", "summary": "재경부"}
-
-    # (1) 끄기 전 — 앱의 추정 그대로.
-    assert looks_like_photo_caption(guessed), "제목 추정이 안 걸렸습니다"
-    assert looks_like_photo_caption(tagged), "[포토] 표식이 안 걸렸습니다"
-    assert not looks_like_photo_caption(plain), "일반 기사가 사진으로 잡혔습니다"
-    assert photo_override(guessed["url"]) is None, "끄기 전엔 적어 둔 값이 없어야 합니다"
-
-    # (2) 끄면 **추정도 표식도** 이긴다 — 담당자는 그 기사를 보고 누른 것이다.
-    set_photo_override(guessed["url"], False)
-    set_photo_override(tagged["url"], False)
-    assert not looks_like_photo_caption(guessed), "해제가 제목 추정을 못 이겼습니다"
-    assert not looks_like_photo_caption(tagged), \
-        "해제가 [포토] 표식을 못 이겼습니다 — 담당자 판단이 표식보다 우선입니다"
-    assert is_photo_cleared(guessed["url"]), "해제 기록이 안 남았습니다"
-
-    # (3) 판정을 읽는 **다른 길**도 같이 따라온다(한 곳에서 입히므로).
-    kept = [a["url"] for a in exclude_photo_articles([guessed, tagged, plain])]
-    assert kept == [guessed["url"], tagged["url"], plain["url"]], \
-        "exclude_photo_articles가 해제를 못 봤습니다 — 판정이 두 벌로 갈렸습니다"
-
-    # (4) 화면: 흐림·칩이 사라지고 ⋯ 메뉴 줄이 「되돌리기」로 바뀐다.
-    from app.renderer import render_article
-    html_cleared = render_article(guessed, [])
-    assert "is-photo" not in html_cleared and "사진 추정</span>" not in html_cleared, \
-        "해제했는데 화면이 아직 흐리게 그립니다"
-    assert "사진 추정 되돌리기" in html_cleared, "해제한 행에 되돌리는 자리가 없습니다"
-    assert "사진 추정 해제" not in html_cleared, "되돌리는 행에 「해제」가 같이 떠 있습니다"
-
-    html_photo = render_article({**guessed, "url": "https://n.news.naver.com/mnews/article/001/14"}, [])
-    assert "사진 추정 해제" in html_photo, "사진으로 잡힌 행에 해제하는 자리가 없습니다"
-    assert "is-photo" in html_photo, "해제 안 한 사진 행이 안 흐려집니다"
-
-    html_plain = render_article(plain, [])
-    assert "사진 추정 해제" not in html_plain and "사진 추정 되돌리기" not in html_plain, \
-        "사진과 무관한 행에까지 메뉴 줄이 붙었습니다 — 누를 일 없는 줄로 모든 메뉴가 길어집니다"
-
-    # (5) 되돌리면 앱의 추정으로 돌아간다(끈 적 없는 상태와 같아야 한다).
-    set_photo_override(guessed["url"], None)
-    assert photo_override(guessed["url"]) is None, "되돌렸는데 기록이 남았습니다"
-    assert looks_like_photo_caption(guessed), "되돌렸는데 추정이 안 살아났습니다"
-    print("48) 사진 추정 해제: 통과 (판정 한 곳, 표식까지 이김, 사진 행에만 메뉴 줄, 되돌리면 추정 복귀)")
-
-
 def test_draft_all_first_classified_hidden_shows_unclassified():
     """초안 첫 분류의 기사를 전부 숨기면, 규칙 기반 대신 남은 기사를 전부 📂 미분류로 보여주는지 확인한다.
 
@@ -2905,6 +2834,77 @@ def test_draft_all_first_classified_hidden_shows_unclassified():
         with patch.object(classifier, "classify_articles", lambda *a, **k: calls.append(k) or real(*a, **{**k, "allow_llm_call": False})):
             classifier.classify_for_finalize(new, round_id=round_id)
         assert calls and calls[0].get("allow_llm_call") is True, calls
+
+
+def test_partial_cache_survives_non_hidden_drops():
+    """숨김 외의 이유로 기사가 빠져도 같은 회차 캐시를 이어 쓰고, 마감은 얇으면 처음부터 분류한다.
+
+    [추가: 2026-10-06] 09:30 회차 — 맥북이 잠들어 06:00 회차가 09:11에야 저장되자, 09:09에
+    분류해 둔 캐시 33건 중 15건이 「앞 회차에 이미 실림」으로 초안에서 빠졌다. 거기에 기사를
+    13건 숨기니 옛 과반 조건(분모는 숨김만 빼 주고 분자는 모든 이유로 깎인다)이 깨져
+    소제목이 「특히」·「lng」·「임명」으로 뭉개졌다.
+
+    지키는 것:
+      1) 같은 회차 캐시면 겹침이 과반에 못 미쳐도 재사용한다(규칙 기반으로 안 떨어진다)
+      2) 캐시에 없는 기사는 📂 미분류로 모인다
+      3) 마감은 이어 쓴 분류가 기사 과반을 미분류로 남기면 처음부터 분류한다
+         — 그래야 assign_to_existing이 기사를 소제목 한두 칸에 몰아넣지 않는다
+    """
+    from app import classifier, llm_classifier
+
+    def art(n):
+        return {"url": f"https://example.com/{n}", "title": n, "summary": n}
+
+    round_id = ("2026-10-06", "09:30")
+    cached = [art(f"c{i}") for i in range(12)]
+    cache = {
+        llm_classifier._cache_key(cached, config.MAX_SUBHEADINGS, round_id): [
+            ("국정감사 개막 및 일정", [a["url"] for a in cached[:4]], "국감 요약"),
+            ("부동산 세제 개편", [a["url"] for a in cached[4:8]], "세제 요약"),
+            ("외환보유액 감소", [a["url"] for a in cached[8:]], "외환 요약"),
+        ]
+    }
+    # 숨김은 2건뿐이고, 6건은 「앞 회차에 이미 실림」으로 빠졌다(캐시에서 못 빼는 쪽)
+    hidden = {cached[0]["url"], cached[1]["url"]}
+    visible = cached[2:4] + cached[8:10] + [art("new1")]
+
+    with patch.object(llm_classifier, "_cache", cache), \
+         patch.object(llm_classifier, "_ensure_cache_hydrated", lambda: None), \
+         patch.object(llm_classifier, "is_configured", lambda: True), \
+         patch.object(curation, "load_hidden_urls", lambda *a, **k: hidden):
+        # 옛 과반 조건이라면 탈락했을 상황인지 먼저 확인한다(겹침 4 × 2 = 8 < 살아있는 캐시 10)
+        overlap, live = 4, len(cached) - len(hidden)
+        assert overlap * 2 < live, f"과반이 깨지는 상황이 아니다: {overlap}*2 vs {live}"
+
+        groups = classifier.classify_articles(visible, round_id=round_id)
+        names = [g["name"] for g in groups]
+        assert "국정감사 개막 및 일정" in names and "외환보유액 감소" in names, names
+        assert llm_classifier.UNCLASSIFIED_GROUP_NAME in names, names
+        assert not llm_classifier.last_classification_was_rule_based(), "규칙 기반으로 떨어졌다"
+        # 기사가 빠진 소제목은 빠지고, 새 기사는 미분류로 모인다
+        unc = next(g for g in groups if g["name"] == llm_classifier.UNCLASSIFIED_GROUP_NAME)
+        assert [a["url"] for a in unc["articles"]] == ["https://example.com/new1"], unc
+
+        # 마감 — 미분류가 과반이 아니면 초안 분류를 그대로 이어 쓴다(AI 전체 재분류 없음)
+        calls = []
+        real = classifier.classify_articles
+        def spy(*a, **k):
+            calls.append(bool(k.get("allow_llm_call")))
+            return real(*a, **{**k, "allow_llm_call": False})
+        with patch.object(classifier, "classify_articles", spy), \
+             patch.object(classifier, "assign_to_existing", lambda *a, **k: None), \
+             patch.object(llm_classifier, "assign_to_existing", lambda *a, **k: None):
+            classifier.classify_for_finalize(visible, round_id=round_id)
+        assert True not in calls, "미분류가 과반이 아닌데 전체 재분류를 불렀다"
+
+        # 마감 — 겹침이 1건뿐이면(미분류 과반) 처음부터 분류한다
+        thin = [cached[2]] + [art(f"n{i}") for i in range(6)]
+        calls.clear()
+        with patch.object(classifier, "classify_articles", spy), \
+             patch.object(classifier, "assign_to_existing", lambda *a, **k: None), \
+             patch.object(llm_classifier, "assign_to_existing", lambda *a, **k: None):
+            classifier.classify_for_finalize(thin, round_id=round_id)
+        assert True in calls, "미분류가 과반인데 전체 재분류를 안 불렀다"
 
 
 def test_today_cut_round():
@@ -4004,6 +4004,425 @@ def test_env_key_transplant():
 
 
 
+def test_search_operator_is_one_rule():
+    """검색어 연산자가 앱 어디서나 같은 뜻인지 지킨다 — 띄어쓰기=덩어리, `+`=AND.
+
+    이 규칙이 칸마다 갈려 있으면 담당자는 알 길이 없다. 실제로 갈려 있었다(2026-09-30):
+    기관 기사 찾기는 띄어쓰기를 덩어리로 읽는데, 정기·수시 검색어는 문자열을 네이버에
+    그대로 넘겨 네이버가 공백을 낱말로 쪼개 AND로 돌렸고(실측: `가상자산 과세` =
+    `가상자산+과세` = 27,200건), 정책 단어 추이·형광펜은 `+`를 글자 그대로 찾아
+    조합 검색어가 늘 0건이었다.
+
+    규칙을 정하는 자리는 app.search_terms 하나다. 이 테스트는 (1) 그 번역이 맞는지와
+    (2) 다른 파일이 자기 자리에서 규칙을 다시 만들지 않는지를 본다 — 새 검색어 칸이
+    직접 `split("+")`을 하거나 키워드를 네이버에 그대로 넘기면 여기서 깨진다.
+    """
+    _require_isolation()
+    from app.highlight import highlight_keywords
+    from app.search_terms import naver_query, split_terms
+    from app.trend_data import word_hits
+
+    # (1) 띄어쓰기는 가르지 않고, `+`로만 가른다.
+    assert split_terms("가상자산 과세+이형일") == ["가상자산 과세", "이형일"], split_terms("가상자산 과세+이형일")
+    assert split_terms("부처 핸즈업") == ["부처 핸즈업"]
+
+    # (2) 네이버 문법으로 옮길 때 덩어리만 겹따옴표로 감싼다(공백=AND인 네이버 규칙 상쇄).
+    assert naver_query("가상자산 과세+이형일") == '"가상자산 과세" 이형일'
+    assert naver_query("가상자산+과세") == "가상자산 과세"  # 낱말끼리는 AND 그대로
+    assert naver_query("재경부") == "재경부"
+    # 담당자가 직접 적은 겹따옴표는 두 겹으로 감싸지 않는다(질의가 깨진다).
+    assert naver_query('"가상자산 과세"+국회') == '"가상자산 과세" 국회'
+
+    # (3) 글자 대조 쪽(추이)도 같은 규칙 — 덩어리와 AND가 다른 값을 낸다.
+    articles = [
+        {"title": "가상자산 과세 유예 논란", "summary": "이형일 부총리"},
+        {"title": "가상자산 시장 점검", "summary": "과세 문제는 별개"},
+    ]
+    assert word_hits("가상자산 과세", articles) == 1, "덩어리는 붙어 있는 것만 세야 한다"
+    assert word_hits("가상자산+과세", articles) == 2, "`+`는 조각이 전부 든 기사를 세야 한다"
+
+    # (4) 형광펜도 같은 규칙 — `+` 든 단어는 조각마다 칠하고, data-word는 등록 단어를
+    #     그대로 둔다(팝오버의 색 바꾸기가 그 속성으로 자리를 찾는다).
+    out = highlight_keywords("가상자산 과세 논란", [{"word": "가상자산+과세", "color": 0}])
+    assert out.count("hl-word") == 2, f"조각마다 칠해야 한다 — {out}"
+    assert 'data-word="가상자산+과세"' in out, f"data-word는 등록 단어 그대로 — {out}"
+
+    # (5) 규칙을 다시 만드는 자리가 생기지 않았는지.
+    app_dir = Path(__file__).resolve().parent.parent
+    sources = sorted(app_dir.glob("app/**/*.py")) + [app_dir / "main.py"]
+    for label, needle, allowed in [
+        ("검색어를 `+`로 가르는 곳", 'split("+")', {"app/search_terms.py"}),
+        ("네이버 질의를 만드는 곳", '"query": naver_query(', {"app/naver_api.py"}),
+    ]:
+        found = {
+            str(path.relative_to(app_dir))
+            for path in sources
+            if needle in path.read_text(encoding="utf-8")
+        }
+        extra = found - allowed
+        assert not extra, (
+            f"{label}가 늘었습니다 — {sorted(extra)}. 검색어 규칙은 app.search_terms "
+            f"한 곳에서만 정합니다(split_terms / naver_query를 부르세요). "
+            f"자기 자리에서 다시 만들면 그 칸만 뜻이 달라집니다."
+        )
+        assert found, f"{label}를 못 찾았습니다 — 규칙이 옛 이름을 보고 있습니다({needle})"
+
+    # 키워드를 번역 없이 네이버에 넘기던 옛 형태가 되살아나지 않았는지.
+    naver_src = (app_dir / "app/naver_api.py").read_text(encoding="utf-8")
+    assert '"query": keyword' not in naver_src, (
+        "키워드를 네이버에 그대로 넘기고 있습니다 — naver_query(keyword)로 옮겨야 "
+        "띄어쓰기가 덩어리로 검색됩니다."
+    )
+
+def test_photo_override_is_one_place():
+    """사진 추정 해제 — **입히는 자리가 `looks_like_photo_caption()` 맨 앞 한 곳**인지.
+
+    이게 이 테스트의 핵심이다. 판정을 한 곳에만 두면 화면 여섯·「📷 사진 추정 (N)」 건수·
+    수시 「사진 제외」·홈 부정 추정 범위가 코드를 더 안 고쳐도 따라온다. 화면마다 따로
+    걸러내는 식으로 새면 "흐림은 사라졌는데 건수엔 남아 있는" 어긋남이 생긴다 —
+    숨김 판정(is_hidden)·exclude_photo_articles에서 이미 같은 이유로 세워둔 규칙이다.
+
+    나머지: 표식([포토])까지 이긴다 · 되돌리면 앱의 추정으로 돌아간다 ·
+    ⋯ 메뉴 줄은 사진으로 잡힌 행과 끈 행에만 붙는다.
+    """
+    # 원문 층은 `photo_body.start()`를 안 부른 테스트에선 네트워크를 안 탄다(_started가 거짓)
+    # — 그래서 이 테스트는 판정 인자를 따로 넘기지 않고 기본값 그대로 부른다.
+    _require_isolation()
+    from app.filters import looks_like_photo_caption, exclude_photo_articles
+    from app.photo_overrides import set_photo_override, is_photo_cleared, photo_override
+
+    guessed = {"url": "https://n.news.naver.com/mnews/article/001/11",
+               "title": "발언하는 이형일 부총리", "outlet": "뉴스1", "summary": "재경부"}
+    tagged = {"url": "https://n.news.naver.com/mnews/article/001/12",
+              "title": "[포토] 답변하는 후보자", "outlet": "뉴스1", "summary": "재경부"}
+    plain = {"url": "https://n.news.naver.com/mnews/article/001/13",
+             "title": "재경부 예산 설명", "outlet": "뉴스1", "summary": "재경부"}
+
+    # (1) 끄기 전 — 앱의 추정 그대로.
+    assert looks_like_photo_caption(guessed), "제목 추정이 안 걸렸습니다"
+    assert looks_like_photo_caption(tagged), "[포토] 표식이 안 걸렸습니다"
+    assert not looks_like_photo_caption(plain), "일반 기사가 사진으로 잡혔습니다"
+    assert photo_override(guessed["url"]) is None, "끄기 전엔 적어 둔 값이 없어야 합니다"
+
+    # (2) 끄면 **추정도 표식도** 이긴다 — 담당자는 그 기사를 보고 누른 것이다.
+    set_photo_override(guessed["url"], False)
+    set_photo_override(tagged["url"], False)
+    assert not looks_like_photo_caption(guessed), "해제가 제목 추정을 못 이겼습니다"
+    assert not looks_like_photo_caption(tagged), \
+        "해제가 [포토] 표식을 못 이겼습니다 — 담당자 판단이 표식보다 우선입니다"
+    assert is_photo_cleared(guessed["url"]), "해제 기록이 안 남았습니다"
+
+    # (3) 판정을 읽는 **다른 길**도 같이 따라온다(한 곳에서 입히므로).
+    kept = [a["url"] for a in exclude_photo_articles([guessed, tagged, plain])]
+    assert kept == [guessed["url"], tagged["url"], plain["url"]], \
+        "exclude_photo_articles가 해제를 못 봤습니다 — 판정이 두 벌로 갈렸습니다"
+
+    # (4) 화면: 흐림·칩이 사라지고 ⋯ 메뉴 줄이 「되돌리기」로 바뀐다.
+    from app.renderer import render_article
+    html_cleared = render_article(guessed, [])
+    assert "is-photo" not in html_cleared and "사진 추정</span>" not in html_cleared, \
+        "해제했는데 화면이 아직 흐리게 그립니다"
+    assert "사진 추정 되돌리기" in html_cleared, "해제한 행에 되돌리는 자리가 없습니다"
+    assert "사진 추정 해제" not in html_cleared, "되돌리는 행에 「해제」가 같이 떠 있습니다"
+
+    html_photo = render_article({**guessed, "url": "https://n.news.naver.com/mnews/article/001/14"}, [])
+    assert "사진 추정 해제" in html_photo, "사진으로 잡힌 행에 해제하는 자리가 없습니다"
+    assert "is-photo" in html_photo, "해제 안 한 사진 행이 안 흐려집니다"
+
+    html_plain = render_article(plain, [])
+    assert "사진 추정 해제" not in html_plain and "사진 추정 되돌리기" not in html_plain, \
+        "사진과 무관한 행에까지 메뉴 줄이 붙었습니다 — 누를 일 없는 줄로 모든 메뉴가 길어집니다"
+
+    # (5) 되돌리면 앱의 추정으로 돌아간다(끈 적 없는 상태와 같아야 한다).
+    set_photo_override(guessed["url"], None)
+    assert photo_override(guessed["url"]) is None, "되돌렸는데 기록이 남았습니다"
+    assert looks_like_photo_caption(guessed), "되돌렸는데 추정이 안 살아났습니다"
+    print("48) 사진 추정 해제: 통과 (판정 한 곳, 표식까지 이김, 사진 행에만 메뉴 줄, 되돌리면 추정 복귀)")
+
+
+def test_agency_archive_filters():
+    """기관 기사 찾기 거르기 줄 — **원문을 새로 받지 않는 것**이 이 테스트의 핵심이다.
+
+    사진 판정(app.filters.looks_like_photo_caption)은 원문 층에서 모르는 URL을 만나면
+    뒤에서 받아오도록 줄을 세운다. 다른 화면은 그 날 기사 수백 건이라 괜찮지만, 이
+    화면은 한 번에 1년치(하루 400여 건 × 365)를 훑고 원문 판정은 90일만 남는다 —
+    기본값 그대로 두면 화면을 열 때마다 옛 기사 수만 건을 새로 받으려 든다.
+    그래서 `fetch_body=False`로 **적어 둔 판정만 읽는다**. 여기가 깨지면 담당자가
+    이 화면을 열 때마다 네이버에 수만 번 요청이 나간다.
+
+    나머지: 칸끼리 AND · 말머리 둘끼리만 OR · 필터는 **미루기(EAGER_ROWS) 전에** 걸어
+    가져가기와 화면이 같은 목록을 보는 것.
+    """
+    _require_isolation()
+    from unittest.mock import patch
+    from app import agency_archive, photo_body
+    from app.agency_archive_renderer import render_agency_archive_page
+
+    day = datetime.now().strftime("%Y-%m-%d")
+    photo_title = "발언하는 이형일 부총리"          # 제목 모양만으로 사진 추정에 걸린다
+    articles = [
+        {"url": "https://n.news.naver.com/mnews/article/001/1", "title": "[단독] 재경부 세제 개편",
+         "outlet": "KBS", "summary": "재경부", "pub_date": f"{day}T10:00:00+09:00"},
+        {"url": "https://n.news.naver.com/mnews/article/002/2", "title": "[속보] 재경부 추경 편성",
+         "outlet": "블로그일보", "summary": "재경부", "pub_date": f"{day}T09:00:00+09:00"},
+        {"url": "https://n.news.naver.com/mnews/article/003/3", "title": photo_title,
+         "outlet": "KBS", "summary": "재경부 사진", "pub_date": f"{day}T08:00:00+09:00"},
+        {"url": "https://n.news.naver.com/mnews/article/004/4", "title": "재경부 예산 설명",
+         "outlet": "KBS", "summary": "재경부", "pub_date": f"{day}T07:00:00+09:00"},
+    ]
+    agency_archive._save_day({"date": day, "articles": articles, "last_seen": "", "collected_at": ""})
+
+    def rows(**filters):
+        html_out = render_agency_archive_page(preset="7d", filters=filters)
+        return [a["title"] for a in articles if f">{a['title']}<" in html_out or a["title"] in html_out]
+
+    # (1) 원문을 새로 받지 않는다 — 앱이 켜진 상태(_started=True)를 흉내 내고 줄 세우기를 센다.
+    queued = []
+    with patch.object(photo_body, "_started", True), \
+            patch.object(photo_body, "_enqueue_locked", lambda url: queued.append(url)):
+        html_all = render_agency_archive_page(preset="7d", filters={})
+    assert queued == [], (
+        f"기관 기사 찾기가 원문을 받으러 {len(queued)}건 줄을 세웠습니다 — 이 화면은 "
+        "looks_like_photo_caption(..., fetch_body=False)로 적어 둔 판정만 읽어야 합니다."
+    )
+
+    # (2) 사진 추정은 화면에 표시되고(흐리게 + 알약), 「빼고」를 켜면 목록에서 빠진다.
+    # 카메라는 이모지가 아니라 SVG다 — 다른 네 화면과 같은 `icon("camera")`.
+    assert "is-photo" in html_all and "사진 추정</span>" in html_all, "사진 추정 표시가 없습니다"
+    assert "📷" not in html_all, "기관 기사 찾기에 이모지 카메라가 남아 있습니다"
+    assert photo_title not in render_agency_archive_page(preset="7d", filters={"nophoto": 1}), \
+        "「사진 추정 빼고」가 사진 행을 못 뺐습니다"
+
+    # (3) 말머리 둘은 서로 OR, 다른 칸과는 AND.
+    both = render_agency_archive_page(preset="7d", filters={"scoop": 1, "flash": 1})
+    assert "[단독] 재경부 세제 개편" in both and "[속보] 재경부 추경 편성" in both, "말머리 둘은 OR여야 합니다"
+    assert "재경부 예산 설명" not in both, "말머리를 켰는데 말머리 없는 기사가 남았습니다"
+    mixed = render_agency_archive_page(preset="7d", filters={"flash": 1, "major": 1})
+    assert "[속보] 재경부 추경 편성" not in mixed, "말머리와 언론사 칸은 AND여야 합니다"
+
+    # (4) 「주요 언론사만」은 고정 13곳(PRIORITY_OUTLETS)이지 설정 화이트리스트가 아니다.
+    major = render_agency_archive_page(preset="7d", filters={"major": 1})
+    assert "[단독] 재경부 세제 개편" in major and "블로그일보" not in major, \
+        "주요 언론사 판정이 PRIORITY_OUTLETS를 안 봅니다"
+
+    # (5) 미루기 전에 걸러야 화면과 가져가기가 같은 목록을 본다.
+    src = (Path(__file__).resolve().parent.parent / "app/agency_archive_renderer.py").read_text(encoding="utf-8")
+    assert src.index("if not _passes(hits, on):") < src.index("defer = eager_budget is not None"), \
+        "필터가 미루기 판정보다 뒤에 있습니다 — 건수와 가져가기가 거짓이 됩니다"
+
+    # (6) 빠른 설정은 화면이 채워 보내는 날짜 칸을 이긴다(아니면 버튼이 아무 일도 못 한다).
+    from app.agency_archive_renderer import _current_preset, _resolve_range
+    dates = agency_archive.available_dates()
+    week = _resolve_range("7d", "", "", dates)
+    assert _resolve_range("7d", "2020-01-01", "2020-01-02", dates) == week, \
+        "빠른 설정을 눌렀는데 날짜 칸이 이겼습니다"
+    assert _current_preset(*week, dates) == "7d", "다시 조회했을 때 눌러 둔 칸이 꺼집니다"
+
+    print("49) 기관 기사 찾기 거르기: 통과 (원문 안 받음, 사진 빼기, 말머리 OR·칸끼리 AND, 자르기 전 필터, 빠른 설정)")
+
+
+def test_agency_archive_keeps_every_date():
+    """기관 기사 찾기 — **걸린 날짜는 하나도 빠지지 않는다.**
+
+    예전엔 전체 상한(MAX_ROWS=300)에 걸린 날짜가 통째로 사라졌다 — 나흘 2,657건을
+    조회해도 오늘 하루가 300건을 다 써서 나머지 사흘이 접힌 줄조차 없이 「없는 날」이
+    됐고, 머리줄 건수(300건)는 그날 참값(634건)과 달랐으며, 가져가기도 그 잘린 목록을
+    담으면서 내보낸 파일엔 「300건만」이라는 말이 없었다.
+
+    지금은 예산(EAGER_ROWS)이 **자르는 값이 아니라 미루는 값**이다 — 날짜 머리줄과 참
+    건수는 언제나 다 그리고, 예산 밖 날짜는 펼칠 때 `/agency-archive/day?`로 받아온다.
+    """
+    _require_isolation()
+    from app import agency_archive
+    from app import agency_archive_renderer
+    from app.agency_archive_renderer import (
+        render_agency_archive_day_fragment,
+        render_agency_archive_page,
+    )
+
+    today = datetime.now()
+    counts = {0: 5, 1: 4, 2: 3}          # 오늘 5건 · 어제 4건 · 그제 3건
+    for back, n in counts.items():
+        day = (today - timedelta(days=back)).strftime("%Y-%m-%d")
+        agency_archive._save_day({
+            "date": day,
+            "articles": [
+                {"url": f"https://n.news.naver.com/mnews/article/00{back}/{i}",
+                 "title": f"재경부 소식 {back}-{i}", "outlet": "KBS", "summary": "재경부",
+                 "pub_date": f"{day}T1{i}:00:00+09:00"}
+                for i in range(n)
+            ],
+            "last_seen": "", "collected_at": "",
+        })
+
+    # (1) 예산을 1건으로 줄여도 **세 날짜 머리줄이 다 나오고 건수는 참값**이다.
+    with patch.object(agency_archive_renderer, "EAGER_ROWS", 1):
+        html_out = render_agency_archive_page(preset="7d", filters={})
+    for back, n in counts.items():
+        day = (today - timedelta(days=back)).strftime("%Y-%m-%d")
+        assert f'data-date="{day}"' in html_out, f"{day} 날짜 묶음이 통째로 사라졌습니다"
+        assert f">{n}건</span>" in html_out, f"{day} 머리줄 건수가 참값({n}건)이 아닙니다"
+    assert "lazy-day-holder" in html_out, "예산 밖 날짜가 지연 로딩으로 안 넘어갔습니다"
+    assert "건만 보입니다" not in html_out, "숨기는 게 없는데 「N건만 보입니다」가 남아 있습니다"
+
+    # (2) 예산이 넉넉하면 오늘은 처음부터 그려지고, 접힌 날짜는 머리줄만 있다.
+    html_out = render_agency_archive_page(preset="7d", filters={})
+    assert "재경부 소식 0-0" in html_out, "오늘 기사가 처음부터 안 그려집니다"
+    assert "재경부 소식 1-0" not in html_out, "접힌 날짜 내용까지 구워 넣고 있습니다"
+
+    # (3) 지연 조각은 그 하루를 **잘리지 않고** 돌려주고, 가져가기 재료를 같이 싣는다.
+    yday = (today - timedelta(days=1)).strftime("%Y-%m-%d")
+    frag = render_agency_archive_day_fragment(yday, word="", filters={})
+    assert frag is not None and all(f"재경부 소식 1-{i}" in frag for i in range(4)), \
+        "지연 조각이 그 날짜를 다 안 돌려줍니다"
+    assert 'data-copy-text=' in frag and 'data-rows=' in frag, \
+        "지연 조각에 가져가기 재료가 없습니다 — 펼쳐도 복사·엑셀에 안 담깁니다"
+
+    # (4) 낱말·거르기를 같이 받는다 — 안 받으면 펼친 날짜만 조건이 풀린다.
+    assert "재경부 소식 1-0" in render_agency_archive_day_fragment(yday, word="재경부", filters={})
+    assert render_agency_archive_day_fragment(yday, word="없는낱말", filters={}) is None, \
+        "지연 조각이 낱말을 안 봅니다"
+    assert render_agency_archive_day_fragment(yday, word="", filters={"scoop": 1}) is None, \
+        "지연 조각이 거르기를 안 봅니다"
+
+    # (5) 쌓인 적 없는 날짜는 404(None) — holder가 남아 다시 펼쳐볼 수 있다.
+    assert render_agency_archive_day_fragment("2020-01-01", word="", filters={}) is None
+
+    print("50) 기관 기사 찾기 날짜 유지: 통과 (예산은 미루기지 자르기가 아님, 참 건수, 지연 조각이 낱말·거르기·가져가기 재료까지)")
+
+
+
+def test_custom_group_with_taken_name_gets_its_own_box():
+    """담당자가 친 이름이 그 회차에 이미 쓰이고 있어도 **새 칸이 따로 생긴다**.
+
+    소제목을 가르는 값이 이름 문자열 하나뿐이라, 예전엔 「기타」를 만들면 AI가 분류
+    못 한 기사를 담아 둔 「기타」 칸과 통째로 합쳐졌다(2026-10-02 제보 — 그 칸은 이름표가
+    붙어 「재경부 1차관(후속)」으로 보이던 참이라 화면 기준 중복 검사에도 안 걸렸다).
+
+    판정은 예나 지금이나 **지금 화면에 그 이름으로 보이는 칸이 있나** 하나뿐이다. 바뀐 건
+    "안 겹친다고 통과시켜 놓고 속으로는 합쳐버리던" 쪽이다.
+    """
+    from app.labels import LABELS_FILE  # noqa: F401  (러너가 이미 격리해 둔다)
+
+    tmp = Path(tempfile.mkdtemp())
+    rid = ("2026-10-02", "09:30")
+    with patch.object(custom_groups, "CUSTOM_GROUPS_FILE", tmp / "custom_groups.json"), \
+         patch.object(curation, "GROUP_LABELS_FILE", tmp / "group_labels.json"):
+        taken = {"기타", "청와대 인사"}
+        assert custom_groups.unique_key("세제 개편", taken) == "세제 개편", "안 겹치는데 이름을 바꿨다"
+        key = custom_groups.unique_key("기타", taken)
+        assert key == "기타 (2)", key
+
+        assert custom_groups.add_custom_group("기타", key=key) == key
+        assert custom_groups.load_custom_groups() == [key], "속이름으로 저장되지 않았다"
+
+        # 화면·복사·보관함이 모두 거치는 한 곳(display_group_name)에서 친 이름이 보인다.
+        labels = curation.load_group_labels(rid)
+        assert curation.display_group_name(key, labels) == "기타", labels
+        assert curation.display_group_name("기타", labels) == "기타", "AI 기타 칸까지 건드렸다"
+
+        # 이제 화면에 「기타」가 보이므로 또 만들려 하면 그때는 막힌다.
+        assert curation.display_name_in_use("기타", {key}, round_id=rid), "같은 이름이 두 칸 허용됨"
+
+        # 엑셀도 화면과 같은 이름 — 속이름이 데이터로 새면 담당자가 만든 적 없는 이름이 남는다.
+        rows = renderer.build_export_rows(
+            [{"name": key, "articles": [{"url": "u1", "title": "t", "outlet": "o"}]}],
+            "2026-10-02", "09:30", labels,
+        )
+        assert rows[0]["소제목"] == "기타", rows[0]["소제목"]
+
+        # ✏️로 고친 이름이 이기고, 그 매핑이 회차 이름표 파일로 복사되지는 않는다.
+        curation.set_group_label(key, "현안 모음", round_id=rid)
+        assert curation.display_group_name(key, curation.load_group_labels(rid)) == "현안 모음"
+        saved = json.loads((tmp / "group_labels.json").read_text(encoding="utf-8"))
+        assert saved[f"{rid[0]}|{rid[1]}"] == {key: "현안 모음"}, saved
+
+        # 세 번째 「기타」도 자리를 따로 잡는다.
+        assert custom_groups.unique_key("기타", taken) == "기타 (3)", "이미 쓴 속이름을 또 내줬다"
+
+        custom_groups.remove_custom_group(key)
+        assert custom_groups.load_custom_group_labels() == {}, "지운 소제목의 화면 이름이 남았다"
+
+def test_login_lock():
+    """로그인 자물쇠 — 켜기 전엔 아무것도 안 바뀌고, 켜면 막히고, 찾기는 둘로 푼다.
+
+    이 단계는 **자물쇠까지**다(MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 중 1·2번 사이).
+    데이터를 사람별로 가르는 일은 저장 한 겹을 넣은 다음이라, 여기서 지키는 것은
+    「켜기 전엔 예전과 똑같다 · 켜면 못 들어온다 · 본인 확인이 핸드폰+질문 둘이다」 셋이다.
+    """
+    from app import auth_session, users
+
+    tmp = Path(tempfile.mkdtemp())
+    with patch.object(users, "USERS_FILE", tmp / "users.json"), \
+         patch.object(auth_session, "AUTH_SESSIONS_FILE", tmp / "sessions.json"), \
+         patch.object(auth_session, "AUTH_ATTEMPTS_FILE", tmp / "attempts.json"), \
+         patch.object(auth_session, "AUTH_CONFIG_FILE", tmp / "auth_config.json"):
+
+        # 기본은 꺼짐 — 켜는 건 담당자가 하고, 꺼져 있는 동안 앱은 예전 그대로다.
+        assert auth_session.is_login_required() is False, "자물쇠가 저절로 켜져 있다"
+
+        # 비밀번호도 「질문의 답」도 평문으로 남지 않는다 — 둘 다 같은 물건이다.
+        user = users.create_user("a@korea.kr", "sijang2026", "홍길동",
+                                 "010-1234-5678", config.SECURITY_QUESTIONS[0], " 서울 초등 ")
+        saved = (tmp / "users.json").read_text(encoding="utf-8")
+        assert "sijang2026" not in saved and "서울" not in saved, "평문이 파일에 남았다"
+        assert user["role"] == "admin", "첫 계정이 관리자가 아니다"
+        assert users.create_user("b@korea.kr", "sijang2026", "김담당", "01099998888",
+                                 config.SECURITY_QUESTIONS[1], "부산")["role"] == "member"
+
+        # 번호는 숫자만 저장해 대조한다 — 하이픈 때문에 본인이 막히면 안 된다.
+        assert user["phone"] == "01012345678", user["phone"]
+        assert users.verify_recovery("a@korea.kr", "010 1234 5678"), "하이픈 모양 때문에 안 맞았다"
+        assert users.verify_recovery("A@Korea.kr ", "01012345678"), "이메일 대소문자로 갈렸다"
+        assert not users.verify_recovery("a@korea.kr", "01000000000"), "번호가 틀렸는데 통과"
+
+        # 띄어쓰기·대소문자를 가려서 보지 않는다(화면이 그렇게 약속한다).
+        assert users.verify_answer(user, "서울초등") and users.verify_answer(user, " 서 울 초등 ")
+        assert not users.verify_answer(user, "부산초등")
+
+        # 로그인 횟수 잠금 — 질문 기반은 잠금이 없으면 자물쇠가 아니다.
+        key = "login:a@korea.kr"
+        for left in range(config.AUTH_MAX_LOGIN_FAILS - 1, -1, -1):
+            assert auth_session.record_fail(key, config.AUTH_MAX_LOGIN_FAILS, config.AUTH_LOGIN_LOCK_MIN) == left
+        assert auth_session.lock_remaining_sec(key) > 0, "다 틀렸는데 안 잠겼다"
+        auth_session.clear_fails(key)
+        assert auth_session.lock_remaining_sec(key) == 0
+
+        # 세션은 쿠키에만 원본이 있고 파일엔 해시만 남는다.
+        token, max_age = auth_session.create_session(user["id"], keep=False)
+        assert token not in (tmp / "sessions.json").read_text(encoding="utf-8"), "토큰 원본이 파일에 남았다"
+        assert auth_session.user_id_for_token(token) == user["id"]
+        assert auth_session.user_id_for_token("아무거나") is None
+        assert max_age == config.AUTH_SESSION_HOURS * 3600
+        assert auth_session.create_session(user["id"], keep=True)[1] == config.AUTH_SESSION_DAYS_KEEP * 86400
+
+        # 비밀번호를 바꾸면 그 사람의 로그인이 전부 끊긴다.
+        users.set_password(user["id"], "newpass2026")
+        auth_session.destroy_user_sessions(user["id"])
+        assert auth_session.user_id_for_token(token) is None, "옛 비밀번호로 연 창이 살아 있다"
+        assert users.verify_login("a@korea.kr", "newpass2026")
+        assert not users.verify_login("a@korea.kr", "sijang2026")
+
+        # 찾기 표는 단계를 들고 있고 한 번 쓰면 끝난다 — 1단계를 건너뛸 수 없다.
+        ticket = auth_session.issue_ticket(user["id"], "answer")
+        assert auth_session.ticket_user_id(ticket, "reset") is None, "단계를 건너뛸 수 있다"
+        assert auth_session.ticket_user_id(ticket, "answer") == user["id"]
+        auth_session.drop_ticket(ticket)
+        assert auth_session.ticket_user_id(ticket, "answer") is None
+
+        # 답은 비워 두면 그대로고, 적으면 바뀐다.
+        users.update_profile(user["id"], display_name="김담당", answer="")
+        assert users.verify_answer(users.get_user(user["id"]), "서울초등"), "빈 칸이 답을 지웠다"
+        assert users.get_user(user["id"])["display_name"] == "김담당"
+        users.update_profile(user["id"], answer="대전중앙")
+        assert users.verify_answer(users.get_user(user["id"]), "대전중앙")
+
+        auth_session.set_login_required(True)
+        assert auth_session.is_login_required() is True
+
+    print("51) 로그인 자물쇠: 통과 (기본 꺼짐, 평문 안 남김, 번호·답 다듬기, 횟수 잠금, 세션 해시·끊기, 단계 표)")
+
+
 def test_key_paths_stay_narrow():
     """키를 쓰는 자리가 서비스마다 한 곳인지 지킨다 — 서버로 옮길 때의 이음매.
 
@@ -4077,11 +4496,17 @@ def test_key_paths_stay_narrow():
 
 if __name__ == "__main__":
     tests = [
+        test_custom_group_with_taken_name_gets_its_own_box,
         test_no_ai_key_is_not_a_failure,
         test_env_key_transplant,
         test_key_paths_stay_narrow,
+        test_login_lock,
+        test_search_operator_is_one_rule,
         test_photo_override_is_one_place,
+        test_agency_archive_filters,
+        test_agency_archive_keeps_every_date,
         test_draft_all_first_classified_hidden_shows_unclassified,
+        test_partial_cache_survives_non_hidden_drops,
         test_assigned_articles_keep_subheading_after_ai_members_hidden,
         test_cache_store_keeps_other_rounds,
         test_full_pipeline_happy_path,
@@ -4178,6 +4603,9 @@ if __name__ == "__main__":
                     (send_log, "SEND_LOG_DIR", tmp_dir / "send_log"),
                     (photo_body, "_verdicts", {}),
                     (photo_body, "_index", {}),
+                    # 기관 기사 원장 — 테스트가 쓴 가짜 날짜가 실제 data/agency_archive/에
+                    # 남으면 담당자 화면에 그대로 보인다(스케줄러 테스트가 실제로 그랬다).
+                    (agency_archive, "AGENCY_ARCHIVE_DIR", tmp_dir / "agency_archive"),
                     # 담당자가 직접 끈 사진 추정 — 경로와 함께 메모리 캐시도 비운다
                     # (서명으로 캐시하므로 앞 테스트의 값이 남으면 다음 테스트가 그걸 읽는다).
                     (photo_overrides, "PHOTO_OVERRIDES_FILE", tmp_dir / "photo_overrides.json"),

@@ -986,6 +986,39 @@ DRAFT_SEEN_FILE = DATA_DIR / "draft_seen.json"
 # 끼워 넣고(app.today_cuts.apply_cuts), 지난 날짜 기록은 정기 보관함의 ✂ 표시에 쓴다.
 TODAY_CUTS_FILE = DATA_DIR / "today_cuts.json"
 
+# ── 로그인(자물쇠) ──────────────────────────────────────────────────────
+# 「각자 로그인해서 각자 데이터」의 **첫 단계**다. 지금은 자물쇠까지만 — 통과하면
+# 보이는 화면과 데이터는 예전 그대로 하나다. 사람별로 가르는 일은 저장 한 겹을
+# 넣은 다음이다(MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서).
+#
+# **기본은 꺼짐이다.** 켜는 것은 설정 화면에서 담당자가 하고, 꺼져 있는 동안
+# 앱은 예전과 한 글자도 다르지 않게 돈다 — 자물쇠를 붙이다 본업이 멈추면 안 된다.
+USERS_FILE = DATA_DIR / "users.json"
+AUTH_SESSIONS_FILE = DATA_DIR / "auth_sessions.json"
+AUTH_ATTEMPTS_FILE = DATA_DIR / "auth_attempts.json"
+AUTH_CONFIG_FILE = DATA_DIR / "auth_config.json"
+
+SESSION_COOKIE_NAME = "pm_session"
+AUTH_SESSION_DAYS_KEEP = 30    # 「로그인 상태 유지」를 켰을 때
+AUTH_SESSION_HOURS = 12        # 안 켰을 때 — 하루 업무를 덮는 길이
+AUTH_MIN_PASSWORD_LEN = 8
+
+# 찍어 맞히기를 막는 잠금. **질문 기반은 잠금이 없으면 자물쇠가 아니다.**
+# 로그인보다 찾기 쪽을 더 빡빡하게 둔다 — 찾기는 비밀번호를 아예 갈아치우는 길이다.
+AUTH_MAX_LOGIN_FAILS = 5
+AUTH_LOGIN_LOCK_MIN = 10
+AUTH_MAX_RECOVER_FAILS = 3
+AUTH_RECOVER_LOCK_MIN = 30
+
+# 비밀번호 질문은 **고르게 한다** — 직접 쓰게 하면 「내 생일?」처럼 남도 아는 걸 적는다.
+SECURITY_QUESTIONS = (
+    "졸업한 초등학교 이름은?",
+    "어릴 때 살던 동네 이름은?",
+    "처음 다닌 회사 이름은?",
+    "가장 기억에 남는 선생님 성함은?",
+    "어머니의 고향은?",
+)
+
 # archive/DESIGN.md §1/§3 — 스크립트가 생성하는 화면 파일
 OUTPUT_HTML_PATH = BASE_DIR / "index.html"
 HISTORY_HTML_PATH = BASE_DIR / "history.html"
