@@ -5558,7 +5558,11 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         """로그인이 필요한데 안 돼 있으면 응답까지 보내고 True를 돌려준다."""
         if not auth_session.is_login_required():
             return False
-        if urlsplit(self.path).path in _AUTH_FREE_PATHS:
+        path = urlsplit(self.path).path
+        # **가입은 계정이 하나도 없을 때만 열려 있다.** 자물쇠를 켜 둔 앱에서 아무나
+        # 계정을 만들어 들어올 수 있으면 그건 자물쇠가 아니다. 계정을 더 만드는 것은
+        # 로그인한 사람의 일이다(설정 → 계정 → 계정 추가).
+        if path in _AUTH_FREE_PATHS and not (path == "/signup" and users.user_count()):
             return False
         if self._current_user():
             return False
@@ -5643,6 +5647,7 @@ class _SettingsHandler(BaseHTTPRequestHandler):
                 email=self._one(form, "email"),
                 password=self._one(form, "password"),
                 display_name=self._one(form, "display_name"),
+                department=self._one(form, "department"),
                 phone=self._one(form, "phone"),
                 question=self._one(form, "question"),
                 answer=self._one(form, "answer"),
@@ -5753,6 +5758,7 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             users.update_profile(
                 user["id"],
                 display_name=self._one(form, "display_name"),
+                department=self._one(form, "department"),
                 phone=self._one(form, "phone"),
                 question=self._one(form, "question"),
                 answer=self._one(form, "answer"),

@@ -4382,13 +4382,25 @@ def test_login_lock():
         assert auth_session.is_login_required() is False, "자물쇠가 저절로 켜져 있다"
 
         # 비밀번호도 「질문의 답」도 평문으로 남지 않는다 — 둘 다 같은 물건이다.
-        user = users.create_user("a@korea.kr", "sijang2026", "홍길동",
-                                 "010-1234-5678", config.SECURITY_QUESTIONS[0], " 서울 초등 ")
+        # 답에 띄어쓰기는 **적을 때** 막는다 — 「서울 초등」과 「서울초등」 중 무엇을
+        # 적었는지 담당자가 기억해야 하는 상황을 아예 만들지 않는다.
+        try:
+            users.create_user("a@korea.kr", "sijang2026", "홍길동", "01012345678",
+                              config.SECURITY_QUESTIONS[0], "서울 초등")
+            raise AssertionError("띄어쓰기가 든 답이 통과했다")
+        except users.UserError as exc:
+            assert "띄어쓰기" in str(exc), exc
+
+        user = users.create_user("a@korea.kr", "sijang2026", "홍길동", "010-1234-5678",
+                                 config.SECURITY_QUESTIONS[0], " 서울초등 ",
+                                 department="디지털소통팀")
         saved = (tmp / "users.json").read_text(encoding="utf-8")
         assert "sijang2026" not in saved and "서울" not in saved, "평문이 파일에 남았다"
+        assert user["department"] == "디지털소통팀", user
         assert user["role"] == "admin", "첫 계정이 관리자가 아니다"
         assert users.create_user("b@korea.kr", "sijang2026", "김담당", "01099998888",
                                  config.SECURITY_QUESTIONS[1], "부산")["role"] == "member"
+        assert users.get_user(user["id"])["department"] == "디지털소통팀"
 
         # 번호는 숫자만 저장해 대조한다 — 하이픈 때문에 본인이 막히면 안 된다.
         assert user["phone"] == "01012345678", user["phone"]
@@ -4396,7 +4408,8 @@ def test_login_lock():
         assert users.verify_recovery("A@Korea.kr ", "01012345678"), "이메일 대소문자로 갈렸다"
         assert not users.verify_recovery("a@korea.kr", "01000000000"), "번호가 틀렸는데 통과"
 
-        # 띄어쓰기·대소문자를 가려서 보지 않는다(화면이 그렇게 약속한다).
+        # **맞힐 때는 너그럽다** — 저장된 답엔 공백이 없으니, 치다가 공백이 끼어도
+        # 본인이 잠길 이유가 없다(쓰는 쪽에 엄하고 읽는 쪽에 너그럽다).
         assert users.verify_answer(user, "서울초등") and users.verify_answer(user, " 서 울 초등 ")
         assert not users.verify_answer(user, "부산초등")
 
@@ -4430,17 +4443,29 @@ def test_login_lock():
         auth_session.drop_ticket(ticket)
         assert auth_session.ticket_user_id(ticket, "answer") is None
 
-        # 답은 비워 두면 그대로고, 적으면 바뀐다.
-        users.update_profile(user["id"], display_name="김담당", answer="")
+        # 답은 비워 두면 그대로고, 적으면 바뀐다. 부서는 선택이라 비우면 비워진다.
+        users.update_profile(user["id"], display_name="김담당", department="", answer="")
         assert users.verify_answer(users.get_user(user["id"]), "서울초등"), "빈 칸이 답을 지웠다"
         assert users.get_user(user["id"])["display_name"] == "김담당"
-        users.update_profile(user["id"], answer="대전중앙")
+        assert users.get_user(user["id"])["department"] == "", "선택 칸을 비울 수 없다"
+
+        # **질문만 바꾸고 답을 비워 두는 것은 막는다** — 그대로 두면 새 질문에 옛 답이
+        # 짝지어져, 담당자가 자기 질문에 자기 답으로는 영영 못 들어간다.
+        try:
+            users.update_profile(user["id"], question=config.SECURITY_QUESTIONS[2], answer="")
+            raise AssertionError("질문만 바꿔 놓고 통과했다")
+        except users.UserError as exc:
+            assert "새 답도 함께" in str(exc), exc
+        assert users.get_user(user["id"])["security_question"] == config.SECURITY_QUESTIONS[0]
+
+        users.update_profile(user["id"], question=config.SECURITY_QUESTIONS[2], answer="대전중앙")
         assert users.verify_answer(users.get_user(user["id"]), "대전중앙")
+        assert users.get_user(user["id"])["security_question"] == config.SECURITY_QUESTIONS[2]
 
         auth_session.set_login_required(True)
         assert auth_session.is_login_required() is True
 
-    print("51) 로그인 자물쇠: 통과 (기본 꺼짐, 평문 안 남김, 번호·답 다듬기, 횟수 잠금, 세션 해시·끊기, 단계 표)")
+    print("51) 로그인 자물쇠: 통과 (기본 꺼짐, 평문 안 남김, 답 띄어쓰기 금지·질문만 바꾸기 금지, 부서, 횟수 잠금, 세션 해시·끊기, 단계 표)")
 
 
 def test_key_paths_stay_narrow():

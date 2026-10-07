@@ -196,8 +196,8 @@ def render_signup_page(error: str = "", form: Optional[dict] = None, first: bool
 
     first_note = (
         '<div class="status status-info"><span>ⓘ</span><span>'
-        "<strong>첫 계정이라 관리자가 됩니다.</strong> 나중에 다른 사람이 비밀번호를 "
-        "잊어 막히면 되돌려 줄 수 있는 자리입니다.</span></div>"
+        "<strong>첫 계정이라 관리자로 기록됩니다.</strong> 지금은 다른 계정과 똑같이 "
+        "동작하고, 나중에 사람이 늘 때 쓸 표시입니다.</span></div>"
         if first else ""
     )
     body = f"""
@@ -217,7 +217,12 @@ def render_signup_page(error: str = "", form: Optional[dict] = None, first: bool
       <label class="field" for="display_name">이름</label>
       <input type="text" id="display_name" name="display_name" value="{v('display_name')}"
              placeholder="홍길동" autocomplete="name">
-      <p class="fhint">화면에 보일 이름입니다. 본인 확인에는 쓰지 않습니다.</p>
+
+      <label class="field" for="department">부서</label>
+      <input type="text" id="department" name="department" value="{v('department')}"
+             placeholder="디지털소통팀" autocomplete="organization">
+      <p class="fhint">이름과 부서는 화면에 누구인지 보이려고 받습니다.
+      본인 확인에는 쓰지 않고, 부서는 비워 둬도 됩니다.</p>
 
       <div class="status status-info" style="margin: 22px 0 0">
         <span>ⓘ</span>
@@ -233,9 +238,9 @@ def render_signup_page(error: str = "", form: Optional[dict] = None, first: bool
       <select id="question" name="question">{_question_options(v('question'))}</select>
 
       <label class="field" for="answer">질문의 답</label>
-      <input type="text" id="answer" name="answer" placeholder="답을 적어 주세요" autocomplete="off">
-      <p class="fhint">띄어쓰기·대소문자는 가려서 보지 않습니다. 적어 둔 답은
-      <strong>다시 볼 수 없고</strong>, 「나의 정보 관리」에서 바꾸기만 됩니다.</p>
+      <input type="text" id="answer" name="answer" placeholder="띄어쓰기 없이 적어 주세요" autocomplete="off">
+      <p class="fhint"><strong>띄어쓰기 없이 붙여서</strong> 적어 주세요(대소문자는 가리지 않습니다).
+      적어 둔 답은 <strong>다시 볼 수 없고</strong>, 「나의 정보 관리」에서 바꾸기만 됩니다.</p>
 
       <button class="primary" type="submit">가입하기</button>
     </form>"""
@@ -278,9 +283,9 @@ def render_forgot_answer_page(ticket: str, question: str, error: str = "") -> st
       <input type="hidden" name="ticket" value="{html.escape(ticket)}">
       <div class="qa-box">
         <p class="q">{html.escape(question)}</p>
-        <input type="text" name="answer" placeholder="답을 적어 주세요" autocomplete="off" autofocus>
+        <input type="text" name="answer" placeholder="띄어쓰기 없이 적어 주세요" autocomplete="off" autofocus>
       </div>
-      <p class="fhint">띄어쓰기·대소문자는 가려서 보지 않습니다.</p>
+      <p class="fhint">가입할 때 적은 그대로, 띄어쓰기 없이 적어 주세요. 대소문자는 가리지 않습니다.</p>
       <button class="primary" type="submit">다음</button>
     </form>"""
     foot = '<p class="foot"><a href="/login">로그인 화면으로</a></p>'
@@ -375,7 +380,10 @@ _ME_PAGE = (
     <input type="email" id="email" value="{email}" readonly>
     <label class="field" for="display_name">이름</label>
     <input type="text" id="display_name" name="display_name" value="{display_name}" form="profile">
-    <p class="fhint">화면에 보일 이름입니다.</p>
+    <label class="field" for="department">부서</label>
+    <input type="text" id="department" name="department" value="{department}"
+           placeholder="디지털소통팀" form="profile">
+    <p class="fhint">화면에 누구인지 보이려고 받습니다. 부서는 비워 둬도 됩니다.</p>
   </div>
 
   <div class="card">
@@ -408,7 +416,8 @@ _ME_PAGE = (
     <label class="field" for="answer">질문의 답 바꾸기</label>
     <input type="text" id="answer" name="answer" autocomplete="off" form="profile"
            placeholder="새 답을 적으면 바뀝니다 (비워 두면 그대로)">
-    <p class="fhint">적어 둔 답은 다시 볼 수 없습니다 — 바꾸기만 됩니다.</p>
+    <p class="fhint">띄어쓰기 없이 붙여서 적어 주세요. 적어 둔 답은 다시 볼 수 없습니다 — 바꾸기만 됩니다.<br>
+    <strong>질문을 바꿀 때는 새 답도 함께 적어 주세요</strong> — 옛 답은 새 질문과 짝이 맞지 않습니다.</p>
   </div>
 
   <div class="card">
@@ -423,7 +432,7 @@ _ME_PAGE = (
   </p>
 </div>
 <div class="save-bar"><div class="save-bar-inner">
-  <span class="msg">이름 · 핸드폰번호 · 질문을 바꾸면 저장하세요.</span>
+  <span class="msg">이름 · 부서 · 핸드폰번호 · 질문을 바꾸면 저장하세요.</span>
   <button type="submit" form="profile">저장</button>
 </div></div>
 </body>
@@ -445,6 +454,7 @@ def render_my_info_page(user: dict, error: str = "", notice: str = "") -> str:
         notice_html=notice_html,
         email=html.escape(user.get("email", "")),
         display_name=html.escape(user.get("display_name", "")),
+        department=html.escape(user.get("department", "")),
         phone=html.escape(phone),
         question_options=_question_options(user.get("security_question", "")),
         min_len=AUTH_MIN_PASSWORD_LEN,

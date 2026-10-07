@@ -49,9 +49,26 @@ def normalize_phone(raw: str) -> str:
 
 
 def normalize_answer(raw: str) -> str:
-    """질문의 답 — 띄어쓰기·대소문자를 가려서 보지 않는다(화면이 그렇게 약속한다)."""
+    """질문의 답을 대조할 모양으로 — 대소문자를 가리지 않고, 공백은 떼고 본다.
+
+    **적을 때는 띄어쓰기를 막고(`validate_answer`), 맞힐 때는 떼고 본다.**
+    쓰는 쪽에 엄하고 읽는 쪽에 너그럽다 — 저장된 답에 띄어쓰기가 없으니
+    맞힐 때 공백이 끼어도 본인이 잠길 이유가 없다.
+    """
     text = unicodedata.normalize("NFKC", (raw or "")).lower()
     return "".join(text.split())
+
+
+def validate_answer(raw: str) -> str:
+    """새로 적는 답을 검사하고 다듬어 돌려준다. 띄어쓰기가 있으면 거부한다 —
+    「서울 초등」과 「서울초등」 중 무엇을 적었는지 담당자가 기억해야 하는 상황을
+    아예 만들지 않는다."""
+    text = unicodedata.normalize("NFKC", (raw or "")).strip()
+    if not text:
+        raise UserError("질문의 답을 적어 주세요.")
+    if any(ch.isspace() for ch in text):
+        raise UserError("답은 띄어쓰기 없이 붙여서 적어 주세요.")
+    return text
 
 
 # ── 해시 ─────────────────────────────────────────────────────────────────
@@ -130,6 +147,7 @@ def create_user(
     phone: str,
     question: str,
     answer: str,
+    department: str = "",
 ) -> dict:
     """새 계정을 만들어 돌려준다. **첫 사용자가 관리자**가 된다."""
     email_n = normalize_email(email)
@@ -140,8 +158,7 @@ def create_user(
         raise UserError("이름을 적어 주세요.")
     if not normalize_phone(phone):
         raise UserError("핸드폰번호를 적어 주세요.")
-    if not normalize_answer(answer):
-        raise UserError("질문의 답을 적어 주세요.")
+    answer = validate_answer(answer)
 
     with _LOCK:
         data = _load()
@@ -153,6 +170,8 @@ def create_user(
             "email": email_n,
             "password_hash": hash_secret(password),
             "display_name": display_name.strip(),
+            # 부서는 선택이다 — 누구인지 화면에 보이려고 받는 것이라 비워 둘 수 있다.
+            "department": (department or "").strip(),
             "phone": normalize_phone(phone),
             "security_question": question,
             "security_answer_hash": hash_secret(normalize_answer(answer)),
@@ -188,21 +207,37 @@ def set_password(user_id: str, new_password: str) -> None:
 def update_profile(
     user_id: str,
     display_name: Optional[str] = None,
+    department: Optional[str] = None,
     phone: Optional[str] = None,
     question: Optional[str] = None,
     answer: Optional[str] = None,
 ) -> None:
     """빈 값으로 넘긴 칸은 건드리지 않는다 — 특히 `answer`는 **비워 두면 그대로**다
-    (지금 답을 보여줄 수 없으니, 화면이 매번 다시 적게 할 수는 없다)."""
+    (지금 답을 보여줄 수 없으니, 화면이 매번 다시 적게 할 수는 없다).
+    예외는 부서 — 선택 칸이라 비우면 비운 대로 지운다.
+
+    **질문을 바꾸면서 답을 비워 두는 것은 막는다.** 그대로 두면 새 질문에 옛 답이
+    짝지어져, 담당자가 자기 질문에 자기 답으로는 영영 못 들어간다.
+    """
+    user = get_user(user_id)
+    if not user:
+        raise UserError("계정을 찾을 수 없습니다.")
+
     changes: dict = {}
     if display_name is not None and display_name.strip():
         changes["display_name"] = display_name.strip()
+    if department is not None:
+        changes["department"] = department.strip()
     if phone is not None and normalize_phone(phone):
         changes["phone"] = normalize_phone(phone)
-    if question:
+
+    answer_given = bool((answer or "").strip())
+    if question and question != user.get("security_question"):
+        if not answer_given:
+            raise UserError("질문을 바꾸려면 새 답도 함께 적어 주세요 — 옛 답은 새 질문과 짝이 맞지 않습니다.")
         changes["security_question"] = question
-    if answer is not None and normalize_answer(answer):
-        changes["security_answer_hash"] = hash_secret(normalize_answer(answer))
+    if answer_given:
+        changes["security_answer_hash"] = hash_secret(normalize_answer(validate_answer(answer)))
     if changes:
         _update(user_id, changes)
 

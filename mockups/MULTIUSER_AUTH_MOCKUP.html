@@ -280,7 +280,11 @@
 
         <label class="field" for="s-name">이름</label>
         <input type="text" id="s-name" placeholder="홍길동" autocomplete="name">
-        <p class="fhint">화면에 보일 이름입니다. 본인 확인에는 쓰지 않습니다.</p>
+
+        <label class="field" for="s-dept">부서</label>
+        <input type="text" id="s-dept" placeholder="디지털소통팀" autocomplete="organization">
+        <p class="fhint">이름과 부서는 화면에 누구인지 보이려고 받습니다.
+        본인 확인에는 쓰지 않고, 부서는 비워 둬도 됩니다.</p>
 
         <div class="status status-info" style="margin: 22px 0 0">
           <span>ⓘ</span>
@@ -303,8 +307,8 @@
         </select>
 
         <label class="field" for="s-a">질문의 답</label>
-        <input type="text" id="s-a" placeholder="답을 적어 주세요">
-        <p class="fhint">띄어쓰기·대소문자는 가려서 보지 않습니다. 적어 둔 답은 <strong>다시 볼 수 없고</strong>, 「나의 정보 관리」에서 바꾸기만 됩니다.</p>
+        <input type="text" id="s-a" placeholder="띄어쓰기 없이 적어 주세요">
+        <p class="fhint"><strong>띄어쓰기 없이 붙여서</strong> 적어 주세요(대소문자는 가리지 않습니다). 적어 둔 답은 <strong>다시 볼 수 없고</strong>, 「나의 정보 관리」에서 바꾸기만 됩니다.</p>
 
         <button class="primary" type="submit">가입하기</button>
       </form>
@@ -316,9 +320,9 @@
 <div class="mk-note">
   <h3>회원가입 — 가입 직후(관리자 승인을 둘 경우)</h3>
   <p>
-    <strong>이건 정해야 하는 갈림길이다.</strong> 주소를 아는 사람이면 누구나 가입해 기사 데이터를 볼 수 있으면 안 되니,
-    가입은 받되 <strong>관리자가 승인할 때까지 못 들어오게</strong> 하는 쪽을 시안으로 뒀다.
-    승인을 안 둘 거면 이 화면 대신 바로 로그인된 홈으로 보내면 된다.
+<strong>이 화면은 아직 안 만들었다.</strong> 지금은 127.0.0.1 로컬 자물쇠라 승인할 사람과
+    승인받을 사람이 같은 컴퓨터 앞에 있어서다. 대신 <strong>계정이 하나라도 있으면 가입 화면이 잠긴다</strong> —
+    계정을 더 만드는 건 로그인한 사람의 일이다. 서버로 옮길 때 이 화면을 되살린다.
   </p>
 </div>
 
@@ -338,6 +342,7 @@
         <span>
           <strong>marie@korea.kr</strong>으로 가입 신청이 들어갔습니다.<br>
           관리자가 승인하면 이 이메일과 비밀번호로 로그인할 수 있습니다.
+          <em>(이 화면은 아직 안 만들었다 — 지금은 가입하면 바로 로그인된다.)</em>
         </span>
       </div>
       <p class="foot"><a href="#">로그인 화면으로</a></p>
@@ -406,8 +411,8 @@
       <div class="status status-warn">
         <span>⚠</span>
         <span>
-          입력한 정보가 가입할 때와 다릅니다. <strong>3번 더</strong> 틀리면 30분간 잠깁니다.<br>
-          기억이 안 나면 관리자에게 알려 주세요 — 관리자가 비밀번호를 되돌려 줄 수 있습니다.
+          입력한 정보가 가입할 때와 다릅니다. <strong>3번 더</strong> 틀리면 30분간 잠깁니다.
+          기억이 안 나면 관리자에게 알려 주세요.
         </span>
       </div>
       <form class="login-form" onsubmit="return false">
@@ -441,9 +446,9 @@
       <form class="login-form" onsubmit="return false">
         <div class="qa-box" style="margin-top: 0">
           <p class="q">졸업한 초등학교 이름은?</p>
-          <input type="text" id="f-a" placeholder="답을 적어 주세요" autocomplete="off">
+          <input type="text" id="f-a" placeholder="띄어쓰기 없이 적어 주세요" autocomplete="off">
         </div>
-        <p class="fhint">띄어쓰기·대소문자는 가려서 보지 않습니다.</p>
+        <p class="fhint">가입할 때 적은 그대로, 띄어쓰기 없이 적어 주세요. 대소문자는 가리지 않습니다.</p>
         <button class="primary" type="submit">다음</button>
       </form>
       <p class="foot"><a href="#">로그인 화면으로</a></p>
@@ -543,7 +548,9 @@
         <input type="email" id="m-id" value="marie@korea.kr" readonly>
         <label class="field" for="m-name">이름</label>
         <input type="text" id="m-name" value="홍길동">
-        <p class="fhint">화면에 보일 이름입니다.</p>
+        <label class="field" for="m-dept">부서</label>
+        <input type="text" id="m-dept" value="디지털소통팀">
+        <p class="fhint">화면에 누구인지 보이려고 받습니다. 부서는 비워 둬도 됩니다.</p>
       </div>
 
       <div class="card">
@@ -582,7 +589,8 @@
         </select>
         <label class="field" for="m-a">질문의 답 바꾸기</label>
         <input type="text" id="m-a" placeholder="새 답을 적으면 바뀝니다 (비워 두면 그대로)">
-        <p class="fhint">적어 둔 답은 다시 볼 수 없습니다 — 바꾸기만 됩니다.</p>
+        <p class="fhint">띄어쓰기 없이 붙여서 적어 주세요. 적어 둔 답은 다시 볼 수 없습니다 — 바꾸기만 됩니다.<br>
+        <strong>질문을 바꿀 때는 새 답도 함께 적어 주세요</strong> — 옛 답은 새 질문과 짝이 맞지 않습니다.</p>
       </div>
 
       <div class="card">
@@ -601,7 +609,7 @@
   </div>
   <div class="save-bar">
     <div class="save-bar-inner">
-      <span class="msg">바뀐 내용이 없습니다.</span>
+      <span class="msg">이름 · 부서 · 핸드폰번호 · 질문을 바꾸면 저장하세요.</span>
       <button type="button">저장</button>
     </div>
   </div>
