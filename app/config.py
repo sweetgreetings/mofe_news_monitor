@@ -1001,7 +1001,10 @@ AUTH_CONFIG_FILE = DATA_DIR / "auth_config.json"
 SESSION_COOKIE_NAME = "pm_session"
 AUTH_SESSION_DAYS_KEEP = 30    # 「로그인 상태 유지」를 켰을 때
 AUTH_SESSION_HOURS = 12        # 안 켰을 때 — 하루 업무를 덮는 길이
-AUTH_MIN_PASSWORD_LEN = 8
+# **로컬 자물쇠라서 4자다.** 127.0.0.1 밖에서는 닿을 수 없고 5회 틀리면 10분
+# 잠기므로 찍어 맞히기가 느리다. **서버로 옮길 때는 다시 올린다**(그때는
+# 네트워크 너머에서 두드릴 수 있다 — MULTIUSER_ROLLOUT_CHECKLIST.md).
+AUTH_MIN_PASSWORD_LEN = 4
 
 # 찍어 맞히기를 막는 잠금. **질문 기반은 잠금이 없으면 자물쇠가 아니다.**
 # 로그인보다 찾기 쪽을 더 빡빡하게 둔다 — 찾기는 비밀번호를 아예 갈아치우는 길이다.

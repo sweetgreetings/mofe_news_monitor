@@ -115,14 +115,16 @@
   .container { width: 800px; max-width: 100%; margin: 24px auto 0; padding: 0 16px 120px;
     box-sizing: border-box; }
   .container h1 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 4px; }
-  .container .page-sub { font-size: var(--fs-md); color: #6B7280; margin: 0 0 20px; }
+  .container .page-sub { font-size: var(--fs-md); color: #6B7280; margin: 0 0 18px; }
 
+  /* 화면이 자기를 해명하는 줄은 두지 않는다 — 그 자리를 제목 아래 여백이 대신 받는다. */
   .card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg);
-    padding: 20px 22px; margin: 0 0 16px; }
-  .card h2 { font-size: var(--fs-lg); color: #1E3A5F; margin: 0 0 4px; }
-  .card .csub { font-size: var(--fs-sm); color: #6B7280; margin: 0 0 16px; line-height: 1.55; }
+    padding: 18px 22px; margin: 0 0 14px; }
+  .card h2 { font-size: var(--fs-lg); color: #1E3A5F; margin: 0 0 14px; }
+  .card label.field { margin: 16px 0 6px; }
   .row2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 18px; }
-  .card .acts { display: flex; justify-content: flex-end; margin-top: 18px; }
+  .row2 label.field:first-of-type { margin-top: 16px; }
+  .card .acts { display: flex; justify-content: flex-end; margin-top: 16px; }
 
   .save-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #FFFFFF;
     border-top: 1px solid #E5E7EB; box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.06); }
@@ -273,7 +275,7 @@
 
         <label class="field" for="s-pw">비밀번호</label>
         <input type="password" id="s-pw" autocomplete="new-password">
-        <p class="fhint">8자 이상, 영문·숫자를 섞어 주세요.</p>
+        <p class="fhint">4자 이상으로 적어 주세요.</p>
 
         <label class="field" for="s-pw2">비밀번호 확인</label>
         <input type="password" id="s-pw2" autocomplete="new-password">
@@ -475,7 +477,7 @@
       <form class="login-form" onsubmit="return false">
         <label class="field" for="n-pw">새 비밀번호</label>
         <input type="password" id="n-pw" autocomplete="new-password">
-        <p class="fhint">8자 이상, 영문·숫자를 섞어 주세요.</p>
+        <p class="fhint">4자 이상으로 적어 주세요.</p>
         <label class="field" for="n-pw2">새 비밀번호 확인</label>
         <input type="password" id="n-pw2" autocomplete="new-password">
         <p class="fhint good">두 칸이 같습니다.</p>
@@ -523,7 +525,8 @@
     다른 동작이라 그 칸 안에서 <strong>테두리 버튼</strong>으로 끝낸다 — 한 화면에 대표 동작이 둘이 되지 않는다.
   </p>
   <ul>
-    <li><strong>이메일은 읽기 전용</strong> — 아이디라서 바꿀 수 없다. 흐린 칸이 그 말을 한다.</li>
+    <li><strong>화면이 자기를 해명하지 않는다</strong> — 카드마다 달려 있던 설명 줄을 뺐다. 이메일이 읽기 전용인 것은 흐린 칸이, 비밀번호 찾기용 정보라는 것은 카드 제목이 이미 말한다.</li>
+    <li><strong>남기는 안내는 「무엇을 적어야 하나」뿐</strong> — 4자 이상·띄어쓰기 없이·질문을 바꾸면 답도. 셋 다 앱이 실제로 막는 규칙이다.</li>
     <li><strong>질문의 답은 「지금 답」을 보여주지 않는다</strong> — 해시로만 두니 보여줄 수가 없고, 바꾸려면 새로 적는다.</li>
     <li><strong>핸드폰번호·질문을 바꿀 때 비밀번호를 한 번 묻는다</strong> — 자리를 비운 사이 누가 이 칸을 바꿔 두면 비밀번호 찾기가 그 사람 것이 된다.</li>
   </ul>
@@ -543,26 +546,23 @@
     <form class="login-form" onsubmit="return false">
       <div class="card">
         <h2>계정</h2>
-        <p class="csub">이메일은 아이디라서 바꿀 수 없습니다. 바꿔야 하면 관리자에게 알려 주세요.</p>
         <label class="field" for="m-id">이메일</label>
         <input type="email" id="m-id" value="marie@korea.kr" readonly>
         <label class="field" for="m-name">이름</label>
         <input type="text" id="m-name" value="홍길동">
         <label class="field" for="m-dept">부서</label>
         <input type="text" id="m-dept" value="디지털소통팀">
-        <p class="fhint">화면에 누구인지 보이려고 받습니다. 부서는 비워 둬도 됩니다.</p>
       </div>
 
       <div class="card">
         <h2>비밀번호 변경</h2>
-        <p class="csub">바꾸면 다른 기기의 로그인은 모두 끊깁니다.</p>
         <label class="field" for="m-cur">현재 비밀번호</label>
         <input type="password" id="m-cur" autocomplete="current-password">
         <div class="row2">
           <div>
             <label class="field" for="m-new">새 비밀번호</label>
             <input type="password" id="m-new" autocomplete="new-password">
-            <p class="fhint">8자 이상, 영문·숫자를 섞어 주세요.</p>
+            <p class="fhint">4자 이상으로 적어 주세요.</p>
           </div>
           <div>
             <label class="field" for="m-new2">새 비밀번호 확인</label>
@@ -574,9 +574,6 @@
 
       <div class="card">
         <h2>비밀번호를 잊었을 때 쓰는 정보</h2>
-        <p class="csub">
-          이 둘이 맞으면 새 비밀번호를 정할 수 있습니다. 문자(SMS)는 보내지 않고, 적어 둔 값과 맞는지만 봅니다.
-        </p>
         <label class="field" for="m-tel">핸드폰번호</label>
         <input type="tel" id="m-tel" value="010-1234-5678">
         <label class="field" for="m-q">비밀번호 질문</label>
@@ -589,13 +586,11 @@
         </select>
         <label class="field" for="m-a">질문의 답 바꾸기</label>
         <input type="text" id="m-a" placeholder="새 답을 적으면 바뀝니다 (비워 두면 그대로)">
-        <p class="fhint">띄어쓰기 없이 붙여서 적어 주세요. 적어 둔 답은 다시 볼 수 없습니다 — 바꾸기만 됩니다.<br>
-        <strong>질문을 바꿀 때는 새 답도 함께 적어 주세요</strong> — 옛 답은 새 질문과 짝이 맞지 않습니다.</p>
+        <p class="fhint">띄어쓰기 없이 붙여서 적어 주세요. 질문을 바꿀 때는 새 답도 함께 적어 주세요.</p>
       </div>
 
       <div class="card">
-        <h2>이 정보를 바꾸려면</h2>
-        <p class="csub">자리를 비운 사이 누가 바꿔 두면 비밀번호 찾기가 그 사람 것이 됩니다.</p>
+        <h2>저장하려면</h2>
         <label class="field" for="m-confirm">지금 비밀번호</label>
         <input type="password" id="m-confirm" autocomplete="current-password">
       </div>
@@ -609,7 +604,7 @@
   </div>
   <div class="save-bar">
     <div class="save-bar-inner">
-      <span class="msg">이름 · 부서 · 핸드폰번호 · 질문을 바꾸면 저장하세요.</span>
+      <span class="msg">바꾼 칸이 있으면 저장하세요.</span>
       <button type="button">저장</button>
     </div>
   </div>

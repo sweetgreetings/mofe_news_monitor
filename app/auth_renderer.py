@@ -18,9 +18,23 @@ from app.config import (
     SETTINGS_SERVER_PORT,
     SHAPE_TOKENS_CSS,
 )
+from app.auth_session import is_login_required
 from app.topnav import plain_nav, topnav_style
 
 _SETTINGS_HOME = f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/"
+_HOME_HREF = _SETTINGS_HOME + "home.html"
+
+
+def _back_home() -> str:
+    """**자물쇠가 꺼져 있을 때만** 로그인 전 화면에 홈으로 가는 길을 둔다.
+
+    꺼져 있으면 로그인 없이도 앱을 다 쓸 수 있으므로, 가입·찾기 화면이
+    빠져나갈 길 없는 막다른 골목이 되면 안 된다. 켜져 있으면 갈 수 있는 곳이
+    정말로 없으니(그게 자물쇠다) 아무것도 안 그린다.
+    """
+    if is_login_required():
+        return ""
+    return f'<span class="dot">·</span><a href="{_HOME_HREF}">홈으로</a>'
 
 # ── 공통 스타일 ──────────────────────────────────────────────────────────
 _FORM_STYLE = """
@@ -181,7 +195,7 @@ def render_login_page(error: str = "", email: str = "", notice: str = "") -> str
       <label class="keep"><input type="checkbox" name="keep" value="1" checked> 로그인 상태 유지</label>
       <button class="primary" type="submit">로그인</button>
     </form>"""
-    foot = '<p class="foot"><a href="/forgot">비밀번호 찾기</a><span class="dot">·</span><a href="/signup">회원가입</a></p>'
+    foot = f'<p class="foot"><a href="/forgot">비밀번호 찾기</a><span class="dot">·</span><a href="/signup">회원가입</a>{_back_home()}</p>'
     notice_html = _ok(notice) if notice else _warn(error)
     return _page("로그인", "AI 뉴스 모니터링", "언론 모니터링", body, foot, notice_html)
 
@@ -244,7 +258,7 @@ def render_signup_page(error: str = "", form: Optional[dict] = None, first: bool
 
       <button class="primary" type="submit">가입하기</button>
     </form>"""
-    foot = '<p class="foot">이미 계정이 있으세요? <a href="/login">로그인</a></p>'
+    foot = f'<p class="foot">이미 계정이 있으세요? <a href="/login">로그인</a>{_back_home()}</p>'
     return _page("회원가입", "회원가입", "AI 뉴스 모니터링",
                  first_note + body, foot, _warn(error), wide=True)
 
@@ -272,7 +286,7 @@ def render_forgot_page(error: str = "", email: str = "") -> str:
       <p class="fhint">문자는 보내지 않습니다. 가입할 때 적은 번호와 맞는지만 봅니다.</p>
       <button class="primary" type="submit">다음</button>
     </form>"""
-    foot = '<p class="foot"><a href="/login">로그인 화면으로</a></p>'
+    foot = f'<p class="foot"><a href="/login">로그인 화면으로</a>{_back_home()}</p>'
     return _page("비밀번호 찾기", "비밀번호 찾기", "가입할 때 적은 정보로 확인합니다",
                  body, foot, _warn(error))
 
@@ -288,7 +302,7 @@ def render_forgot_answer_page(ticket: str, question: str, error: str = "") -> st
       <p class="fhint">가입할 때 적은 그대로, 띄어쓰기 없이 적어 주세요. 대소문자는 가리지 않습니다.</p>
       <button class="primary" type="submit">다음</button>
     </form>"""
-    foot = '<p class="foot"><a href="/login">로그인 화면으로</a></p>'
+    foot = f'<p class="foot"><a href="/login">로그인 화면으로</a>{_back_home()}</p>'
     return _page("비밀번호 찾기", "비밀번호 찾기", "가입할 때 고른 질문입니다",
                  body, foot, _warn(error))
 
@@ -309,7 +323,7 @@ def render_forgot_reset_page(ticket: str, email: str, error: str = "") -> str:
 
 def render_forgot_done_page(email: str) -> str:
     notice = _ok("새 비밀번호로 로그인해 주세요. 다른 기기에서 로그인돼 있던 것은 모두 끊었습니다.")
-    foot = '<p class="foot"><a href="/login">로그인 화면으로</a></p>'
+    foot = f'<p class="foot"><a href="/login">로그인 화면으로</a>{_back_home()}</p>'
     return _page("비밀번호를 바꿨어요", "비밀번호를 바꿨어요", email, "", foot, notice)
 
 
@@ -324,14 +338,19 @@ _ME_STYLE = """
   .container {{ width: 800px; max-width: 100%; margin: 24px auto 0;
     padding: 44px 16px 120px; box-sizing: border-box; }}
   .container h1 {{ font-size: var(--fs-xl); color: {header}; margin: 0 0 4px; }}
-  .container .page-sub {{ font-size: var(--fs-md); color: {muted}; margin: 0 0 20px; }}
+  .container .page-sub {{ font-size: var(--fs-md); color: {muted}; margin: 0 0 18px; }}
 
+  /* 화면이 자기를 해명하는 줄(`.csub`)은 두지 않는다 — 그 자리를 제목 아래 여백이
+     대신 받는다(4 → 14px). 남는 안내는 「무엇을 적어야 하나」뿐이다(`.fhint`). */
   .card {{ background: {card}; border: 1px solid {border}; border-radius: var(--r-lg);
-    padding: 20px 22px; margin: 0 0 16px; }}
-  .card h2 {{ font-size: var(--fs-lg); color: {header}; margin: 0 0 4px; }}
-  .card .csub {{ font-size: var(--fs-sm); color: {muted}; margin: 0 0 16px; line-height: 1.55; }}
+    padding: 18px 22px; margin: 0 0 14px; }}
+  .card h2 {{ font-size: var(--fs-lg); color: {header}; margin: 0 0 14px; }}
+  .card label.field {{ margin: 16px 0 6px; }}
   .row2 {{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 18px; }}
-  .card .acts {{ display: flex; justify-content: flex-end; margin-top: 18px; }}
+  /* 두 칸 안 라벨도 윗줄과 간격이 같아야 한다 — 칸마다 `first-of-type`이 걸려
+     위 여백이 0으로 눌리면 현재 비밀번호 칸에 바싹 붙는다. */
+  .row2 label.field:first-of-type {{ margin-top: 16px; }}
+  .card .acts {{ display: flex; justify-content: flex-end; margin-top: 16px; }}
 
   .save-bar {{ position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: {card};
     border-top: 1px solid {border}; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08); }}
@@ -375,7 +394,6 @@ _ME_PAGE = (
 
   <div class="card">
     <h2>계정</h2>
-    <p class="csub">이메일은 아이디라서 바꿀 수 없습니다.</p>
     <label class="field" for="email">이메일</label>
     <input type="email" id="email" value="{email}" readonly>
     <label class="field" for="display_name">이름</label>
@@ -383,12 +401,10 @@ _ME_PAGE = (
     <label class="field" for="department">부서</label>
     <input type="text" id="department" name="department" value="{department}"
            placeholder="디지털소통팀" form="profile">
-    <p class="fhint">화면에 누구인지 보이려고 받습니다. 부서는 비워 둬도 됩니다.</p>
   </div>
 
   <div class="card">
     <h2>비밀번호 변경</h2>
-    <p class="csub">바꾸면 다른 기기의 로그인은 모두 끊깁니다.</p>
     <label class="field" for="current">현재 비밀번호</label>
     <input type="password" id="current" name="current" autocomplete="current-password" form="pwform">
     <div class="row2">
@@ -407,8 +423,6 @@ _ME_PAGE = (
 
   <div class="card">
     <h2>비밀번호를 잊었을 때 쓰는 정보</h2>
-    <p class="csub">이 둘이 맞으면 새 비밀번호를 정할 수 있습니다.
-      문자(SMS)는 보내지 않고, 적어 둔 값과 맞는지만 봅니다.</p>
     <label class="field" for="phone">핸드폰번호</label>
     <input type="tel" id="phone" name="phone" value="{phone}" form="profile">
     <label class="field" for="question">비밀번호 질문</label>
@@ -416,13 +430,11 @@ _ME_PAGE = (
     <label class="field" for="answer">질문의 답 바꾸기</label>
     <input type="text" id="answer" name="answer" autocomplete="off" form="profile"
            placeholder="새 답을 적으면 바뀝니다 (비워 두면 그대로)">
-    <p class="fhint">띄어쓰기 없이 붙여서 적어 주세요. 적어 둔 답은 다시 볼 수 없습니다 — 바꾸기만 됩니다.<br>
-    <strong>질문을 바꿀 때는 새 답도 함께 적어 주세요</strong> — 옛 답은 새 질문과 짝이 맞지 않습니다.</p>
+    <p class="fhint">띄어쓰기 없이 붙여서 적어 주세요. 질문을 바꿀 때는 새 답도 함께 적어 주세요.</p>
   </div>
 
   <div class="card">
-    <h2>이 정보를 바꾸려면</h2>
-    <p class="csub">자리를 비운 사이 누가 바꿔 두면 비밀번호 찾기가 그 사람 것이 됩니다.</p>
+    <h2>저장하려면</h2>
     <label class="field" for="confirm">지금 비밀번호</label>
     <input type="password" id="confirm" name="confirm" autocomplete="current-password" form="profile">
   </div>
@@ -432,7 +444,7 @@ _ME_PAGE = (
   </p>
 </div>
 <div class="save-bar"><div class="save-bar-inner">
-  <span class="msg">이름 · 부서 · 핸드폰번호 · 질문을 바꾸면 저장하세요.</span>
+  <span class="msg">바꾼 칸이 있으면 저장하세요.</span>
   <button type="submit" form="profile">저장</button>
 </div></div>
 </body>

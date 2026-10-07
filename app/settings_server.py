@@ -334,8 +334,15 @@ _TOP_BAR_HTML = plain_nav("설정", f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SE
 
 # 로그인이 켜져 있어도 통과시키는 주소. **정확히 일치하는 것만**이다 —
 # 앞글자로 재면 `/login-settings`(설정 화면)까지 열려 버린다.
+# 가입 직후 「나의 정보 관리」 맨 위에 뜨는 줄. 적어 넣은 값이 그대로 보이는 화면이라
+# 「가입됐다」와 「무엇이 저장됐나」를 한 번에 말한다.
+_SIGNUP_WELCOME = (
+    "가입했습니다 — 지금 이 계정으로 로그인돼 있습니다. "
+    "앱을 열 때 로그인을 받으려면 <strong>설정 → 계정 → 로그인 사용</strong>에서 켜세요."
+)
+
 _AUTH_FREE_PATHS = {
-    "/login", "/signup", "/forgot", "/forgot-answer", "/forgot-reset",
+    "/login", "/signup", "/forgot", "/forgot-answer", "/forgot-reset", "/whoami",
     f"/{LOGO_PATH.name}",
 }
 _LABELS_TOP_BAR_HTML = plain_nav()
@@ -440,13 +447,6 @@ _MENU_TEMPLATE = (
       <a href="/telegram">텔레그램<span class="menu-chev">›</span></a>
       <a href="/email">이메일<span class="menu-note">정기 확정본만</span><span class="menu-chev">›</span></a>
       <a href="/send-log">발송 기록<span class="menu-note">누가 받았는지</span><span class="menu-chev">›</span></a>
-    </div>
-  </div>
-  <div class="category">
-    <div class="category-name">계정</div>
-    <div class="menu">
-      <a href="/login-settings">로그인 사용<span class="menu-note">{login_note}</span><span class="menu-chev">›</span></a>
-      <a href="/me">나의 정보 관리<span class="menu-chev">›</span></a>
     </div>
   </div>
   <!-- [추가: 2026-08-20] "연동"은 일부러 맨 아래에 둔다(사용자 지정 위치) — 검색어
@@ -1583,7 +1583,6 @@ def _credential_badge(source: str) -> str:
 def render_menu_page() -> str:
     """설정 메뉴 화면을 렌더링한다 (PRD.md 기능1 규칙 17)."""
     return _MENU_TEMPLATE.format(
-        login_note="켜짐" if auth_session.is_login_required() else "꺼짐",
         **_theme(),
         topnav_html=plain_nav(),
         naver_badge=_credential_badge(naver_source()),
@@ -5536,10 +5535,13 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_signup_page()
         elif self.path == "/forgot":
             self._respond(render_forgot_page())
-        elif self.path == "/me":
-            self._handle_my_info_page()
+        elif self.path == "/me" or self.path.startswith("/me?"):
+            self._handle_my_info_page(
+                notice=_SIGNUP_WELCOME if "welcome" in parse_qs(urlsplit(self.path).query) else "")
         elif self.path == "/login-settings":
             self._respond(render_login_settings_page())
+        elif self.path == "/whoami":
+            self._handle_whoami()
         else:
             self.send_response(404)
             self.end_headers()
@@ -5598,6 +5600,31 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         return f"{minutes}분"
 
     # ── 로그인 ───────────────────────────────────────────────────────────
+    def _handle_whoami(self) -> None:
+        """홈 머리의 계정 버튼이 「지금 누구인가」를 물어보는 자리.
+
+        **홈(`home.html`)은 파일로 한 벌만 구워 두는 화면이라** 그 안에 이름을 박아
+        넣으면 사람마다 다른 값을 줄 수 없고, 스케줄러가 다시 구울 때 남의 이름이
+        남는다. 그래서 파일엔 빈 버튼만 두고 **화면이 열릴 때 여기에 물어본다.**
+        못 물어보면(file://로 연 경우) 버튼은 「계정」으로 남고 링크는 그대로 돈다.
+
+        로그인하지 않았으면 이메일·이름을 주지 않는다 — 누가 쓰는 앱인지 묻지도
+        않은 사람에게 알려줄 이유가 없다.
+        """
+        user = self._current_user()
+        data = {
+            "logged_in": bool(user),
+            "login_required": auth_session.is_login_required(),
+            "has_accounts": users.user_count() > 0,
+        }
+        if user:
+            data.update(
+                name=user.get("display_name", ""),
+                department=user.get("department", ""),
+                email=user.get("email", ""),
+            )
+        self._respond_json(data)
+
     def _handle_login_page(self) -> None:
         if users.user_count() == 0:
             self._redirect("/signup")
@@ -5662,7 +5689,7 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             return
         logger.info("계정 생성: %s (%s)", user["email"], user["role"])
         token, max_age = auth_session.create_session(user["id"], False)
-        self._redirect_with_session(_home_href(), token, max_age)
+        self._redirect_with_session("/me?welcome=1", token, max_age)
 
     # ── 비밀번호 찾기 ────────────────────────────────────────────────────
     def _handle_forgot(self, form: dict) -> None:

@@ -4554,10 +4554,19 @@ def test_login_lock():
         assert users.verify_answer(users.get_user(user["id"]), "대전중앙")
         assert users.get_user(user["id"])["security_question"] == config.SECURITY_QUESTIONS[2]
 
+        # **자물쇠가 꺼져 있을 때만** 로그인 전 화면에 홈으로 가는 길이 있다.
+        # 꺼져 있으면 로그인 없이도 앱을 다 쓰므로 가입 화면이 막다른 골목이 되면
+        # 안 되고, 켜져 있으면 갈 수 있는 곳이 정말로 없다(그게 자물쇠다).
+        from app import auth_renderer
+        assert "홈으로" in auth_renderer.render_signup_page(), "꺼졌는데 돌아갈 길이 없다"
+        assert "홈으로" in auth_renderer.render_login_page()
+
         auth_session.set_login_required(True)
         assert auth_session.is_login_required() is True
+        assert "홈으로" not in auth_renderer.render_signup_page(), "자물쇠를 켰는데 홈으로 가는 길이 남았다"
+        assert "홈으로" not in auth_renderer.render_forgot_page()
 
-    print("51) 로그인 자물쇠: 통과 (기본 꺼짐, 평문 안 남김, 답 띄어쓰기 금지·질문만 바꾸기 금지, 부서, 횟수 잠금, 세션 해시·끊기, 단계 표)")
+    print("51) 로그인 자물쇠: 통과 (기본 꺼짐, 평문 안 남김, 답 띄어쓰기 금지·질문만 바꾸기 금지, 부서, 횟수 잠금, 세션 해시·끊기, 단계 표, 꺼졌을 때만 홈으로)")
 
 
 def test_key_paths_stay_narrow():

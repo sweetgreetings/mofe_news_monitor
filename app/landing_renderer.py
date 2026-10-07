@@ -323,11 +323,37 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     .tip.l::before {{ left: 28px; margin-left: 0; }}
     .tip.r::before {{ left: auto; right: 28px; margin-left: 0; }}
   }}
-  /* ⚙ 설정 — 페이지 머리(.hd) 오른쪽 끝. */
-  .gearlink {{ margin-left: auto; font-size: var(--fs-sm); font-weight: 500; color: {muted};
-    text-decoration: none; border: 1px solid {border}; border-radius: var(--r-md); padding: 4px 11px;
-    display: inline-flex; align-items: center; gap: 5px; }}
-  .gearlink:hover {{ background: {hover}; }}
+  /* 계정 · ⚙ 설정 — 페이지 머리(.hd) 오른쪽 끝. 둘이 **같은 모양**이라 한 규칙을 쓴다. */
+  .hd-right {{ margin-left: auto; display: inline-flex; align-items: center; gap: 8px; position: relative; }}
+  .gearlink, .acctbtn {{ font-size: var(--fs-sm); font-weight: 500; color: {muted};
+    text-decoration: none; background: {card}; border: 1px solid {border}; border-radius: var(--r-md);
+    padding: 4px 11px; display: inline-flex; align-items: center; gap: 5px;
+    cursor: pointer; font-family: inherit; }}
+  .gearlink:hover, .acctbtn:hover {{ background: {hover}; }}
+  .acctbtn .nm {{ color: {text}; }}
+  .acctbtn .chev {{ font-size: var(--fs-xs); color: {text_faint}; }}
+  .acctbtn.is-open {{ background: {hover}; border-color: {accent_border}; color: {accent}; }}
+
+  /* 계정 메뉴 — 담는 틀이라 큰 네모(--r-lg) + 팝오버 그림자. */
+  .acct-pop {{ position: absolute; top: calc(100% + 6px); right: 0; width: 248px; z-index: 10;
+    background: {card}; border: 1px solid {border}; border-radius: var(--r-lg);
+    box-shadow: var(--sh-pop); padding: 6px; }}
+  .acct-who {{ padding: 10px 10px 11px; border-bottom: 1px solid {divider_soft}; margin-bottom: 5px; }}
+  .acct-who .nm {{ font-size: var(--fs-base); color: {header}; font-weight: 600; }}
+  .acct-who .dept {{ font-size: var(--fs-sm); color: {muted}; margin-left: 5px; }}
+  .acct-who .mail {{ font-size: var(--fs-sm); color: {text_faint}; margin-top: 2px; }}
+  .acct-pop form {{ margin: 0; }}
+  .acct-pop a, .acct-pop button {{ display: flex; align-items: center; gap: 8px; width: 100%;
+    box-sizing: border-box; padding: 8px 10px; border-radius: var(--r-md);
+    font-size: var(--fs-md); color: {text}; text-decoration: none; background: none;
+    border: none; font-family: inherit; cursor: pointer; text-align: left; }}
+  .acct-pop a:hover, .acct-pop button:hover {{ background: {row_hover}; }}
+  .acct-pop .state {{ margin-left: auto; font-size: var(--fs-xs); color: {muted};
+    background: {pill_bg}; border: 1px solid {border}; border-radius: var(--r-pill); padding: 1px 8px; }}
+  .acct-pop .state.on {{ color: {ok_text}; background: {ok_bg}; border-color: {ok_border}; }}
+  .acct-pop .sep {{ border-top: 1px solid {divider_soft}; margin: 5px 0; }}
+  .acct-pop .out {{ color: {error}; }}
+  .acct-pop .out:hover {{ background: {error_bg}; }}
   /* 좁은 화면에선 칸이 한 줄씩 쌓이고 이름표는 그 줄 칸들 위의 머리글로 눕는다(띠 → 밑줄).
      실시간은 격자(.fl-top)가 맨 위라 그대로 쌓으면 「정기」 머리글보다 위에 와 어느 줄에도 안
      속한 것처럼 읽힌다 — 격자 셋을 display: contents로 풀어 한 줄 흐름으로 만든 뒤 order로
@@ -350,7 +376,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
 <div class="page">
-  <header class="hd">{logo_html}<div class="ttl"><h1>AI 뉴스 모니터링</h1><p class="today">{today_label}</p></div>{gear_html}</header>
+  <header class="hd">{logo_html}<div class="ttl"><h1>AI 뉴스 모니터링</h1><p class="today">{today_label}</p></div><div class="hd-right">{account_html}{gear_html}</div></header>
 
   {board_html}
   <div class="pair">
@@ -363,11 +389,97 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 </div>
 <script>
 {alert_hover_js}
+{account_js}
 {board_js}
 </script>
 </body>
 </html>
 """
+_BASE = f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}"
+
+
+def _account_html() -> str:
+    """홈 머리 오른쪽의 계정 버튼과 그 메뉴 — **이름 칸을 비운 채로** 굽는다.
+
+    홈은 파일로 한 벌만 만들어 두는 화면이라 여기에 이름을 박으면 사람마다 다른
+    값을 줄 수 없고, 스케줄러가 다시 구울 때 남의 이름이 남는다. 그래서 화면이
+    열릴 때 `/whoami`에 물어 채운다(`_ACCOUNT_JS`). 못 물어보면 「계정」인 채로
+    남고 링크는 그대로 돈다 — 주소가 설정 서버 절대주소라 file://로 열려도 간다.
+    """
+    return (
+        '<button class="acctbtn" id="acct-btn" type="button" aria-haspopup="true"'
+        f' aria-expanded="false" data-base="{_BASE}">'
+        f'{icon("user")}<span class="nm" id="acct-name">계정</span>'
+        '<span class="chev" id="acct-chev" hidden>▾</span></button>'
+        '<div class="acct-pop" id="acct-pop" hidden>'
+        '<div class="acct-who"><div><span class="nm" id="acct-who-name"></span>'
+        '<span class="dept" id="acct-who-dept"></span></div>'
+        '<div class="mail" id="acct-who-mail"></div></div>'
+        f'<a href="{_BASE}/me">{icon("user")} 나의 정보 관리</a>'
+        f'<a href="{_BASE}/login-settings">{icon("lock")} 로그인 사용'
+        '<span class="state" id="acct-lock"></span></a>'
+        '<div class="sep"></div>'
+        f'<form method="POST" action="{_BASE}/logout">'
+        f'<button class="out" type="submit">{icon("logout")} 로그아웃</button></form>'
+        "</div>"
+    )
+
+
+_ACCOUNT_JS = """
+// 계정 버튼 — 「지금 누구인가」만 서버에 묻고, 나머지 링크는 구워진 그대로 쓴다.
+// 주소는 버튼의 data-base에서 읽는다(JS 안에 박으면 홈을 구울 때마다 문자열이 섞인다).
+(function () {
+  var btn = document.getElementById("acct-btn");
+  var pop = document.getElementById("acct-pop");
+  if (!btn || !pop) return;
+  var BASE = btn.dataset.base || "";
+  var state = { logged_in: false, has_accounts: false };
+
+  function open(v) {
+    pop.hidden = !v;
+    btn.classList.toggle("is-open", v);
+    btn.setAttribute("aria-expanded", v ? "true" : "false");
+  }
+
+  btn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    // 로그인 전에는 메뉴를 열 게 없다 — 누르면 바로 그 화면으로 보낸다.
+    if (!state.logged_in) {
+      location.href = BASE + (state.has_accounts ? "/login" : "/signup");
+      return;
+    }
+    open(pop.hidden);
+  });
+  document.addEventListener("click", function (e) {
+    if (!pop.hidden && !pop.contains(e.target)) open(false);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") open(false);
+  });
+
+  fetch(BASE + "/whoami", { credentials: "include" })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      state = d;
+      if (!d.logged_in) {
+        document.getElementById("acct-name").textContent =
+          d.has_accounts ? "로그인" : "계정 만들기";
+        return;
+      }
+      document.getElementById("acct-name").textContent = d.name || "계정";
+      document.getElementById("acct-chev").hidden = false;
+      document.getElementById("acct-who-name").textContent = d.name || "";
+      document.getElementById("acct-who-dept").textContent = d.department || "";
+      document.getElementById("acct-who-mail").textContent = d.email || "";
+      var lock = document.getElementById("acct-lock");
+      lock.textContent = d.login_required ? "켜짐" : "꺼짐";
+      lock.classList.toggle("on", !!d.login_required);
+    })
+    .catch(function () { /* 물어볼 수 없으면 「계정」인 채로 둔다 */ });
+})();
+"""
+
+
 def _render_logo() -> str:
     """LOGO_PATH 파일이 있으면 보여주고, 없으면 자리를 아예 만들지 않는다 (깨진 이미지 아이콘 방지)."""
     if LOGO_PATH.exists():
@@ -1025,6 +1137,8 @@ def render_landing_page(
         shape_tokens=SHAPE_TOKENS_CSS,
         logo_html=_render_logo(),
         gear_html=f'<a class="gearlink" href="http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/">{icon("gear")} 설정</a>',
+        account_html=_account_html(),
+        account_js=_ACCOUNT_JS,
         today_label=today_label,
         board_html=_board_card_html(settings, runs_today if runs_today is not None else load_today_runs(today_str)),
         trend_html=_trend_card_html(today_str, f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/trend",
