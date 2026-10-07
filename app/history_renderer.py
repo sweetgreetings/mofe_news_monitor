@@ -938,9 +938,10 @@ def build_excel_rows_for_dates(dates: list[str]) -> list[dict]:
 
     화면(_render_slot)·복사 텍스트(_build_slot_plain_text)와 같은 그룹핑
     (_group_articles_by_saved_group)을 써서 소제목이 화면과 어긋나지 않는다.
-    소제목은 스냅샷 시점 원본 이름 그대로 넣는다 — display_group_name/
-    apply_subheading_format을 적용하지 않는다(app.renderer.render_page의 엑셀
-    내보내기와 같은 이유: 이건 화면 표시가 아니라 데이터 계약이다). 레거시 회차
+    소제목에 표시 형식(<>)은 안 씌우지만 **이름은 화면에 보이는 이름을 쓴다**
+    (display_group_name — app.renderer.build_export_rows와 같다). 직접 만든 소제목은
+    같은 이름이 그 회차에 이미 있으면 속이름을 따로 짓는데(app.custom_groups), 저장된
+    원본을 그대로 쓰면 담당자가 만든 적 없는 그 속이름이 엑셀에 남는다. 레거시 회차
     (group 필드가 없는 옛 데이터)는 그룹 없이(빈 소제목) 평평하게 담긴다 — 화면도
     같은 회차를 평평한 목록으로 대체 표시한다.
     """
@@ -952,6 +953,7 @@ def build_excel_rows_for_dates(dates: list[str]) -> list[dict]:
                 continue
             grouped = _group_articles_by_saved_group(articles, run)
             groups_iter = grouped.items() if grouped is not None else [(None, articles)]
+            run_labels = load_group_labels(round_id_for_run(run))
             for group_name, group_articles in groups_iter:
                 for a in group_articles:
                     rows.append(
@@ -962,7 +964,7 @@ def build_excel_rows_for_dates(dates: list[str]) -> list[dict]:
                             "언론사명": a.get("outlet", ""),
                             "기사제목": a.get("title", ""),
                             "URL": a.get("url", ""),
-                            "소제목": group_name or "",
+                            "소제목": display_group_name(group_name, run_labels) if group_name else "",
                             "라벨명": ", ".join(labels_for_url(a["url"])),
                         }
                     )

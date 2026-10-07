@@ -138,14 +138,19 @@ def _load_locked() -> None:
             _index[url] = None if flag == _UNDECIDED else bool(flag)
 
 
-def verdict(url: str) -> Optional[bool]:
-    """원문 판정 결과. 아직 없으면 None이고, 켜져 있으면 뒤에서 판정하도록 줄 세운다."""
+def verdict(url: str, enqueue: bool = True) -> Optional[bool]:
+    """원문 판정 결과. 아직 없으면 None이고, 켜져 있으면 뒤에서 판정하도록 줄 세운다.
+
+    `enqueue=False`는 **이미 적어 둔 판정만 읽고 새 원문은 받지 않는다** — 기관 기사
+    원장처럼 한 화면이 수만 건을 훑는 자리에 쓴다. 그 원장은 1년을 쌓는데 이 판정은
+    90일만 두므로, 줄을 세우면 화면을 열 때마다 옛 기사 수만 건을 새로 받으려 든다.
+    """
     if not is_mirror_url(url):
         return None
     with _lock:
         _load_locked()
         found = _index.get(url)
-        if url not in _index and _started:
+        if url not in _index and _started and enqueue:
             _enqueue_locked(url)
     return found
 

@@ -288,8 +288,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .t-ad:hover {{ border-color: {adhoc_border_soft}; }}
   .t-adarch {{ background: {card}; border-color: {adhoc_border_soft}; color: {adhoc_text}; }}
   .t-adarch:hover {{ background: {arch_adhoc_bg}; }}
-  .t-lab {{ grid-column: 1 / -1; background: {label_bg}; color: {label_text}; }}
-  .t-agency {{ grid-column: 1 / -1; background: {card}; border-color: {border}; color: {arch_reg_text}; }}
+  /* 두 칸은 흐름의 단계가 아니라 두 흐름을 가로지르는 형제라 한 줄에 반씩 선다.
+     가르는 자리는 6열(위 줄들의 「초안 → 확정본」 화살표 칸)이라 틈이 세로로 줄 맞는다. */
+  .t-lab {{ grid-column: 1 / 6; background: {label_bg}; color: {label_text}; }}
+  .t-agency {{ grid-column: 7 / -1; background: {card}; border-color: {border}; color: {arch_reg_text}; }}
   .t-agency:hover {{ background: {bg}; border-color: {ghost_border_hover}; }}
   .t-lab:hover {{ border-color: {label_border}; }}
   /* 말풍선 — 칸 가운데 아래에 뜬다. 칸 위를 스치듯 지나갈 때 툭툭 뜨지 않게 0.15초 뒤에

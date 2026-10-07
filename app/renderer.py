@@ -1664,7 +1664,14 @@ function moveGroupOrder(btn, direction) {{
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{order: JSON.stringify(names), run_slot: runSlot}})
   }}).then(function(res) {{
-    if (res.ok) {{ location.reload(); }}
+    if (res.ok) {{
+      // 새로고침 뒤 세이지로 되짚어줄 소제목 = **방금 ▲▼를 누른 그 칸 하나**다(미니 목차
+      // (적용)과 같은 justMovedGroups·같은 머리줄 전용 색). 자리를 맞바꾼 이웃은 담당자가
+      // 누른 게 아니라 밀려난 것이라 칠하지 않는다 — 기사 ↑↓와 같은 규칙. 저장이 끝난
+      // 뒤에만 적는다 — 실패했는데 적어두면 나중에 엉뚱한 새로고침에서 칠해진다.
+      sessionStorage.setItem("justMovedGroups", JSON.stringify([btn.dataset.name]));
+      location.reload();
+    }}
     else {{ alert("순서 변경에 실패했습니다. 다시 시도해주세요."); }}
   }}).catch(function() {{
     alert("순서 변경에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
@@ -3370,15 +3377,17 @@ def _note_word_key(word: str) -> str:
 
 
 def keyword_note_history_html(run_key=None) -> str:
-    """메모 칸 아래 「지난 회차 메모」 목록(없으면 빈 문자열). 재료는 저장된 메모뿐 — API 호출 없음."""
+    """메모 칸 아래 「지난 회차 메모」 목록(없으면 빈 문자열). 재료는 저장된 메모뿐 — API 호출 없음.
+
+    줄은 **오늘 앞 회차뿐**이라 앞칸에 날짜를 적지 않는다(모든 줄에 같은 「오늘」이
+    붙으면 아무것도 가르지 못한다 — 소제목 이름 고르기 창과 같은 규칙).
+    """
     rows = past_notes(run_key)
     if not rows:
         return ""
-    today = datetime.now().strftime("%Y-%m-%d")
     lines = []
-    for date, slots, text in rows:
-        day = "오늘" if date == today else f"{int(date[5:7])}/{int(date[8:10])}"
-        when = f'{day} {"·".join(html.escape(s) for s in slots)}'
+    for _date, slots, text in rows:
+        when = "·".join(html.escape(s) for s in slots)
         words = []
         for part in re.split(r"(\s+)", text):
             key = _note_word_key(part) if part and not part.isspace() else ""
@@ -3400,7 +3409,8 @@ KEYWORD_NOTE_HISTORY_STYLE = """
   /* 보이는 높이는 past_notes의 _MAX_PAST_ROWS(5줄)와 같은 값 — 한쪽을 바꾸면 다른 쪽도 바꾼다. */
   .kn-h-list {{ max-height: calc(var(--fs-sm) * 1.6 * 5); overflow-y: auto; }}
   .kn-h-row {{ display: flex; gap: 10px; font-size: var(--fs-sm); line-height: 1.6; color: {text_soft}; cursor: text; }}
-  .kn-h-when {{ flex: none; min-width: 7.5em; color: {text_faint}; font-variant-numeric: tabular-nums; }}
+  /* 앞칸은 회차 시각만(날짜 없음) — 「09:30·11:00」처럼 합쳐진 줄은 알아서 넓어진다. */
+  .kn-h-when {{ flex: none; min-width: 4.5em; color: {text_faint}; font-variant-numeric: tabular-nums; }}
   .kn-h-text {{ min-width: 0; overflow-wrap: anywhere; }}
   .kn-w.is-same {{ color: {accent}; font-weight: 600; }}
 """
@@ -3754,7 +3764,7 @@ def render_page(
     # 새면 안 된다는 것이지, 이건 애초에 보고서가 아니라 "데이터"다). 소제목 표시 형식
     # (subheading_format)도 마찬가지 이유로 적용하지 않는다 — 기계가 다시 읽을 원본
     # 이름 그대로가 데이터 계약에 맞다.
-    export_rows = build_export_rows(groups, export_date, run_slot)
+    export_rows = build_export_rows(groups, export_date, run_slot, labels)
     export_excel_filename = f"{export_date}_언론모니터링_{run_slot.replace(':', '-')}기준.xlsx"
 
     note_vars = keyword_note_template_vars((run_date, run_slot))
@@ -4187,21 +4197,26 @@ HIDDEN_TRASH_STYLE = """
 # (render_article·휴지통과 같은 이유).
 NAME_PICKER_STYLE = """
   #name-picker-back {{ position: fixed; inset: 0; z-index: 39; background: rgba(15,23,42,0.12); }}
+  /* 창 높이는 예전의 절반이다(약 430 → 230px, 사용자 결정) — 목록이 오늘 하루뿐이라 길 일이
+     없고, 이름 하나 고르는 창이 화면 절반을 덮으면 뒤에 있는 소제목이 안 보인다.
+     줄인 자리는 셋이다: 목록 상한(250 → 100px), 창 안 글자 한 단계씩, 그리고 없앤 두 줄
+     — 「치면 그 자리에서 걸러져요」는 안내줄에 붙이고, 「Enter 적용 · Esc 닫기」는
+     평소 비어 있는 아래 왼쪽 자리(.np-msg)로 들어갔다. */
   #name-picker {{ position: fixed; top: 13vh; left: 50%; transform: translateX(-50%); z-index: 40;
     width: 372px; max-width: calc(100vw - 32px); background: {card}; border: 1px solid {border};
-    border-radius: var(--r-lg); box-shadow: var(--sh-modal); padding: 14px 14px 10px; }}
-  .np-title {{ font-size: var(--fs-md); font-weight: 700; color: {header}; margin: 0 0 9px; }}
-  #np-input {{ width: 100%; font: inherit; font-size: var(--fs-base); padding: 8px 10px;
+    border-radius: var(--r-lg); box-shadow: var(--sh-modal); padding: 11px 12px 9px; }}
+  .np-title {{ font-size: var(--fs-sm); font-weight: 700; color: {header}; margin: 0 0 7px; }}
+  #np-input {{ width: 100%; font: inherit; font-size: var(--fs-md); padding: 6px 9px;
     border: 1px solid {border}; border-radius: var(--r-md); color: {text}; background: {card}; }}
   #np-input:focus {{ outline: none; border-color: {accent}; box-shadow: 0 0 0 3px {hover}; }}
   #np-input.is-bad {{ border-color: {error}; box-shadow: 0 0 0 3px {error_bg}; }}
-  .np-lead {{ font-size: var(--fs-sm); color: {muted}; margin: 11px 6px 2px; }}
-  .np-list {{ max-height: 250px; overflow-y: auto; margin: 0 -4px; }}
+  .np-lead {{ font-size: var(--fs-xs); color: {muted}; margin: 8px 6px 1px; }}
+  .np-list {{ max-height: 100px; overflow-y: auto; margin: 0 -4px; }}
   .np-row {{ display: flex; align-items: baseline; gap: 8px; width: calc(100% - 8px);
-    margin: 0 4px; padding: 5px 8px; border: none; background: none; border-radius: var(--r-sm);
+    margin: 0 4px; padding: 3px 8px; border: none; background: none; border-radius: var(--r-sm);
     font: inherit; text-align: left; cursor: pointer; color: {text}; }}
   .np-row:hover {{ background: {hover}; }}
-  .np-row .np-nm {{ flex: 1; font-size: var(--fs-md); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+  .np-row .np-nm {{ flex: 1; font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
   /* 볼드 = 담당자가 직접 고치거나 만든 이름. 직접 만든 소제목이 「다른 소제목」 드롭다운·미니
      목차에서 이미 볼드인 것과 같은 뜻이라 새 표시를 만들지 않고 그 관례를 그대로 이어쓴다. */
   .np-row.np-mine .np-nm {{ font-weight: 700; }}
@@ -4215,22 +4230,20 @@ NAME_PICKER_STYLE = """
      대개 1~3건인데 서로 다른 회차라 구분선이 이름 수만큼 붙어(실측 '개각' 2건 → 4줄) 줄만
      두 배가 되고, 그때 담당자가 묻는 건 "몇 회차 것인가"가 아니라 "그 글자가 든 이름이
      있나"라서다. 줄 오른쪽 .np-when이 이미 회차를 말하므로 같은 말을 두 번 하는 셈이기도 하다. */
-  .np-sep {{ font-size: var(--fs-xs); color: {muted}; margin: 9px 8px 2px; padding-top: 7px;
+  .np-sep {{ font-size: var(--fs-xs); color: {muted}; margin: 6px 8px 1px; padding-top: 5px;
     border-top: 1px dashed {border}; }}
-  .np-sep:first-child {{ border-top: none; padding-top: 0; margin-top: 2px; }}
-  .np-hint {{ color: {muted}; font-size: var(--fs-sm); margin: 7px 6px 0; opacity: 0.85; }}
+  .np-sep:first-child {{ border-top: none; padding-top: 0; margin-top: 1px; }}
   .np-foot {{ display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    margin-top: 10px; padding-top: 9px; border-top: 1px solid {border}; }}
-  .np-msg {{ font-size: var(--fs-sm); color: {muted}; flex: 1; }}
+    margin-top: 8px; padding-top: 7px; border-top: 1px solid {border}; }}
+  .np-msg {{ font-size: var(--fs-xs); color: {muted}; flex: 1; }}
   .np-msg.bad {{ color: {error}; }}
   .np-msg.new {{ color: {accent}; }}
   .np-btns {{ display: flex; gap: 6px; }}
-  .np-btns button {{ font: inherit; font-size: var(--fs-md); padding: 6px 13px; border-radius: var(--r-md); cursor: pointer; }}
+  .np-btns button {{ font: inherit; font-size: var(--fs-sm); padding: 5px 12px; border-radius: var(--r-md); cursor: pointer; }}
   .np-cancel {{ background: {card}; color: {muted}; border: 1px solid {border}; }}
   .np-ok {{ background: {accent}; color: {on_fill}; border: none; font-weight: 700; }}
   .np-ok:hover {{ background: {accent_pressed}; }}
   .np-ok:disabled {{ opacity: 0.45; cursor: not-allowed; }}
-  .np-key {{ font-size: var(--fs-xs); color: {muted}; text-align: right; margin: 6px 2px 0; }}
 """
 
 
@@ -4248,12 +4261,10 @@ def name_picker_html() -> str:
   <input type="text" id="np-input" autocomplete="off" spellcheck="false">
   <p class="np-lead"></p>
   <div class="np-list"></div>
-  <p class="np-hint"></p>
   <div class="np-foot"><span class="np-msg"></span><span class="np-btns">
     <button type="button" class="np-cancel" onclick="closeNamePicker()">취소</button>
     <button type="button" class="np-ok"></button>
   </span></div>
-  <p class="np-key">Enter 적용 · Esc 닫기</p>
 </div>
 """
 
@@ -4307,9 +4318,9 @@ function closeNamePicker() {
 function _npRender(q) {
   var box = document.getElementById("name-picker");
   var list = box.querySelector(".np-list");
-  var lead = box.querySelector(".np-lead"), hint = box.querySelector(".np-hint");
-  // [수정: 2026-09-10] 기본 목록이 오늘·어제 전부다(예전엔 직전 회차 하나 — 그 회차가 비면
-  // 목록이 0줄이 돼 창이 통째로 입력칸만 남았다. app/subheading_names.py 참고).
+  var lead = box.querySelector(".np-lead");
+  // [수정: 2026-09-30] 기본 목록은 오늘 전 회차다(예전엔 오늘·어제 — 67줄이 돼 창이 화면
+  // 절반을 덮었다. app/subheading_names.py 참고).
   var hits = q ? NAME_POOL.all.filter(function(i) { return i.name.indexOf(q) >= 0; }) : null;
   // 걸린 이름이 없으면 기본 목록으로 되돌아간다 — 이름 바꾸기는 현재 이름을 미리 채워 열기
   // 때문에, 가운데를 눌러 한 글자만 고치면 그 긴 이름이 그대로 검색어가 돼 반드시 0건이 된다.
@@ -4322,14 +4333,14 @@ function _npRender(q) {
   // 오늘·어제에 저장된 회차가 아예 없을 때만 목록 자리(안내줄·목록·힌트)를 통째로 안 그린다 —
   // 창이 입력칸+버튼만 남아 예전 prompt() 크기가 된다(2026-09-04 규칙 그대로).
   if (!items.length) {
-    lead.hidden = true; list.hidden = true; hint.hidden = true;
+    lead.hidden = true; list.hidden = true;
     return;
   }
-  var hintText = grouped ? "치면 그 자리에서 걸러져요" : "";
-  lead.hidden = false; list.hidden = false; hint.hidden = !hintText;
-  lead.textContent = fellBack ? "찾은 이름이 없어요 · 최근 쓴 이름"
-                    : (q ? "오늘·어제에서 찾은 이름" : "최근 쓴 이름 · 오늘·어제");
-  hint.textContent = hintText;
+  // 「치면 걸러져요」는 예전에 목록 아래 따로 있던 줄이다 — 창을 반으로 줄이면서 이 안내줄에
+  // 붙였다(같은 것을 말하는 두 줄이었다).
+  lead.hidden = false; list.hidden = false;
+  lead.textContent = fellBack ? "찾은 이름이 없어요 · 오늘 쓴 이름"
+                    : (q ? "오늘 쓴 이름에서 찾았어요" : "오늘 쓴 이름 · 치면 걸러져요");
   var lastWhen = null;
   items.forEach(function(item) {
     if (grouped && item.when !== lastWhen) {
@@ -4349,7 +4360,7 @@ function _npRender(q) {
     row.querySelector(".np-nm").textContent = item.name;
     // 구분선이 회차를 말하는 자리에서는 줄마다 또 적지 않는다(같은 말 두 번).
     row.querySelector(".np-when").textContent = grouped ? "" : (item.when || "");
-    if (used) { row.title = "이 화면에 이미 있는 이름이에요"; }
+    if (used) { row.title = "이미 같은 소제목이 있어요"; }
     else { row.onclick = function() { var i = document.getElementById("np-input"); i.value = item.name; _npPristine = false; i.focus(); _npCheck(); }; }
     list.appendChild(row);
   });
@@ -4368,7 +4379,10 @@ function _npCheck() {
   // 안 거른다(직전 회차 목록이 이 창의 존재 이유다).
   var q = _npPristine ? "" : v;
   msg.className = "np-msg" + (clash ? " bad" : (q && !known ? " new" : ""));
-  msg.textContent = clash ? "이 화면에 이미 있는 이름이에요" : (!q ? "" : (known ? "" : "처음 쓰는 이름이에요"));
+  // 할 말이 없을 때는 단축키 안내가 이 자리에 앉는다 — 예전엔 창 맨 아래 한 줄을 따로
+  // 차지했고, 그 줄은 창 높이를 반으로 줄이면서 없앴다.
+  var idle = "Enter 적용 · Esc 닫기";
+  msg.textContent = clash ? "이미 같은 소제목이 있어요" : (!q ? idle : (known ? idle : "처음 쓰는 이름이에요"));
   _npRender(q);
 }
 (function() {
@@ -4442,12 +4456,21 @@ def export_links_style() -> str:
     return EXPORT_LINKS_STYLE.format(**PALETTE)
 
 
-def build_export_rows(groups: list, export_date: str, run_slot: str) -> list[dict]:
+def build_export_rows(
+    groups: list, export_date: str, run_slot: str, group_labels: Optional[dict] = None
+) -> list[dict]:
     """확정본·초안 엑셀 8열 행 — 화면의 소제목 순서대로 groups를 그대로 순회한다.
 
-    보고서 텍스트와 달리 📂 소제목 미분류를 「기타」로 접지 않고 소제목 표시 형식도
+    보고서 텍스트와 달리 📂 소제목 미분류를 「기타」로 접지 않고 소제목 표시 형식(<>)도
     적용하지 않는다(PRD 기능11 규칙4 — 엑셀은 보고서가 아니라 데이터다).
+
+    [수정: 2026-10-02] **이름은 화면에 보이는 이름을 쓴다**(display_group_name). 직접 만든
+    소제목은 그 회차에 같은 이름이 이미 있으면 속이름을 따로 짓는데(app.custom_groups),
+    그 속이름이 엑셀로 새면 담당자가 만든 적 없는 이름이 데이터에 남는다. 덤으로 ✏️로
+    고친 이름도 이제 화면·복사·보관함과 같은 값으로 나간다 — 꺾쇠를 안 씌운다는 규칙은
+    그대로고, 바뀌는 건 "담당자가 보는 이름인가"뿐이다.
     """
+    group_labels = group_labels or {}
     return [
         {
             "스크랩일자": export_date,
@@ -4456,7 +4479,7 @@ def build_export_rows(groups: list, export_date: str, run_slot: str) -> list[dic
             "언론사명": a.get("outlet", ""),
             "기사제목": a.get("title", ""),
             "URL": a.get("url", ""),
-            "소제목": g["name"],
+            "소제목": display_group_name(g["name"], group_labels),
             "라벨명": ", ".join(labels_for_url(a["url"])),
         }
         for g in groups

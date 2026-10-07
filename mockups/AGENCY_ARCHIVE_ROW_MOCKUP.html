@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>기관 기사 찾기 — 기사 행 시안(아이콘 · 요약 접기)</title>
+<style>
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+    --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --chk-sm: 14px; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .mk { max-width: 800px; margin: 0 auto; padding: 26px 20px 0; }
+  .mk h2 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 6px; }
+  .mk p { font-size: var(--fs-md); color: #4B5563; line-height: 1.75; margin: 0 0 4px; }
+  .mk p b { color: #1F2937; }
+  .sec { margin: 40px 0 8px; font-size: var(--fs-lg); color: #1E3A5F; font-weight: 700; }
+  .why { font-size: var(--fs-sm); color: #4B5563; line-height: 1.75; margin: 0 0 10px; }
+  .why b { color: #1F2937; }
+  .rec { display: inline-block; font-size: var(--fs-xs); font-weight: 700; color: #fff; background: #2563EB;
+    border-radius: var(--r-md); padding: 2px 8px; margin-left: 6px; vertical-align: 2px; }
+  .no { display: inline-block; font-size: var(--fs-xs); font-weight: 700; color: #B91C1C; background: #FEF2F2;
+    border: 1px solid #F5C2C2; border-radius: var(--r-md); padding: 1px 7px; margin-left: 6px; vertical-align: 2px; }
+  .box { max-width: 800px; margin: 0 auto 8px; background: #FFF; border: 1px solid #E5E7EB;
+    border-radius: var(--r-lg); padding: 14px 18px; }
+
+  /* ── 기사 행 ── */
+  .art { padding: 5px 8px; margin: 4px 0; border-radius: var(--r-md); }
+  .art:hover { background: #F3F4F6; }
+  .title-row { display: flex; align-items: flex-start; gap: 8px; }
+  .a-title { font-size: var(--fs-base); line-height: 1.55; flex: 1 1 auto; min-width: 0; }
+  .a-title .outlet { color: #4B5563; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  .a-title a { color: #1F2937; text-decoration: none; }
+  .a-title a:hover { text-decoration: underline; }
+  .t-flash { color: #B91C1C; font-weight: 600; }
+  .photo-badge { flex-shrink: 0; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
+    color: #6B7280; background: #F3F4F6; border: 1px solid #E5E7EB; white-space: nowrap; margin-left: 6px; }
+  .a-meta { margin-top: 2px; font-size: var(--fs-sm); color: #4B5563; display: flex; align-items: center; gap: 6px; }
+  .a-meta a { color: #4B5563; text-decoration: none; }
+  .lab { font-size: var(--fs-xs); font-weight: 600; color: #8A5A14; background: #FBF0DA;
+    border: 1px solid rgba(138,90,20,.28); border-radius: var(--r-pill); padding: 1px 8px; }
+  .a-sum { margin-top: 3px; font-size: var(--fs-md); color: #4B5563; line-height: 1.7; }
+  .snip { margin-top: 2px; font-size: var(--fs-md); color: #4B5563; line-height: 1.6;
+    overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+  mark { background: #FFF9C4; color: inherit; padding: 0 1px; border-radius: 2px; }
+
+  /* ── 휴지통 문법 아이콘 묶음 (30×26 테두리 상자 + 13px 아이콘) ── */
+  .acts { flex: none; display: flex; align-items: center; gap: 6px; }
+  .acts .ib { flex: none; display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 26px; color: #6B7280; text-decoration: none; background: #FFF;
+    border: 1px solid #E5E7EB; border-radius: var(--r-md); cursor: pointer; padding: 0; }
+  .acts .ib:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .acts .ib svg { width: 13px; height: 13px; fill: none; stroke: currentColor;
+    stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  /* 기각안 — 테두리 없는 맨 아이콘 */
+  .acts.bare .ib { border-color: transparent; background: transparent; width: 22px; }
+
+  details.a-det > summary { cursor: pointer; list-style: none; }
+  details.a-det > summary::-webkit-details-marker { display: none; }
+  details.a-det[open] .a-title { opacity: .62; }
+
+  .tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-md); margin: 8px 0 0; }
+  .tbl th, .tbl td { border: 1px solid #E5E7EB; padding: 7px 10px; text-align: left; vertical-align: top; }
+  .tbl th { background: #F8FAFC; color: #1E3A5F; font-size: var(--fs-sm); }
+  .tbl td.num { text-align: right; white-space: nowrap; }
+  .note { max-width: 800px; margin: 20px auto 80px; padding: 0 20px; }
+  .note ul { margin: 6px 0 0; padding-left: 18px; }
+  .note li { font-size: var(--fs-md); color: #4B5563; line-height: 1.9; }
+  .note li b { color: #1F2937; }
+</style>
+</head>
+<body>
+
+<div class="mk">
+  <h2>🗄️ 기관 기사 찾기 — 기사 행</h2>
+  <p>두 가지를 고칩니다: <b>원문보기·복사가 둘 다 글자라 헷갈리는 것</b>과 <b>요약이 늘 펼쳐져 읽기 힘든 것</b>.</p>
+
+  <div class="sec">① 원문 · 복사 — 아이콘으로</div>
+  <p class="why">지금(글자 둘)과 아래 A안을 나란히 둡니다. 크기·색·간격은 <b>휴지통 화면의 <code>[원문 ↗][복구 ↩]</code>에서 그대로</b> 가져왔습니다
+  — 그 화면도 읽기 전용 목록이고 행마다 「원문 + 동작 하나」라 구조가 같습니다.</p>
+</div>
+
+<div class="box">
+  <p class="why" style="margin:0 0 8px;"><b>지금</b> — 회색 글자 둘이 나란히 서서 어느 쪽이 링크이고 어느 쪽이 버튼인지 안 보입니다.</p>
+  <div class="art">
+    <div class="a-title"><span class="outlet">이데일리</span><a href="#">초과세수 63조, 주거·일자리·서민금융에 쓴다…국채 긴급 매입에도 투입</a></div>
+    <div class="a-meta"><span>13:48 게시</span><span>·</span><a href="#">원문보기</a><span>·</span><a href="#">복사</a><span class="lab">비상경제본부회의</span></div>
+  </div>
+</div>
+
+<div class="box">
+  <p class="why" style="margin:0 0 8px;"><b>A안</b><span class="rec">권장</span> — 아이콘 둘을 <b>행 오른쪽 끝</b>에 모으고, 메타 줄엔 시각과 라벨만 남깁니다.</p>
+  <div class="art">
+    <div class="title-row">
+      <div class="a-title"><span class="outlet">이데일리</span><a href="#">초과세수 63조, 주거·일자리·서민금융에 쓴다…국채 긴급 매입에도 투입</a></div>
+      <span class="acts">
+        <a class="ib" href="#" title="원문 보기"><svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+        <button class="ib" title="복사"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+      </span>
+    </div>
+    <div class="a-meta"><span>13:48 게시</span><span class="lab">비상경제본부회의</span></div>
+  </div>
+</div>
+
+<div class="box">
+  <p class="why" style="margin:0 0 8px;"><b>기각</b><span class="no">안 함</span> — 테두리 없는 맨 아이콘.
+  <b>2026-08-14에 확정본에서 ↗를 뺀 적이 있습니다</b> — 작게 두면 <b>↗와 복사가 같은 실루엣</b>으로 보였기 때문입니다.
+  휴지통이 그 문제를 안 겪은 건 <b>테두리 상자로 두 칸을 갈랐기</b> 때문이라, 테두리가 이 안의 핵심입니다.</p>
+  <div class="art">
+    <div class="title-row">
+      <div class="a-title"><span class="outlet">이데일리</span><a href="#">초과세수 63조, 주거·일자리·서민금융에 쓴다…국채 긴급 매입에도 투입</a></div>
+      <span class="acts bare">
+        <a class="ib" href="#"><svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+        <button class="ib"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+      </span>
+    </div>
+    <div class="a-meta"><span>13:48 게시</span></div>
+  </div>
+</div>
+
+<div class="mk">
+  <div class="sec">② 요약 — 실측 먼저</div>
+  <p class="why">「그냥 접자」로 끝나지 않는 이유가 있습니다. 오늘 255건에서 낱말별로 <b>제목에 그 낱말이 있는지</b>를 재봤습니다.</p>
+</div>
+
+<div class="box">
+  <table class="tbl">
+    <tr><th>낱말</th><th class="num">걸린 건수</th><th class="num">제목에 있음</th><th class="num">제목엔 없고 요약에만</th></tr>
+    <tr><td>예산</td><td class="num">74</td><td class="num">0</td><td class="num"><b>74 (100%)</b></td></tr>
+    <tr><td>부동산</td><td class="num">5</td><td class="num">1</td><td class="num"><b>4 (80%)</b></td></tr>
+    <tr><td>법인세</td><td class="num">21</td><td class="num">9</td><td class="num"><b>12 (57%)</b></td></tr>
+    <tr><td>국고채</td><td class="num">7</td><td class="num">5</td><td class="num">2 (29%)</td></tr>
+    <tr><td>세수</td><td class="num">114</td><td class="num">97</td><td class="num">17 (15%)</td></tr>
+  </table>
+  <p class="why" style="margin:10px 0 0;"><b>요약을 그냥 접으면 검색 결과의 15~100%가 「왜 이게 나왔지?」가 됩니다.</b>
+  제목만 봐서는 걸린 이유를 알 수 없습니다.</p>
+</div>
+
+<div class="mk"><div class="sec">③ 요약 처리 — 세 안</div></div>
+
+<div class="box">
+  <p class="why" style="margin:0 0 8px;"><b>A안</b> — 확정본처럼 전부 접고, 누르면 요약.
+  <b>「예산」으로 찾은 이 세 건은 제목에 「예산」이 없어서, 왜 걸렸는지 알 수 없습니다.</b></p>
+  <details class="a-det"><summary>
+    <div class="title-row"><div class="a-title"><span class="outlet">efnews</span>재정금융수장들 "국고채 금리 상승 과도하면 긴급바이백·초과세수 활용"</div></div>
+    <div class="a-meta"><span>11:04 게시</span></div>
+  </summary><div class="a-sum">…석자들과 기념 촬영하고 있다. 왼쪽부터 박홍근 기획<mark>예산</mark>처 장관, 이형일 부총리, 신현송 한국은행 총재…</div></details>
+  <details class="a-det"><summary>
+    <div class="title-row"><div class="a-title"><span class="outlet">전자신문</span>반도체 호황에 올해 초과 세수 '역대 최대'…63조 더 걷힌다</div></div>
+    <div class="a-meta"><span>10:41 게시</span></div>
+  </summary><div class="a-sum">…조7000억원(28.0%) 늘어난 규모다. 올해 본<mark>예산</mark> 390조2000억원보다는 88조4000억원, 추경<mark>예산</mark>…</div></details>
+</div>
+
+<div class="box">
+  <p class="why" style="margin:0 0 8px;"><b>B안</b><span class="rec">권장</span> — 접되, <b>낱말 주변만 한 줄</b>로 보여줍니다(줄이 넘치면 <code>…</code>).
+  왜 걸렸는지 바로 보이고, <b>잘못 걸린 것도 그 자리에서 걸러집니다</b> — 아래 첫 줄은 「기획<b>예산</b>처」에 걸린 거라 찾던 예산이 아닙니다.</p>
+  <details class="a-det"><summary>
+    <div class="title-row">
+      <div class="a-title"><span class="outlet">efnews</span>재정금융수장들 "국고채 금리 상승 과도하면 긴급바이백·초과세수 활용"</div>
+      <span class="acts">
+        <a class="ib" href="#" title="원문 보기"><svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+        <button class="ib" title="복사"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+      </span>
+    </div>
+    <div class="snip">…석자들과 기념 촬영하고 있다. 왼쪽부터 박홍근 기획<mark>예산</mark>처 장관, 이형일 부총리, 신현송 한국은행 총재…</div>
+    <div class="a-meta"><span>11:04 게시</span></div>
+  </summary><div class="a-sum">재정·금융 수장들이 30일 처음으로 한자리에 모였다. 참석자들과 기념 촬영하고 있다. 왼쪽부터 박홍근 기획<mark>예산</mark>처 장관, 이형일 부총리, 신현송 한국은행 총재.</div></details>
+  <details class="a-det"><summary>
+    <div class="title-row">
+      <div class="a-title"><span class="outlet">전자신문</span>반도체 호황에 올해 초과 세수 '역대 최대'…63조 더 걷힌다</div>
+      <span class="acts">
+        <a class="ib" href="#" title="원문 보기"><svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+        <button class="ib" title="복사"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+      </span>
+    </div>
+    <div class="snip">…조7000억원(28.0%) 늘어난 규모다. 올해 본<mark>예산</mark> 390조2000억원보다는 88조4000억원, 추경<mark>예산</mark>…</div>
+    <div class="a-meta"><span>10:41 게시</span></div>
+  </summary><div class="a-sum">기획재정부는 올해 국세 수입이 63조원 더 걷힐 것으로 전망했다. 지난해보다 69조7000억원(28.0%) 늘어난 규모다. 올해 본<mark>예산</mark> 390조2000억원보다는 88조4000억원, 추경<mark>예산</mark>보다는 63조2000억원 많다.</div></details>
+  <p class="why" style="margin:10px 0 0;"><b>낱말 없이 기간만 조회하면 스니펫 줄도 없습니다</b> — 그때는 제목 한 줄이라 목록이 가장 짧아집니다.</p>
+</div>
+
+<div class="box">
+  <p class="why" style="margin:0 0 8px;"><b>C안</b><span class="no">권하지 않음</span> — 제목을 키우고 요약은 그대로 둡니다.</p>
+  <div class="art">
+    <div class="a-title" style="font-size:1.2rem;font-weight:700;"><span class="outlet" style="font-size:.7em;">전자신문</span>반도체 호황에 올해 초과 세수 '역대 최대'…63조 더 걷힌다</div>
+    <div class="a-meta"><span>10:41 게시</span></div>
+    <div class="a-sum">기획재정부는 올해 국세 수입이 63조원 더 걷힐 것으로 전망했다. 지난해보다 69조7000억원(28.0%) 늘어난 규모다. 올해 본<mark>예산</mark> 390조2000억원보다는 88조4000억원, 추경<mark>예산</mark>보다는 63조2000억원 많다.</div>
+  </div>
+  <p class="why" style="margin:10px 0 0;"><b>행이 여전히 3줄이라 목록 길이가 그대로입니다</b> — 읽기 힘든 원인은 대비가 아니라 줄 수였습니다.
+  그리고 <code>1.2rem</code>은 <b>여섯 단계(--fs-xs~xl) 밖의 값</b>이라 글자 크기 규칙을 깹니다.</p>
+</div>
+
+<div class="note">
+  <div class="mk" style="padding:0"><div class="sec">정리</div></div>
+  <table class="tbl">
+    <tr><th>안</th><th>행 높이</th><th>왜 걸렸는지</th><th>규칙</th></tr>
+    <tr><td>지금</td><td>3줄</td><td>보인다</td><td>확정본은 접는데 여기만 펼쳐 둠</td></tr>
+    <tr><td>A안 (전부 접기)</td><td><b>2줄</b></td><td><b>안 보인다 (최대 100%)</b></td><td>확정본과 같음</td></tr>
+    <tr><td><b>B안 (스니펫)</b></td><td><b>2~3줄</b><br><small>낱말 없으면 2줄</small></td><td><b>보인다</b></td><td>확정본의 접기 + 검색 화면의 스니펫</td></tr>
+    <tr><td>C안 (제목 키우기)</td><td>3줄 (그대로)</td><td>보인다</td><td><b>글자 크기 6단계를 깸</b></td></tr>
+  </table>
+
+  <div class="mk" style="padding:0"><div class="sec">B안에서 정할 잔가지</div></div>
+  <ul>
+    <li><b>스니펫 길이</b> — 지금 시안은 낱말 앞 28자 + 뒤 52자입니다. 한 줄에 안 들어가면 CSS가 자릅니다(<code>-webkit-line-clamp: 1</code>).</li>
+    <li><b>낱말이 제목에만 있으면?</b> 스니펫을 안 그리는 쪽이 맞아 보입니다 — 제목이 이미 답이라 한 줄이 중복입니다.</li>
+    <li><b>펼치면 제목이 흐려집니다</b>(<code>opacity: .62</code>) — 확정본의 「읽은 것은 색이 아니라 밝기로」 규칙 그대로입니다.</li>
+    <li><b>복사 아이콘은 누르면 1초간 ✓</b>로 바뀝니다(<code>copyArticleIcon</code>, 다른 화면과 같은 함수).</li>
+  </ul>
+</div>
+
+</body>
+</html>

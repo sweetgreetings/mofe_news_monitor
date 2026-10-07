@@ -36,7 +36,7 @@ def load_custom_groups(now: Optional[datetime] = None) -> list:
         # 바로 사라지면 "왜 갑자기 없어졌지" 하는 데이터 유실처럼 보인다. 오늘 막
         # 만든 것으로 간주해 오늘 자정까지는 그대로 살려주고, 그 이후부터 정상적으로
         # 날짜 기준 초기화가 적용되도록 오늘 날짜로 한 번 마이그레이션해 다시 쓴다.
-        _write(data, now)
+        _write(data, now=now)
         return data
     if not isinstance(data, dict) or data.get("date") != _today_str(now):
         return []
@@ -44,17 +44,70 @@ def load_custom_groups(now: Optional[datetime] = None) -> list:
     return names if isinstance(names, list) else []
 
 
-def _write(names: list, now: Optional[datetime] = None) -> None:
-    atomic_write_text(
-        CUSTOM_GROUPS_FILE, json.dumps({"date": _today_str(now), "names": names}, ensure_ascii=False)
-    )
+def load_custom_group_labels(now: Optional[datetime] = None) -> dict:
+    """직접 만든 소제목의 {속이름: 화면에 보일 이름} — 둘이 다를 때만 들어 있다.
+
+    소제목을 가르는 값은 이름 문자열 하나뿐이라, 담당자가 친 이름이 그 회차에 이미
+    쓰이고 있으면(대표적으로 "기타" — AI가 분류 못 한 기사를 담는 받이로 늘 쓴다) 같은
+    칸에 합쳐져 **새 칸이 아예 안 생긴다**. 그래서 겹칠 때만 속이름을 따로 짓고
+    (unique_key) 화면에는 담당자가 친 이름을 보인다 — 그 매핑이 여기 산다.
+
+    **이 매핑은 이름표(data/group_labels.json)가 아니라 여기 있어야 한다.** 이름표는
+    회차 단위인데 직접 만든 소제목은 하루를 산다 — 이름표에 적으면 다음 회차 화면에서
+    속이름이 그대로 드러난다. 읽는 쪽은 app.curation.load_group_labels 한 곳이고,
+    그 함수가 이 매핑을 밑에 깔고 그 위에 회차 이름표를 얹는다(✏️로 고친 이름이 이긴다).
+    """
+    if not CUSTOM_GROUPS_FILE.exists():
+        return {}
+    try:
+        data = json.loads(CUSTOM_GROUPS_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    if not isinstance(data, dict) or data.get("date") != _today_str(now):
+        return {}
+    labels = data.get("labels", {})
+    return dict(labels) if isinstance(labels, dict) else {}
 
 
-def add_custom_group(name: str, now: Optional[datetime] = None) -> Optional[str]:
-    """새 소제목 이름을 추가한다. 이미 있는 이름이면 조용히 무시(중복 방지)한다.
+def unique_key(name: str, taken, now: Optional[datetime] = None) -> str:
+    """담당자가 친 이름을 그대로 쓸 수 있으면 그대로, 이미 쓰이고 있으면 "이름 (2)"처럼
+    안 겹치는 속이름을 지어 돌려준다.
 
-    반환값은 없음(호출하는 쪽은 성공 여부를 신경 쓸 필요가 없다 — 이미 있어도 결과적으로
-    "그 이름의 소제목이 존재한다"는 상태는 똑같이 보장되기 때문).
+    taken은 그 회차에 이미 존재하는 **속이름** 전부다(화면에 지금 안 보이는 것까지 —
+    기사가 0건이라 안 그려진 칸도 나중에 기사가 들어오면 되살아나 합쳐진다). 막는 판정이
+    아니라 안 겹치는 자리를 고르는 일이라, taken은 넉넉할수록 안전하고 담당자에게는
+    아무것도 달라 보이지 않는다.
+
+    속이름이 사람 눈에 띌 자리는 없지만(화면·복사·txt·발송·엑셀·보관함이 모두 화면 이름을
+    쓴다) 라벨 스냅샷처럼 붙는 순간 값을 복사해 두는 자리가 있어, 혹시 새더라도 읽히도록
+    "기타 (2)" 꼴을 쓴다 — 무의미한 식별자를 쓰지 않는 이유가 그것이다.
+    """
+    name = name.strip()
+    if not name:
+        return name
+    used = set(taken or ()) | set(load_custom_groups(now))
+    if name not in used:
+        return name
+    n = 2
+    while f"{name} ({n})" in used:
+        n += 1
+    return f"{name} ({n})"
+
+
+def _write(names: list, labels: Optional[dict] = None, now: Optional[datetime] = None) -> None:
+    payload = {"date": _today_str(now), "names": names}
+    if labels:
+        payload["labels"] = labels
+    atomic_write_text(CUSTOM_GROUPS_FILE, json.dumps(payload, ensure_ascii=False))
+
+
+def add_custom_group(name: str, key: Optional[str] = None, now: Optional[datetime] = None) -> Optional[str]:
+    """새 소제목을 추가하고 **실제로 저장한 속이름**을 돌려준다. 이미 있으면 조용히 무시한다.
+
+    key는 호출부가 unique_key로 미리 구해 둔 속이름이다 — 담당자가 친 이름이 그 회차에
+    이미 쓰이고 있을 때만 달라진다. 미리 구하는 이유는 되돌리기 때문이다: 되돌리기 스냅샷은
+    "동작 전" 상태를 찍어야 하는데, 그러려면 무엇을 지울지(그 속이름을 가리키던 배정 기록)
+    를 저장 전에 알아야 한다(app.settings_server._handle_add_custom_group).
 
     **새로 만든 소제목은 목록 맨 아래에 온다** — 이 함수는 `group_order.json`을 아예
     건드리지 않고, 순서는 전적으로 자연 순서에 맡긴다. 자연 순서에서 커스텀 소제목이
@@ -72,11 +125,17 @@ def add_custom_group(name: str, now: Optional[datetime] = None) -> Optional[str]
     name = name.strip()
     if not name:
         return None
+    key = (key or name).strip() or name
     names = load_custom_groups(now)
-    if name not in names:
-        names.append(name)
-        _write(names, now)
-    return name
+    labels = load_custom_group_labels(now)
+    if key not in names:
+        names.append(key)
+        # 속이름과 화면 이름이 같으면 매핑을 안 적는다 — 적어 두면 담당자가 나중에 ✏️로
+        # 이름을 지워 원래대로 돌려도 옛 이름이 따라붙는 것처럼 보인다.
+        if key != name:
+            labels[key] = name
+        _write(names, labels, now)
+    return key
 
 
 def remove_custom_group(name: str, now: Optional[datetime] = None) -> None:
@@ -89,4 +148,5 @@ def remove_custom_group(name: str, now: Optional[datetime] = None) -> None:
     목록 전체가 비워질 때와 동일한 자기 치유 동작).
     """
     names = [n for n in load_custom_groups(now) if n != name]
-    _write(names, now)
+    labels = {k: v for k, v in load_custom_group_labels(now).items() if k != name}
+    _write(names, labels, now)

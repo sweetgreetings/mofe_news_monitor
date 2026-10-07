@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>소제목 이름 고르기 창 — 반으로</title>
+<style>
+:root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem; --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%; --h-sm: 24px; --h-tb: 28px; --h-md: 30px; --h-lg: 36px; --fab-lg: 56px; --fab-sm: 48px; --chk-md: 16px; --chk-sm: 14px; --sh-float: 0 4px 12px rgba(15, 23, 42, 0.12); --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14); --sh-modal: 0 16px 40px rgba(15, 23, 42, 0.22); }
+body { margin: 0; padding: 28px 20px 40px; background: #F8FAFC;
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif; color: #1F2937; }
+h1 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 4px; }
+.sub { font-size: var(--fs-sm); color: #6B7280; margin: 0 0 24px; }
+.cols { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
+.col { flex: 0 0 auto; }
+.col > h2 { font-size: var(--fs-md); color: #1E3A5F; margin: 0 0 8px; }
+.col > .note { font-size: var(--fs-xs); color: #6B7280; margin: 8px 0 0; max-width: 372px; line-height: 1.6; }
+/* 목업에선 창을 화면에 고정하지 않고 그 자리에 세워 둔다 */
+.pane .npw { position: static !important; top: auto !important; left: auto !important;
+  transform: none !important; }
+.pane { width: 372px; }
+.ruler { font-size: var(--fs-xs); color: #6B7280; margin-top: 6px; }
+
+  .old .npw { position: fixed; top: 13vh; left: 50%; transform: translateX(-50%); z-index: 40;
+    width: 372px; max-width: calc(100vw - 32px); background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: var(--r-lg); box-shadow: var(--sh-modal); padding: 14px 14px 10px; }
+  .old .np-title { font-size: var(--fs-md); font-weight: 700; color: #1E3A5F; margin: 0 0 9px; }
+  .old .np-input { width: 100%; font: inherit; font-size: var(--fs-base); padding: 8px 10px;
+    border: 1px solid #E5E7EB; border-radius: var(--r-md); color: #1F2937; background: #FFFFFF; }
+  .old .np-input:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 3px #EFF6FF; }
+  .old .np-input.is-bad { border-color: #DC2626; box-shadow: 0 0 0 3px #FEF2F2; }
+  .old .np-lead { font-size: var(--fs-sm); color: #6B7280; margin: 11px 6px 2px; }
+  .old .np-list { max-height: 250px; overflow-y: auto; margin: 0 -4px; }
+  .old .np-row { display: flex; align-items: baseline; gap: 8px; width: calc(100% - 8px);
+    margin: 0 4px; padding: 5px 8px; border: none; background: none; border-radius: var(--r-sm);
+    font: inherit; text-align: left; cursor: pointer; color: #1F2937; }
+  .old .np-row:hover { background: #EFF6FF; }
+  .old .np-row .old .np-nm { flex: 1; font-size: var(--fs-md); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 볼드 = 담당자가 직접 고치거나 만든 이름. 직접 만든 소제목이 「다른 소제목」 드롭다운·미니
+     목차에서 이미 볼드인 것과 같은 뜻이라 새 표시를 만들지 않고 그 관례를 그대로 이어쓴다. */
+  .old .np-row.np-mine .old .np-nm { font-weight: 700; }
+  .old .np-row .old .np-when { font-size: var(--fs-xs); color: #6B7280; white-space: nowrap; }
+  .old .np-row.np-used { color: #6B7280; cursor: not-allowed; }
+  .old .np-row.np-used:hover { background: none; }
+  .old .np-row.np-used .old .np-nm { text-decoration: line-through; text-decoration-color: #CBD5E1; font-weight: 400; }
+  .old .np-row .old .np-tag { font-size: var(--fs-xs); color: #6B7280; border: 1px solid #E5E7EB;
+    border-radius: var(--r-pill); padding: 0 6px; white-space: nowrap; }
+  /* [추가: 2026-09-10] 회차 구분선 — 기본 목록(안 쳤을 때)에만 그린다. 치면 걸린 이름이
+     대개 1~3건인데 서로 다른 회차라 구분선이 이름 수만큼 붙어(실측 '개각' 2건 → 4줄) 줄만
+     두 배가 되고, 그때 담당자가 묻는 건 "몇 회차 것인가"가 아니라 "그 글자가 든 이름이
+     있나"라서다. 줄 오른쪽 .old .np-when이 이미 회차를 말하므로 같은 말을 두 번 하는 셈이기도 하다. */
+  .old .np-sep { font-size: var(--fs-xs); color: #6B7280; margin: 9px 8px 2px; padding-top: 7px;
+    border-top: 1px dashed #E5E7EB; }
+  .old .np-sep:first-child { border-top: none; padding-top: 0; margin-top: 2px; }
+  .old .np-hint { color: #6B7280; font-size: var(--fs-sm); margin: 7px 6px 0; opacity: 0.85; }
+  .old .np-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    margin-top: 10px; padding-top: 9px; border-top: 1px solid #E5E7EB; }
+  .old .np-msg { font-size: var(--fs-sm); color: #6B7280; flex: 1; }
+  .old .np-msg.bad { color: #DC2626; }
+  .old .np-msg.new { color: #2563EB; }
+  .old .np-btns { display: flex; gap: 6px; }
+  .old .np-btns button { font: inherit; font-size: var(--fs-md); padding: 6px 13px; border-radius: var(--r-md); cursor: pointer; }
+  .old .np-cancel { background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; }
+  .old .np-ok { background: #2563EB; color: #FFFFFF; border: none; font-weight: 700; }
+  .old .np-ok:hover { background: #1D4ED8; }
+  .old .np-ok:disabled { opacity: 0.45; cursor: not-allowed; }
+  .old .np-key { font-size: var(--fs-xs); color: #6B7280; text-align: right; margin: 6px 2px 0; }
+
+
+  /* 창 높이는 예전의 절반이다(약 430 → 230px, 사용자 결정) — 목록이 오늘 하루뿐이라 길 일이
+     없고, 이름 하나 고르는 창이 화면 절반을 덮으면 뒤에 있는 소제목이 안 보인다.
+     줄인 자리는 셋이다: 목록 상한(250 → 100px), 창 안 글자 한 단계씩, 그리고 없앤 두 줄
+     — 「치면 그 자리에서 걸러져요」는 안내줄에 붙이고, 「Enter 적용 · Esc 닫기」는
+     평소 비어 있는 아래 왼쪽 자리(.new .np-msg)로 들어갔다. */
+  .new .npw { position: fixed; top: 13vh; left: 50%; transform: translateX(-50%); z-index: 40;
+    width: 372px; max-width: calc(100vw - 32px); background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: var(--r-lg); box-shadow: var(--sh-modal); padding: 11px 12px 9px; }
+  .new .np-title { font-size: var(--fs-sm); font-weight: 700; color: #1E3A5F; margin: 0 0 7px; }
+  .new .np-input { width: 100%; font: inherit; font-size: var(--fs-md); padding: 6px 9px;
+    border: 1px solid #E5E7EB; border-radius: var(--r-md); color: #1F2937; background: #FFFFFF; }
+  .new .np-input:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 3px #EFF6FF; }
+  .new .np-input.is-bad { border-color: #DC2626; box-shadow: 0 0 0 3px #FEF2F2; }
+  .new .np-lead { font-size: var(--fs-xs); color: #6B7280; margin: 8px 6px 1px; }
+  .new .np-list { max-height: 100px; overflow-y: auto; margin: 0 -4px; }
+  .new .np-row { display: flex; align-items: baseline; gap: 8px; width: calc(100% - 8px);
+    margin: 0 4px; padding: 3px 8px; border: none; background: none; border-radius: var(--r-sm);
+    font: inherit; text-align: left; cursor: pointer; color: #1F2937; }
+  .new .np-row:hover { background: #EFF6FF; }
+  .new .np-row .new .np-nm { flex: 1; font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 볼드 = 담당자가 직접 고치거나 만든 이름. 직접 만든 소제목이 「다른 소제목」 드롭다운·미니
+     목차에서 이미 볼드인 것과 같은 뜻이라 새 표시를 만들지 않고 그 관례를 그대로 이어쓴다. */
+  .new .np-row.np-mine .new .np-nm { font-weight: 700; }
+  .new .np-row .new .np-when { font-size: var(--fs-xs); color: #6B7280; white-space: nowrap; }
+  .new .np-row.np-used { color: #6B7280; cursor: not-allowed; }
+  .new .np-row.np-used:hover { background: none; }
+  .new .np-row.np-used .new .np-nm { text-decoration: line-through; text-decoration-color: #CBD5E1; font-weight: 400; }
+  .new .np-row .new .np-tag { font-size: var(--fs-xs); color: #6B7280; border: 1px solid #E5E7EB;
+    border-radius: var(--r-pill); padding: 0 6px; white-space: nowrap; }
+  /* [추가: 2026-09-10] 회차 구분선 — 기본 목록(안 쳤을 때)에만 그린다. 치면 걸린 이름이
+     대개 1~3건인데 서로 다른 회차라 구분선이 이름 수만큼 붙어(실측 '개각' 2건 → 4줄) 줄만
+     두 배가 되고, 그때 담당자가 묻는 건 "몇 회차 것인가"가 아니라 "그 글자가 든 이름이
+     있나"라서다. 줄 오른쪽 .new .np-when이 이미 회차를 말하므로 같은 말을 두 번 하는 셈이기도 하다. */
+  .new .np-sep { font-size: var(--fs-xs); color: #6B7280; margin: 6px 8px 1px; padding-top: 5px;
+    border-top: 1px dashed #E5E7EB; }
+  .new .np-sep:first-child { border-top: none; padding-top: 0; margin-top: 1px; }
+  .new .np-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    margin-top: 8px; padding-top: 7px; border-top: 1px solid #E5E7EB; }
+  .new .np-msg { font-size: var(--fs-xs); color: #6B7280; flex: 1; }
+  .new .np-msg.bad { color: #DC2626; }
+  .new .np-msg.new { color: #2563EB; }
+  .new .np-btns { display: flex; gap: 6px; }
+  .new .np-btns button { font: inherit; font-size: var(--fs-sm); padding: 5px 12px; border-radius: var(--r-md); cursor: pointer; }
+  .new .np-cancel { background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; }
+  .new .np-ok { background: #2563EB; color: #FFFFFF; border: none; font-weight: 700; }
+  .new .np-ok:hover { background: #1D4ED8; }
+  .new .np-ok:disabled { opacity: 0.45; cursor: not-allowed; }
+
+</style></head>
+<body>
+<h1>소제목 이름 고르기 창 — 반으로</h1>
+<p class="sub">① 오늘 것만 ② 창 높이 절반 ③ 창 안 글자 한 단계씩 · 54개 → 28개</p>
+<div class="cols">
+  <div class="col">
+    <h2>지금까지</h2>
+    
+<div class="pane old">
+  <div class="npw">
+    <p class="np-title">소제목 이름 바꾸기</p>
+    <input type="text" class="np-input" value="" placeholder="새 이름">
+    <p class="np-lead">최근 쓴 이름 · 오늘·어제</p>
+    <div class="np-list">
+<p class="np-sep">11:00 · 직전 회차</p>
+<button type="button" class="np-row"><span class="np-nm">10월 개인투자용 국채 발행</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">AIIB 연차총회 참석</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">8월 산업활동동향</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">거시재정금융간담회 - 국채 금리 과도하면</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">기타</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">국세수입 재추계(지속)</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">한은 국정감사 자료 - 외환보유액 순위 비공개</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">거시재정금융간담회 - 초과세수 활용</span><span class="np-when"></span></button>
+<p class="np-sep">09:30</p>
+<button type="button" class="np-row"><span class="np-nm">8월 누계 세수 현황</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">국세수입 재추계 - 초과세수 원인</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">국세수입 재추계 - 세수 오차</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">국세수입 재추계 - 올해 전망</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">국세수입 재추계 - 초과세수 운용</span><span class="np-when"></span></button>
+<p class="np-sep">06:00</p>
+<button type="button" class="np-row"><span class="np-nm">2주택 보유 과세 기준 변화</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">9월 30일 경제·정치 일정</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">가덕도 신공항 공사비 분쟁</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">경기도 주택 재산세 증가</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">교육교부금 제도 개편</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">노인 의료비 기준 상향</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">미국 금리 상승과 시장 영향</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">미래대응기금 &#x27;빚투&#x27; 논란</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">연말정산 기본공제 확대</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">외환보유액 순위 삭제 논란</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">유산기부와 레거시 텐</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">재정경제위 증인 채택 논란</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">전기차 산업 세제 지원</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">제조업 법인세 실효세율 역전</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">중소기업 LNG 펌프 국산화</span><span class="np-when"></span></button>
+<p class="np-sep">17:00</p>
+<button type="button" class="np-row"><span class="np-nm">2026년 세제개편안 시행령</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">전략경제자문단, 방산분과 현장분과위 개최</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">국무회의 - 태양광 언급 등</span><span class="np-when"></span></button>
+<p class="np-sep">14:00</p>
+<button type="button" class="np-row"><span class="np-nm">2분기 해외직접투자 현황</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">수출플러스지원단, 경북지역 회의</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">국무회의 - 한중 정상회담 후 수출</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">국무회의 - 세제개편안 후속조치</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">국무회의 - 양극화 언급</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">국무회의 - 전통시장 할인 언급</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">국무회의 - 채권시장 안정조치</span><span class="np-when"></span></button>
+<p class="np-sep">11:00</p>
+<button type="button" class="np-row"><span class="np-nm">2분기 해외직접투자 동향</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">국무회의 참석</span><span class="np-when"></span></button>
+<p class="np-sep">09:30</p>
+<button type="button" class="np-row np-mine"><span class="np-nm">가상자산 과세 관련</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">대미투자 발표 일정</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">항만공사 통합 추진</span><span class="np-when"></span></button>
+<p class="np-sep">06:00</p>
+<button type="button" class="np-row"><span class="np-nm">가덕도신공항 공사비 협상</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">경제 일정</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">경제부총리-한은 총재 첫 회동</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">금융시장 안정화 방안</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">금융위원 재산공개</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">미래대응기금 운용 논란</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">법원행정처 소통 논란</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">세제개편안 정책 조율</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">영남권 메가프로젝트 추진</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">정부 공공기관 경영평가</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">정부 인사이동</span><span class="np-when"></span></button>
+    </div>
+    <p class="np-hint">치면 그 자리에서 걸러져요</p>
+    <div class="np-foot"><span class="np-msg"></span><span class="np-btns">
+      <button type="button" class="np-cancel">취소</button>
+      <button type="button" class="np-ok">바꾸기</button>
+    </span></div>
+    <p class="np-key">Enter 적용 · Esc 닫기</p>
+  </div>
+</div>
+    <p class="ruler" id="h-old"></p>
+    <p class="note">오늘·어제 전 회차 · 목록 상한 250px · 목록 아래 안내줄과 맨 아래 단축키 줄이 따로 있었다.</p>
+  </div>
+  <div class="col">
+    <h2>이렇게</h2>
+    
+<div class="pane new">
+  <div class="npw">
+    <p class="np-title">소제목 이름 바꾸기</p>
+    <input type="text" class="np-input" value="" placeholder="새 이름">
+    <p class="np-lead">오늘 쓴 이름 · 치면 걸러져요</p>
+    <div class="np-list">
+<p class="np-sep">11:00 · 직전 회차</p>
+<button type="button" class="np-row"><span class="np-nm">10월 개인투자용 국채 발행</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">AIIB 연차총회 참석</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">8월 산업활동동향</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">거시재정금융간담회 - 국채 금리 과도하면</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">기타</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">국세수입 재추계(지속)</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">한은 국정감사 자료 - 외환보유액 순위 비공개</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">거시재정금융간담회 - 초과세수 활용</span><span class="np-when"></span></button>
+<p class="np-sep">09:30</p>
+<button type="button" class="np-row"><span class="np-nm">8월 누계 세수 현황</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">국세수입 재추계 - 초과세수 원인</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">국세수입 재추계 - 세수 오차</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">국세수입 재추계 - 올해 전망</span><span class="np-when"></span></button>
+<button type="button" class="np-row np-mine"><span class="np-nm">국세수입 재추계 - 초과세수 운용</span><span class="np-when"></span></button>
+<p class="np-sep">06:00</p>
+<button type="button" class="np-row"><span class="np-nm">2주택 보유 과세 기준 변화</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">9월 30일 경제·정치 일정</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">가덕도 신공항 공사비 분쟁</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">경기도 주택 재산세 증가</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">교육교부금 제도 개편</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">노인 의료비 기준 상향</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">미국 금리 상승과 시장 영향</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">미래대응기금 &#x27;빚투&#x27; 논란</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">연말정산 기본공제 확대</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">외환보유액 순위 삭제 논란</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">유산기부와 레거시 텐</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">재정경제위 증인 채택 논란</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">전기차 산업 세제 지원</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">제조업 법인세 실효세율 역전</span><span class="np-when"></span></button>
+<button type="button" class="np-row"><span class="np-nm">중소기업 LNG 펌프 국산화</span><span class="np-when"></span></button>
+    </div>
+    
+    <div class="np-foot"><span class="np-msg">Enter 적용 · Esc 닫기</span><span class="np-btns">
+      <button type="button" class="np-cancel">취소</button>
+      <button type="button" class="np-ok">바꾸기</button>
+    </span></div>
+    
+  </div>
+</div>
+    <p class="ruler" id="h-new"></p>
+    <p class="note">오늘 전 회차만 · 목록 상한 100px · 안내줄은 「오늘 쓴 이름」 줄에 붙이고, 단축키는 평소 비어 있던 아래 왼쪽 자리로 옮겼다. 제목·입력칸·이름·버튼 글자를 한 단계씩 내렸다.</p>
+  </div>
+</div>
+<script>
+function h(sel) { var e = document.querySelector(sel + " .npw"); return Math.round(e.getBoundingClientRect().height); }
+var a = h(".pane.old"), b = h(".pane.new");
+document.getElementById("h-old").textContent = "창 높이 " + a + "px";
+document.getElementById("h-new").textContent = "창 높이 " + b + "px (" + Math.round(b / a * 100) + "%)";
+</script>
+</body></html>

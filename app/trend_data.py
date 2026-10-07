@@ -7,13 +7,28 @@
 """
 from datetime import datetime, timedelta
 
+from app.search_terms import split_terms
 from app.storage import list_run_dates, list_runs_for_date, run_exists
 
 
 def word_hits(word: str, articles: list) -> int:
     """제목+요약 원문에서 문자열 그대로 찾는다 — 소제목 분류 상태와 무관하게 항상
-    셀 수 있는 게 이 카드의 존재 이유다(CLAUDE.md "정책 단어 추이" 참고)."""
-    return sum(1 for a in articles if word in (a.get("title", "") + " " + (a.get("summary") or "")))
+    셀 수 있는 게 이 카드의 존재 이유다(CLAUDE.md "정책 단어 추이" 참고).
+
+    검색어 규칙은 앱 어디서나 같다(app.search_terms) — **띄어 쓴 말은 붙어 있는 그대로**
+    찾고, `+`로 묶은 조각은 **전부 든** 기사만 센다. 예전엔 칸 값을 통째로 `in`으로 대조해
+    `가상자산+과세`가 글자 그대로 찾아져 선이 늘 0으로 깔렸다(그래서 조합 검색어를 고를
+    수 없게 막아 뒀는데, 이제 셀 수 있으니 막지 않는다 — all_registered_keywords 참고).
+    """
+    terms = split_terms(word)
+    if not terms:
+        return 0
+    hits = 0
+    for a in articles:
+        haystack = a.get("title", "") + " " + (a.get("summary") or "")
+        if all(t in haystack for t in terms):
+            hits += 1
+    return hits
 
 
 def articles_by_date_range(start_str: str, end_str: str) -> dict:
@@ -73,10 +88,10 @@ def all_registered_keywords(settings: dict) -> list:
     검색하나)과 주제 축(무슨 얘기인가)이 다르기 때문이다. 정책 단어 추이는
     주제 축이라 include_in_scrap을 안 본다. enabled=False(그룹 자체를 껐음)만 뺀다.
 
-    [추가] 조합 검색어(`가상자산+과세`)는 뺀다 — 네이버는 한 칸 안을 낱말로 쪼개 AND로
-    읽지만, 추이는 검색이 아니라 제목·요약 **글자 대조**라 그 글자가 통째로 든 기사만
-    센다. 그대로 두면 고를 수는 있는데 선이 0으로 깔려, 담당자는 "이 단어가 안 나왔나"로
-    읽는다(실제로는 셀 수 없는 단어다). 공백으로 적힌 옛 조합도 같이 뺀다.
+    조합 검색어(`가상자산+과세`)·띄어 쓴 검색어(`부처 핸즈업`)도 그대로 둔다 — word_hits가
+    앱 공통 규칙(app.search_terms)으로 읽어 덩어리는 붙어 있는 그대로, `+`는 조각이 전부
+    든 기사로 세므로 이제 셀 수 있는 단어다. 예전엔 칸 값을 통째로 글자 대조해 선이 0으로
+    깔려 여기서 미리 뺐다.
     """
     flat, seen = [], set()
     for group in settings.get("keyword_groups", []):
@@ -84,8 +99,6 @@ def all_registered_keywords(settings: dict) -> list:
             continue
         for kw in group.get("keywords", []):
             word = kw["word"] if isinstance(kw, dict) else kw
-            if "+" in word or any(ch.isspace() for ch in word):
-                continue
             if word not in seen:
                 seen.add(word)
                 flat.append(word)

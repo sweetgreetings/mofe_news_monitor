@@ -101,14 +101,14 @@ def _manual_verdict(url: str) -> Optional[bool]:
     return photo_overrides.photo_override(url)
 
 
-def _body_verdict(url: str) -> Optional[bool]:
+def _body_verdict(url: str, fetch: bool = True) -> Optional[bool]:
     """원문 판정 결과(없으면 None). app.photo_body는 naver_api 쪽을 거쳐 이 모듈을 부르지
     않지만, 순수 도구인 이 모듈이 import 시점에 네트워크 모듈을 끌어오지 않도록 늦게 읽는다."""
     from app import photo_body
-    return photo_body.verdict(url)
+    return photo_body.verdict(url, enqueue=fetch)
 
 
-def photo_badge_tip(title: str, url: str = "") -> str:
+def photo_badge_tip(title: str, url: str = "", fetch_body: bool = True) -> str:
     """📷 사진 추정 배지의 툴팁 문구 — 확정본·초안·실시간 현황·수시가 함께 쓴다.
 
     [추가: 2026-09-15] 배지 글자는 표식·추정 모두 「📷 사진 추정」 하나이고 정확성은 여기서만
@@ -116,11 +116,12 @@ def photo_badge_tip(title: str, url: str = "") -> str:
     `[헤럴드pic]` 기사에 "[포토] 표식이 붙은"이라 쓰면 틀린 말이다. 예전엔 같은 문구가
     화면 셋에 따로 적혀 있었고, 수시는 표식 기사에도 늘 "표식은 없지만"이라고 했다.
     반환값은 제목에서 온 글자를 담으므로 속성에 넣을 땐 이스케이프한다.
+    `fetch_body=False`는 looks_like_photo_caption과 같은 뜻이다(적어 둔 판정만 읽는다).
     """
     tag = photo_tag_text(title)
     if tag:
         return f"제목에 {tag} 표식이 붙은 사진기사입니다"
-    if url and _body_verdict(url):
+    if url and _body_verdict(url, fetch_body):
         return "원문이 사진과 설명 한 문장뿐인 사진기사입니다"
     return "제목에 [포토] 표식은 없지만 사진기사로 추정됩니다"
 
@@ -414,7 +415,7 @@ def _looks_like_truncated_position_caption(title: str, summary: str) -> bool:
     return "다." not in summary[last_position.end():]
 
 
-def looks_like_photo_caption(article: dict) -> bool:
+def looks_like_photo_caption(article: dict, fetch_body: bool = True) -> bool:
     """사진기사인지 판정한다 (아래 신호 중 하나라도 걸리면 True).
 
     맨 앞에 담당자가 직접 적어 둔 판정(app.photo_overrides)이 있고, 없을 때만 앱이
@@ -432,6 +433,9 @@ def looks_like_photo_caption(article: dict) -> bool:
     "[속보]"는 여기서도 항상 예외다 — exclude_photo_articles와 같은 이유(규칙12).
     (2)는 어디까지나 추정이라 실시간 현황에서는 지우지 않고 "📷 사진 추정" 배지로만
     보여주고, 정기 스크랩·초안에서만 (설정이 켜져 있을 때) 실제로 걸러낸다.
+
+    `fetch_body=False`는 원문 층을 **이미 적어 둔 판정만 읽는** 모드로 돌린다(새 원문을
+    받지 않는다). 한 화면이 수만 건을 훑는 기관 기사 원장 몫이다 — 그 화면 규칙 참고.
     """
     # [추가: 2026-10-01] 담당자가 직접 끈 기사가 가장 먼저다 — 표식([포토])까지 이긴다.
     # 담당자는 그 기사를 **보고** 누른 것이라, 앱의 어떤 층보다 정확하다(담당자 > AI
@@ -447,7 +451,7 @@ def looks_like_photo_caption(article: dict) -> bool:
         return True
     # 원문 층(app.photo_body) — 원문을 받아 판정했으면 그 결과가 아래 추정을 이긴다.
     # 추정은 원문을 못 본 기사(자체 도메인·아직 판정 전·못 받음)에만 쓴다.
-    body = _body_verdict(article.get("url", ""))
+    body = _body_verdict(article.get("url", ""), fetch_body)
     if body is not None:
         return body
     summary = (article.get("summary") or "").strip()

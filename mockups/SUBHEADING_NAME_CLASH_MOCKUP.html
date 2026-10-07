@@ -1,0 +1,194 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>소제목 이름 겹침 — 현 화면 기준 시안</title>
+<!-- 돌아가는 앱에서 CSS·마크업을 그대로 가져왔다(app/renderer.py의 name_picker_style·
+     소제목 h2·subheading-custom·subheading-count). 바꾼 건 창을 나란히 놓으려고
+     #name-picker → .np-box, #np-input → .np-input으로 셀렉터만 바꾸고
+     position: fixed를 푼 것뿐이다. 값은 손대지 않았다. -->
+<style>
+:root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem; --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14); --sh-modal: 0 16px 40px rgba(15, 23, 42, 0.22); }
+body { margin: 0; padding: 28px 24px 60px; background: #F8FAFC; color: #1F2937;
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+.wrap { max-width: 860px; margin: 0 auto; }
+h1 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 6px; }
+.sub { font-size: var(--fs-md); color: #6B7280; margin: 0 0 8px; line-height: 1.75; }
+.rule { background: #FFFFFF; border: 1px solid #E5E7EB; border-left: 4px solid #2563EB;
+  border-radius: 0 var(--r-lg) var(--r-lg) 0; padding: 12px 16px; margin: 0 0 30px; }
+.rule p { margin: 0; font-size: var(--fs-md); color: #1F2937; line-height: 1.7; }
+.rule b { color: #1E3A5F; }
+
+.case { margin: 0 0 34px; padding: 0 0 30px; border-bottom: 1px dashed #E5E7EB; }
+.case:last-of-type { border-bottom: none; }
+.cap { font-size: var(--fs-lg); font-weight: 700; color: #1E3A5F; margin: 0 0 4px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cap .ok-tag { font-size: var(--fs-xs); font-weight: 400; color: #166534; border: 1px solid #BBF7D0;
+  background: #F0FDF4; border-radius: var(--r-pill); padding: 1px 8px; }
+.cap .bad-tag { font-size: var(--fs-xs); font-weight: 400; color: #DC2626; border: 1px solid #FECACA;
+  background: #FEF2F2; border-radius: var(--r-pill); padding: 1px 8px; }
+.why { font-size: var(--fs-md); color: #6B7280; margin: 0 0 16px; line-height: 1.7; }
+.flow { display: flex; align-items: flex-start; gap: 20px; flex-wrap: wrap; }
+.step { flex: 1 1 340px; min-width: 300px; }
+.steplab { font-size: var(--fs-xs); color: #6B7280; margin: 0 0 6px; }
+.arrow { align-self: center; font-size: 1.4rem; color: #CBD5E1; padding-top: 40px; }
+
+/* ↓ 앱 CSS 그대로 (셀렉터만 바꿈) */
+.np-box { width: 372px; max-width: 100%; background: #FFFFFF; border: 1px solid #E5E7EB;
+  border-radius: var(--r-lg); box-shadow: var(--sh-modal); padding: 11px 12px 9px; }
+.np-title { font-size: var(--fs-sm); font-weight: 700; color: #1E3A5F; margin: 0 0 7px; }
+.np-input { width: 100%; box-sizing: border-box; font: inherit; font-size: var(--fs-md); padding: 6px 9px;
+  border: 1px solid #E5E7EB; border-radius: var(--r-md); color: #1F2937; background: #FFFFFF; }
+.np-input.is-focus { border-color: #2563EB; box-shadow: 0 0 0 3px #EFF6FF; }
+.np-input.is-bad { border-color: #DC2626; box-shadow: 0 0 0 3px #FEF2F2; }
+.np-lead { font-size: var(--fs-xs); color: #6B7280; margin: 8px 6px 1px; }
+.np-list { max-height: 100px; overflow-y: auto; margin: 0 -4px; }
+.np-row { display: flex; align-items: baseline; gap: 8px; width: calc(100% - 8px);
+  margin: 0 4px; padding: 3px 8px; border: none; background: none; border-radius: var(--r-sm);
+  font: inherit; text-align: left; cursor: pointer; color: #1F2937; }
+.np-row .np-nm { flex: 1; font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-row.np-mine .np-nm { font-weight: 700; }
+.np-row .np-when { font-size: var(--fs-xs); color: #6B7280; white-space: nowrap; }
+.np-row.np-used { color: #6B7280; cursor: not-allowed; }
+.np-row.np-used .np-nm { text-decoration: line-through; text-decoration-color: #CBD5E1; font-weight: 400; }
+.np-row .np-tag { font-size: var(--fs-xs); color: #6B7280; border: 1px solid #E5E7EB;
+  border-radius: var(--r-pill); padding: 0 6px; white-space: nowrap; }
+.np-sep { font-size: var(--fs-xs); color: #6B7280; margin: 6px 8px 1px; padding-top: 5px;
+  border-top: 1px dashed #E5E7EB; }
+.np-sep:first-child { border-top: none; padding-top: 0; margin-top: 1px; }
+.np-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 8px; padding-top: 7px; border-top: 1px solid #E5E7EB; }
+.np-msg { font-size: var(--fs-xs); color: #6B7280; flex: 1; }
+.np-msg.bad { color: #DC2626; }
+.np-msg.new { color: #2563EB; }
+.np-btns { display: flex; gap: 6px; }
+.np-btns button { font: inherit; font-size: var(--fs-sm); padding: 5px 12px; border-radius: var(--r-md); cursor: pointer; }
+.np-cancel { background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; }
+.np-ok { background: #2563EB; color: #FFFFFF; border: none; font-weight: 700; }
+.np-ok:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* 소제목 — 확정본 화면 그대로 */
+.screen { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 14px 18px 18px; }
+.subheading { margin-top: 20px; }
+.subheading:first-child { margin-top: 2px; }
+.subheading-custom { border: 2px dashed #7DD3FC; border-radius: var(--r-lg); padding: 8px 16px; }
+.subheading h2 { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  font-size: var(--fs-lg); color: #1E3A5F; border-bottom: 1px solid #E5E7EB;
+  margin: 0 0 6px; padding-bottom: 6px; }
+.subheading-title { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.subheading-count { margin-left: 6px; font-size: var(--fs-sm); font-weight: 700; color: #6B7280;
+  background: #F3F4F6; border-radius: var(--r-pill); padding: 1px 8px; }
+.subheading-icons { display: flex; align-items: center; gap: 2px; flex-shrink: 0; color: #6B7280; font-size: 0.9rem; }
+.ai-badge { margin-left: 6px; font-size: var(--fs-sm); opacity: 0.75; }
+.empty-group-hint { color: #6B7280; font-size: var(--fs-md); margin: 6px 0 0; }
+.art { font-size: var(--fs-base); margin: 7px 0; color: #1F2937; }
+.art .o { color: #6B7280; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+
+.alertbox { border: 1px solid #E5E7EB; border-radius: var(--r-lg); background: #FFFFFF;
+  box-shadow: var(--sh-pop); padding: 14px 16px; width: 372px; max-width: 100%; box-sizing: border-box; }
+.alertbox .msg { font-size: var(--fs-md); color: #1F2937; margin: 0; line-height: 1.6; }
+.alertbox .btn { display: inline-block; margin-top: 12px; background: #2563EB; color: #fff;
+  font-size: var(--fs-sm); font-weight: 700; padding: 5px 16px; border-radius: var(--r-md); }
+.foot { margin-top: 10px; font-size: var(--fs-sm); color: #6B7280; line-height: 1.7; }
+</style>
+<div class="wrap">
+<h1>소제목 이름 겹침 — 현 화면 기준</h1>
+<p class="sub">「+ 새 소제목」이 쓰는 이름 고르기 창.</p>
+<div class="rule"><p><b>지금 이 화면에 그 이름으로 보이는 칸이 있나</b> — 그것만 본다.<br>
+있으면 막고, 없으면 만든다. <b>그 칸이 예전에 무슨 이름이었는지는 보지 않는다.</b></p></div>
+
+<!-- ① 안 겹친다 → 만들어진다 -->
+<div class="case">
+  <p class="cap">① 화면에 「기타」가 안 보인다 <span class="ok-tag">만들어진다</span></p>
+  <p class="why">AI가 만든 칸은 이름을 <b>「재경부 1차관(후속)」으로 바꿔 둔 상태</b>라, 화면 어디에도 「기타」는 없다.
+    그러니 「기타」는 쓸 수 있는 이름이고, 눌렀을 때 <b>빈 칸이 따로 생긴다</b>.</p>
+  <div class="flow">
+    <div class="step">
+      <p class="steplab">창에서 「기타」를 친다</p>
+      <div class="np-box">
+        <p class="np-title">새 소제목 만들기</p>
+        <input class="np-input is-focus" value="기타">
+        <p class="np-lead">찾은 이름이 없어요 · 오늘 쓴 이름</p>
+        <div class="np-list">
+          <button class="np-row np-mine"><span class="np-nm">재경부 1차관(후속)</span><span class="np-tag">이 화면에 있음</span><span class="np-when">09:30</span></button>
+          <button class="np-row np-mine"><span class="np-nm">국고채·재정증권·원화표시 외평채 발행</span><span class="np-when">09:30</span></button>
+        </div>
+        <div class="np-foot"><span class="np-msg new">처음 쓰는 이름이에요</span><span class="np-btns">
+          <button class="np-cancel">취소</button><button class="np-ok">만들기</button></span></div>
+      </div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <p class="steplab">화면 — 두 칸이 따로 선다</p>
+      <div class="screen">
+        <div class="subheading">
+          <h2><span class="subheading-title">&lt;재경부 1차관(후속)&gt;<span class="subheading-count">2</span></span>
+            <span class="subheading-icons">✏️ ▲ ▼</span></h2>
+          <p class="art"><span class="o">뉴시스</span>권대영 재경부 1차관行에 금융위 인사시계 '째깍'</p>
+          <p class="art"><span class="o">연합뉴스</span>권대영 1차관 합류에 재경부 기대·긴장</p>
+        </div>
+        <div class="subheading subheading-custom">
+          <h2><span class="subheading-title">&lt;기타&gt;</span>
+            <span class="subheading-icons">✏️ 🗑️ ▲ ▼</span></h2>
+          <p class="empty-group-hint">아직 기사가 없습니다 — 기사의 「다른 소제목」에서 이리로 옮겨보세요.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ② 겹친다 → 막는다 -->
+<div class="case">
+  <p class="cap">② 화면에 「기타」가 이미 보인다 <span class="bad-tag">막는다</span></p>
+  <p class="why">AI가 만든 칸이 이름 그대로 「기타」로 떠 있는 경우. 같은 이름이 두 칸이 되면
+    보고서에 <b>&lt;기타&gt;가 두 번 찍히므로</b> 여기서 막는다. 담당자 눈에 그 칸이 그대로 보이니
+    어디를 말하는지 설명할 것도 없다.</p>
+  <div class="flow">
+    <div class="step">
+      <p class="steplab">창에서 「기타」를 친다</p>
+      <div class="np-box">
+        <p class="np-title">새 소제목 만들기</p>
+        <input class="np-input is-bad" value="기타">
+        <p class="np-lead">오늘 쓴 이름 · 치면 걸러져요</p>
+        <div class="np-list">
+          <button class="np-row np-used"><span class="np-nm">기타</span><span class="np-tag">이 화면에 있음</span><span class="np-when">09:30</span></button>
+        </div>
+        <div class="np-foot"><span class="np-msg bad">이미 같은 소제목이 있어요</span><span class="np-btns">
+          <button class="np-cancel">취소</button><button class="np-ok" disabled>만들기</button></span></div>
+      </div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <p class="steplab">창을 건너뛴 요청이 오면 서버가 같은 말로 돌려보낸다</p>
+      <div class="alertbox">
+        <p class="msg">이미 '기타'라는 이름의 소제목이 이 화면에 있습니다.</p>
+        <span class="btn">확인</span>
+      </div>
+      <p class="foot">지금 쓰는 409 안내창(<code>_respond_conflict</code>) 그대로다 — 문구도 안 바꾼다.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ③ 이름 바꾸기도 같은 잣대 -->
+<div class="case">
+  <p class="cap">③ ✏️ 이름 바꾸기도 같은 잣대</p>
+  <p class="why">소제목 이름을 「기타」로 바꿀 때도 묻는 건 하나다 — <b>지금 화면에 「기타」가 보이나.</b>
+    보이면 막고, 안 보이면 바꾼다. 지금도 이렇게 돌고 있어 고칠 것이 없다.</p>
+  <div class="flow">
+    <div class="step">
+      <div class="np-box">
+        <p class="np-title">소제목 이름 바꾸기</p>
+        <input class="np-input is-bad" value="기타">
+        <p class="np-lead">오늘 쓴 이름 · 치면 걸러져요</p>
+        <div class="np-list">
+          <button class="np-row np-used"><span class="np-nm">기타</span><span class="np-tag">이 화면에 있음</span><span class="np-when">09:30</span></button>
+        </div>
+        <div class="np-foot"><span class="np-msg bad">이미 같은 소제목이 있어요</span><span class="np-btns">
+          <button class="np-cancel">취소</button><button class="np-ok" disabled>바꾸기</button></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="foot">문구는 창 안 한 줄과 서버 안내창 두 자리에만 있다.
+창 안은 <b>「이미 같은 소제목이 있어요」</b>(지금은 「이 화면에 이미 있는 이름이에요」),
+서버는 지금 문장 그대로.</p>
+</div>

@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 
 from app.atomic_write import atomic_write_text
 from app.classifier import classify_articles, forced_group_target_names
+from app.custom_groups import load_custom_group_labels
 from app.config import (
     GROUP_LABELS_FILE,
     GROUP_OVERRIDE_RETENTION_DAYS,
@@ -585,6 +586,26 @@ def load_group_labels(round_id: Optional[tuple] = None) -> dict:
     된다, 이전 회차를 기억할 필요 없다")으로 뒤집혔다. "기타"에 붙인 이름표가 그 뒤
     36개 회차·259건에 잘못 적용됐던 사고(2026-08-14)가 이 방식이면 원천적으로
     불가능해진다 — 다른 회차의 "기타"는 아예 다른 dict를 본다.
+
+    **직접 만든 소제목의 화면 이름(app.custom_groups.load_custom_group_labels)을 밑에
+    깔고 그 위에 이 회차 이름표를 얹는다.** 담당자가 친 이름이 그 회차에 이미 쓰이고
+    있으면 속이름이 따로 지어지는데(그래야 기존 칸과 안 합쳐진다), 화면에는 친 이름이
+    보여야 한다. 여기 한 곳에서 합치면 display_group_name을 거치는 모든 자리 — 화면·
+    복사·txt·발송·보관함·순서 고정(app.group_order)·중복 이름 검사(display_name_in_use)
+    — 가 코드를 더 안 고쳐도 따라온다. 회차 이름표가 뒤에 와서 이긴다: ✏️로 고친 이름이
+    담당자의 더 최근 결정이다.
+    """
+    labels = load_custom_group_labels()
+    labels.update(_round_labels(round_id))
+    return labels
+
+
+def _round_labels(round_id: Optional[tuple] = None) -> dict:
+    """data/group_labels.json에 적힌 그 회차 이름표만 — 직접 만든 소제목 매핑은 안 섞는다.
+
+    쓰기(set_group_label)는 반드시 이쪽을 읽어야 한다. 합쳐진 값을 읽어 그대로 다시 쓰면
+    직접 만든 소제목의 화면 이름이 회차 이름표 파일로 복사돼, 그 소제목을 지운 뒤에도
+    그 회차에만 유령처럼 남는다.
     """
     if not GROUP_LABELS_FILE.exists():
         return {}
@@ -595,7 +616,7 @@ def load_group_labels(round_id: Optional[tuple] = None) -> dict:
     if not isinstance(data, dict):
         return {}
     bucket = data.get(round_key(round_id))
-    return bucket if isinstance(bucket, dict) else {}
+    return dict(bucket) if isinstance(bucket, dict) else {}
 
 
 def _write_labels_for_round(round_id: Optional[tuple], labels_for_round: dict) -> None:
@@ -617,7 +638,7 @@ def set_group_label(topic_word: str, label: str, round_id: Optional[tuple] = Non
     단어와 똑같은 이름으로 "바꾸면" 이름표를 지운 것으로 본다(되돌리기를 별도 버튼
     없이 자연스럽게 처리) — 이건 그대로다.
     """
-    labels = load_group_labels(round_id)
+    labels = _round_labels(round_id)
     if label == topic_word:
         labels.pop(topic_word, None)
     else:

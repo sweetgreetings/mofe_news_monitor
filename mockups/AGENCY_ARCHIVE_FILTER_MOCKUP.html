@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>기관 기사 찾기 — 필터·복사·사진 추정 시안</title>
+<style>
+  /* 토큰·조회 바·기사 행은 돌아가는 /agency-archive에서 그대로,
+     필터 줄은 /live.html(.filter-box/.fb-row), 사진 칩·말머리 색은 확정본에서 가져왔다 */
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+    --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --chk-md: 16px; --chk-sm: 14px; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+
+  .topbar { background: #FFFFFF; border-bottom: 1px solid #E5E7EB; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+  .topbar-inner { max-width: 800px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center;
+    gap: 10px; height: 54px; }
+  .topbar-inner > .tn { color: #2563EB; text-decoration: none; font-size: var(--fs-md); font-weight: 600;
+    padding: 5px 14px; border: 1px solid transparent; border-radius: var(--r-pill); }
+
+  .container { max-width: 800px; margin: 24px auto 40px; background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: var(--r-lg); padding: 24px 24px 26px; }
+  h1 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 6px; }
+  .hint { color: #4B5563; font-size: var(--fs-md); margin: 0 0 18px; line-height: 1.7; }
+
+  /* ── 조회 바 (지금 있는 것 그대로) ── */
+  .qbar { border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 12px 14px; margin-bottom: 14px;
+    background: #F8FAFC; }
+  .qrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .qrow + .qrow { margin-top: 10px; }
+  .qlabel { font-size: var(--fs-sm); color: #4B5563; font-weight: 600; width: 46px; flex: none; }
+  .qbar input[type="text"], .qbar input[type="date"] { height: 30px; border: 1px solid #E5E7EB;
+    border-radius: var(--r-md); padding: 0 10px; font-size: var(--fs-md); font-family: inherit; background: #FFF; }
+  .qbar input[type="text"] { flex: 1 1 240px; min-width: 180px; }
+  .qbar input[type="date"] { font-size: var(--fs-sm); }
+  .btn-go { height: 30px; background: #2563EB; color: #FFF; border: none; border-radius: var(--r-md);
+    padding: 0 16px; font-size: var(--fs-md); font-weight: 600; font-family: inherit; cursor: pointer; }
+  .preset { display: inline-flex; border: 1px solid #E5E7EB; border-radius: var(--r-md); overflow: hidden; background: #FFF; }
+  .preset button { border: none; background: transparent; color: #4B5563; font-size: var(--fs-sm);
+    font-family: inherit; padding: 0 11px; height: 30px; cursor: pointer; }
+  .preset button + button { border-left: 1px solid #E5E7EB; }
+  .preset button.on { background: #EFF6FF; color: #1E3A5F; font-weight: 700; }
+  .qsep { color: #9CA3AF; font-size: var(--fs-sm); }
+
+  /* ── 새로 붙는 필터 줄 (오늘 전체 기사 .filter-box와 같은 문법) ── */
+  .filter-box { margin: 0 0 12px; padding: 10px 14px; background: #F8FAFC; border: 1px solid #E5E7EB;
+    border-radius: var(--r-lg); display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .filter-box label { font-size: var(--fs-md); display: flex; align-items: center; gap: 8px; cursor: pointer;
+    white-space: nowrap; }
+  .filter-box label input[type=checkbox] { width: var(--chk-sm); height: var(--chk-sm); margin: 0;
+    flex: none; accent-color: #2563EB; cursor: pointer; }
+  .filter-box .sep { width: 1px; height: 16px; background: #E5E7EB; }
+  .filter-box .n { color: #9CA3AF; font-size: var(--fs-xs); }
+
+  /* ── 결과 머리줄 ── */
+  .rhead { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; flex-wrap: wrap; }
+  .rhead .n { font-size: var(--fs-md); color: #1E3A5F; font-weight: 700; flex: none; white-space: nowrap; }
+  .rhead .sub { font-size: var(--fs-sm); color: #4B5563; min-width: 0; }
+  .exp { display: inline-flex; gap: 2px; flex: none; margin-left: auto; }
+  .exp button { border: none; background: transparent; color: #4B5563; font-weight: 500;
+    border-radius: var(--r-md); padding: 4px 8px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; }
+  .exp button:hover { color: #2563EB; text-decoration: underline; }
+
+  .dblock { margin-top: 14px; }
+  .dhead { display: flex; align-items: center; gap: 8px; font-size: var(--fs-lg); color: #1E3A5F;
+    font-weight: 700; padding: 6px 0; border-bottom: 1px solid #E5E7EB; }
+  .dhead .dcnt { font-size: var(--fs-sm); color: #9CA3AF; font-weight: 500; }
+  .chip-today { font-size: var(--fs-xs); font-weight: 700; color: #1E3A5F; background: #EFF6FF;
+    border: 1px solid #BFDBFE; border-radius: var(--r-pill); padding: 1px 8px; }
+
+  /* ── 기사 행 ── */
+  .art { padding: 4px 8px; margin: 6px 0; border-radius: var(--r-md); }
+  .art:hover { background: #F3F4F6; }
+  .a-title { font-size: var(--fs-base); line-height: 1.55; }
+  .a-title .outlet { color: #4B5563; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  .a-title a { color: #1F2937; text-decoration: none; }
+  .a-title a:hover { text-decoration: underline; }
+  /* 말머리는 배지 없이 제목 글자색 — 오늘 전체 기사와 같은 값(색은 같고 굵기로 가른다) */
+  .t-scoop { color: #B91C1C; font-weight: 800; }
+  .t-flash { color: #B91C1C; font-weight: 600; }
+  /* 사진 추정 — 확정본과 같은 값(행 흐리게 + 알약, hover면 또렷) */
+  .art.is-photo { opacity: 0.55; }
+  .art.is-photo:hover { opacity: 1; }
+  .photo-badge { flex-shrink: 0; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
+    color: #6B7280; background: #F3F4F6; border: 1px solid #E5E7EB; white-space: nowrap;
+    position: relative; top: -0.15em; margin-left: 6px; }
+  .a-meta { margin-top: 2px; font-size: var(--fs-sm); color: #4B5563; display: flex; align-items: center;
+    gap: 6px; flex-wrap: wrap; }
+  .a-meta a { color: #4B5563; text-decoration: none; }
+  .a-meta a:hover { color: #2563EB; text-decoration: underline; }
+  /* 복사 = 가져가기라 글자 버튼(「누르는 것의 위계」) — 「원문보기」와 같은 줄·같은 무게 */
+  .a-copy { border: none; background: transparent; color: #4B5563; font-family: inherit;
+    font-size: var(--fs-sm); padding: 0; cursor: pointer; }
+  .a-copy:hover { color: #2563EB; text-decoration: underline; }
+  .a-meta .lab { font-size: var(--fs-xs); font-weight: 600; color: #8A5A14; background: #FBF0DA;
+    border: 1px solid rgba(138,90,20,.28); border-radius: var(--r-pill); padding: 1px 8px; }
+  .a-sum { margin-top: 3px; font-size: var(--fs-md); color: #4B5563; line-height: 1.7; }
+  mark { background: #FFF9C4; color: inherit; padding: 0 1px; border-radius: 2px; }
+
+  /* ── 목업 전용 ── */
+  .mk { max-width: 800px; margin: 0 auto; padding: 26px 20px 0; }
+  .mk h2 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 6px; }
+  .mk p { font-size: var(--fs-md); color: #4B5563; line-height: 1.75; margin: 0 0 4px; }
+  .mk p b { color: #1F2937; }
+  .mk .sec { margin: 40px 0 8px; font-size: var(--fs-lg); color: #1E3A5F; font-weight: 700; }
+  .mk .why { font-size: var(--fs-sm); color: #4B5563; line-height: 1.75; margin: 0 0 10px; }
+  .mk .why b { color: #1F2937; }
+  .rec { display: inline-block; font-size: var(--fs-xs); font-weight: 700; color: #fff; background: #2563EB;
+    border-radius: var(--r-md); padding: 2px 8px; margin-left: 6px; vertical-align: 2px; }
+  .note { max-width: 800px; margin: 26px auto 80px; padding: 0 20px; }
+  .note ul { margin: 6px 0 0; padding-left: 18px; }
+  .note li { font-size: var(--fs-md); color: #4B5563; line-height: 1.9; }
+  .note li b { color: #1F2937; }
+  .tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-md); margin: 8px 0 0; }
+  .tbl th, .tbl td { border: 1px solid #E5E7EB; padding: 7px 10px; text-align: left; }
+  .tbl th { background: #F8FAFC; color: #1E3A5F; font-size: var(--fs-sm); }
+</style>
+</head>
+<body>
+
+<div class="mk">
+  <h2>🗄️ 기관 기사 찾기 — 필터 · 복사 · 사진 추정</h2>
+  <p>오늘 쌓인 <b>174건</b>으로 재보니 사진 추정 <b>26건(15%)</b> · 말머리 <b>4건</b> · 주요 언론사 <b>53건(30%)</b>입니다.
+  아래 숫자는 그 실측을 그대로 썼습니다.</p>
+  <div class="sec">① 필터를 끈 기본 상태</div>
+  <p class="why">사진 추정 행은 <b>흐리게 + 📷 알약</b>(확정본과 같은 값, 마우스를 올리면 또렷해집니다).
+  말머리는 <b>배지 없이 제목 글자색</b>입니다 — 오늘 전체 기사와 같은 규칙이라 두 화면이 같아 보입니다.</p>
+</div>
+
+<div class="topbar"><div class="topbar-inner"><a class="tn" href="#">홈</a></div></div>
+
+<div class="container">
+  <h1>🗄️ 기관 기사 찾기</h1>
+  <p class="hint">재정경제부·재경부·기획재정부·기재부 관련 기사를 하루 종일 모아 둡니다. 지우지 않습니다.</p>
+
+  <div class="qbar">
+    <div class="qrow">
+      <span class="qlabel">낱말</span>
+      <input type="text" value="" placeholder="제목·요약에서 찾을 낱말" />
+      <button class="btn-go">찾기</button>
+    </div>
+    <div class="qrow">
+      <span class="qlabel">기간</span>
+      <span class="preset"><button>7일</button><button class="on">1개월</button><button>3개월</button><button>1년</button><button>전체</button></span>
+      <input type="date" value="2026-08-31" /><span class="qsep">~</span><input type="date" value="2026-09-30" />
+    </div>
+  </div>
+
+  <div class="filter-box">
+    <label><input type="checkbox" /> 주요 언론사만 <span class="n">53</span></label>
+    <span class="sep"></span>
+    <label><input type="checkbox" /> [단독] <span class="n">0</span></label>
+    <label><input type="checkbox" /> [속보] <span class="n">4</span></label>
+    <span class="sep"></span>
+    <label><input type="checkbox" /> 📷 사진 추정 빼고 <span class="n">26</span></label>
+  </div>
+
+  <div class="rhead">
+    <span class="n">174건</span>
+    <span class="sub">8월 31일 ~ 9월 30일</span>
+    <span class="exp"><button>복사</button><button>텍스트</button><button>엑셀</button></span>
+  </div>
+
+  <div class="dblock">
+    <div class="dhead">9월 30일 (수) <span class="chip-today">오늘</span> <span class="dcnt">174건</span></div>
+
+    <div class="art">
+      <div class="a-title"><span class="outlet">프레시안</span><a href="#"><span class="t-flash">[속보]</span> 정부, 올해 63조 추가세수 전망…반도체 호황 영향</a></div>
+      <div class="a-meta"><span>14:02 게시</span><span>·</span><a href="#">원문보기</a><span>·</span><button class="a-copy">복사</button></div>
+      <div class="a-sum">재정경제부는 30일 국무회의에서 올해 국세 수입이 당초 전망보다 63조 원 더 걷힐 것으로 내다봤다고 밝혔다.</div>
+    </div>
+
+    <div class="art">
+      <div class="a-title"><span class="outlet">이데일리</span><a href="#">초과세수 63조, 주거·일자리·서민금융에 쓴다…국채 긴급 매입에도 투입</a></div>
+      <div class="a-meta"><span>13:48 게시</span><span>·</span><a href="#">원문보기</a><span>·</span><button class="a-copy">복사</button><span class="lab">비상경제본부회의</span></div>
+      <div class="a-sum">기획재정부와 관계 부처는 초과세수 활용 방안을 이날 함께 발표했다.</div>
+    </div>
+
+    <div class="art is-photo">
+      <div class="a-title"><span class="outlet">뉴스핌</span><a href="#">모두발언하는 이형일 부총리 겸 재정경제부 장관</a><span class="photo-badge">📷 사진 추정</span></div>
+      <div class="a-meta"><span>13:36 게시</span><span>·</span><a href="#">원문보기</a><span>·</span><button class="a-copy">복사</button></div>
+      <div class="a-sum">이형일 부총리 겸 재정경제부 장관이 30일 서울 종로구 정부서울청사에서 열린 비상경제본부회의에서 모두발언을 하고 있다. 2026.09.30</div>
+    </div>
+
+    <div class="art">
+      <div class="a-title"><span class="outlet">YTN</span><a href="#"><span class="t-flash">[속보]</span> 올해 초과세수 63.2조 원 전망...법인세 35조·소득세 15.6조 더 걷혀</a></div>
+      <div class="a-meta"><span>13:31 게시</span><span>·</span><a href="#">원문보기</a><span>·</span><button class="a-copy">복사</button></div>
+      <div class="a-sum">기획재정부가 발표한 세수 재추계 결과에 따르면 법인세가 35조 원, 소득세가 15조 6천억 원 늘어난다.</div>
+    </div>
+
+    <div class="art is-photo">
+      <div class="a-title"><span class="outlet">뉴시스</span><a href="#">[그래픽] 8월까지 국세 329.9조…전년대비 69조 더 걷혀</a><span class="photo-badge">📷 사진 추정</span></div>
+      <div class="a-meta"><span>11:20 게시</span><span>·</span><a href="#">원문보기</a><span>·</span><button class="a-copy">복사</button></div>
+      <div class="a-sum">재정경제부가 30일 발표한 8월 국세수입 현황이다. 2026.09.30</div>
+    </div>
+  </div>
+</div>
+
+<div class="mk">
+  <div class="sec">② 「주요 언론사만」 + 「📷 사진 추정 빼고」를 켠 모습</div>
+  <p class="why">필터는 서로 <b>AND</b>, <b>말머리 둘끼리만 OR</b>입니다(오늘 전체 기사와 같은 규칙).
+  머리줄이 <b>전체 건수 대신 걸러진 건수</b>를 말하고, 무엇 때문에 줄었는지 뒤에 붙습니다.</p>
+</div>
+
+<div class="container">
+  <div class="filter-box">
+    <label><input type="checkbox" checked /> 주요 언론사만 <span class="n">53</span></label>
+    <span class="sep"></span>
+    <label><input type="checkbox" /> [단독] <span class="n">0</span></label>
+    <label><input type="checkbox" /> [속보] <span class="n">4</span></label>
+    <span class="sep"></span>
+    <label><input type="checkbox" checked /> 📷 사진 추정 빼고 <span class="n">26</span></label>
+  </div>
+
+  <div class="rhead">
+    <span class="n">41건</span>
+    <span class="sub">174건 중 · 주요 언론사만 · 사진 추정 빼고</span>
+    <span class="exp"><button>복사</button><button>텍스트</button><button>엑셀</button></span>
+  </div>
+
+  <div class="dblock">
+    <div class="dhead">9월 30일 (수) <span class="chip-today">오늘</span> <span class="dcnt">41건</span></div>
+    <div class="art">
+      <div class="a-title"><span class="outlet">이데일리</span><a href="#">초과세수 63조, 주거·일자리·서민금융에 쓴다…국채 긴급 매입에도 투입</a></div>
+      <div class="a-meta"><span>13:48 게시</span><span>·</span><a href="#">원문보기</a><span>·</span><button class="a-copy">복사</button><span class="lab">비상경제본부회의</span></div>
+      <div class="a-sum">기획재정부와 관계 부처는 초과세수 활용 방안을 이날 함께 발표했다.</div>
+    </div>
+    <div class="art">
+      <div class="a-title"><span class="outlet">YTN</span><a href="#"><span class="t-flash">[속보]</span> 올해 초과세수 63.2조 원 전망...법인세 35조·소득세 15.6조 더 걷혀</a></div>
+      <div class="a-meta"><span>13:31 게시</span><span>·</span><a href="#">원문보기</a><span>·</span><button class="a-copy">복사</button></div>
+      <div class="a-sum">기획재정부가 발표한 세수 재추계 결과에 따르면 법인세가 35조 원, 소득세가 15조 6천억 원 늘어난다.</div>
+    </div>
+    <div class="art">
+      <div class="a-title"><span class="outlet">한국경제</span><a href="#">세수 추계 또 빗나가…"재정 신뢰 흔든다" 지적</a></div>
+      <div class="a-meta"><span>10:55 게시</span><span>·</span><a href="#">원문보기</a><span>·</span><button class="a-copy">복사</button></div>
+      <div class="a-sum">재정경제부의 세수 추계 오차가 3년째 이어지면서 국회 재정경제기획위원회에서 지적이 나왔다.</div>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  <div class="mk" style="padding:0"><div class="sec">정해야 할 것 하나 — 사진 필터의 방향</div></div>
+  <p style="font-size:var(--fs-md);color:#4B5563;line-height:1.75;margin:0 0 6px;">
+  오늘 전체 기사의 특수조건 필터는 <b>다섯 다 「~만 보기」 방향이고 「~빼고 보기」는 넣지 않는다</b>가 규칙입니다.
+  그런데 사진은 <b>찾을 때 빼고 싶은 것</b>이라 방향이 반대입니다.</p>
+  <table class="tbl">
+    <tr><th>안</th><th>필터 줄</th><th>좋은 점</th><th>걸리는 점</th></tr>
+    <tr>
+      <td><b>A안</b><span class="rec">권장</span></td>
+      <td>📷 사진 추정 <b>빼고</b></td>
+      <td>실제 용도 그대로. 26건(15%)이 한 번에 빠진다</td>
+      <td>이 줄에서 <b>방향이 하나만 반대</b>가 된다</td>
+    </tr>
+    <tr>
+      <td>B안</td>
+      <td>📷 사진 추정<b>만</b></td>
+      <td>규칙 방향 그대로. 넷이 전부 「~만」</td>
+      <td>사진만 골라 볼 일이 <b>거의 없다</b> — 있으나 마나 한 칸이 된다</td>
+    </tr>
+    <tr>
+      <td>C안</td>
+      <td>(필터 없이 표시만)</td>
+      <td>오늘 전체 기사와 완전히 같다</td>
+      <td>26건이 계속 섞여 <b>찾는 일을 방해한다</b></td>
+    </tr>
+  </table>
+  <p style="font-size:var(--fs-md);color:#4B5563;line-height:1.75;margin:10px 0 0;">
+  <b>A안을 권합니다.</b> 그 규칙이 있는 이유는 다섯 칸의 방향이 섞이면 AND 조합이 헷갈려서인데,
+  여기선 <b>말머리·언론사와 사진이 세로선으로 갈라져 있어</b> 한눈에 다른 축으로 읽힙니다.
+  그리고 이 화면은 보고서를 만드는 곳이 아니라 <b>찾는 곳</b>이라, 방해되는 것을 치우는 쪽이 본업에 맞습니다.</p>
+
+  <div class="mk" style="padding:0"><div class="sec">이미 정해진 것 (규칙에서 따라 나옴)</div></div>
+  <ul>
+    <li><b>「주요 언론사만」은 고정 13곳</b>(KBS·MBC·조선·중앙·동아·한경·매경·서울경제·한국일보·머니투데이·이데일리·연합·뉴시스, `PRIORITY_OUTLETS`). 설정의 「선택 언론사」(화이트리스트)가 아닙니다 — <b>그건 지금 0곳이라 켜면 한 건도 안 남습니다.</b></li>
+    <li><b>복사는 글자 버튼</b> — 「복사는 가져가기」이고 가져가기는 글자 버튼이라는 규칙 그대로입니다. 메타 줄의 「원문보기」와 같은 줄·같은 무게로 섭니다.</li>
+    <li><b>⋯ 메뉴를 만들지 않습니다</b> — 확정본의 ⋯엔 「원문 다시 불러오기」·「기사제목 직접 수정」이 같이 들어가는데 <b>둘 다 고치는 동작이라 이 화면엔 없습니다.</b> 담을 게 복사 하나뿐이면 메뉴를 열게 할 이유가 없습니다.</li>
+    <li><b>사진 판정은 `looks_like_photo_caption` 그대로</b> — 새 판정을 만들지 않습니다. 표식·원문·추정 세 층을 그대로 씁니다.</li>
+    <li><b>말머리는 배지 없이 제목 글자색</b>([단독] 굵기 800, [속보] 600 — 색은 같은 빨강입니다).</li>
+    <li>필터는 <b>이미 그려진 목록을 클라이언트에서만</b> 거릅니다(서버 재검색 없음). 「찾기」를 다시 누를 필요가 없습니다.</li>
+    <li>필터 칸 옆 <b>작은 숫자는 그 조건에 걸리는 건수</b>입니다. 0건이면 그 칸은 흐려집니다(오늘 전체 기사가 언론사 목록이 빌 때 하는 것과 같습니다).</li>
+  </ul>
+
+  <div class="mk" style="padding:0"><div class="sec">안 넣은 것</div></div>
+  <ul>
+    <li><b>[사설] 필터</b> — 오늘 전체 기사엔 있지만, 기관 원장에서 사설은 드물고 찾을 때 따로 가릴 일이 적습니다. 필요해지면 그때 한 칸 더합니다.</li>
+    <li><b>「아직 처리 안 한 기사만」</b> — 숨김·스크랩됨·담아둠 같은 <b>처리 상태가 이 화면엔 없습니다</b>(책은 고쳐 쓰지 않습니다).</li>
+    <li><b>📷 사진 추정 모아 보기 알약</b> — 확정본의 그 기능은 소제목을 잠시 걷어내고 사진만 모으는 것인데, 여기엔 소제목이 없어 「빼고 보기」 한 칸이면 충분합니다.</li>
+    <li><b>필터 상태 기억</b> — 오늘 전체 기사는 `localStorage`에 기억하지만, 여기선 조회할 때마다 조건이 달라서 지난번 필터가 켜진 채 열리면 「왜 안 나오지」가 됩니다. 열 때는 늘 꺼진 채입니다.</li>
+  </ul>
+</div>
+
+</body>
+</html>

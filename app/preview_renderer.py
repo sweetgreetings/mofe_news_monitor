@@ -1761,7 +1761,14 @@ function moveGroupOrder(btn, direction) {{
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{order: JSON.stringify(names)}})
   }}).then(function(res) {{
-    if (res.ok) {{ location.reload(); }}
+    if (res.ok) {{
+      // 새로고침 뒤 세이지로 되짚어줄 소제목 = **방금 ▲▼를 누른 그 칸 하나**다(미니 목차
+      // (적용)과 같은 justMovedGroups·같은 머리줄 전용 색). 자리를 맞바꾼 이웃은 담당자가
+      // 누른 게 아니라 밀려난 것이라 칠하지 않는다 — 기사 ↑↓와 같은 규칙. 저장이 끝난
+      // 뒤에만 적는다 — 실패했는데 적어두면 나중에 엉뚱한 새로고침에서 칠해진다.
+      sessionStorage.setItem("justMovedGroups", JSON.stringify([btn.dataset.name]));
+      location.reload();
+    }}
     else {{ alert("순서 변경에 실패했습니다. 다시 시도해주세요."); }}
   }}).catch(function() {{
     alert("순서 변경에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
@@ -3617,7 +3624,7 @@ def _compute_preview_content(
         "actions_html": _actions_html(
             plain_text, slot["end"], pending_count, manual_edits, classify_degraded,
             photo_suspect_count,
-            export_rows=build_export_rows(groups, label_scrap_date, label_scrap_end),
+            export_rows=build_export_rows(groups, label_scrap_date, label_scrap_end, labels),
             export_date=label_scrap_date,
         ),
         # [추가: 2026-08-20] previewMoveArticle(JS)이 DOM 조각과 함께 이 값도 받아

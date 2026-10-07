@@ -39,9 +39,9 @@ RoundKey = Tuple[str, str]
 # 늘지 않게만 막는 값이고, 화면이 실제로 쓰는 건 "이번 회차"와 "직전 회차" 둘뿐이다.
 _MAX_NOTES = 60
 
-# 「지난 회차 메모」에 한 번에 보이는 줄 수 상한. 날짜로 자르지 않고 **줄 수로만** 자른다 —
-# 오늘 앞 회차가 먼저 차고 남는 자리만 직전 하루가 채우므로, 첫 회차엔 어제가 보이고
-# 오후엔 저절로 오늘 것만 남는다. 스크롤이 안 생기는 높이(.kn-h-list)와 같은 값이다.
+# 「지난 회차 메모」에 한 번에 보이는 줄 수 상한. 보이는 범위는 **오늘 앞 회차뿐**이라
+# 하루 회차 수를 넘지 않지만, 회차를 많이 잡아둔 날에도 칸이 길어지지 않게 막는다.
+# 스크롤이 안 생기는 높이(.kn-h-list)와 같은 값이다.
 _MAX_PAST_ROWS = 5
 
 
@@ -115,40 +115,30 @@ def load_manual_keyword_note(run_key: Optional[RoundKey] = None) -> str:
     return notes.get(_key_str(target), "")
 
 
-def past_notes(run_key: Optional[RoundKey] = None, prev_days: int = 1) -> list:
-    """메모 칸 아래 「지난 회차 메모」 참고 목록 — 이 회차보다 **앞** 회차들의 저장된 메모.
+def past_notes(run_key: Optional[RoundKey] = None) -> list:
+    """메모 칸 아래 「지난 회차 메모」 참고 목록 — **오늘** 이 회차보다 앞 회차들의 저장된 메모.
 
-    범위는 **오늘 앞 회차 전부 + 메모가 있는 직전 `prev_days`개 날짜**이고, 그중
-    **최신 `_MAX_PAST_ROWS`줄까지만** 돌려준다. 오늘은 날짜 수로 세지 않는다 — 14시
-    회차를 쓸 때 가장 가까운 참고는 오늘 9:30·11시 메모라서 아침 첫 회차든 오후든
-    「오늘 + 하루」가 같은 뜻이어야 한다. **달력상 어제로 세지 않는 것**도 같은
-    이유다: 월요일·연휴 다음 날은 어제 메모가 없어 칸이 빈다(메모가 있는 가장 최근
-    하루를 가져온다).
+    **오늘 것만 본다.** 어제 메모를 끌어오면 오늘 쓰는 동안 옆에 펴 두는 글이 아니라
+    「지난 날 기록」이 돼 참고하려던 줄(오늘 앞 회차)이 아래로 밀린다. 그 대신
+    오늘 첫 회차에선 칸이 통째로 비고, 그때는 아무것도 안 그린다(참고할 앞 회차가
+    없다는 사실 그대로다).
 
-    **자르는 축은 날짜가 아니라 줄 수다.** 오늘 것만 남기면 오늘 첫 회차에서 칸이
-    통째로 비는데, 참고가 가장 필요한 순간이 하필 거기다. 줄 수로 자르면 오늘 앞
-    회차가 먼저 차고 남는 자리만 어제가 채우므로 첫 회차엔 어제가 보이고 오후엔
-    저절로 오늘 것만 남는다.
-
-    최신 회차부터, 같은 날 이어진 회차가 같은 문구면 한 줄로 합친다.
+    최신 회차부터 `_MAX_PAST_ROWS`줄까지, 같은 문구가 이어진 회차는 한 줄로 합친다.
     돌려주는 값: [(날짜, [회차…(이른 것부터)], 문구)].
     **칸을 채우는 재료가 아니다** — 화면은 읽기만 한다(2026-08-27 이어받기 되돌림과 같은 원칙).
     """
     notes = _read_notes()
     target = _key_str(run_key if run_key is not None else _current_round_key())
     today = target.partition("|")[0]
-    past = sorted((k for k in notes if k and (not target or k < target)), reverse=True)
-    prev_dates: list = []
+    past = sorted(
+        (k for k in notes if k and k.partition("|")[0] == today and (not target or k < target)),
+        reverse=True,
+    )
     rows: list = []
     for key in past:
         date, _, slot = key.partition("|")
-        if date != today:
-            if date not in prev_dates:
-                if len(prev_dates) >= prev_days:
-                    break
-                prev_dates.append(date)
         text = notes[key]
-        if rows and rows[-1][0] == date and rows[-1][2] == text:
+        if rows and rows[-1][2] == text:
             rows[-1][1].insert(0, slot)
         else:
             rows.append((date, [slot], text))

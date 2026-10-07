@@ -9,8 +9,12 @@
 **목록의 축은 「회차」다**(사용자 결정). 사람이 지었는지 AI가 지었는지가 아니라 "지금
 이어지고 있는 사안인가"가 실제로 쓸모 있는 축이라서고, 그래서 최신 회차가 맨 위에 온다.
 
-  - 아무것도 안 치면 → 오늘·어제 전 회차의 소제목 전부(회차별로 나눠서)
+  - 아무것도 안 치면 → 오늘 전 회차의 소제목 전부(회차별로 나눠서)
   - 한 글자라도 치면 → 같은 목록에서 걸러내되 회차 구분 없이 평평하게
+
+[수정: 2026-09-30] 범위는 **오늘 회차만**이다(사용자 결정). 어제까지 담던 동안 목록이
+창 높이의 두 배가 넘게 길어졌고, 담당자가 실제로 되쓰는 이름은 오늘 이어지는 사안이다.
+어제 이름이 필요하면 그 글자를 치는 길이 남아 있지 않다 — 대신 창이 짧아졌다.
 
 [수정: 2026-09-10] 기본 목록이 예전엔 **직전 회차 하나**였다(사용자 결정). 두 가지가
 동시에 깨져서 넓혔다. (1) 그 회차가 비면(💤이거나 저장 사고) 목록이 **0줄**이 되는데,
@@ -37,9 +41,9 @@ from app.custom_groups import load_custom_groups
 from app.llm_classifier import UNCLASSIFIED_GROUP_NAME
 from app.storage import list_runs_for_date
 
-# 목록에 담을 날짜 수(오늘 포함). 오늘+어제 = 2 — 며칠씩 이어지는 사안(부총리 후보자 등)을
-# 잡으면서 목록이 부풀지 않는 선(실측: 이틀치 67개, 사흘 이상은 재사용이 사실상 없었다).
-_RECENT_DAYS = 2
+# 목록에 담을 날짜 수(오늘 포함) = 1. 오늘만 본다 — 이틀치는 67개 줄이 돼 창이 화면 절반을
+# 덮었고, 되쓰는 이름은 오늘 이어지는 사안이다.
+_RECENT_DAYS = 1
 
 
 def _round_sort_key(date_str: str, slot: str) -> tuple:
@@ -50,10 +54,9 @@ def _round_display_names(date_str: str, run: dict) -> list:
     """그 회차 화면에 실제로 찍혔던 소제목 이름을 [(표시이름, kind)]로.
 
     kind는 "mine"(담당자가 이름표로 고쳤거나 직접 만든 것) 또는 "ai"(AI가 지었고 담당자가
-    그대로 둔 것). **커스텀 소제목은 이름표가 아니라 원래 이름 자리에 저장되므로**
-    (data/custom_groups.json은 자정에 비워진다) 어제 만든 커스텀 소제목은 AI가 지은 것과
-    구분되지 않는다 — 그때는 kind가 "ai"로 나온다. 즉 **볼드 표시는 오늘 것만 정확하다**
-    (사용자와 합의한 알려진 한계 — 이름 자체는 그대로 다 나오므로 고르는 데는 지장이 없다).
+    그대로 둔 것). 커스텀 소제목은 이름표가 아니라 원래 이름 자리에 저장되고
+    data/custom_groups.json은 자정에 비워지는데, 목록이 오늘 하루뿐이라 그 한계에 걸리지
+    않는다 — 볼드 표시는 목록 전체에서 정확하다.
     """
     slot = run.get("run_slot")
     labels = load_group_labels((date_str, slot))
@@ -68,7 +71,7 @@ def _round_display_names(date_str: str, run: dict) -> list:
 
 
 def _recent_rounds(now: Optional[datetime] = None) -> list:
-    """오늘·어제 저장된 회차를 [(date_str, slot, run), ...] 최신순으로."""
+    """오늘 저장된 회차를 [(date_str, slot, run), ...] 최신순으로."""
     base = now or datetime.now()
     rounds = []
     for back in range(_RECENT_DAYS):
@@ -80,8 +83,9 @@ def _recent_rounds(now: Optional[datetime] = None) -> list:
 
 
 def _when_label(date_str: str, slot: str, now: Optional[datetime] = None) -> str:
-    today = (now or datetime.now()).strftime("%Y-%m-%d")
-    return ("오늘 " if date_str == today else "어제 ") + slot
+    """회차 이름표. 목록이 오늘 하루뿐이라 「오늘」은 적지 않는다 — 모든 줄에 같은 말이
+    붙으면 구분선·줄 오른쪽이 아무것도 가르지 못한다."""
+    return slot or ""
 
 
 def name_pool(round_id: Optional[tuple], now: Optional[datetime] = None) -> dict:
@@ -91,7 +95,7 @@ def name_pool(round_id: Optional[tuple], now: Optional[datetime] = None) -> dict
     "직전 회차"다(초안이면 최신 확정 회차, 확정본이면 그 앞 회차).
 
     돌려주는 값:
-        {"all": [{"name","kind","when"}, ...]}   # 오늘·어제 전부, 최신 회차순·이름 중복 제거
+        {"all": [{"name","kind","when"}, ...]}   # 오늘 전부, 최신 회차순·이름 중복 제거
 
     **최신순이라 첫 묶음이 곧 「직전 회차」다** — 화면은 그 사실을 구분선에 적기만 하고
     별도 목록으로 뽑지 않는다(예전엔 prev를 따로 실어 보냈는데, 그 회차가 비면 목록이

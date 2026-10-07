@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>넓은 검색어 경고 — 문구</title>
+<style>
+body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+.container {
+    max-width: 800px; margin: 24px auto; padding: 24px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+  }
+:root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem; --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%; --h-sm: 24px; --h-tb: 28px; --h-md: 30px; --h-lg: 36px; --fab-lg: 56px; --fab-sm: 48px; --chk-md: 16px; --chk-sm: 14px; --sh-float: 0 4px 12px rgba(15, 23, 42, 0.12); --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14); --sh-modal: 0 16px 40px rgba(15, 23, 42, 0.22); }
+/* [추가: 2026-08-24] 오류가 아니라 "참고해 두면 좋을 안내"라 .live-warning(빨강)이
+     아니라 앰버(주의) 계열을 쓴다 — CLAUDE.md 색 규칙: 빨강은 오류, 앰버는 주의. */
+  .live-heavy-kw-warning {
+    background: #FFFBEB; border: 1px solid #FDE68A; border-radius: var(--r-lg); padding: 10px 14px;
+    margin: 12px 0; font-size: var(--fs-md); color: #92400E; line-height: 1.5;
+  }
+.ic { width: 1em; height: 1em; vertical-align: -0.12em; fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.live-heavy-kw-warning a { color: #92400E; font-weight: 600; }
+.live-heavy-kw-warning .bad { text-decoration: underline wavy #DC2626 1.5px; text-underline-offset: 3px; }
+/* ── 시안 전용 ── */
+h1 { max-width: 800px; margin: 28px auto 6px; padding: 0 24px; font-size: 1.3rem; color: #1E3A5F; }
+.lede { max-width: 800px; margin: 0 auto 4px; padding: 0 24px; color: #6B7280;
+  font-size: .88rem; line-height: 1.65; }
+.container { margin-top: 18px; }
+.tag { display: flex; align-items: baseline; gap: 10px; margin: 0 0 8px; flex-wrap: wrap; }
+.tag b { font-size: 1.05rem; color: #1E3A5F; }
+.tag .v { font-size: .78rem; padding: 2px 9px; border-radius: 999px; font-weight: 600; }
+.v-now { background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
+.v-alt { background: #F3F4F6; color: #6B7280; border: 1px solid #E5E7EB; }
+.v-rec { background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
+.tag .why { font-size: .8rem; color: #6B7280; }
+.tag .ln { font-size: .72rem; color: #6B7280; background: #F3F4F6; border: 1px solid #E5E7EB;
+  border-radius: 999px; padding: 1px 8px; }
+.tag .ln.one { background: #ECFDF5; color: #047857; border-color: #A7F3D0; }
+.note { margin: 8px 0 26px; font-size: .8rem; color: #6B7280; line-height: 1.7; }
+.note b { color: #92400E; }
+.note code { background: #F3F4F6; padding: 1px 5px; border-radius: 4px; font-size: .95em; }
+.redline { display: inline-block; border-bottom: 2px wavy #DC2626; }
+.foot { max-width: 800px; margin: 4px auto 60px; padding: 16px 20px; background: #FFFBEB;
+  border: 1px solid #FDE68A; border-radius: 10px; color: #92400E; font-size: .85rem; line-height: 1.7; }
+.foot b { display: block; margin-bottom: 4px; }
+</style></head>
+<body>
+
+<h1>오늘 전체 기사 — 넓은 검색어 경고 문구</h1>
+<p class="lede">지금 문구는 <b>없앤 기능</b>을 시키고, 화면 이름도 옛 이름으로 부른다.
+  빨간 물결선 두 군데가 그 자리다. 줄 수는 화면 폭 800px 기준으로 실제로 쟀다.</p>
+
+<div class="container">
+
+  <div class="tag"><b>지금</b><span class="v v-now">문제</span><span class="ln">두 줄</span>
+    <span class="why">할 수 없는 일을 시킨다</span></div>
+  <div class="live-heavy-kw-warning"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5"/><path d="M12 17.2h.01"/></svg> 검색어 '재정경제부'가 전체 결과의 65%(611/947건)를 차지하고 있습니다 — 너무 넓은 검색어일 수 있어요. <u class='bad'>설정 &gt; 키워드 화면</u>에서 더 구체적인 말로 바꾸거나, <u class='bad'>그룹의 검색 방식을 '모두 포함'으로 바꿔</u> 다른 검색어와 함께 좁히는 걸 고려해보세요.</div>
+  <p class="note">
+    ① <span class="redline">그룹의 검색 방식을 '모두 포함'으로</span> — 「1개라도 포함 | 모두 포함」
+    두 칸 버튼은 <b>없앴다</b>. <code>validate_keyword_groups</code>가 <code>mode</code>를 늘
+    <code>"OR"</code>로 눕힌다. 담당자가 그 화면에 가도 그런 스위치가 없다.<br />
+    ② <span class="redline">설정 &gt; 키워드 화면</span> — 그 화면 이름은 이제
+    <b>「검색어」</b>다(<code>/keywords</code>).
+  </p>
+
+  <div class="tag"><b>A안</b><span class="v v-alt">지우기만</span><span class="ln one">한 줄</span>
+    <span class="why">더 좁은 말로 바꾸라고만</span></div>
+  <div class="live-heavy-kw-warning"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5"/><path d="M12 17.2h.01"/></svg> 검색어 '재정경제부'가 결과의 65%(611/947건)를 차지해요 — 너무 넓은 말일 수 있어요. <a href='#'>검색어</a> 화면에서 더 좁은 말로 바꿔 보세요.</div>
+  <p class="note">틀린 데가 없고 짧다. 다만 <b>없앤 조언을 지우기만 하고 대신 줄 게 없다</b> —
+    「재정경제부」를 어떻게 좁히라는 건지 담당자가 스스로 떠올려야 한다.</p>
+
+  <div class="tag"><b>B안</b><span class="v v-alt">진단 + 방법</span><span class="ln">두 줄</span>
+    <span class="why">지금 문장 구조를 그대로 두고 틀린 말만 바꾼다</span></div>
+  <div class="live-heavy-kw-warning"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5"/><path d="M12 17.2h.01"/></svg> 검색어 '재정경제부'가 결과의 65%(611/947건)를 차지해요 — 너무 넓은 말일 수 있어요. <a href='#'>검색어</a> 화면에서 더 좁은 말로 바꾸거나 「재정경제부+예산」처럼 <b>+</b>로 묶어 보세요.</div>
+  <p class="note">「모두 포함」이 하던 일(= 두 낱말이 다 든 기사)을 지금은 <b><code>+</code>가 한다</b>.
+    조언을 지우는 게 아니라 <b>지금 맞는 말로 바꿔 주는</b> 쪽이다.
+    다만 「너무 넓은 말일 수 있어요」를 남기면 <b>두 줄을 못 벗어난다</b>.</p>
+
+  <div class="tag"><b>C안</b><span class="v v-rec">추천</span><span class="ln one">한 줄</span>
+    <span class="why">진단 문장을 빼고 숫자가 말하게 둔다</span></div>
+  <div class="live-heavy-kw-warning"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5"/><path d="M12 17.2h.01"/></svg> 검색어 '재정경제부'가 결과의 65%(611/947건)예요 — 「재정경제부+예산」처럼 <b>+</b>로 묶거나 <a href='#'>검색어</a> 화면에서 더 좁은 말로 바꿔 보세요.</div>
+  <p class="note">
+    B안에서 <b>「너무 넓은 말일 수 있어요」만 뺐다</b> — 65%라는 숫자와 앰버 ⚠가 이미 그 말이라,
+    한 번 더 적는 건 <b>화면이 자기를 해명하는 것</b>에 가깝다. 그만큼이 줄어 한 줄에 들어간다.<br />
+    <b>+ 안내를 앞에 둔다</b> — 담당자가 바로 할 수 있는 일이 그쪽이고, 화면을 옮겨야 하는
+    「검색어 화면에서 바꾸기」가 뒤에 선다.<br />
+    문장은 앱 전체가 쓰는 검색어 안내와 같은 말을 쓴다 — 검색어·새 수집 두 화면의
+    「두 낱말이 다 든 기사는 「가상자산+과세」처럼 +로 묶으세요」와 같은 문법이다.
+  </p>
+
+</div>
+
+<div class="foot">
+  <b>같이 고쳐야 할 곳</b>
+  TEXT_AUDIT.md:135에 이 줄이 이미 올라와 있는데, <b>거기 적힌 대안 문구에도 '모두 포함'이
+  그대로 남아 있다</b> — 그 항목의 대안도 같이 바꾸고, 고친 뒤엔 그 줄을 지운다.
+</div>
+
+</body></html>

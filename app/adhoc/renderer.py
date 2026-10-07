@@ -1481,7 +1481,7 @@ def render_new_card_page(
       </div>
       <div id="kw-hidden-inputs"></div>
     </div>
-    <div class="kw-note">검색어는 하나씩 따로 걸립니다. 둘 다 든 기사만 찾으려면 「가상자산+과세」처럼 +로 묶으세요.</div>
+    <div class="kw-note">검색어는 하나씩 따로 걸립니다. 띄어 쓴 말은 붙어 있는 그대로 찾고, 두 낱말이 다 든 기사는 「가상자산+과세」처럼 +로 묶으세요.</div>
     <div class="field">
       <label>수집시간</label>
       {_hm_select_html("win-start", "window_start", "00:00", now_hhmm)}
@@ -1830,8 +1830,6 @@ def _render_bundle_meta_chips(card: dict) -> str:
             '<div class="meta-row"><span class="chip">아직 보내온 기사가 없습니다 — '
             '원본 화면에서 「확정본으로」로 넣어주세요.</span></div>'
         )
-    total = sum(1 for a in card["articles"] if not a.get("hidden"))
-
     def _source_name(source_id: str, name: str) -> str:
         # 같은 사안의 몇 번째 원본에서 왔는지(#2) — 원본이 지워졌으면 저장된 이름만.
         source = load_card(source_id)

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>기관 기사 찾기 — 안 보이는 날짜</title>
+<style>
+
+  
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem; --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%; --h-sm: 24px; --h-tb: 28px; --h-md: 30px; --h-lg: 36px; --fab-lg: 56px; --fab-sm: 48px; --chk-md: 16px; --chk-sm: 14px; --sh-float: 0 4px 12px rgba(15, 23, 42, 0.12); --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14); --sh-modal: 0 16px 40px rgba(15, 23, 42, 0.22); }
+  .plus-glyph { font-size: 1.2em; font-weight: 600; line-height: 0; margin-right: 4px; }
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    background: #FFFFFF; border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .topbar-inner {
+    max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: flex-start; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .topbar-inner > .tn { color: #2563EB; text-decoration: none; font-size: var(--fs-md); font-weight: 600;
+    padding: 5px 14px; border: 1px solid transparent; border-radius: var(--r-pill); white-space: nowrap; }
+  .topbar-inner > a.tn:hover { background: #EFF6FF; }
+  .topbar-inner > .tn-sep { width: 1px; height: 18px; background: #E5E7EB; margin: 0 16px; }
+  .topbar-inner > .tn.is-current { cursor: default; background: #EFF6FF;
+    border-color: #BFDBFE; color: #2563EB; }
+  .topbar.adhoc .topbar-inner > .tn.is-current { background: #E3F1EE;
+    border-color: rgba(20, 107, 94, 0.45); color: #146B5E; }
+  .topbar-inner > .tn.is-empty { color: #6B7280; opacity: 0.55; cursor: not-allowed; }
+  .topbar-inner > a.tn.back { color: #4B5563; }
+  .topbar-inner > a.tn.back:hover { color: #2563EB; }
+  @media (max-width: 480px) {
+    .topbar-inner { padding: 12px 12px; gap: 2px; }
+    .topbar-inner > .tn { padding: 5px 8px; }
+    .topbar-inner > .tn-sep { margin: 0 8px; }
+  }
+
+  * { box-sizing: border-box; }
+  /* 단색 SVG 아이콘(app.icons) 공통 크기·색 — 확정본·보관함과 같은 값. */
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  /* 위 여백 24 + 안쪽 44 — 상단 고정바(54px)를 피하는 값이고, 확정본·초안·오늘 전체 기사·
+     정기 보관함·설정·라벨 일곱 화면이 같은 값을 쓴다(화면을 오갈 때 제목이 안 들썩이게). */
+  .container { max-width: 800px; margin: 24px auto 80px; background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: var(--r-lg); padding: 44px 24px 26px; }
+  h1 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 6px; }
+  .hint { color: #4B5563; font-size: var(--fs-md); margin: 0 0 18px; line-height: 1.7; }
+
+  .qbar { border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 12px 14px; margin-bottom: 18px;
+    background: #F8FAFC; }
+  .qrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .qrow + .qrow { margin-top: 10px; }
+  .qlabel { font-size: var(--fs-sm); color: #4B5563; font-weight: 600; width: 46px; flex: none; }
+  .qbar input[type="text"], .qbar input[type="date"] { height: var(--h-md); border: 1px solid #E5E7EB;
+    border-radius: var(--r-md); padding: 0 10px; font-size: var(--fs-md); font-family: inherit; background: #FFFFFF;
+    color: #1F2937; }
+  .qbar input[type="text"] { flex: 1 1 240px; min-width: 180px; }
+  .qbar input[type="date"] { font-size: var(--fs-sm); }
+  .btn-go { height: var(--h-md); background: #2563EB; color: #FFFFFF; border: none; border-radius: var(--r-md);
+    padding: 0 16px; font-size: var(--fs-md); font-weight: 600; font-family: inherit; cursor: pointer; }
+  .preset { display: inline-flex; border: 1px solid #E5E7EB; border-radius: var(--r-md); overflow: hidden;
+    background: #FFFFFF; }
+  .preset button { border: none; background: transparent; color: #4B5563; font-size: var(--fs-sm);
+    font-family: inherit; padding: 0 11px; height: var(--h-md); cursor: pointer; }
+  .preset button + button { border-left: 1px solid #E5E7EB; }
+  .preset button.on { background: #EFF6FF; color: #1E3A5F; font-weight: 700; }
+  .qsep { color: #4B5563; font-size: var(--fs-sm); }
+
+  /* 거르기 줄 — 오늘 전체 기사의 특수조건 줄과 같은 모양(보조 줄이라 체크는 --chk-sm).
+     사진 칸만 「빼고」 방향이라 세로선으로 갈라 둔다. */
+  .frow label { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-sm);
+    color: #1F2937; cursor: pointer; }
+  .frow input[type="checkbox"] { flex: none; width: var(--chk-sm); height: var(--chk-sm); margin: 0;
+    accent-color: #2563EB; cursor: pointer; }
+  .frow .n { font-size: var(--fs-xs); color: #4B5563; }
+  .fsep { width: 1px; height: 14px; background: #E5E7EB; margin: 0 2px; }
+
+  /* 사진 추정 — 확정본과 같은 값(행 흐리게 + 알약, 마우스를 올리면 또렷). */
+  .art.is-photo { opacity: 0.55; }
+  .art.is-photo:hover { opacity: 1; }
+  .photo-badge { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-pill);
+    font-size: var(--fs-xs); font-weight: 600; color: #4B5563; background: #F8FAFC;
+    border: 1px solid #E5E7EB; white-space: nowrap; }
+  /* 말머리는 배지 없이 제목 글자색(확정본·오늘 전체 기사와 같은 값). */
+  .t-scoop { color: #B91C1C; font-weight: 800; }
+  .t-flash { color: #B91C1C; font-weight: 600; }
+
+  .rhead { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; flex-wrap: wrap; }
+  .rhead .n { font-size: var(--fs-md); color: #1E3A5F; font-weight: 700; flex: none; white-space: nowrap; }
+  .rhead .sub { font-size: var(--fs-sm); color: #4B5563; min-width: 0; }
+  .rhead .cap { font-size: var(--fs-sm); color: #92400E; }
+  .exp { display: inline-flex; gap: 2px; flex: none; margin-left: auto; }
+  .exp button { border: none; background: transparent; color: #4B5563; font-weight: 500;
+    border-radius: var(--r-md); padding: 4px 8px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; }
+  .exp button:hover { background: transparent; color: #2563EB; text-decoration: underline; }
+
+  .dblock { margin-top: 16px; }
+  .dhead { display: flex; align-items: center; gap: 8px; font-size: var(--fs-lg); color: #1E3A5F;
+    font-weight: 700; padding: 6px 0; border-bottom: 1px solid #E5E7EB; }
+  /* 날짜 묶음 접기 — 정기 보관함·휴지통과 같은 ▸/▾. */
+  details.dblock > summary { cursor: pointer; list-style: none; }
+  details.dblock > summary::-webkit-details-marker { display: none; }
+  details.dblock > summary::before { content: "▸"; color: #4B5563; font-size: 0.8rem;
+    font-weight: 400; }
+  details.dblock[open] > summary::before { content: "▾"; }
+  details.dblock > summary:hover { background: #F3F4F6; }
+  .dhead .dcnt { font-size: var(--fs-sm); color: #4B5563; font-weight: 500; }
+  .chip-today { font-size: var(--fs-xs); font-weight: 700; color: #1E3A5F; background: #EFF6FF;
+    border: 1px solid #BFDBFE; border-radius: var(--r-pill); padding: 1px 8px; }
+
+  .art { padding: 4px 8px; margin: 6px 0; border-radius: var(--r-md); }
+  .art:hover { background: #F3F4F6; }
+  .a-title { font-size: var(--fs-base); line-height: 1.55; }
+  .a-title .outlet { color: #4B5563; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  .a-title a { color: #1F2937; text-decoration: none; }
+  .a-title a:hover { text-decoration: underline; }
+  /* 게시 시각 — 제목 줄 오른쪽 끝, 아이콘 바로 왼쪽. 제목 첫 줄에 맞춰 위로 붙인다. */
+  .a-when { flex: none; font-size: var(--fs-sm); color: #4B5563; white-space: nowrap;
+    padding-top: 3px; }
+  /* 좁은 화면에선 제목이 한 줄을 다 쓰고 시각·아이콘이 아랫줄 오른쪽으로 내려간다 —
+     폰에서 제목 폭을 시각에 150px 내주면 한 제목이 세 줄이 된다. */
+  @media (max-width: 640px) {
+    .title-row { flex-wrap: wrap; }
+    .a-title { flex: 1 1 100%; }
+    .a-when { margin-left: auto; padding-top: 0; }
+  }
+  .a-title .lab { margin-left: 6px; font-size: var(--fs-xs); font-weight: 600; color: #8A5A14;
+    background: #FBF0DA; border: 1px solid rgba(138, 90, 20, 0.28); border-radius: var(--r-pill);
+    padding: 1px 8px; white-space: nowrap; }
+  /* 제목 줄 = 제목(왼쪽) + 아이콘 두 칸(오른쪽 끝) */
+  .title-row { display: flex; align-items: flex-start; gap: 8px; }
+  .a-title { flex: 1 1 auto; min-width: 0; }
+  /* 원문·복사 — 휴지통 행과 같은 30×26 테두리 상자 + 13px 아이콘. **테두리가 핵심이다**:
+     맨 아이콘만 두면 ↗와 복사가 같은 실루엣으로 보인다(확정본에서 ↗를 뺐던 이유). */
+  .acts { flex: none; display: flex; align-items: center; gap: 6px; }
+  .acts .ib { flex: none; display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 26px; color: #4B5563; text-decoration: none; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: var(--r-md); cursor: pointer; padding: 0; }
+  .acts .ib:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .acts .ib svg { width: 13px; height: 13px; fill: none; stroke: currentColor;
+    stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .acts .ib .icon-done { display: none; }
+  .acts .ib.is-copied .icon-default { display: none; }
+  .acts .ib.is-copied .icon-done { display: inline-flex; color: #166534; }
+  /* 스니펫 — 접힌 채로도 「왜 걸렸는지」가 보이게 낱말 주변만 한 줄. 넘치면 여기서 자른다. */
+  .snip { margin-top: 2px; font-size: var(--fs-md); color: #4B5563; line-height: 1.6;
+    overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical; }
+  /* 요약은 접혀 있다(확정본과 같은 규칙). 펼친 동안 제목은 색이 아니라 밝기로만 흐려진다. */
+  .art details > summary { cursor: pointer; list-style: none; }
+  .art details > summary::-webkit-details-marker { display: none; }
+  .art details[open] .a-title { opacity: 0.62; }
+  .a-sum { margin-top: 3px; font-size: var(--fs-md); color: #4B5563; line-height: 1.7; }
+  mark { background: #FFF9C4; color: inherit; padding: 0 1px; border-radius: 2px; }
+
+  .empty { border: 1px dashed #E5E7EB; border-radius: var(--r-lg); padding: 28px 20px; text-align: center;
+    color: #4B5563; font-size: var(--fs-lg); }
+  .empty .sm { display: block; margin-top: 8px; font-size: var(--fs-md); color: #4B5563; line-height: 1.8; }
+
+/* ── 시안 전용(실제 화면엔 안 들어간다) ── */
+body { padding-bottom: 80px; }
+.mk-head { max-width: 800px; margin: 0 auto; padding: 28px 44px 0; }
+.mk-head h1 { font-size: 1.3rem; margin: 0 0 6px; }
+.mk-head p { margin: 0; color: #6B7280; font-size: .88rem; line-height: 1.6; }
+.mk-case { max-width: 800px; margin: 26px auto 0; padding: 0 44px; }
+.mk-tag { display: flex; align-items: baseline; gap: 10px; margin: 0 0 10px; }
+.mk-tag b { font-size: 1.1rem; color: #1E3A5F; }
+.mk-tag .verdict { font-size: .8rem; padding: 2px 9px; border-radius: 999px; font-weight: 600; }
+.v-now { background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
+.v-alt { background: #F3F4F6; color: #6B7280; border: 1px solid #E5E7EB; }
+.v-rec { background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
+.mk-tag .why { font-size: .8rem; color: #6B7280; }
+.mk-frame { background: #FFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 18px 20px 20px; }
+.mk-note { margin: 10px 0 0; font-size: .8rem; color: #6B7280; line-height: 1.65; }
+.mk-note b { color: #92400E; }
+.mk-gone { margin: 12px 0 0; padding: 11px 14px; background: #FEF2F2; border: 1px dashed #FECACA;
+  border-radius: 10px; font-size: .82rem; color: #991B1B; line-height: 1.6; }
+.mk-more { display: block; width: 100%; margin: 2px 0 0; padding: 7px; background: #fff;
+  border: 1px solid #E5E7EB; border-radius: 6px; color: #2563EB; font-size: .8rem;
+  font-weight: 500; cursor: pointer; }
+.mk-more:hover { background: #EFF6FF; }
+.mk-q { max-width: 800px; margin: 30px auto 0; padding: 16px 20px; background: #FFFBEB;
+  border: 1px solid #FDE68A; border-radius: 10px; color: #92400E; font-size: .85rem; line-height: 1.7; }
+.mk-q b { display: block; margin-bottom: 4px; }
+.mk-q ul { margin: 6px 0 0; padding-left: 18px; }
+</style></head>
+<body>
+
+<div class="mk-head">
+  <h1>기관 기사 찾기 — 날짜가 통째로 사라진다</h1>
+  <p>지금 원장엔 <b>9/29 ~ 10/2 나흘, 2,657건</b>이 쌓여 있다. 기본값인 1개월로 열면
+     <code>MAX_ROWS = 300</code>을 오늘 하루가 혼자 다 써서 <b>나머지 사흘 2,023건이 한 줄도 안 그려진다.</b>
+     「7일」로 좁혀도 같다. 낱말을 넣으면 정상이다 — 즉 <b>찾기는 멀쩡하고 둘러보기만 막혀 있다.</b></p>
+</div>
+
+<!-- ───────────── 지금 ───────────── -->
+<div class="mk-case">
+  <div class="mk-tag"><b>지금</b><span class="verdict v-now">문제</span>
+    <span class="why">날짜 묶음이 하나만 그려진다</span></div>
+  <div class="mk-frame">
+    
+  <form onsubmit="return false">
+    <div class="qbar">
+      <div class="qrow"><span class="qlabel">낱말</span>
+        <input type="text" name="q" value="" placeholder="예: 비상경제본부 회의+전기차" />
+        <button type="submit" class="btn-go">찾기</button></div>
+      <div class="qrow"><span class="qlabel">기간</span>
+        <span class="preset"><button type="button">7일</button><button type="button" class="on">1개월</button><button type="button">3개월</button><button type="button">1년</button><button type="button">전체</button></span>
+        <input type="date" value="2026-09-03" /><span class="qsep">~</span><input type="date" value="2026-10-02" /></div>
+    </div>
+  </form>
+    <div class="rhead"><span class="n">2657건</span><span class="sub">9월 3일 ~ 10월 2일</span>
+      <span class="cap">최근 300건만 보입니다 · 낱말이나 기간으로 좁혀 보세요</span><span class="exp"><button type="button">복사</button><button type="button">텍스트</button><button type="button">엑셀</button></span></div>
+    <details class="dblock" open><summary class="dhead">10월 2일 (금) <span class="chip-today">오늘</span><span class="dcnt">300건</span></summary><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">kukinews.com</span>권대영 재경부행…금융위 ‘인사 도미노’ 불붙나</div><span class="a-when">17:28 게시</span><span class="acts"><a class="ib" href="#" title="원문 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span></div></summary><div class="a-sum">(요약)</div></details></div><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">businesspost.co.kr</span>[인사] 예금보험공사, 기후에너지환경부, 재정경제부 외</div><span class="a-when">17:24 게시</span><span class="acts"><a class="ib" href="#" title="원문 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span></div></summary><div class="a-sum">(요약)</div></details></div><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">매일경제</span>9월 소비자물가 상승률 2.9% … 석유 최고가격제로 눌렀다</div><span class="a-when">17:19 게시</span><span class="acts"><a class="ib" href="#" title="원문 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span></div></summary><div class="a-sum">(요약)</div></details></div></details>
+    <div class="mk-gone">↑ 여기서 끝난다. 10월 1일(947건)·9월 30일(700건)·9월 29일(376건)은
+      접힌 줄조차 없다 — 화면에 <b>없는 날</b>이 된다.<br />
+      머리줄은 <b>300건</b>이라 적지만 그날 원장엔 <b>634건</b>이 있다. 맨 위 <b>2657건</b>과 뜻이 다른 숫자다.<br />
+      복사·텍스트·엑셀도 이 잘린 목록을 쓰는데, <b>내보낸 파일엔 「300건만」이라는 말이 없다.</b></div>
+  </div>
+</div>
+
+<!-- ───────────── A안 ───────────── -->
+<div class="mk-case">
+  <div class="mk-tag"><b>A안</b><span class="verdict v-alt">날짜마다 몇 건씩</span>
+    <span class="why">모든 날짜를 보이되 각 날짜 안에서 자른다</span></div>
+  <div class="mk-frame">
+    <div class="rhead"><span class="n">2657건</span><span class="sub">9월 3일 ~ 10월 2일</span>
+      <span class="cap">날짜마다 최근 50건까지 보입니다</span><span class="exp"><button type="button">복사</button><button type="button">텍스트</button><button type="button">엑셀</button></span></div>
+    <details class="dblock" open><summary class="dhead">10월 2일 (금) <span class="chip-today">오늘</span><span class="dcnt">634건</span></summary><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">kukinews.com</span>권대영 재경부행…금융위 ‘인사 도미노’ 불붙나</div><span class="a-when">17:28 게시</span><span class="acts"><a class="ib" href="#" title="원문 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span></div></summary><div class="a-sum">(요약)</div></details></div><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">businesspost.co.kr</span>[인사] 예금보험공사, 기후에너지환경부, 재정경제부 외</div><span class="a-when">17:24 게시</span><span class="acts"><a class="ib" href="#" title="원문 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span></div></summary><div class="a-sum">(요약)</div></details></div><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">매일경제</span>9월 소비자물가 상승률 2.9% … 석유 최고가격제로 눌렀다</div><span class="a-when">17:19 게시</span><span class="acts"><a class="ib" href="#" title="원문 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span></div></summary><div class="a-sum">(요약)</div></details></div><button class="mk-more">이 날 634건 중 50건 보임 · 더 보기</button></details>
+    <details class="dblock"><summary class="dhead">10월 1일 (목) <span class="dcnt">947건</span></summary><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">경향신문</span>2026년 10월 2일[인사]</div><span class="a-when">20:42 게시</span><span class="acts"><a class="ib" href="#" title="원문 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span></div></summary><div class="a-sum">(요약)</div></details></div><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">news2day.co.kr</span>[오늘의 인사 : 10월 1일] 전북일보·인더스트리뉴스·포인트경제 外</div><span class="a-when">17:50 게시</span><span class="acts"><a class="ib" href="#" title="원문 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span></div></summary><div class="a-sum">(요약)</div></details></div></details>
+    <details class="dblock"><summary class="dhead">9월 30일 (수) <span class="dcnt">700건</span></summary></details>
+    <details class="dblock"><summary class="dhead">9월 29일 (화) <span class="dcnt">376건</span></summary></details>
+    <p class="mk-note">모든 날짜가 남고 건수도 참값이다. 대신 <b>어느 날짜도 다 보여주지 않는다</b> —
+      「그날 무엇이 있었나」를 묻는 화면인데 날마다 「더 보기」를 눌러야 한다.
+      가져가기가 무엇을 담는지도 다시 정해야 한다.</p>
+  </div>
+</div>
+
+<!-- ───────────── B안 ───────────── -->
+<div class="mk-case">
+  <div class="mk-tag"><b>B안</b><span class="verdict v-rec">추천</span>
+    <span class="why">날짜 머리줄은 전부 그리고, 펼칠 때 그 날짜를 받아온다</span></div>
+  <div class="mk-frame">
+    <div class="rhead"><span class="n">2657건</span><span class="sub">9월 3일 ~ 10월 2일</span><span class="exp"><button type="button">복사</button><button type="button">텍스트</button><button type="button">엑셀</button></span></div>
+    <details class="dblock" open><summary class="dhead">10월 2일 (금) <span class="chip-today">오늘</span><span class="dcnt">634건</span></summary><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">kukinews.com</span>권대영 재경부행…금융위 ‘인사 도미노’ 불붙나</div><span class="a-when">17:28 게시</span><span class="acts"><a class="ib" href="#" title="원문 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span></div></summary><div class="a-sum">(요약)</div></details></div><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">businesspost.co.kr</span>[인사] 예금보험공사, 기후에너지환경부, 재정경제부 외</div><span class="a-when">17:24 게시</span><span class="acts"><a class="ib" href="#" title="원문 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span></div></summary><div class="a-sum">(요약)</div></details></div><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">매일경제</span>9월 소비자물가 상승률 2.9% … 석유 최고가격제로 눌렀다</div><span class="a-when">17:19 게시</span><span class="acts"><a class="ib" href="#" title="원문 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span></div></summary><div class="a-sum">(요약)</div></details></div></details>
+    <details class="dblock"><summary class="dhead">10월 1일 (목) <span class="dcnt">947건</span></summary><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">경향신문</span>2026년 10월 2일[인사]</div><span class="a-when">20:42 게시</span><span class="acts"><a class="ib" href="#" title="원문 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span></div></summary><div class="a-sum">(요약)</div></details></div><div class="art"><details><summary><div class="title-row"><div class="a-title"><span class="outlet">news2day.co.kr</span>[오늘의 인사 : 10월 1일] 전북일보·인더스트리뉴스·포인트경제 外</div><span class="a-when">17:50 게시</span><span class="acts"><a class="ib" href="#" title="원문 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span></div></summary><div class="a-sum">(요약)</div></details></div></details>
+    <details class="dblock"><summary class="dhead">9월 30일 (수) <span class="dcnt">700건</span></summary></details>
+    <details class="dblock"><summary class="dhead">9월 29일 (화) <span class="dcnt">376건</span></summary></details>
+    <p class="mk-note">접힌 날짜는 <b>어차피 안 그리던 것</b>이라, 머리줄만 남기고 내용은 펼칠 때 받아오면
+      페이지가 무거워지지 않는다. <b>정기 보관함이 이미 쓰는 문법</b>이다
+      (<code>GET /history/day?date=</code> · 최근 2일만 즉시 렌더링).
+      이 화면의 「날짜 묶음은 접히고 오늘만 펼친 채로 연다」는 규칙과도 정확히 맞물린다 —
+      지금은 그 규칙이 <b>접힐 날짜가 있다는 전제</b>에서만 성립한다.<br />
+      <b>「최근 300건만 보입니다」 캡션이 사라진다</b> — 더 숨기는 게 없다.</p>
+  </div>
+</div>
+
+<div class="mk-q">
+  <b>B안으로 가면 같이 정해야 할 것 둘</b>
+  <ul>
+    <li><b>가져가기(복사·텍스트·엑셀)가 무엇을 담나.</b> 정기 보관함은 「한 번이라도 펼쳐 본 날짜만」
+      이어붙인다(<code>historyDayIsLoaded</code>). 같은 문법을 쓸지, 아니면 서버가 구간 전체를
+      다시 만들지(<code>/download-excel-history</code> 방식).</li>
+    <li><b>낱말로 찾았을 때.</b> 「걸린 날짜를 전부 펼친다」는 규칙은 그대로 둬도 된다 —
+      낱말을 넣으면 건수가 확 준다(「세제개편」 1개월 = 28건). 다만 안전망으로 상한은 남겨 두고,
+      <b>상한에 걸려도 날짜 머리줄은 절대 지우지 않는</b> 쪽으로 바꾼다.</li>
+  </ul>
+</div>
+
+</body></html>

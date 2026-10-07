@@ -15,6 +15,7 @@ import requests
 from app.api_usage import record_api_call
 from app.config import COLOR_ERROR, SEARCH_LOOKBACK_MIN
 from app.credentials import naver_client_id, naver_client_secret, naver_is_configured
+from app.search_terms import naver_query
 
 logger = logging.getLogger(__name__)
 
@@ -962,7 +963,11 @@ def _search_one_keyword(
             response = requests.get(
                 NAVER_NEWS_API_URL,
                 headers=headers,
-                params={"query": keyword, "display": _MAX_DISPLAY, "start": start, "sort": "date"},
+                # naver_query — 앱의 검색어 규칙(띄어쓰기=덩어리, `+`=AND)을 네이버 문법으로
+                # 옮기는 유일한 자리다(app.search_terms). 키워드 문자열을 그대로 넘기면
+                # 네이버가 공백을 낱말로 쪼개 AND로 읽어, 같은 칸이 다른 화면과 뜻이 갈린다.
+                params={"query": naver_query(keyword), "display": _MAX_DISPLAY,
+                        "start": start, "sort": "date"},
                 timeout=10,
             )
         # [추가: 2026-08-20] 정기 스크랩·실시간 현황·수시 모니터링·[단독]·[속보] 폴링
