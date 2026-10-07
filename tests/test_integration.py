@@ -4311,6 +4311,98 @@ def test_agency_archive_keeps_every_date():
     print("50) 기관 기사 찾기 날짜 유지: 통과 (예산은 미루기지 자르기가 아님, 참 건수, 지연 조각이 낱말·거르기·가져가기 재료까지)")
 
 
+def test_agency_archive_labels():
+    """기관 기사 찾기에서 라벨을 **붙인다** — 그리고 그게 라벨 보관함에 거짓으로 안 적힌다.
+
+    이 화면에만 있는 기사(평일 마지막 회차 뒤에 나온 기관 기사)는 회차 파일에 안
+    들어가서 확정본·초안·정기 보관함 어디에도 안 나온다 — 라벨을 붙일 **다른 길이
+    아예 없다.** 라벨은 이 앱에서 유일하게 나이로 안 지우는 장치라, 그 기사를 남길
+    방법이 여기 말고 없다.
+
+    이 테스트가 지키는 것 셋:
+      (1) **공용 라벨 장치의 기본값 경로가 그대로다.** 확정본·초안·정기 보관함·수시는
+          기사 줄이 `.article`이고 칩을 `<summary>` 밑 별도 줄에 단다. 이 화면을 열려고
+          그 장치를 고쳤으므로, 기본값이 바뀌면 **이미 돌고 있는 화면 넷이 조용히
+          망가진다**(라벨은 저장됐는데 화면이 안 바뀌어 담당자는 실패로 읽는다).
+      (2) 이 화면은 `data-lab-root`·`data-lab-inline`으로 자기 생김새를 알려준다.
+          **요약이 없어 `<details>`가 없는 행에도** 붙어야 한다 — 거기가 빠지면 같은
+          화면 안에서 어떤 기사는 되고 어떤 기사는 안 되는, 재현이 어려운 버그가 된다.
+      (3) 출처가 `agency`라 라벨 보관함이 `회차`·`✓ 스크랩됨`을 안 그린다. 회차에 실린
+          적 없는 기사인데 그렇게 적으면 **화면이 아니라 파일에 거짓이 남고** 엑셀
+          「스크랩일자·스크랩종료시간·소제목」까지 따라 나간다.
+    """
+    _require_isolation()
+    import tempfile
+    from unittest.mock import patch
+    from app import agency_archive, labels as labels_mod
+    from app.agency_archive_renderer import (
+        render_agency_archive_day_fragment,
+        render_agency_archive_page,
+    )
+    from app.labels import attach_label, labels_for_url, snapshot_source
+    from app.renderer import label_popover_script
+    from app.settings_server import _label_source_tag_html
+
+    day = datetime.now().strftime("%Y-%m-%d")
+    with_summary = "https://n.news.naver.com/mnews/article/001/1"
+    no_summary = "https://n.news.naver.com/mnews/article/002/2"
+    agency_archive._save_day({"date": day, "last_seen": "", "collected_at": "", "articles": [
+        {"url": with_summary, "title": "재경부 세제 개편", "outlet": "KBS",
+         "summary": "재경부가 세제를 고친다", "pub_date": f"{day}T22:10:00+09:00"},
+        # 요약이 없는 기사 — 이 화면은 그런 행에 <details>를 **일부러** 안 그린다(행 높이).
+        {"url": no_summary, "title": "재경부 예산 설명", "outlet": "KBS",
+         "summary": "", "pub_date": f"{day}T22:20:00+09:00"},
+    ]})
+
+    # (1) 공용 장치의 기본값 경로 — 확정본 넷이 쓰는 길이 그대로 남아 있어야 한다.
+    js = label_popover_script("127.0.0.1", 8765)
+    assert 'el.closest(".article")' in js, \
+        "공용 라벨 장치의 기본값(.article)이 사라졌습니다 — 확정본·초안·정기 보관함·수시가 멈춥니다"
+    assert 'btn.closest("summary")' in js, \
+        "공용 라벨 장치의 기본 칩 자리(<summary> 밑 .lab-row)가 사라졌습니다"
+    assert "function labRoot" in js, "줄 찾기가 한 곳(labRoot)으로 안 모여 있습니다"
+
+    # (2) 이 화면은 자기 생김새를 알려준다 — 요약 없는 행에도 빠짐없이.
+    html_out = render_agency_archive_page(preset="7d")
+    assert html_out.count('data-lab-root data-lab-inline=".a-title"') == 2, \
+        "요약 없는 행에 라벨 장치 표시가 안 붙었습니다 — 그 행만 🏷가 먹통이 됩니다"
+    assert html_out.count('data-lab-source="agency"') == 2, "🏷에 출처 표시가 빠졌습니다"
+    assert 'data-scrap-end=""' in html_out and 'data-group=""' in html_out, \
+        "없는 회차·소제목을 지어내고 있습니다"
+    # 지연 조각도 같은 버튼을 낸다 — 안 그러면 펼쳐 본 날짜만 🏷가 없다.
+    frag = render_agency_archive_day_fragment(day)
+    assert frag is not None and frag.count('data-lab-source="agency"') == 2, \
+        "지연 조각에 🏷가 빠졌습니다 — 펼쳐 본 날짜만 라벨을 못 답니다"
+    assert "이미 쓴 라벨" in frag, "지연 조각의 팝오버에 「이미 쓴 라벨」 목록이 안 실렸습니다"
+
+    # (3) 출처 — 파일에 `agency`로 남고, 라벨 보관함이 회차·스크랩 상태를 안 그린다.
+    assert snapshot_source("agency") == {"kind": "agency"}
+    # 라벨 저장소는 `_require_isolation()`이 안 막아 준다(그건 ARTICLES_DIR만 본다).
+    # 그리고 `app.labels`는 `LABELS_FILE`을 **모듈 상수로** 들고 있어 `app.config`를
+    # 패치하면 안 따라온다 — 반드시 `app.labels`를 패치한다(CLAUDE.md 「테스트 격리」).
+    with tempfile.TemporaryDirectory() as tmp:
+        with patch.object(labels_mod, "LABELS_FILE", Path(tmp) / "labels.json"):
+            attach_label(
+                {"url": with_summary, "outlet": "KBS", "title": "재경부 세제 개편",
+                 "pub_date": f"{day}T22:10:00+09:00", "scrap_date": day, "scrap_end": ""},
+                "밤사이", snapshot_source("agency"), group="",
+            )
+            assert labels_for_url(with_summary) == ["밤사이"]
+            saved = json.loads((Path(tmp) / "labels.json").read_text(encoding="utf-8"))
+            entry = saved[with_summary]
+            assert entry["source"] == {"kind": "agency"}
+            assert entry["scrap_end"] == "" and entry["group"] == "", \
+                "없는 회차·소제목을 파일에 지어내 적었습니다"
+            assert entry["scrap_date"] == day, "원장 날짜는 적어야 한다(그날 관측한 사실)"
+    tag = _label_source_tag_html({"kind": "agency"})
+    assert "기관 기사" in tag and "회차" not in tag, "원장 라벨에 「회차」라고 적고 있습니다"
+    # 정기·수시 태그는 그대로 — 새 종류가 옛 두 종류를 건드리면 안 된다.
+    assert "회차" in _label_source_tag_html({"kind": "regular"})
+    assert "청문회" in _label_source_tag_html({"kind": "adhoc", "issue": "청문회"})
+
+    print("52) 기관 기사 찾기 라벨: 통과 (공용 장치 기본값 그대로, 요약 없는 행도, 출처 agency라 회차·스크랩 안 적음)")
+
+
 
 def test_custom_group_with_taken_name_gets_its_own_box():
     """담당자가 친 이름이 그 회차에 이미 쓰이고 있어도 **새 칸이 따로 생긴다**.
@@ -4550,6 +4642,7 @@ if __name__ == "__main__":
         test_photo_override_is_one_place,
         test_agency_archive_filters,
         test_agency_archive_keeps_every_date,
+        test_agency_archive_labels,
         test_draft_all_first_classified_hidden_shows_unclassified,
         test_partial_cache_survives_non_hidden_drops,
         test_assigned_articles_keep_subheading_after_ai_members_hidden,

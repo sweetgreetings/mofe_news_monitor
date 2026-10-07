@@ -239,9 +239,19 @@ def delete_label(name: str) -> int:
 
 
 def snapshot_source(kind: str, issue: Optional[str] = None) -> dict:
-    """8번째 필드(source) 값 — 정기는 {"kind":"regular"}, 수시는 사안명을 더한다.
+    """8번째 필드(source) 값 — 정기는 {"kind":"regular"}, 수시는 사안명을 더하고,
+    기관 기사 원장에서 붙인 것은 {"kind":"agency"}다.
     화면의 출처 태그는 수시일 때 사안명만 보여준다([결정: 2026-08-18] q1 — 색으로 이미
-    정기/수시가 구분되므로 "수시 ·" 접두어는 글자만 늘린다)."""
+    정기/수시가 구분되므로 "수시 ·" 접두어는 글자만 늘린다).
+
+    **`agency`를 따로 두는 이유**: 원장 기사는 어느 회차 보고서에도 실린 적이 없을 수
+    있다(정기 회차는 하루를 다 덮지 않는다). 그런데도 `regular`로 적으면 라벨 보관함이
+    그 줄에 `회차` 태그와 `✓ 스크랩됨`을 그린다 — 둘 다 없던 일이고, 화면 표시로 그치지
+    않고 엑셀 「스크랩일자·스크랩종료시간·소제목」까지 따라 나간다. 「화면 전용 표시가
+    보고서로 새면 안 된다」(CODING_CONVENTIONS §4)의 반대 방향이라 더 나쁘다.
+    보고서에 실렸는지는 `scrap_end`가 비었는지로 읽는다(수시 확정본이 이미 빈 값이다)."""
     if kind == "adhoc":
         return {"kind": "adhoc", "issue": issue or ""}
+    if kind == "agency":
+        return {"kind": "agency"}
     return {"kind": "regular"}

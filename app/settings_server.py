@@ -4595,7 +4595,7 @@ _LABEL_STYLE = """
   }}
   .snap-tag {{ font-size: var(--fs-xs); background: {bg}; color: {text}; border: 1px solid {border}; border-radius: var(--r-pill); padding: 1px 6px; }}
   .snap-tag.sub {{ background: {hover}; color: {header}; }}
-  .snap-tag.src-reg {{ background: {bg}; color: {muted}; }}
+  .snap-tag.src-reg, .snap-tag.src-agency {{ background: {bg}; color: {muted}; }}
   .snap-tag.src-adhoc {{ background: {adhoc_bg}; color: {adhoc_text}; }}
   .snap-tag.gone {{ background: {snap_gone_bg}; color: {snap_gone_text}; border-color: {snap_gone_border}; }}
   /* 정기 보고서에 있나 — 「스크랩됨」/「숨김」 한 칸. 오늘 전체 기사의 행 상태와 같은 말. */
@@ -4698,9 +4698,14 @@ def _label_undo_fab_html() -> str:
 def _label_source_tag_html(source: dict) -> str:
     """출처 태그 — [결정: 2026-08-18] q1: 수시는 사안명만 보여준다(정기/수시가 이미
     색으로 구분되므로 "수시 ·" 접두어는 글자만 늘린다)."""
-    if (source or {}).get("kind") == "adhoc":
+    kind = (source or {}).get("kind")
+    if kind == "adhoc":
         issue = (source or {}).get("issue") or "사안"
         return f'<span class="snap-tag src-adhoc">{html.escape(issue)}</span>'
+    if kind == "agency":
+        # 새 색을 만들지 않고 정기와 같은 중립 회색 — 글자가 이미 다르다.
+        # 이 줄엔 회차·소제목·스크랩 상태가 없는 게 정상이다.
+        return '<span class="snap-tag src-agency">기관 기사</span>'
     return '<span class="snap-tag src-reg">회차</span>'
 
 
@@ -7779,8 +7784,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         self._respond_json({"label": restored["label"], "touched": restored["touched"]})
 
     def _handle_add_label(self, form: dict) -> None:
-        """확정본·초안·수시 수집 확정본·[추가: 2026-09-16] 정기 보관함 화면의 🏷 팝오버가
-        fetch로 호출한다(attachLabel).
+        """확정본·초안·수시 수집 확정본·[추가: 2026-09-16] 정기 보관함·[추가] 기관 기사
+        찾기 화면의 🏷 팝오버가 fetch로 호출한다(attachLabel).
         붙이는 시점의 스냅샷 필드(app.labels.attach_label 참고)를 함께 실어 보낸다 —
         회차 파일이 나중에 지워져도 라벨 보관함이 이 사본만으로 온전히 복원되게 하려면
         붙이는 이 순간에 받아둬야 한다. 응답은 그 기사에 지금 붙어 있는 라벨 전체
@@ -7803,8 +7808,13 @@ class _SettingsHandler(BaseHTTPRequestHandler):
                 "scrap_end": form.get("scrapEnd", [""])[0],
             }
             group = form.get("group", [""])[0]
+            # [추가] 출처 — 화면이 알려준다. 기관 기사 찾기(원장)에서 붙인 라벨은
+            # 회차 보고서에 실린 적이 없을 수 있어 `regular`로 적으면 라벨 보관함이
+            # `회차`·`✓ 스크랩됨`이라고 거짓을 그린다(app.labels.snapshot_source 참고).
+            # 모르는 값은 조용히 `regular`로 떨어진다(옛 화면이 안 보내도 그대로 돈다).
+            source_kind = form.get("source", [""])[0] or "regular"
             label_undo_push(f'라벨 "{label}" 붙이기')
-            labels_now = attach_label(article, label, snapshot_source("regular"), group=group)
+            labels_now = attach_label(article, label, snapshot_source(source_kind), group=group)
             self._regenerate_screens()
         else:
             labels_now = []

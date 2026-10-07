@@ -6,7 +6,13 @@
 # URL 키 전역 상태는 **「기사에 관한 사실」만 입힌다**(같은 절의 기준표):
 #   - `summary_overrides`(제목·요약) → 입힌다. **표시뿐 아니라 검색 대상에도** 입히는 게
 #     핵심이다 — 안 그러면 담당자가 직접 고친 말로 검색했을 때 0건이 나온다.
-#   - `labels` → 보여만 준다(붙이는 화면 넷에 이 화면을 더하지 않는다).
+#   - `labels` → **붙인다.** 「책은 고쳐 쓰지 않는다」가 깨지는 게 아니다 — 라벨은
+#     data/labels.json에만 쓰고 원장 파일(data/agency_archive/)은 한 글자도 안 건드린다.
+#     그리고 이 화면에만 있는 기사(평일 마지막 회차 뒤 기사)는 **라벨을 붙일 다른 길이
+#     아예 없다** — 회차 파일에 안 들어가니 확정본·초안·정기 보관함 어디에도 안 나온다.
+#     라벨은 이 앱에서 유일하게 나이로 안 지우는 장치라, 그 기사를 남길 방법이 여기 말고
+#     없다. 출처는 `agency`로 적어 라벨 보관함이 `회차`·`✓ 스크랩됨`이라고 거짓을 그리지
+#     않게 한다(app.labels.snapshot_source).
 #   - `hidden_articles` → **거르지 않는다.** 「그날 무엇이 있었나」가 이 화면의 질문이라
 #     보고서에서 뺀 기사도 기록으로 남고, 표시만 「🗑️ 숨김」으로 붙인다.
 #
@@ -20,6 +26,8 @@ from typing import Optional
 from app.agency_archive import available_dates, load_day
 from app.config import (
     AGENCY_ARCHIVE_KEYWORDS,
+    SETTINGS_SERVER_HOST,
+    SETTINGS_SERVER_PORT,
     AGENCY_ARCHIVE_TITLE,
     DEFAULT_ARTICLE_LINE_TEMPLATE,
     FONT_STACK,
@@ -30,7 +38,12 @@ from app.excel_export import sanitize_filename_part
 from app.icons import icon
 from app.labels import load_labels
 from app.naver_api import outlet_display_label
-from app.renderer import build_group_copy_texts
+from app.renderer import (
+    build_group_copy_texts,
+    known_label_chips_html,
+    label_popover_script,
+    label_popover_style,
+)
 from app.search_terms import split_terms
 from app.settings import load_settings
 from app.summary_overrides import load_summary_overrides
@@ -304,7 +317,62 @@ def _snippet(summary: str, title: str, word: str) -> str:
     return f'<div class="snip">{_highlight(cut, word)}</div>'
 
 
-def _row_html(article: dict, word: str, labels: dict, line_template: str) -> str:
+def _label_button_html(article: dict, labels: dict, date_str: str, known_html: str) -> str:
+    """행의 🏷 — 확정본의 팝오버(app.renderer의 CSS·JS)를 그대로 쓰고, 생김새만 이 화면에
+    맞춘다. 상자(`.ib`)를 두르는 게 핵심이다 — 옆의 ↗·복사가 테두리 상자라, 맨 아이콘만
+    두면 셋이 다른 종류로 보인다.
+
+    데이터로 넘기는 것 둘이 이 화면의 규칙이다:
+      - `data-lab-source="agency"` — 라벨 보관함이 출처를 `기관 기사`로 적게 한다.
+      - `scrapEnd`·`group`은 **빈 값**이다. 이 기사는 회차 보고서에 실린 적이 없을 수
+        있어 지어내면 안 된다(수시 확정본의 「스크랩종료시간」이 빈 값인 것과 같은 규칙).
+        `scrapDate`는 원장 날짜 — 그날 실제로 관측한 사실이라 적는다.
+    """
+    url = article.get("url") or ""
+    current = list((labels.get(url) or {}).get("labels") or [])
+    on = " on" if current else ""
+    count = f'<span class="lab-count">{len(current)}</span>' if current else ""
+    attached = (
+        "".join(
+            f'<span class="lab-chip" data-label="{html.escape(n)}">{html.escape(n)} '
+            '<span class="x" onclick="event.stopPropagation(); event.preventDefault(); '
+            'detachLabelChip(this);">×</span></span>'
+            for n in current
+        )
+        if current
+        else '<span class="none">아직 없음</span>'
+    )
+    return (
+        '<span class="lab-pop-wrap">'
+        f'<button type="button" class="ib lab-btn{on}" data-url="{html.escape(url, quote=True)}" '
+        f'data-outlet="{html.escape(article.get("outlet") or "", quote=True)}" '
+        f'data-title="{html.escape(article.get("title") or "", quote=True)}" '
+        f'data-pub-date="{html.escape(article.get("pub_date") or "", quote=True)}" '
+        'data-group="" data-scrap-end="" data-lab-source="agency" '
+        f'data-scrap-date="{html.escape(date_str, quote=True)}" '
+        'onclick="event.stopPropagation(); event.preventDefault(); toggleLabelPopover(this);" '
+        f'title="라벨">{icon("tag")}{count}</button>'
+        '<span class="lab-pop hidden" onclick="event.stopPropagation(); event.preventDefault();">'
+        "<h4>이 기사에 붙은 라벨</h4>"
+        f'<div class="attached">{attached}</div>'
+        "<h4>이미 쓴 라벨 (눌러서 붙이기)</h4>"
+        f'<div class="known">{known_html}</div>'
+        '<div class="addbox">'
+        '<input type="text" placeholder="새 라벨 입력" class="lab-input" '
+        "onkeydown=\"event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); "
+        'addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);">'
+        '<button type="button" onclick="event.stopPropagation(); event.preventDefault(); '
+        'addLabelFromInput(this.previousElementSibling);">추가</button>'
+        "</div>"
+        '<div class="sim-warn hidden"></div>'
+        "</span></span>"
+    )
+
+
+def _row_html(
+    article: dict, word: str, labels: dict, line_template: str,
+    date_str: str = "", known_html: str = "",
+) -> str:
     """기사 한 줄 = **한 줄짜리 제목 줄 하나**. 게시 시각은 아이콘 왼쪽 끝에 서고
     메타 줄은 없다 — 시각 한 조각 때문에 행마다 줄이 하나씩 더 생기던 자리다.
     요약은 접혀 있고 제목 줄을 누르면 펼쳐진다(확정본과 같은 규칙 — 펼친 동안
@@ -343,7 +411,8 @@ def _row_html(article: dict, word: str, labels: dict, line_template: str) -> str
     # 보인다(2026-08-14에 확정본에서 ↗를 뺐던 이유). 휴지통 행과 같은 30×26 규격.
     acts = (
         '<span class="acts">'
-        f'<a class="ib" href="{escaped_url}" target="_blank" rel="noopener" title="원문 보기"'
+        + _label_button_html(article, labels, date_str, known_html)
+        + f'<a class="ib" href="{escaped_url}" target="_blank" rel="noopener" title="원문 보기"'
         f' onclick="event.stopPropagation()">{icon("external_link")}</a>'
         f'<button type="button" class="ib" title="복사" data-copy-text="{copy_attr}"'
         f' onclick="copyArchiveRow(event, this)">'
@@ -367,17 +436,20 @@ def _row_html(article: dict, word: str, labels: dict, line_template: str) -> str
         f"{when}{acts}</div>"
         f"{_snippet(summary, article.get('title') or '', word)}"
     )
+    # 공용 라벨 장치에게 "기사 줄은 나다(.article이 아니다) · 칩은 제목 끝에 붙인다"를
+    # 알려준다. 이 두 속성이 없으면 장치가 `.article`을 찾다 못 찾고 그 자리에서 멈춘다.
+    lab_attrs = ' data-lab-root data-lab-inline=".a-title"'
     if not summary:
-        return f'<div class="{cls}">{head}</div>'
+        return f'<div class="{cls}"{lab_attrs}>{head}</div>'
     return (
-        f'<div class="{cls}">'
+        f'<div class="{cls}"{lab_attrs}>'
         f"<details><summary>{head}</summary>"
         f'<div class="a-sum">{_highlight(summary, word)}</div>'
         "</details></div>"
     )
 
 
-def _day_payload(date_str: str, rows: list, line_template: str) -> tuple:
+def _day_payload(date_str: str, rows: list, line_template: str, labels: Optional[dict] = None) -> tuple:
     """한 날짜 몫의 가져가기 재료 — (기사 줄 텍스트, 엑셀 행들).
 
     기사 줄은 **전용 빌더를 만들지 않고** 다른 화면과 같은 `build_group_copy_texts`를
@@ -402,21 +474,25 @@ def _day_payload(date_str: str, rows: list, line_template: str) -> tuple:
             "기사제목": a.get("title", ""),
             "URL": a.get("url", ""),
             "소제목": "",
-            "라벨명": "",
+            # 화면이 제목 끝에 칩으로 보여주는 라벨을 엑셀에도 적는다 — 이 화면에서
+            # 라벨을 붙일 수 있게 된 뒤로는 칸을 비워 두면 화면과 엑셀이 어긋난다.
+            "라벨명": ", ".join(((labels or {}).get(a.get("url") or "") or {}).get("labels") or []),
         }
         for a in rows
     ]
     return text.split("\n", 1)[1], excel_rows
 
 
-def _day_rows_html(date_str: str, rows: list, word: str, labels: dict, line_template: str) -> str:
+def _day_rows_html(
+    date_str: str, rows: list, word: str, labels: dict, line_template: str, known_html: str = "",
+) -> str:
     """한 날짜의 기사 줄 + 그 날짜 몫의 가져가기 재료. **즉시 렌더링과 지연 조각이 같은
     함수를 쓴다** — 한쪽만 고치면 펼쳐 본 날짜와 처음부터 있던 날짜가 조용히 달라진다."""
-    text, excel_rows = _day_payload(date_str, rows, line_template)
+    text, excel_rows = _day_payload(date_str, rows, line_template, labels)
     return (
         f'<div class="dbody" data-copy-text="{html.escape(text)}"'
         f' data-rows="{html.escape(json.dumps(excel_rows, ensure_ascii=False))}">'
-        + "".join(_row_html(a, word, labels, line_template) for a in rows)
+        + "".join(_row_html(a, word, labels, line_template, date_str, known_html) for a in rows)
         + "</div>"
     )
 
@@ -483,7 +559,10 @@ def render_agency_archive_page(
 
     overrides = load_summary_overrides()
     days, total, counts, raw_total = _collect(date_from, date_to, word, overrides, on, allowed)
+    # 라벨 저장소는 **화면마다 한 번만** 읽는다(행마다 읽으면 기사 수만큼 파일을 다시
+    # 파싱한다). 「이미 쓴 라벨」 칩 목록도 한 번 구워 모든 행의 팝오버에 같은 값으로 넣는다.
     labels = load_labels()
+    known_html = known_label_chips_html()
     # 한 건 복사는 보고서와 같은 한 줄 형식을 쓴다(정기 설정 `/format`).
     line_template = load_settings().get("article_line_template", DEFAULT_ARTICLE_LINE_TEMPLATE)
 
@@ -564,7 +643,7 @@ def render_agency_archive_page(
             today_chip = '<span class="chip-today">오늘</span>' if date_str == today else ""
             opens = " open" if _opens_by_default(date_str, word, today) else ""
             inner = (
-                _day_rows_html(date_str, rows, word, labels, line_template)
+                _day_rows_html(date_str, rows, word, labels, line_template, known_html)
                 if rows is not None
                 else '<div class="lazy-day-holder">'
                      '<p class="lazy-day-hint">펼치면 불러옵니다…</p></div>'
@@ -585,6 +664,8 @@ def render_agency_archive_page(
         **PALETTE,
         font_stack=FONT_STACK,
         topnav_style=topnav_style(),
+        label_popover_style=label_popover_style(),
+        label_popover_script=label_popover_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
         topnav=plain_nav(),
         title=html.escape(AGENCY_ARCHIVE_TITLE),
         scope=html.escape("·".join(AGENCY_ARCHIVE_KEYWORDS)),
@@ -617,7 +698,11 @@ def render_agency_archive_day_fragment(
         return None
     _date, _count, rows = days[0]
     line_template = load_settings().get("article_line_template", DEFAULT_ARTICLE_LINE_TEMPLATE)
-    return _day_rows_html(date_str, rows, (word or "").strip(), load_labels(), line_template)
+    # 「이미 쓴 라벨」 목록을 조각에도 같이 넘긴다 — 안 넘기면 펼쳐 본 날짜의 팝오버만
+    # 목록이 비어, 한 화면에서 위아래 날짜가 서로 다르게 동작한다.
+    return _day_rows_html(
+        date_str, rows, (word or "").strip(), load_labels(), line_template, known_label_chips_html(),
+    )
 
 
 def _kr(date_str: str, weekday: bool = False) -> str:
@@ -761,6 +846,18 @@ _TEMPLATE = """<!DOCTYPE html>
   .empty {{ border: 1px dashed {border}; border-radius: var(--r-lg); padding: 28px 20px; text-align: center;
     color: {text_soft}; font-size: var(--fs-lg); }}
   .empty .sm {{ display: block; margin-top: 8px; font-size: var(--fs-md); color: {text_soft}; line-height: 1.8; }}
+  {label_popover_style}
+  /* 🏷는 옆의 ↗·복사와 같은 30×26 상자여야 한다 — 공용 .lab-btn은 테두리 없는 맨
+     아이콘이라 이 화면에서만 상자를 다시 입힌다(.ib와 같은 값). 라벨이 붙은 행은
+     공용 `.lab-btn.on`의 앰버가 그대로 보인다. */
+  .acts .lab-btn {{ width: 30px; height: 26px; padding: 0; justify-content: center;
+    border: 1px solid {border}; background: {card}; border-radius: var(--r-sm); }}
+  .acts .lab-btn:hover {{ border-color: {accent_border}; }}
+  .acts .lab-btn.on {{ background: {label_bg}; border-color: {label_border}; }}
+  .acts .lab-btn .lab-count {{ margin-left: 1px; }}
+  /* 팝오버는 접힌 요약(.snip) 위로 떠야 한다 — 행이 한 줄이라 아래 공간이 좁다. */
+  .acts .lab-pop {{ width: 248px; }}
+  .art .lab-pop .lab-chip {{ white-space: nowrap; }}
 </style>
 </head>
 <body>
@@ -794,6 +891,7 @@ _TEMPLATE = """<!DOCTYPE html>
   {body_html}
 </div>
 <script>
+{label_popover_script}
 /* 다른 화면의 copyArticleIcon과 하는 일은 같지만, 이 버튼은 <summary> 안에 있어
    **누르면 요약이 같이 펼쳐진다** — 그 한 가지 때문에 따로 둔다(공용 함수엔 그 처리가 없다). */
 function copyArchiveRow(e, btn) {{

@@ -4985,6 +4985,13 @@ var LAB_TAG_ICON_SVG = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><
 // 커서 밑에서 움직인 엉뚱한 라벨을 누르게 된다. 대신 팝오버를 "열 때" 칠한다
 // (toggleLabelPopover가 어차피 열 때마다 used를 다시 매기고 있어 그 자리에 얹힌다).
 var KNOWN_CHIPS_HTML = null;
+// [추가] 라벨 장치가 "기사 줄"을 찾는 자리 — **한 곳**이다. 확정본·초안·정기 보관함·수시는
+// 기사 줄 클래스가 `.article`이라 그대로 걸리고, 그 이름을 못 쓰는 화면(기관 기사 찾기의
+// `.art`)은 줄에 `data-lab-root`를 달아 자기를 가리킨다. 기존 화면은 그 속성이 없으므로
+// 두 번째 줄로 떨어져 **동작이 한 글자도 안 바뀐다**. 새 화면을 열 때 고칠 곳은 여기뿐이다.
+function labRoot(el) {{
+  return el.closest("[data-lab-root]") || el.closest(".article");
+}}
 function closeLabelPopovers() {{
   document.querySelectorAll(".lab-pop").forEach(function(p) {{ p.classList.add("hidden"); }});
 }}
@@ -5008,7 +5015,7 @@ function escapeLabelHtml(s) {{
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }}
 function applyLabelState(btn, labelsList) {{
-  var article = btn.closest(".article");
+  var article = labRoot(btn);
   var pop = btn.parentNode.querySelector(".lab-pop");
   var chipsHtml = labelsList.length
     ? labelsList.map(function(n) {{
@@ -5017,17 +5024,35 @@ function applyLabelState(btn, labelsList) {{
       }}).join("")
     : '<span class="none">아직 없음</span>';
   pop.querySelector(".attached").innerHTML = chipsHtml;
-  var row = article.querySelector(".lab-row");
-  if (labelsList.length) {{
-    var rowHtml = '<span class="tagmark">' + LAB_TAG_ICON_SVG + "</span>" + chipsHtml;
-    if (row) {{ row.innerHTML = rowHtml; }}
-    else {{
-      row = document.createElement("div");
-      row.className = "lab-row";
-      row.innerHTML = rowHtml;
-      btn.closest("summary").appendChild(row);
+  // [추가] 「제목 끝에 칩」 방식 화면(data-lab-inline)은 별도 줄(.lab-row)을 안 만든다 —
+  // 기관 기사 찾기는 **행이 한 줄인 것 자체가 규칙**이라(행 높이 55→36px) 줄을 하나 더
+  // 붙이면 그 규칙이 깨진다. 그 화면은 라벨을 제목 끝 `.lab` 칩으로 이미 보여주고 있어,
+  // 서버가 그린 것과 **같은 모양**으로 다시 그린다(×는 팝오버 안에만 둔다).
+  var inlineSel = article.getAttribute("data-lab-inline");
+  if (inlineSel) {{
+    var host = article.querySelector(inlineSel);
+    if (host) {{
+      host.querySelectorAll(".lab").forEach(function (c) {{ c.remove(); }});
+      labelsList.forEach(function (n) {{
+        var sp = document.createElement("span");
+        sp.className = "lab";
+        sp.textContent = n;
+        host.appendChild(sp);
+      }});
     }}
-  }} else if (row) {{ row.remove(); }}
+  }} else {{
+    var row = article.querySelector(".lab-row");
+    if (labelsList.length) {{
+      var rowHtml = '<span class="tagmark">' + LAB_TAG_ICON_SVG + "</span>" + chipsHtml;
+      if (row) {{ row.innerHTML = rowHtml; }}
+      else {{
+        row = document.createElement("div");
+        row.className = "lab-row";
+        row.innerHTML = rowHtml;
+        btn.closest("summary").appendChild(row);
+      }}
+    }} else if (row) {{ row.remove(); }}
+  }}
   btn.classList.toggle("on", labelsList.length > 0);
   var countEl = btn.querySelector(".lab-count");
   if (labelsList.length) {{
@@ -5047,7 +5072,9 @@ function attachLabel(btn, label) {{
     body: new URLSearchParams({{
       url: btn.dataset.url, outlet: btn.dataset.outlet, title: btn.dataset.title,
       pubDate: btn.dataset.pubDate, group: btn.dataset.group,
-      scrapDate: btn.dataset.scrapDate, scrapEnd: btn.dataset.scrapEnd, label: label
+      scrapDate: btn.dataset.scrapDate, scrapEnd: btn.dataset.scrapEnd, label: label,
+      // 빈 값이면 서버가 `regular`로 읽는다 — 기존 화면 넷은 이 속성을 안 달았다.
+      source: btn.dataset.labSource || ""
     }})
   }}).then(function(res) {{
     if (!res.ok) {{ throw new Error(); }}
@@ -5074,16 +5101,16 @@ function detachLabel(btn, label) {{
 }}
 function detachLabelChip(el) {{
   var chip = el.closest(".lab-chip");
-  var btn = el.closest(".article").querySelector(".lab-btn");
+  var btn = labRoot(el).querySelector(".lab-btn");
   detachLabel(btn, chip.dataset.label);
 }}
 function knownChipClick(el) {{
-  var btn = el.closest(".article").querySelector(".lab-btn");
+  var btn = labRoot(el).querySelector(".lab-btn");
   if (el.classList.contains("used")) {{ detachLabel(btn, el.dataset.label); }}
   else {{ attachLabel(btn, el.dataset.label); }}
 }}
 function addLabelFromInput(input) {{
-  var btn = input.closest(".article").querySelector(".lab-btn");
+  var btn = labRoot(input).querySelector(".lab-btn");
   attachLabel(btn, input.value);
   input.value = "";
   var warn = input.closest(".lab-pop").querySelector(".sim-warn");
