@@ -29,7 +29,7 @@ from app.filters import HEADLINE_TAG_RE, headline_kind, looks_like_photo_caption
 from app.excel_export import sanitize_filename_part
 from app.icons import icon
 from app.labels import load_labels
-from app.naver_api import PRIORITY_OUTLETS, outlet_display_label
+from app.naver_api import outlet_display_label
 from app.renderer import build_group_copy_texts
 from app.search_terms import split_terms
 from app.settings import load_settings
@@ -143,13 +143,31 @@ def _highlight(text: str, word: str) -> str:
     return "".join(out)
 
 
-def _is_major(article: dict) -> bool:
-    """고정 주요 언론사 13곳(`PRIORITY_OUTLETS`)인가.
+def _selected_outlets() -> frozenset:
+    """설정 「언론사 선택 및 순서 지정」에서 체크한 언론사(`outlet_order`).
 
-    **설정의 「선택 언론사」(화이트리스트)가 아니다** — 그건 지금 0곳이라 켜면 한 건도
-    안 남는다. 이 화면은 찾는 자리라 「무엇이 주요 매체인가」를 담당자에게 되묻지 않는다.
+    **이 화면도 그 설정을 쓴다** — 「무엇이 주요 매체인가」를 화면마다 따로 정하면
+    같은 이름의 칸이 화면마다 다른 답을 낸다. 오늘 전체 기사의 「선택 언론사만」과
+    같은 목록·같은 뜻이다.
     """
-    return (article.get("outlet") or "") in PRIORITY_OUTLETS
+    return frozenset(load_settings().get("outlet_order") or ())
+
+
+def _is_selected(article: dict, allowed: frozenset) -> bool:
+    """체크한 언론사인가. **아무도 안 골랐으면 거르지 않는다** —
+    `filter_by_outlet_whitelist`와 같은 규칙이고, 그때 칸은 아예 잠긴다."""
+    if not allowed:
+        return True
+    return (article.get("outlet") or "") in allowed
+
+
+def _filters_on(filters: Optional[dict], allowed: frozenset) -> dict:
+    """URL에서 받은 거르기 상태. 체크한 언론사가 0곳이면 「선택 언론사만」은 끈 것으로
+    읽는다 — 주소에 `major=1`이 실려 와도 한 건도 안 남는 화면을 그리지 않는다."""
+    on = {key: bool((filters or {}).get(key)) for key in _FILTERS}
+    if not allowed:
+        on["major"] = False
+    return on
 
 
 def _is_photo(article: dict) -> bool:
@@ -165,11 +183,11 @@ def _is_photo(article: dict) -> bool:
 AGENCY_ARCHIVE_FILTERS = _FILTERS = ("major", "scoop", "flash", "nophoto")
 
 
-def _tally(article: dict) -> dict:
+def _tally(article: dict, allowed: frozenset) -> dict:
     """이 기사가 어느 필터에 걸리는가. 건수 표시와 걸러내기가 같은 판정을 쓴다."""
     kind = headline_kind(article.get("title") or "")
     return {
-        "major": _is_major(article),
+        "major": _is_selected(article, allowed),
         "scoop": kind == "단독",
         "flash": kind == "속보",
         "photo": _is_photo(article),
@@ -199,6 +217,7 @@ def _opens_by_default(date_str: str, word: str, today: str) -> bool:
 
 def _collect(
     date_from: str, date_to: str, word: str, overrides: dict, on: dict,
+    allowed: frozenset = frozenset(),
     eager_budget: Optional[int] = EAGER_ROWS, only_date: Optional[str] = None,
 ) -> tuple:
     """(날짜 → (참 건수, 기사 목록 또는 None), 걸린 총 건수, 필터별 건수, 필터 걸기 전 건수).
@@ -231,7 +250,7 @@ def _collect(
             if not _matches(merged, word):
                 continue
             raw_total += 1
-            hits = _tally(merged)
+            hits = _tally(merged, allowed)
             for key, hit in hits.items():
                 if hit:
                     counts[key] += 1
@@ -431,18 +450,21 @@ def _export_html(word: str, date_from: str, date_to: str) -> str:
 
 
 # 필터 칸 — 이름·건수 키. 사진만 「빼고」 방향이라 세로선 오른쪽에 혼자 선다.
+# `major` 키는 주소(`?major=1`)와 JS에 박혀 있어 그대로 두지만, 뜻은 「설정에서 체크한
+# 언론사」다(옛 고정 13곳이 아니다 — 아래 `_selected_outlets`).
 _FILTER_LABELS = [
-    ("major", "주요 언론사만", "major"),
+    ("major", "선택 언론사만", "major"),
     ("scoop", "[단독]", "scoop"),
     ("flash", "[속보]", "flash"),
     ("nophoto", "사진 추정 제외", "photo"),
 ]
 _FILTER_TIPS = {
-    "major": "KBS·MBC·조선·중앙·동아·한경·매경·서울경제·한국일보·머니투데이·이데일리·연합·뉴시스 13곳",
+    "major": "설정 「언론사 선택 및 순서 지정」에서 체크한 언론사만 남깁니다",
     "scoop": "제목 맨 앞에 [단독]이 붙은 기사만",
     "flash": "제목 맨 앞에 [속보]가 붙은 기사만",
     "nophoto": "사진과 설명 한 문장뿐인 것으로 보이는 기사를 목록에서 뺍니다",
 }
+_FILTER_LOCKED_TIP = "아직 스크랩 언론사가 지정되지 않았어요 (설정에서 선택하면 활성화됩니다)"
 
 
 def render_agency_archive_page(
@@ -456,10 +478,11 @@ def render_agency_archive_page(
     dates = available_dates()
     preset = preset if preset in dict((k, 1) for k, _l, _n in _PRESETS) else ""
     date_from, date_to = _resolve_range(preset, start, end, dates)
-    on = {key: bool((filters or {}).get(key)) for key in _FILTERS}
+    allowed = _selected_outlets()
+    on = _filters_on(filters, allowed)
 
     overrides = load_summary_overrides()
-    days, total, counts, raw_total = _collect(date_from, date_to, word, overrides, on)
+    days, total, counts, raw_total = _collect(date_from, date_to, word, overrides, on, allowed)
     labels = load_labels()
     # 한 건 복사는 보고서와 같은 한 줄 형식을 쓴다(정기 설정 `/format`).
     line_template = load_settings().get("article_line_template", DEFAULT_ARTICLE_LINE_TEMPLATE)
@@ -473,12 +496,16 @@ def render_agency_archive_page(
     custom_badge = (
         f'<span class="qsep">직접 지정</span>' if current is None else ""
     )
+    # 체크한 언론사가 0곳이면 「선택 언론사만」은 잠근다 — 켜도 아무것도 안 걸러내는
+    # 칸을 누를 수 있게 두면 안 된다(오늘 전체 기사의 같은 이름 칸과 같은 규칙·같은 문구).
+    locked = {"major": not allowed}
     filter_html = "".join(
         (
             '<span class="fsep"></span>' if key == "nophoto" else ""
         ) + (
-            f'<label title="{html.escape(_FILTER_TIPS[key])}">'
+            f'<label title="{html.escape(_FILTER_LOCKED_TIP if locked.get(key) else _FILTER_TIPS[key])}">'
             f'<input type="checkbox" name="{key}" value="1"{" checked" if on[key] else ""}'
+            f'{" disabled" if locked.get(key) else ""}'
             ' onchange="this.form.submit()" />'
             f'{icon("camera") if key == "nophoto" else ""}{html.escape(label)}'
             f'<span class="n">{counts[count_key]}</span></label>'
@@ -580,9 +607,10 @@ def render_agency_archive_day_fragment(
     위 날짜와 아래 날짜가 서로 다른 목록이 된다. 그 날짜에 걸린 기사가 없으면 None(404) —
     holder가 그대로 남아 담당자가 다시 펼쳐볼 수 있다.
     """
-    on = {key: bool((filters or {}).get(key)) for key in _FILTERS}
+    allowed = _selected_outlets()
     days, _total, _counts, _raw = _collect(
-        "", "", (word or "").strip(), load_summary_overrides(), on,
+        "", "", (word or "").strip(), load_summary_overrides(),
+        _filters_on(filters, allowed), allowed,
         eager_budget=None, only_date=date_str,
     )
     if not days:

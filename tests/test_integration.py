@@ -4157,6 +4157,7 @@ def test_agency_archive_filters():
     from unittest.mock import patch
     from app import agency_archive, photo_body
     from app.agency_archive_renderer import render_agency_archive_page
+    from app.settings import save_outlet_selection
 
     day = datetime.now().strftime("%Y-%m-%d")
     photo_title = "발언하는 이형일 부총리"          # 제목 모양만으로 사진 추정에 걸린다
@@ -4169,8 +4170,14 @@ def test_agency_archive_filters():
          "outlet": "KBS", "summary": "재경부 사진", "pub_date": f"{day}T08:00:00+09:00"},
         {"url": "https://n.news.naver.com/mnews/article/004/4", "title": "재경부 예산 설명",
          "outlet": "KBS", "summary": "재경부", "pub_date": f"{day}T07:00:00+09:00"},
+        # 옛 고정 13곳엔 없지만 설정에서 체크할 수 있는 언론사 — (4)가 이 줄을 본다.
+        {"url": "https://n.news.naver.com/mnews/article/005/5", "title": "뉴스1 재경부 국감",
+         "outlet": "뉴스1", "summary": "재경부", "pub_date": f"{day}T06:00:00+09:00"},
     ]
     agency_archive._save_day({"date": day, "articles": articles, "last_seen": "", "collected_at": ""})
+    # 「선택 언론사만」은 설정 체크를 보므로 먼저 골라 둔다 — 0곳이면 그 칸은 잠기고
+    # 아무것도 안 거른다(아래 (4)에서 그 경우도 검증한다).
+    save_outlet_selection(["KBS", "뉴스1"])
 
     def rows(**filters):
         html_out = render_agency_archive_page(preset="7d", filters=filters)
@@ -4200,10 +4207,22 @@ def test_agency_archive_filters():
     mixed = render_agency_archive_page(preset="7d", filters={"flash": 1, "major": 1})
     assert "[속보] 재경부 추경 편성" not in mixed, "말머리와 언론사 칸은 AND여야 합니다"
 
-    # (4) 「주요 언론사만」은 고정 13곳(PRIORITY_OUTLETS)이지 설정 화이트리스트가 아니다.
+    # (4) 「선택 언론사만」은 설정 「언론사 선택 및 순서 지정」의 체크(outlet_order)를 본다.
+    # 화면마다 다른 목록을 쓰면 같은 이름의 칸이 화면마다 다른 답을 낸다.
+    from app import settings as settings_mod
     major = render_agency_archive_page(preset="7d", filters={"major": 1})
     assert "[단독] 재경부 세제 개편" in major and "블로그일보" not in major, \
-        "주요 언론사 판정이 PRIORITY_OUTLETS를 안 봅니다"
+        "「선택 언론사만」이 설정 체크(outlet_order)를 안 봅니다"
+    assert "뉴스1 재경부 국감" in major, \
+        "설정에서 체크한 언론사인데 「선택 언론사만」에서 빠졌습니다 — 화면마다 목록이 갈립니다"
+
+    # 체크한 언론사가 0곳이면 칸은 잠기고, 주소로 켜도 한 건도 안 사라진다.
+    saved = settings_mod.load_settings()
+    saved["outlet_order"] = []
+    settings_mod._write(saved)
+    empty = render_agency_archive_page(preset="7d", filters={"major": 1})
+    assert "블로그일보" in empty, "체크한 언론사가 0곳인데 「선택 언론사만」이 기사를 걸러냈습니다"
+    assert "disabled" in empty, "체크한 언론사가 0곳인데 칸이 안 잠겼습니다"
 
     # (5) 미루기 전에 걸러야 화면과 가져가기가 같은 목록을 본다.
     src = (Path(__file__).resolve().parent.parent / "app/agency_archive_renderer.py").read_text(encoding="utf-8")
@@ -4218,7 +4237,8 @@ def test_agency_archive_filters():
         "빠른 설정을 눌렀는데 날짜 칸이 이겼습니다"
     assert _current_preset(*week, dates) == "7d", "다시 조회했을 때 눌러 둔 칸이 꺼집니다"
 
-    print("49) 기관 기사 찾기 거르기: 통과 (원문 안 받음, 사진 빼기, 말머리 OR·칸끼리 AND, 자르기 전 필터, 빠른 설정)")
+    print("49) 기관 기사 찾기 거르기: 통과 (원문 안 받음, 사진 빼기, 말머리 OR·칸끼리 AND, "
+          "선택 언론사 = 설정 체크, 자르기 전 필터, 빠른 설정)")
 
 
 def test_agency_archive_keeps_every_date():
