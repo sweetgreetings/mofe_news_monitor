@@ -460,6 +460,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     font-size: var(--fs-xs); font-weight: 700; color: {text_soft}; background: {pill_bg}; border: 1px solid {border};
     border-radius: var(--r-pill); padding: 2px 4px 2px 10px; }}
   .cut-chip.done {{ padding-right: 10px; }}
+  .cut-chip.done.has-btn {{ padding-right: 4px; }}
   .cut-chip button {{ border: none; background: {card}; color: {accent}; border-radius: var(--r-pill); font-family: inherit;
     font-size: var(--fs-xs); font-weight: 600; padding: 1px 9px; cursor: pointer; }}
   .cut-chip button:hover {{ background: {hover}; }}
@@ -1027,8 +1028,8 @@ function syncCutPop(errText, syncInput) {{
     : !valid ? start + ' 뒤, ' + end + ' 전 시각만 고를 수 있어요.'
     : future ? sel + '이 되면 확정본이 만들어져요. 그 전엔 제목 옆 칩에서 취소할 수 있어요.'
     : ago > CUT_LONG_AGO_MIN ? sel + '은 ' + _cutAgoKr(ago) + ' 전이에요 — 그 뒤에 나온 기사는 '
-        + _cutKr(end) + ' 회차로 넘어가요. 오늘 회차라 지울 수 없어요.'
-    : '바로 확정본이 만들어져요. 오늘 회차라 지울 수 없어요.';
+        + _cutKr(end) + ' 회차로 넘어가요. 보내기 전이면 제목 옆 칩에서 되돌릴 수 있어요.'
+    : '바로 확정본이 만들어져요. 보내기 전이면 제목 옆 칩에서 되돌릴 수 있어요.';
   var ok = document.getElementById("cut-ok");
   ok.disabled = !valid;
   ok.textContent = "✂ " + sel + "까지 확정본으로";
@@ -1040,7 +1041,7 @@ function submitCut(btn) {{
   if (ago > CUT_LONG_AGO_MIN && !confirm(
       _cutSel + "은 지금(" + now + ")보다 " + _cutAgoKr(ago) + " 전이에요.\\n\\n"
       + _cutSel + " 뒤에 나온 기사는 이 확정본에 안 들어가고 " + _cutKr(pop.dataset.end) + " 회차로 넘어가요.\\n"
-      + "오늘 회차라 만든 뒤에는 지울 수 없어요.\\n\\n" + _cutSel + "까지로 확정본을 만들까요?")) return;
+      + "보내기 전이면 제목 옆 칩에서 되돌릴 수 있어요.\\n\\n" + _cutSel + "까지로 확정본을 만들까요?")) return;
   var at = _cutIsNow ? "" : _cutSel;
   btn.disabled = true;
   btn.textContent = "만드는 중…";
@@ -1053,6 +1054,29 @@ function submitCut(btn) {{
     try {{ sessionStorage.setItem(CUT_NOTICE_KEY, JSON.stringify({{ mode: res.mode, end: res.end, t: Date.now() }})); }} catch (e) {{}}
     location.reload();
   }}).catch(function () {{ syncCutPop("앱에 연결하지 못했어요. 잠시 뒤 다시 눌러 주세요.", true); }});
+}}
+function revertCut(btn) {{
+  // 확정본이 만들어진 끊기를 되돌린다 — 눌러 되살릴 자리가 눈앞에 없는 동작이라 한 번 되묻는다
+  // (보관함 「선택 삭제」와 같은 기준). 치운 회차는 정기 보관함의 「삭제함 · 되살리기」로 남는다.
+  var end = btn.getAttribute("data-end"), n = btn.getAttribute("data-count");
+  var start = btn.getAttribute("data-start"), restored = btn.getAttribute("data-restored");
+  if (!confirm(end + " 끊기를 되돌릴까요?\n\n"
+      + "· " + end + " 확정본(" + n + "건)을 휴지통으로 치웁니다.\n"
+      + "· 오늘 시간표가 " + start + "~" + restored + "으로 돌아갑니다.\n"
+      + "· 그 " + n + "건은 " + _cutKr(restored) + " 회차가 다시 모아요.")) return;
+  btn.disabled = true;
+  btn.textContent = "되돌리는 중…";
+  fetch("http://{settings_host}:{settings_port}/cut-round-cancel", {{
+    method: "POST",
+    headers: {{ "Content-Type": "application/x-www-form-urlencoded" }},
+    body: "end=" + encodeURIComponent(end),
+  }}).then(function (r) {{ return r.json(); }}).then(function (res) {{
+    if (!res.ok) {{ alert(res.reason || "되돌리지 못했어요."); btn.disabled = false; btn.textContent = "되돌리기"; return; }}
+    try {{ sessionStorage.setItem(CUT_NOTICE_KEY, JSON.stringify({{ mode: "reverted", end: end, restored: restored, t: Date.now() }})); }} catch (e) {{}}
+    location.reload();
+  }}).catch(function () {{
+    alert("앱에 연결하지 못했어요."); btn.disabled = false; btn.textContent = "되돌리기";
+  }});
 }}
 function cancelCut(btn) {{
   btn.disabled = true;
@@ -1080,6 +1104,8 @@ document.addEventListener("keydown", function (e) {{ if (e.key === "Escape") clo
   line.className = "cut-done-line";
   line.innerHTML = n.mode === "done"
     ? "✂ " + _cutKr(n.end) + " 확정본을 만들었어요. 이어지는 회차는 " + n.end + " 뒤 기사부터 모아요.<a href='{scrap_href}'>확정본 열기 →</a>"
+    : n.mode === "reverted"
+    ? "✂ " + n.end + " 끊기를 되돌렸어요. " + _cutKr(n.restored) + " 회차가 이어서 모아요.<a href='{scrap_href}'>확정본 열기 →</a>"
     : "✂ " + n.end + "에 끊도록 걸어 뒀어요. 그때 확정본이 만들어지고, 그 전엔 제목 옆 칩에서 취소할 수 있어요.";
   var head = document.querySelector(".preview-head");
   if (head && head.parentNode) head.parentNode.insertBefore(line, head.nextSibling);
@@ -2475,9 +2501,29 @@ def _cut_heading_html(slot: dict) -> str:
         )
     elif state["done"]:
         ends = " · ".join(html.escape(e) for e in state["done"])
+        revert, blocked = state.get("revert"), state.get("blocked")
+        # 되돌리기는 **발송 전 + 뒤 회차가 안 돈** 끊기 하나에만 붙는다(app.cut_round._revert_state).
+        # 못 하는 이유는 글자를 더 붙이지 않고 툴팁이 말한다 — 칩은 상태를 알려 주는 자리다.
+        tip = (
+            "이미 발송한 확정본이라 되돌릴 수 없어요 — 자정이 지나면 원래 수집 시간으로 돌아갑니다"
+            if blocked == "sent" else
+            "뒤 회차가 이미 수집돼 되돌릴 수 없어요 — 자정이 지나면 원래 수집 시간으로 돌아갑니다"
+            if blocked == "next" else
+            "오늘만 — 자정이 지나면 원래 수집 시간으로 돌아갑니다"
+        )
+        btn = ""
+        if revert:
+            # 끊기가 둘 이상이면 어느 쪽을 되돌리는지 글자에 적는다(「되돌리기」만으론 모른다).
+            label = f'{html.escape(revert["end"])} 되돌리기' if len(state["done"]) > 1 else "되돌리기"
+            btn = (
+                f'<button type="button" data-end="{html.escape(revert["end"])}" '
+                f'data-count="{int(revert["count"])}" data-start="{html.escape(revert["restored"]["start"])}" '
+                f'data-restored="{html.escape(revert["restored"]["end"])}" '
+                f'onclick="revertCut(this)">{label}</button>'
+            )
         chip = (
-            f'<span class="cut-chip done" title="오늘만 — 자정이 지나면 원래 수집 시간으로 돌아갑니다">'
-            f'✂ 오늘 {ends}에 끊음</span>'
+            f'<span class="cut-chip done{" has-btn" if btn else ""}" title="{tip}">'
+            f'✂ 오늘 {ends}에 끊음{btn}</span>'
         )
     return (
         '<button type="button" class="cut-btn" onclick="openCutPop(event)" '

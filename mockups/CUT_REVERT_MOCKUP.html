@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>끊기 되돌리기 시안</title>
+<style>
+  :root {
+    --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px;
+    --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+    --sh-pop: 0 6px 20px rgba(15, 23, 42, 0.12);
+    --sh-modal: 0 12px 32px rgba(15, 23, 42, 0.18);
+  }
+  body { margin: 0; background: #F8FAFC; color: #1F2937;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  .container { max-width: 800px; margin: 24px auto; padding: 0 24px 60px; }
+  h2.sec { font-size: var(--fs-lg); color: #1E3A5F; margin: 34px 0 6px; }
+  p.note { font-size: var(--fs-sm); color: #6B7280; margin: 0 0 12px; line-height: 1.6; }
+  .case { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 18px 20px; margin: 0 0 14px; }
+
+  /* ── 실제 초안 머리줄 (app/preview_renderer.py) ───────────────────────── */
+  .preview-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .preview-head h1 { position: relative; margin: 0; font-size: var(--fs-xl); color: #1E3A5F; font-weight: 700; }
+  .screen-tag { font-size: var(--fs-sm); font-weight: 700; color: #6B7280; background: #F3F4F6;
+    border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 2px 9px; margin-right: 8px; vertical-align: middle; }
+  .head-sub { margin-left: 8px; font-size: var(--fs-sm); font-weight: 400; color: #6B7280; }
+
+  .cut-btn { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; vertical-align: middle;
+    border: 1px solid transparent; background: transparent; color: #6B7280; border-radius: var(--r-md);
+    font-family: inherit; font-size: var(--fs-sm); font-weight: 600; padding: 1px 5px; cursor: pointer;
+    opacity: 0.45; transition: opacity .12s, background .12s; }
+  .cut-btn .lbl { display: none; font-size: var(--fs-xs); }
+  .cut-btn:hover { opacity: 1; color: #2563EB; border-color: #BFDBFE; background: #EFF6FF; }
+  .cut-btn:hover .lbl { display: inline; }
+
+  /* 끊은 상태 칩 — 지금 있는 것 그대로. 되돌리기 글자만 새로 붙는다. */
+  .cut-chip { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; vertical-align: middle;
+    font-size: var(--fs-xs); font-weight: 700; color: #4B5563; background: #F3F4F6; border: 1px solid #E5E7EB;
+    border-radius: var(--r-pill); padding: 2px 4px 2px 10px; }
+  .cut-chip.done { padding-right: 10px; }
+  .cut-chip.has-btn { padding-right: 4px; }
+  .cut-chip button { border: none; background: #FFFFFF; color: #2563EB; border-radius: var(--r-pill);
+    font-family: inherit; font-size: var(--fs-xs); font-weight: 600; padding: 1px 9px; cursor: pointer; }
+  .cut-chip button:hover { background: #EFF6FF; }
+
+  /* 되돌린 뒤 안내줄 — 끊은 뒤 뜨는 .cut-done-line과 같은 모양 */
+  .cut-done-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #EFF6FF;
+    border: 1px solid #BFDBFE; color: #1E3A5F; border-radius: var(--r-lg); padding: 9px 12px;
+    font-size: var(--fs-md); margin: 14px 0 0; }
+  .cut-done-line a { margin-left: auto; color: #2563EB; font-weight: 600; text-decoration: none; }
+
+  /* 확인창 — 브라우저 confirm()이라 모양은 OS가 그린다. 문구만 보여주는 상자. */
+  .confirm-box { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+    box-shadow: var(--sh-modal); padding: 16px 18px; max-width: 460px; font-size: var(--fs-md); line-height: 1.7; }
+  .confirm-box .ttl { font-weight: 700; color: #1E3A5F; margin-bottom: 8px; }
+  .confirm-box pre { margin: 0; font: inherit; white-space: pre-wrap; color: #1F2937; }
+  .confirm-box .btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .confirm-box .btns button { height: 30px; padding: 0 14px; border-radius: var(--r-md); font-family: inherit;
+    font-size: var(--fs-md); cursor: pointer; }
+  .confirm-box .btns .cancel { border: 1px solid #E5E7EB; background: #FFFFFF; color: #4B5563; }
+  .confirm-box .btns .go { border: 1px solid #2563EB; background: #2563EB; color: #FFFFFF; font-weight: 600; }
+
+  .why { font-size: var(--fs-sm); color: #6B7280; margin: 8px 0 0; line-height: 1.6; }
+  .why b { color: #1F2937; }
+  .tipline { font-size: var(--fs-xs); color: #6B7280; margin-top: 6px; }
+  code { background: #F3F4F6; border-radius: var(--r-sm); padding: 1px 5px; font-size: 0.92em; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h2 class="sec" style="margin-top: 8px;">① 예약 — 지금 있는 것 (안 바뀜)</h2>
+  <p class="note">앞 시각으로 걸어 두면 아직 아무 일도 안 일어났다. 그래서 「취소」다.</p>
+  <div class="case">
+    <header class="preview-head"><h1>
+      <span class="screen-tag">초안</span>언론 모니터링 16시 기준<span class="head-sub">(예정, 지금 15시 01분 기준)</span>
+      <button type="button" class="cut-btn" title="오늘만 — 이 시간까지 확정본으로 넣고, 뒤 기사는 원래 회차가 이어서 모읍니다">✂<span class="lbl">여기서 끊기</span></button>
+      <span class="cut-chip" title="오늘만 — 16:00이 되면 확정본이 만들어집니다">✂ 오늘만 16:00에 끊음<button type="button">취소</button></span>
+    </h1></header>
+  </div>
+
+  <h2 class="sec">② 확정본이 됐고 아직 안 보냄 — 새로 붙는 「되돌리기」</h2>
+  <p class="note">일이 이미 일어났으니 「취소」가 아니라 <b>「되돌리기」</b>다(앱이 ↩·휴지통에서 쓰는 말과 같다). 자리는 그 칩 안이고 새 자리를 만들지 않는다.</p>
+  <div class="case">
+    <header class="preview-head"><h1>
+      <span class="screen-tag">초안</span>언론 모니터링 17시 기준<span class="head-sub">(예정, 지금 15시 01분 기준)</span>
+      <button type="button" class="cut-btn" title="오늘만 — 이 시간까지 확정본으로 넣고, 뒤 기사는 원래 회차가 이어서 모읍니다">✂<span class="lbl">여기서 끊기</span></button>
+      <span class="cut-chip done has-btn" title="오늘만 — 자정이 지나면 원래 수집 시간으로 돌아갑니다">✂ 오늘 15:00에 끊음<button type="button">되돌리기</button></span>
+    </h1></header>
+    <p class="why"><b>누르면 한 번 되묻는다</b> — 눌러 되살릴 자리가 눈앞에 없는 동작이라(보관함 「선택 삭제」와 같은 기준):</p>
+    <div class="confirm-box" style="margin-top: 10px;">
+      <div class="ttl">localhost:8765</div>
+      <pre>15:00 끊기를 되돌릴까요?
+
+· 15:00 확정본(36건)을 휴지통으로 치웁니다.
+· 오늘 시간표가 14:00~17:00으로 돌아갑니다.
+· 그 36건은 17시 회차가 다시 모아요.</pre>
+      <div class="btns"><button class="cancel">취소</button><button class="go">확인</button></div>
+    </div>
+    <p class="why" style="margin-top: 12px;">되돌리고 나면 끊은 뒤와 같은 자리에 안내줄이 한 번 뜬다:</p>
+    <div class="cut-done-line">✂ 15:00 끊기를 되돌렸어요. 17시 회차가 14:00부터 이어서 모아요.<a href="#">정기 보관함 열기 →</a></div>
+  </div>
+
+  <h2 class="sec">③ 이미 보낸 확정본 — 되돌리기를 안 그린다</h2>
+  <p class="note">나간 보고서를 없던 일로 만들 수 없고, 발송 기록에 주인 없는 줄이 남는다. 칩은 지금 모양 그대로 두고, <b>왜 안 되는지는 툴팁이 말한다</b>(칩에 글자를 더 붙이지 않는다).</p>
+  <div class="case">
+    <header class="preview-head"><h1>
+      <span class="screen-tag">초안</span>언론 모니터링 17시 기준<span class="head-sub">(예정, 지금 15시 20분 기준)</span>
+      <button type="button" class="cut-btn">✂<span class="lbl">여기서 끊기</span></button>
+      <span class="cut-chip done" title="15:00 확정본은 이미 발송해서 되돌릴 수 없어요 — 자정이 지나면 원래 수집 시간으로 돌아갑니다">✂ 오늘 15:00에 끊음</span>
+    </h1></header>
+    <p class="tipline">▸ 마우스를 올리면: 「15:00 확정본은 이미 발송해서 되돌릴 수 없어요 — 자정이 지나면 원래 수집 시간으로 돌아갑니다」</p>
+  </div>
+
+  <h2 class="sec">④ 뒤 회차가 이미 돌았다 — 가장 최근 끊기 하나만 되돌린다</h2>
+  <p class="note">15:00과 16:00을 둘 다 끊었고 16:00이 이미 수집됐으면, 그 36건은 16:00 확정본에서 빠진 채로 굳었다. 그래서 15:00은 잠긴다 — 되돌릴 수 있는 건 <b>맨 뒤 끊기 하나</b>다.</p>
+  <div class="case">
+    <header class="preview-head"><h1>
+      <span class="screen-tag">초안</span>언론 모니터링 17시 기준<span class="head-sub">(예정, 지금 16시 10분 기준)</span>
+      <button type="button" class="cut-btn">✂<span class="lbl">여기서 끊기</span></button>
+      <span class="cut-chip done has-btn" title="오늘만 — 자정이 지나면 원래 수집 시간으로 돌아갑니다">✂ 오늘 15:00 · 16:00에 끊음<button type="button">16:00 되돌리기</button></span>
+    </h1></header>
+    <p class="tipline">▸ 끊기가 둘 이상이면 되돌릴 시각을 글자에 적는다(「되돌리기」만 적으면 어느 쪽인지 모른다). 하나뿐일 땐 ②처럼 「되돌리기」.</p>
+  </div>
+
+  <h2 class="sec">⑤ 하루가 지나면 이 버튼은 없다</h2>
+  <p class="note">자정이 지나면 시간표는 저절로 원래대로 돌아가고, 남은 회차는 <b>정기 보관함의 🗑</b>가 맡는다(오늘 잠금이 내일 풀린다). 그래서 이 되돌리기가 받치는 건 「끊은 당일」 하나다 — 어제 이전 끊기엔 칩도 안 뜬다.</p>
+
+</div>
+</body>
+</html>

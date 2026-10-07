@@ -2916,7 +2916,7 @@ def test_today_cut_round():
          끊은 시각 뒤에 게시된 기사는 빠진다
       3) 끊는 순간 원래 회차 이름의 기록(이름표·메모·초안에 보인 기사)이 새 회차로 넘어간다
       4) 앞 시각이면 예약만 하고, 취소하면 그동안 다듬은 기록이 원래 회차로 돌아간다
-      5) 이미 확정본이 된 끊기는 취소할 수 없다 · 회차 밖 시각은 거절한다
+      5) 확정본이 된 끊기도 보내기 전·뒤 회차 전이면 되돌아간다(회차 파일까지) · 회차 밖 시각은 거절
       6) 예약 회차가 수집되면 기록이 이어지는 회차로 넘어간다(after_round_collected)
     """
     from datetime import time as dt_time
@@ -3043,17 +3043,54 @@ def test_today_cut_round():
             "예약 중에 고친 이름표가 원래 회차로 안 돌아감"
         )
 
-        # 5) 거절
-        for bad, why in (("15:30", "이미 확정본이 된 끊기"), ("18:00", "회차 밖 시각")):
-            try:
-                if why.startswith("이미"):
-                    cut_round.cancel_cut(bad, now=now2)
-                else:
-                    cut_round.cut_round(bad, now=now2)
-            except cut_round.CutError:
-                pass
-            else:
-                raise AssertionError(f"{why}({bad})를 거절하지 않았음")
+        # 5) 거절 — 회차 밖 시각
+        try:
+            cut_round.cut_round("18:00", now=now2)
+        except cut_round.CutError:
+            pass
+        else:
+            raise AssertionError("회차 밖 시각(18:00)을 거절하지 않았음")
+
+        # 5-1) 되돌리기가 막히는 두 경우 — 이미 발송했거나, 뒤 회차가 이미 돌았거나
+        run_file = storage.ARTICLES_DIR / f"{today_s}_15-30.json"
+        saved_run = json.loads(run_file.read_text(encoding="utf-8"))
+        run_file.write_text(json.dumps({**saved_run, "send_count": 1}, ensure_ascii=False), encoding="utf-8")
+        assert cut_round.cut_state(now2)["blocked"] == "sent", "발송한 확정본인데 되돌리기가 열렸음"
+        try:
+            cut_round.cancel_cut("15:30", now=now2)
+        except cut_round.CutError:
+            pass
+        else:
+            raise AssertionError("이미 발송한 확정본을 되돌렸음")
+        run_file.write_text(json.dumps(saved_run, ensure_ascii=False), encoding="utf-8")
+
+        storage.save_run("17:00", [], run_at=f"{today_s}T17:00:05")
+        assert cut_round.cut_state(now2)["blocked"] == "next", "뒤 회차가 돌았는데 되돌리기가 열렸음"
+        try:
+            cut_round.cancel_cut("15:30", now=now2)
+        except cut_round.CutError:
+            pass
+        else:
+            raise AssertionError("뒤 회차가 이미 수집됐는데 되돌렸음")
+        (storage.ARTICLES_DIR / f"{today_s}_17-00.json").unlink()
+
+        # 5-2) 되돌리기 — 끊기 한 줄과 회차 파일이 **함께** 사라지고 시간표가 돌아간다
+        state = cut_round.cut_state(now2)
+        assert state["revert"] == {"end": "15:30", "count": 2,
+                                   "restored": {"start": "14:00", "end": "17:00"}}, state["revert"]
+        with patch.object(confirm_send, "refresh_confirmed_screens", MagicMock()):
+            reverted = cut_round.cancel_cut("15:30", now=now2)
+        assert reverted == {"mode": "reverted", "end": "15:30", "restored": "17:00"}, reverted
+        assert not run_file.exists(), "되돌렸는데 회차 파일이 남아 있음 — 시간표 밖 고아 확정본이 된다"
+        assert today_cuts.cut_origin(today_s, "15:30") is None, "되돌렸는데 끊기가 남음"
+        assert settings.active_schedule_times(st, now2) == windows, "시간표가 끊기 전으로 안 돌아감"
+        assert any(d["run_slot"] == "15:30" for d in storage.list_deleted_runs()), (
+            "되돌린 회차가 휴지통에 없음 — 잘못 눌렀을 때 되살릴 길이 사라진다"
+        )
+        seen_back = json.loads(draft_seen.DRAFT_SEEN_FILE.read_text())
+        assert seen_back["round_id"] == [today_s, "17:00"], (
+            f"초안에 보인 기사 목록이 원래 회차로 안 돌아감: {seen_back['round_id']}"
+        )
 
         # 6) 예약 회차가 제시각에 수집되면 기록이 이어지는 회차로
         today_cuts.add_cut(today_s, "16:45", "17:00")
@@ -3063,7 +3100,7 @@ def test_today_cut_round():
         today_cuts.after_round_collected({"run_at": f"{today_s}T16:45:05", "run_slot": "16:45"})
         assert json.loads(labels_file.read_text())[f"{today_s}|17:00"] == {"AI 이름": "끊는 회차에서 고친 이름"}
 
-    print("오늘만 회차 끊기: 통과 (시간표 끼우기·초안 기사로 즉시 확정본 저장·예약·취소·기록 이어 쓰기)")
+    print("오늘만 회차 끊기: 통과 (시간표 끼우기·초안 기사로 즉시 확정본 저장·예약·취소·되돌리기·기록 이어 쓰기)")
 
 
 

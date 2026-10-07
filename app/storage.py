@@ -453,18 +453,27 @@ def run_lock_reason(date_str: str, run_slot: str, metas: Optional[list] = None,
 
 
 def delete_run(date_str: str, run_slot: str, stamp: Optional[str] = None,
-               now: Optional[datetime] = None) -> bool:
+               now: Optional[datetime] = None, for_cut_revert: bool = False) -> bool:
     """정기 보관함의 회차 하나를 trash로 옮긴다. 그 회차가 없으면 False.
 
     지우면 안 되는 회차(run_lock_reason)는 RunLockedError — 화면이 애초에 🗑를 안 그리지만,
     열어둔 옛 탭에서 눌릴 수 있으므로 서버가 한 번 더 막는다.
     stamp: 지운 시각("YYYYMMDDHHMMSS"). 여러 개를 한 번에 지울 때 같은 값을 넘기면 한 묶음이 된다.
+
+    for_cut_revert: 「✂ 오늘만 여기서 끊기」 되돌리기(app.cut_round.cancel_cut)만 참으로 넘긴다.
+    두 잠금 이유가 거기선 둘 다 성립하지 않기 때문이고, **그 이유가 성립하게 만드는 것은
+    되돌리기의 순서다** — 다른 자리에서 이 인자를 쓰면 잠금이 그냥 뚫린다:
+    - "today": 되돌리기는 **끊기를 시간표에서 먼저 뺀 뒤** 이 함수를 부른다. 그 회차가 오늘
+      시간표에 아예 없으니 스케줄러가 "안 돈 회차"로 보고 다시 모으지 않는다.
+    - "latest": 되돌리기는 **한 번도 발송하지 않은** 회차만 다루고, 그 앞 회차는 같은 날 더
+      이른 회차다 — 자동발송 유예가 이미 끝난 뒤라 "어제 회차가 자동발송 대상이 된다"는
+      그 위험이 없다.
     """
     now = now or datetime.now()
     stamp = stamp or now.strftime("%Y%m%d%H%M%S")
     with _run_trash_lock:
         metas = list_run_meta()
-        reason = run_lock_reason(date_str, run_slot, metas, now)
+        reason = None if for_cut_revert else run_lock_reason(date_str, run_slot, metas, now)
         if reason:
             raise RunLockedError(reason)
         meta = next(

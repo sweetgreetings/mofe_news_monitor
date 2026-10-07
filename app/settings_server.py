@@ -6959,15 +6959,25 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         self._respond_json({"ok": True, **result})
 
     def _handle_cut_round_cancel(self, form: dict) -> None:
-        """머리줄 칩 「✂ 오늘만 16:00에 끊음 · 취소」가 부른다(app.cut_round.cancel_cut)."""
+        """머리줄 칩의 「취소」·「되돌리기」가 부른다(app.cut_round.cancel_cut).
+
+        둘이 같은 주소인 이유는 하는 일이 같기 때문이다 — 끊기 전으로 돌린다. 아직 안 온
+        끊기면 시간표에서 한 줄 빼는 것으로 끝나고(mode=pending), 확정본이 이미 만들어졌으면
+        그 회차 파일까지 치운다(mode=reverted). 거절하면 200 + ok=false + 이유
+        (CODING_CONVENTIONS §3 — 담당자가 누른 동작이 조용히 사라지면 안 된다).
+        """
         from app.cut_round import CutError, cancel_cut
 
         try:
-            cancel_cut(form.get("end", [""])[0].strip())
+            result = cancel_cut(form.get("end", [""])[0].strip())
         except CutError as e:
             self._respond_json({"ok": False, "reason": str(e)})
             return
-        self._respond_json({"ok": True})
+        except Exception:
+            logger.exception("오늘만 회차 끊기 되돌리기 실패")
+            self._respond_json({"ok": False, "reason": "되돌리지 못했어요. 잠시 뒤 다시 눌러 주세요."})
+            return
+        self._respond_json({"ok": True, **result})
 
     def _handle_add_article_by_url(self, form: dict) -> None:
         """초안의 "+ 수기로 기사 추가"가 fetch로 호출한다 — 담당자가 네이버에서 직접
