@@ -135,8 +135,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .highlight-add-form input {{ flex: 1; font-size: var(--fs-md); padding: 5px 8px; min-width: 0; }}
   .highlight-add-form button {{ font-size: var(--fs-sm); padding: 5px 10px; white-space: nowrap; }}
   .live-head {{ display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }}
-  .live-badge {{ display: inline-flex; align-items: center; gap: 6px; color: {error}; font-size: var(--fs-xl); font-weight: 600; }}
-  .pulse {{ width: 8px; height: 8px; border-radius: var(--r-circle); background: {error}; }}
+  /* 화면 제목 — 다른 화면과 같은 --fs-xl·제목색이다. 예전엔 붉은 「● 실시간」 배지였는데,
+     화면 이름이 「오늘 전체 기사」라 제목도 그 이름을 쓴다(상단바 칩·탭 제목과 같은 말).
+     빨강은 오류와 [단독]·[속보]의 색이라 제목이 가져가지 않고, 붉은 점도 같이 뗐다. */
+  .live-badge {{ display: inline-flex; align-items: center; gap: 6px; color: {header}; font-size: var(--fs-xl); font-weight: 600; }}
   .refresh-btn {{
     background: {card}; color: {accent}; border: 1px solid {accent}; border-radius: var(--r-md);
     padding: 7px 14px; font-size: var(--fs-md); font-weight: 500; text-decoration: none; white-space: nowrap;
@@ -269,6 +271,13 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     padding: 4px; box-shadow: var(--sh-pop);
   }}
   .more-wrap.is-open .more-menu {{ display: block; }}
+  /* ⋯ 메뉴를 연 행은 또렷해지고 위로 뜬다 — 상태가 있는 행(✔️ 스크랩됨·📌 담아둠·
+     🤖 자동 선별)의 opacity: 0.86이 쌓임 맥락을 만들어, 그 안의 메뉴는 z-index를
+     아무리 올려도 행 밖으로 못 나왔다. 그래서 메뉴가 반투명해지고 아랫줄·시간대
+     머리줄에 깔려 둘째 항목이 가려졌다. opacity를 1로 되돌려 맥락을 풀고(메뉴 글자도
+     흐려지지 않는다) 행 자체를 떠 있는 것들 높이로 올린다.
+     확정본·초안의 .article.is-photo:has(.more-wrap.is-open)과 같은 처방이다. */
+  .live-row:has(.more-wrap.is-open) {{ position: relative; z-index: 30; opacity: 1; }}
   .more-menu button {{
     display: block; width: 100%; text-align: left; background: transparent; border: none;
     padding: 8px 10px; border-radius: var(--r-sm); font-size: var(--fs-md); color: {text};
@@ -541,7 +550,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 {topnav_html}
 <div class="container">
   <div class="live-head">
-    <span class="live-badge"><span class="pulse"></span> 실시간{head_stat_html}</span>
+    <span class="live-badge">오늘 전체 기사{head_stat_html}</span>
     <div class="live-head-actions">{auto_refresh_html}{refresh_button_html}</div>
   </div>
   {new_strip_html}
