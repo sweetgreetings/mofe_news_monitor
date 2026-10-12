@@ -33,8 +33,9 @@ from app.config import (
 from app.atomic_write import atomic_write_text
 from app.alerted_urls import alerted_items, already_alerted_urls
 from app.credentials import llm_is_configured, naver_is_configured
-from app.curation import filter_hidden
+from app.curation import display_group_name, filter_hidden, load_group_labels
 from app.filters import is_schedule_listing
+from app.llm_classifier import ETC_GROUP_NAME, round_id_for_run
 from app.home_trend import load_trend_words
 from app.icons import icon
 from app.settings import load_settings
@@ -885,11 +886,20 @@ def _issue_streams(articles: list) -> list:
     "기타"와 통신사 정형 일정 나열 기사([오늘의 주요일정] 류, app.filters.
     is_schedule_listing)는 대상에서 뺀다 — 확정본·수집엔 그대로 남고, 이 순위
     계산에서만 뺀다.
+
+    **묶는 것도 "기타"를 가리는 것도 화면에 보이는 이름(display_group)으로 한다**
+    — app.group_order._lock_rank가 "기타는 맨 뒤 고정"을 이름표 적용 후에 판단하는
+    것과 같은 기준이다. 저장된 원래 이름으로 보면 두 가지가 한꺼번에 샌다:
+    담당자가 직접 만든 "기타"의 속이름("기타 (5)" — 같은 회차에 이미 "기타"가 있어
+    app.custom_groups.unique_key가 지은 것)이 정확일치를 빠져나가 짬뽕 칸이 순위에
+    올라오고, 회차를 잇는 근거인 이름표를 못 봐서 같은 사안이 갈라진다(실측
+    2026-10-12: "대외경제장관회의"+"공급망 안보 및 경제안보품목 확대" 5건·5건으로
+    갈라졌던 것이 이름표 "…(지속)"으로 묶여 8건 한 줄).
     """
     streams: list = []
     for a in articles:
-        name = a.get("group")
-        if not name or name == "기타" or is_schedule_listing(a.get("title", "")):
+        name = a.get("display_group") or a.get("group")
+        if not name or name.strip() == ETC_GROUP_NAME or is_schedule_listing(a.get("title", "")):
             continue
         tokens = _name_tokens(name)
         hit = None
@@ -1166,14 +1176,26 @@ def _today_label(last_run: Optional[dict]) -> str:
 
 
 def _report_articles(runs: list) -> list:
-    """회차들의 기사를 숨김 제외·URL 중복 제거해 한 목록으로 모은다(오늘의 주요 주제 입력)."""
+    """회차들의 기사를 숨김 제외·URL 중복 제거해 한 목록으로 모은다(오늘의 주요 주제 입력).
+
+    **화면 이름을 여기서 입혀 `display_group`으로 들려 보낸다** — 이름표는 회차
+    단위라(app.curation.load_group_labels) 회차를 합치고 나면 어느 회차 이름표를
+    봐야 할지 알 수 없다. 합치기 전, 회차마다 한 번만 읽어 입힌다.
+
+    저장된 기사 dict는 건드리지 않는다(얕은 복사) — 같은 dict를 남색 카드
+    (_board_card_html)도 보고, 여기서 키를 더하면 그쪽으로 샌다.
+    """
     seen_urls: set = set()
     articles: list = []
     for run in runs:
+        labels = load_group_labels(round_id_for_run(run))
         for article in filter_hidden(run["articles"]):
-            if article["url"] not in seen_urls:
-                seen_urls.add(article["url"])
-                articles.append(article)
+            if article["url"] in seen_urls:
+                continue
+            seen_urls.add(article["url"])
+            tagged = dict(article)
+            tagged["display_group"] = display_group_name(article.get("group") or "", labels)
+            articles.append(tagged)
     return articles
 
 
