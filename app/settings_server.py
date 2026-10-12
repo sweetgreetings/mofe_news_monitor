@@ -1936,6 +1936,7 @@ _FORMAT_TEMPLATE = (
   <h1>📃 {flow_name} · 기사 제목 형식</h1>
   <p class="hint">
     {flow_scope}의 복사·txt·발송 텍스트에서 기사 첫 줄의 형식을 바꿀 수 있습니다.<br>
+    {flow_also}<br>
     <code>{{outlet}}</code>은 언론사명, <code>{{title}}</code>은 기사 제목으로 바뀝니다.<br>
     ※ 두 자리표시자를 각각 정확히 1번씩 포함해야 합니다. 아래 URL 줄과 "발행일 미표시"는
     이 설정과 무관하게 항상 고정입니다.
@@ -1959,12 +1960,20 @@ _FORMAT_FLOWS = {
     "regular": {
         "name": "정기", "scope": "정기 초안·확정본·보관함",
         "sub_where": "화면·복사·내보내기",
+        # 정기 값이 곧 앱의 기본 모양이라 흐름 밖 화면도 전부 이걸 쓴다 — 적용 범위를
+        # 적어 두지 않으면 「정기」라는 묶음 이름 때문에 정기 보고서 전용으로 읽힌다.
+        "line_also": "오늘 전체 기사·기관 기사 찾기·라벨 보관함·홈 목록의 복사와 "
+                     "[단독]·[속보] 알림도 같은 형식입니다 — 수시 모니터링만 따로 정합니다.",
+        "sub_also": "라벨 보관함의 라벨 이름 머리줄도 같은 형식입니다 — "
+                    "수시 모니터링만 따로 정합니다.",
         "line_key": "article_line_template", "sub_key": "subheading_format_template",
         "line_path": "/format", "sub_path": "/subheading-format",
     },
     "adhoc": {
         "name": "수시", "scope": "수시 확정본·보관함",
         "sub_where": "복사·txt·발송 텍스트",
+        "line_also": "수시 화면에서만 씁니다 — 나머지 화면은 모두 정기 형식을 따릅니다.",
+        "sub_also": "수시 화면에서만 씁니다 — 나머지 화면은 모두 정기 형식을 따릅니다.",
         "line_key": "adhoc_article_line_template", "sub_key": "adhoc_subheading_format_template",
         "line_path": "/format-adhoc", "sub_path": "/subheading-format-adhoc",
     },
@@ -1987,6 +1996,7 @@ def render_format_page(settings: dict, error: str = "", flow: str = "regular") -
         **_theme(),
         flow_name=spec["name"],
         flow_scope=spec["scope"],
+        flow_also=html.escape(spec["line_also"]),
         save_path="/save-" + spec["line_path"].lstrip("/"),
         error_html=error_html,
         template_value=html.escape(template),
@@ -2023,6 +2033,7 @@ _SUBHEADING_FORMAT_TEMPLATE = (
   <h1>📃 {flow_name} · 소제목 형식</h1>
   <p class="hint">
     {flow_scope}의 소제목을 {sub_where}에 보여줄 형식을 바꿀 수 있습니다.<br>
+    {flow_also}<br>
     <code>{{section}}</code>이 소제목 이름으로 바뀝니다 (기본값 <code>&lt;{{section}}&gt;</code>).<br>
     ※ <code>{{section}}</code>을 정확히 1번 포함해야 합니다. 직접 고친 소제목 이름에는
     앱이 괄호를 덧붙이지 않고 쓴 그대로를 씁니다.
@@ -2050,6 +2061,7 @@ def render_subheading_format_page(settings: dict, error: str = "", flow: str = "
         **_theme(),
         flow_name=spec["name"],
         flow_scope=spec["scope"],
+        flow_also=html.escape(spec["sub_also"]),
         sub_where=spec["sub_where"],
         save_path="/save-" + spec["sub_path"].lstrip("/"),
         error_html=error_html,
