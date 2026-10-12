@@ -21,7 +21,7 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app import agency_archive, alerted_urls, config, credentials, api_usage, breaking_alert, breaking_alert_sender, breaking_alert_state, confirm_send, curation, custom_groups, draft_articles, draft_seen, history_renderer, landing_renderer, llm_classifier, naver_api, preview_cache, preview_order, preview_renderer, renderer, scheduler, scraper, settings, storage, telegram_bot, telegram_recipients, negative_guess, today_cuts, auto_classify_turn, photo_body, breaking_burst, send_log, photo_overrides  # noqa: E402
+from app import agency_archive, alerted_urls, config, credentials, api_usage, breaking_alert, breaking_alert_sender, breaking_alert_state, confirm_send, curation, custom_groups, draft_articles, draft_seen, history_renderer, landing_renderer, llm_classifier, naver_api, preview_cache, preview_order, preview_renderer, renderer, scheduler, scraper, settings, storage, telegram_bot, telegram_recipients, negative_guess, today_cuts, auto_classify_turn, photo_body, breaking_burst, send_log, photo_overrides, manual_keyword_note  # noqa: E402
 import main  # noqa: E402
 
 _FIXTURE_BY_KEYWORD = {
@@ -4999,6 +4999,9 @@ if __name__ == "__main__":
                     # 기관 기사 원장 — 테스트가 쓴 가짜 날짜가 실제 data/agency_archive/에
                     # 남으면 담당자 화면에 그대로 보인다(스케줄러 테스트가 실제로 그랬다).
                     (agency_archive, "AGENCY_ARCHIVE_DIR", tmp_dir / "agency_archive"),
+                    # 한 줄 메모 — 격리하지 않으면 실제 data/를 읽어, 오늘 그 회차에 메모를
+                    # 써 둔 날에만 화면 테스트가 실패한다(메모가 있으면 툴바 버튼이 안 그려진다).
+                    (manual_keyword_note, "MANUAL_KEYWORD_NOTE_FILE", tmp_dir / "manual_keyword_note.json"),
                     # 담당자가 직접 끈 사진 추정 — 경로와 함께 메모리 캐시도 비운다
                     # (서명으로 캐시하므로 앞 테스트의 값이 남으면 다음 테스트가 그걸 읽는다).
                     (photo_overrides, "PHOTO_OVERRIDES_FILE", tmp_dir / "photo_overrides.json"),
