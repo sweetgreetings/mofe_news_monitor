@@ -7330,19 +7330,24 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def _handle_edit_summary(self, form: dict) -> None:
-        """✏️ 직접 수정 버튼이 fetch로 호출한다(editSummary) — 🔄가 원문에서도 못 찾는
-        경우의 최후 수단으로, 사용자가 직접 타이핑한 제목·요약을 그대로 저장한다.
-        저장 형식·적용 범위는 🔄와 완전히 같다(app.summary_overrides, 부분 저장 —
-        비워둔 칸은 기존 값을 그대로 둔다).
+        """✏️ 「기사 정보 직접 수정」이 fetch로 호출한다(editSummary) — 🔄가 원문에서도
+        못 찾는 경우의 최후 수단으로, 담당자가 직접 타이핑한 언론사·제목·요약을 그대로
+        저장한다. 저장 형식·적용 범위는 🔄와 완전히 같다(app.summary_overrides, 부분
+        저장 — 비워둔 칸은 기존 값을 그대로 둔다).
+
+        언론사 칸은 자체 도메인 기사라 이름을 못 찾아 도메인 문자열이 찍힐 때 쓴다
+        (보고서 한 줄로 그대로 나가는 값이다). 🔄는 제목·요약만 읽으므로 언론사를
+        고치는 길은 이 창 하나뿐이다.
         """
         url = form.get("url", [""])[0]
         title = form.get("title", [""])[0].strip()
         summary = form.get("summary", [""])[0].strip()
-        if not url or not (title or summary):
+        outlet = form.get("outlet", [""])[0].strip()
+        if not url or not (title or summary or outlet):
             self.send_response(400)
             self.end_headers()
             return
-        set_summary_override(url, title or None, summary or None)
+        set_summary_override(url, title or None, summary or None, outlet or None)
         self._regenerate_screens()
         self.send_response(204)
         self.end_headers()
@@ -7355,7 +7360,7 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         (URL 키 전역)이고, 판정에 입히는 자리는 looks_like_photo_caption() 맨 앞
         한 곳이라 화면·건수·수시 「사진 제외」가 저절로 따라온다.
 
-        되돌리기(app.undo) 대상이 아니다 — 「기사제목 직접 수정」과 같은 성격이고
+        되돌리기(app.undo) 대상이 아니다 — 「기사 정보 직접 수정」과 같은 성격이고
         (보고서 편집이 아니라 기사에 관한 사실), 되돌리는 자리는 같은 ⋯ 메뉴 안에
         바로 생긴다. 확정본은 정적 파일이라 다시 그려야 다음 접속에도 반영된다.
         """

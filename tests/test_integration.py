@@ -4111,6 +4111,88 @@ def test_search_operator_is_one_rule():
         "띄어쓰기가 덩어리로 검색됩니다."
     )
 
+def test_outlet_override_is_one_place():
+    """언론사명 직접 수정 — **입히는 자리가 `apply_summary_overrides()` 한 곳**인지.
+
+    네이버 미러가 아닌 언론사 자체 도메인 기사는 oid가 없어 resolve_outlet이 이름을 못 찾고
+    도메인 문자열(aienews.co.kr)을 그대로 돌려준다. 그 값은 제목과 달리 **보고서 한 줄
+    (`ㅇ (언론사) 제목`)과 엑셀 「언론사명」으로 그대로 나가므로** 담당자가 고칠 길이 있어야
+    하고, 「이 기사의 언론사가 무엇인가」는 제목과 같은 **기사에 관한 사실**이라 같은 칸
+    (summary_overrides, URL 키 전역)에 산다.
+
+    핵심은 저장이 아니라 **입히는 자리가 한 곳**이라는 것이다 — 화면·복사·txt·발송·엑셀이
+    코드를 더 안 고쳐도 따라온다. 화면마다 따로 입히면 "화면엔 고친 이름, 보고서엔 도메인"
+    이라는 어긋남이 생긴다(사진 추정 해제·숨김 판정에서 이미 세워둔 규칙이다).
+
+    같이 보는 것: 부분 저장(언론사만 고쳐도 제목·요약은 그대로) · 편집 창 네 벌이 안
+    어긋나는지(editSummary JS가 파일마다 복제돼 있다).
+    """
+    _require_isolation()
+    from app import summary_overrides as so
+
+    url = "https://aienews.co.kr/news/articleView.html?idxno=12345"
+    article = {"outlet": "aienews.co.kr", "title": "가상자산 과세 2027년 시행 앞두고 기류 변화",
+               "url": url, "summary": "2027년 시행을 앞둔 가상자산 과세를 두고 유예론이 나온다.",
+               "pub_date": "2026-10-12T12:47:00+09:00", "group": "세제"}
+
+    with tempfile.TemporaryDirectory() as tmp, \
+         patch.object(so, "SUMMARY_OVERRIDES_FILE", Path(tmp) / "overrides.json"):
+        # (1) 언론사만 고친다 — 제목·요약은 손대지 않는다(부분 저장).
+        so.set_summary_override(url, None, None, "AI뉴스")
+        saved = so.load_summary_overrides()[url]
+        assert saved == {"outlet": "AI뉴스"}, saved
+
+        # (2) 입히는 자리 한 곳이 그걸 입힌다 — 나머지 필드는 그대로.
+        applied = so.apply_summary_overrides([article])[0]
+        assert applied["outlet"] == "AI뉴스", applied["outlet"]
+        assert applied["title"] == article["title"], "제목이 같이 바뀌면 안 됩니다"
+        assert applied["pub_date"] == article["pub_date"], "발행시각이 같이 바뀌면 안 됩니다"
+
+        # (3) 화면을 그리는 쪽은 이 한 목록만 받는다(render_confirmed_content 등이 입구에서
+        #     apply_summary_overrides를 한 번 거친다) — 그래서 화면과 **보고서 한 줄**이
+        #     같은 값을 본다. 화면마다 따로 입히면 여기서 둘이 갈린다.
+        page = renderer.render_page(
+            "14:00", so.apply_summary_overrides([article]), ["가상자산"], [],
+            "ㅇ ({outlet}) {title}", "<{section}>",
+        )
+        assert "AI뉴스" in page, "화면에 고친 언론사가 안 보입니다"
+        assert "ㅇ (AI뉴스) " in page, "복사·txt 한 줄이 옛 도메인 그대로입니다"
+        assert "aienews.co.kr<" not in page, "화면에 옛 도메인이 남아 있습니다"
+
+        # (4) 엑셀 「언론사명」도 같은 목록에서 구워진다.
+        rows = renderer.build_export_rows(
+            [{"name": "세제", "articles": so.apply_summary_overrides([article])}],
+            "2026-10-12", "14:00", {},
+        )
+        assert rows[0]["언론사명"] == "AI뉴스", rows[0]["언론사명"]
+
+        # (5) 되돌릴 수 있게 빈 칸은 기존 값을 그대로 둔다 — 제목만 다시 고쳐도 언론사는 유지.
+        so.set_summary_override(url, "고친 제목", None, None)
+        again = so.load_summary_overrides()[url]
+        assert again == {"outlet": "AI뉴스", "title": "고친 제목"}, again
+
+    # (6) 편집 창은 파일마다 복제돼 있다 — 네 벌 중 하나라도 언론사 칸을 빠뜨리면
+    #     그 화면에서만 고칠 수 없게 되는데, 저장소가 전역이라 담당자는 왜 안 되는지 모른다.
+    root = Path(__file__).resolve().parent.parent
+    for name in ("renderer.py", "preview_renderer.py", "history_renderer.py", "live_renderer.py"):
+        src = (root / "app" / name).read_text(encoding="utf-8")
+        head = src.index("function editSummary(btn) {{")
+        block = src[head:src.index("\n}}\n", head)]
+        assert "esf-outlet" in block, f"{name}: 편집 창에 언론사 칸이 없습니다"
+        assert "outlet: outletInput.value" in block, f"{name}: 저장할 때 언론사를 안 보냅니다"
+        assert ".esf-row {{" in src, f"{name}: .esf-row CSS가 빠졌습니다"
+    # 수시는 form 제출이라 모양이 다르지만 같은 저장소로 간다.
+    adhoc_src = (root / "app" / "adhoc" / "renderer.py").read_text(encoding="utf-8")
+    assert 'name="outlet"' in adhoc_src, "수시 편집 상자에 언론사 칸이 없습니다"
+    # 메뉴 이름은 앱 어디서나 하나다(제목만 고치는 창이 아니게 됐다).
+    for name in ("renderer.py", "live_renderer.py"):
+        src = (root / "app" / name).read_text(encoding="utf-8")
+        assert "기사 정보 직접 수정" in src, f"{name}: ⋯ 메뉴 이름이 안 맞습니다"
+    assert "기사 정보 직접 수정" in adhoc_src, "수시: ⋯ 메뉴 이름이 안 맞습니다"
+
+    print("48) 언론사명 직접 수정: 통과 (입히는 자리 한 곳 — 화면·보고서 한 줄·엑셀, 부분 저장, 편집 창 네 벌)")
+
+
 def test_photo_override_is_one_place():
     """사진 추정 해제 — **입히는 자리가 `looks_like_photo_caption()` 맨 앞 한 곳**인지.
 
@@ -4812,6 +4894,7 @@ if __name__ == "__main__":
         test_login_lock,
         test_search_operator_is_one_rule,
         test_photo_override_is_one_place,
+        test_outlet_override_is_one_place,
         test_agency_archive_filters,
         test_agency_archive_keeps_every_date,
         test_agency_archive_labels,

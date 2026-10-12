@@ -390,7 +390,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
   .article:hover .refetch-btn {{ opacity: 1; }}
   .refetch-btn:disabled {{ opacity: 0.35 !important; cursor: not-allowed; }}
-  /* [추가: 2026-08-11] "⋯ 더보기" 메뉴 — 원문 다시 불러오기 / 기사제목 직접 수정.
+  /* [추가: 2026-08-11] "⋯ 더보기" 메뉴 — 원문 다시 불러오기 / 기사 정보 직접 수정.
      예전엔 이 둘과 복사하기까지 셋이 제목 줄에 아이콘으로 직접 붙어 있었고
      .refetch-btn의 opacity:0으로 숨겼다가 카드 호버 시에만 나타났는데, (1) 호버할
      때마다 아이콘이 4→8개로 늘어 목록을 훑을 때 산만했고 (2) **모바일엔 호버가 없어
@@ -430,6 +430,14 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .edit-summary-form input, .edit-summary-form textarea {{
     width: 100%; box-sizing: border-box; padding: 6px 10px; border: 1px solid {border}; border-radius: var(--r-md);
     font-size: var(--fs-md); color: {text}; background: {card}; font-family: inherit;
+  }}
+  /* [추가] 언론사 칸 — 제목과 한 줄에. 같은 값이 app/renderer.py에도 있다(한쪽만 고치지 않는다). */
+  .edit-summary-form .esf-row {{ display: flex; gap: 8px; }}
+  .edit-summary-form .esf-row .esf-outlet {{ flex: 0 0 132px; }}
+  .edit-summary-form .esf-row .esf-title {{ flex: 1 1 auto; min-width: 0; }}
+  @media (max-width: 560px) {{
+    .edit-summary-form .esf-row {{ flex-wrap: wrap; }}
+    .edit-summary-form .esf-row .esf-outlet {{ flex: 1 1 100%; }}
   }}
   .edit-summary-form .edit-summary-actions {{ display: flex; justify-content: flex-end; gap: 8px; }}
   .edit-summary-form button {{ font-size: var(--fs-sm); padding: 5px 12px; }}
@@ -541,9 +549,21 @@ function editSummary(btn) {{
   var url = btn.dataset.url;
   var form = document.createElement("div");
   form.className = "edit-summary-form";
+  // [추가] 언론사 칸 — 제목과 한 줄(.esf-row)에 둔다. 자체 도메인 기사는 이름을 못 찾아
+  // 도메인 문자열이 그대로 보고서로 나가므로 담당자가 고칠 길이 여기 하나뿐이다.
+  // 비워 두고 저장하면 그 칸만 원래 값이 유지된다(서버의 부분 저장).
+  var esfRow = document.createElement("div");
+  esfRow.className = "esf-row";
+  var outletInput = document.createElement("input");
+  outletInput.type = "text";
+  outletInput.className = "esf-outlet";
+  outletInput.value = btn.dataset.outlet || "";
   var titleInput = document.createElement("input");
   titleInput.type = "text";
+  titleInput.className = "esf-title";
   titleInput.value = btn.dataset.title;
+  esfRow.appendChild(outletInput);
+  esfRow.appendChild(titleInput);
   var summaryInput = document.createElement("textarea");
   summaryInput.rows = 2;
   summaryInput.value = btn.dataset.summary;
@@ -562,7 +582,7 @@ function editSummary(btn) {{
     fetch("http://{settings_host}:{settings_port}/edit-summary", {{
       method: "POST", keepalive: true,
       headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
-      body: new URLSearchParams({{url: url, title: titleInput.value, summary: summaryInput.value}})
+      body: new URLSearchParams({{url: url, outlet: outletInput.value, title: titleInput.value, summary: summaryInput.value}})
     }}).then(function(res) {{
       if (res.ok) {{ location.reload(); }}
       else {{ alert("저장하지 못했습니다. 다시 시도해주세요."); }}
@@ -572,7 +592,7 @@ function editSummary(btn) {{
   }};
   actions.appendChild(cancelBtn);
   actions.appendChild(saveBtn);
-  form.appendChild(titleInput);
+  form.appendChild(esfRow);
   form.appendChild(summaryInput);
   form.appendChild(actions);
   var details = article.querySelector("details");

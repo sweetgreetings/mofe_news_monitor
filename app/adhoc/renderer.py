@@ -284,7 +284,7 @@ def _article_groups(card: dict) -> list[tuple[Optional[str], list[dict]]]:
     [수정: 2026-08-20] 지금 조건(검색어·꼭 포함할 검색어)에서 벗어난 기사는 여기서 뺀다
     (ADHOC_DESIGN.md §6.4) — 이 함수가 화면·복사·txt·엑셀이 모두 지나가는 길목이라,
     여기 한 곳만 걸러도 "화면엔 없는데 보고서엔 있는" 어긋남이 생기지 않는다."""
-    # [추가: 2026-09-02] "🔄 원문 다시 불러오기"·"✏️ 기사제목 직접 수정"으로 고쳐둔
+    # [추가: 2026-09-02] "🔄 원문 다시 불러오기"·"✏️ 기사 정보 직접 수정"으로 고쳐둔
     # 제목·요약을 여기서 입힌다(app.summary_overrides — URL 키 전역 저장소라 정기
     # 화면들과 같은 값을 본다). 이 함수가 화면·복사·txt·엑셀이 모두 지나는 길목이라
     # 여기 한 곳이면 전부 덮인다 — 붙이는 곳(⋯ 메뉴)만 만들고 이 줄을 빠뜨리면
@@ -1060,7 +1060,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .a-acts .more-btn.is-copied .icon-default {{ display: none; }}
   .a-acts .more-btn.is-copied .icon-done {{ display: inline-flex; }}
   /* [추가: 2026-09-02] ⋯ 더보기 — 정기와 같은 마크업·같은 치수. 담기는 건 원문 다시
-     불러오기·기사제목 직접 수정 둘이고, 저장은 정기와 같은 전역 저장소를 쓴다
+     불러오기·기사 정보 직접 수정 둘이고, 저장은 정기와 같은 전역 저장소를 쓴다
      (app.summary_overrides — 같은 URL이면 어느 화면에서 봐도 같은 제목이어야 한다). */
   .more-wrap {{ position: relative; display: inline-flex; flex-shrink: 0; }}
   .more-menu {{
@@ -1085,6 +1085,14 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     font-size: var(--fs-md); padding: 6px 8px; border: 1px solid {border}; border-radius: var(--r-md);
     margin-bottom: 8px; background: {card}; color: {text}; }}
   .edit-box textarea {{ min-height: 60px; resize: vertical; }}
+  /* [추가] 언론사 칸 — 제목과 한 줄에. 정기 .edit-summary-form .esf-row와 같은 값이다. */
+  .edit-box .eb-row {{ display: flex; gap: 8px; }}
+  .edit-box .eb-f {{ display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }}
+  .edit-box .eb-f.eb-outlet {{ flex: 0 0 132px; }}
+  @media (max-width: 560px) {{
+    .edit-box .eb-row {{ flex-wrap: wrap; }}
+    .edit-box .eb-f.eb-outlet {{ flex: 1 1 100%; }}
+  }}
   .edit-box .acts {{ display: flex; gap: 6px; justify-content: flex-end; }}
   /* [추가: 2026-09-02] 소제목 헤더의 🗑(통째 숨기기·빈 소제목 삭제)만 hover 빨강 —
      같은 묶음의 📋·▲▼는 무채색 그대로다(정기 .rename-btn.group-hide-btn과 같은 규칙). */
@@ -2084,7 +2092,7 @@ def _render_article_row(
         '<button type="submit">원문 다시 불러오기</button>'
         "</form>"
         f'<button type="button" data-target="{edit_id}" '
-        'onclick="event.stopPropagation(); openEditSummary(this)">기사제목 직접 수정</button>'
+        'onclick="event.stopPropagation(); openEditSummary(this)">기사 정보 직접 수정</button>'
         f"{photo_menu_html}"
         "</span>"
         "</span>"
@@ -2094,8 +2102,14 @@ def _render_article_row(
         f'<form method="POST" action="/adhoc/card/edit-summary">'
         f'<input type="hidden" name="id" value="{card_id}">'
         f'<input type="hidden" name="url" value="{url}">'
-        '<label>기사 제목</label>'
-        f'<input type="text" name="title" value="{html.escape(article["title"])}">'
+        # 언론사 칸은 제목과 한 줄에 둔다 — 기사 행의 [언론사][제목] 배치 그대로다.
+        # 이 상자는 원래 칸마다 이름표가 있던 모양이라 이름표는 그대로 두고 줄만 합친다.
+        '<div class="eb-row">'
+        '<div class="eb-f eb-outlet"><label>언론사</label>'
+        f'<input type="text" name="outlet" value="{html.escape(article["outlet"])}"></div>'
+        '<div class="eb-f"><label>기사 제목</label>'
+        f'<input type="text" name="title" value="{html.escape(article["title"])}"></div>'
+        "</div>"
         '<label>요약</label>'
         f'<textarea name="summary">{html.escape(summary_text)}</textarea>'
         '<div class="acts">'
@@ -3409,7 +3423,7 @@ function toggleArticleMenu(btn) {{
   if (menu.getBoundingClientRect().bottom > window.innerHeight - barH - 8) menu.classList.add('flip-up');
 }}
 
-// ✏️ 기사제목 직접 수정 — 입력칸은 <details> 안(요약 아래)이라, 접혀 있으면 먼저 펼친다.
+// ✏️ 기사 정보 직접 수정 — 입력칸은 <details> 안(요약 아래)이라, 접혀 있으면 먼저 펼친다.
 function openEditSummary(btn) {{
   closeArticleMenus();
   var box = document.getElementById(btn.dataset.target);

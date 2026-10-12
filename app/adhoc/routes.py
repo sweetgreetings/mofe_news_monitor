@@ -284,7 +284,7 @@ def _handle_refetch_summary(handler, form: dict) -> None:
         _card_redirect(
             handler,
             card_id,
-            error="원문에서 제목·요약을 찾지 못했습니다. 「기사제목 직접 수정」으로 고쳐주세요.",
+            error="원문에서 제목·요약을 찾지 못했습니다. 「기사 정보 직접 수정」으로 고쳐주세요.",
         )
         return
     set_summary_override(url, result.get("title"), result.get("summary"))
@@ -292,17 +292,19 @@ def _handle_refetch_summary(handler, form: dict) -> None:
 
 
 def _handle_edit_summary(handler, form: dict) -> None:
-    """⋯ 더보기 > "기사제목 직접 수정" — 🔄가 원문에서도 못 찾을 때의 최후 수단.
-    저장 형식·적용 범위는 🔄와 완전히 같다(빈 칸은 기존 값을 그대로 둔다).
+    """⋯ 더보기 > "기사 정보 직접 수정" — 🔄가 원문에서도 못 찾을 때의 최후 수단.
+    저장 형식·적용 범위는 🔄와 완전히 같다(빈 칸은 기존 값을 그대로 둔다). 정기와 같은
+    전역 저장소라 여기서 고친 언론사·제목·요약은 정기 화면에도 그대로 보인다.
     """
     card_id = _field(form, "id")
     url = _field(form, "url")
     title = _field(form, "title").strip()
     summary = _field(form, "summary").strip()
-    if not url or not (title or summary):
-        _card_redirect(handler, card_id, error="제목이나 요약 중 하나는 입력해주세요.")
+    outlet = _field(form, "outlet").strip()
+    if not url or not (title or summary or outlet):
+        _card_redirect(handler, card_id, error="언론사·제목·요약 중 하나는 입력해주세요.")
         return
-    set_summary_override(url, title or None, summary or None)
+    set_summary_override(url, title or None, summary or None, outlet or None)
     _card_redirect(handler, card_id)
 
 

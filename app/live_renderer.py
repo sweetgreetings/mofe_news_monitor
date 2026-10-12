@@ -524,6 +524,14 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     width: 100%; box-sizing: border-box; padding: 6px 10px; border: 1px solid {border}; border-radius: var(--r-md);
     font-size: var(--fs-md); color: {text}; background: {card}; font-family: inherit;
   }}
+  /* [추가] 언론사 칸 — 제목과 한 줄에. 같은 값이 app/renderer.py에도 있다(한쪽만 고치지 않는다). */
+  .edit-summary-form .esf-row {{ display: flex; gap: 8px; }}
+  .edit-summary-form .esf-row .esf-outlet {{ flex: 0 0 132px; }}
+  .edit-summary-form .esf-row .esf-title {{ flex: 1 1 auto; min-width: 0; }}
+  @media (max-width: 560px) {{
+    .edit-summary-form .esf-row {{ flex-wrap: wrap; }}
+    .edit-summary-form .esf-row .esf-outlet {{ flex: 1 1 100%; }}
+  }}
   .edit-summary-form .edit-summary-actions {{ display: flex; justify-content: flex-end; gap: 8px; }}
   .edit-summary-form button {{ font-size: var(--fs-sm); padding: 5px 12px; }}
   .empty {{ text-align: center; margin: 60px 0; font-size: var(--fs-lg); color: {muted}; }}
@@ -739,9 +747,21 @@ function editSummary(btn) {{
   var url = btn.dataset.url;
   var form = document.createElement("div");
   form.className = "edit-summary-form";
+  // [추가] 언론사 칸 — 제목과 한 줄(.esf-row)에 둔다. 자체 도메인 기사는 이름을 못 찾아
+  // 도메인 문자열이 그대로 보고서로 나가므로 담당자가 고칠 길이 여기 하나뿐이다.
+  // 비워 두고 저장하면 그 칸만 원래 값이 유지된다(서버의 부분 저장).
+  var esfRow = document.createElement("div");
+  esfRow.className = "esf-row";
+  var outletInput = document.createElement("input");
+  outletInput.type = "text";
+  outletInput.className = "esf-outlet";
+  outletInput.value = btn.dataset.outlet || "";
   var titleInput = document.createElement("input");
   titleInput.type = "text";
+  titleInput.className = "esf-title";
   titleInput.value = btn.dataset.title;
+  esfRow.appendChild(outletInput);
+  esfRow.appendChild(titleInput);
   var summaryInput = document.createElement("textarea");
   summaryInput.rows = 2;
   summaryInput.value = btn.dataset.summary;
@@ -760,7 +780,7 @@ function editSummary(btn) {{
     fetch("http://{settings_host}:{settings_port}/edit-summary", {{
       method: "POST", keepalive: true,
       headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
-      body: new URLSearchParams({{url: url, title: titleInput.value, summary: summaryInput.value}})
+      body: new URLSearchParams({{url: url, outlet: outletInput.value, title: titleInput.value, summary: summaryInput.value}})
     }}).then(function(res) {{
       if (res.ok) {{ location.reload(); }}
       else {{ alert("저장하지 못했습니다. 다시 시도해주세요."); }}
@@ -770,7 +790,7 @@ function editSummary(btn) {{
   }};
   actions.appendChild(cancelBtn);
   actions.appendChild(saveBtn);
-  form.appendChild(titleInput);
+  form.appendChild(esfRow);
   form.appendChild(summaryInput);
   form.appendChild(actions);
   var details = row.querySelector(".live-title");
@@ -1729,7 +1749,7 @@ def _render_row(
     copy_text_attr = html.escape(f"{copy_line}\n{article['url']}")
     # [수정: 2026-09-01] "복사하기"를 메뉴에서 꺼내 담아두기 바로 오른쪽에 상시 노출한다
     # (사용자 요청) — 실시간 현황에서 기사 한 건을 그때그때 집어 붙여넣는 일이 잦은데
-    # 매번 ⋯를 한 번 더 눌러야 했다. 메뉴에는 원문 다시 불러오기·제목·요약 직접 수정
+    # 매번 ⋯를 한 번 더 눌러야 했다. 메뉴에는 원문 다시 불러오기·기사 정보 직접 수정
     # 둘만 남는다(둘 다 "가끔 한 번"이라 메뉴 뒤가 맞는 무게).
     copy_btn_html = (
         f'<button class="copy-btn" type="button" data-copy-text="{copy_text_attr}" '
@@ -1748,8 +1768,9 @@ def _render_row(
         f'<button type="button" data-url="{url}" '
         'onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button>'
         f'<button type="button" data-url="{url}" '
+        f'data-outlet="{html.escape(article.get("outlet", ""))}" '
         f'data-title="{title_attr_escaped}" data-summary="{summary_attr}" '
-        'onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">제목·요약 직접 수정</button>'
+        'onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사 정보 직접 수정</button>'
         "</span>"
         "</span>"
     )
