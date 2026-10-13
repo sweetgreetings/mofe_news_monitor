@@ -4606,7 +4606,7 @@ _LABEL_STYLE = """
   }}
   .snap-tag {{ font-size: var(--fs-xs); background: {bg}; color: {text}; border: 1px solid {border}; border-radius: var(--r-pill); padding: 1px 6px; }}
   .snap-tag.sub {{ background: {hover}; color: {header}; }}
-  .snap-tag.src-reg, .snap-tag.src-agency {{ background: {bg}; color: {muted}; }}
+  .snap-tag.src-reg, .snap-tag.src-agency, .snap-tag.src-live {{ background: {bg}; color: {muted}; }}
   .snap-tag.src-adhoc {{ background: {adhoc_bg}; color: {adhoc_text}; }}
   .snap-tag.gone {{ background: {snap_gone_bg}; color: {snap_gone_text}; border-color: {snap_gone_border}; }}
   /* 정기 보고서에 있나 — 「스크랩됨」/「숨김」 한 칸. 오늘 전체 기사의 행 상태와 같은 말. */
@@ -4717,6 +4717,10 @@ def _label_source_tag_html(source: dict) -> str:
         # 새 색을 만들지 않고 정기와 같은 중립 회색 — 글자가 이미 다르다.
         # 이 줄엔 회차·소제목·스크랩 상태가 없는 게 정상이다.
         return '<span class="snap-tag src-agency">기관 기사</span>'
+    if kind == "live":
+        # 오늘 전체 기사에서 붙인 것 — 기관 기사와 같은 이유로 회차를 적지 않는다.
+        # 화면 이름 그대로 쓴다(이 줄엔 회차·소제목·스크랩 시각이 없는 게 정상).
+        return '<span class="snap-tag src-live">오늘 전체 기사</span>'
     return '<span class="snap-tag src-reg">회차</span>'
 
 

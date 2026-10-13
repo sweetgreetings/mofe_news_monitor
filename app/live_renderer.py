@@ -47,7 +47,14 @@ from app.naver_api import (
     outlet_display_label,
     search_keywords,
 )
-from app.renderer import apply_line_template, range_select_script
+from app.labels import load_labels
+from app.renderer import (
+    apply_line_template,
+    known_label_chips_html,
+    label_popover_script,
+    label_popover_style,
+    range_select_script,
+)
 from app.scheduler import next_pending_slot
 from app.settings import active_schedule_times, active_search_groups, group_in_scrap, load_settings
 from app.storage import load_latest_run, load_today_runs
@@ -282,7 +289,12 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      머리줄에 깔려 둘째 항목이 가려졌다. opacity를 1로 되돌려 맥락을 풀고(메뉴 글자도
      흐려지지 않는다) 행 자체를 떠 있는 것들 높이로 올린다.
      확정본·초안의 .article.is-photo:has(.more-wrap.is-open)과 같은 처방이다. */
-  .live-row:has(.more-wrap.is-open) {{ position: relative; z-index: 30; opacity: 1; }}
+  /* 🏷 라벨 팝오버도 같은 처방이다 — 상태가 있는 행(✔️ 스크랩됨·📌 담아둠·🤖 자동 선별)의
+     opacity: 0.86이 쌓임 맥락을 만들어, 그 안에 뜨는 팝오버가 반투명해지고 아랫줄에
+     깔린다. 행에 opacity를 주는 화면에 **떠 있는 것을 새로 넣을 때마다** 이 줄에 그
+     선택자를 더해야 한다(CLAUDE.md 「상태색이 있는 행의 ⋯ 메뉴」). */
+  .live-row:has(.more-wrap.is-open),
+  .live-row:has(.lab-pop:not(.hidden)) {{ position: relative; z-index: 30; opacity: 1; }}
   .more-menu button {{
     display: block; width: 100%; text-align: left; background: transparent; border: none;
     padding: 8px 10px; border-radius: var(--r-sm); font-size: var(--fs-md); color: {text};
@@ -541,6 +553,12 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [추가: 2026-08-13] app.renderer와 동일 — 단색 SVG 아이콘(app.icons) 공통 크기·색. */
   .ic {{ width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
     stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }}
+  /* 🏷 라벨 — 확정본·초안·정기 보관함·기관 기사 찾기와 **같은 공용 CSS**(app.renderer). */
+{label_popover_style}
+  /* 이 화면의 🏷는 <summary> 안이 아니라 행 오른쪽 묶음에 서므로, 칩 줄은 기사 글 묶음
+     (.live-row-text) 맨 아래 — URL 줄 다음에 붙는다(마크업·JS 모두 data-lab-row-host). */
+  .live-row-actions .lab-btn .ic {{ width: 1.25em; height: 1.25em; }}
+  .live-row-text > .lab-row {{ margin-top: 5px; }}
 </style>
 </head>
 <body>
@@ -827,6 +845,7 @@ function unhideFromLive(btn) {{
   }});
 }}
 {bulk_select_script}
+{label_popover_script}
 // [추가] 여러 건 한 번에 담아두기 — 회차 작업 중에 "이 기사들 지금 회차에 넣자"가
 // 뭉텅이로 생기는데, 행 버튼만 있으면 건수만큼 눌러야 했다. 고르는 문법(체크박스·선택 바·
 // Shift+클릭)은 확정본·초안·수시가 쓰는 것을 그대로 가져온다.
@@ -1412,6 +1431,9 @@ def _theme() -> dict:
         # 숨긴 행 버튼 — 서버 렌더링(_render_row)과 hideFromLive가 같은 마크업을 쓴다.
         "unhide_label_js": json.dumps(unhide_btn_label(), ensure_ascii=False),
         "unhide_title_js": json.dumps(UNHIDE_BTN_TITLE, ensure_ascii=False),
+        # 🏷 라벨 팝오버 — 네 화면(본문·대기·오류)이 같은 조각을 받는다.
+        "label_popover_style": label_popover_style(),
+        "label_popover_script": label_popover_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
     }
 
 
@@ -1548,6 +1570,8 @@ def _render_row(
     auto_drafted_urls: set,
     matched_groups: Optional[list] = None,
     line_template: str = DEFAULT_ARTICLE_LINE_TEMPLATE,
+    labels: Optional[dict] = None,
+    known_labels_html: str = "",
 ) -> str:
     """기사 한 줄을 렌더링한다.
 
@@ -1763,6 +1787,52 @@ def _render_row(
         "</span>"
         "</span>"
     )
+    # [추가: 2026-10-13] 🏷 라벨 — 이 화면에서도 붙인다. 「오늘 전체 기사」만 켠 그룹의
+    # 기사는 어느 회차에도 안 들어가서, 라벨(이 앱에서 나이로 안 지우는 유일한 장치)을
+    # 붙일 길이 여기 말고 없었다. 장치는 확정본·초안·정기 보관함·기관 기사 찾기와 **같은
+    # 공용 CSS·JS**(app.renderer)이고, 이 화면이 알려주는 건 둘뿐이다 — 기사 줄이
+    # `.article`이 아니라서 `data-lab-root`, 🏷가 <summary> 밖이라 칩 줄이 들어갈 칸
+    # (`data-lab-row-host`). 출처는 `live`다(app.labels.snapshot_source) — `regular`로
+    # 적으면 라벨 보관함이 「회차」·「✓ 스크랩됨」을 그리는데, 이 화면 기사의 절반은
+    # 아직 어느 회차에도 안 실렸다. 그래서 회차·소제목·스크랩 시각 칸은 빈 값으로 둔다.
+    row_labels = list(((labels or {}).get(article.get("url") or "") or {}).get("labels") or [])
+    lab_chips_html = "".join(
+        f'<span class="lab-chip" data-label="{html.escape(n, quote=True)}">{html.escape(n)} '
+        '<span class="x" onclick="event.stopPropagation(); event.preventDefault(); '
+        'detachLabelChip(this);">×</span></span>'
+        for n in row_labels
+    )
+    lab_row_html = (
+        f'<div class="lab-row"><span class="tagmark">{icon("tag")}</span>{lab_chips_html}</div>'
+        if row_labels
+        else ""
+    )
+    lab_attached_html = lab_chips_html or '<span class="none">아직 없음</span>'
+    lab_btn_html = (
+        '<span class="lab-pop-wrap">'
+        f'<button type="button" class="lab-btn{" on" if row_labels else ""}" data-url="{url}" '
+        f'data-outlet="{outlet}" data-title="{title_attr_escaped}" '
+        f'data-pub-date="{html.escape(pub_date or "", quote=True)}" '
+        'data-group="" data-scrap-date="" data-scrap-end="" data-lab-source="live" '
+        'onclick="event.stopPropagation(); event.preventDefault(); toggleLabelPopover(this);" '
+        f'title="라벨">{icon("tag")}'
+        + (f'<span class="lab-count">{len(row_labels)}</span>' if row_labels else "")
+        + "</button>"
+        '<span class="lab-pop hidden" onclick="event.stopPropagation(); event.preventDefault();">'
+        "<h4>이 기사에 붙은 라벨</h4>"
+        f'<div class="attached">{lab_attached_html}</div>'
+        "<h4>이미 쓴 라벨 (눌러서 붙이기)</h4>"
+        f'<div class="known">{known_labels_html}</div>'
+        '<div class="addbox">'
+        '<input type="text" placeholder="새 라벨 입력" class="lab-input" '
+        "onkeydown=\"event.stopPropagation(); if(event.key==='Enter'){event.preventDefault(); "
+        'addLabelFromInput(this);}" oninput="event.stopPropagation(); checkSimilarLabel(this);">'
+        '<button type="button" onclick="event.stopPropagation(); event.preventDefault(); '
+        'addLabelFromInput(this.previousElementSibling);">추가</button>'
+        "</div>"
+        '<div class="sim-warn hidden"></div>'
+        "</span></span>"
+    )
     # [추가: 2026-08-13] 그룹 필터 칩 — 이 기사가 실제로 걸린 키워드가 속한 그룹들을
     # 작은 태그로 보여준다. 이름이 길면(칩 자체가 필터 바에서도 잘리므로) 여기서도
     # CSS로만 말줄임(ellipsis)하고 값은 title 툴팁으로 전체를 보여준다 — 저장값은
@@ -1795,19 +1865,21 @@ def _render_row(
     return (
         f'<div class="{row_class}" data-outlet="{outlet}" data-status="{data_status}" '
         f'data-groups="{data_groups_attr}" data-headline="{data_headline_attr}" '
-        f'data-editorial="{data_editorial_attr}">'
+        f'data-editorial="{data_editorial_attr}" data-lab-root '
+        'data-lab-row-host=".live-row-text">'
         f'{select_html}'
         f'<div class="live-row-text"><span class="outlet-tag">{outlet_display}</span>{group_tags_html}{pub_time_html}{kw_inline_html}{photo_badge_html}'
         '<details class="live-title">'
         f"<summary>{title_html}</summary>"
         f'<p class="live-summary">{summary_html}</p>'
         "</details>"
-        f'<div class="live-url"><a href="{url}" target="_blank" rel="noopener noreferrer">{url}</a></div></div>'
+        f'<div class="live-url"><a href="{url}" target="_blank" rel="noopener noreferrer">{url}</a></div>'
+        f"{lab_row_html}</div>"
         '<div class="live-row-actions">'
         f'<button class="{btn_class}" type="button" data-outlet="{outlet}" data-title="{title_attr_escaped}" '
         f'data-url="{url}" data-summary="{summary_attr}" data-pub-date="{html.escape(pub_date or "")}" '
         f'onclick="{btn_onclick}"{disabled} title="{title_attr}">{btn_label}</button>'
-        f"{more_menu_html}{hide_icon_html}"
+        f"{lab_btn_html}{more_menu_html}{hide_icon_html}"
         "</div>"
         "</div>"
     )
@@ -2079,12 +2151,18 @@ def render_live_page(
         hidden_urls = load_hidden_urls()
         pinned_urls = _pinned_urls()
         auto_drafted_urls = _auto_drafted_urls(articles, load_settings())
+        # 라벨 저장소·「이미 쓴 라벨」 목록은 **화면마다 한 번만** 읽는다 — 행마다 읽으면
+        # 기사 수만큼 같은 파일을 다시 파싱한다(기관 기사 찾기와 같은 규칙).
+        labels_lookup = load_labels()
+        known_labels_html = known_label_chips_html()
 
         def _row(a: dict) -> str:
             return _render_row(
                 a, can_add, highlight_words, scrapped_urls, hidden_urls, pinned_urls, auto_drafted_urls,
                 matched_groups=_matched_groups_for(a, groups),
                 line_template=line_template,
+                labels=labels_lookup,
+                known_labels_html=known_labels_html,
             )
 
         # [수정] 시간대별로 묶어 접어 둔다 — 하루치가 200건 가까이 쌓여 한 줄 목록으로는

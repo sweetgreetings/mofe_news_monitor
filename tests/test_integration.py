@@ -4522,6 +4522,104 @@ def test_agency_archive_labels():
     print("52) 기관 기사 찾기 라벨: 통과 (공용 장치 기본값 그대로, 요약 없는 행도, 출처 agency라 회차·스크랩 안 적음)")
 
 
+def test_live_labels():
+    """오늘 전체 기사에서 라벨을 **붙인다** — 그리고 그게 라벨 보관함에 거짓으로 안 적힌다.
+
+    이 화면에만 있는 기사가 있다: 「오늘 전체 기사」만 켠 그룹의 기사는 어느 회차에도
+    안 들어가 확정본·초안·정기 보관함 어디에도 안 나온다 — 라벨을 붙일 **다른 길이
+    아예 없다**(기관 기사 찾기와 같은 이유, 같은 처방).
+
+    이 테스트가 지키는 것 넷:
+      (1) **공용 라벨 장치의 기본값 경로가 그대로다.** 확정본·초안·정기 보관함·수시는
+          기사 줄이 `.article`이고 칩을 `<summary>` 밑에 단다. 이 화면을 열려고 장치에
+          칩 줄 자리(`data-lab-row-host`)를 더했으므로, 기본값이 바뀌면 **이미 돌고 있는
+          화면 넷이 조용히 망가진다**(라벨은 저장됐는데 화면이 안 바뀐다).
+      (2) 이 화면은 `data-lab-root`(줄이 `.article`이 아니다)와 `data-lab-row-host`
+          (🏷가 `<summary>` 밖이라 칩 줄을 넣을 칸을 가리킨다)로 자기 생김새를 알려준다.
+          **칩 줄은 기사 글 묶음 안(URL 줄 다음)**이다 — 행 오른쪽 버튼 묶음에 들어가면
+          칩이 버튼 옆으로 선다.
+      (3) 출처가 `live`라 라벨 보관함이 `회차`·`✓ 스크랩됨`을 안 그린다. 이 화면 기사의
+          절반은 아직 어느 회차에도 안 실렸는데 그렇게 적으면 **화면이 아니라 파일에
+          거짓이 남고** 엑셀 「스크랩일자·스크랩종료시간·소제목」까지 따라 나간다.
+      (4) **라벨 팝오버가 상태색 행에 깔리지 않는다.** 이 화면은 스크랩됨·담아둠·자동
+          선별 행에 `opacity`를 주는데, 그게 쌓임 맥락을 만들어 그 안에 뜨는 것은
+          `z-index`를 올려도 행 밖으로 못 나간다(⋯ 메뉴가 이미 겪은 사고).
+    """
+    import json
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from app.labels import attach_label, labels_for_url, snapshot_source
+    from app.renderer import label_popover_script
+    from app.settings_server import _label_source_tag_html
+    from app import labels as labels_mod, live_renderer
+
+    # (1) 공용 장치의 기본값 경로 — 확정본 넷이 쓰는 길이 그대로 남아 있어야 한다.
+    js = label_popover_script("127.0.0.1", 8765)
+    assert 'el.closest(".article")' in js, \
+        "공용 라벨 장치의 기본값(.article)이 사라졌습니다 — 확정본·초안·정기 보관함·수시가 멈춥니다"
+    assert 'btn.closest("summary")' in js, \
+        "공용 라벨 장치의 기본 칩 자리(<summary> 밑 .lab-row)가 사라졌습니다"
+    assert 'getAttribute("data-lab-row-host")' in js, \
+        "칩 줄 자리를 화면이 알려주는 길이 없습니다 — 🏷가 <summary> 밖인 화면이 멈춥니다"
+
+    article = {
+        "outlet": "연합뉴스", "title": "가산세 3만건 넘어",
+        "url": "https://n.news.naver.com/mnews/article/003/1",
+        "summary": "요약", "pub_date": "2026-10-13T14:05:00+09:00",
+    }
+    # (2) 생김새를 알려주고, 칩 줄은 기사 글 묶음 안(URL 줄 다음)에 선다.
+    row = live_renderer._render_row(
+        article, True, [], set(), set(), set(), set(),
+        labels={article["url"]: {"labels": ["세제", "국정감사"]}}, known_labels_html="",
+    )
+    assert "data-lab-root" in row and 'data-lab-row-host=".live-row-text"' in row, \
+        "라벨 장치에 이 화면의 생김새를 안 알려줬습니다 — 🏷가 먹통이 됩니다"
+    assert 'data-lab-source="live"' in row, "🏷에 출처 표시가 빠졌습니다"
+    assert 'data-scrap-date=""' in row and 'data-scrap-end=""' in row and 'data-group=""' in row, \
+        "없는 회차·소제목을 지어내고 있습니다"
+    assert row.index("live-url") < row.index('<div class="lab-row"') < row.index("live-row-actions"), \
+        "라벨 칩 줄이 기사 글 묶음 밖에 있습니다 — 행 오른쪽 버튼 옆으로 섭니다"
+    assert row.index("add-btn") < row.index("lab-btn") < row.index("more-btn"), \
+        "🏷 자리가 「상태 버튼 · 🏷 · ⋯ · 🗑」가 아닙니다"
+    # 라벨이 0건이면 칩 줄 자체를 안 그린다(확정본과 같은 규칙).
+    row0 = live_renderer._render_row(
+        article, True, [], set(), set(), set(), set(), labels={}, known_labels_html="",
+    )
+    assert '<div class="lab-row"' not in row0 and "lab-count" not in row0, \
+        "라벨이 없는데 빈 칩 줄·건수를 그렸습니다"
+    assert "lab-btn" in row0, "라벨이 없으면 🏷까지 사라집니다"
+
+    # (4) 상태색 행에 뜨는 것이 깔리지 않는다 — ⋯ 메뉴와 같은 처방을 함께 받는다.
+    assert ".lab-pop:not(.hidden)" in live_renderer.render_live_error_page(), \
+        "상태색 행에서 라벨 팝오버가 반투명해지고 아랫줄에 깔립니다(⋯ 메뉴와 같은 사고)"
+
+    # (3) 출처 — 파일에 `live`로 남고, 라벨 보관함이 회차·스크랩 상태를 안 그린다.
+    assert snapshot_source("live") == {"kind": "live"}
+    with tempfile.TemporaryDirectory() as tmp:
+        with patch.object(labels_mod, "LABELS_FILE", Path(tmp) / "labels.json"):
+            attach_label(
+                {"url": article["url"], "outlet": "연합뉴스", "title": "가산세 3만건 넘어",
+                 "pub_date": article["pub_date"], "scrap_date": "", "scrap_end": ""},
+                "세제", snapshot_source("live"), group="",
+            )
+            assert labels_for_url(article["url"]) == ["세제"]
+            entry = json.loads((Path(tmp) / "labels.json").read_text(encoding="utf-8"))[article["url"]]
+            assert entry["source"] == {"kind": "live"}
+            assert entry["scrap_date"] == "" and entry["scrap_end"] == "" and entry["group"] == "", \
+                "없는 회차·소제목을 파일에 지어내 적었습니다"
+    tag = _label_source_tag_html({"kind": "live"})
+    assert "오늘 전체 기사" in tag and "회차" not in tag, "이 화면의 라벨에 「회차」라고 적고 있습니다"
+    # 옛 종류 셋은 그대로 — 새 종류가 그것들을 건드리면 안 된다.
+    assert "회차" in _label_source_tag_html({"kind": "regular"})
+    assert "기관 기사" in _label_source_tag_html({"kind": "agency"})
+    assert "청문회" in _label_source_tag_html({"kind": "adhoc", "issue": "청문회"})
+
+    print("60) 오늘 전체 기사 라벨: 통과 (공용 장치 기본값 그대로, 칩 줄은 글 묶음 안, 출처 live라 회차·스크랩 안 적음)")
+
+
+
 
 def test_custom_group_with_taken_name_gets_its_own_box():
     """담당자가 친 이름이 그 회차에 이미 쓰이고 있어도 **새 칸이 따로 생긴다**.
@@ -4898,6 +4996,7 @@ if __name__ == "__main__":
         test_agency_archive_filters,
         test_agency_archive_keeps_every_date,
         test_agency_archive_labels,
+        test_live_labels,
         test_draft_all_first_classified_hidden_shows_unclassified,
         test_partial_cache_survives_non_hidden_drops,
         test_assigned_articles_keep_subheading_after_ai_members_hidden,

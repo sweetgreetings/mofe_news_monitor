@@ -5073,7 +5073,13 @@ function applyLabelState(btn, labelsList) {{
         row = document.createElement("div");
         row.className = "lab-row";
         row.innerHTML = rowHtml;
-        btn.closest("summary").appendChild(row);
+        // [추가] 칩 줄을 어디에 붙이나 — 확정본·초안·정기 보관함·수시는 🏷가 <summary> 안에
+        // 있어 그 끝에 붙인다. 🏷가 <summary> 밖인 화면(오늘 전체 기사 — 버튼이 행 오른쪽
+        // 묶음에 선다)은 줄에 data-lab-row-host로 "칩 줄이 들어갈 칸"을 가리킨다. 기존 네
+        // 화면은 그 속성이 없어 closest("summary")로 떨어지므로 동작이 한 글자도 안 바뀐다.
+        var hostSel = article.getAttribute("data-lab-row-host");
+        var rowHost = (hostSel && article.querySelector(hostSel)) || btn.closest("summary");
+        rowHost.appendChild(row);
       }}
     }} else if (row) {{ row.remove(); }}
   }}
