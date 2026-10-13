@@ -271,6 +271,11 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     padding: 4px; box-shadow: var(--sh-pop);
   }}
   .more-wrap.is-open .more-menu {{ display: block; }}
+  /* ⋯ 버튼 — 메뉴의 「복사하기」를 누르면 1초간 ✓로 바뀐다(copyArticleIcon). */
+  .more-btn .icon-default {{ display: inline-flex; }}
+  .more-btn .icon-done {{ display: none; }}
+  .more-btn.is-copied .icon-default {{ display: none; }}
+  .more-btn.is-copied .icon-done {{ display: inline-flex; }}
   /* ⋯ 메뉴를 연 행은 또렷해지고 위로 뜬다 — 상태가 있는 행(✔️ 스크랩됨·📌 담아둠·
      🤖 자동 선별)의 opacity: 0.86이 쌓임 맥락을 만들어, 그 안의 메뉴는 z-index를
      아무리 올려도 행 밖으로 못 나왔다. 그래서 메뉴가 반투명해지고 아랫줄·시간대
@@ -415,10 +420,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      텅 비면서 핀이 화면 한가운데로 떠밀려 보였다. 두 버튼을 이 래퍼 하나로 묶어 다시
      "텍스트 vs 버튼 묶음" 2개짜리 레이아웃으로 되돌린다. */
   .live-row-actions {{ display: flex; align-items: center; gap: 6px; flex-shrink: 0; }}
-  /* [수정: 2026-10-02] 한 줄에 선 아이콘은 전부 16px로 그린다 — 📌·복사는 글자가 붙은 버튼이라
-     --fs-sm(12.8px)이고, 🗑·⋯·🔄는 아이콘만이라 --fs-base(16px)여서 같은 줄에서
+  /* [수정: 2026-10-02] 한 줄에 선 아이콘은 전부 16px로 그린다 — 📌는 글자가 붙은 버튼이라
+     --fs-sm(12.8px)이고, 🗑·⋯는 아이콘만이라 --fs-base(16px)여서 같은 줄에서
      아이콘만 크기가 갈렸다. 글자는 그대로 두고 아이콘만 1.25em으로 맞춘다. */
-  .live-row-actions .add-btn .ic, .live-row-actions .copy-btn .ic {{ width: 1.25em; height: 1.25em; }}
+  .live-row-actions .add-btn .ic {{ width: 1.25em; height: 1.25em; }}
   .outlet-tag {{ color: {muted}; font-size: var(--fs-sm); }}
   /* [추가: 2026-08-11] 표식 없는 사진기사 추정 배지 — 기존 상태색(노랑=새 기사, 초록=이동,
      파랑=선택)과 겹치지 않게, 채도 낮은 모래색 테두리 알약으로 "행 강조"가 아니라 "작은
@@ -482,22 +487,6 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .add-btn.is-scrapped-btn {{ color: {accent}; border-color: {accent}; background: {hover}; }}
   .add-btn.is-pinned-btn {{ color: {pin_gray}; border-color: {pin_gray}; background: {pin_gray_bg}; }}
   .add-btn.is-auto-drafted-btn {{ color: {ai_text}; border-color: {ai_text}; background: {ai_bg}; }}
-  /* [추가: 2026-09-01] 복사 — "⋯ 더보기" 메뉴 안에 있던 "복사하기"를 담아두기 바로
-     오른쪽으로 꺼냈다(사용자 요청). 아이콘만 두지 않고 글자 라벨을 붙이는 건, 이
-     화면의 오른쪽 묶음에서 글자 버튼은 상태(담아두기/담아둠/…)를 말하는 자리이고
-     아이콘은 ⋯·🗑처럼 "가끔 한 번"인 자리라, 자주 쓰는 복사를 아이콘 쪽에 두면
-     무게가 실제 사용 빈도와 어긋나기 때문이다. 누르면 확정본·초안과 같은 규칙으로
-     아이콘만 1초간 check로 바뀐다(copyArticleIcon, .is-copied) — 라벨은 그대로 둬
-     버튼 폭이 흔들리지 않는다. */
-  .copy-btn {{
-    flex-shrink: 0; display: inline-flex; align-items: center; gap: 3px;
-    background: {card}; color: {text}; border: 1px solid {border};
-    border-radius: var(--r-md); padding: 6px 10px; font-size: var(--fs-sm); cursor: pointer; white-space: nowrap;
-  }}
-  .copy-btn:hover {{ color: {accent}; border-color: {accent}; background: {hover}; }}
-  .copy-btn .icon-done {{ display: none; }}
-  .copy-btn.is-copied .icon-default {{ display: none; }}
-  .copy-btn.is-copied .icon-done {{ display: inline-flex; }}
   /* [추가: 2026-07-29] "📌 담아둠" 옆의 작은 숨기기 아이콘 — 초안까지 안 가고 바로
      실시간 현황에서 필요없는 기사를 숨길 수 있게 한다(사용자 요청). 숨기면 스크랩
      화면(index/history)에서도 똑같이 안 보인다(app.curation.hide_article, 전역
@@ -1030,15 +1019,16 @@ document.addEventListener("click", function (e) {{
 }});
 // [추가: 2026-08-13] 기사 한 건만 복사 — 버튼에 이미 복사할 한 줄(data-copy-text)이
 // 들어 있어서 서버 호출이 필요 없다.
-// [수정: 2026-09-01] "⋯ 더보기" 메뉴에서 담아두기 옆으로 나오면서, 확정본·초안과 같은
-// 함수 이름·같은 피드백(아이콘만 1초간 check)을 쓴다 — 하는 일이 완전히 같은데 이름만
-// 다른 쌍둥이가 있으면 한쪽만 고쳤을 때 화면끼리 피드백이 어긋난다. 메뉴 안에서 쓰던
-// 글자 치환("복사했습니다")은 라벨을 바꿔 버튼 폭이 흔들리므로 안 쓴다.
-function copyArticleIcon(btn) {{
+// [수정: 2026-10-13] 확정본·초안과 같은 함수 이름·같은 시그니처·같은 피드백을 쓴다 —
+// 하는 일이 완전히 같은데 이름만 다른 쌍둥이가 있으면 한쪽만 고쳤을 때 화면끼리
+// 피드백이 어긋난다. flashEl은 ✓로 바꿀 대상(없으면 누른 버튼) — ⋯ 메뉴의
+// 「복사하기」는 누르는 순간 메뉴가 닫히므로 ⋯ 버튼을 넘긴다.
+function copyArticleIcon(btn, flashEl) {{
+  var mark = flashEl || btn;
   navigator.clipboard.writeText(btn.dataset.copyText).then(function () {{
-    btn.classList.add("is-copied");
-    clearTimeout(btn._copyTimer);
-    btn._copyTimer = setTimeout(function () {{ btn.classList.remove("is-copied"); }}, 1000);
+    mark.classList.add("is-copied");
+    clearTimeout(mark._copyTimer);
+    mark._copyTimer = setTimeout(function () {{ mark.classList.remove("is-copied"); }}, 1000);
   }}).catch(function () {{
     alert("복사에 실패했습니다.");
   }});
@@ -1740,31 +1730,30 @@ def _render_row(
     # 숨기지 않고 항상 보이는 링크로 남긴다).
     # [추가: 2026-08-13] 이 화면에도 "복사하기"를 넣었다(사용자 요청) — 실시간 현황에서
     # 기사 한 건만 바로 복사해야 하는 경우가 있는데, 여기만 빠져 있었다.
-    # [수정: 2026-09-01] 그 자리가 메뉴 안에서 담아두기 옆으로 나왔다(아래 copy_btn_html). 복사 본문은
+    # 복사 본문은
     # 확정본·초안·지난 기사와 완전히 같은 줄 형식(기사 제목 형식 설정 + URL 줄)이라
     # 어느 화면에서 복사했든 붙여넣은 결과가 같다. 언론사는 화면 표시용 이름
     # (outlet_display_label의 "매일경제**")이 아니라 원본 값을 쓴다 — 화면 전용 표식이
     # 보고서 텍스트로 새면 안 되기 때문(CODING_CONVENTIONS.md §4).
     copy_line = apply_line_template(line_template, article["outlet"], raw_title)
     copy_text_attr = html.escape(f"{copy_line}\n{article['url']}")
-    # [수정: 2026-09-01] "복사하기"를 메뉴에서 꺼내 담아두기 바로 오른쪽에 상시 노출한다
-    # (사용자 요청) — 실시간 현황에서 기사 한 건을 그때그때 집어 붙여넣는 일이 잦은데
-    # 매번 ⋯를 한 번 더 눌러야 했다. 메뉴에는 원문 다시 불러오기·기사 정보 직접 수정
-    # 둘만 남는다(둘 다 "가끔 한 번"이라 메뉴 뒤가 맞는 무게).
-    copy_btn_html = (
-        f'<button class="copy-btn" type="button" data-copy-text="{copy_text_attr}" '
-        'onclick="event.stopPropagation(); copyArticleIcon(this);" '
-        'title="복사하기" aria-label="복사하기">'
-        f'<span class="icon-default">{icon("copy")}</span>'
-        f'<span class="icon-done">{icon("check")}</span>'
-        "복사</button>"
-    )
+    # [수정: 2026-10-13] "복사하기"를 다시 "⋯ 더보기" 메뉴 첫 항목으로 넣는다 — 기사 한 건
+    # 복사는 앱 어디서나 ⋯ 메뉴 첫 항목이고(확정본·초안·정기 보관함·수시 원본·확정본),
+    # 이 화면만 글자 버튼으로 밖에 나와 있었다. 밖에 두면 상태 버튼(✔️ 스크랩됨·🤖 자동
+    # 선별 — 누를 수 없는 버튼)과 같은 테두리·같은 무게라 한 줄에 "누를 수 있는 것"이
+    # 둘로 보인다. 메뉴는 누르는 순간 닫히므로 피드백은 ⋯ 아이콘이 1초간 ✓로 바뀌는
+    # 것으로 준다(copyArticleIcon의 두 번째 인자, CSS .more-btn.is-copied).
     more_menu_html = (
         '<span class="more-wrap">'
         '<button class="more-btn" type="button" '
         'onclick="event.stopPropagation(); toggleArticleMenu(this);" '
-        f'title="더보기" aria-label="더보기">{icon("dots")}</button>'
+        'title="더보기" aria-label="더보기">'
+        f'<span class="icon-default">{icon("dots")}</span>'
+        f'<span class="icon-done">{icon("check")}</span></button>'
         '<span class="more-menu">'
+        f'<button type="button" data-copy-text="{copy_text_attr}" '
+        'onclick="event.stopPropagation(); closeArticleMenus(); '
+        "copyArticleIcon(this, this.closest('.more-wrap').querySelector('.more-btn'));\">복사하기</button>"
         f'<button type="button" data-url="{url}" '
         'onclick="event.stopPropagation(); closeArticleMenus(); refetchSummary(this);">원문 다시 불러오기</button>'
         f'<button type="button" data-url="{url}" '
@@ -1818,7 +1807,7 @@ def _render_row(
         f'<button class="{btn_class}" type="button" data-outlet="{outlet}" data-title="{title_attr_escaped}" '
         f'data-url="{url}" data-summary="{summary_attr}" data-pub-date="{html.escape(pub_date or "")}" '
         f'onclick="{btn_onclick}"{disabled} title="{title_attr}">{btn_label}</button>'
-        f"{copy_btn_html}{more_menu_html}{hide_icon_html}"
+        f"{more_menu_html}{hide_icon_html}"
         "</div>"
         "</div>"
     )
