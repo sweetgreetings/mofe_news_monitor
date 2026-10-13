@@ -289,7 +289,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
   /* [수정: 2026-09-16] 행 여백 한 단계씩 축소 — padding은 원래 4px, 제목·메타 줄 사이 4→2px,
      행 사이 10→6px. 글자·버튼 크기는 그대로다(한 건 74 → 64px). 확정본·초안·정기 보관함·
-     수시 네 파일에 같은 값이 복제돼 있으니 한쪽만 고치지 않는다. 시안 파일은 정리하며 없앴다(당시 B안). */
+     수시 네 파일에 같은 값이 복제돼 있으니 한쪽만 고치지 않는다. 시안 파일은 정리하며 없앴다(당시 B안).
+     **여백은 네 화면이 같고, 줄 구성만 이 화면이 다르다**(아래 `.article summary` — 메타를
+     제목 줄로 올렸다). 여백까지 더 줄이는 안(C안)은 행 경계가 흐려져 기각했다. */
   .article {{ margin: 6px 0 6px 20px; line-height: 1.5; padding: 4px 6px; border-radius: var(--r-md); }}
   /* [추가: 2026-08-20] app.renderer와 동일한 이유(위 finalize-added 주석 참고) —
      render_article이 [단독] 기사에 항상 붙이는 art-scoop/t-scoop, [속보]의 t-flash도
@@ -329,24 +331,47 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     flex-shrink: 0; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
     color: {warn_text}; background: {warn_chip_bg}; border: 1px solid {warn_border}; white-space: nowrap;
   }}
-  /* [수정: 2026-08-13] app.renderer와 동일 — summary를 1행에서 2행(.title-row/
-     .action-row)으로 나눴다. 제목이 게시시각·액션 묶음과 폭을 다투다 대부분 2~3줄로
-     꺾이던 문제 때문. */
+  /* 기사 한 줄 — **이 화면만** 메타 줄(시각·원문보기·아이콘)을 제목 줄 오른쪽 끝에
+     올린다. 확정본·초안·수시는 2행 그대로다. 보관함은 손대지 않고 훑기만 하는 화면이고
+     (체크박스도 ↑↓도 없다), 그 세 화면은 누를 표적이 커야 하는 작업 화면이라 여기서만
+     갈라진다. 실측(쌓인 10,765건·창 1024px): 한 건 65 → **한 줄짜리 39px · 평균 43px**,
+     제목 칸 746 → 530px. 제목이 길면 메타가 통째로 아랫줄로 내려간다(14%, 지금 모양
+     그대로) — 그래서 `flex-wrap: wrap`이다. nowrap으로 두면 높이는 같은데 제목만 530px에
+     갇힌다. 시안 mockups/HISTORY_ROW_DENSITY_MOCKUP.html A안.
+     summary는 wrap하는 가로 flex이고 `order`로 줄을 가른다 — DOM 순서는
+     제목 → (옛 제목 `.refetch-was`) → 메타 → 라벨 칩(.lab-row)인데, 그대로 두면
+     한 줄짜리가 되려는 자리에 네 덩어리가 나란히 선다. 앞 둘만 첫 줄이고 나머지는
+     제 줄을 쓴다. */
   .article summary {{
-    cursor: pointer; display: flex; flex-direction: column; gap: 2px;
+    cursor: pointer; display: flex; flex-direction: row; flex-wrap: wrap;
+    align-items: baseline; gap: 2px 10px;
     -webkit-tap-highlight-color: transparent;
   }}
-  .title-row {{ display: flex; align-items: baseline; justify-content: flex-start; gap: 8px; }}
-  /* [수정: 2026-08-13] app.renderer와 동일 — 좁은 화면에서 액션 묶음이 옆으로 넘치던
-     문제(실측) 때문에 wrap을 허용한다. */
-  .action-row {{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 4px; }}
-  /* [추가: 2026-08-10] app.renderer와 동일 — render_article()이 만드는 🗑️ 등 액션
-     버튼 묶음(.article-actions)이 이 화면엔 margin-left:auto가 없어 제목 길이에 따라
-     위치가 들쭉날쭉했다(사용자 스크린샷) — flex 구조와 함께 적용해야 2행 오른쪽 끝에
-     고정된다. [수정: 2026-08-13] 그래도 좁은 화면에서 안 들어가면 wrap한다. */
+  .title-row {{
+    order: 1; flex: 1 1 auto; min-width: 0;
+    display: flex; align-items: baseline; justify-content: flex-start; gap: 8px;
+  }}
+  /* 메타 묶음은 통째로 오른쪽 끝에 서고 **안에서 줄바꿈하지 않는다** — 늦게 들어온
+     기사 칩·✎ 칩이 붙어 길어지면 제목 칸이 그만큼 줄어들 뿐이다(제목은 여러 줄로
+     흐를 수 있지만 이 묶음은 아니다). */
+  .action-row {{
+    order: 2; flex: 0 0 auto; margin-left: auto;
+    display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;
+  }}
   .article-actions {{
-    margin-left: auto; display: flex; align-items: center; justify-content: flex-end;
-    gap: 4px; flex-shrink: 0; flex-wrap: wrap; row-gap: 4px;
+    margin-left: 0; display: flex; align-items: center; justify-content: flex-end;
+    gap: 4px; flex-shrink: 0; flex-wrap: nowrap;
+  }}
+  /* 제 줄을 쓰는 둘 — 옛 제목(제목 바로 아래여야 뜻이 통한다)과 라벨 칩. */
+  .article summary > .refetch-was {{ order: 3; flex: 1 1 100%; }}
+  .article summary > .lab-row {{ order: 4; flex: 1 1 100%; }}
+  /* 좁은 화면에선 예전처럼 쌓는다 — 폰에서 제목에 200px 넘게 내주면 한 제목이 세 줄이
+     된다(기관 기사 찾기와 같은 처방). `display: block`이라 위 order·flex는 그대로 꺼지고
+     DOM 순서(제목 → 옛 제목 → 메타 → 라벨)가 곧 보이는 순서가 된다. */
+  @media (max-width: 640px) {{
+    .article summary {{ display: block; }}
+    .article summary > .action-row {{ margin-top: 2px; margin-left: 0; flex-wrap: wrap; row-gap: 4px; }}
+    .article-actions {{ margin-left: auto; flex-wrap: wrap; row-gap: 4px; }}
   }}
   .article summary::marker {{ color: {muted}; }}
   /* [추가: 2026-08-07] app.renderer와 동일 — 모바일 사파리 탭 하이라이트 잔상 방지. */
