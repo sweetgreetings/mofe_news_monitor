@@ -2451,6 +2451,10 @@ def render_article(
     # (known_url_labels_lookup이 원래 이 용도로 만들어져 있었다). 실측: 504건 화면에서
     # 파일을 504번 읽으면 83ms — 라벨이 늘수록 같이 커진다. 안 넘기면 예전 그대로.
     labels_lookup: Optional[dict] = None,
+    # [추가: 2026-10-12] 「⟳ 제목 다시 불러오기」가 읽는 표식(위 그 절). **기본은 꺼짐**이라
+    # 확정본·초안은 한 글자도 안 바뀐다 — 버튼이 없는 화면에 표식만 달아 두면, 나중에
+    # 문서 전체를 훑는 버튼이 생겼을 때 그 화면들까지 조용히 딸려 간다.
+    refetch_marks: bool = False,
 ) -> str:
     """기사 한 건을 렌더링한다.
 
@@ -2570,7 +2574,11 @@ def render_article(
     # [수정: 2026-09-11] 괄호도 뺐다 — 경계는 문장부호 대신 색·크기가 나눈다(.title-outlet,
     # 회색·조금 작은 글자, 시안 OUTLET_TITLE_MOCKUP.html A안). 복사·발송 텍스트는 위
     # line_template로 따로 만들므로 여기는 화면 전용이다.
-    line_html = f'<span class="title-outlet">{outlet_display}</span>{title}'
+    title_mark = " data-refetch-title" if refetch_marks else ""
+    line_html = (
+        f'<span class="title-outlet">{outlet_display}</span>'
+        f"<span{title_mark}>{title}</span>"
+    )
     move_html = ""
     if move is not None:
         up_disabled = " disabled" if move.get("disable_up") else ""
@@ -2830,12 +2838,15 @@ def render_article(
         )
         if current_labels:
             label_row_html = f'<div class="lab-row"><span class="tagmark">{icon("tag")}</span>{attached_html}</div>'
+    row_mark = f' data-refetch-row data-pub="{pub_date_attr}"' if refetch_marks else ""
+    meta_mark = " data-refetch-meta" if refetch_marks else ""
     return (
-        f'<div class="{article_class}" data-url="{url}" data-outlet-rank="{outlet_rank}">'
+        f'<div class="{article_class}" data-url="{url}" data-outlet-rank="{outlet_rank}"'
+        f"{row_mark}>"
         "<details>"
         "<summary>"
         f'<div class="title-row">{checkbox_html}<span class="title-line">{line_html}</span>{photo_badge_html}{finalize_badge_html}</div>'
-        '<div class="action-row">'
+        f'<div class="action-row"{meta_mark}>'
         # [수정: 2026-09-14] 칩을 검색어 앞으로 — 검색어가 남는 자리만큼 잘리게 되면서, 뒤에
         # 두면 칩의 가로 위치가 검색어 길이만큼 행마다 달라진다(목업 실측 108px 차이).
         # 원문보기보다는 뒤라 누르는 링크 자리는 안 흔들린다. KW_CHIP_MOCKUP.html C안.
@@ -2915,8 +2926,12 @@ def _render_groups(
     show_label_control: bool = False, scrap_date: str = "", scrap_end: str = "",
     finalize_new_subheadings: Optional[set] = None,
     group_copy_texts: Optional[dict] = None,
-) -> str:
-    """소제목별 화면을 렌더링한다.
+) -> tuple:
+    """소제목별 화면을 렌더링한다. 돌려주는 값은 (소제목 칸들, 📂 소제목 미분류 칸) 둘이다.
+
+    미분류 칸은 보고서로 나갈 소제목이 아니라 아직 갈 곳이 안 정해진 기사의 대기실이라,
+    💬 하단 요약 블록 **아래**(📌 담아둔 기사 칸 바로 위)에 그린다 — 호출부가 그 자리에
+    끼워 넣을 수 있도록 여기서는 합치지 않고 따로 돌려준다.
 
     ↑/↓ 버튼은 각 소제목 안에서만이 아니라 소제목 경계도 넘나들 수 있어(규칙21),
     맨 처음 소제목의 첫 기사(↑)·맨 마지막 소제목의 마지막 기사(↓)일 때만 버튼을
@@ -2937,6 +2952,7 @@ def _render_groups(
     all_names = [g["name"] for g in groups]
     finalize_new_set = finalize_new_subheadings or set()
     sections = []
+    unclassified_html = ""
     # [수정: 2026-09-10] ▼를 잠그는 기준은 "화면의 마지막 소제목"이 아니라 "옮길 수 있는
     # 마지막 소제목"이다 — 그 아래엔 순서가 고정된 기타·📂 미분류만 오므로(apply_group_order),
     # 예전처럼 전체 끝을 기준으로 삼으면 기타 바로 위 소제목의 ▼가 눌려도 아무 일이 없었다.
@@ -3114,12 +3130,16 @@ def _render_groups(
         split_attrs = f' data-group="{original_name}"' + (
             ' data-renamed="1"' if display_name != original_name else ""
         )
-        sections.append(
+        section_html = (
             f'<section class="{section_class}" id="subheading-{group_index}" data-toc-name="{toc_name}"'
             f"{locked_attr}{split_attrs}>"
             f"{heading}{articles_html}</section>"
         )
-    return "\n".join(sections)
+        if group["name"] == UNCLASSIFIED_GROUP_NAME:
+            unclassified_html = section_html
+        else:
+            sections.append(section_html)
+    return "\n".join(sections), unclassified_html
 
 
 def _format_summary_title(name: str, labels: dict, subheading_format: str) -> str:
@@ -3509,7 +3529,7 @@ def keyword_note_template_vars(run_key=None, has_round: bool = True) -> dict:
         "keyword_note_btn_html": (
             ""
             if text
-            else '<button class="create-group-btn" type="button" onclick="toggleKeywordNote(this)"><span class="plus-glyph">+</span>한 줄 메모</button>'
+            else '<button class="create-group-btn" type="button" onclick="toggleKeywordNote(this)">한 줄 메모</button>'
         ),
     }
 
@@ -3740,7 +3760,7 @@ def render_page(
     if not render_groups:
         body = '<div class="empty">💤<div class="cute-caption">뉴스가 잠잠</div></div>'
     else:
-        body = _render_groups(
+        body, unclassified_html = _render_groups(
             render_groups, highlight_words, line_template, labels, rank_by_url, set(custom_names), ai_names,
             subheading_format,
             show_label_control=True, scrap_date=label_scrap_date, scrap_end=run_slot,
@@ -3751,6 +3771,8 @@ def render_page(
         )
         if groups:
             body += _render_bottom(groups, highlight_words, labels, subheading_format)
+        # 📂 소제목 미분류는 요약 블록 아래, 📌 담아둔 기사 칸 바로 위에 선다.
+        body += unclassified_html
     # "직접 추가한 기사"(실시간 현황 → 📌)는 이 회차에 실제로 수집된 기사가 하나도
     # 없어도(💤) 독립적으로 존재할 수 있으므로, 위 분기와 무관하게 항상 이어붙인다.
     # [수정: 2026-07-27] 전체를 자동으로 정식 결과에 합치는 대신, 맨 위 기사를 ↑로
@@ -5186,6 +5208,222 @@ function useSimilarLabel(btn) {{
   addLabelFromInput(input);
 }}
 """
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 「⟳ 제목 다시 불러오기」 — 라벨 보관함·정기 보관함 공용 (archive/TITLE_CHANGE_DESIGN.md §5)
+#
+# **동작을 바꾸면 두 화면이 같이 바뀐다.** 화면이 지킬 약속은 넷뿐이다:
+#   · 묶음 안에 빈 `.refetch-note` 하나 — 결과 줄이 여기 들어간다
+#   · 기사 줄마다 `data-refetch-row` + `data-url` + `data-pub`
+#   · 그 안에 제목 글자를 담은 `[data-refetch-title]`
+#   · 칩이 붙을 자리 `[data-refetch-meta]` — 「옛 제목」 줄도 이 요소 **바로 앞**에 선다
+#     (제목 span 뒤에 넣으면 정기 보관함처럼 제목 줄이 flex인 화면에서 한 줄에 끼인다)
+# 버튼의 `data-refetch-scope`는 그 묶음을 가리키는 CSS 선택자다(없으면 문서 전체).
+# ──────────────────────────────────────────────────────────────────────────────
+
+REFETCH_TITLES_STYLE = """
+  /* 제목을 바꾸는 동작이라 **테두리 박스**다(글자 버튼은 가져가거나 보기만 바꾸는 것).
+     높이·여백·굵기는 확정본·초안 툴바 버튼과 같은 값. */
+  .title-refetch-btn {{
+    height: var(--h-tb); padding: 0 9px; font-size: var(--fs-md); font-weight: 500;
+    background: {card}; color: {text_soft}; border: 1px solid {border};
+    border-radius: var(--r-md); display: inline-flex; align-items: center; gap: 5px;
+    cursor: pointer; font-family: inherit; white-space: nowrap; flex: none;
+  }}
+  .title-refetch-btn:hover {{ background: {hover}; color: {accent}; border-color: {accent}; }}
+  .title-refetch-btn:disabled {{ background: {card}; color: {text_soft}; border-color: {border};
+    cursor: progress; }}
+  .title-refetch-btn.is-busy .ic {{ animation: refetch-spin 0.9s linear infinite; }}
+  @keyframes refetch-spin {{ to {{ transform: rotate(360deg); }} }}
+  /* 결과 줄 — 「잘 됐다」 안내라 초록 세트다. 바뀐 게 0건이어도 같은 색이다
+     (확인이 끝난 것 자체가 결과다). */
+  .refetch-note {{
+    margin: 0 0 10px; padding: 8px 12px; font-size: var(--fs-sm); line-height: 1.7;
+    background: {ok_bg}; border: 1px solid {ok_border}; border-radius: var(--r-md);
+    color: {ok_text};
+  }}
+  .refetch-note[hidden] {{ display: none; }}
+  .refetch-note .sub {{ opacity: 0.85; }}
+  /* 제목이 바뀐 줄만 세이지 — 담당자가 눌러서 일어난 일이라 「방금 손댄 것」 색이다.
+     행 hover(회색·파랑)에 지지 않게 속성 선택자로 명시도를 한 칸 올린다. */
+  [data-refetch-row].refetch-row-changed,
+  [data-refetch-row].refetch-row-changed:hover {{ background: {row_moved}; }}
+  .chip-changed {{
+    display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs);
+    font-weight: 700; color: {warn_text}; background: {warn_chip_bg};
+    border: 1px solid {warn_border}; border-radius: var(--r-pill); padding: 2px 8px;
+    white-space: nowrap;
+  }}
+  /* 제목은 그대로인데 원문만 손댄 줄 — **우리 값이 하나도 안 바뀌었으므로** 세이지를
+     안 칠하고 칩도 중립 회색이다. 「고쳐졌다」는 사실만 알린다. */
+  .chip-touched {{
+    display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs);
+    font-weight: 600; color: {text_soft}; background: {photo_badge_bg};
+    border: 1px solid {photo_badge_border}; border-radius: var(--r-pill); padding: 2px 8px;
+    white-space: nowrap;
+  }}
+  .refetch-was {{ margin-top: 5px; font-size: var(--fs-xs); color: {text_soft}; line-height: 1.6; }}
+  .refetch-was .k {{ color: {warn_text}; font-weight: 700; margin-right: 4px; }}
+  .refetch-was .t {{ text-decoration: line-through; text-decoration-color: {text_soft}; }}
+  .refetch-was.touched .k {{ color: {text_soft}; }}
+"""
+
+# 한 번에 보내는 기사 수 — 서버가 동시 4개로 받아오므로 두 바퀴다. 통째로 보내지 않는
+# 이유는 **진행이 보여야** 해서다: 회차 하나가 60건이면 한 요청이 10초를 넘는데 그동안
+# 화면이 아무 말도 안 하면 멈춘 것처럼 보인다.
+REFETCH_CHUNK = 8
+
+# JS 본문 — `.format()`을 거치지 않는 평범한 문자열이라 중괄호를 겹쳐 쓰지 않는다.
+# 자리표시자 셋만 뒤에서 갈아 끼운다(__URL__ · __SPIN__ · __CHUNK__).
+_REFETCH_TITLES_JS = """
+function refetchTitles(btn) {
+  var sel = btn.getAttribute("data-refetch-scope");
+  var scope = sel ? btn.closest(sel) : document;
+  if (!scope) scope = document;
+  var rows = Array.prototype.slice.call(scope.querySelectorAll("[data-refetch-row]"));
+  if (!rows.length) return;
+  var note = scope.querySelector(".refetch-note");
+  var total = rows.length, done = 0, all = {rows: {}, counts: {}};
+  btn.disabled = true;
+  btn.classList.add("is-busy");
+  function label() {
+    btn.innerHTML = '__SPIN__' + total + "건 중 " + done + "건 확인 중…";
+  }
+  label();
+  function chunk(start) {
+    var part = rows.slice(start, start + __CHUNK__);
+    var body = new URLSearchParams();
+    part.forEach(function (row) {
+      var t = row.querySelector("[data-refetch-title]");
+      body.append("url", row.getAttribute("data-url") || "");
+      body.append("title", t ? t.textContent.trim() : "");
+      body.append("pubDate", row.getAttribute("data-pub") || "");
+    });
+    fetch("__URL__", {method: "POST", body: body})
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        Object.keys(data.rows || {}).forEach(function (u) { all.rows[u] = data.rows[u]; });
+        Object.keys(data.counts || {}).forEach(function (k) {
+          all.counts[k] = (all.counts[k] || 0) + data.counts[k];
+        });
+        done += part.length;
+        if (start + __CHUNK__ < total) { label(); chunk(start + __CHUNK__); }
+        else { finish(false); }
+      })
+      .catch(function () { finish(true); });
+  }
+  function finish(failed) {
+    btn.disabled = false;
+    btn.classList.remove("is-busy");
+    btn.innerHTML = '__SPIN__' + "제목 다시 불러오기";
+    if (failed) {
+      if (note) {
+        note.hidden = false;
+        note.textContent = "불러오지 못했어요 — 잠시 뒤 다시 눌러 주세요.";
+      }
+      return;
+    }
+    rows.forEach(function (row) { paint(row, all.rows[row.getAttribute("data-url")]); });
+    if (note) { note.hidden = false; note.innerHTML = summary(all.counts); }
+  }
+  function paint(row, v) {
+    if (!v) return;
+    var old = row.querySelector(".refetch-was");
+    if (old) old.remove();
+    row.querySelectorAll(".chip-changed, .chip-touched").forEach(function (c) { c.remove(); });
+    row.classList.remove("refetch-row-changed");
+    if (v.state !== "changed" && v.state !== "touched") return;
+    var title = row.querySelector("[data-refetch-title]");
+    var meta = row.querySelector("[data-refetch-meta]");
+    var was = document.createElement("div");
+    var when = stamp(v.modified_at);
+    var key = document.createElement("span");
+    key.className = "k";
+    key.textContent = "✎ " + (when ? when + " 수정" : "수정됨");
+    was.appendChild(key);
+    if (v.state === "changed") {
+      was.className = "refetch-was";
+      row.classList.add("refetch-row-changed");
+      var prev = title ? title.textContent.trim() : (v.old_title || "");
+      if (title && v.new_title) title.textContent = v.new_title;
+      var strike = document.createElement("span");
+      strike.className = "t";
+      strike.textContent = prev;
+      was.appendChild(strike);
+      if (meta) meta.insertAdjacentHTML("afterbegin", '<span class="chip-changed">✎ 제목 바뀜</span>');
+    } else {
+      was.className = "refetch-was touched";
+      was.appendChild(document.createTextNode("제목은 그대로예요 — 원문만 손댔어요"));
+      if (meta) meta.insertAdjacentHTML("afterbegin", '<span class="chip-touched">✎ 원문 수정</span>');
+    }
+    if (meta && meta.parentNode) meta.parentNode.insertBefore(was, meta);
+  }
+  function stamp(raw) {
+    if (!raw) return "";
+    var m = String(raw).replace("T", " ").slice(0, 16);
+    if (m.length < 16) return "";
+    var now = new Date();
+    var ymd = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") +
+      "-" + String(now.getDate()).padStart(2, "0");
+    if (m.slice(0, 10) === ymd) return "오늘 " + m.slice(11);
+    return Number(m.slice(5, 7)) + "/" + Number(m.slice(8, 10)) + " " + m.slice(11);
+  }
+  function summary(c) {
+    var head = (c.checked || 0) + "건 확인";
+    if (c.title_changed) head += " · <b>제목이 바뀐 기사 " + c.title_changed + "건</b>";
+    if (c.touched) head += " · 원문만 손댄 기사 " + c.touched + "건";
+    if (!c.title_changed && !c.touched) head += " · 바뀐 제목 없어요";
+    var sub = [];
+    if (c.protected) sub.push("직접 고친 제목 " + c.protected + "건은 그대로 뒀어요");
+    if (c.skipped) sub.push("언론사 자체 주소 " + c.skipped + "건은 확인할 수 없어요");
+    if (c.failed) sub.push(c.failed + "건은 불러오지 못했어요");
+    if (!sub.length) return head;
+    return head + '<br><span class="sub">' + sub.join(" · ") + "</span>";
+  }
+  chunk(0);
+}
+"""
+
+
+def refetch_titles_style() -> str:
+    """「⟳ 제목 다시 불러오기」 CSS — 템플릿에 {refetch_titles_style}로 끼워 넣는다."""
+    return REFETCH_TITLES_STYLE.format(**PALETTE)
+
+
+def refetch_titles_button_html(scope: str = "", tip: str = "") -> str:
+    """버튼 하나. scope는 이 버튼이 맡을 묶음을 가리키는 CSS 선택자(없으면 문서 전체)."""
+    attr = f' data-refetch-scope="{html.escape(scope, quote=True)}"' if scope else ""
+    title = tip or "이 목록의 기사 제목을 원문에서 다시 불러옵니다"
+    return (
+        '<button type="button" class="title-refetch-btn" '
+        'onclick="event.stopPropagation(); refetchTitles(this)"'
+        f'{attr} title="{html.escape(title, quote=True)}">'
+        f'{icon("refresh")}제목 다시 불러오기</button>'
+    )
+
+
+def refetch_titles_note_html() -> str:
+    """결과 줄이 들어갈 빈 자리 — 버튼이 맡는 묶음 안에 하나 둔다."""
+    return '<p class="refetch-note" hidden></p>'
+
+
+def refetch_titles_script(host: str, port: int) -> str:
+    """「⟳ 제목 다시 불러오기」 JS — 한 곳이고 두 화면이 같이 쓴다.
+
+    보내는 값은 **화면이 지금 보여주고 있는 제목**이다(저장소를 다시 뒤지지 않는다) —
+    갈리면 담당자가 보는 것과 판정이 다른 값을 본다. 받은 뒤엔 제목 글자를 그 자리에서
+    갈아끼우고 옛 제목을 취소선으로 한 줄 남긴다. **순서는 흔들지 않는다** — 바뀐 줄을
+    위로 올리지 않는다(보던 목록의 줄 자리가 움직이면 어디를 보고 있었는지 잃는다).
+
+    제목 글자는 textContent로 넣는다 — 기사 제목엔 `<`·`&`가 섞여 들어온다.
+    """
+    return (
+        _REFETCH_TITLES_JS
+        .replace("__URL__", f"http://{host}:{port}/refetch-titles")
+        .replace("__SPIN__", icon("refresh"))
+        .replace("__CHUNK__", str(REFETCH_CHUNK))
+    )
 
 
 def label_popover_style() -> str:

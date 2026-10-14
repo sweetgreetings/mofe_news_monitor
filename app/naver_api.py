@@ -576,6 +576,27 @@ _ARTICLE_PUBLISHED_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _JSONLD_PUBLISHED_PATTERN = re.compile(r'"datePublished"\s*:\s*"([^"]+)"')
+
+# [추가: 2026-10-12] 네이버 미러 페이지는 발행 시각(data-date-time) 바로 옆에 **기사수정
+# 시각**도 찍는다 — 「제목 다시 불러오기」가 "담은 뒤 원문을 또 손댔나"를 이 값으로 본다
+# (archive/TITLE_CHANGE_DESIGN.md §3.2). 패턴이 data-date-time과 안 겹친다: 페이지엔
+# `data-date-time-age-in-minutes`도 있지만 `=`가 아니라 `-`가 이어져 걸리지 않고,
+# `data-modify-date-time`은 앞에 `modify-`가 붙어 발행 쪽 패턴에 안 걸린다.
+#
+# 실측(2026-10-12, 라벨 붙은 네이버 미러 기사 8건): **8건 전부에 값이 있었다**
+# (발행 +3분 ~ +6시간 44분). 그래서 "이 값이 있나"는 판정으로 못 쓰고, 처음 본 값보다
+# 뒤로 밀렸을 때만 뜻이 있다 — 그 판정은 app.title_refetch.touched_since가 한다.
+_NAVER_MODIFY_DATE_TIME_PATTERN = re.compile(r'data-modify-date-time=["\']([^"\']+)["\']')
+
+
+def _modified_at_from_html(text: str) -> Optional[str]:
+    """원문 페이지에서 기사수정 시각을 뽑는다 — **네이버 미러만**. 없으면 None.
+
+    자체 도메인은 표기가 매체마다 달라 안 본다(_pub_date_from_html이 자체 도메인
+    폴백을 두는 것과 달리, 여기엔 믿을 만한 공통 후보가 없다).
+    """
+    match = _NAVER_MODIFY_DATE_TIME_PATTERN.search(text)
+    return _normalize_pub_date(match.group(1)) if match else None
 _LOOSE_DATETIME_PATTERN = re.compile(r"(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})")
 
 
@@ -622,6 +643,32 @@ def _pub_date_from_html(text: str) -> Optional[str]:
     if jsonld_match:
         return _normalize_pub_date(jsonld_match.group(1))
     return None
+
+
+def fetch_for_title_check(url: str) -> Optional[dict]:
+    """「제목 다시 불러오기」가 기사 하나에 쓰는 입구 — **페이지를 한 번만 받아** 제목·발행
+    시각·기사수정 시각 셋을 함께 돌려준다(archive/TITLE_CHANGE_DESIGN.md §3).
+
+    받아온 값을 **대조하지는 않는다** — 무엇이 달라졌나는 app.title_refetch가 정한다.
+    여긴 "페이지에서 무엇을 읽어 오나"만 맡는다.
+
+    **요약은 안 읽는다.** 저장된 요약은 네이버 검색의 「검색어 주변 발췌」라 그 기사가 왜
+    걸렸는지를 담고 있는데, 원문의 og:description은 「본문 맨 앞」이라 다른 물건이다.
+    수십 건을 한꺼번에 갈아치우면 그 정보가 통째로 사라진다(§3.3). 한 건씩 바꾸는
+    fetch_full_title_and_summary는 담당자가 "이 요약이 이상하다"고 보고 누르는 것이라
+    지금 그대로 둔다.
+
+    접속 자체가 실패하면 None — 부르는 쪽이 "확인함"과 "확인 못 함"을 가른다
+    (못 받은 것을 "안 바뀜"으로 굳히면 그 기사는 영영 안 걸린다).
+    """
+    text = _fetch_page_html(url, timeout=5)
+    if text is None:
+        return None
+    return {
+        "title": _best_title_from_html(text),
+        "pub_date": _pub_date_from_html(text),
+        "modified_at": _modified_at_from_html(text),
+    }
 
 
 # 네이버 미러 페이지의 og:article:author는 "{언론사} | 네이버" 형태다 — 실측(2026-09-21)

@@ -13,7 +13,7 @@ from app.last_slot_topup import last_window, topup_due_at
 from app.scraper import collect_run_with_retry, top_up_last_run
 from app.settings import active_schedule_times, load_settings
 from app.curation import cleanup_group_overrides
-from app.storage import delete_expired_runs, run_exists
+from app.storage import delete_expired_runs, purge_expired_deleted_runs, run_exists
 
 logger = logging.getLogger(__name__)
 
@@ -245,6 +245,7 @@ def run_scheduler(
     scrape: Callable[[str, str], dict] = collect_run_with_retry,
     cleanup: Callable[[], list] = delete_expired_runs,
     cleanup_overrides: Callable[[], int] = cleanup_group_overrides,
+    purge_deleted: Callable[[], int] = purge_expired_deleted_runs,
     # [추가: 2026-08-18] 기본값을 아무 일도 안 하는 람다로 둔다 — app/scheduler.py는
     # "정기" 코드라 app.adhoc를 import하지 않는다(ADHOC_DESIGN.md §4의 단방향 의존 규칙).
     # 실제 함수(app.adhoc.card.delete_expired_cards)는 main.py가 이 자리에 주입한다.
@@ -268,6 +269,11 @@ def run_scheduler(
     # 부르는 테스트가 전부 실제 data/agency_archive/를 쓰고 네이버까지 부른다. 실제로
     # 그랬다(CODING_CONVENTIONS §1 — 재봤더니 엉뚱한 날짜 파일이 생겼다).
     collect_agency_archive: Callable[[datetime], int] = lambda _now: 0,
+    # 「제목 바뀜 알림」(app.title_watch) — 라벨 붙인 기사의 제목이 원문에서 바뀌었는지
+    # 30분마다 돌아보고 텔레그램으로 알린다. **기본값을 빈 람다로 두고 main.py가
+    # 실제 함수를 주입한다**(collect_agency_archive와 같은 이유) — 기본값이 진짜 함수면
+    # run_scheduler를 부르는 테스트가 실제 data/·네이버·텔레그램까지 탄다.
+    check_title_watch: Callable[[datetime], int] = lambda _now: 0,
     should_continue: Callable[[], bool] = lambda: True,
 ) -> None:
     """앱이 켜져 있는 동안 poll_interval_sec마다 실행할 회차가 있는지 확인하고 수집한다.
@@ -291,6 +297,10 @@ def run_scheduler(
     RETENTION_DAYS가 지났는가"로 바뀌었다 — 앞의 기준은 담당자가 방금 초안에서 옮긴
     배정을 조용히 지워버렸다(app.curation.cleanup_group_overrides 참고).
 
+    [추가: 2026-10-12] purge_deleted — 지운 지 DELETED_RESTORE_DAYS가 지난 회차를 껍데기로
+    바꾼다(「삭제 기록」에 줄은 남고 되살리기만 빠진다). cleanup과 같이 trash 폴더만
+    건드리고 ARTICLES_DIR를 따라가므로 기본값을 진짜 함수로 둬도 테스트가 안전하다.
+
     [추가: 2026-08-18] cleanup_adhoc_cards — 수시 모니터링 카드도 정기와 같은 보관 정책
     (ADHOC_RETENTION_DAYS, PRD 기능9 규칙9)으로 정리한다. app/adhoc/card.py의
     delete_expired_cards를 여기서 직접 import하지 않는 이유는 app/scheduler.py가 "정기"
@@ -304,8 +314,14 @@ def run_scheduler(
     확정·발송·집계 어디에도 얹히지 않는다. cleanup_adhoc_cards와 같은 이유로 **기본값은
     빈 람다이고 main.py가 실제 함수를 주입한다**(위 인자 주석 참고).
 
+    [추가] check_title_watch — 라벨 붙인 기사의 제목이 원문에서 바뀌었는지 30분마다
+    돌아보고 텔레그램으로 알린다(app.title_watch). 라벨은 나이로 안 지우는 유일한 장치라
+    제목 오차가 가장 오래 남는 자리다. 알리기만 하고 화면 제목은 안 건드린다 — 반영은
+    담당자가 라벨 보관함에서 버튼을 누를 때다. collect_agency_archive와 같은 이유로
+    **기본값은 빈 람다이고 main.py가 실제 함수를 주입한다**.
+
     now_fn/sleep/scrape/cleanup/render_waiting/check_confirm_send/check_breaking_alert/check_negative_guess/
-    collect_agency_archive/should_continue는 테스트에서 주입할 수 있다.
+    collect_agency_archive/check_title_watch/should_continue는 테스트에서 주입할 수 있다.
 
     [추가: 2026-08-10] 매 tick마다 확정·전송 유예 시간 경과도 함께 확인한다
     (app.confirm_send.check_pending_confirm_and_send) — 담당자가 (확정)/(전송)을 직접
@@ -329,8 +345,11 @@ def run_scheduler(
             check_breaking_alert(now)
             check_negative_guess(now)
             collect_agency_archive(now)
+            # 제목 바뀜 알림 — 아침 시각 전이거나 오늘 이미 돌았으면 즉시 돌아온다(비용 0).
+            check_title_watch(now)
             cleanup()
             cleanup_overrides()
+            purge_deleted()
             cleanup_adhoc_cards()
         except Exception:
             logger.exception("스크랩 회차 실행 중 오류 — 다음 회차에 다시 시도합니다")

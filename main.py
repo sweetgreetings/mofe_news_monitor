@@ -8,11 +8,13 @@ import time
 import webbrowser
 
 from app import photo_body
-from app.adhoc.card import delete_expired_cards
+from app.adhoc.card import delete_expired_cards, purge_expired_deleted_cards
 from app.agency_archive import collect_tick as agency_archive_tick
+from app.title_watch import watch_tick as title_watch_tick
 from app.breaking_alert_sender import catch_up_on_wake
 from app.config import LANDING_HTML_PATH, SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT
 from app.confirm_send import confirm_and_promote
+from app.alert_groups import transplant_alert_groups
 from app.credentials import cleanup_env_backups, transplant_env_keys
 from app.today_cuts import after_round_collected
 from app.curation import cleanup_group_overrides
@@ -23,7 +25,7 @@ from app.renderer import generate_screen, generate_waiting_page
 from app.scheduler import run_due_slot, run_scheduler
 from app.scraper import collect_run_with_retry
 from app.settings_server import create_settings_server
-from app.storage import delete_expired_runs
+from app.storage import delete_expired_runs, purge_expired_deleted_runs
 from app.telegram_bot_name import apply_default_bot_name_once
 
 logger = logging.getLogger(__name__)
@@ -110,6 +112,17 @@ def _apply_default_bot_name() -> None:
         logger.exception("봇 기본 이름 걸기 실패 — 다음에 앱을 켤 때 다시 시도합니다")
 
 
+def _cleanup_adhoc() -> list:
+    """스케줄러 tick이 부르는 수시 정리 — 보관 기한이 지난 카드를 trash로 옮기고,
+    지운 지 오래된 카드는 껍데기로 바꾼다(「삭제 기록」에 줄은 남고 되살리기만 빠진다).
+
+    app/scheduler.py는 app.adhoc를 import하지 않으므로(수시 경계 규칙) 여기서 주입한다.
+    """
+    moved = delete_expired_cards()
+    purge_expired_deleted_cards()
+    return moved
+
+
 def main(open_browser: bool = True) -> None:
     """앱 진입점: 켜지자마자 놓친 회차가 있으면 즉시 1회 수집한 뒤, 스케줄 루프와 설정
     저장 서버를 백그라운드로 띄우고 브라우저로 화면을 연다 (PRD.md 4절).
@@ -172,6 +185,12 @@ def main(open_browser: bool = True) -> None:
     except Exception:
         logger.exception("키 옮겨심기 실패 — .env를 그대로 쓰며 앱은 정상 동작합니다")
 
+    # [추가] [단독]·[속보] 감시 대상을 검색어 그룹 스위치로 한 번 옮겨 심는다 — 옛 설정은
+    # /breaking-alert의 group_names(그룹 **이름 문자열** 목록)였다. 아래 수집 단계의
+    # 「바닥」 검사가 이 스위치를 보므로 그보다 먼저 와야 한다. 실패해도 앱은 멈추지
+    # 않는다(app.settings.group_in_alert가 키 없는 그룹을 켜짐으로 읽는다).
+    transplant_alert_groups()
+
     # 며칠 꺼뒀다 켠 경우, 정리(cleanup)는 스케줄 루프 안에서만 비동기로 도는데(scheduler.py)
     # 그걸 기다리면 아래에서 만들 "정기 보관함"이 보관 기간을 넘긴 회차까지 잠깐 보여줄 수 있다.
     # 화면을 만들기 전에 한 번 먼저 정리한다.
@@ -179,6 +198,9 @@ def main(open_browser: bool = True) -> None:
         delete_expired_runs()
         cleanup_group_overrides()
         delete_expired_cards()
+        # 지운 지 오래된 회차는 껍데기로 — 「삭제 기록」에 줄은 남고 되살리기만 빠진다.
+        purge_expired_deleted_runs()
+        purge_expired_deleted_cards()
         cleanup_env_backups()
     except Exception:
         logger.exception("시작 시 보관 기간 정리 실패 — 스케줄 루프가 이어서 재시도합니다")
@@ -203,8 +225,11 @@ def main(open_browser: bool = True) -> None:
         target=run_scheduler,
         kwargs={
             "scrape": _scrape_and_render,
-            "cleanup_adhoc_cards": delete_expired_cards,
+            "cleanup_adhoc_cards": _cleanup_adhoc,
             "collect_agency_archive": agency_archive_tick,
+            # 라벨 붙인 기사의 제목이 바뀌었는지 30분마다(app.title_watch) — 기본값이
+            # 빈 람다라 여기서 주입하지 않으면 아무 일도 안 한다.
+            "check_title_watch": title_watch_tick,
         },
         daemon=True,
     ).start()

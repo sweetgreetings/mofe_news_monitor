@@ -14,6 +14,7 @@ from app.config import (
     DEFAULT_ARTICLE_LINE_TEMPLATE,
     DEFAULT_HIGHLIGHT_KEYWORDS,
     DEFAULT_SUBHEADING_FORMAT_TEMPLATE,
+    DELETED_LOG_TITLE,
     EAGER_HISTORY_DAYS,
     FONT_STACK,
     HISTORY_HTML_PATH,
@@ -36,6 +37,10 @@ from app.labels import load_labels
 from app import send_log
 from app.renderer import (
     send_log_href,
+    refetch_titles_button_html,
+    refetch_titles_note_html,
+    refetch_titles_script,
+    refetch_titles_style,
     apply_line_template,
     apply_subheading_format,
     format_slot_time_kr,
@@ -92,36 +97,23 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .slot-missing::before {{ content: "·"; color: {muted}; font-size: 0.75rem; }}
   .slot-missing .slot-label {{ flex: none; white-space: nowrap; }}
   .missing-mark {{ font-size: var(--fs-sm); color: {muted}; }}
-  /* [추가: 2026-09-11] 담당자가 지운 회차 — 「수집 기록 없음」과 같은 자리에 「삭제함 ·
-     되살리기」로 남는다. 지운 걸 "앱이 못 모은 것"처럼 보이게 두면 거짓말이 된다.
-     수시 보관함의 같은 줄(.run-line.gone)과 같은 모양이다. */
-  .slot-gone {{ margin: 0 0 0 22px; border-top: 1px solid {border}; padding: 8px 4px;
-    display: flex; align-items: center; gap: 10px; color: {muted}; background: {bg}; }}
-  .slot-gone::before {{ content: "·"; color: {muted}; font-size: 0.75rem; }}
-  .slot-gone .slot-label {{ flex: none; white-space: nowrap; }}
-  .gone-tag {{ flex: none; font-size: var(--fs-xs); border: 1px dashed {dash_border}; border-radius: var(--r-pill);
-    padding: 0 8px; color: {muted}; background: {card}; }}
-  .gone-when {{ font-size: var(--fs-sm); color: {text_faint}; }}
-  .restore-btn {{ flex: none; margin-left: auto; border: none; background: none; color: {accent};
-    font: inherit; font-size: var(--fs-sm); cursor: pointer; padding: 2px 4px; }}
-  .restore-btn:hover {{ text-decoration: underline; text-underline-offset: 3px; }}
-  details.slot.just-restored > summary {{ background: {row_moved}; }}
   /* 회차 줄 끝 🗑 — 확정본 기사 행의 🗑와 같은 무게(평소 회색, hover만 빨강). 확인창 없이
-     바로 지우고, 그 자리에 「삭제함 · 되살리기」가 남는다. 오늘 회차·가장 최근 회차엔 안 그린다. */
+     바로 지우고 줄은 사라진다 — 되살릴 자리는 초록 안내 한 줄(.ok-note)과 「삭제 기록」이
+     받는다. 오늘 회차·가장 최근 회차엔 안 그린다. */
   .slot-del {{ flex: none; margin-left: auto; border: none; background: none; color: {text_faint};
     cursor: pointer; padding: 3px 6px; border-radius: var(--r-sm); line-height: 1; display: inline-flex; font-size: 0.95rem; }}
   details.slot[open] > summary .slot-del {{ margin-left: 0; }}
   .slot-del:hover {{ color: {error}; background: {error_bg}; }}
   /* [추가: 2026-09-15] 날짜 줄 🗑 — 그 날의 (지울 수 있는) 회차 모두, 확인창 한 번. 모양은
-     회차 줄 🗑와 같다. 통째로 지우면 날짜 줄이 all-gone이 되어 복사·txt·xlsx·🗑 대신
-     「삭제함 · 모두 되살리기」가 보인다(수시 보관함 사안 줄과 같은 규칙). */
+     회차 줄 🗑와 같다. 통째로 지우면 그 날짜 줄이 화면에서 사라진다. */
   .day-del {{ flex: none; border: none; background: none; color: {text_faint}; cursor: pointer;
     padding: 3px 6px; border-radius: var(--r-sm); line-height: 1; display: inline-flex; font-size: 0.95rem; font-weight: 400; }}
   .day-del:hover {{ color: {error}; background: {error_bg}; }}
-  .day-gone-mark {{ display: none; align-items: center; gap: 6px; font-weight: 400; }}
-  details.date.all-gone > summary .day-gone-mark {{ display: inline-flex; }}
-  details.date.all-gone > summary .exp, details.date.all-gone > summary .day-del {{ display: none; }}
-  .day-gone-mark .restore-btn {{ margin-left: 0; }}
+  /* [추가: 2026-10-12] 지운 직후의 초록 안내 — 사라진 줄의 자리를 받는다(수시 카드 화면의
+     .ok-note와 같은 색·같은 문법). 화면을 다시 열면 없어지고, 그 뒤는 「삭제 기록」이 받는다. */
+  .ok-note {{ background: {ok_bg}; border: 1px solid {ok_border}; color: {ok_text};
+    border-radius: var(--r-lg); padding: 11px 14px; margin: 12px 0; font-size: var(--fs-md); }}
+  .ok-note .ok-link {{ color: inherit; font-weight: 600; margin-left: 6px; }}
   /* 선택 삭제 모드(body.hist-tidy) — 체크박스·회차별 건수·잠금 안내가 나오고, 꺼내는
      동작(복사·txt·xlsx)과 줄 끝 🗑는 숨는다. 건수는 이때만 보인다: 평소엔 찾는 기준이
      아니라 뺐지만(2026-08-21), 지울지 판단할 땐 근거가 된다. 0건은 앰버 굵게. */
@@ -137,9 +129,15 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   body.hist-tidy .tidy-only {{ display: inline-flex; }}
   body.hist-tidy .normal-only, body.hist-tidy .exp, body.hist-tidy .slot-del, body.hist-tidy .day-del,
   body.hist-tidy details.slot > summary .slot-export-actions {{ display: none; }}
-  body.hist-tidy details.slot > summary::before, body.hist-tidy .slot-missing::before, body.hist-tidy .slot-gone::before {{ content: ""; }}
+  body.hist-tidy details.slot > summary::before, body.hist-tidy .slot-missing::before {{ content: ""; }}
   details.slot:has(> summary input.pick:checked) > summary {{ background: {hover}; }}
   .result-bar .tidy-btn + .tidy-bar + .exp {{ margin-left: 0; }}
+  /* [추가: 2026-10-12] 「삭제 기록」으로 가는 글자 링크 — 건수는 안 적는다(적으면 보관함이
+     다시 어수선해진다). 선택 삭제 모드에선 다른 평소 버튼과 같이 숨는다. */
+  .deleted-link {{ margin-left: auto; color: {text_soft}; text-decoration: none; font-size: var(--fs-sm);
+    font-weight: 500; white-space: nowrap; }}
+  .deleted-link:hover {{ color: {accent}; text-decoration: underline; text-underline-offset: 3px; }}
+  .result-bar .deleted-link + .tidy-btn {{ margin-left: 0; }}
   .tidy-btn {{ margin-left: auto; border: 1px solid {border}; background: {card}; color: {muted}; border-radius: var(--r-md);
     padding: 6px 13px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; white-space: nowrap; }}
   .tidy-btn:hover {{ border-color: {error_border}; color: {error}; background: {error_bg}; }}
@@ -215,8 +213,6 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      반드시 .chip 뒤에 와야 한다 — .chip의 `border: 1px solid` 단축 속성이 뒤에 오면
      여기 border-color를 덮어쓴다. */
   .chip-missing {{ background: {warn_bg}; color: {warn_text}; border-color: {warn_border}; }}
-  /* [추가: 2026-09-11] 살아 있는 회차는 없고 지운 회차만 남은 날짜 — 「삭제함」 줄과 같은 점선. */
-  .chip-gone {{ background: {card}; color: {muted}; border-color: {dash_border}; border-style: dashed; }}
   /* [추가: 2026-08-26] 발송 여부 = 칩 대신 점 하나(사용자 요청 — "발송 완료"보다
      키워드가 더 자주 보게 되는 정보라, 칩이 그 줄의 무게를 더 가져가면 안 된다).
      성공은 꽉 찬 초록 점, 실패는 속이 빈 빨간 링 — 색만 다르면 적록색약에서
@@ -273,6 +269,12 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   details.slot > summary:hover {{ background: {hover}; }}
   .slot-export-actions {{ display: none; gap: 2px; flex-shrink: 0; margin-left: auto; }}
   details.slot[open] > summary .slot-export-actions {{ display: flex; }}
+  /* 「⟳ 제목 다시 불러오기」도 가져가기와 같이 **펼친 회차에만** 보인다 — 접힌 줄마다
+     박스 버튼이 서면 날짜 하나가 버튼 밭이 된다. CSS는 app.renderer가 내고(공용),
+     여기선 보이고 숨는 규칙만 정한다. */
+  details.slot > summary .title-refetch-btn {{ display: none; }}
+  details.slot[open] > summary .title-refetch-btn {{ display: inline-flex; }}
+  body.hist-tidy details.slot > summary .title-refetch-btn {{ display: none; }}
   .slot-export-actions button, .slot-export-actions a.btn {{
     background: transparent; color: {text_soft}; border: none; border-radius: var(--r-md);
     font-weight: 500; padding: 4px 8px; font-size: var(--fs-sm); font-family: inherit; cursor: pointer;
@@ -481,6 +483,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }}
   /* [추가: 2026-09-16] 🏷 라벨 팝오버 — 확정본·초안과 같은 값(app.renderer.label_popover_style). */
 {label_popover_style}
+  /* [추가: 2026-10-12] 「⟳ 제목 다시 불러오기」 — 라벨 보관함과 같은 값(공용). */
+{refetch_titles_style}
 </style>
 </head>
 <body>
@@ -639,8 +643,9 @@ function loadHistoryDay(details) {{
 }}
 
 // [추가: 2026-09-11] 회차 삭제 — 줄 끝 🗑(하나, 확인창 없음)와 [선택 삭제](여러 개, 확인창 한 번)가
-// 같은 deleteRuns를 쓴다. 서버가 돌려준 「삭제함 · 되살리기」 줄로 그 자리만 갈아 끼우므로
-// 새로고침이 없다 — 펼쳐 둔 날짜·스크롤 위치가 그대로다.
+// 같은 deleteRuns를 쓴다. 지운 줄은 **그 자리에서 없어지고**, 되살릴 자리는 초록 안내 한 줄이
+// 받는다([수정: 2026-10-12] — 지운 자리에 줄을 남기던 때는 같은 삭제가 보관함 안 두 자리에
+// 나타나 어디서 되살리는지 헷갈렸다). 새로고침은 없다 — 펼쳐 둔 날짜·스크롤 위치가 그대로다.
 var HIST_API = "http://{settings_host}:{settings_port}";
 var EMPTY_RUN_KEYS = {empty_run_keys_json};
 var pendingPicks = new Set();
@@ -656,11 +661,12 @@ function deleteRuns(keys) {{
     method: "POST", headers: {{"Content-Type": "application/x-www-form-urlencoded"}}, body: body
   }}).then(function (res) {{ return res.ok ? res.json() : Promise.reject(); }})
     .then(function (data) {{
-      Object.keys(data.rows).forEach(function (k) {{
+      data.gone.forEach(function (k) {{
         var el = slotByKey(k);
-        if (el) {{ el.outerHTML = data.rows[k]; }}
+        if (el) {{ el.remove(); }}
       }});
       onRunPickChange();
+      if (data.gone.length) {{ showHistGone(data.gone.length, data.label); }}
       if (data.failed && data.failed.length) {{ alert(data.failed.join('\\n')); }}
       return data;
     }})
@@ -668,7 +674,7 @@ function deleteRuns(keys) {{
 }}
 // [추가: 2026-09-15] 날짜 줄 🗑 — 그 날의 (지울 수 있는) 회차 전부. 여러 개라 확인창을 한 번
 // 거친다. 회차 목록은 서버가 구워 넣은 값(data-keys)이다 — 아직 안 펼친 날짜는 회차 줄이
-// 화면에 없어서다. 지운 뒤 안 불러온 날짜면 펼쳐 불러와 「삭제함」 줄을 보여준다.
+// 화면에 없어서다. 그 날에 남은 회차가 없으면 날짜 줄째 사라진다.
 function deleteDay(btn) {{
   var day = btn.closest('details.date');
   var keys = JSON.parse(btn.dataset.keys);
@@ -677,49 +683,34 @@ function deleteDay(btn) {{
   var msg = label + ' 회차를 모두 지울까요?\\n회차 ' + keys.length + '개 · 기사 '
     + Number(btn.dataset.count || 0).toLocaleString() + '건';
   if (btn.dataset.keep) {{ msg += '\\n가장 최근 회차(' + btn.dataset.keep + ')는 남아요 — 확정본 화면과 자동발송이 보고 있어요.'; }}
-  msg += '\\n\\n지운 자리에 「삭제함」이 남고, 거기서 되살릴 수 있어요.';
+  msg += '\\n\\n「삭제 기록」에서 되살릴 수 있어요.';
   if (!confirm(msg)) {{ return; }}
   deleteRuns(keys).then(function (data) {{
-    if (!data || !Object.keys(data.rows).length) {{ return; }}
+    if (!data || !data.gone.length) {{ return; }}
     btn.remove();
-    if (!btn.dataset.keep) {{
-      day.classList.add('all-gone');
-      var restoreAll = day.querySelector(':scope > summary .day-gone-mark .restore-btn');
-      if (restoreAll) {{ restoreAll.hidden = Object.keys(data.rows).length < 2; }}
+    // 그 날에 남은 회차가 없으면 날짜 줄째 사라진다 — 지운 흔적을 보관함에 안 남긴다.
+    if (!btn.dataset.keep && !day.querySelector('[data-slot-key]') && historyDayIsLoaded(day)) {{
+      day.remove();
+      return;
     }}
     if (!historyDayIsLoaded(day) && day.open) {{ loadHistoryDay(day); }}
     else {{ day.open = true; }}
   }});
 }}
-// 날짜 줄 「모두 되살리기」 — 그 날의 「삭제함」 줄을 하나씩 차례로 되살린다(한꺼번에 보내지 않는다:
-// 되살리기마다 인덱스·화면을 다시 쓰므로 순서대로가 안전하다).
-function restoreDay(btn) {{
-  var day = btn.closest('details.date');
-  var buttons = Array.prototype.slice.call(day.querySelectorAll('.slot-gone .restore-btn'));
-  btn.disabled = true;
-  buttons.reduce(function (p, b) {{ return p.then(function () {{ return restoreRun(b); }}); }}, Promise.resolve())
-    .then(function () {{
-      btn.disabled = false;
-      if (!day.querySelector('.slot-gone')) {{ day.classList.remove('all-gone'); }}
-    }});
-}}
-function restoreRun(btn) {{
-  var row = btn.closest('.slot-gone');
-  btn.disabled = true;
-  return fetch(HIST_API + "/history/restore-run", {{
-    method: "POST", headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
-    body: new URLSearchParams({{name: btn.dataset.trash}})
-  }}).then(function (res) {{ return res.json().then(function (data) {{ return {{ok: res.ok, data: data}}; }}); }})
-    .then(function (r) {{
-      if (!r.ok) {{ alert(r.data.error || "되살리지 못했습니다."); btn.disabled = false; return; }}
-      row.outerHTML = r.data.html;
-      var restored = slotByKey(r.data.key);
-      if (restored) {{
-        restored.classList.add('just-restored');
-        setTimeout(function () {{ restored.classList.remove('just-restored'); }}, 1500);
-      }}
-    }})
-    .catch(function () {{ alert("되살리지 못했습니다 — 앱이 실행 중인지 확인해주세요."); btn.disabled = false; }});
+// 지운 직후의 초록 안내 — 줄이 사라진 자리를 받는다. 줄 끝 🗑에 확인창이 없는 건 되살릴
+// 자리가 눈앞에 남아서였으니, 그 자리를 이 줄이 대신한다. 화면을 다시 열면 사라지고,
+// 그 뒤로는 「삭제 기록」이 받는다.
+function showHistGone(n, label) {{
+  var old = document.getElementById('hist-gone');
+  if (old) {{ old.remove(); }}
+  var what = n > 1 ? ('회차 ' + n + '개를') : ((label || '회차') + '를');
+  var box = document.createElement('div');
+  box.id = 'hist-gone';
+  box.className = 'ok-note';
+  box.innerHTML = '{icon_check} ' + what + ' 지웠어요.'
+    + '<a class="ok-link" href="' + HIST_API + '/deleted">{deleted_log_title} →</a>';
+  var anchor = document.querySelector('.period-bar') || document.querySelector('h1');
+  if (anchor) {{ anchor.insertAdjacentElement('afterend', box); }}
 }}
 function setHistoryTidy(on) {{
   document.body.classList.toggle('hist-tidy', on);
@@ -779,7 +770,7 @@ function deletePickedRuns() {{
   if (!slots.length) {{ return; }}
   var lines = slots.slice(0, 4).map(function (s) {{ return s.dataset.label + ' · ' + s.dataset.count + '건'; }});
   if (slots.length > 4) {{ lines.push('외 ' + (slots.length - 4) + '개'); }}
-  if (!confirm('회차 ' + slots.length + '개를 삭제할까요?\\n' + lines.join('\\n') + '\\n\\n지운 자리에 「삭제함」이 남고, 거기서 되살릴 수 있어요.')) {{ return; }}
+  if (!confirm('회차 ' + slots.length + '개를 삭제할까요?\\n' + lines.join('\\n') + '\\n\\n「삭제 기록」에서 되살릴 수 있어요.')) {{ return; }}
   deleteRuns(slots.map(function (s) {{ return s.dataset.slotKey; }}));
 }}
 // 선택 삭제 중엔 회차 줄을 눌러도 펼쳐지지 않고 체크된다(고르려다 기사 목록이 열리지 않게).
@@ -947,6 +938,7 @@ function applyHistoryCustomRange() {{
   }});
   applyHistoryPeriodFilter(start, end);
 }}
+{refetch_titles_script}
 </script>
 </body>
 </html>
@@ -1238,7 +1230,7 @@ def _render_slot(
                         show_label_control=True, group_name=name,
                         known_labels_html=known_labels_html,
                         scrap_date=label_scrap_date, scrap_end=run["run_slot"],
-                        labels_lookup=labels_lookup,
+                        labels_lookup=labels_lookup, refetch_marks=True,
                     )
                     for a in group_articles
                 )
@@ -1250,7 +1242,7 @@ def _render_slot(
                     a, highlight_words, line_template, show_relative_time=False,
                     show_label_control=True, known_labels_html=known_labels_html,
                     scrap_date=label_scrap_date, scrap_end=run["run_slot"],
-                    labels_lookup=labels_lookup,
+                    labels_lookup=labels_lookup, refetch_marks=True,
                 )
                 for a in articles
             )
@@ -1322,10 +1314,20 @@ def _render_slot(
         if cut_from is not None
         else ""
     )
+    # [추가: 2026-10-12] 「⟳ 제목 다시 불러오기」 — 제목을 바꾸는 동작이라 **테두리 박스**
+    # 이고 가져가기 글자(.slot-export-actions)보다 왼쪽에 선다. 가져가기와 똑같이
+    # **펼친 회차에만** 보이고(아래 CSS), 0건 회차엔 아예 안 그린다(받아올 게 없다).
+    # **날짜 줄엔 안 붙인다** — 하루면 230~560건이라 한 번에 받아올 양이 아니다
+    # (archive/TITLE_CHANGE_DESIGN.md §5).
+    refetch_html = refetch_titles_button_html(
+        "details.slot", "이 회차 기사 제목을 원문에서 다시 불러옵니다"
+    ) if articles else ""
     summary_html = (
         f'<summary>{pick_html}<span class="slot-label">{label}</span>{cut_html}{count_html}{sent_dot_html}{degraded_html}'
-        f'{note_html}{export_actions_html}{del_html}</summary>'
+        f'{refetch_html}{note_html}{export_actions_html}{del_html}</summary>'
     )
+    if articles:
+        body = refetch_titles_note_html() + body
     open_attr = " open" if open_first else ""
     slot_label = html.escape(f"{_short_date(run['run_at'][:10])} {run['run_slot']} 기준")
     return (
@@ -1346,39 +1348,12 @@ def _slot_key(date_str: str, run_slot: str) -> str:
     return f"{date_str}|{run_slot}"
 
 
+_WEEKDAY_KR = ["월", "화", "수", "목", "금", "토", "일"]
+
+
 def _short_date(date_str: str) -> str:
     d = datetime.fromisoformat(date_str)
     return f"{d.month}월 {d.day}일"
-
-
-def _deleted_when_label(deleted_at: datetime) -> str:
-    """「삭제함」 줄의 지운 시각 — 오늘이면 "오늘 10:12", 아니면 "9월 10일 10:12"."""
-    hm = deleted_at.strftime("%H:%M")
-    if deleted_at.date() == datetime.now().date():
-        return f"오늘 {hm}에 삭제"
-    return f"{deleted_at.month}월 {deleted_at.day}일 {hm}에 삭제"
-
-
-def _render_deleted_slot(entry: dict) -> str:
-    """담당자가 지운 회차 자리 — 「HH:MM 기준 · 삭제함 · 지운 시각 · 되살리기」 한 줄.
-
-    [추가: 2026-09-11] 「수집 기록 없음」 줄을 대신한다. 지운 회차는 파일째 trash로
-    옮겨졌을 뿐이라(app.storage.delete_run) 되살리면 발송 기록까지 그대로 돌아온다.
-    수시와 달리 다시 열어도 이 자리에 남는다 — 정기는 빈 자리가 어차피 한 줄로 그려지므로
-    그 줄의 문구만 바꾸면 되고, 안 바꾸면 앱이 못 모은 날처럼 보인다.
-    """
-    key = html.escape(_slot_key(entry["date"], entry["run_slot"]))
-    return (
-        f'<div class="slot-gone" data-slot-key="{key}">'
-        f'<span class="slot-label">{html.escape(entry["run_slot"])} 기준</span>'
-        '<span class="gone-tag">삭제함</span>'
-        f'<span class="gone-when">{html.escape(_deleted_when_label(entry["deleted_at"]))}</span>'
-        f'<button type="button" class="restore-btn" data-trash="{html.escape(entry["trash_name"])}" '
-        'onclick="restoreRun(this)">되살리기</button></div>'
-    )
-
-
-_WEEKDAY_KR = ["월", "화", "수", "목", "금", "토", "일"]
 
 
 def _date_label(run_date, today) -> str:
@@ -1423,7 +1398,12 @@ def _theme() -> dict:
         # [추가: 2026-08-18] 보관 기간을 상수에서 그대로 읽어 제목에 쓴다 — 예전엔
         # "(최근 7일)"이 화면에 박혀 있어 RETENTION_DAYS를 바꿔도 화면이 거짓말을 했다.
         "retention_label": _retention_label(),
+        # [추가: 2026-10-12] 지운 직후 초록 안내가 쓰는 값.
+        "icon_check": icon("check"),
+        "deleted_log_title": DELETED_LOG_TITLE,
         # [추가: 2026-09-16] 🏷 라벨 팝오버 — 확정본·초안과 한 곳에서 온다.
+        "refetch_titles_style": refetch_titles_style(),
+        "refetch_titles_script": refetch_titles_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
         "label_popover_style": label_popover_style(),
         "label_popover_script": label_popover_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
         "photo_override_script": photo_override_script(),
@@ -1448,7 +1428,8 @@ def _render_day_slots(
     회차만 그린다(호출부 호환).
 
     deleted_entries: [추가: 2026-09-11] 이 날짜에서 담당자가 지운 회차(app.storage.
-    list_deleted_runs의 항목). 그 자리는 「수집 기록 없음」 대신 「삭제함 · 되살리기」다.
+    list_deleted_runs의 항목). [수정: 2026-10-12] 그 자리는 **비워 둔다** — 「수집 기록
+    없음」도 안 그린다(지운 걸 앱이 못 모은 것처럼 보이게 하면 거짓말이다).
     latest_key: app.storage.latest_run_key() — 지우면 안 되는 "가장 최근 회차"를 가린다.
     """
     now = datetime.now()
@@ -1467,10 +1448,11 @@ def _render_day_slots(
         for i, r in enumerate(day_runs)
     ]
     collected = {r["run_slot"] for r in day_runs}
-    for entry in deleted_entries or []:
-        if entry["run_slot"] not in collected:
-            entries.append((entry["run_slot"], _render_deleted_slot(entry)))
-            collected.add(entry["run_slot"])
+    # [수정: 2026-10-12] 담당자가 지운 회차는 **아무 줄도 안 그린다.** 「삭제함」 줄을
+    # 남기던 때는 같은 삭제가 보관함 안 두 자리에 나타나 헷갈렸고, 그렇다고 그냥 빼면
+    # 아래 「수집 기록 없음」이 그 자리에 들어와 앱이 못 모은 날처럼 보인다 — 그래서
+    # 여기서 미리 걸러 둔다. 지웠다는 사실과 되살리는 길은 「삭제 기록」(/deleted)에 있다.
+    collected |= {entry["run_slot"] for entry in deleted_entries or []}
     if run_date is not None:
         entries += [
             (slot, _render_missing_slot(slot))
@@ -1529,6 +1511,7 @@ def _period_and_result_html(total_days: int, empty_count: int = 0) -> str:
 </div>
 <div class="result-bar">
   <p class="result-line" id="hist-result-line">전체 기간 · <b id="hist-result-count">{total_days}</b>일</p>
+  <a class="deleted-link normal-only" href="http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/deleted">{DELETED_LOG_TITLE} →</a>
   <button type="button" class="tidy-btn normal-only" onclick="setHistoryTidy(true)">선택 삭제</button>
   <span class="tidy-bar tidy-only"><span>지울 회차를 고르세요</span>{empty_btn}
     <button type="button" class="done-btn" onclick="setHistoryTidy(false)">완료</button></span>
@@ -1628,19 +1611,6 @@ def _day_delete_html(date_str: str, target: Optional[dict], latest_key: Optional
     )
 
 
-def _day_gone_mark_html(restore_all: bool) -> str:
-    """날짜 줄이 통째로 「삭제함」일 때의 표시 — 점선 칩 + (지운 회차가 둘 이상이면)
-    「모두 되살리기」. details.date.all-gone일 때만 보인다(날짜 줄 🗑로 지운 직후엔 화면이
-    그 클래스를 붙이고, 다시 열면 서버가 붙여 그린다)."""
-    restore_html = (
-        '<button type="button" class="restore-btn" onclick="event.preventDefault(); '
-        'event.stopPropagation(); restoreDay(this)">모두 되살리기</button>'
-        if restore_all
-        else ""
-    )
-    return f'<span class="day-gone-mark"><span class="chip chip-gone">삭제함</span>{restore_html}</span>'
-
-
 def render_history_page(
     runs: list,
     highlight_words: Optional[list] = None,
@@ -1695,11 +1665,10 @@ def render_history_page(
     # [추가: 2026-09-03] 회차가 하나도 없는 날짜를 여기서 끼워 넣는다. 그 날짜는 아래에서
     # 지연 로딩(ontoggle)을 붙이면 안 된다 — 서버가 돌려줄 회차가 없어 영영 "펼치면
     # 불러옵니다…"에 머문다. 대신 "수집 기록 없음" 줄을 그 자리에서 바로 그린다.
+    # [수정: 2026-10-12] 지운 회차만 있는 날짜는 더는 날짜 줄을 만들지 않는다 —
+    # 지운 흔적을 보관함에 안 남기기로 했다(「삭제 기록」이 받는다).
     dates_with_runs = set(ordered_dates)
-    ordered_dates = sorted(
-        dates_with_runs | {datetime.fromisoformat(d).date() for d in deleted_by_date}, reverse=True
-    )
-    ordered_dates = _with_gap_dates(ordered_dates)
+    ordered_dates = _with_gap_dates(sorted(dates_with_runs, reverse=True))
 
     if not ordered_dates:
         return _PAGE_TEMPLATE.format(
@@ -1732,23 +1701,18 @@ def render_history_page(
                 [], highlight_words, line_template, subheading_format,
                 run_date=run_date, deleted_entries=deleted_here, latest_key=latest_key,
             )
+            # [수정: 2026-10-12] 지운 회차만 남은 날짜는 줄이 통째로 사라진다 —
+            # rows_html이 비면 여기서 끝난다(그 날 예정 회차가 아예 없었던 경우와 같다).
             if not rows_html:
-                continue  # 그날 예정된 회차가 아예 없었다면(스케줄 밖) 줄을 만들지 않는다.
-            if deleted_here:
-                chip = _day_gone_mark_html(restore_all=len(deleted_here) > 1)
-                gone_cls = " all-gone"
-            else:
-                chip = '<span class="chip chip-missing">회차 없음</span>'
-                gone_cls = ""
+                continue
             sections.append(
-                f'<details class="date{gone_cls}" data-date="{date_str}"{open_attr}>'
-                f"<summary>{head}{chip}</summary>{rows_html}</details>"
+                f'<details class="date" data-date="{date_str}"{open_attr}>'
+                f'<summary>{head}<span class="chip chip-missing">회차 없음</span></summary>{rows_html}</details>'
             )
             continue
-        # [추가: 2026-09-15] 날짜 줄 🗑 + (그걸로 통째로 지웠을 때 보일) 「삭제함 · 모두 되살리기」.
+        # [추가: 2026-09-15] 날짜 줄 🗑 — 그 날의 (지울 수 있는) 회차 전부, 확인창 한 번.
         summary_inner = (
             f"{head}{_DAY_EXPORT_ACTIONS_HTML}{_day_delete_html(date_str, day_delete.get(date_str), latest_key)}"
-            f"{_day_gone_mark_html(restore_all=True)}"
         )
         # 기사를 미리 읽어온 날짜만 즉시 렌더링한다 — all_dates를 받은 경우 앞쪽
         # EAGER_HISTORY_DAYS일치만 grouped에 들어 있고, 나머지는 자연히 지연 로딩으로 간다.
@@ -1821,27 +1785,6 @@ def render_history_day_fragment(
         run_date=datetime.fromisoformat(date_str).date(),
         deleted_entries=[e for e in list_deleted_runs() if e["date"] == date_str],
     )
-
-
-def render_slot_fragment(date_str: str, run_slot: str) -> Optional[str]:
-    """회차 한 줄(펼치기 전 모양)만 — 되살리기 직후 「삭제함」 줄을 이것으로 갈아 끼운다.
-    즉시·지연 렌더링과 같은 _render_slot을 쓰므로 모양이 어긋나지 않는다."""
-    run = next((r for r in list_runs_for_date(date_str) if r["run_slot"] == run_slot), None)
-    if run is None:
-        return None
-    highlight_words, line_template, subheading_format = _display_settings()
-    return _render_slot(
-        run, highlight_words, line_template, subheading_format,
-        lock_reason=run_lock_reason(date_str, run_slot),
-    )
-
-
-def render_deleted_slot_fragment(date_str: str, run_slot: str) -> Optional[str]:
-    """「삭제함 · 되살리기」 한 줄만 — 지운 직후 그 회차 줄을 이것으로 갈아 끼운다."""
-    entry = next(
-        (e for e in list_deleted_runs() if e["date"] == date_str and e["run_slot"] == run_slot), None
-    )
-    return _render_deleted_slot(entry) if entry else None
 
 
 def generate_history_page(

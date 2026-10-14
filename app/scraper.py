@@ -7,7 +7,7 @@ from typing import Callable, Optional
 import requests
 
 from app import undo
-from app.breaking_alert_sender import detect_and_alert
+from app.breaking_alert_sender import articles_in_alert_scope, detect_and_alert
 from app.classifier import classify_for_finalize, forced_group_target_names, groups_from_snapshot
 from app.llm_classifier import (
     assign_to_existing,
@@ -274,13 +274,15 @@ def collect_run(
     clear_preview_order()
 
     # [추가: 2026-08-20] [단독]·[속보] 기사 알림 "바닥" 경로 — 이 회차가 어차피 검색한
-    # 결과를 그대로 검사한다(추가 네이버 호출 0회). /breaking-alert 설정을 전부 꺼도
-    # 이 경로만은 항상 동작한다(CLAUDE.md "[단독]·[속보] 기사 알림" 참고) — 담당자가
-    # 수시 감시를 켜지 않았어도 정기 회차 안에서는 놓치지 않게 하기 위해서다. 텔레그램
-    # 발송 실패가 회차 저장을 막으면 안 된다(app.telegram_bot.send_text의 기존
+    # 결과를 그대로 검사한다(추가 네이버 호출 0회).
+    # [수정] 예전엔 설정을 통째로 무시하고 회차 기사 **전부**를 알렸다("감시를 켜지
+    # 않았어도 회차 안에서는 놓치지 않게"). 그 안전장치 때문에 담당자가 알림을 끌 방법이
+    # 아예 없었다 — 검색어 그룹의 「알림」 스위치를 꺼도 그 그룹이 초안·확정본에 들어가는
+    # 한 알림은 그대로 나갔다. 이제 폴링과 **같은 범위**(articles_in_alert_scope)를 본다.
+    # 텔레그램 발송 실패가 회차 저장을 막으면 안 된다(app.telegram_bot.send_text의 기존
     # fail-open 원칙과 동일)는 이유로 예외를 여기서 삼킨다.
     try:
-        detect_and_alert(articles)
+        detect_and_alert(articles_in_alert_scope(articles, settings))
     except Exception:
         logger.exception("[단독]·[속보] 알림(정기 회차 경로) 실패 — 회차 저장은 정상 진행됩니다")
 
@@ -521,7 +523,7 @@ def top_up_last_run(
     # 검사를 영영 못 받는다(그 회차 수집은 이미 끝났다). 중복은 app.alerted_urls가 막는다.
     # 알림 실패가 보충 저장을 막으면 안 된다(collect_run과 같은 fail-open).
     try:
-        detect_and_alert(fresh)
+        detect_and_alert(articles_in_alert_scope(fresh))
     except Exception:
         logger.exception("[단독]·[속보] 알림(보충 훑기 경로) 실패 — 보충 저장은 정상 진행됩니다")
 

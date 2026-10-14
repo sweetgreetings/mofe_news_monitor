@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>개인정보 수집·이용 동의 시안 — 회원가입</title>
+<style>
+  /* 값은 전부 지금 앱에서 그대로 가져왔다(app/config.py 모양·글자·색 토큰, app/auth_renderer.py). */
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+    --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%;
+    --h-sm: 24px; --h-tb: 28px; --h-md: 30px; --h-lg: 36px; --fab-lg: 56px; --fab-sm: 48px;
+    --chk-md: 16px; --chk-sm: 14px;
+    --sh-float: 0 4px 12px rgba(15, 23, 42, 0.12); --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14);
+    --sh-modal: 0 16px 40px rgba(15, 23, 42, 0.22); }
+
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+
+  /* ── 시안 설명 전용(실제 화면엔 없다) ───────────────────────── */
+  .mk-note { max-width: 860px; margin: 0 auto; padding: 22px 24px 0; }
+  .mk-note h2 { font-size: var(--fs-lg); color: #1E3A5F; margin: 26px 0 6px; }
+  .mk-note h2:first-child { margin-top: 0; }
+  .mk-note h3 { font-size: var(--fs-base); color: #1E3A5F; margin: 18px 0 6px; }
+  .mk-note p { font-size: var(--fs-md); color: #6B7280; margin: 0 0 14px; line-height: 1.65; }
+  .mk-note li { font-size: var(--fs-md); color: #6B7280; line-height: 1.65; margin-bottom: 5px; }
+  .mk-note code { background: #F3F4F6; border-radius: var(--r-sm); padding: 1px 5px; font-size: 0.9em; }
+  .mk-sep { max-width: 860px; margin: 34px auto 0; border-top: 1px dashed #D1D5DB; }
+  .mk-stage { background: #EEF2F6; padding: 26px 0 30px; margin-top: 14px; border-radius: var(--r-lg); }
+  .mk-tag { display: inline-block; font-size: var(--fs-xs); color: #6B7280; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 2px 10px; margin: 0 0 12px 24px; }
+
+  /* ── 로그인 전 화면(회원가입) — 지금 앱 그대로 ───────────────── */
+  .login-wrap { display: flex; justify-content: center; padding: 0 16px; }
+  .login-card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+    padding: 30px 28px 26px; box-sizing: border-box; width: 400px; }
+  .login-card.sign { width: 440px; }
+
+  .lg-head { display: flex; align-items: center; gap: 14px; margin: 0 0 22px; }
+  .lg-head .logo { height: 34px; width: auto; flex-shrink: 0; display: block; }
+  .lg-head .ttl { display: flex; flex-direction: column; gap: 1px; min-width: 0;
+    padding-left: 14px; border-left: 1px solid #E5E7EB; }
+  .lg-head h1 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0; }
+  .lg-head .sub { font-size: var(--fs-sm); color: #6B7280; margin: 0; }
+
+  .f label.field { display: block; font-size: var(--fs-md); font-weight: 600;
+    color: #1E3A5F; margin: 18px 0 6px; }
+  .f label.field:first-of-type { margin-top: 0; }
+  .f input, .f select { background: #F8FAFC; color: #1F2937; border: 1px solid #E5E7EB;
+    border-radius: var(--r-md); padding: 8px 10px; font-size: var(--fs-base); font-family: inherit;
+    width: 100%; box-sizing: border-box; }
+  .f select { height: var(--h-lg); padding: 0 30px 0 10px; appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat; background-position: right 9px center; }
+  .f input:focus, .f select:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 3px #EFF6FF; }
+  .f input::placeholder { color: #9CA3AF; }
+
+  .fhint { font-size: var(--fs-sm); color: #6B7280; margin: 6px 0 0; line-height: 1.5; }
+
+  .f button.primary { background: #2563EB; color: #FFFFFF; border: none; border-radius: var(--r-md);
+    height: var(--h-lg); padding: 0 16px; font-size: var(--fs-base); font-weight: 600;
+    font-family: inherit; cursor: pointer; appearance: none; -webkit-appearance: none;
+    display: inline-flex; align-items: center; justify-content: center; width: 100%; margin-top: 18px; }
+  .f button.primary:hover { background: #1E3A5F; }
+
+  .status { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px;
+    border-radius: var(--r-md); font-size: var(--fs-md); line-height: 1.5; margin: 0 0 18px; }
+  .status.is-off { display: none; }
+  .status-warn { background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; }
+  .status-info { background: #EFF6FF; color: #1E3A5F; border: 1px solid #BFDBFE; }
+
+  .foot { margin: 18px 0 0; font-size: var(--fs-sm); color: #6B7280; text-align: center; }
+  .foot a { color: #2563EB; text-decoration: none; }
+  .foot a:hover { text-decoration: underline; }
+  .foot .dot { color: #D1D5DB; margin: 0 7px; }
+
+  /* ── 새로 들어오는 것 1 — 동의 줄 ───────────────────────────── */
+  /* 가입 버튼 바로 위 한 줄. 네모(누르면 뭔가 한다)도 알약(상태)도 아닌
+     평범한 체크 줄이라, 「로그인 상태 유지」(.keep)와 같은 문법을 쓴다. */
+  .consent { display: flex; align-items: center; gap: 7px; margin: 22px 0 0;
+    font-size: var(--fs-md); color: #1F2937; line-height: 1.5; }
+  /* 「내용 보기」는 <label> 밖이다 — 안에 두면 누를 때 체크가 같이 토글된다. */
+  .consent .cl { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+  .consent input[type=checkbox] { width: var(--chk-sm); height: var(--chk-sm);
+    accent-color: #2563EB; flex: none; margin: 0; }
+  .consent .req { color: #6B7280; font-size: var(--fs-sm); }
+  .consent .open { margin-left: auto; flex: none; background: none; border: none; padding: 0;
+    font-family: inherit; font-size: var(--fs-sm); font-weight: 600; color: #2563EB;
+    cursor: pointer; text-decoration: none; }
+  .consent .open:hover { text-decoration: underline; }
+  /* 동의하지 않고 가입을 누른 순간에만 — 앰버 주의. 평소엔 아무 색도 없다. */
+  .consent.is-missing { background: #FFFBEB; border: 1px solid #FDE68A;
+    border-radius: var(--r-md); padding: 8px 10px; margin: 22px -10px 0; }
+
+  /* ── 새로 들어오는 것 2 — 동의 내용 창 ──────────────────────── */
+  .ov { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); z-index: 60;
+    display: none; align-items: center; justify-content: center; padding: 20px; }
+  .ov.is-open { display: flex; }
+  .modal { background: #FFFFFF; border-radius: var(--r-lg); box-shadow: var(--sh-modal);
+    width: 560px; max-width: 100%; max-height: calc(100vh - 40px); overflow: auto;
+    box-sizing: border-box; }
+  .modal .mh { display: flex; align-items: center; gap: 12px;
+    padding: 18px 22px 14px; border-bottom: 1px solid #E5E7EB; }
+  .modal .mh h2 { font-size: var(--fs-lg); color: #1E3A5F; margin: 0; flex: 1 1 auto; }
+  .modal .mh .x { flex: none; background: none; border: none; cursor: pointer; color: #6B7280;
+    font-size: 1.1rem; line-height: 1; width: 30px; height: 26px; border-radius: var(--r-sm); }
+  .modal .mh .x:hover { background: #F3F4F6; color: #1F2937; }
+  .modal .mb { padding: 18px 22px 20px; }
+  .modal .lead { font-size: var(--fs-md); color: #1F2937; line-height: 1.65; margin: 0 0 14px; }
+
+  .ctable { width: 100%; border-collapse: collapse; border: 1px solid #E5E7EB;
+    border-radius: var(--r-md); overflow: hidden; }
+  .ctable th, .ctable td { border-bottom: 1px solid #E5E7EB; padding: 11px 14px;
+    font-size: var(--fs-md); line-height: 1.6; text-align: left; vertical-align: top; }
+  .ctable tr:last-child th, .ctable tr:last-child td { border-bottom: none; }
+  .ctable th { width: 108px; background: #F8FAFC; color: #1E3A5F; font-weight: 600; white-space: nowrap; }
+  .ctable td { color: #1F2937; }
+  .ctable td .sub { display: block; color: #6B7280; font-size: var(--fs-sm); margin-top: 3px; }
+
+  .modal .tail { font-size: var(--fs-sm); color: #6B7280; line-height: 1.65; margin: 14px 0 0; }
+  .modal .mf { display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+    padding: 0 22px 20px; }
+  /* 이 창의 대표 동작 하나라 채운 파랑. 앱에서 채움은 늘 담당자의 동작이다. */
+  .modal .mf button.agree { background: #2563EB; color: #FFFFFF; border: none;
+    border-radius: var(--r-md); height: var(--h-lg); padding: 0 22px;
+    font-size: var(--fs-md); font-weight: 600; font-family: inherit; cursor: pointer; }
+  .modal .mf button.agree:hover { background: #1E3A5F; }
+
+  @media (max-width: 480px) {
+    .login-card, .login-card.sign { width: 100%; max-width: 440px; }
+    .lg-head { flex-wrap: wrap; }
+    .lg-head .ttl { padding-left: 0; border-left: 0; }
+    .consent { flex-wrap: wrap; }
+    .consent .open { margin-left: 23px; }
+    .ctable th { width: 86px; padding: 10px 10px; }
+    .ctable td { padding: 10px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true"><symbol id="logo" viewBox="0 0 1672.828 529.32797"><path fill="#fff" d="M350.627 58.031c0 105.382-85.432 190.814-190.813 190.814-105.37 0-190.792-85.432-190.792-190.814 0-105.38 85.421-190.802 190.792-190.802 105.381 0 190.813 85.421 190.813 190.802" style="stroke-width:5.17895" transform="translate(164.177 211.97)"/><path fill="#003668" d="M263.008 53.28c-31.783-21.61-72.508-12.794-93.896 19.717-17.854 27.153-44.817 30.524-55.256 30.524-34.014 0-57.297-23.934-64.186-48.693h-.032c-.06-.245-.087-.45-.19-.695a8 8 0 0 0-.206-.836c-2.698-10.336-3.377-15.276-3.377-26.252 0-59.219 60.739-125.153 148.25-125.153 89.608 0 140.896 68.225 154.098 106.137-.217-.668-.429-1.34-.673-2.025-25.422-74.136-95.747-127.454-178.525-127.454-104.177 0-188.671 84.461-188.671 188.682 0 93.14 67.177 172.88 160.361 172.88 74.327 0 124.28-41.68 147.203-99.108 12.556-31.414 3.67-68.328-24.9-87.723" style="stroke-width:5.42844" transform="translate(162.753 205.868)scale(.95404)"/><path fill="#e6002d" d="M349.397 11.697C338.367-25.276 286.71-98.11 194.117-98.11c-87.512 0-148.25 65.934-148.25 125.153 0 10.976.672 15.916 3.376 26.257-1.135-4.527-1.748-9.06-1.748-13.473 0-61.667 61.77-104.4 125.234-104.4 85.932 0 155.584 69.652 155.584 155.568 0 67.356-38.764 125.652-95.084 153.669l.016.043c72.6-26.295 124.442-95.817 124.442-177.483 0-19.325-2.6-36.354-8.29-55.527" style="stroke-width:5.42844" transform="translate(162.753 205.868)scale(.95404)"/><path fill="#595757" d="M581.472-32.255h21.601V148.64h-21.601V63.695h-20.768v83.91h-20.98V-32.049h20.98v74.975h20.768zM438.999-1.311v-19.732h88.472V-1.31h-36.548l40.494 121.079-19.105 5.82-28.246-86.814-28.453 88.27-19.934-6.023L476.588-1.311zM766.313 63.697V24.445h-33.648V5.128h33.648v-37.382h22.425v95.95zm-14.952 46.315c0-6.784-2.496-12.637-7.478-17.551q-7.479-7.371-17.655-7.37c-6.784 0-12.637 2.455-17.551 7.37q-7.371 7.373-7.37 17.551c0 6.784 2.455 12.595 7.37 17.443 4.914 4.847 10.767 7.271 17.551 7.271q10.175 0 17.655-7.271c4.982-4.848 7.478-10.659 7.478-17.443m22.016.207c0 6.09-1.253 11.803-3.739 17.132q-3.745 7.997-9.97 14.02c-4.293 4.013-9.316 7.198-15.06 9.555q-8.624 3.526-18.173 3.527-9.553 0-18.276-3.527-8.725-3.535-15.16-9.555c-4.158-4.014-7.478-8.69-9.969-14.02-2.496-5.329-3.739-11.041-3.739-17.132 0-6.09 1.243-11.839 3.74-17.24 2.49-5.397 5.81-10.105 9.969-14.124q6.433-6.02 15.159-9.55c5.816-2.35 11.906-3.537 18.276-3.537 6.365 0 12.425 1.186 18.173 3.537 5.744 2.352 10.767 5.537 15.06 9.55q6.225 6.03 9.97 14.123c2.486 5.402 3.74 11.15 3.74 17.241M629.65-7.752v-19.312h103.843v19.312h-44.233l46.108 56.285-15.786 12.88-36.967-46.108-36.765 49.22-16.402-13.289 45.896-58.988ZM955.723-32.255h22.43v95.95h-22.43V41.058h-29.701V22.574h29.7V5.96h-29.7v-18.484h29.7zm-6.438 142.265c0-6.784-2.49-12.631-7.478-17.551-4.982-4.91-10.87-7.37-17.65-7.37-6.79 0-12.642 2.46-17.551 7.37-4.92 4.92-7.375 10.767-7.375 17.551 0 6.785 2.455 12.6 7.375 17.443q7.365 7.272 17.551 7.271c6.78 0 12.668-2.423 17.65-7.27q7.48-7.266 7.478-17.444m22.016.208c0 6.095-1.248 11.802-3.744 17.131-2.486 5.33-5.811 10.006-9.965 14.025-4.298 4.014-9.317 7.194-15.06 9.55-5.743 2.351-11.803 3.532-18.173 3.532s-12.46-1.18-18.271-3.532c-5.821-2.356-10.876-5.536-15.164-9.55q-6.232-6.03-9.97-14.025c-2.49-5.329-3.739-11.036-3.739-17.131 0-6.09 1.248-11.84 3.74-17.236q3.736-8.102 9.969-14.128 6.432-6.015 15.164-9.55c5.81-2.351 11.9-3.532 18.271-3.532 6.37 0 12.43 1.18 18.173 3.532q8.614 3.535 15.06 9.55c4.154 4.019 7.479 8.726 9.965 14.128 2.496 5.396 3.744 11.145 3.744 17.236M910.448 58.92h-22.435V-7.127h-65.208v-19.939h87.643zM1149.7-32.254h21.601v180.896H1149.7zm-36.968.202h20.975v179.653h-20.975V54.14h-23.47V33.788h23.47zM1007.227-1.31V-21.04h88.472V-1.31h-36.548l40.494 121.079-19.105 5.816-28.246-86.81-28.453 88.265-19.934-6.023L1044.821-1.31zM1329.14 13.228h-95.116v24.92h95.116Zm-95.116-19.525h95.116v-22.844h22.223V57.88h-139.568v-87.022h22.229zm-35.518 88.477h166.146v19.934h-71.858v46.528h-22.637v-46.528h-71.65z" style="stroke-width:5.17895" transform="translate(164.177 211.97)"/></symbol></svg>
+
+<div class="mk-note">
+  <h2>개인정보 수집·이용 동의 시안</h2>
+  <p>
+    <strong>자리는 회원가입이다 — 로그인 화면이 아니다.</strong> 동의는 정보를 <em>받는</em> 자리에 서야
+    뜻이 통한다. 로그인은 이미 가입한 사람이 들어오는 문이라 동의 줄이 서면 매번 다시 묻는 것처럼 읽힌다.
+    (들어가는 길은 <code>/login</code> → <code>회원가입</code> 하나뿐이라 못 보고 지나칠 수 없다.)
+  </p>
+  <p>
+    <strong>수집 항목은 이 앱이 실제로 받는 것만 적는다.</strong> 보내 주신 예시의
+    「시험 구분 · 유튜브 구독/댓글 여부」 같은 칸은 이 앱에 없다. 없는 것을 적으면 그 순간 동의서가
+    거짓이 되고, 나중에 칸이 바뀌면 어느 쪽이 진짜인지 묻게 된다 — 그래서 표 세 줄이
+    <strong>회원가입 폼의 칸과 한 글자씩 맞물린다</strong>(이메일 · 비밀번호 · 이름 · 부서 ·
+    핸드폰번호 · 비밀번호 질문과 답).
+  </p>
+  <p>
+    <strong>보유 기간에 「회원 탈퇴 시까지」를 쓰지 않는다.</strong> 지금 앱엔 탈퇴·계정 삭제 화면이
+    없어서 그렇게 적으면 화면에 없는 것을 문구로 약속하는 셈이다. 대신 사실 그대로
+    <code>계정이 남아 있는 동안</code>이라고 적고, 그 밑에 이 앱의 진짜 성격인
+    <strong>「이 컴퓨터 안에만 저장되고 밖으로 내보내지 않는다」</strong>를 한 줄 덧붙였다.
+  </p>
+
+  <h3>모양은 앱 규칙 그대로다</h3>
+  <ul>
+    <li><strong>창은 담는 틀</strong>이라 <code>--r-lg</code>(10px) + <code>--sh-modal</code>.</li>
+    <li><strong>「동의합니다」는 그 창의 대표 동작 하나</strong>라 채운 파랑(<code>#2563EB</code>) ·
+      높이 <code>--h-lg</code>. 예시의 주황은 안 쓴다 — 이 앱에서 채움은 늘 담당자의 동작이고,
+      그 색은 파랑이다.</li>
+    <li><strong>닫기 ×는 회색</strong>이다. 예시는 빨강이지만 이 앱에서 빨강은 오류와
+      <code>[단독]·[속보]</code>뿐이고, 창을 닫는 건 오류가 아니다. 모양은 휴지통·원장 행과 같은
+      30×26 상자.</li>
+    <li><strong>동의 줄은 「로그인 상태 유지」와 같은 체크 줄</strong>이다(<code>--chk-sm</code> 14px ·
+      <code>--fs-md</code> — 보조 줄에 선 체크는 14px이라는 그 규칙). 알약·네모로 만들지 않는다.</li>
+  </ul>
+
+  <h3>동의하지 않으면 가입이 막힌다 — 확인창 말고 그 줄에서</h3>
+  <p>
+    체크를 안 한 채 <code>가입하기</code>를 누르면 <strong>그 줄이 앰버 주의로 바뀌고</strong>
+    위에 거부 문구가 뜬다(앱의 다른 거부와 같은 문법 — 「+ 수기로 기사 추가」의 앰버 주의 상자).
+    <strong>버튼을 흐리게 잠그지 않는다</strong> — 잠긴 버튼은 왜 못 누르는지 스스로 말하지 못한다.
+  </p>
+  <p>
+    <strong>동의했다는 사실은 계정에 시각으로 적어 둔다</strong>(<code>consent_at</code>).
+    아무 데도 안 남으면 받을 이유가 없다. 「나의 정보 관리」 맨 아래에
+    <code>개인정보 수집·이용 동의 (2026-10-07 동의함) · 내용 보기</code> 한 줄로 같은 창을
+    다시 열 수 있게 두면 가입 뒤에도 읽을 수 있다.
+  </p>
+</div>
+
+<div class="mk-sep"></div>
+
+<div class="mk-note">
+  <h2>1. 회원가입 — 가입 버튼 바로 위 한 줄</h2>
+  <p>
+    폼 맨 끝, <code>가입하기</code> 바로 위다. <strong>왼쪽이 체크, 오른쪽 끝이 「내용 보기」</strong> —
+    누르면 창이 열린다. 아래 시안은 실제로 눌러 볼 수 있다.
+  </p>
+</div>
+
+<div class="mk-stage">
+  <span class="mk-tag">회원가입 · 폼 끝부분 (누르면 창이 열립니다)</span>
+  <div class="login-wrap">
+    <div class="login-card sign">
+      <header class="lg-head">
+        <svg class="logo" role="img" aria-label="로고" viewBox="0 0 1672.828 529.32797"><use href="#logo"/></svg>
+        <div class="ttl"><h1>회원가입</h1><p class="sub">AI 뉴스 모니터링</p></div>
+      </header>
+
+      <div class="status status-warn is-off" id="miss-note">
+        <span>⚠</span><span>개인정보 수집·이용에 동의해야 가입할 수 있습니다.</span>
+      </div>
+
+      <form class="f" onsubmit="return false">
+        <label class="field" for="s-phone">핸드폰번호</label>
+        <input type="tel" id="s-phone" value="010-1234-5678">
+
+        <label class="field" for="s-q">비밀번호 질문</label>
+        <select id="s-q"><option>내가 졸업한 초등학교 이름은?</option></select>
+
+        <label class="field" for="s-a">질문의 답</label>
+        <input type="text" id="s-a" placeholder="띄어쓰기 없이 적어 주세요">
+        <p class="fhint"><strong>띄어쓰기 없이 붙여서</strong> 적어 주세요(대소문자는 가리지 않습니다).
+        적어 둔 답은 <strong>다시 볼 수 없고</strong>, 「나의 정보 관리」에서 바꾸기만 됩니다.</p>
+
+        <div class="consent" id="consent-row">
+          <label class="cl"><input type="checkbox" id="consent-chk">
+            <span>개인정보 수집·이용에 동의합니다 <span class="req">(필수)</span></span></label>
+          <button type="button" class="open" onclick="openConsent(event)">내용 보기</button>
+        </div>
+
+        <button class="primary" type="button" onclick="trySignup()">가입하기</button>
+      </form>
+      <p class="foot">이미 계정이 있으세요? <a href="#" onclick="return false">로그인</a></p>
+    </div>
+  </div>
+</div>
+
+<div class="mk-sep"></div>
+
+<div class="mk-note">
+  <h2>2. 동의 내용 창</h2>
+  <p>
+    표 세 줄이 전부라 <strong>창 안에 스크롤이 생기지 않는다</strong> — 다 읽고 누르게 하려면
+    글이 한 화면에 들어와야 한다. 아래는 창만 떼어 둔 모습이다.
+  </p>
+</div>
+
+<div class="mk-stage" style="display:flex; justify-content:center; padding:30px 20px;">
+  <div class="modal" style="box-shadow: var(--sh-pop)">
+    <div class="mh">
+      <h2 id="ov-ttl">개인정보 수집 및 이용 동의</h2>
+      <button class="x" type="button" onclick="closeConsent()" aria-label="닫기">&#10005;</button>
+    </div>
+    <div class="mb">
+      <p class="lead">회원가입과 비밀번호 찾기를 위해 아래와 같이 개인정보를 수집·이용합니다.</p>
+      <table class="ctable">
+        <tr>
+          <th>수집 항목</th>
+          <td>이메일, 비밀번호, 이름, 부서, 핸드폰번호, 비밀번호 질문과 답
+            <span class="sub">부서는 적지 않아도 됩니다.</span></td>
+        </tr>
+        <tr>
+          <th>수집 목적</th>
+          <td>로그인과 계정 구분, 화면에 누구인지 표시, 비밀번호를 잊었을 때 본인 확인
+            <span class="sub">핸드폰번호는 적어 둔 값과 맞는지 대조만 하고, 문자(SMS)는 보내지 않습니다.</span></td>
+        </tr>
+        <tr>
+          <th>보유 기간</th>
+          <td>계정이 남아 있는 동안
+            <span class="sub">적어 주신 정보는 이 컴퓨터 안에만 저장되고, 밖으로 내보내지 않습니다.</span></td>
+        </tr>
+      </table>
+      <p class="tail">동의하지 않을 수 있습니다. 다만 위 항목은 모두 계정을 만드는 데 꼭 필요한 것이라,
+      동의하지 않으면 회원가입을 할 수 없습니다.</p>
+    </div>
+    <div class="mf">
+      <button class="agree" type="button" onclick="agreeConsent()">동의합니다</button>
+    </div>
+  </div>
+</div>
+
+<div class="mk-sep"></div>
+
+<div class="mk-note">
+  <h2>3. 동의한 뒤</h2>
+  <p>
+    체크가 켜지고 오른쪽 글자가 <code>다시 보기</code>로 바뀐다. 줄 자체는 그대로다 —
+    동의했다고 초록으로 칠하거나 칩을 달지 않는다(체크 표시가 이미 그 말이다).
+  </p>
+</div>
+
+<div class="mk-stage">
+  <span class="mk-tag">회원가입 · 동의한 뒤</span>
+  <div class="login-wrap">
+    <div class="login-card sign" style="padding-top: 22px">
+      <form class="f" onsubmit="return false">
+        <div class="consent">
+          <label class="cl"><input type="checkbox" checked>
+            <span>개인정보 수집·이용에 동의합니다 <span class="req">(필수)</span></span></label>
+          <button type="button" class="open" onclick="openConsent(event)">다시 보기</button>
+        </div>
+        <button class="primary" type="button">가입하기</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="mk-sep"></div>
+
+<div class="mk-note">
+  <h2>4. 동의 없이 「가입하기」를 눌렀을 때</h2>
+  <p>
+    줄이 앰버 주의로 바뀌고 카드 맨 위에 거부 문구가 선다. 다시 체크하면 둘 다 사라진다.
+    위 1번 시안에서 체크를 비운 채 눌러 보면 그대로 재현된다.
+  </p>
+</div>
+
+<div class="mk-stage">
+  <span class="mk-tag">회원가입 · 동의 없이 눌렀을 때</span>
+  <div class="login-wrap">
+    <div class="login-card sign" style="padding-top: 22px">
+      <div class="status status-warn">
+        <span>⚠</span><span>개인정보 수집·이용에 동의해야 가입할 수 있습니다.</span>
+      </div>
+      <form class="f" onsubmit="return false">
+        <div class="consent is-missing">
+          <label class="cl"><input type="checkbox">
+            <span>개인정보 수집·이용에 동의합니다 <span class="req">(필수)</span></span></label>
+          <button type="button" class="open" onclick="openConsent(event)">내용 보기</button>
+        </div>
+        <button class="primary" type="button">가입하기</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="mk-note" style="padding-bottom: 60px">
+  <h2>만들 때 고칠 자리</h2>
+  <ul>
+    <li><code>app/auth_renderer.py</code> — <code>render_signup_page</code>에 동의 줄 + 창 마크업,
+      <code>_FORM_STYLE</code>에 <code>.consent</code>·<code>.ov</code>·<code>.modal</code>·<code>.ctable</code> CSS.
+      색·글자·모양 값은 전부 토큰에서 온다(여기에 숫자를 적지 않는다).</li>
+    <li><code>app/users.py</code> — 계정에 <code>consent_at</code> 한 칸. 가입할 때 서버가 다시 확인한다
+      (화면만 막으면 막은 게 아니다).</li>
+    <li>동의 문구 원본은 <strong>한 곳</strong>에 둔다(<code>app/config.py</code>) — 가입 창과
+      「나의 정보 관리」가 같은 글을 보게.</li>
+  </ul>
+</div>
+
+<div class="ov" id="ov" onclick="if(event.target===this) closeConsent()">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ov-ttl">
+    <div class="mh">
+      <h2 id="ov-ttl">개인정보 수집 및 이용 동의</h2>
+      <button class="x" type="button" onclick="closeConsent()" aria-label="닫기">&#10005;</button>
+    </div>
+    <div class="mb">
+      <p class="lead">회원가입과 비밀번호 찾기를 위해 아래와 같이 개인정보를 수집·이용합니다.</p>
+      <table class="ctable">
+        <tr>
+          <th>수집 항목</th>
+          <td>이메일, 비밀번호, 이름, 부서, 핸드폰번호, 비밀번호 질문과 답
+            <span class="sub">부서는 적지 않아도 됩니다.</span></td>
+        </tr>
+        <tr>
+          <th>수집 목적</th>
+          <td>로그인과 계정 구분, 화면에 누구인지 표시, 비밀번호를 잊었을 때 본인 확인
+            <span class="sub">핸드폰번호는 적어 둔 값과 맞는지 대조만 하고, 문자(SMS)는 보내지 않습니다.</span></td>
+        </tr>
+        <tr>
+          <th>보유 기간</th>
+          <td>계정이 남아 있는 동안
+            <span class="sub">적어 주신 정보는 이 컴퓨터 안에만 저장되고, 밖으로 내보내지 않습니다.</span></td>
+        </tr>
+      </table>
+      <p class="tail">동의하지 않을 수 있습니다. 다만 위 항목은 모두 계정을 만드는 데 꼭 필요한 것이라,
+      동의하지 않으면 회원가입을 할 수 없습니다.</p>
+    </div>
+    <div class="mf">
+      <button class="agree" type="button" onclick="agreeConsent()">동의합니다</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function openConsent(e) { e.preventDefault(); document.getElementById('ov').classList.add('is-open'); }
+function closeConsent() { document.getElementById('ov').classList.remove('is-open'); }
+function agreeConsent() {
+  var c = document.getElementById('consent-chk');
+  if (c) { c.checked = true; c.closest('.consent').classList.remove('is-missing');
+           var b = c.closest('.consent').querySelector('.open'); if (b) b.textContent = '다시 보기'; }
+  document.getElementById('miss-note').classList.add('is-off');
+  closeConsent();
+}
+function trySignup() {
+  var c = document.getElementById('consent-chk');
+  var row = c.closest('.consent');
+  var note = document.getElementById('miss-note');
+  if (!c.checked) { row.classList.add('is-missing'); note.classList.remove('is-off'); return; }
+  row.classList.remove('is-missing'); note.classList.add('is-off');
+  alert('(시안) 가입 진행');
+}
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeConsent(); });
+document.addEventListener('change', function (e) {
+  if (e.target.id === 'consent-chk' && e.target.checked) {
+    e.target.closest('.consent').classList.remove('is-missing');
+    document.getElementById('miss-note').classList.add('is-off');
+  }
+});
+</script>
+</body>
+</html>

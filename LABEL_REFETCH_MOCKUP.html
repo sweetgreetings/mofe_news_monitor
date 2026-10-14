@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>시안 · 제목 다시 불러오기</title>
+<style>
+  /* ===== 지금 돌고 있는 /labels · /history.html 에서 그대로 가져온 값 ===== */
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+    --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%;
+    --h-sm: 24px; --h-tb: 28px; --h-md: 30px; --h-lg: 36px; --chk-md: 16px; --chk-sm: 14px;
+    --sh-float: 0 4px 12px rgba(15, 23, 42, 0.12); }
+  .container { max-width: 800px; margin: 24px auto; padding: 24px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: var(--r-lg); }
+  h1 { font-size: var(--fs-xl); color: #1E3A5F; }
+  .page-sub { color: #6B7280; font-size: var(--fs-md); margin: 6px 0 16px; }
+  button, a.btn { background: #2563EB; color: #FFFFFF; border: none; border-radius: var(--r-md);
+    padding: 8px 16px; font-size: var(--fs-base); font-family: inherit; cursor: pointer; text-decoration: none;
+    appearance: none; -webkit-appearance: none; display: inline-flex; align-items: center; justify-content: center; }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+
+  /* 라벨 보관함 */
+  .lab-topbar { display: flex; align-items: center; gap: 10px; padding-bottom: 12px;
+    border-bottom: 1px solid #E5E7EB; margin-bottom: 16px; flex-wrap: wrap; }
+  .lab-topbar h1 { margin: 0; font-size: var(--fs-xl); }
+  .lab-topbar .spacer { margin-left: auto; }
+  a.btn.ghost { background: transparent; color: #6B7280; border: 1px solid #E5E7EB; }
+  .lab-filter-chip { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-sm); font-weight: 600;
+    background: #FFFFFF; border: 1px solid #E5E7EB; color: #1F2937; border-radius: var(--r-pill);
+    padding: 5px 12px; margin: 0 6px 6px 0; text-decoration: none; }
+  .lab-filter-chip .n { color: #6B7280; font-weight: 500; font-size: var(--fs-xs); }
+  .lab-filter-chip.on { background: #8A5A14; border-color: #8A5A14; color: #FFFFFF; }
+  .lab-filter-chip.on .n { color: rgba(255, 255, 255, 0.75); }
+  .lab-chipbar { margin-bottom: 6px; }
+  .lab-listhead { display: flex; align-items: center; gap: 8px; margin: 12px 0 10px;
+    font-size: var(--fs-md); color: #1E3A5F; font-weight: 700; }
+  .exp { display: inline-flex; gap: 2px; flex: none; margin-left: auto; }
+  .exp button { border: none; background: transparent; color: #4B5563; font-weight: 500;
+    border-radius: var(--r-md); padding: 4px 8px; font-size: var(--fs-sm); cursor: pointer;
+    font-family: inherit; white-space: nowrap; }
+  .exp button:hover { color: #2563EB; text-decoration: underline; text-underline-offset: 3px; }
+  .arc-row { border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 10px 12px; margin-bottom: 8px; }
+  .arc-row:hover { background: #EFF6FF; }
+  .arc-title { font-size: var(--fs-md); color: #1F2937; }
+  .arc-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 7px;
+    font-size: var(--fs-xs); color: #6B7280; }
+  .snap-tag { font-size: var(--fs-xs); background: #F8FAFC; color: #6B7280; border: 1px solid #E5E7EB;
+    border-radius: var(--r-pill); padding: 1px 6px; }
+  .arc-meta a.origin-link { color: #2563EB; text-decoration: none; display: inline-flex; align-items: center; gap: 3px; }
+  .arc-meta a.origin-link .ic { width: 0.9em; height: 0.9em; }
+  .arc-labels { display: inline-flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+  .lab-chip { display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs); font-weight: 700;
+    color: #8A5A14; background: #FBF0DA; border: 1px solid rgba(138, 90, 20, 0.28);
+    border-radius: var(--r-pill); padding: 2px 8px; white-space: nowrap; }
+  .lab-chip .x-btn { background: none; border: none; padding: 0; margin: 0; color: #8A5A14; opacity: 0.55;
+    cursor: pointer; font-weight: 700; font-size: 0.9rem; line-height: 1; }
+
+  /* 정기 보관함 회차 줄 */
+  details.day { border: 1px solid #E5E7EB; border-radius: var(--r-lg); margin-bottom: 10px; padding: 4px 10px; }
+  details.day > summary { list-style: none; cursor: pointer; display: flex; align-items: center;
+    gap: 10px; padding: 8px 4px; font-size: var(--fs-lg); font-weight: 700; color: #1E3A5F; }
+  details.day > summary::-webkit-details-marker { display: none; }
+  details.day > summary::before { content: "▾"; color: #6B7280; font-size: 0.8rem; }
+  .chip { font-size: var(--fs-xs); border-radius: var(--r-pill); padding: 1px 9px; border: 1px solid; flex: none;
+    font-weight: 600; }
+  .chip-today { background: #EFF6FF; color: #2563EB; border-color: #BFDBFE; }
+  details.slot { margin: 0 0 0 22px; border-top: 1px solid #E5E7EB; }
+  details.slot > summary { list-style: none; cursor: pointer; display: flex; align-items: center;
+    justify-content: flex-start; gap: 10px; padding: 8px 4px; font-size: var(--fs-base); }
+  details.slot > summary::-webkit-details-marker { display: none; }
+  details.slot > summary::before { content: "▸"; color: #6B7280; font-size: 0.75rem; }
+  details.slot[open] > summary::before { content: "▾"; }
+  details.slot > summary:hover { background: #EFF6FF; }
+  details.slot > summary > .slot-label { flex: none; white-space: nowrap; }
+  .slot-note { font-size: var(--fs-sm); color: #6B7280; flex: 1 1 auto; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sent-dot { display: inline-block; width: 7px; height: 7px; border-radius: var(--r-circle);
+    background: #15803D; flex: none; }
+  .slot-export-actions { display: none; gap: 2px; flex-shrink: 0; margin-left: auto; }
+  details.slot[open] > summary .slot-export-actions { display: flex; }
+  .slot-export-actions button { background: transparent; color: #4B5563; border: none; border-radius: var(--r-md);
+    font-weight: 500; padding: 4px 8px; font-size: var(--fs-sm); font-family: inherit; cursor: pointer;
+    display: inline-flex; align-items: center; }
+  .slot-export-actions button:hover { color: #2563EB; text-decoration: underline; text-underline-offset: 3px; }
+  .slot-body { margin: 0 0 8px 26px; font-size: var(--fs-sm); color: #6B7280; padding: 4px 0 8px; }
+
+  /* ===== 이 시안에서 새로 더하는 것 ===== */
+
+  /* 「제목 다시 불러오기」 — 내용을 바꾸는 동작이라 **테두리 박스**이고, 가져가기 글자보다
+     왼쪽에 선다. 높이·여백·굵기는 확정본·초안 툴바 버튼과 같은 값. */
+  .refetch-btn { height: var(--h-tb); padding: 0 9px; font-size: var(--fs-md); font-weight: 500;
+    background: #FFFFFF; color: #4B5563; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-family: inherit;
+    white-space: nowrap; flex: none; }
+  .refetch-btn:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .refetch-btn:disabled { color: #6B7280; border-color: #E5E7EB; cursor: progress; }
+  .refetch-btn.is-busy .ic { animation: spin 0.9s linear infinite; }
+  details.slot > summary .refetch-btn { display: none; }
+  details.slot[open] > summary .refetch-btn { display: inline-flex; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 결과 줄 — 「잘 됐다」 안내라 초록 세트. 바뀐 게 0건이어도 같은 색이다. */
+  .refetch-note { margin: 0 0 10px; padding: 8px 12px; font-size: var(--fs-sm); line-height: 1.7;
+    background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: var(--r-md); color: #065F46; }
+  .refetch-note .sub { color: #047857; opacity: 0.85; }
+
+  /* 제목이 바뀐 행 — 세이지(담당자가 방금 손댄 것) */
+  .arc-row.is-changed { background: #E7EFE8; border-color: #C6D8C9; }
+  .arc-row.is-changed:hover { background: #E7EFE8; }
+  .chip-changed { display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs); font-weight: 700;
+    color: #92400E; background: #FFFBEB; border: 1px solid #FDE68A;
+    border-radius: var(--r-pill); padding: 2px 8px; white-space: nowrap; }
+  /* 제목은 그대로인데 원문만 손댄 행 — 우리 값이 하나도 안 바뀌었으므로 세이지도 안 칠하고
+     칩도 중립 회색이다. 「고쳐졌다」는 사실만 알린다. */
+  .chip-touched { display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs); font-weight: 600;
+    color: #6B7280; background: #F8FAFC; border: 1px solid #E5E7EB;
+    border-radius: var(--r-pill); padding: 2px 8px; white-space: nowrap; }
+  .arc-was { margin-top: 5px; font-size: var(--fs-xs); color: #6B7280; line-height: 1.6; }
+  .arc-was .k { color: #92400E; font-weight: 700; margin-right: 4px; }
+  .arc-was .t { text-decoration: line-through; text-decoration-color: #9CA3AF; }
+  .arc-was.touched .k { color: #6B7280; }
+
+  /* 시안 설명용 — 실제 화면엔 없다 */
+  .mk-label { max-width: 800px; margin: 36px auto -8px; padding: 0 24px; }
+  .mk-label .tag { display: inline-block; background: #1E3A5F; color: #FFF; font-size: var(--fs-xs);
+    font-weight: 700; border-radius: var(--r-pill); padding: 3px 10px; }
+  .mk-label p { color: #6B7280; font-size: var(--fs-sm); margin: 8px 0 0; line-height: 1.7; }
+  .mk-real { display: inline-block; background: #FBF0DA; color: #8A5A14; font-size: var(--fs-xs);
+    font-weight: 700; border-radius: var(--r-pill); padding: 3px 10px; margin-left: 4px; }
+  .mk-notes { max-width: 800px; margin: 40px auto 60px; padding: 20px 24px;
+    background: #FFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg); }
+  .mk-notes h2 { font-size: var(--fs-lg); color: #1E3A5F; margin: 0 0 12px; }
+  .mk-notes li { font-size: var(--fs-md); color: #1F2937; line-height: 1.85; margin-bottom: 8px; }
+  .mk-notes code { background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: var(--r-sm);
+    padding: 1px 5px; font-size: var(--fs-sm); }
+</style>
+</head>
+<body>
+
+<!-- ============ A ============ -->
+<div class="mk-label">
+  <span class="tag">A · 평소</span>
+  <p>「부정기사」 칩을 눌러 둔 상태. 머리줄에 <b>테두리 버튼</b> 하나가 늘어난 것이 전부다 —
+     가져가기 글자(복사·텍스트·엑셀)는 오른쪽 끝에 그대로 있다.</p>
+</div>
+<div class="container">
+  <div class="lab-topbar">
+    <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg> 라벨 보관함</h1>
+    <span class="spacer"></span>
+    <a class="btn ghost" href="#">라벨 관리</a>
+  </div>
+  <div class="lab-chipbar">
+    <a class="lab-filter-chip on" href="#">부정기사<span class="n">5</span></a>
+    <a class="lab-filter-chip" href="#">별도 보고<span class="n">2</span></a>
+    <a class="lab-filter-chip" href="#">사진기사 아닌 것<span class="n">2</span></a>
+    <a class="lab-filter-chip" href="#">테스트<span class="n">1</span></a>
+  </div>
+  <div class="lab-listhead">
+    부정기사 · 5건
+    <button type="button" class="refetch-btn">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+      제목 다시 불러오기
+    </button>
+    <span class="exp"><button type="button">복사</button><button type="button">텍스트</button><button type="button">엑셀</button></span>
+  </div>
+
+  <div class="arc-row"><div class="arc-title">[단독] 살균 맥주는 되고 막걸리는 안 된다?…기한 표시 다른 잣대</div><div class="arc-meta"><span class="snap-tag">회차</span><span>2026-10-12 11:00</span><span>·</span><span>2026-10-12 09:41 발행</span><span>·</span><span>뉴스1</span><a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="arc-labels"><span class="lab-chip">부정기사 <button type="button" class="x-btn">×</button></span></span></div></div>
+
+  <div class="arc-row"><div class="arc-title">“외화 채권 발행 주관하려면 한국 면허 따라”…재경부 방침에 논란 확대</div><div class="arc-meta"><span class="snap-tag">회차</span><span>2026-10-12 09:30</span><span>·</span><span>2026-10-12 09:01 발행</span><span>·</span><span>조선일보</span><a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="arc-labels"><span class="lab-chip">부정기사 <button type="button" class="x-btn">×</button></span></span></div></div>
+
+  <div class="arc-row"><div class="arc-title">장관 관사 짓는게 미래대응?… 성장자금 162조 ‘쌈짓돈’ 현실화</div><div class="arc-meta"><span class="snap-tag">회차</span><span>2026-10-07 14:00</span><span>·</span><span>2026-10-07 12:11 발행</span><span>·</span><span>문화일보</span><a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="arc-labels"><span class="lab-chip">부정기사 <button type="button" class="x-btn">×</button></span></span></div></div>
+
+  <div class="arc-row"><div class="arc-title">삼일천하(三日天下)로 끝난 기재부와 캠코의 굴욕</div><div class="arc-meta"><span class="snap-tag">회차</span><span>2026-10-06 17:00</span><span>·</span><span>2026-10-06 14:40 발행</span><span>·</span><span>헤럴드경제</span><a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="arc-labels"><span class="lab-chip">부정기사 <button type="button" class="x-btn">×</button></span></span></div></div>
+
+  <div class="arc-row"><div class="arc-title">"한솥밥 먹던 사이인데 누군 벌써 승진"…공무원들 '후회' [김익환의 부처 핸즈업]</div><div class="arc-meta"><span class="snap-tag">회차</span><span>2026-09-30 16:30</span><span>·</span><span>2026-09-30 15:02 발행</span><span>·</span><span>한국경제</span><a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="arc-labels"><span class="lab-chip">부정기사 <button type="button" class="x-btn">×</button></span></span></div></div>
+</div>
+
+<!-- ============ B ============ -->
+<div class="mk-label">
+  <span class="tag">B · 누르는 중</span>
+  <p>아이콘이 돌고 버튼은 못 누른다. <b>몇 건까지 봤는지를 버튼이 그대로 센다</b> — 진행 막대를
+     따로 만들지 않고 목록도 가리지 않는다.</p>
+</div>
+<div class="container">
+  <div class="lab-chipbar">
+    <a class="lab-filter-chip on" href="#">부정기사<span class="n">5</span></a>
+    <a class="lab-filter-chip" href="#">별도 보고<span class="n">2</span></a>
+  </div>
+  <div class="lab-listhead">
+    부정기사 · 5건
+    <button type="button" class="refetch-btn is-busy" disabled>
+      <svg class="ic" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+      5건 중 3건 확인 중…
+    </button>
+    <span class="exp"><button type="button">복사</button><button type="button">텍스트</button><button type="button">엑셀</button></span>
+  </div>
+  <div class="arc-row"><div class="arc-title">[단독] 살균 맥주는 되고 막걸리는 안 된다?…기한 표시 다른 잣대</div><div class="arc-meta"><span class="snap-tag">회차</span><span>2026-10-12 11:00</span><span>·</span><span>뉴스1</span><span class="arc-labels"><span class="lab-chip">부정기사</span></span></div></div>
+  <div class="arc-row"><div class="arc-title">“외화 채권 발행 주관하려면 한국 면허 따라”…재경부 방침에 논란 확대</div><div class="arc-meta"><span class="snap-tag">회차</span><span>2026-10-12 09:30</span><span>·</span><span>조선일보</span><span class="arc-labels"><span class="lab-chip">부정기사</span></span></div></div>
+</div>
+
+<!-- ============ C ============ -->
+<div class="mk-label">
+  <span class="tag">C · 끝난 뒤</span><span class="mk-real">실제로 일어난 일</span>
+  <p>아래 두 행은 <b>지어낸 예시가 아니라 2026-10-12에 실제로 재어 본 결과</b>다.
+     문화일보 기사는 제목이 바뀌어 있었고(단정 → 「우려」), 조선일보 기사는 제목은 그대로인데
+     원문만 손댄 상태였다. <b>순서는 흔들지 않는다</b> — 발행 최신순 그대로이고 바뀐 행만 칠한다.</p>
+</div>
+<div class="container">
+  <div class="lab-chipbar">
+    <a class="lab-filter-chip on" href="#">부정기사<span class="n">5</span></a>
+    <a class="lab-filter-chip" href="#">별도 보고<span class="n">2</span></a>
+    <a class="lab-filter-chip" href="#">사진기사 아닌 것<span class="n">2</span></a>
+    <a class="lab-filter-chip" href="#">테스트<span class="n">1</span></a>
+  </div>
+  <div class="lab-listhead">
+    부정기사 · 5건
+    <button type="button" class="refetch-btn">
+      <svg class="ic" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+      제목 다시 불러오기
+    </button>
+    <span class="exp"><button type="button">복사</button><button type="button">텍스트</button><button type="button">엑셀</button></span>
+  </div>
+
+  <p class="refetch-note">
+    5건 확인 · <b>제목이 바뀐 기사 1건</b> · 원문만 손댄 기사 1건<br>
+    <span class="sub">직접 고친 제목 1건은 그대로 뒀어요</span>
+  </p>
+
+  <div class="arc-row"><div class="arc-title">[단독] 살균 맥주는 되고 막걸리는 안 된다?…기한 표시 다른 잣대</div><div class="arc-meta"><span class="snap-tag">회차</span><span>2026-10-12 11:00</span><span>·</span><span>2026-10-12 09:41 발행</span><span>·</span><span>뉴스1</span><a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="arc-labels"><span class="lab-chip">부정기사 <button type="button" class="x-btn">×</button></span></span></div></div>
+
+  <div class="arc-row">
+    <div class="arc-title">“외화 채권 발행 주관하려면 한국 면허 따라”…재경부 방침에 논란 확대</div>
+    <div class="arc-was touched"><span class="k">✎ 오늘 15:45 수정</span>제목은 그대로예요 — 원문만 손댔어요</div>
+    <div class="arc-meta"><span class="snap-tag">회차</span><span>2026-10-12 09:30</span><span>·</span><span>2026-10-12 09:01 발행</span><span>·</span><span>조선일보</span><span class="chip-touched">✎ 원문 수정</span><a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="arc-labels"><span class="lab-chip">부정기사 <button type="button" class="x-btn">×</button></span></span></div>
+  </div>
+
+  <div class="arc-row is-changed">
+    <div class="arc-title">장관 관사 짓는게 미래대응?… 성장자금 162조 ‘쌈짓돈’ 현실화 우려</div>
+    <div class="arc-was"><span class="k">✎ 10/7 17:22 수정</span><span class="t">장관 관사 짓는게 미래대응?… 성장자금 162조 ‘쌈짓돈’ 현실화</span></div>
+    <div class="arc-meta"><span class="snap-tag">회차</span><span>2026-10-07 14:00</span><span>·</span><span>2026-10-07 12:11 발행</span><span>·</span><span>문화일보</span><span class="chip-changed">✎ 제목 바뀜</span><a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="arc-labels"><span class="lab-chip">부정기사 <button type="button" class="x-btn">×</button></span></span></div>
+  </div>
+
+  <div class="arc-row"><div class="arc-title">삼일천하(三日天下)로 끝난 기재부와 캠코의 굴욕</div><div class="arc-meta"><span class="snap-tag">회차</span><span>2026-10-06 17:00</span><span>·</span><span>2026-10-06 14:40 발행</span><span>·</span><span>헤럴드경제</span><a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="arc-labels"><span class="lab-chip">부정기사 <button type="button" class="x-btn">×</button></span></span></div></div>
+
+  <div class="arc-row"><div class="arc-title">"한솥밥 먹던 사이인데 누군 벌써 승진"…공무원들 '후회' [김익환의 부처 핸즈업]</div><div class="arc-meta"><span class="snap-tag">회차</span><span>2026-09-30 16:30</span><span>·</span><span>2026-09-30 15:02 발행</span><span>·</span><span>한국경제</span><a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="arc-labels"><span class="lab-chip">부정기사 <button type="button" class="x-btn">×</button></span></span></div></div>
+</div>
+
+<!-- ============ D ============ -->
+<div class="mk-label">
+  <span class="tag">D · 정기 보관함</span>
+  <p>같은 버튼을 <b>회차 줄</b>에도 붙인다. 가져가기(복사·텍스트)와 똑같이 <b>펼친 회차에만</b>
+     나타난다. <b>날짜 줄엔 안 붙인다</b> — 하루면 230~560건이라 한 번에 받아올 양이 아니다.</p>
+</div>
+<div class="container">
+  <h1><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg> 정기 보관함</h1>
+  <p class="page-sub">날짜별로 쌓인 스크랩 · 최근 1년 보관됩니다</p>
+
+  <details class="day" open>
+    <summary>10월 12일 (월) <span class="chip chip-today">오늘</span></summary>
+    <details class="slot">
+      <summary><span class="slot-label">14:00 기준</span><span class="sent-dot"></span><span class="slot-note">한은 국감 등.</span></summary>
+    </details>
+    <details class="slot" open>
+      <summary>
+        <span class="slot-label">11:00 기준</span><span class="sent-dot"></span>
+        <button type="button" class="refetch-btn" onclick="event.stopPropagation()">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+          제목 다시 불러오기
+        </button>
+        <span class="slot-note">소비기한 표시, 외화채권.</span>
+        <span class="slot-export-actions"><button type="button">복사</button><button type="button">텍스트</button></span>
+      </summary>
+      <p class="slot-body">… 이 회차 기사 24건 …</p>
+    </details>
+    <details class="slot" open>
+      <summary>
+        <span class="slot-label">09:30 기준</span><span class="sent-dot"></span>
+        <button type="button" class="refetch-btn is-busy" disabled onclick="event.stopPropagation()">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+          31건 중 12건 확인 중…
+        </button>
+        <span class="slot-note">외화채권 규제.</span>
+        <span class="slot-export-actions"><button type="button">복사</button><button type="button">텍스트</button></span>
+      </summary>
+      <p class="slot-body">… 이 회차 기사 31건 …</p>
+    </details>
+  </details>
+</div>
+
+<!-- ============ 정한 것 ============ -->
+<div class="mk-notes">
+  <h2>이 시안이 정한 것</h2>
+  <ul>
+    <li><b>버튼은 테두리 박스이고 가져가기 글자보다 왼쪽에 선다.</b> 제목을 바꾸는 동작이라
+      「박스는 내용을 바꾸는 버튼, 글자는 가져가거나 보기만 바꾸는 것」 규칙을 따른다.
+      높이·여백·굵기는 확정본·초안 툴바 버튼과 같은 값(<code>--h-tb</code> 28px · 좌우 9px · 굵기 500).</li>
+    <li><b>범위는 지금 화면에 보이는 목록 그대로다</b>(엑셀·복사와 같은 규칙). 라벨을 둘 이상
+      골라 두면 그 교집합, 보관함에선 그 회차 하나.</li>
+    <li><b>층을 가린다.</b> 라벨 목록(5~12건)·회차 줄(20~60건)엔 붙이고,
+      <b>날짜 줄(230~560건)·결과 전체엔 안 붙인다.</b> 한 번 눌러 몇 분을 기다리게 하지 않는다.</li>
+    <li><b>진행은 버튼이 센다</b>(<code>5건 중 3건 확인 중…</code>). 진행 막대를 따로 만들지 않는다.</li>
+    <li><b>바뀐 값은 바로 반영하되, 무엇이 바뀌었는지 눈앞에 남긴다.</b> ⋯ 메뉴에서 한 건씩 누를 때
+      바로 반영하는데 여러 건 묶었다고 확인창을 띄우면 같은 버튼이 다른 뜻이 된다. 대신 옛 제목
+      줄(<code>.arc-was</code>)이 취소선으로 남는다.</li>
+    <li><b>「제목 바뀜」과 「원문 수정」은 다른 표시다.</b> 제목이 바뀐 행만 세이지 + 앰버 칩이고,
+      제목은 그대로인데 원문만 손댄 행은 <b>세이지를 안 칠하고 중립 회색 칩</b>이다 —
+      우리 값이 하나도 안 바뀌었으니 「담당자가 방금 손댄 것」 색을 쓸 이유가 없다.</li>
+    <li><b>「원문 수정」은 담은 뒤의 변화만 센다.</b> 실측에서 <b>기사 8건 전부에 수정 시각이
+      찍혀 있었다</b>(발행 +3분 ~ +6시간 44분) — 기사는 거의 다 한 번은 손대므로 「수정 시각이
+      있다」를 그대로 쓰면 모든 줄에 표시가 붙어 아무것도 못 가른다. 그래서 <b>처음 확인할 때의
+      수정 시각을 적어 두고 그보다 뒤로 밀렸을 때만</b> 알린다(그래서 이미 담아 둔 기사는
+      다음 확인부터 기준이 생긴다).</li>
+    <li><b>발행 시각도 같이 대조한다.</b> 공짜이긴 한데 실측 8건 중 0건이라 거의 안 울린다
+      — 기사를 내렸다 다시 올린 드문 경우에만 바뀐다.</li>
+    <li><b>요약은 대조하지 않는다 — 실측으로 기각.</b> 8건 중 5건이 「바뀜」으로 나왔는데 거의 다
+      거짓이었다. 저장된 요약은 <b>네이버 검색이 준 「검색어 주변 발췌」</b>이고 원문 페이지의
+      요약은 <b>「본문 맨 앞」</b>이라 애초에 다른 물건이다. 그냥 넣었으면 5/8에 거짓 표시가 붙어
+      기능이 그 자리에서 죽었다.</li>
+    <li><b>✏️로 직접 고친 제목은 건드리지 않는다.</b> 지금 <code>summary_overrides.json</code>엔
+      출처가 안 적혀 있어(실측 15건) 그대로 덮으면 손으로 고친 제목이 조용히 사라진다. 저장할 때
+      <code>"by": "manual"</code> 한 칸을 더하고 일괄 불러오기는 그 항목과 출처를 모르는 옛 항목을
+      건너뛴다.</li>
+    <li><b>못 본 기사도 결과에 적는다.</b> 언론사 자체 도메인은 제목을 믿을 수 없어 확인하지
+      않는다(저장 기사의 6.5%). 「확인했다」와 「확인할 수 없다」를 뭉개지 않는다.</li>
+    <li><b>순서는 흔들지 않는다.</b> 바뀐 행을 위로 올리지 않는다 — 발행 최신순이 이 화면의
+      규칙이고, 보던 목록의 줄 자리가 움직이면 어디를 보고 있었는지 잃는다.</li>
+    <li><b>LLM을 안 쓴다.</b> 제목이 같은지는 글자 비교이고, 네이버 검색 API(하루 25,000)도
+      안 지나간다 — 이미 아는 주소를 직접 연다. 드는 건 기사당 259KB 트래픽뿐이다.</li>
+    <li><b>고친 제목은 그 뒤 내보내기에 그대로 나간다 — 담당자가 눌러서 일어난 일이기 때문이다.</b>
+      <code>summary_overrides</code>가 URL 전역이라 그 회차를 다시 복사·엑셀로 뽑으면 새 제목이
+      나오고, 이미 보낸 보고서와 달라진다. 그래도 그게 맞다 — <b>앱이 혼자 바꾼 게 아니라
+      담당자가 「지금 맞는 제목으로 맞춰라」고 누른 결과</b>이고, 지금 뽑는 자료는 지금 맞는 제목이어야
+      한다. <b>누르지 않으면 한 글자도 안 바뀐다.</b> 잃는 것은 「그때 그렇게 보냈다」는 기록인데,
+      그건 발송 기록(<code>send_log</code>)의 그 줄이 들고 있다.</li>
+  </ul>
+
+  <h2 style="margin-top: 22px;">아직 안 정한 것</h2>
+  <ul>
+    <li>보관함 회차 줄이 <b>좁은 화면에서 비좁다</b>(▸ · 시각 · 점 · 버튼 · 메모 · 복사 · 텍스트).
+      640px에서 어떻게 접을지 봐야 한다.</li>
+    <li>세이지가 <b>언제 사라지나</b>. 다음 새로고침에 지우면 "내가 뭘 봤는지"를 잃고,
+      남기려면 상태를 저장해야 한다.</li>
+    <li>텔레그램 알림을 얹을지 — <b>이 버튼을 몇 주 써 보고 정한다.</b></li>
+  </ul>
+</div>
+
+</body>
+</html>

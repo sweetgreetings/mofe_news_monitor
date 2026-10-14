@@ -21,7 +21,7 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app import agency_archive, alerted_urls, config, credentials, api_usage, breaking_alert, breaking_alert_sender, breaking_alert_state, confirm_send, curation, custom_groups, draft_articles, draft_seen, history_renderer, landing_renderer, llm_classifier, naver_api, preview_cache, preview_order, preview_renderer, renderer, scheduler, scraper, settings, storage, telegram_bot, telegram_recipients, negative_guess, today_cuts, auto_classify_turn, photo_body, breaking_burst, send_log, photo_overrides, manual_keyword_note  # noqa: E402
+from app import agency_archive, alert_groups, alerted_urls, config, credentials, api_usage, breaking_alert, breaking_alert_sender, breaking_alert_state, confirm_send, curation, custom_groups, draft_articles, draft_seen, history_renderer, landing_renderer, llm_classifier, naver_api, preview_cache, preview_order, preview_renderer, renderer, scheduler, scraper, settings, storage, telegram_bot, telegram_recipients, negative_guess, today_cuts, auto_classify_turn, photo_body, breaking_burst, send_log, photo_overrides, manual_keyword_note  # noqa: E402
 import main  # noqa: E402
 
 _FIXTURE_BY_KEYWORD = {
@@ -77,6 +77,109 @@ def _article(key: str) -> dict:
 # 테스트가 "실제 data/를 안 건드린다"는 약속은 하네스를 거쳤을 때만 참이었는데, 그 조건이
 # 어디에도 강제돼 있지 않았다 — 이제 모든 테스트가 첫 줄에서 이걸 확인한다.
 _REAL_ARTICLES_DIR = config.ARTICLES_DIR
+
+
+
+def test_alert_scope_follows_keyword_switch():
+    """[단독]·[속보] 알림 범위를 정하는 자리가 **검색어 그룹 스위치 하나**인지 확인한다.
+
+    고치기 전 사고: 「바닥」 경로(app.scraper.collect_run이 회차 저장 직전에 하는 말머리
+    검사)가 설정을 통째로 무시하고 **회차 기사 전부**를 알렸다. "감시를 켜지 않았어도
+    회차 안에서는 놓치지 않게" 하려던 안전장치인데, 그 때문에 담당자가 알림을 끌 방법이
+    아예 없었다 — 설정 화면에서 그룹 체크를 풀어도 그 그룹이 초안·확정본에 들어가는 한
+    알림은 그대로 나갔다(국정감사 기간 「재경위」 키워드 하나가 [단독] 알림의 절반을
+    만들었다). 이제 폴링과 바닥이 **같은 스위치**를 본다.
+
+    보는 것 다섯:
+      1) 바닥 경로(articles_in_alert_scope)가 알림 끈 그룹의 기사를 걸러낸다.
+      2) 폴링(_watched_keywords)도 같은 스위치를 본다 — 두 경로가 같은 범위여야 한다.
+      3) 꺼진 그룹(목적지 둘 다 끔)은 알림도 안 간다.
+      4) 스위치가 저장·복원된다(include_in_alert).
+      5) 옛 설정(/breaking-alert의 group_names)이 스위치로 옮겨지고 그 키는 지워진다.
+    """
+    _require_isolation()
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        with patch.object(settings, "SETTINGS_FILE", tmp_dir / "settings.json"), \
+             patch.object(breaking_alert, "BREAKING_ALERT_FILE", tmp_dir / "breaking_alert.json"), \
+             patch.object(alert_groups, "BREAKING_ALERT_FILE", tmp_dir / "breaking_alert.json"):
+            settings.save_keyword_groups([
+                {"name": "기관", "keywords": ["재경부"], "mode": "OR",
+                 "include_in_live": True, "include_in_scrap": True, "include_in_alert": True},
+                {"name": "재경위", "keywords": ["재정경제기획위원회"], "mode": "OR",
+                 "include_in_live": True, "include_in_scrap": True, "include_in_alert": False},
+                {"name": "꺼진그룹", "keywords": ["설탕세"], "mode": "OR",
+                 "include_in_live": False, "include_in_scrap": False, "include_in_alert": True},
+            ])
+
+            # 4) 스위치가 저장·복원된다
+            saved = {g["name"]: g for g in settings.load_settings()["keyword_groups"]}
+            assert saved["기관"]["include_in_alert"] is True
+            assert saved["재경위"]["include_in_alert"] is False, "끈 스위치가 저장되지 않았다"
+
+            # 3) 꺼진 그룹은 스위치를 켜 뒀어도 알림 대상이 아니다 — 다만 **설정은 남는다**
+            assert settings.group_in_alert(saved["꺼진그룹"]) is False, (
+                "어느 화면에도 안 보이는 그룹이 텔레그램만 울리는 조합은 뜻이 없다"
+            )
+            assert saved["꺼진그룹"]["include_in_alert"] is True, (
+                "꺼진 그룹의 알림 설정이 False로 굳으면 그룹을 다시 켤 때 안 돌아온다 "
+                "— 꺼둔 키워드(disabled_keywords)를 보존하는 것과 같은 원칙"
+            )
+            assert settings.group_in_alert(
+                dict(saved["꺼진그룹"], include_in_live=True)
+            ) is True, "다시 켠 그룹의 알림 설정이 살아나지 않는다"
+
+            # 2) 폴링이 보는 키워드 — 알림을 켠 그룹의 것만
+            watched = breaking_alert_sender._watched_keywords(settings.load_settings())
+            assert watched == ["재경부"], f"폴링 범위가 스위치와 어긋난다: {watched}"
+
+            # 1) 바닥 경로 — 회차 기사 중 알림 켠 그룹에 걸린 것만 넘어간다
+            articles = [
+                {"url": "u1", "title": "[단독] 기관 기사", "matched_keywords": ["재경부"]},
+                {"url": "u2", "title": "[단독] 국감 공방", "matched_keywords": ["재정경제기획위원회"]},
+                {"url": "u3", "title": "[속보] 둘 다 걸림",
+                 "matched_keywords": ["재정경제기획위원회", "재경부"]},
+                {"url": "u4", "title": "[단독] 수기로 담은 기사"},  # matched_keywords 없음
+            ]
+            scoped = {a["url"] for a in breaking_alert_sender.articles_in_alert_scope(articles)}
+            assert scoped == {"u1", "u3"}, (
+                f"바닥 경로가 스위치를 안 따른다: {scoped} — 끈 그룹의 기사가 새면 "
+                "담당자가 알림을 끌 수가 없다"
+            )
+
+            # 알림을 전부 끄면 바닥도 조용하다(그게 끄는 것의 뜻이다)
+            groups = settings.load_settings()["keyword_groups"]
+            for g in groups:
+                g["include_in_alert"] = False
+            settings.save_keyword_groups(groups)
+            assert breaking_alert_sender.articles_in_alert_scope(articles) == []
+
+            # 5) 옛 설정 이관 — group_names -> include_in_alert, 그 키는 지운다
+            settings.save_keyword_groups([
+                {"name": "기관", "keywords": ["재경부"], "mode": "OR",
+                 "include_in_live": True, "include_in_scrap": True},
+                {"name": "재경위", "keywords": ["재정경제기획위원회"], "mode": "OR",
+                 "include_in_live": True, "include_in_scrap": True},
+            ])
+            (tmp_dir / "breaking_alert.json").write_text(
+                json.dumps({"enabled": True, "group_names": ["기관"], "start": "06:00",
+                            "end": "23:00", "interval_min": 3, "catch_up_enabled": True},
+                           ensure_ascii=False),
+                encoding="utf-8",
+            )
+            assert alert_groups.transplant_alert_groups() is True
+            moved = {g["name"]: g["include_in_alert"]
+                     for g in settings.load_settings()["keyword_groups"]}
+            assert moved == {"기관": True, "재경위": False}, f"이관 결과가 다르다: {moved}"
+            raw = json.loads((tmp_dir / "breaking_alert.json").read_text(encoding="utf-8"))
+            assert "group_names" not in raw, (
+                "옛 키가 남으면 같은 설정이 두 자리에 있게 된다"
+            )
+            # 두 번째 호출은 아무것도 하지 않는다(이미 옮겼다)
+            assert alert_groups.transplant_alert_groups() is False
+
+    print("54) [단독]·[속보] 알림 범위: 통과 (검색어 그룹 스위치 하나 — 폴링·바닥 같은 범위, "
+          "꺼진 그룹 제외, 옛 group_names 이관·키 삭제)")
 
 
 def _require_isolation():
@@ -540,12 +643,13 @@ def test_breaking_alert_catches_up_at_window_start():
         with patch.object(breaking_alert, "BREAKING_ALERT_FILE", tmp_dir / "breaking_alert.json"), \
              patch.object(breaking_alert_state, "BREAKING_ALERT_STATE_FILE", tmp_dir / "ba_state.json"), \
              patch.object(settings, "SETTINGS_FILE", tmp_dir / "settings.json"):
+            # 감시 대상은 그룹의 「[단독]·[속보] 알림」 스위치가 정한다(include_in_alert)
             settings.save_keyword_groups([
                 {"name": "감시", "keywords": ["기재부"], "mode": "OR",
-                 "include_in_live": True, "include_in_scrap": True},
+                 "include_in_live": True, "include_in_scrap": True, "include_in_alert": True},
             ])
             breaking_alert.save_breaking_alert_settings(
-                enabled=True, group_names=["감시"], start="06:00", end="23:00",
+                enabled=True, start="06:00", end="23:00",
                 interval_min=3, catch_up_enabled=True,
             )
             # 앱이 밤새 켜져 있던 상태 — 어제 마지막 폴링 기록만 있고, 오늘 폴링은 아직.
@@ -855,12 +959,14 @@ def test_draft_sees_the_same_window_as_confirmed():
 
 
 def test_regular_run_delete_and_restore():
-    """정기 보관함 회차 삭제 — trash로 옮기고, 그 자리에 「삭제함」이 남고, 되살리면 돌아온다.
+    """정기 보관함 회차 삭제 — trash로 옮기고, 보관함에선 흔적 없이 사라지고, 되살리면 돌아온다.
 
     [추가: 2026-09-11] 지키는 것 셋:
       1) 오늘 회차는 못 지운다 — 파일이 없어지면 스케줄러가 run_exists로 곧바로 다시 수집한다.
       2) 가장 최근 회차는 못 지운다 — 지우면 그 앞 회차가 자동발송 대상이 될 수 있다(새벽).
-      3) 지운 자리는 「수집 기록 없음」이 아니라 「삭제함 · 되살리기」다(앱이 못 모은 것처럼 보이면 거짓말).
+      3) [수정: 2026-10-12] 지운 자리는 **아무 줄도 아니다** — 「삭제함」 줄도, 「수집 기록
+         없음」도 안 그린다(뒤는 앱이 못 모은 날처럼 보여 거짓말이고, 앞은 같은 삭제가
+         보관함 안 두 자리에 나타나 헷갈렸다). 지운 회차만 남은 날짜는 줄째 사라진다.
     """
     _require_isolation()
     now = datetime.now()
@@ -881,6 +987,18 @@ def test_regular_run_delete_and_restore():
 
     # 지울 수 있는 회차 두 개를 한 묶음(같은 stamp)으로 지운다.
     assert storage.delete_run(two_days_ago, "17:00", stamp="20260101120000")
+
+    # ③-1 살아 있는 회차가 남은 날짜 — 지운 자리에 「삭제함」도 「수집 기록 없음」도 없다
+    # (뒤는 담당자가 지운 걸 앱이 못 모은 것처럼 보이게 하므로 거짓말이다).
+    page = history_renderer.render_history_page(
+        [], all_dates=storage.list_run_dates(), deleted_runs=storage.list_deleted_runs(),
+        latest_key=storage.latest_run_key(),
+    )
+    day_part = page.split(f'data-date="{two_days_ago}"', 1)[1].split("</details>\n<details", 1)[0]
+    assert f"{two_days_ago}|09:00" in day_part, "살아 있는 회차까지 사라졌음"
+    assert "17:00" not in day_part, "지운 회차 자리에 아직 줄이 있음"
+    assert "삭제함" not in page and "slot-gone" not in page, "「삭제함」 줄이 아직 남아 있음"
+
     assert storage.delete_run(two_days_ago, "09:00", stamp="20260101120000")
     assert not storage.run_exists("17:00", two_days_ago), "지운 회차 파일이 그대로 남아 있음"
     assert not storage.delete_run(two_days_ago, "17:00"), "이미 지운 회차를 또 지웠다고 함"
@@ -890,12 +1008,11 @@ def test_regular_run_delete_and_restore():
     # 조회 쪽(인덱스)에서도 빠져야 한다 — 보관함·엑셀·홈 추이가 전부 이걸 본다.
     assert all(m["run_at"][:10] != two_days_ago for m in storage.list_run_meta())
 
-    # ③ 보관함 화면: 살아 있는 회차가 없어진 날짜도 줄이 남고, 지운 자리는 「삭제함 · 되살리기」.
+    # ③-2 그 날짜의 회차를 다 지우면 날짜 줄째 사라진다.
     page = history_renderer.render_history_page(
         [], all_dates=storage.list_run_dates(), deleted_runs=deleted, latest_key=storage.latest_run_key()
     )
-    assert f'data-slot-key="{two_days_ago}|17:00"' in page and "slot-gone" in page, "지운 자리가 안 그려짐"
-    assert 'class="chip chip-gone"' in page, "지운 회차만 남은 날짜 표시가 없음"
+    assert f'data-date="{two_days_ago}"' not in page, "지운 회차만 남은 날짜 줄이 안 사라짐"
 
     # ① 오늘 회차가 생기면 오늘은 "today"로 잠기고, 어제 19:30은 이제 지울 수 있다.
     storage.save_run("09:30", [_article("c")], run_at=f"{today}T09:31:00")
@@ -907,7 +1024,7 @@ def test_regular_run_delete_and_restore():
     assert storage.run_lock_reason(yesterday, "19:30") is None
 
     # [추가: 2026-09-15] 날짜 줄 🗑 — 지울 수 있는 회차가 있는 날만, 그 회차 키를 구워 넣는다.
-    # 오늘은 없다. 지운 회차 둘만 남은 날짜는 「삭제함 · 모두 되살리기」로 그린다.
+    # 오늘은 없다. 되살리는 길은 보관함이 아니라 「삭제 기록」이라 그 링크가 한 번 선다.
     page = history_renderer.render_history_page(
         [], all_dates=storage.list_run_dates(), deleted_runs=storage.list_deleted_runs(),
         latest_key=storage.latest_run_key(),
@@ -920,9 +1037,31 @@ def test_regular_run_delete_and_restore():
         "날짜 줄 🗑가 없거나 지울 회차 키가 안 실림"
     )
     assert 'class="day-del"' not in _date_summary(today), "오늘 날짜 줄에 🗑가 그려짐"
-    gone_part = page.split(f'data-date="{two_days_ago}"', 1)[0].rsplit("<details", 1)[1]
-    assert "all-gone" in gone_part, "통째로 지운 날짜가 all-gone이 아님"
-    assert "모두 되살리기" in _date_summary(two_days_ago), "지운 회차 둘인 날짜에 「모두 되살리기」가 없음"
+    assert "되살리기" not in page.split("<script", 1)[0], "보관함 본문에 되살리기가 남아 있음"
+    assert 'class="deleted-link' in page, "「삭제 기록」으로 가는 링크가 없음"
+
+    # [추가: 2026-10-12] 되살릴 기간이 지나면 껍데기로 — 줄은 「삭제 기록」에 남고 되살리기만 빠진다.
+    assert storage.purge_expired_deleted_runs(restore_days=36500, now=now) == 0, "기간 안인데 껍데기가 됐음"
+    assert storage.purge_expired_deleted_runs(restore_days=0, now=now + timedelta(days=1)) == 2
+    purged = storage.list_deleted_runs()
+    assert len(purged) == 2 and not any(e["restorable"] for e in purged), "껍데기가 목록에서 빠지거나 되살릴 수 있다고 함"
+    assert storage.deleted_run_article_count(purged[0]["trash_name"]) is not None, "껍데기에 건수가 없음"
+    assert storage.restore_run(purged[0]["trash_name"]) is None, "껍데기를 되살렸음"
+    # 껍데기여도 그 자리에 「수집 기록 없음」이 돌아오면 안 된다(지운 사실이 거짓이 된다).
+    page = history_renderer.render_history_page(
+        [], all_dates=storage.list_run_dates(), deleted_runs=storage.list_deleted_runs(),
+        latest_key=storage.latest_run_key(),
+    )
+    assert f'data-date="{two_days_ago}"' not in page, "껍데기 날짜가 보관함에 되살아남"
+
+    # 그 상태를 되돌려 아래 되살리기 검사를 이어 간다.
+    assert storage.empty_deleted_runs() == 2, "비우기가 껍데기를 안 지움"
+    assert storage.list_deleted_runs() == []
+    storage.save_run("09:00", [_article("a")], run_at=f"{two_days_ago}T09:01:00")
+    storage.save_run("17:00", [], run_at=f"{two_days_ago}T17:01:00")
+    assert storage.delete_run(two_days_ago, "17:00", stamp="20260101120000")
+    assert storage.delete_run(two_days_ago, "09:00", stamp="20260101120000")
+    deleted = storage.list_deleted_runs()
 
     # 되살리기 — 원래 자리로 돌아오고, 같은 회차가 이미 있으면 덮어쓰지 않는다.
     trash_17 = next(e["trash_name"] for e in deleted if e["run_slot"] == "17:00")
@@ -935,12 +1074,12 @@ def test_regular_run_delete_and_restore():
     newest_17 = next(e["trash_name"] for e in storage.list_deleted_runs() if e["run_slot"] == "17:00")
     assert storage.restore_run(newest_17) is None, "같은 날짜·회차가 있는데 덮어써 되살렸음"
 
-    print("17) 정기 회차 삭제·되살리기: 통과 (오늘·가장 최근 잠금, 지운 자리 「삭제함」, 되살리기·충돌 방어)")
+    print("17) 정기 회차 삭제·되살리기: 통과 (오늘·가장 최근 잠금, 보관함엔 흔적 없음, 기한 뒤 껍데기·비우기, 되살리기·충돌 방어)")
 
 
 def test_adhoc_card_delete_and_restore():
-    """수시 보관함 카드 삭제 — 보관 기한으로 옮긴 것은 「최근 삭제」에 안 뜨고, 제자리 줄·
-    이름 없는 사안 묶음·되살리기가 동작하는지.
+    """수시 보관함 카드 삭제 — 보관 기한으로 옮긴 것은 삭제 기록에 안 뜨고, 지운 회차는
+    보관함에서 **흔적 없이** 사라지고(초록 안내 한 줄만), 되살리기가 동작하는지.
 
     [추가: 2026-09-11] 수시 카드 폴더는 하네스가 격리하지 않으므로 이 테스트가 직접 임시
     폴더로 바꿔 끼운다(실제 data/adhoc/를 절대 건드리지 않는다).
@@ -977,10 +1116,13 @@ def test_adhoc_card_delete_and_restore():
             listed = card.list_deleted_cards()
             assert {c["id"] for c in listed} == {gone_a["id"], orphan["id"]}, "보관 기한으로 옮긴 카드가 「최근 삭제」에 섞였음"
 
-            # 방금 지운 카드는 제자리에 「삭제함 · 되살리기」 줄로, 나머지 지운 카드는 맨 아래 「최근 삭제」로.
-            page = archive_renderer.render_archive_page(preset="all", deleted_ids=[gone_a["id"]])
-            assert f'class="run-line gone" data-card-id="{gone_a["id"]}"' in page, "지운 자리에 「삭제함」 줄이 없음"
-            assert "최근 삭제 · 회차 1개" in page, "제자리 줄과 「최근 삭제」에 같은 카드가 두 번 뜸"
+            # [수정: 2026-10-12] 지운 카드는 목록에서 흔적 없이 사라지고, 그 자리를 초록
+            # 안내 한 줄이 받는다 — 「삭제함」 줄도 맨 아래 「최근 삭제」도 없다.
+            page = archive_renderer.render_archive_page(preset="all", gone="「재경위」 12:00 기준 회차를")
+            assert f'data-card-id="{gone_a["id"]}"' not in page, "지운 카드가 아직 목록에 있음"
+            assert "삭제함" not in page and "recent-del" not in page, "「삭제함」·「최근 삭제」가 남아 있음"
+            assert 'class="ok-note"' in page and "「재경위」 12:00 기준 회차를 지웠어요" in page, "초록 안내가 없음"
+            assert 'href="/deleted"' in page, "「삭제 기록」으로 가는 길이 없음"
             assert f'data-card-id="{kept["id"]}"' in page
 
             # 날짜 → 회차: 사안 층 없이 날짜 줄 🗑, 회차 줄에 사안명. 사안명 검색은 걸린 회차만.
@@ -1008,20 +1150,37 @@ def test_adhoc_card_delete_and_restore():
             _, names = _group_names()  # 기본은 언제나 날짜별(기억하지 않는다)
             assert all(n.endswith(")") for n in names), f"기본 보기가 날짜별이 아님: {names}"
 
-            # 날짜가 통째로 「삭제함」이 되면 날짜 줄에 「모두 되살리기」(🗑는 없음)
+            # 그 날짜의 회차를 다 지우면 날짜 줄째 사라진다(「삭제함」 묶음을 안 남긴다).
             assert card.delete_card(kept["id"], stamp="20260101130000")
-            page = archive_renderer.render_archive_page(preset="all", q="재경", deleted_ids=[gone_a["id"], kept["id"]])
-            date_head = page.split(f'data-day-label="{day_label}"', 1)[1].split("</summary>", 1)[0]
-            assert "모두 되살리기" in date_head and "day-del" not in date_head, "통째로 지운 날짜 줄이 이상함"
+            page = archive_renderer.render_archive_page(preset="all", q="재경")
+            assert f'data-day-label="{day_label}"' not in page, "지운 회차만 남은 날짜 줄이 안 사라짐"
             assert card.restore_card(next(c["_trash_name"] for c in card.list_deleted_cards() if c["id"] == kept["id"]))
+
+            # [추가: 2026-10-12] 기한이 지나면 껍데기로 — 삭제 기록에 줄은 남고 되살리기만 빠진다.
+            assert card.purge_expired_deleted_cards(restore_days=36500) == 0, "기간 안인데 껍데기가 됐음"
+            assert card.purge_expired_deleted_cards(restore_days=0, now=datetime.now()) >= 1
+            shells = [c for c in card.list_deleted_cards() if not c["_restorable"]]
+            assert shells and all(isinstance(c.get("article_count"), int) for c in shells), "껍데기에 건수가 없음"
+            assert card.restore_card(shells[0]["_trash_name"]) is None, "껍데기를 되살렸음"
+            # 보관 기한으로 앱이 옮긴 것(.expired-)은 담당자 눈에 안 보이니 EXPIRED_TRASH_KEEP_DAYS
+            # 뒤에 같이 지운다 — 치우려고 옮긴 건데 디스크에 영원히 남으면 옮긴 의미가 없다.
+            assert list((adhoc_dir / "trash").glob("*.expired-*.json")), "기한 만료 카드가 벌써 사라졌음"
+            card.purge_expired_deleted_cards(restore_days=36500, now=datetime.now() + timedelta(days=40))
+            assert not list((adhoc_dir / "trash").glob("*.expired-*.json")), "기한 만료 카드가 안 치워짐"
+            assert card.empty_deleted_cards() >= 1 and card.list_deleted_cards() == [], "비우기가 안 됨"
+
+            # 아래 되살리기 검사를 위해 다시 만들어 지운다.
+            again = card.new_card(issue["id"], "재경위", "11:00", "12:00", ["재경위"], now=base, raw=False)
+            assert card.delete_card(again["id"], stamp="20260101140000")
+            listed = card.list_deleted_cards()
 
             # 되살리기 — 같은 id가 이미 있으면 덮어쓰지 않고, 형식 밖 이름은 받지 않는다.
             restored = card.restore_card(listed[0]["_trash_name"])
-            assert restored in {gone_a["id"], orphan["id"]} and card.load_card(restored) is not None
+            assert restored == again["id"] and card.load_card(restored) is not None
             assert card.restore_card(listed[0]["_trash_name"]) is None
             assert card.restore_card("../issues.json") is None
 
-    print("18) 수시 카드 삭제·되살리기: 통과 (이름 없는 사안 표시, 기한 만료 제외, 제자리 줄·최근 삭제·되살리기)")
+    print("18) 수시 카드 삭제·되살리기: 통과 (이름 없는 사안 표시, 보관함엔 흔적 없이 초록 안내, 기한 뒤 껍데기·비우기, 되살리기)")
 
 
 def test_adhoc_reload_to_now():
@@ -1284,6 +1443,14 @@ def test_photo_caption_candidate_title_and_cut_stamp():
                     "강신철 후보자의 경우 14~18일 중 하루를 정해 청문회를 여는 방안이 논의되고 있다.... "):
         assert not looks_like_photo_caption({"title": "정부, 재정 운용 방향 논의", "summary": summary}), \
             f"'…고 있다.'에서 잘린 일반 기사를 사진으로 잘못 잡음: {summary}"
+    # 서술어 뒤가 사람 직함이 아니라 **정당 이름**인 캡션 제목 — 2026-10-08 뉴스핌 제보 실물.
+    # 요약이 "…퇴장하고... "처럼 "고 있다."에 닿기 전에 잘려 날짜 도장·기자 이메일이 통째로 없다.
+    walkout = ("8일 오전 서울 여의도 국회 재정경제기획위원회에서 열린 기획예산처에 대한 국정감사에서 국민의힘 "
+               "의원들이 노트북 앞에 피켓을 붙인 가운데 감사개시가 지연되자 더불어민주당 의원들이 퇴장하고... ")
+    for title in ("재경위 국감 퇴장하는 더불어민주당", "재경위 퇴장하는 국민의힘"):
+        assert looks_like_photo_caption({"title": title, "summary": walkout}), f"정당 이름으로 끝나는 캡션 제목을 놓침: {title}"
+    assert not looks_like_photo_caption({"title": "종부세 제외 기준 두고 ‘부자감세’ 지적받는 민주당", "summary": body}), \
+        "약칭 정당명으로 끝나는 일반 기사 제목을 사진으로 잘못 잡음"
     print("20b) '…장관 후보'·받침 ㄴ 서술어·'이름 + 후보자' 캡션 제목·잘린 날짜 도장·캡션 문장 직후 잘림: 통과 (곡선 따옴표 제목·인사 기사·'영끌한 국토 후보자'·'밝혔다. 2024...'·'…고 있다.'에서 잘린 칼럼 등 일반 기사는 제외)")
 
 
@@ -3204,6 +3371,59 @@ def test_no_ai_key_is_not_a_failure():
     print("47) AI 키 없음은 실패가 아니다: 통과 (사실 판정과 실패 판정 분리, 저장된 실패는 유지, 배너는 앰버 안내)")
 
 
+def test_unclassified_sits_below_summary():
+    """📂 소제목 미분류는 💬 요약 블록 **아래**, 📌 담아둔 기사 칸 바로 위에 선다(확정본·초안 같다).
+
+    보고서로 나갈 소제목·기사와 그 요약이 먼저 끝나고, 아직 갈 곳이 안 정해진 기사가 그 뒤에
+    남는다 — 왼쪽 띠를 가진 두 칸(미분류 앰버·담아둔 기사 캐러멜)이 화면 맨 아래 나란히 선다.
+    같이 「+ 한 줄 메모」의 +를 뗐다(칸이 하나뿐이라 더하는 게 아니라 쓰는 자리다 — 「+ 새
+    소제목」의 +는 그대로). 두 화면이 어긋나면 안 되므로 한 테스트에서 둘 다 본다.
+    """
+    _require_isolation()
+    uncl = llm_classifier.UNCLASSIFIED_GROUP_NAME
+
+    def art(url, title, group):
+        return {"outlet": "연합뉴스", "title": title, "url": url,
+                "summary": "정부가 세수 대책을 내놨다.", "pub_date": "2026-09-15T10:00:00+09:00",
+                "group": group}
+
+    articles = [art("https://u.x/1", "세제 개편 발표", "세제"),
+                art("https://u.x/2", "아직 못 고른 기사", uncl)]
+
+    def places(page):
+        # 미분류 칸을 가리키는 표식은 두 화면이 다르다(초안만 앰버 띠 class를 단다) —
+        # 둘 다 가진 data-toc-name으로 자리를 잰다.
+        return (page.index('<div class="bottom">'),
+                page.index('data-toc-name="%s"' % uncl),
+                page.index('<div class="manual-zone"'))
+
+    # 1) 확정본
+    page = renderer.render_page("11:00", articles, ["세제"], [], "ㅇ ({outlet}) {title}", "<{section}>")
+    bottom, unclassified, manual = places(page)
+    assert bottom < unclassified < manual, "확정본: 미분류가 요약 아래·담아둔 기사 위에 와야 한다"
+    assert '<section class="subheading" id="subheading-0"' in page, "다른 소제목은 제자리에 남아야 한다"
+
+    # 2) 초안 — 분류 결과만 심어 같은 자리를 확인한다(AI 호출 없음)
+    groups = [{"name": "세제", "articles": [articles[0]]}, {"name": uncl, "articles": [articles[1]]}]
+    with patch.object(preview_renderer, "classify_articles", return_value=groups):
+        content = preview_renderer._compute_preview_content(
+            {"start": "09:00", "end": "09:30"}, articles, ["세제"], [],
+            "ㅇ ({outlet}) {title}", "09:18",
+        )
+    bottom, unclassified, manual = places(content["body"])
+    assert bottom < unclassified < manual, "초안: 미분류가 요약 아래·담아둔 기사 위에 와야 한다"
+    assert '<section class="subheading subheading-unclassified"' in content["body"], \
+        "초안 미분류 칸의 앰버 띠(class)는 그대로 둔다"
+
+    # 3) 「한 줄 메모」엔 +가 없고, 「새 소제목」엔 그대로 있다
+    draft_actions = preview_renderer._actions_html("본문", "09:30", export_rows=[], export_date="2026-09-15")
+    for name, html_text in (("확정본", page), ("초안", draft_actions)):
+        assert 'toggleKeywordNote(this)">한 줄 메모</button>' in html_text, f"{name}: 메모 버튼에 +가 남아 있음"
+        assert '<span class="plus-glyph">+</span>새 소제목' in html_text, f"{name}: 새 소제목의 +는 그대로 둔다"
+
+    print("48) 📂 소제목 미분류 자리: 통과 (요약 아래·담아둔 기사 위, 확정본·초안 같음, 메모 버튼 + 뗌)")
+
+
 def test_send_log():
     """발송 기록(2026-09-23, mockups/SEND_LOG_MOCKUP.html).
 
@@ -3358,7 +3578,7 @@ def test_breaking_burst_alert():
         assert len(texts(mock_post)) == 1, "몰린 시간이 이미 지난 기사로 울리면 안 된다"
 
         # 꺼 두면 안 울린다
-        breaking_alert.save_breaking_alert_settings(True, [], "06:00", "23:00", 3, True, False, 30, 5)
+        breaking_alert.save_breaking_alert_settings(True, "06:00", "23:00", 3, True, False, 30, 5)
         mock_post.reset_mock()
         fresh = [flash(60 + i, f"신문{i}", "14:2" + str(i)) for i in range(6)]
         breaking_alert_sender.detect_and_alert(fresh, now=datetime(2026, 9, 18, 14, 27))
@@ -3366,7 +3586,7 @@ def test_breaking_burst_alert():
 
     for bad in ((45, 5), (30, 7)):
         try:
-            breaking_alert.save_breaking_alert_settings(True, [], "06:00", "23:00", 3, True, True, *bad)
+            breaking_alert.save_breaking_alert_settings(True, "06:00", "23:00", 3, True, True, *bad)
         except breaking_alert.BreakingAlertSettingsError:
             continue
         raise AssertionError(f"고를 수 없는 몰림 기준이 저장됐다: {bad}")
@@ -3408,7 +3628,7 @@ def test_breaking_alert_folds_same_event():
             [{"name": "나", "chat_id": "111", "alert_scoop": True, "alert_flash": True}]
         )
         # 몰림 알림은 끈 채로 센다 — 여기서 세는 건 개별 알림 통수다(⑥에서 따로 켠다).
-        breaking_alert.save_breaking_alert_settings(True, [], "06:00", "23:00", 3, True, False, 30, 5)
+        breaking_alert.save_breaking_alert_settings(True, "06:00", "23:00", 3, True, False, 30, 5)
 
         # ① 한 통 안: 같은 사건 3곳 + 다른 사건 1건 → 블록 2개. 대표는 가장 먼저 게시한 곳(KBS)이고,
         #    입력 순서가 08:33부터여도 대표 자리를 넘겨받는다.
@@ -3456,7 +3676,7 @@ def test_breaking_alert_folds_same_event():
         assert len(texts(mock_post)) == 1, "시각을 모르는 기사를 접었다"
 
         # ⑥ 접기만 한 경우에도 몰림 판정은 돈다 — 쏟아진 사실이 아무 데도 안 남으면 안 된다.
-        breaking_alert.save_breaking_alert_settings(True, [], "06:00", "23:00", 3, True, True, 30, 3)
+        breaking_alert.save_breaking_alert_settings(True, "06:00", "23:00", 3, True, True, 30, 3)
         breaking_alert_sender.detect_and_alert(
             [art(21, "KBS", "08:10", day=23), art(22, "MBC", "08:12", day=23)],
             now=datetime(2026, 9, 23, 8, 13))
@@ -4138,9 +4358,12 @@ def test_outlet_override_is_one_place():
     with tempfile.TemporaryDirectory() as tmp, \
          patch.object(so, "SUMMARY_OVERRIDES_FILE", Path(tmp) / "overrides.json"):
         # (1) 언론사만 고친다 — 제목·요약은 손대지 않는다(부분 저장).
-        so.set_summary_override(url, None, None, "AI뉴스")
+        #     언론사 칸은 ✏️「기사 정보 직접 수정」에서만 들어오므로 manual=True다.
+        #     [추가: 2026-10-12] 손으로 친 칸 이름이 같이 적힌다 — 「제목 다시 불러오기」가
+        #     여러 건을 덮을 때 이 표시를 보고 건너뛴다(archive/TITLE_CHANGE_DESIGN.md §4).
+        so.set_summary_override(url, None, None, "AI뉴스", manual=True)
         saved = so.load_summary_overrides()[url]
-        assert saved == {"outlet": "AI뉴스"}, saved
+        assert saved == {"outlet": "AI뉴스", "manual": ["outlet"]}, saved
 
         # (2) 입히는 자리 한 곳이 그걸 입힌다 — 나머지 필드는 그대로.
         applied = so.apply_summary_overrides([article])[0]
@@ -4167,9 +4390,10 @@ def test_outlet_override_is_one_place():
         assert rows[0]["언론사명"] == "AI뉴스", rows[0]["언론사명"]
 
         # (5) 되돌릴 수 있게 빈 칸은 기존 값을 그대로 둔다 — 제목만 다시 고쳐도 언론사는 유지.
-        so.set_summary_override(url, "고친 제목", None, None)
+        so.set_summary_override(url, "고친 제목", None, None, manual=True)
         again = so.load_summary_overrides()[url]
-        assert again == {"outlet": "AI뉴스", "title": "고친 제목"}, again
+        assert again == {"outlet": "AI뉴스", "title": "고친 제목",
+                         "manual": ["outlet", "title"]}, again
 
     # (6) 편집 창은 파일마다 복제돼 있다 — 네 벌 중 하나라도 언론사 칸을 빠뜨리면
     #     그 화면에서만 고칠 수 없게 되는데, 저장소가 전역이라 담당자는 왜 안 되는지 모른다.
@@ -4620,7 +4844,6 @@ def test_live_labels():
 
 
 
-
 def test_custom_group_with_taken_name_gets_its_own_box():
     """담당자가 친 이름이 그 회차에 이미 쓰이고 있어도 **새 칸이 따로 생긴다**.
 
@@ -4672,6 +4895,62 @@ def test_custom_group_with_taken_name_gets_its_own_box():
         custom_groups.remove_custom_group(key)
         assert custom_groups.load_custom_group_labels() == {}, "지운 소제목의 화면 이름이 남았다"
 
+
+def test_home_issue_card_uses_display_names():
+    """홈 「오늘의 주요 주제」는 화면에 보이는 이름으로 묶고 「기타」를 가린다.
+
+    저장된 원래 이름으로 보면 두 가지가 한꺼번에 샜다(2026-10-12 제보):
+
+    1. 담당자가 직접 만든 「기타」는 속이름이 「기타 (5)」라(같은 회차에 이미 AI의
+       「기타」가 있어 app.custom_groups.unique_key가 지은 것) `name == "기타"`
+       정확일치를 빠져나가, 빼기로 한 짬뽕 칸이 순위에 올라오고 화면엔 담당자가
+       지은 적 없는 「(5)」가 그대로 찍혔다.
+    2. 회차마다 소제목을 새로 분류하므로 같은 사안이 회차마다 다른 AI 이름을 받는데,
+       그걸 잇는 근거가 바로 담당자가 붙인 이름표다. 원래 이름만 보면 묶을 수가 없어
+       한 사안이 두 줄로 갈라진다.
+
+    판정 기준(이름표 적용 후)은 app.group_order._lock_rank와 같다.
+    """
+    tmp = Path(tempfile.mkdtemp())
+    with patch.object(curation, "GROUP_LABELS_FILE", tmp / "group_labels.json"), \
+         patch.object(curation, "HIDDEN_ARTICLES_FILE", tmp / "hidden.json"):
+        etc_key = custom_groups.unique_key("기타", {"기타"})
+        assert etc_key == "기타 (2)", etc_key
+        custom_groups.add_custom_group("기타", key=etc_key)
+
+        # 같은 사안인데 회차마다 AI가 다른 이름을 지었고(토큰이 안 겹쳐 원래 이름으로는
+        # 절대 안 묶인다), 담당자가 이름표로 이어 뒀다.
+        curation.set_group_label("대외경제장관회의", "대외경제장관회의 - 대미통상",
+                                 round_id=("2026-10-12", "09:30"))
+        curation.set_group_label("공급망 안보 품목 확대", "대외경제장관회의 - 대미통상(지속)",
+                                 round_id=("2026-10-12", "11:00"))
+
+        def _run(slot, pairs):
+            return {
+                "run_at": f"2026-10-12T{slot.replace(':', '')}00",
+                "run_slot": slot,
+                "articles": [
+                    {"url": f"u-{slot}-{i}", "title": f"기사 {slot} {i}", "outlet": "A", "group": g}
+                    for i, g in enumerate(pairs)
+                ],
+            }
+
+        runs = [
+            _run("09:30", ["대외경제장관회의", "대외경제장관회의", etc_key, etc_key, etc_key, "기타"]),
+            _run("11:00", ["공급망 안보 품목 확대", "공급망 안보 품목 확대"]),
+        ]
+
+        articles = landing_renderer._report_articles(runs)
+        assert not any("display_group" in a for r in runs for a in r["articles"]), \
+            "저장된 기사 dict에 화면 전용 키가 새어 들어갔다"
+
+        streams = landing_renderer._issue_streams(articles)
+        names = [s["name"] for s in streams]
+        assert all("기타" not in n for n in names), f"짬뽕 칸이 순위에 올라왔다: {names}"
+        assert names == ["대외경제장관회의 - 대미통상"], names
+        assert len(streams[0]["articles"]) == 4, "회차를 잇는 이름표를 못 보고 갈라졌다"
+
+
 def test_login_lock():
     """로그인 자물쇠 — 켜기 전엔 아무것도 안 바뀌고, 켜면 막히고, 찾기는 둘로 푼다.
 
@@ -4695,20 +4974,33 @@ def test_login_lock():
         # 적었는지 담당자가 기억해야 하는 상황을 아예 만들지 않는다.
         try:
             users.create_user("a@korea.kr", "sijang2026", "홍길동", "01012345678",
-                              config.SECURITY_QUESTIONS[0], "서울 초등")
+                              config.SECURITY_QUESTIONS[0], "서울 초등", consent=True)
             raise AssertionError("띄어쓰기가 든 답이 통과했다")
         except users.UserError as exc:
             assert "띄어쓰기" in str(exc), exc
 
+        # 개인정보 수집·이용에 동의하지 않으면 계정이 만들어지지 않는다 — 화면의
+        # 체크가 아니라 여기가 막는다(폼은 누구든 직접 보낼 수 있다).
+        try:
+            users.create_user("a@korea.kr", "sijang2026", "홍길동", "01012345678",
+                              config.SECURITY_QUESTIONS[0], "서울초등")
+            raise AssertionError("동의 없이 계정이 만들어졌다")
+        except users.UserError as exc:
+            assert str(exc) == config.PRIVACY_CONSENT_REQUIRED, exc
+        assert users.user_count() == 0, "거부했는데 계정이 남았다"
+
         user = users.create_user("a@korea.kr", "sijang2026", "홍길동", "010-1234-5678",
                                  config.SECURITY_QUESTIONS[0], " 서울초등 ",
-                                 department="디지털소통팀")
+                                 department="디지털소통팀", consent=True)
+        # 동의한 사실은 시각으로 남는다 — 아무 데도 안 남으면 받을 이유가 없다.
+        assert user["consent_at"], user
         saved = (tmp / "users.json").read_text(encoding="utf-8")
         assert "sijang2026" not in saved and "서울" not in saved, "평문이 파일에 남았다"
         assert user["department"] == "디지털소통팀", user
         assert user["role"] == "admin", "첫 계정이 관리자가 아니다"
         assert users.create_user("b@korea.kr", "sijang2026", "김담당", "01099998888",
-                                 config.SECURITY_QUESTIONS[1], "부산")["role"] == "member"
+                                 config.SECURITY_QUESTIONS[1], "부산",
+                                 consent=True)["role"] == "member"
         assert users.get_user(user["id"])["department"] == "디지털소통팀"
 
         # 번호는 숫자만 저장해 대조한다 — 하이픈 때문에 본인이 막히면 안 된다.
@@ -4982,15 +5274,590 @@ def test_screen_js_strings_are_not_cut_by_newlines():
     print(f"53) 화면 JS 문자열: 통과 (JS {scanned}덩어리, 줄바꿈으로 끊긴 리터럴 없음)")
 
 
+def test_title_refetch_compares_fairly():
+    """「제목 다시 불러오기」가 안 바뀐 제목을 「바뀜」이라 하지 않는지 지킨다.
+
+    여기가 이 기능의 생사다. 저장된 제목과 원문 제목을 **그대로** 비교하면 거의 모든
+    기사에 「바뀜」이 붙고, 모든 줄에 붙는 표시는 아무것도 가르지 못한다. 실제로 다른
+    것들을 실측으로 확인했다(2026-10-12) — 네이버 검색 API가 주는 제목엔 HTML 엔티티가
+    남고(`&quot;`) `<b>` 강조 태그가 섞이며, 따옴표·말줄임표·줄표 모양과 공백이 원문
+    페이지와 다르다.
+
+    같은 날 「부정기사」 라벨 8건에 돌려 **오탐 0건·진짜 변경 1건**을 확인했다. 그 1건이
+    아래 문화일보 사례다(단정 → 「우려」로 톤을 낮춘 기관 대응 교정).
+
+    요약은 대조하지 않는다 — 저장값은 네이버 검색의 「검색어 주변 발췌」이고 원문은
+    「본문 맨 앞」이라 다른 물건이라, 8건 중 5건이 거짓 「바뀜」이었다
+    (archive/TITLE_CHANGE_DESIGN.md §3.3).
+    """
+    _require_isolation()
+    from app.title_refetch import (
+        compare, is_title_protected, pub_differs, summarize, titles_differ, touched_since,
+    )
+
+    # (1) 모양만 다른 건 「안 바뀜」이다 — 이게 깨지면 전 기사에 표시가 붙는다.
+    same = [
+        ("李대통령 &quot;청렴도 31위&quot;", '李대통령 "청렴도 31위"'),        # 엔티티
+        ("정부, <b>가상자산</b> 과세 검토", "정부, 가상자산 과세 검토"),        # 강조 태그
+        ("재경부 \u201c검토 단계\u201d", '재경부 "검토 단계"'),               # 둥근 따옴표
+        ("기한 표시 다른 잣대...", "기한 표시 다른 잣대…"),                      # 말줄임표
+        ("성장자금  162조   쌈짓돈 ", "성장자금 162조 쌈짓돈"),                  # 공백
+        ("한국\u2013미국 공조", "한국-미국 공조"),                              # 줄표
+    ]
+    for stored, fetched in same:
+        assert not titles_differ(stored, fetched), f"모양만 다른데 바뀜으로 봤다: {stored!r}"
+
+    # (2) 진짜 바뀐 건 잡는다 — 2026-10-07 문화일보 실제 사례.
+    old = "장관 관사 짓는게 미래대응?… 성장자금 162조 \u2018쌈짓돈\u2019 현실화"
+    new = "장관 관사 짓는게 미래대응?… 성장자금 162조 \u2018쌈짓돈\u2019 현실화 우려"
+    assert titles_differ(old, new)
+    # 말머리를 떼는 것도 진짜 변화다(정규화가 말머리를 지우면 안 된다).
+    assert titles_differ("[단독] 살균 맥주는", "살균 맥주는")
+
+    # (3) 못 읽은 제목으로 멀쩡한 제목을 덮지 않는다.
+    assert not titles_differ(old, None)
+    assert not titles_differ(old, "   ")
+
+    # (4) ✏️로 직접 고친 제목은 건드리지 않는다. 출처를 모르는 옛 항목도 안전한 쪽으로 둔다.
+    assert is_title_protected({"title": "손으로 친 제목", "manual": ["title"]})
+    assert is_title_protected({"title": "옛 항목"}), "출처를 모르면 보호해야 한다"
+    assert not is_title_protected({"title": "앱이 가져온 제목", "refetched_at": "2026-10-12T10:00:00"})
+    assert not is_title_protected({"summary": "요약만 고친 항목"}), "제목이 없으면 덮을 게 없다"
+    assert not is_title_protected(None)
+
+    # (5) 「원문 수정」은 담은 뒤의 변화만 센다 — 실측 8건 전부에 수정 시각이 있었다.
+    assert not touched_since(None, "2026-10-12 15:45:11"), "처음 확인은 기준만 적는다"
+    assert touched_since("2026-10-12 09:58:11", "2026-10-12 15:45:11")
+    assert not touched_since("2026-10-12 15:45:11", "2026-10-12 15:45:11")
+    assert not touched_since("2026-10-12 15:45:11", "2026-10-12 09:58:11"), "과거로는 안 센다"
+
+    # (6) 발행 시각은 분 단위로 보고, 한쪽이라도 못 읽으면 「안 바뀜」이다.
+    assert not pub_differs("2026-10-07T12:11:13+09:00", "2026-10-07 12:11:55")
+    assert pub_differs("2026-10-07T12:11:13+09:00", "2026-10-07 12:40:00")
+    assert not pub_differs(None, "2026-10-07 12:11:13")
+
+    # (7) 제목이 바뀐 행에 「원문도 손댔다」를 겹쳐 적지 않는다(표시가 둘이면 뜻이 흐려진다).
+    both = compare(
+        {"title": old, "pub_date": "2026-10-07T12:11:13+09:00"},
+        {"title": new, "pub_date": "2026-10-07 12:11:13", "modified_at": "2026-10-07 17:22:19"},
+        seen_modified_at="2026-10-07 13:00:00",
+    )
+    assert both["title_changed"] and not both["touched"], both
+    assert both["new_title"] == new and both["modified_at"] == "2026-10-07 17:22:19"
+
+    # 보호된 제목은 바뀌었어도 안 바꾼다.
+    kept = compare(
+        {"title": old, "pub_date": None},
+        {"title": new, "pub_date": None, "modified_at": None},
+        override_entry={"title": old, "manual": ["title"]},
+    )
+    assert kept["protected"] and not kept["title_changed"] and kept["new_title"] is None, kept
+
+    # (8) 못 받은 기사(None)는 「확인했다」에서 빠진다 — 확인과 못 함을 뭉개지 않는다.
+    counts = summarize([both, kept, None])
+    assert counts == {"checked": 2, "title_changed": 1, "touched": 0,
+                      "pub_changed": 0, "protected": 1}, counts
+
+    print("55) 제목 다시 불러오기 판정: 통과 (모양 차이 6종 오탐 0, 실제 변경 1건 잡음)")
+
+def test_naver_page_stamps_do_not_cross_match():
+    """원문 페이지의 **발행 시각과 기사수정 시각이 서로 섞이지 않는지** 지킨다.
+
+    네이버 미러 페이지는 두 값을 나란히 찍고 이름이 겹친다 —
+    `data-date-time` / `data-date-time-age-in-minutes` / `data-modify-date-time` /
+    `data-modify-date-time-age-in-minutes` 넷이 한 덩어리에 있다. 발행 쪽 패턴이
+    수정 값을 집으면 「+ 수기로 기사 추가」의 발행시각과 기사 정렬 자리가 **조용히**
+    어긋나고, 수정 쪽이 발행 값을 집으면 「제목 다시 불러오기」가 손댄 적 없는 기사를
+    손댔다고 한다(archive/TITLE_CHANGE_DESIGN.md §3.2).
+
+    아래 HTML은 2026-10-07 문화일보 기사(021/0002823595) 페이지에서 그대로 떠 온
+    것이다. 같은 날 라벨 붙은 미러 기사 8건 전수로도 확인했다 — 발행·수정이 섞인
+    경우 0건, 손으로 잰 정답 5건과 전부 일치.
+    """
+    _require_isolation()
+    from app.naver_api import _modified_at_from_html, _pub_date_from_html
+
+    page = (
+        '<span class="media_end_head_info_datestamp_time _ARTICLE_DATE_TIME" '
+        'data-date-time="2026-10-07 12:11:13" data-date-time-age-in-minutes="7480">'
+        '2026.10.07. 오후 12:11</span>'
+        '<span class="media_end_head_info_datestamp_time _ARTICLE_MODIFY_DATE_TIME" '
+        'data-modify-date-time="2026-10-07 17:22:19" '
+        'data-modify-date-time-age-in-minutes="7169">2026.10.07. 오후 5:22</span>'
+    )
+    pub, mod = _pub_date_from_html(page), _modified_at_from_html(page)
+    assert pub and pub.startswith("2026-10-07T12:11"), pub
+    assert mod and mod.startswith("2026-10-07T17:22"), mod
+    assert pub != mod, "발행 자리에 수정 시각이 들어갔다"
+
+    # 수정된 적 없는 기사 — 수정 시각만 없고 발행은 그대로 읽힌다(None을 지어내지 않는다).
+    only_pub = '<span data-date-time="2026-10-07 12:11:13">2026.10.07.</span>'
+    assert _modified_at_from_html(only_pub) is None
+    assert _pub_date_from_html(only_pub).startswith("2026-10-07T12:11")
+
+    # 자체 도메인(미러가 아닌 곳)엔 수정 시각 후보가 없다 — 발행만 폴백으로 읽는다.
+    own = '<meta property="article:published_time" content="2026-10-07T12:11:13+09:00" />'
+    assert _modified_at_from_html(own) is None
+    assert _pub_date_from_html(own).startswith("2026-10-07T12:11")
+
+    print("56) 원문 페이지 시각 두 개: 통과 (발행·수정 안 섞임, 없는 값은 안 지어냄)")
+
+def test_summary_override_provenance():
+    """저장된 제목이 **누가 쓴 값인지** 가려지는지 지킨다.
+
+    app.summary_overrides는 🔄(원문에서 가져옴)와 ✏️(직접 적음)를 같은 칸에 담는다.
+    「제목 다시 불러오기」가 여러 건을 한꺼번에 덮을 때 둘을 못 가리면 **담당자가 손으로
+    고친 제목이 조용히 사라진다**(CODING_CONVENTIONS §3). 실제로 이 기능을 설계할 때
+    저장돼 있던 15건엔 출처가 하나도 안 적혀 있었다(archive/TITLE_CHANGE_DESIGN.md §4).
+
+    칸 단위로 적는 이유: 하나로 묶으면 **언론사명만 ✏️로 고쳐도 제목까지 영영 잠긴다.**
+
+    같이 보는 것: 기록용 칸(manual·refetched_at·seen_modified_at)이 **기사 dict로 새지
+    않는지** — apply_summary_overrides가 항목을 통째로 병합하던 자리라, 새 칸을 더하면
+    기사마다 그 키가 달라붙어 내보내기·저장 경로로 퍼진다.
+    """
+    _require_isolation()
+    from app import summary_overrides as so
+    from app.title_refetch import is_title_protected
+
+    url = "https://n.news.naver.com/mnews/article/021/0002823595"
+    with tempfile.TemporaryDirectory() as tmp, \
+         patch.object(so, "SUMMARY_OVERRIDES_FILE", Path(tmp) / "overrides.json"):
+        # (1) 🔄가 쓴 제목은 앱이 가져온 값이라 다시 덮어도 된다.
+        so.set_summary_override(url, "원문에서 가져온 제목", None)
+        entry = so.load_summary_overrides()[url]
+        assert entry.get("refetched_at"), entry
+        assert "manual" not in entry, entry
+        assert not is_title_protected(entry)
+
+        # (2) ✏️로 친 제목은 보호된다.
+        so.set_summary_override(url, "손으로 친 제목", None, manual=True)
+        entry = so.load_summary_overrides()[url]
+        assert entry["manual"] == ["title"], entry
+        assert is_title_protected(entry)
+
+        # (3) 그 기사에 **직접** 🔄를 누르면 손으로 친 값보다 이쪽이 최신이다 — 잠금이 풀린다.
+        so.set_summary_override(url, "다시 가져온 제목", None)
+        entry = so.load_summary_overrides()[url]
+        assert "manual" not in entry, entry
+        assert not is_title_protected(entry)
+
+        # (4) 칸 단위다 — 언론사만 ✏️로 고쳐도 제목은 안 잠긴다.
+        so.set_summary_override(url, None, None, "문화일보", manual=True)
+        entry = so.load_summary_overrides()[url]
+        assert entry["manual"] == ["outlet"], entry
+        assert not is_title_protected(entry), "언론사만 고쳤는데 제목이 잠겼습니다"
+
+        # (5) 출처를 모르는 옛 항목은 보호한다 — 🔄였다고 증명할 수 없다.
+        assert is_title_protected({"title": "이 기능 전에 저장된 제목"})
+
+        # (6) 기준점은 옮겨 적힌다 — 안 옮기면 한 번 손댄 기사에 영영 표시가 붙는다.
+        assert so.title_check_baseline(url) is None, "확인한 적 없으면 기준이 없다"
+        so.record_title_check(url, "2026-10-07T17:22:19+09:00")
+        assert so.title_check_baseline(url) == "2026-10-07T17:22:19+09:00"
+        so.record_title_check(url, "2026-10-08T09:00:00+09:00")
+        assert so.title_check_baseline(url) == "2026-10-08T09:00:00+09:00"
+        so.record_title_check(url, None)  # 미러가 아니거나 수정된 적 없는 기사
+        assert so.title_check_baseline(url) == "2026-10-08T09:00:00+09:00", "빈 값이 기준을 지웠다"
+
+        # (7) **기록용 칸은 기사 dict로 새지 않는다.** 여기가 깨지면 article["manual"]이
+        #     내보내기·저장 경로로 조용히 퍼진다.
+        article = {"url": url, "title": "저장된 제목", "outlet": "문화일보", "pub_date": "x"}
+        applied = so.apply_summary_overrides([article])[0]
+        assert applied["outlet"] == "문화일보"
+        for leaked in ("manual", "refetched_at", "seen_modified_at"):
+            assert leaked not in applied, f"기록용 칸 {leaked}이(가) 기사로 샜습니다: {applied}"
+
+    print("57) 제목 출처 가리기: 통과 (🔄/✏️ 칸 단위, 옛 항목 보호, 기준점 이동, 기록 칸 안 샘)")
+
+def test_refetch_titles_bulk():
+    """「⟳ 제목 다시 불러오기」가 여러 건을 한 번에 처리하는 길을 지킨다.
+
+    이 경로가 꿰는 것: app.naver_api(페이지 받기) → app.title_refetch(판정) →
+    app.summary_overrides(저장). 셋 중 하나라도 어긋나면 담당자는 **결과 줄 숫자와
+    실제로 바뀐 것이 다른** 상태를 보게 되는데, 어느 쪽이 맞는지 알 길이 없다.
+
+    특히 지키는 둘:
+      · **저장은 맨 끝에 한 번이다.** 기사마다 쓰면 60건에 파일을 120번 읽고 쓰고,
+        겹치면 앞 기사의 수정이 사라진다(여러 기사 숨기기를 요청 하나로 묶은 것과 같은 이유).
+      · **「확인했다」와 「확인할 수 없다」를 뭉개지 않는다.** 언론사 자체 주소는 애초에
+        안 보고, 접속 실패는 「안 바뀜」으로 굳히지 않는다 — 굳히면 그 기사는 영영 안 걸린다.
+    """
+    _require_isolation()
+    from app import summary_overrides as so
+    from app import title_refetch as tr
+
+    mirror = "https://n.news.naver.com/mnews/article/%s"
+    changed_url = mirror % "021/0002823595"   # 제목이 바뀐 기사(실제 사례)
+    same_url = mirror % "016/0002705959"      # 그대로
+    touched_url = mirror % "023/0004003276"   # 제목은 같고 원문만 손댐
+    kept_url = mirror % "015/0005332784"      # ✏️로 고쳐 둔 제목 — 건너뛴다
+    dead_url = mirror % "008/0005403105"      # 접속 실패
+    own_url = "https://www.newspim.com/news/view/20260903000684"  # 자체 도메인
+
+    page = {
+        changed_url: {"title": "성장자금 162조 ‘쌈짓돈’ 현실화 우려",
+                      "pub_date": "2026-10-07T12:11:13+09:00",
+                      "modified_at": "2026-10-07T17:22:19+09:00"},
+        same_url: {"title": "삼일천하로 끝난 기재부와 캠코의 굴욕",
+                   "pub_date": "2026-10-06T14:40:10+09:00",
+                   "modified_at": "2026-10-06T15:10:14+09:00"},
+        touched_url: {"title": "재경부 방침에 논란 확대",
+                      "pub_date": "2026-10-12T09:01:11+09:00",
+                      "modified_at": "2026-10-12T15:45:11+09:00"},
+        kept_url: {"title": "언론사가 바꾼 제목",
+                   "pub_date": "2026-09-16T08:01:12+09:00",
+                   "modified_at": "2026-09-16T12:00:15+09:00"},
+        dead_url: None,
+    }
+    asked = []
+
+    def fake_fetch(url):
+        asked.append(url)
+        return page.get(url)
+
+    articles = [
+        {"url": changed_url, "title": "성장자금 162조 ‘쌈짓돈’ 현실화", "pub_date": "2026-10-07T12:11:13+09:00"},
+        {"url": same_url, "title": "삼일천하로 끝난 기재부와 캠코의 굴욕", "pub_date": "2026-10-06T14:40:10+09:00"},
+        {"url": touched_url, "title": "재경부 방침에 논란 확대", "pub_date": "2026-10-12T09:01:11+09:00"},
+        {"url": kept_url, "title": "손으로 친 제목", "pub_date": "2026-09-16T08:01:12+09:00"},
+        {"url": dead_url, "title": "못 받는 기사", "pub_date": None},
+        {"url": own_url, "title": "자체 도메인 기사", "pub_date": None},
+    ]
+
+    writes = []
+    real_write = so._write
+
+    with tempfile.TemporaryDirectory() as tmp, \
+         patch.object(so, "SUMMARY_OVERRIDES_FILE", Path(tmp) / "overrides.json"), \
+         patch("app.naver_api.fetch_for_title_check", fake_fetch), \
+         patch.object(so, "_write", lambda d: (writes.append(1), real_write(d))[1]):
+        # ✏️로 고쳐 둔 제목 하나와, 「원문만 손댐」을 재려면 기준점이 하나 필요하다.
+        so.set_summary_override(kept_url, "손으로 친 제목", None, manual=True)
+        so.record_title_check(touched_url, "2026-10-12T09:58:11+09:00")
+        writes.clear()
+
+        result = tr.refetch_titles(articles)
+        rows, counts = result["rows"], result["counts"]
+
+        # (1) 상태가 여섯 갈래로 갈린다.
+        assert rows[changed_url]["state"] == "changed", rows[changed_url]
+        assert rows[same_url]["state"] == "same", rows[same_url]
+        assert rows[touched_url]["state"] == "touched", rows[touched_url]
+        assert rows[kept_url]["state"] == "protected", rows[kept_url]
+        assert rows[dead_url]["state"] == "failed", rows[dead_url]
+        assert rows[own_url]["state"] == "skipped", rows[own_url]
+
+        # (2) 자체 도메인은 **받아오지도 않는다** — 안 볼 걸 받으면 네트워크만 쓴다.
+        assert own_url not in asked, asked
+        assert len(asked) == 5, asked
+
+        # (3) 결과 줄 숫자가 실제와 맞는다.
+        assert counts == {"checked": 4, "title_changed": 1, "touched": 1,
+                          "pub_changed": 0, "protected": 1, "skipped": 1, "failed": 1}, counts
+
+        # (4) **저장은 한 번이다.** 기사마다 쓰면 여기서 깨진다.
+        assert writes == [1], f"파일을 {len(writes)}번 썼습니다 — 한 번이어야 합니다"
+
+        saved = so.load_summary_overrides()
+        # (5) 바뀐 제목만 적히고, ✏️ 제목은 그대로다.
+        assert saved[changed_url]["title"] == "성장자금 162조 ‘쌈짓돈’ 현실화 우려"
+        assert saved[kept_url]["title"] == "손으로 친 제목", saved[kept_url]
+        assert saved[kept_url]["manual"] == ["title"], "✏️ 표시가 지워졌습니다"
+        assert "title" not in saved.get(same_url, {}), "안 바뀐 제목을 적었습니다"
+
+        # (6) 기준점은 확인한 기사에만 — 못 받은 기사엔 안 적는다(확인한 셈이 되면 안 된다).
+        assert saved[touched_url]["seen_modified_at"] == "2026-10-12T15:45:11+09:00"
+        assert so.title_check_baseline(dead_url) is None, "못 받았는데 기준을 적었습니다"
+        assert so.title_check_baseline(kept_url) == "2026-09-16T12:00:15+09:00", \
+            "✏️라 건너뛴 기사도 확인은 했으므로 기준은 적어야 합니다"
+
+        # (7) 한 번 더 돌리면 「손댔다」가 가라앉는다 — 안 그러면 영영 표시가 붙는다.
+        again = tr.refetch_titles([articles[2]])
+        assert again["rows"][touched_url]["state"] == "same", again["rows"][touched_url]
+
+    print("58) 제목 일괄 불러오기: 통과 (여섯 갈래, 자체 도메인 안 받음, 저장 한 번, 기준점 이동)")
+
+def test_title_watch_alert():
+    """「제목 바뀜 알림」이 주기마다 돌고, 알리기만 하고 아무것도 덮지 않는 길을 지킨다.
+
+    이 기능의 중심 규칙이 **「알리고 끝」**이라, 깨지면 담당자가 안 보는 사이에 화면 제목이
+    바뀌어 이미 복사해 쓴 보고서와 말없이 어긋난다. 그래서 여기서 가장 강하게 보는 것이
+    「summary_overrides를 한 글자도 안 쓴다」다.
+
+    함께 지키는 것들:
+      · **때가 아니면 파일 한 번 읽고 돌아온다** — tick마다 불리므로 비용이 0이어야 한다.
+      · **라벨 파일을 못 읽은 것과 라벨이 0건인 것을 가르지 못하므로**(`load_labels`가 둘 다
+        `{}`다) 라벨이 비면 `alerted` 가지치기를 건너뛴다 — 안 그러면 읽기 실패 한 번에
+        알린 기록이 통째로 지워지고, 다음 주기에 그동안 알린 것 전부가 다시 간다.
+      · **일하다 난 예외가 스케줄러까지 올라가지 않는다** — 올라가면 그 tick의 보관 기간
+        정리 묶음이 통째로 건너뛰어진다.
+      · **대상은 라벨 붙인 기사 중 네이버 미러 + 발행 나이 안쪽만.** 자체 도메인은 og:title을
+        믿을 수 없고, 기한이 없으면 라벨이 쌓인 1년 뒤엔 작년 기사를 매일 아침 다시 받아온다.
+      · **같은 변경을 두 번 알리지 않는다**(키는 URL + 다듬은 새 제목) — 반영하지 않고 그대로
+        두기로 했을 때 같은 알림이 또 오면 안 된다. 같은 기사가 **또** 고쳐지면 새 제목이라
+        다시 알리고, 언론사가 **옛 제목으로 되돌리면** 그건 이미 알린 제목이라 조용하다
+        (URL당 마지막 하나만 기억하면 그 되돌림을 새것으로 보고 또 알린다).
+      · **「제목」 칸을 켠 사람에게만 간다.** 예전 active_alert_chat_ids는 「단독이 아닌 모든
+        kind」를 속보 칸으로 떨어뜨렸다 — 그대로면 끈 사람에게도 가고 왜 오는지 알 길이 없다.
+      · **아무에게도 못 갔으면 알린 것으로 적지 않는다** — 다음 주기에 다시 보낸다.
+    """
+    _require_isolation()
+    from app import labels as labels_mod
+    from app import send_log
+    from app import summary_overrides as so
+    from app import telegram_recipients as tr_mod
+    from app import title_watch as tw
+    from app.send_result import SendResult
+
+    mirror = "https://n.news.naver.com/mnews/article/%s"
+    changed_url = mirror % "021/0002823595"   # 제목이 바뀐다
+    same_url = mirror % "016/0002705959"      # 그대로
+    old_url = mirror % "023/0004003276"       # 미러지만 발행이 너무 오래됐다
+    own_url = "https://www.newspim.com/news/view/20260903000684"  # 자체 도메인
+
+    now = datetime(2026, 10, 13, 9, 10)
+    label_rows = {
+        changed_url: {"labels": ["부정기사"], "title": "성장자금 162조 ‘쌈짓돈’ 현실화",
+                      "pub_date": "2026-10-07T12:11:13+09:00", "outlet": "문화일보",
+                      "labeled_at": "2026-10-07T13:00:00"},
+        same_url: {"labels": ["별도 보고"], "title": "삼일천하로 끝난 기재부와 캠코의 굴욕",
+                   "pub_date": "2026-10-12T14:40:10+09:00", "outlet": "헤럴드경제",
+                   "labeled_at": "2026-10-12T15:00:00"},
+        old_url: {"labels": ["부정기사"], "title": "작년 기사", "outlet": "조선일보",
+                  "pub_date": "2026-08-01T09:01:11+09:00", "labeled_at": "2026-08-01T10:00:00"},
+        own_url: {"labels": ["부정기사"], "title": "자체 도메인 기사", "outlet": "뉴스핌",
+                  "pub_date": "2026-10-12T12:11:00+09:00", "labeled_at": "2026-10-12T13:00:00"},
+    }
+    page = {
+        changed_url: {"title": "성장자금 162조 ‘쌈짓돈’ 현실화 우려",
+                      "pub_date": "2026-10-07T12:11:13+09:00",
+                      "modified_at": "2026-10-07T17:22:19+09:00"},
+        same_url: {"title": "삼일천하로 끝난 기재부와 캠코의 굴욕",
+                   "pub_date": "2026-10-12T14:40:10+09:00",
+                   "modified_at": "2026-10-12T15:10:14+09:00"},
+    }
+    asked, sent = [], []
+
+    def fake_fetch(url):
+        asked.append(url)
+        return page.get(url)
+
+    def fake_send(text, chat_ids, now=None):
+        sent.append((text, list(chat_ids)))
+        return SendResult(ok=True, delivered=[{"target": c} for c in chat_ids])
+
+    with tempfile.TemporaryDirectory() as tmp, \
+         patch.object(labels_mod, "LABELS_FILE", Path(tmp) / "labels.json"), \
+         patch.object(tw, "TITLE_WATCH_FILE", Path(tmp) / "title_watch.json"), \
+         patch.object(so, "SUMMARY_OVERRIDES_FILE", Path(tmp) / "overrides.json"), \
+         patch.object(tr_mod, "TELEGRAM_RECIPIENTS_FILE", Path(tmp) / "recipients.json"), \
+         patch.object(send_log, "SEND_LOG_DIR", Path(tmp) / "send_log"), \
+         patch("app.naver_api.fetch_for_title_check", fake_fetch), \
+         patch("app.telegram_bot.send_text", fake_send):
+        labels_mod.LABELS_FILE.write_text(json.dumps(label_rows, ensure_ascii=False), encoding="utf-8")
+        tw._memo_last_run_at = None
+        tick = lambda when: tw.watch_tick(when, background=False)
+
+        # (1) 주기가 안 됐으면 아무것도 하지 않는다 — 네이버를 한 건도 부르지 않는다.
+        assert tw.is_due(now, (now - timedelta(minutes=5)).isoformat()) is False
+        assert tw.is_due(now, (now - timedelta(minutes=31)).isoformat()) is True
+        # 적힌 시각이 미래여도 돈다(시계를 되돌렸거나 파일이 깨진 경우 — 안 그러면 몇
+        # 시간이고 조용해진다).
+        assert tw.is_due(now, (now + timedelta(hours=3)).isoformat()) is True
+
+        # (2) 대상 고르기 — 자체 도메인·오래된 기사는 애초에 빼 둔다.
+        picked = {a["url"] for a in tw.due_articles(labels_mod.load_labels(), now)}
+        assert picked == {changed_url, same_url}, picked
+
+        # (3) **「제목」 칸을 아무도 안 켰으면 확인조차 하지 않는다** — 네이버를 안 부르고,
+        # 무엇보다 「알렸다」고 적지 않는다(적으면 나중에 켜도 그 변경이 영영 안 온다).
+        assert tick(now) == 0
+        assert asked == [], asked
+        assert tw.load_state()["alerted"] == {}, tw.load_state()
+        assert send_log.load_days(now) == [], send_log.load_days(now)
+
+        # (4) 속보 칸만 켠 사람에게는 안 간다 — 예전 코드는 「단독이 아닌 모든 kind」를
+        # 속보 칸으로 떨어뜨렸다.
+        tr_mod.save_telegram_recipients([
+            {"name": "속보만", "chat_id": "111", "alert_flash": True},
+        ])
+        assert tr_mod.active_alert_chat_ids("제목") == []
+        assert tick(now) == 0
+        assert asked == [], asked
+
+        # (5) 「제목」 칸을 켜면 그때부터 돈다 — 끈 동안 지나간 변경도 첫 아침에 온다.
+        tr_mod.save_telegram_recipients([
+            {"name": "속보만", "chat_id": "111", "alert_flash": True},
+            {"name": "제목받는사람", "chat_id": "222", "alert_title_change": True},
+        ])
+        assert tr_mod.active_alert_chat_ids("제목") == ["222"]
+        assert tr_mod.active_alert_chat_ids("속보") == ["111"]
+        assert tick(now) == 1
+
+        assert len(sent) == 1, sent
+        text, chat_ids = sent[0]
+        assert chat_ids == ["222"], chat_ids
+        # 전·후 제목이 둘 다, 받아온 그대로 들어간다(다듬은 값은 비교용이다).
+        assert "전: 성장자금 162조 ‘쌈짓돈’ 현실화" in text, text
+        assert "후: 성장자금 162조 ‘쌈짓돈’ 현실화 우려" in text, text
+        assert "🏷 부정기사" in text and "문화일보" in text, text
+        assert "17:22 수정" in text, text          # 수정 시각은 있을 때만
+        assert same_url not in text, text          # 안 바뀐 기사는 안 적는다
+
+        # (6) **아무것도 저장하지 않는다** — 이 기능의 중심 규칙.
+        assert so.load_summary_overrides() == {}, so.load_summary_overrides()
+        assert not so.SUMMARY_OVERRIDES_FILE.exists() or so.load_summary_overrides() == {}
+
+        # (7) 같은 변경을 두 번 알리지 않는다 — 주기가 지나 다시 돌아도 조용하다.
+        assert tick(now + timedelta(hours=1)) == 0
+        assert len(sent) == 1, sent
+
+        # (8) 같은 기사가 **또** 고쳐지면 다시 알린다(키가 URL만이 아니라서).
+        page[changed_url]["title"] = "성장자금 162조 ‘쌈짓돈’ 현실화 우려 확산"
+        assert tick(now + timedelta(hours=2)) == 1
+        assert len(sent) == 2, sent
+        assert "우려 확산" in sent[1][0], sent[1][0]
+
+        # (8b) 언론사가 **옛 제목으로 되돌리면** 그건 이미 알린 제목이라 조용하다.
+        # URL당 마지막 하나만 기억하면 여기서 또 한 통이 간다.
+        page[changed_url]["title"] = "성장자금 162조 ‘쌈짓돈’ 현실화 우려"
+        assert tick(now + timedelta(hours=3)) == 0, sent
+        assert len(sent) == 2, sent
+
+        # (9) 아무에게도 못 갔으면 알린 것으로 적지 않는다 — 다음 주기에 다시 보낸다.
+        page[changed_url]["title"] = "또 바뀐 제목"
+        with patch("app.telegram_bot.send_text",
+                   lambda text, chat_ids, now=None: SendResult(ok=False, failures=[{"target": "222"}])):
+            assert tick(now + timedelta(hours=4)) == 0
+            assert "또 바뀐 제목" not in str(tw.load_state()["alerted"]), tw.load_state()
+        assert tick(now + timedelta(hours=5)) == 1
+        assert len(sent) == 3, sent
+
+        # (10) **라벨 파일을 못 읽은 경우에는 가지치기를 하지 않는다.** load_labels가
+        # 「없음」과 「못 읽음」에 똑같이 {}를 주므로, 그대로 지우면 읽기 실패 한 번에
+        # 알린 기록이 통째로 날아가고 다음 주기에 그동안 알린 것 전부가 다시 간다.
+        before = dict(tw.load_state()["alerted"])
+        assert changed_url in before, before
+        labels_mod.LABELS_FILE.write_text("{ 깨진 json", encoding="utf-8")
+        tick(now + timedelta(hours=6))
+        assert tw.load_state()["alerted"] == before, tw.load_state()
+
+        # (11) 라벨을 **정말로** 떼면 알린 기록도 함께 버린다(파일이 영원히 자라지 않게).
+        labels_mod.LABELS_FILE.write_text(json.dumps(
+            {same_url: label_rows[same_url]}, ensure_ascii=False), encoding="utf-8")
+        tick(now + timedelta(hours=7))
+        assert changed_url not in tw.load_state()["alerted"], tw.load_state()
+
+        # (12) 일하다 난 예외는 스케줄러까지 올라가지 않는다 — 올라가면 그 tick의
+        # 보관 기간 정리가 통째로 건너뛰어진다.
+        labels_mod.LABELS_FILE.write_text(json.dumps(label_rows, ensure_ascii=False), encoding="utf-8")
+        def boom():
+            raise PermissionError("labels.json을 읽을 수 없음")
+        with patch("app.labels.load_labels", boom):
+            assert tick(now + timedelta(hours=8)) == 0
+
+    print("✓ 제목 바뀜 알림 — 30분마다, 알리기만 하고 덮지 않는다")
+
+
+def test_refetch_titles_widget_contract():
+    """「⟳ 제목 다시 불러오기」를 두 화면이 **같은 약속**으로 쓰는지 지킨다.
+
+    장치는 app.renderer 한 곳이고(CSS·버튼·JS), 화면이 지킬 약속은 넷이다 —
+    묶음 안의 빈 `.refetch-note` · 줄마다 `data-refetch-row`+`data-url`+`data-pub` ·
+    제목 글자를 담은 `[data-refetch-title]` · 칩이 붙을 `[data-refetch-meta]`.
+    하나라도 빠지면 **버튼은 눌리는데 아무 일도 안 일어난다**(화면은 멀쩡해 보이고
+    서버 로그에도 안 남는다).
+
+    특히 지키는 둘:
+      · **결과 줄은 버튼이 맡는 묶음 *안*에 있어야 한다** — JS가 `scope.querySelector`로
+        찾으므로 밖에 있으면 결과가 아무 데도 안 뜬다.
+      · **확정본·초안엔 표식이 없어야 한다** — 버튼이 없는 화면에 표식만 달아 두면,
+        나중에 문서 전체를 훑는 버튼이 생겼을 때 그 화면들까지 조용히 딸려 간다.
+    """
+    _require_isolation()
+    import re as _re
+
+    from app.renderer import (
+        refetch_titles_button_html, refetch_titles_note_html, refetch_titles_script,
+        render_article,
+    )
+
+    article = {"url": "https://n.news.naver.com/mnews/article/023/0004003321",
+               "title": "신현송, 단일종목 레버리지 ETF 대응에 “위험 충분히 경고 못 해”",
+               "outlet": "조선일보", "summary": "요약",
+               "pub_date": "2026-10-12T13:40:00+09:00"}
+
+    # (1) 기본은 꺼짐 — 확정본·초안은 한 글자도 안 바뀐다.
+    assert "data-refetch" not in render_article(article, [])
+
+    # (2) 켜면 표식 넷이 다 나온다.
+    on = render_article(article, [], refetch_marks=True)
+    for mark in ("data-refetch-row", "data-refetch-title", "data-refetch-meta",
+                 'data-pub="2026-10-12T13:40:00+09:00"', 'data-url='):
+        assert mark in on, f"{mark}이(가) 없습니다"
+
+    # (3) 제목 글자만 담겼는지 — JS가 textContent로 읽어 서버로 보낸다. 언론사 이름이
+    #     같이 들어가면 **엉뚱한 제목으로 대조**해 전 기사가 「바뀜」이 된다.
+    inner = _re.search(r'<span data-refetch-title>(.*?)</span>', on, _re.S)
+    assert inner, on[:400]
+    assert "조선일보" not in inner.group(1), inner.group(1)
+    assert "신현송" in inner.group(1)
+
+    # (4) JS가 찾는 선택자와 서버가 내는 표식의 이름이 같은지 — 둘이 갈리면 조용히 먹통이다.
+    js = refetch_titles_script("127.0.0.1", 8765)
+    for sel in ("[data-refetch-row]", "[data-refetch-title]", "[data-refetch-meta]",
+                ".refetch-note", "data-refetch-scope", "data-url", "data-pub"):
+        assert sel in js, f"JS가 {sel}을(를) 안 봅니다"
+    assert "/refetch-titles" in js
+
+    # (5) 버튼의 scope가 가리키는 묶음 **안에** 결과 줄이 있어야 한다.
+    #     정기 보관함: 버튼 scope가 details.slot이고 결과 줄은 그 안(본문 맨 위).
+    from app import history_renderer as hist
+    slot = hist._render_slot(
+        {"run_at": "2026-10-12T14:00:00", "run_slot": "14:00", "articles": [article]},
+        [], "ㅇ ({outlet}) {title}",
+    )
+    assert 'data-refetch-scope="details.slot"' in slot
+    assert slot.count('class="refetch-note"') == 1, "결과 줄이 없거나 둘입니다"
+    assert slot.index('class="refetch-note"') > slot.index("<summary>"), \
+        "결과 줄이 details.slot 밖에 있습니다 — JS가 못 찾습니다"
+    assert "data-refetch-row" in slot
+
+    # 0건 회차엔 버튼도 결과 줄도 안 그린다 — 받아올 게 없다.
+    empty = hist._render_slot(
+        {"run_at": "2026-10-12T06:00:00", "run_slot": "06:00", "articles": []},
+        [], "ㅇ ({outlet}) {title}",
+    )
+    assert "title-refetch-btn" not in empty and "refetch-note" not in empty
+
+    # (6) 버튼 클래스 이름이 **옛 죽은 CSS(.refetch-btn)와 겹치면 안 된다** — 그 규칙은
+    #     `opacity: 0`이라(평소 숨김·hover에 나타남) 겹치는 순간 버튼이 투명해진다.
+    #     실제로 그렇게 한 번 사라졌다.
+    btn = refetch_titles_button_html("details.slot")
+    assert 'class="title-refetch-btn"' in btn, btn[:120]
+    assert 'class="refetch-btn"' not in btn
+    assert refetch_titles_note_html().count("refetch-note") == 1
+
+    print("59) 제목 불러오기 장치 계약: 통과 (표식 넷, 기본 꺼짐, 결과 줄 자리, 이름 안 겹침)")
+
 if __name__ == "__main__":
     tests = [
+        test_unclassified_sits_below_summary,
         test_custom_group_with_taken_name_gets_its_own_box,
+        test_home_issue_card_uses_display_names,
         test_no_ai_key_is_not_a_failure,
         test_env_key_transplant,
         test_key_paths_stay_narrow,
         test_screen_js_strings_are_not_cut_by_newlines,
         test_login_lock,
         test_search_operator_is_one_rule,
+        test_title_refetch_compares_fairly,
+        test_naver_page_stamps_do_not_cross_match,
+        test_summary_override_provenance,
+        test_refetch_titles_bulk,
+        test_refetch_titles_widget_contract,
+        test_title_watch_alert,
         test_photo_override_is_one_place,
         test_outlet_override_is_one_place,
         test_agency_archive_filters,
@@ -5050,6 +5917,7 @@ if __name__ == "__main__":
         test_last_slot_topup_adds_late_articles,
         test_trend_end_day_follows_today_completion,
         test_trend_today_partial_column,
+        test_alert_scope_follows_keyword_switch,
     ]
 
     failures = []

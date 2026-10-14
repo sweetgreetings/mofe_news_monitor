@@ -30,7 +30,6 @@ class BreakingAlertSettingsError(ValueError):
 def _default() -> dict:
     return {
         "enabled": True,
-        "group_names": [],
         "start": DEFAULT_BREAKING_ALERT_START,
         "end": DEFAULT_BREAKING_ALERT_END,
         "interval_min": DEFAULT_BREAKING_ALERT_INTERVAL_MIN,
@@ -73,7 +72,6 @@ def _choice(value, choices: tuple, label: str) -> int:
 
 def save_breaking_alert_settings(
     enabled: bool,
-    group_names: list,
     start: str,
     end: str,
     interval_min,
@@ -82,11 +80,12 @@ def save_breaking_alert_settings(
     burst_window_min=DEFAULT_BURST_WINDOW_MIN,
     burst_min_outlets=DEFAULT_BURST_MIN_OUTLETS,
 ) -> dict:
-    """설정 화면(/breaking-alert)의 "저장". 감시 대상 그룹은 이름 문자열로 저장한다 —
-    이 프로젝트의 기존 저장소들(data/group_order.json, data/custom_groups.json 등)과
-    같은 관례로, 그룹에 별도 ID가 없다. 그룹 이름을 나중에 바꾸면 감시 대상에서
-    조용히 빠진다는 뜻인데, 소제목 강제배정(group_overrides)도 같은 한계를 갖고 있고
-    그룹 이름은 자주 바뀌는 값이 아니라 감수한다.
+    """설정 화면(/breaking-alert)의 "저장" — 시간대·주기·몰아보내기·몰림 알림만 맡는다.
+
+    [수정] 감시 **대상**(어느 검색어 그룹을 볼까)은 여기서 빠졌다. 검색어 화면의 그룹
+    스위치(include_in_alert)가 그 자리다 — 예전엔 그룹 이름 문자열 목록이라 그룹명을
+    바꾸면 감시가 조용히 풀렸고, 무엇보다 회차 수집의 「바닥」 경로가 이 설정을 통째로
+    무시해서 담당자가 알림을 끌 수가 없었다(app.alert_groups).
     """
     start = _validate_time(start, "감시 시작 시각")
     end = _validate_time(end, "감시 종료 시각")
@@ -102,7 +101,6 @@ def save_breaking_alert_settings(
     burst_outlets = _choice(burst_min_outlets, BURST_MIN_OUTLETS_CHOICES, "몰림 알림의 언론사 수")
     data = {
         "enabled": bool(enabled),
-        "group_names": [str(name) for name in group_names if str(name).strip()],
         "start": start,
         "end": end,
         "interval_min": interval,

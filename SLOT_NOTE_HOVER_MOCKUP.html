@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>정기 보관함 — 한 줄 메모 말풍선 시안</title>
+<style>
+:root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+  --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%;
+  --h-sm: 24px; --h-tb: 28px; --h-md: 30px; --h-lg: 36px;
+  --chk-md: 16px; --chk-sm: 14px;
+  --sh-float: 0 4px 12px rgba(15, 23, 42, 0.12); --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14);
+  --sh-modal: 0 16px 40px rgba(15, 23, 42, 0.22); }
+
+body { margin: 0; background: #F8FAFC; color: #1F2937;
+  font-family: 'Pretendard', 'Noto Sans KR', -apple-system, sans-serif; }
+.container { max-width: 800px; margin: 24px auto; padding: 24px; background: #FFFFFF;
+  border: 1px solid #E5E7EB; border-radius: var(--r-lg); }
+
+/* ───────── 보관함 실제 CSS (app/history_renderer.py에서 그대로) ───────── */
+details.date { margin: 0; border-top: 1px solid #E5E7EB; }
+details.date > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px;
+  padding: 10px 4px; font-size: var(--fs-lg); color: #1E3A5F; font-weight: 600; }
+details.date > summary::-webkit-details-marker { display: none; }
+details.date > summary::before { content: "▸"; color: #6B7280; font-size: 0.8rem; font-weight: 400; }
+details.date[open] > summary::before { content: "▾"; }
+details.date > summary:hover { background: #EFF6FF; }
+
+details.slot { margin: 0 0 0 22px; border-top: 1px solid #E5E7EB; }
+details.slot > summary { list-style: none; cursor: pointer; display: flex; align-items: center;
+  justify-content: flex-start; gap: 10px; padding: 8px 4px; }
+details.slot > summary::-webkit-details-marker { display: none; }
+details.slot > summary::before { content: "▸"; color: #6B7280; font-size: 0.75rem; }
+details.slot[open] > summary::before { content: "▾"; }
+details.slot > summary:hover { background: #EFF6FF; }
+details.slot > summary > .slot-label { flex: none; white-space: nowrap; }
+
+.slot-note { font-size: var(--fs-sm); color: #6B7280; flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sent-dot { display: inline-block; width: 7px; height: 7px; border-radius: var(--r-circle);
+  background: #15803D; flex: none; }
+.sent-dot-link { display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 18px; height: 18px; margin: -5px -4px; border-radius: var(--r-circle); }
+.sent-dot-link:hover { background: #EFF6FF; }
+.chip { font-size: var(--fs-xs); border-radius: var(--r-pill); padding: 1px 9px; border: 1px solid; flex: none; }
+.chip-today { background: #EFF6FF; color: #2563EB; border-color: #BFDBFE; font-weight: 600; }
+.slot-del { flex: none; margin-left: auto; border: none; background: none; color: #9CA3AF;
+  cursor: pointer; padding: 3px 6px; border-radius: var(--r-sm); line-height: 1;
+  display: inline-flex; font-size: 0.95rem; }
+.slot-del:hover { color: #DC2626; background: #FEF2F2; }
+.ic { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round; }
+
+/* ───────── 새로 더하는 것: 메모 자리를 감싸는 칸 ─────────
+   .slot-note 자신은 overflow:hidden이라 그 안에 말풍선을 두면 잘린다.
+   그래서 position:relative 한 겹(.note-wrap)을 두르고 말풍선은 그 밑에 둔다. */
+.note-wrap { position: relative; flex: 1 1 auto; min-width: 0; display: flex; align-items: center; }
+.note-wrap > .slot-note { flex: 1 1 auto; }
+/* 잘린 줄만 커서가 바뀐다 — 올려도 더 볼 게 없는 줄은 아무 일도 안 일어난다 */
+.note-wrap[data-clipped] > .slot-note { cursor: help; }
+
+/* 말풍선 — 홈 흐름도 .tip과 같은 문법(흰 카드·--sh-pop·0.15초 지연·pointer-events 없음).
+   다만 자리는 가운데가 아니라 메모가 시작하는 **왼쪽 끝**에 맞춘다(읽던 자리에서 이어 읽는다). */
+.ntip { position: absolute; top: calc(100% + 8px); left: 0; z-index: 10; width: 360px;
+  max-width: calc(100vw - 40px); background: #FFFFFF; border: 1px solid #E5E7EB;
+  border-radius: var(--r-lg); box-shadow: var(--sh-pop); padding: 11px 14px 12px;
+  text-align: left; white-space: normal; cursor: default;
+  opacity: 0; visibility: hidden; transform: translateY(-4px); pointer-events: none;
+  transition: opacity .12s, transform .12s, visibility 0s linear .12s; }
+.ntip::before { content: ""; position: absolute; top: -6px; left: 22px;
+  width: 10px; height: 10px; background: #FFFFFF; border-left: 1px solid #E5E7EB;
+  border-top: 1px solid #E5E7EB; transform: rotate(45deg); }
+.note-wrap[data-clipped]:hover .ntip, .ntip.on {
+  opacity: 1; visibility: visible; transform: translateY(0);
+  transition: opacity .12s .15s, transform .12s .15s, visibility 0s .15s; }
+.ntip .nh { display: block; font-size: var(--fs-xs); font-weight: 600; color: #6B7280;
+  padding-bottom: 7px; margin-bottom: 7px; border-bottom: 1px solid #E5E7EB; }
+.ntip .nb { display: block; font-size: var(--fs-sm); color: #1F2937; line-height: 1.7; }
+
+/* B안 — 쉼표로 쪼갠 칩 */
+.ntip .kws { display: flex; flex-wrap: wrap; gap: 5px; }
+.ntip .kw { font-size: var(--fs-sm); color: #4B5563; background: #F3F4F6;
+  border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 1px 9px; }
+
+/* C안 — 제자리 펼침 */
+.plan-c .note-wrap[data-clipped]:hover > .slot-note { white-space: normal; overflow: visible;
+  text-overflow: clip; background: #FFFFFF; position: relative; z-index: 6; }
+.plan-c details.slot > summary { align-items: flex-start; }
+.plan-c details.slot > summary::before { line-height: 1.6; }
+
+/* ───────── 시안 문서 틀 ───────── */
+h1 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 6px; }
+.lead { font-size: var(--fs-md); color: #6B7280; margin: 0 0 28px; line-height: 1.7; }
+h2 { font-size: var(--fs-lg); color: #1E3A5F; margin: 34px 0 4px; }
+h2 .pick { font-size: var(--fs-xs); font-weight: 700; color: #2563EB; background: #EFF6FF;
+  border: 1px solid #BFDBFE; border-radius: var(--r-pill); padding: 1px 9px; margin-left: 6px;
+  vertical-align: middle; }
+.note { font-size: var(--fs-sm); color: #6B7280; margin: 0 0 12px; line-height: 1.75; }
+.demo { border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 4px 14px 14px; margin-bottom: 8px; }
+.cons { font-size: var(--fs-sm); color: #4B5563; line-height: 1.8; margin: 10px 0 0;
+  padding-left: 18px; }
+.cons li { margin: 2px 0; }
+.hint { font-size: var(--fs-xs); color: #9CA3AF; margin: 6px 0 0; }
+.spacer { height: 150px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>정기 보관함 — 한 줄 메모에 마우스를 올리면</h1>
+<p class="lead">회차 줄의 메모는 폭이 모자라 <code>…</code>로 잘린다. 지금은 브라우저 기본 <code>title</code> 툴팁이라
+1초쯤 기다려야 뜨고, 뜨고 나서도 한 줄로 길게 늘어져 읽기 어렵다.<br>
+아래 세 안 모두 <b>잘린 줄에만</b> 반응한다 — 다 보이는 줄에 올리면 아무 일도 일어나지 않는다.
+세 번째 줄(메모 없는 회차)도 그대로 둔다.</p>
+
+<!-- ─────────────── A안 ─────────────── -->
+<h2>A안 — 메모를 그대로 펴서 보여주는 말풍선<span class="pick">추천</span></h2>
+<p class="note">홈 흐름도 말풍선(<code>.tip</code>)과 같은 문법이다 — 흰 카드, <code>--sh-pop</code> 그림자,
+0.15초 뒤에 열림(줄을 스치듯 지나갈 때 툭툭 뜨지 않게). 자리는 칸 가운데가 아니라 <b>메모가 시작하는 왼쪽 끝</b>에
+맞춘다(읽던 자리에서 그대로 이어 읽는다). 적어둔 글자를 손대지 않고 줄만 풀어 준다.</p>
+<div class="demo">
+  <details class="date" open>
+    <summary>10월 10일 (금)<span class="chip chip-today">오늘</span></summary>
+
+    <details class="slot">
+      <summary>
+        <span class="slot-label">14:00 기준</span>
+        <span class="sent-dot-link" title="14시 05분 발송 완료"><span class="sent-dot"></span></span>
+        <span class="note-wrap">
+          <span class="slot-note">가난은 견뎌도 불공정은 못 견뎌, 정책집행 공평, 한중 정상회담, 수출 증가, 순방 사후관리, 양극화 완화, 국채 금리 상승, 바이백 재개, 세수 재추계</span>
+          <span class="ntip">
+            <span class="nh">이 회차에 적어둔 한 줄 메모</span>
+            <span class="nb">가난은 견뎌도 불공정은 못 견뎌, 정책집행 공평, 한중 정상회담, 수출 증가, 순방 사후관리, 양극화 완화, 국채 금리 상승, 바이백 재개, 세수 재추계</span>
+          </span>
+        </span>
+        <button type="button" class="slot-del" title="이 회차 삭제"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+      </summary>
+    </details>
+
+    <details class="slot">
+      <summary>
+        <span class="slot-label">11:00 기준</span>
+        <span class="sent-dot-link" title="11시 03분 발송 완료"><span class="sent-dot"></span></span>
+        <span class="note-wrap">
+          <span class="slot-note">코인 과세 유예, 상속세 개편, 추경 편성 논의</span>
+          <span class="ntip">
+            <span class="nh">이 회차에 적어둔 한 줄 메모</span>
+            <span class="nb">코인 과세 유예, 상속세 개편, 추경 편성 논의</span>
+          </span>
+        </span>
+        <button type="button" class="slot-del" title="이 회차 삭제"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+      </summary>
+    </details>
+
+    <details class="slot">
+      <summary>
+        <span class="slot-label">09:30 기준</span>
+        <span class="note-wrap"><span class="slot-note"></span></span>
+        <button type="button" class="slot-del" title="이 회차 삭제"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+      </summary>
+    </details>
+  </details>
+  <p class="hint">↑ 14:00 줄의 메모 글자 위에 마우스를 올려 보세요. 11:00 줄은 다 보이므로 안 뜹니다.</p>
+</div>
+<ul class="cons">
+  <li>적어둔 글을 앱이 쪼개거나 고치지 않는다 — 쉼표 나열이든 문장이든 그대로 선다.</li>
+  <li>새 모양을 만들지 않는다(홈 흐름도 말풍선과 같은 값).</li>
+  <li>말풍선 안에 누를 것이 없다(<code>pointer-events: none</code>) — 줄을 누르면 회차가 그냥 펼쳐진다.</li>
+</ul>
+
+<!-- ─────────────── B안 ─────────────── -->
+<h2>B안 — 쉼표로 쪼개 키워드 칩으로</h2>
+<p class="note">같은 말풍선인데 안에서 메모를 쉼표로 쪼개 칩으로 세운다. 머리줄에 개수를 적는다.
+키워드가 몇 개인지 한눈에 보이는 대신, <b>쉼표로 안 나눈 메모</b>(「특이사항 없음.」 같은 문장)는
+칩 하나로 어색하게 선다.</p>
+<div class="demo">
+  <details class="date" open>
+    <summary>10월 10일 (금)<span class="chip chip-today">오늘</span></summary>
+
+    <details class="slot">
+      <summary>
+        <span class="slot-label">14:00 기준</span>
+        <span class="sent-dot-link" title="14시 05분 발송 완료"><span class="sent-dot"></span></span>
+        <span class="note-wrap">
+          <span class="slot-note">가난은 견뎌도 불공정은 못 견뎌, 정책집행 공평, 한중 정상회담, 수출 증가, 순방 사후관리, 양극화 완화, 국채 금리 상승, 바이백 재개, 세수 재추계</span>
+          <span class="ntip">
+            <span class="nh">이 회차에 적어둔 키워드 9개</span>
+            <span class="nb kws">
+              <span class="kw">가난은 견뎌도 불공정은 못 견뎌</span><span class="kw">정책집행 공평</span><span class="kw">한중 정상회담</span><span class="kw">수출 증가</span><span class="kw">순방 사후관리</span><span class="kw">양극화 완화</span><span class="kw">국채 금리 상승</span><span class="kw">바이백 재개</span><span class="kw">세수 재추계</span>
+            </span>
+          </span>
+        </span>
+        <button type="button" class="slot-del" title="이 회차 삭제"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+      </summary>
+    </details>
+
+    <details class="slot">
+      <summary>
+        <span class="slot-label">11:00 기준</span>
+        <span class="sent-dot-link" title="11시 03분 발송 완료"><span class="sent-dot"></span></span>
+        <span class="note-wrap">
+          <span class="slot-note">코인 과세 유예, 상속세 개편, 추경 편성 논의, 환율 방어, 특이사항 없음.</span>
+          <span class="ntip">
+            <span class="nh">이 회차에 적어둔 키워드 5개</span>
+            <span class="nb kws">
+              <span class="kw">코인 과세 유예</span><span class="kw">상속세 개편</span><span class="kw">추경 편성 논의</span><span class="kw">환율 방어</span><span class="kw">특이사항 없음.</span>
+            </span>
+          </span>
+        </span>
+        <button type="button" class="slot-del" title="이 회차 삭제"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+      </summary>
+    </details>
+  </details>
+  <p class="hint">↑ 11:00 줄의 마지막 칩 「특이사항 없음.」 — 쪼개면 이런 조각이 생긴다.</p>
+</div>
+<ul class="cons">
+  <li>개수가 보인다. 다만 「한 줄 메모」는 자유 텍스트라 쉼표가 늘 구분자인 건 아니다.</li>
+  <li>칩은 앱에서 「구조화된 값」이라는 뜻인데(라벨·검색어), 메모는 그런 값이 아니다.</li>
+</ul>
+
+<!-- ─────────────── C안 ─────────────── -->
+<h2>C안 — 그 자리에서 줄을 펴기</h2>
+<p class="note">말풍선을 띄우지 않고 그 줄의 말줄임만 풀어 여러 줄로 보여준다. 새 요소가 없는 대신
+<b>아래 줄들이 밀려 내려간다</b> — 마우스를 옮길 때마다 목록이 들썩인다.</p>
+<div class="demo plan-c">
+  <details class="date" open>
+    <summary>10월 10일 (금)<span class="chip chip-today">오늘</span></summary>
+
+    <details class="slot">
+      <summary>
+        <span class="slot-label">14:00 기준</span>
+        <span class="sent-dot-link" title="14시 05분 발송 완료"><span class="sent-dot"></span></span>
+        <span class="note-wrap">
+          <span class="slot-note">가난은 견뎌도 불공정은 못 견뎌, 정책집행 공평, 한중 정상회담, 수출 증가, 순방 사후관리, 양극화 완화, 국채 금리 상승, 바이백 재개, 세수 재추계</span>
+        </span>
+        <button type="button" class="slot-del" title="이 회차 삭제"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+      </summary>
+    </details>
+
+    <details class="slot">
+      <summary>
+        <span class="slot-label">11:00 기준</span>
+        <span class="sent-dot-link" title="11시 03분 발송 완료"><span class="sent-dot"></span></span>
+        <span class="note-wrap">
+          <span class="slot-note">코인 과세 유예, 상속세 개편, 추경 편성 논의</span>
+        </span>
+        <button type="button" class="slot-del" title="이 회차 삭제"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+      </summary>
+    </details>
+  </details>
+  <p class="hint">↑ 14:00 줄에 올리면 아래 11:00 줄이 밀려 내려간다.</p>
+</div>
+<ul class="cons">
+  <li>새로 만드는 것이 없다.</li>
+  <li>목록이 움직인다 — 지우려고 겨눈 🗑가 손 밑에서 달아난다.</li>
+</ul>
+
+<div class="spacer"></div>
+</div>
+
+<script>
+// 잘린 줄만 표시한다 — 다 보이는 메모에 말풍선을 달면 올릴 때마다 아무 뜻 없는 카드가 뜬다.
+// (확정본 「🔍 검색어」가 hover 순간에 scrollWidth로 판정하는 것과 같은 방식)
+function markClipped() {
+  document.querySelectorAll('.note-wrap').forEach(function (w) {
+    var n = w.querySelector('.slot-note');
+    if (n && n.scrollWidth > n.clientWidth + 1) w.setAttribute('data-clipped', '1');
+    else w.removeAttribute('data-clipped');
+  });
+}
+markClipped();
+window.addEventListener('resize', markClipped);
+</script>
+</body>
+</html>

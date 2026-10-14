@@ -7,6 +7,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Optional
 from urllib.parse import parse_qs, quote, urlsplit
 
+from collections import OrderedDict
+
 from app.config import (
     AUTH_LOGIN_LOCK_MIN,
     AUTH_MAX_LOGIN_FAILS,
@@ -75,6 +77,7 @@ from app.confirm_send import send_confirmed_run
 from app.icons import icon
 from app import send_log
 from app.config import SEND_LOG_RETENTION_DAYS
+from app.config import DELETED_LOG_TITLE, DELETED_RESTORE_DAYS
 from app.topnav import plain_nav, regular_nav, topnav_style
 from app import auth_session, users
 from app.auth_renderer import (
@@ -117,9 +120,7 @@ from app.history_renderer import (
     build_excel_rows_for_dates,
     excel_filename_for_dates,
     generate_history_page,
-    render_deleted_slot_fragment,
     render_history_day_fragment,
-    render_slot_fragment,
 )
 from app.home_trend import add_trend_word, remove_trend_word
 from app.agency_archive_renderer import (
@@ -184,6 +185,8 @@ from app.credentials import (
     save_naver_credentials,
 )
 from app.summary_overrides import load_summary_overrides, set_summary_override
+from app.title_refetch import refetch_titles
+
 from app.photo_overrides import set_photo_override
 from app.scheduler import next_pending_slot
 from app.preview_renderer import (
@@ -200,12 +203,18 @@ from app.renderer import (
     build_group_copy_texts,
     generate_screen,
     known_label_chips_html,
+    refetch_titles_button_html,
+    refetch_titles_note_html,
+    refetch_titles_script,
+    refetch_titles_style,
 )
 from app.settings import (
     SettingsError,
     active_search_groups,
     all_search_keywords,
+    alert_switch_of,
     cycle_highlight_color,
+    group_in_alert,
     group_in_live,
     group_in_scrap,
     load_settings,
@@ -248,6 +257,11 @@ from app.scraper import _already_published_urls
 from app.storage import list_run_meta, load_latest_run, update_run_articles
 from app.storage import load_run_file
 from app.storage import RunLockedError, delete_run, restore_run
+from app.storage import (
+    deleted_run_article_count,
+    empty_deleted_runs,
+    list_deleted_runs as _list_deleted_runs,
+)
 from app.undo import peek_label as undo_peek_label
 from app.undo import push as undo_push
 from app.undo import undo as undo_restore
@@ -439,6 +453,7 @@ _MENU_TEMPLATE = (
     <div class="category-name">정기, 수시 공통</div>
     <div class="menu">
       <a href="/outlets">언론사 선택 및 순서 지정<span class="menu-chev">›</span></a>
+      <a href="/deleted">삭제 기록<span class="menu-note">지운 회차 되살리기</span><span class="menu-chev">›</span></a>
     </div>
   </div>
   <div class="category">
@@ -503,6 +518,7 @@ _KEYWORD_GROUPS_SCRIPT = "<script>\n" + r"""(function () {
       name: g.name || "",
       live: g.include_in_live !== false,   // 「실시간 현황」
       scrap: !!g.include_in_scrap,          // 「초안·확정본」
+      alert: !!g.include_in_alert,          // 「[단독]·[속보] 알림」(아랫줄)
       kws: (g.keywords || []).map(function (w) { return { w: w, on: !disabled[w] }; })
     };
   }
@@ -711,6 +727,17 @@ _KEYWORD_GROUPS_SCRIPT = "<script>\n" + r"""(function () {
     var foot = document.createElement("div");
     foot.className = "kw-foot";
 
+    // [추가] 세 번째 스위치 — 이 그룹에 걸린 [단독]·[속보]를 알릴까.
+    // **머리줄이 아니라 아랫줄이다**: 머리줄에 셋을 두면 짧은 그룹명에서도 스위치 묶음이
+    // 밀려(이름 60 + 스위치 셋 250 + 🗑 28 + 틈 > 카드 안쪽 폭 370px) 모든 카드의
+    // 머리줄이 두 줄이 된다. 뜻으로도 줄이 갈리는 게 맞다 — 머리줄 둘은 「어느 화면에
+    // 보이나」(목적지)이고 이건 「텔레그램으로 알릴까」(발송)다. 자리가 넉넉해 이름표를
+    // 줄이지 않아도 되므로 말풍선 없이 뜻이 보인다.
+    // 이 스위치 하나가 **텔레그램 알림과 홈 화면 [단독]/[속보] 목록 둘 다**를 정한다
+    // (홈 목록은 알림 발송 기록을 그대로 읽으므로 저절로 따라온다).
+    foot.appendChild(destSwitch(g, "alert", "[단독]·[속보] 알림", box,
+      "이 그룹에 걸린 [단독]·[속보] 기사를 텔레그램으로 알리고 홈 화면 목록에 올립니다.\n" +
+      "끄면 기사는 초안·확정본에 그대로 들어오고 알림만 조용해집니다."));
     foot.appendChild(cnt);
     box.appendChild(foot);
 
@@ -852,7 +879,7 @@ _KEYWORD_GROUPS_SCRIPT = "<script>\n" + r"""(function () {
   // ====== 그룹 추가 ======
   document.getElementById("kwAddGroupBtn").addEventListener("click", function () {
     if (state.length >= MAX_GROUPS) return;
-    state.push({ name: "", live: true, scrap: false, mode: "OR", kws: [] });
+    state.push({ name: "", live: true, scrap: false, alert: false, mode: "OR", kws: [] });
     markDirty(); render();
     var blocks = groupBlocks();
     var last = blocks[blocks.length - 1];
@@ -884,6 +911,7 @@ _KEYWORD_GROUPS_SCRIPT = "<script>\n" + r"""(function () {
       });
       if (g.live) addHidden(form, "group" + gi + "_include_in_live", "1");
       if (g.scrap) addHidden(form, "group" + gi + "_include_in_scrap", "1");
+      if (g.alert) addHidden(form, "group" + gi + "_include_in_alert", "1");
     });
     submitting = true;  // 우리가 지금 막 만든 이 이동은 beforeunload가 막으면 안 된다
     document.body.appendChild(form);
@@ -929,8 +957,11 @@ _KEYWORD_GROUPS_TEMPLATE = (
     background: {card};
   }}
   .group-block.off {{ background: {surface_off}; }}
+  /* [수정] .kw-count → .kw-foot — 아랫줄에 「[단독]·[속보] 알림」 스위치가 들어오며
+     꺼진 그룹에서는 그 스위치도 함께 잠겨야 한다(어느 화면에도 안 보이는 그룹이
+     텔레그램만 울리는 조합은 뜻이 없다 — app.settings.group_in_alert가 같은 규칙). */
   .group-block.off .group-body,
-  .group-block.off .kw-count {{ opacity: .5; pointer-events: none; }}
+  .group-block.off .kw-foot {{ opacity: .5; pointer-events: none; }}
   .group-head {{ display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-bottom: 8px; }}
   /* [수정: 2026-09-11] 앞에 .group-head를 붙여 명시도를 올렸다 — 예전엔 _BASE_STYLE의
      공용 input[type=text](회색 배경·테두리, 명시도 0,1,1)가 이 규칙(0,1,0)을 이겨서
@@ -1125,6 +1156,9 @@ def _group_to_chip_dict(group: dict) -> dict:
         # 옮기기 전 형식이 섞여 와도 옛 규칙으로 읽게 app.settings 헬퍼를 거친다
         "include_in_live": group_in_live(group),
         "include_in_scrap": group_in_scrap(group),
+        # 화면에는 **적힌 값**을 그린다 — 꺼진 그룹의 스위치도 끄기 전 상태를
+        # 그대로 보이고(흐리게 잠길 뿐), 다시 켜면 그 설정이 돌아온다.
+        "include_in_alert": alert_switch_of(group),
         # 그룹 안은 언제나 OR이다 — 「모두 포함」은 없앴고, 조합은 키워드 하나 안의 +로 한다.
         "mode": "OR",
         "keywords": list(keywords),
@@ -2179,10 +2213,20 @@ _TELEGRAM_TIPS = {
     "h_notify": (
         "알림이 울리는 시간",
         "고른 시간에만 소리·진동으로 알립니다. 그 밖의 시간엔 메시지가 알림 없이 조용히 옵니다 — 내용은 그대로 받습니다.",
-        "[단독]·[속보]·정기·수시 모두에 적용됩니다. 텔레그램에만 해당합니다.",
+        "[단독]·[속보]·제목 바뀜·정기·수시 모두에 적용됩니다. 텔레그램에만 해당합니다.",
+    ),
+    "h_title_chg": (
+        "제목이 바뀌면 알림",
+        "라벨 붙인 기사의 제목이 원문에서 바뀌면 30분 안에 알려 줍니다 — 언론사는 기사를 내보낸 뒤에도 제목을 고칩니다.",
+        "알려만 주고 화면 제목은 그대로 둡니다. 반영은 라벨 보관함의 「제목 다시 불러오기」로 합니다.",
     ),
     "c_scoop": ("[단독] 알림 받기", "제목이 [단독]으로 시작하는 기사를 이 사람에게 즉시 보냅니다.", ""),
     "c_flash": ("[속보] 알림 받기", "제목이 [속보]로 시작하는 기사를 이 사람에게 즉시 보냅니다.", ""),
+    "c_title_chg": (
+        "제목 바뀜 알림 받기",
+        "라벨 붙인 기사의 제목이 바뀌면 전·후 제목을 이 사람에게 보냅니다. 하루 한 번(아침)만 갑니다.",
+        "",
+    ),
     "reg_a": ("정기 — 기사 목록", "그 회차의 기사 목록 전체를 보냅니다. 소제목·언론사·제목·링크가 화면 그대로 들어갑니다.", ""),
     "reg_s": (
         "정기 — 요약",
@@ -2261,7 +2305,7 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
   /* 한 줄 격자 — 머리글과 칸이 같은 열을 쓴다(예전 flex는 머리글과 입력칸 폭이 어긋났다). */
   .rcp-head, .rcp-row {{
     display: grid; align-items: center; column-gap: 7px;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) 52px 52px 96px 96px 92px 24px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) 52px 52px 52px 94px 94px 90px 24px;
   }}
   .rcp-head {{ font-size: var(--fs-xs); font-weight: 700; color: {muted}; padding: 0 0 5px; border-bottom: 1px solid {border}; margin: 0 0 3px; }}
   .rcp-head > span {{ text-align: center; }}
@@ -2302,6 +2346,9 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
   .rchip input {{ position: absolute; opacity: 0; width: 0; height: 0; }}
   .rchip:has(input:focus-visible) {{ outline: 2px solid {accent}; outline-offset: 1px; }}
   .rchip:has(input:checked) {{ border: 1px solid {scoop_chip_border}; background: {scoop_bg}; color: {scoop_text}; }}
+  /* 「제목」만 앰버다 — 빨강은 [단독]·[속보](새로 올라온 기사)의 색이고, 이쪽은 이미 담은
+     기사가 고쳐졌다는 주의다. 새 색 세트를 만들지 않고 주의 세트를 그대로 쓴다. */
+  .rchip.titlechg:has(input:checked) {{ border: 1px solid {warn_border}; background: {warn_bg}; color: {warn_text}; }}
   /* 정기·수시 「기사 | 요약」 — 둘 중 하나를 고르는 칸이 아니라 각각 켜고 끄는 칸이라 4px 띄우고
      칸마다 제 테두리를 준다. 켜짐은 기사·요약 같은 모양(옅은 흐름 색 + 실선 + ✓), 꺼짐은 점선.
      시안 mockups/TELEGRAM_PAIR_CHIP_MOCKUP.html B안. */
@@ -2373,10 +2420,13 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
     .rcp-row > .c-name {{ grid-column: 1 / 3; grid-row: 1; }}
     .rcp-row > .c-id {{ grid-column: 3 / 5; grid-row: 1; }}
     .rcp-row > .rcp-del {{ grid-column: 5; grid-row: 1; }}
+    /* 받는 것 칩 셋([단독]·[속보]·제목)이 한 줄, 알림 칩은 그 아래 줄 왼쪽 2칸이다.
+       칩이 둘일 때는 알림이 같은 줄 3~5열에 들어갔는데, 셋이 되면서 그 자리가 찼다 —
+       1칸(약 73px)으로 좁히면 「22:00~07:00」 같은 값이 잘린다. */
     .rcp-row > .rchip {{ grid-row: 2; }}
-    .rcp-row > .nchip {{ grid-column: 3 / 5; grid-row: 2; }}
+    .rcp-row > .nchip {{ grid-column: 1 / 3; grid-row: 3; }}
     /* 머리글이 없으니 두 「기사 | 요약」이 어느 흐름인지 칸 위에 적는다 */
-    .rcp-row > .rpair {{ grid-column: span 2; grid-row: 3; position: relative; margin-top: 14px; }}
+    .rcp-row > .rpair {{ grid-column: span 2; grid-row: 4; position: relative; margin-top: 14px; }}
     .rcp-row > .rpair::before {{ position: absolute; left: 2px; top: -15px; font-size: var(--fs-xs); font-weight: 700; color: {muted}; }}
     .rcp-row > .rpair.reg::before {{ content: "정기"; }}
     .rcp-row > .rpair.adh::before {{ content: "수시"; }}
@@ -2408,6 +2458,7 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
     <div class="rcp-head">
       <span class="l">이름</span><span class="l">chat id</span>
       <span class="span2"><span class="tw">단독/속보{tip_alert}</span></span>
+      <span><span class="tw">제목{tip_title_chg}</span></span>
       <span><span class="tw">정기{tip_reg}</span></span>
       <span><span class="tw">수시{tip_adh}</span></span>
       <span><span class="tw">알림{tip_notify}</span></span><span></span>
@@ -2567,6 +2618,7 @@ def _render_telegram_recipient_rows(recipients: list, slots: int) -> str:
             f'<input type="text" class="c-id" name="{prefix}_chat_id" value="{html.escape(r.get("chat_id", ""))}" placeholder="chat id">'
             f'<label class="rchip tw"><input type="checkbox" name="{prefix}_alert_scoop" value="1"{ck("alert_scoop")}>[단독]{_tip_html("c_scoop")}</label>'
             f'<label class="rchip tw"><input type="checkbox" name="{prefix}_alert_flash" value="1"{ck("alert_flash")}>[속보]{_tip_html("c_flash")}</label>'
+            f'<label class="rchip titlechg tw"><input type="checkbox" name="{prefix}_alert_title_change" value="1"{ck("alert_title_change")}>제목{_tip_html("c_title_chg")}</label>'
             '<div class="rpair reg">'
             f'<label class="a tw"><input type="checkbox" name="{prefix}_regular_articles" value="1"{ck("regular_articles")}>기사{_tip_html("reg_a")}</label>'
             f'<label class="s tw"><input type="checkbox" name="{prefix}_regular_summary" value="1"{ck("regular_summary")}>요약{_tip_html("reg_s")}</label>'
@@ -2720,6 +2772,7 @@ def render_telegram_settings(
         add_disabled=" disabled" if slots >= MAX_TELEGRAM_RECIPIENTS else "",
         dirty_class=" show" if dirty else "",
         tip_alert=_tip_html("h_alert"),
+        tip_title_chg=_tip_html("h_title_chg"),
         tip_reg=_tip_html("h_reg"),
         tip_adh=_tip_html("h_adh"),
         tip_notify=_tip_html("h_notify", right=True),
@@ -2768,13 +2821,17 @@ _BREAKING_ALERT_SETTINGS_TEMPLATE = (
   .sec:first-of-type {{ border-top: none; }}
   .sec-t {{ font-size: var(--fs-md); font-weight: 700; color: {header}; margin: 0 0 4px; }}
   .sec-d {{ font-size: var(--fs-sm); color: {muted}; margin: 0 0 10px; line-height: 1.55; }}
-  .grp {{ display: flex; align-items: center; gap: 8px; padding: 7px 0; font-size: var(--fs-md); }}
-  .grp input[type=checkbox] {{ width: var(--chk-sm); height: var(--chk-sm); accent-color: {accent}; flex-shrink: 0; margin: 0; }}
-  .grp .cnt {{ color: {muted}; font-size: var(--fs-sm); }}
-  .grp .warn {{
-    margin-left: auto; font-size: var(--fs-xs); color: {warn_accent}; background: {warn_bg};
-    border: 1px solid {warn_border}; border-radius: var(--r-pill); padding: 1px 8px;
+  /* [수정] 감시 대상 체크박스(.grp)는 검색어 화면의 그룹 스위치로 옮겨 갔다 — 여기
+     남은 것은 「지금 무엇이 켜져 있나」를 보여주는 읽기 전용 알약뿐이다(모양 규칙:
+     알약 = 상태를 알려 준다). 색은 중립 회색이다 — 빨강은 [단독]·[속보] 제목 글자와
+     오류의 색이라 배경으로 쓰면 이 줄이 경고로 읽힌다. */
+  .grp-now {{ display: flex; flex-wrap: wrap; gap: 6px; }}
+  .grp-chip {{
+    display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: {text};
+    background: {card}; border: 1px solid {border}; border-radius: var(--r-pill); padding: 3px 10px;
   }}
+  .grp-chip .cnt {{ color: {muted}; font-size: var(--fs-xs); }}
+  .grp-none {{ font-size: var(--fs-sm); color: {warn_accent}; margin: 0; }}
   .row {{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 8px; }}
   .row label.k {{ font-size: var(--fs-md); color: {text}; }}
   .row select {{
@@ -2801,9 +2858,6 @@ _BREAKING_ALERT_SETTINGS_TEMPLATE = (
   .container {{ padding-bottom: 88px; }}
   /* [추가: 2026-09-11] 800px 폭에 맞춰 감시 대상 그룹 체크를 한 줄에 세 개씩. 그룹이
      없을 때의 안내 문장은 세 칸을 다 쓴다. 좁은 화면에선 한 줄에 하나로 돌아간다. */
-  .grp-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 16px; }}
-  .grp-grid > :not(.grp) {{ grid-column: 1 / -1; }}
-  @media (max-width: 640px) {{ .grp-grid {{ grid-template-columns: minmax(0, 1fr); }} }}
 </style>
 </head>
 <body>
@@ -2830,8 +2884,11 @@ _BREAKING_ALERT_SETTINGS_TEMPLATE = (
 
     <div class="sec">
       <p class="sec-t">감시 대상 검색어 그룹</p>
-      <p class="sec-d">고른 그룹의 검색 결과에서만 말머리를 찾습니다. 그룹이 많을수록 네이버 호출도 늘어납니다.</p>
-      <div class="grp-grid">{group_rows}</div>
+      <p class="sec-d">그룹마다 켜고 끄는 자리는 검색어 화면입니다. 켠 그룹이 많을수록 네이버 호출도 늘어납니다.</p>
+      <div class="who">
+        <div class="grp-now">{group_rows}</div>
+        <a class="btn" href="/keywords">검색어 화면에서 고르기 →</a>
+      </div>
     </div>
 
     <div class="sec">
@@ -2875,20 +2932,21 @@ _BREAKING_ALERT_SETTINGS_TEMPLATE = (
     <p class="foot">
       <b>이 설정을 모두 꺼도</b> 회차가 기사를 모을 때 하는 말머리 검사는 그대로
       동작합니다 — 네이버 추가 호출이 없는 검사라 항상 켜져 있습니다. 위 수시 감시는
-      그보다 빨리 알기 위한 기능입니다.
+      그보다 빨리 알기 위한 기능입니다.<br>
+      <b>어떤 기사를 알릴지는 검색어 화면의 그룹 스위치가 정합니다</b> — 거기서
+      「[단독]·[속보] 알림」을 끈 그룹은 이 회차 검사에서도 빠집니다. 그 기사는 초안·확정본에
+      그대로 들어오고 알림만 조용해집니다.
     </p>
 
     <div class="save-bar"><div class="save-bar-inner"><button type="submit">저장</button></div></div>
   </form>
 </div>
 <script>
-  var BA_GROUPS = {group_js};
+  // [수정] 감시 대상을 고르는 체크박스가 이 화면에서 빠지며(검색어 화면의 그룹
+  // 스위치로 옮겼다) 키워드 수는 더 이상 화면에서 바뀌지 않는다 — 서버가 센 값 하나다.
+  var BA_KW = {group_js};
   function baCalc() {{
-    var n = 0;
-    BA_GROUPS.forEach(function (g) {{
-      var el = document.getElementById('ba-g-' + g.i);
-      if (el && el.checked) n += g.n;
-    }});
+    var n = BA_KW;
     var t1 = document.getElementById('ba-start').value.split(':');
     var t2 = document.getElementById('ba-end').value.split(':');
     var mins = (t2[0] * 60 + +t2[1]) - (t1[0] * 60 + +t1[1]);
@@ -2900,14 +2958,14 @@ _BREAKING_ALERT_SETTINGS_TEMPLATE = (
     var box = document.getElementById('ba-est');
     box.className = 'est' + (pct >= 70 ? ' hot' : '');
     if (n === 0) {{
-      box.innerHTML = '감시할 그룹을 하나 이상 골라주세요.';
+      box.innerHTML = '검색어 화면에서 「[단독]·[속보] 알림」을 켠 그룹이 없습니다.';
       return;
     }}
     box.innerHTML =
       '키워드 <b>' + n + '개</b> × 하루 <b>' + polls + '회</b> 확인 = 네이버 호출 <b>' +
       calls.toLocaleString() + '회/일</b> (일일 한도 {daily_limit_fmt}의 <b>' + pct.toFixed(1) + '%</b>)' +
       (pct >= 70
-        ? '<br>⚠️ 한도에 가깝습니다 — 확인 주기를 늘리거나 감시 그룹을 줄여주세요.'
+        ? '<br>⚠️ 한도에 가깝습니다 — 확인 주기를 늘리거나 검색어 화면에서 알림을 켠 그룹을 줄여주세요.'
         : '<br>정기 스크랩·오늘 전체 기사가 쓰는 호출은 여기에 포함되지 않습니다.');
   }}
   baCalc();
@@ -2948,37 +3006,40 @@ _BREAKING_ALERT_SETTINGS_TEMPLATE = (
 )
 
 
-def _breaking_alert_group_rows(settings: dict, selected_names: set) -> tuple:
-    """감시 대상 그룹 체크박스 HTML과, 그룹별 활성 키워드 수(JS 예상 호출량 계산용)를
-    함께 만든다. 활성 키워드 수는 app.breaking_alert_sender._watched_keywords와 같은
-    기준(그룹 enabled + disabled_keywords 제외)으로 센다 — 화면 추정치와 실제 폴링이
-    같은 숫자를 보게 하기 위해서다."""
+def _breaking_alert_group_rows(settings: dict) -> tuple:
+    """「[단독]·[속보] 알림」을 켠 그룹을 읽기 전용 칩으로 보여주고, 그 키워드 수 합계를
+    함께 돌려준다(JS 예상 호출량 계산용).
+
+    [수정] 예전엔 이 화면에 감시 대상을 고르는 체크박스가 있었다. 지금 고르는 자리는
+    검색어 화면의 그룹 스위치 하나다 — 같은 설정이 두 자리에 있으면 어느 쪽이 진짜인지
+    묻게 되고, 무엇보다 이 화면의 체크는 회차 수집의 「바닥」 경로를 전혀 못 막았다
+    (app.alert_groups). 여기서는 지금 켜진 게 무엇인지만 보여준다.
+
+    키워드 수는 app.breaking_alert_sender._watched_keywords와 같은 기준으로 센다 —
+    화면 추정치와 실제 폴링이 같은 숫자를 봐야 한다."""
     groups = active_search_groups(settings, settings.get("keyword_groups", []))
-    rows, group_js = [], []
-    for i, group in enumerate(groups):
+    chips, total = [], 0
+    for group in groups:
+        if not group_in_alert(group):
+            continue
         name = group.get("name", "")
         count = len(group.get("keywords", []))
-        checked = " checked" if name in selected_names else ""
-        warn = "" if group.get("enabled", True) else '<span class="warn">그룹 꺼짐</span>'
-        rows.append(
-            f'<label class="grp"><input type="checkbox" id="ba-g-{i}" name="group_names" '
-            f'value="{html.escape(name)}"{checked} onchange="baCalc()">'
-            f'{html.escape(name)} <span class="cnt">키워드 {count}개</span>{warn}</label>'
+        total += count
+        chips.append(
+            f'<span class="grp-chip">{html.escape(name)}'
+            f'<span class="cnt">키워드 {count}개</span></span>'
         )
-        group_js.append({"i": i, "n": count})
-    return "\n".join(rows), json.dumps(group_js, ensure_ascii=False)
+    return "\n".join(chips), total
 
 
 def render_breaking_alert_settings(error: Optional[str] = None) -> str:
     """[단독]·[속보] 알림 설정 화면을 렌더링한다."""
     settings = load_settings()
     config = load_breaking_alert_settings()
-    selected = set(config["group_names"])
-    group_rows, group_js = _breaking_alert_group_rows(settings, selected)
+    group_rows, group_js = _breaking_alert_group_rows(settings)
     if not group_rows:
         group_rows = (
-            '<p class="sec-d">등록된 검색어 그룹이 없습니다 — 먼저 '
-            '<a href="/keywords">검색어</a>에서 그룹을 만들어주세요.</p>'
+            '<p class="grp-none">알림을 켠 그룹이 없어 [단독]·[속보]가 오지 않습니다.</p>'
         )
     interval_options = "".join(
         f'<option value="{m}"{" selected" if m == config["interval_min"] else ""}>{m}분</option>'
@@ -4772,10 +4833,14 @@ def _render_label_archive_row(
         f'원문보기{icon("external_link")}</a>'
     )
     meta_parts.append(f'<span class="arc-labels">{label_chips}</span>')
+    # [추가: 2026-10-12] 「⟳ 제목 다시 불러오기」가 읽는 표식 넷(app.renderer의 그 절).
+    # 보내는 값은 **화면이 지금 보여주는 제목**이라야 한다 — data-refetch-title이 가리키는
+    # 글자가 곧 그 값이고, 위에서 override를 이미 입혔다.
     return (
-        '<div class="arc-row">'
-        f'<div class="arc-title">{title}</div>'
-        f'<div class="arc-meta">{"".join(meta_parts)}</div>'
+        f'<div class="arc-row" data-refetch-row data-url="{html.escape(url, quote=True)}" '
+        f'data-pub="{html.escape(pub_date or "", quote=True)}">'
+        f'<div class="arc-title" data-refetch-title>{title}</div>'
+        f'<div class="arc-meta" data-refetch-meta>{"".join(meta_parts)}</div>'
         "</div>"
     )
 
@@ -4790,6 +4855,7 @@ _LABELS_TEMPLATE = (
 <style>"""
     + _BASE_STYLE
     + _LABEL_STYLE
+    + "{refetch_titles_style}"
     + """
 </style>
 </head>
@@ -4818,6 +4884,7 @@ function copyLabelText(btn) {{
     alert('복사에 실패했습니다.');
   }});
 }}
+{refetch_titles_script}
 </script>
 </body>
 </html>
@@ -4825,19 +4892,10 @@ function copyLabelText(btn) {{
 )
 
 
-# ── 발송 기록 (/send-log) ─────────────────────────────────────────────────────
-# 시안 mockups/SEND_LOG_MOCKUP.html. 저장은 app.send_log. 휴지통처럼 날짜별 <details>, 오늘만
-# 펼치고, 발송 한 번이 한 줄(펼치면 사람마다 결과). 필터(보고서/알림 · 실패만)는 화면에서만 거른다.
-_SEND_LOG_TEMPLATE = (
-    """<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>발송 기록</title>
-<style>"""
-    + _BASE_STYLE
-    + """
+# [추가: 2026-10-12] 발송 기록(/send-log)과 삭제 기록(/deleted)이 같이 쓰는 목록 CSS —
+# 두 화면은 「앱에 무슨 일이 있었나」를 날짜별로 적어 둔 한 쌍이라 생김새가 같아야 한다.
+# 한쪽만 고치면 형제 화면이 조용히 달라진다.
+_LOG_LIST_STYLE = """
   .sl-filters {{ display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 4px; }}
   .sl-chip {{ font-size: var(--fs-sm); padding: 3px 12px; border-radius: var(--r-pill); border: 1px solid {border};
     background: {card}; color: {text_soft}; cursor: pointer; font-family: inherit; height: auto; }}
@@ -4869,8 +4927,33 @@ _SEND_LOG_TEMPLATE = (
   .sl-kind {{ flex: none; font-size: var(--fs-xs); font-weight: 600; border-radius: var(--r-pill); padding: 1px 8px; border: 1px solid; }}
   .k-regular {{ background: {hover}; color: {accent}; border-color: {accent_border}; }}
   .k-adhoc {{ background: {adhoc_bg}; color: {adhoc_text}; border-color: {flow_entry_adhoc_border}; }}
+  .sl-empty {{ color: {muted}; text-align: center; padding: 28px 0; }}
+  .sl-foot {{ margin-top: 22px; color: {muted}; font-size: var(--fs-sm); text-align: center; }}
+  .sl-hide {{ display: none !important; }}
+"""
+
+
+# ── 발송 기록 (/send-log) ─────────────────────────────────────────────────────
+# 시안 mockups/SEND_LOG_MOCKUP.html. 저장은 app.send_log. 휴지통처럼 날짜별 <details>, 오늘만
+# 펼치고, 발송 한 번이 한 줄(펼치면 사람마다 결과). 필터(보고서/알림 · 실패만)는 화면에서만 거른다.
+_SEND_LOG_TEMPLATE = (
+    """<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>발송 기록</title>
+<style>"""
+    + _BASE_STYLE
+    + """
+"""
+    + _LOG_LIST_STYLE
+    + """
   .k-scoop, .k-flash, .k-burst {{ background: {error_bg}; color: {scoop_text}; border-color: {error_border}; }}
-  .k-quota {{ background: {warn_bg}; color: {warn_text}; border-color: {warn_border}; }}
+  /* 「제목 바뀜」은 앰버 — 빨강은 [단독]·[속보](새로 올라온 기사)의 색이고, 이쪽은 이미
+     담은 기사가 고쳐졌다는 주의다. 텔레그램 받는 사람 화면의 「제목」 칩과 같은 색이어야
+     한다(같은 뜻의 칩이 화면마다 다른 색이면 안 된다). */
+  .k-quota, .k-title_change {{ background: {warn_bg}; color: {warn_text}; border-color: {warn_border}; }}
   .sl-send .what {{ flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
   .sl-send .by {{ flex: none; color: {muted}; font-size: var(--fs-sm); }}
   .sl-send .tally {{ flex: none; font-size: var(--fs-sm); color: {muted}; font-variant-numeric: tabular-nums; }}
@@ -4893,9 +4976,6 @@ _SEND_LOG_TEMPLATE = (
   .st-note {{ color: {muted}; font-size: var(--fs-sm); }}
   .st-fix {{ display: block; color: {muted}; font-size: var(--fs-sm); font-weight: 400; margin-top: 2px; }}
   .st-fix a {{ color: {accent}; }}
-  .sl-empty {{ color: {muted}; text-align: center; padding: 28px 0; }}
-  .sl-foot {{ margin-top: 22px; color: {muted}; font-size: var(--fs-sm); text-align: center; }}
-  .sl-hide {{ display: none !important; }}
   @media (max-width: 640px) {{
     .sl-send > summary {{ flex-wrap: wrap; row-gap: 2px; }}
     .sl-send .what {{ flex-basis: calc(100% - 5em); order: 5; padding-left: 19px; }}
@@ -4955,6 +5035,7 @@ _SEND_LOG_TEMPLATE = (
 
 _SEND_LOG_KIND_LABELS = {
     "regular": "정기", "adhoc": "수시", "scoop": "[단독]", "flash": "[속보]", "burst": "🔥 몰림", "quota": "한도 경고",
+    "title_change": "✎ 제목 바뀜",
 }
 
 
@@ -5147,6 +5228,235 @@ def render_send_log_page(query: Optional[dict] = None) -> str:
     )
 
 
+# ── 삭제 기록 (/deleted) ──────────────────────────────────────────────────────
+# 시안 mockups/DELETED_LOG_MOCKUP.html. 담당자가 지운 회차는 두 보관함에서 **흔적 없이** 사라지고
+# 여기 한 곳에만 남는다 — 「최근 삭제」 묶음이 보관함 안에 있던 때는 같은 삭제가 두 자리에
+# (지운 직후엔 제자리 줄, 다시 열면 맨 아래 묶음) 나타나 어디서 되살리는지 헷갈렸다.
+#
+# 읽는 자리만 옮긴 것이고 **새로 쌓는 저장소는 없다** — 지운 회차는 지금도 파일째
+# trash(data/articles_trash/ · data/adhoc/trash/)에 들어가 있고, 파일 이름에 지운 시각이,
+# 안에 날짜·회차·사안명·건수가 다 있다.
+_DELETED_LOG_TEMPLATE = (
+    """<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{title}</title>
+<style>"""
+    + _BASE_STYLE
+    + _LOG_LIST_STYLE
+    + """
+  /* 발송 기록의 .sl-send > summary와 같은 생김새인데, 펼칠 속이 없어 <details>가 아니라
+     그냥 한 줄이다(▸도 없다). */
+  .dl-row {{ display: flex; align-items: center; gap: 9px; padding: 9px 12px; font-size: var(--fs-md);
+    background: {bg}; border: 1px solid {border}; border-radius: var(--r-lg); margin: 0 0 8px; }}
+  .dl-row .t {{ color: {muted}; font-variant-numeric: tabular-nums; flex: none; width: 3.1em; }}
+  .dl-row .nm {{ flex: none; font-weight: 600; color: {text}; max-width: 11em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+  .dl-row .nm.noname {{ font-style: italic; font-weight: 500; color: {muted}; }}
+  .dl-row .what {{ flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; color: {muted}; }}
+  .dl-row .n {{ flex: none; font-size: var(--fs-sm); color: {text_faint}; font-variant-numeric: tabular-nums; }}
+  /* 되살리기 — 휴지통·보관함의 .restore-btn과 같은 글자 버튼. */
+  .dl-row .restore-btn {{ flex: none; border: none; background: none; color: {accent}; font: inherit;
+    font-size: var(--fs-sm); cursor: pointer; padding: 2px 4px; height: auto;
+    display: inline-flex; align-items: center; gap: 4px; }}
+  .dl-row .restore-btn:hover {{ background: none; text-decoration: underline; text-underline-offset: 3px; }}
+  /* 되살릴 기간이 지난 줄 — 지우지 않고 흐리게, 이유는 툴팁(휴지통의 같은 규칙). */
+  .dl-row.expired {{ background: {card}; }}
+  .dl-row.expired .nm, .dl-row.expired .what {{ color: {text_faint}; font-weight: 500; }}
+  .dl-row.expired .restore-btn {{ color: {text_faint}; opacity: 0.6; cursor: not-allowed; }}
+  .dl-row.expired .restore-btn:hover {{ text-decoration: none; }}
+  /* 비우기 — 지우는 버튼이라 채움 파랑을 안 쓴다(평소 회색 글자, hover만 빨강). */
+  .empty-btn {{ margin-left: auto; border: none; background: none; font: inherit; font-size: var(--fs-sm);
+    color: {text_faint}; cursor: pointer; padding: 3px 8px; border-radius: var(--r-sm); height: auto; }}
+  .empty-btn:hover {{ color: {error}; background: {error_bg}; }}
+</style>
+</head>
+<body>
+{topbar}
+<div class="container">
+  <h1>{title}</h1>
+  <p class="hint">지운 회차가 여기 모입니다 · {restore_days}일 안에는 되살릴 수 있고, 지나면 기록만 남습니다.</p>
+  {filters_html}
+  {days_html}
+</div>
+<script>
+(function () {{
+  var chips = document.querySelectorAll(".sl-chip[data-kind]");
+  var liveChip = document.querySelector(".sl-chip.live");
+  var kind = "all", liveOnly = false;
+  function apply() {{
+    document.querySelectorAll(".sl-day").forEach(function (day) {{
+      var shown = 0;
+      day.querySelectorAll(".dl-row").forEach(function (row) {{
+        var ok = (kind === "all" || row.dataset.kind === kind)
+          && (!liveOnly || row.dataset.live === "1");
+        row.classList.toggle("sl-hide", !ok);
+        if (ok) shown++;
+      }});
+      day.classList.toggle("sl-hide", shown === 0);
+      if ((kind !== "all" || liveOnly) && shown) day.open = true;
+    }});
+  }}
+  chips.forEach(function (chip) {{
+    chip.addEventListener("click", function () {{
+      kind = chip.dataset.kind;
+      chips.forEach(function (c) {{ c.classList.toggle("on", c === chip); }});
+      apply();
+    }});
+  }});
+  if (liveChip) liveChip.addEventListener("click", function () {{
+    liveOnly = !liveOnly;
+    liveChip.classList.toggle("on", liveOnly);
+    apply();
+  }});
+}})();
+
+function restoreDeleted(btn) {{
+  if (btn.getAttribute("aria-disabled") === "true") {{
+    alert("되살릴 수 있는 기간({restore_days}일)이 지났어요.");
+    return;
+  }}
+  var body = "kind=" + encodeURIComponent(btn.dataset.kind) + "&name=" + encodeURIComponent(btn.dataset.trash);
+  btn.disabled = true;
+  fetch("/deleted/restore", {{
+    method: "POST", headers: {{ "Content-Type": "application/x-www-form-urlencoded" }}, body: body,
+  }}).then(function (r) {{ return r.json(); }}).then(function (d) {{
+    if (d.error) {{ btn.disabled = false; alert(d.error); return; }}
+    location.reload();
+  }}).catch(function () {{ btn.disabled = false; alert("되살리지 못했어요."); }});
+}}
+
+function emptyDeleted(btn) {{
+  var msg = btn.dataset.msg;
+  if (!confirm(msg)) {{ return; }}
+  btn.disabled = true;
+  fetch("/deleted/empty", {{ method: "POST", headers: {{ "Content-Type": "application/x-www-form-urlencoded" }}, body: "" }})
+    .then(function () {{ location.reload(); }})
+    .catch(function () {{ btn.disabled = false; alert("비우지 못했어요."); }});
+}}
+</script>
+</body>
+</html>
+"""
+)
+
+
+def _deleted_log_rows() -> list:
+    """정기·수시의 지운 회차를 한 목록으로 — 지운 시각 최신 먼저.
+
+    두 흐름을 한 화면에 섞는 이유: 삭제는 두 보관함이 같은 규칙을 쓰고, 담당자는 "내가 뭘
+    지웠더라"를 흐름으로 나눠 기억하지 않는다. 가르는 건 줄마다 붙는 흐름 칩이다.
+
+    각 항목: {"at": datetime, "kind": "regular"|"adhoc", "name", "what", "count",
+              "restorable": bool, "trash": 파일명}
+    """
+    rows = []
+    for e in _list_deleted_runs():
+        count = deleted_run_article_count(e["trash_name"])
+        rows.append({
+            "at": e["deleted_at"],
+            "kind": "regular",
+            "name": f'{e["run_slot"]} 기준',
+            "noname": False,
+            "what": f'{_hidden_date_label(e["date"])} 회차',
+            "count": count,
+            "restorable": e.get("restorable", True),
+            "trash": e["trash_name"],
+        })
+    # 수시 몫은 app.adhoc.routes가 꺼내 준다 — 이 파일이 app.adhoc를 만나는 창구는
+    # 그 모듈 하나뿐이라는 수시 경계 규칙 그대로다.
+    for r in adhoc_routes.deleted_log_rows():
+        rows.append({**r, "kind": "adhoc"})
+    return sorted(rows, key=lambda r: r["at"], reverse=True)
+
+
+_DELETED_KIND_LABELS = {"regular": "정기", "adhoc": "수시"}
+
+
+def _deleted_row_html(row: dict) -> str:
+    noname_cls = " noname" if row.get("noname") else ""
+    name_html = f'<span class="nm{noname_cls}">{html.escape(row["name"])}</span>'
+    count_html = f'<span class="n">{row["count"]}건</span>' if isinstance(row["count"], int) else ""
+    if row["restorable"]:
+        tip, disabled = "", ""
+    else:
+        tip = f' title="되살릴 수 있는 기간({DELETED_RESTORE_DAYS}일)이 지났어요"'
+        disabled = ' aria-disabled="true"'
+    return (
+        f'<div class="dl-row{"" if row["restorable"] else " expired"}" '
+        f'data-kind="{row["kind"]}" data-live="{"1" if row["restorable"] else "0"}"{tip}>'
+        f'<span class="t">{row["at"].strftime("%H:%M")}</span>'
+        f'<span class="sl-kind k-{row["kind"]}">{_DELETED_KIND_LABELS[row["kind"]]}</span>'
+        f'{name_html}<span class="what">{html.escape(row["what"])}</span>{count_html}'
+        f'<button type="button" class="restore-btn" data-kind="{row["kind"]}" '
+        f'data-trash="{html.escape(row["trash"])}"{disabled} '
+        f'onclick="restoreDeleted(this)">{icon("undo")} 되살리기</button>'
+        "</div>"
+    )
+
+
+def render_deleted_log_page() -> str:
+    """삭제 기록 — 정기·수시에서 담당자가 지운 회차를 날짜별로 모아 본다."""
+    rows = _deleted_log_rows()
+    today = datetime.now().strftime("%Y-%m-%d")
+    by_date: "OrderedDict[str, list]" = OrderedDict()
+    for row in rows:
+        by_date.setdefault(row["at"].strftime("%Y-%m-%d"), []).append(row)
+
+    live_total = sum(1 for r in rows if r["restorable"])
+    blocks = []
+    for date_str, day_rows in by_date.items():
+        is_today = date_str == today
+        blocks.append(
+            f'<details class="sl-day"{" open" if is_today else ""}>'
+            f"<summary>{_hidden_date_label(date_str)}"
+            + ('<span class="chip-today">오늘</span>' if is_today else "")
+            + f'<span class="dcnt">{len(day_rows)}건</span></summary>'
+            + "".join(_deleted_row_html(r) for r in day_rows)
+            + "</details>"
+        )
+
+    if blocks:
+        live_chip = (
+            f'<span class="sl-sep"></span><button type="button" class="sl-chip live">'
+            f"되살릴 수 있는 것만 ({live_total})</button>"
+            if live_total else ""
+        )
+        # 비우기 확인창 — 「되살릴 수 있다」가 여기서 끝난다는 말이 마지막 줄이다(보관함
+        # 삭제 확인창의 「지운 자리에서 바로 되살릴 수 있어요」와 정확히 반대).
+        msg = f"삭제 기록 {len(rows)}건을 영영 지울까요?"
+        if live_total:
+            msg += f"\n되살릴 수 있는 회차 {live_total}개도 함께 사라져요."
+        msg += "\n\n이번엔 되살릴 수 없어요."
+        filters_html = (
+            '<div class="sl-filters">'
+            '<button type="button" class="sl-chip on" data-kind="all">전체</button>'
+            '<button type="button" class="sl-chip" data-kind="regular">정기</button>'
+            '<button type="button" class="sl-chip" data-kind="adhoc">수시</button>'
+            + live_chip
+            + f'<button type="button" class="empty-btn" data-msg="{html.escape(msg)}" '
+              'onclick="emptyDeleted(this)">비우기</button></div>'
+        )
+        days_html = "\n".join(blocks)
+    else:
+        filters_html = ""
+        days_html = (
+            '<p class="sl-empty">💤 지운 회차가 없어요<br>'
+            "<span class=\"caption\">보관함에서 회차를 지우면 여기에 쌓입니다</span></p>"
+        )
+    return _DELETED_LOG_TEMPLATE.format(
+        **_theme(),
+        topbar=_TOP_BAR_HTML,
+        title=DELETED_LOG_TITLE,
+        restore_days=DELETED_RESTORE_DAYS,
+        filters_html=filters_html,
+        days_html=days_html,
+    )
+
+
 def render_labels_page(selected: Optional[list] = None) -> str:
     """정기·수시를 가로질러 라벨이 붙은 기사만 모아 보는 화면 (PRD.md 기능10 규칙5).
 
@@ -5245,16 +5555,26 @@ def render_labels_page(selected: Optional[list] = None) -> str:
                 "</form>"
                 "</span>"
             )
+            # [추가: 2026-10-12] 「⟳ 제목 다시 불러오기」 — 제목을 바꾸는 동작이라
+            # **테두리 박스**이고 가져가기 글자(.exp)보다 왼쪽에 선다. **라벨을 고른
+            # 목록에만** 붙는다: 전체 목록에서 누르면 수백 건을 한꺼번에 받아오게 되고,
+            # 그건 「이 목록을 지금 쓰려고 맞춘다」는 이 버튼의 뜻에서 벗어난다(§5).
             body_html = (
-                f'<div class="lab-listhead">{names_display} · {len(rows)}건 {export_form_html}</div>'
+                '<div class="lab-body">'
+                f'<div class="lab-listhead">{names_display} · {len(rows)}건 '
+                f'{refetch_titles_button_html(".lab-body")}{export_form_html}</div>'
+                + refetch_titles_note_html()
                 + "".join(
                     _render_label_archive_row(r, hidden_urls, overrides, return_qs)
                     for r in rows
                 )
+                + "</div>"
             )
     undo_fab_html = _label_undo_fab_html()
     return _LABELS_TEMPLATE.format(
         **_theme(),
+        refetch_titles_style=refetch_titles_style(),
+        refetch_titles_script=refetch_titles_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
         icon_tag=icon("tag"),
         icon_gear=icon("gear"),
         chips_html=chips_html,
@@ -5483,6 +5803,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._respond(render_schedule_page(load_settings()))
         elif self.path == "/hidden":
             self._respond(render_hidden_page())
+        elif self.path == "/deleted":
+            self._respond(render_deleted_log_page())
         elif self.path == "/send-log" or self.path.startswith("/send-log?"):
             self._respond(render_send_log_page(parse_qs(urlsplit(self.path).query)))
         elif self.path == "/trend" or self.path.startswith("/trend?"):
@@ -5699,6 +6021,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
                 phone=self._one(form, "phone"),
                 question=self._one(form, "question"),
                 answer=self._one(form, "answer"),
+                # 화면의 체크만 믿지 않는다 — 폼은 누구든 직접 보낼 수 있다.
+                consent=self._one(form, "consent") == "1",
             )
         except users.UserError as exc:
             self._respond(render_signup_page(str(exc), form, first))
@@ -5895,14 +6219,14 @@ class _SettingsHandler(BaseHTTPRequestHandler):
 
     def _handle_delete_history_runs(self, form: dict) -> None:
         """정기 보관함의 줄 끝 🗑(하나)와 [선택 삭제](여러 개)가 같이 쓴다 — fetch로 부르고,
-        지운 회차마다 그 자리에 들어갈 「삭제함 · 되살리기」 줄을 돌려준다(화면이 그 줄만
-        갈아 끼우므로 새로고침·스크롤 튐이 없다). 한 요청에서 지운 것은 같은 시각을 붙인다.
+        실제로 지워진 회차 키를 돌려준다(화면이 그 줄을 없애고 초록 안내 한 줄을 띄운다).
+        한 요청에서 지운 것은 같은 시각을 붙인다 — 「삭제 기록」에서 한 묶음으로 선다.
 
         지우면 안 되는 회차(오늘·가장 최근 — app.storage.run_lock_reason)는 건너뛰고 이유를
         failed에 담는다. 화면이 애초에 🗑를 안 그리지만 열어둔 옛 탭에서 눌릴 수 있다.
         """
         stamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        rows, failed = {}, []
+        gone, failed = [], []
         for key in form.get("key", []):
             date_str, _, run_slot = key.partition("|")
             try:
@@ -5916,24 +6240,42 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             if not deleted:
                 failed.append(f"{date_str} {run_slot} — 이미 없는 회차예요.")
                 continue
-            row = render_deleted_slot_fragment(date_str, run_slot)
-            if row:
-                rows[key] = row
-        if rows:
+            gone.append(key)
+        if gone:
             self._regenerate_screens()
-        self._respond_json({"rows": rows, "failed": failed})
+        label = ""
+        if len(gone) == 1:
+            label = f"{gone[0].split('|')[1]} 회차"
+        self._respond_json({"gone": gone, "label": label, "failed": failed})
 
-    def _handle_restore_history_run(self, form: dict) -> None:
-        """정기 보관함 「삭제함」 줄의 되살리기 — 되살린 회차 줄(펼치기 전 모양)을 돌려준다."""
-        restored = restore_run(form.get("name", [""])[0])
-        if restored is None:
+    def _handle_deleted_restore(self, form: dict) -> None:
+        """삭제 기록의 ↩ 되살리기 — kind로 정기·수시를 가른다.
+
+        되살릴 기간이 지난 껍데기(.purged-)는 두 복구 함수가 이름 형식에서 이미 튕겨낸다
+        (화면도 그 줄의 버튼을 못 누르게 하지만, 열어둔 옛 탭에서 눌릴 수 있다).
+        """
+        kind = (form.get("kind") or [""])[0]
+        name = (form.get("name") or [""])[0]
+        if kind == "adhoc":
+            ok = adhoc_routes.restore_deleted_card(name) is not None
+        else:
+            ok = restore_run(name) is not None
+        if not ok:
             self._respond_json(
-                {"error": "되살리지 못했어요 — 이미 되살렸거나, 같은 날짜·회차가 보관함에 있어요."}, status=409
+                {"error": "되살리지 못했어요 — 이미 되살렸거나, 되살릴 수 있는 기간이 지났어요."}, status=409
             )
             return
         self._regenerate_screens()
-        key = f"{restored['date']}|{restored['run_slot']}"
-        self._respond_json({"key": key, "html": render_slot_fragment(restored["date"], restored["run_slot"]) or ""})
+        self._respond_json({"ok": True})
+
+    def _handle_deleted_empty(self) -> None:
+        """삭제 기록의 비우기 — 지운 회차 파일을 정기·수시 모두 **진짜로** 지운다.
+
+        확인창은 화면이 띄운다(되살릴 자리가 여기서 끝나는 동작이라 한 번 묻는다).
+        """
+        removed = empty_deleted_runs() + adhoc_routes.empty_deleted_cards()
+        logger.info("삭제 기록 비우기 — 파일 %d개 삭제", removed)
+        self._respond_json({"removed": removed})
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
@@ -5954,8 +6296,10 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_download_excel_history(form)
         elif self.path == "/history/delete-runs":
             self._handle_delete_history_runs(form)
-        elif self.path == "/history/restore-run":
-            self._handle_restore_history_run(form)
+        elif self.path == "/deleted/restore":
+            self._handle_deleted_restore(form)
+        elif self.path == "/deleted/empty":
+            self._handle_deleted_empty()
         elif self.path == "/trend/add-word":
             self._handle_add_trend_word(form)
         elif self.path == "/trend/remove-word":
@@ -6018,6 +6362,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_preview_bulk_move_order(form)
         elif self.path == "/refetch-summary":
             self._handle_refetch_summary(form)
+        elif self.path == "/refetch-titles":
+            self._handle_refetch_titles(form)
         elif self.path == "/edit-summary":
             self._handle_edit_summary(form)
         elif self.path == "/set-photo-override":
@@ -6145,6 +6491,7 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             "mode": mode,
             "include_in_live": f"group{index}_include_in_live" in form,
             "include_in_scrap": f"group{index}_include_in_scrap" in form,
+            "include_in_alert": f"group{index}_include_in_alert" in form,
             "disabled_keywords": disabled_keywords,
         }
 
@@ -6270,7 +6617,6 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         try:
             save_breaking_alert_settings(
                 "enabled" in form,
-                form.get("group_names", []),
                 form.get("start", [""])[0],
                 form.get("end", [""])[0],
                 form.get("interval_min", [""])[0],
@@ -7345,6 +7691,40 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         self.send_response(204)
         self.end_headers()
 
+    def _handle_refetch_titles(self, form: dict) -> None:
+        """라벨 보관함·정기 보관함의 「⟳ 제목 다시 불러오기」가 fetch로 호출한다
+        (refetchTitles) — 지금 화면에 보이는 기사들의 제목을 원문에서 한꺼번에 다시
+        가져온다(archive/TITLE_CHANGE_DESIGN.md).
+
+        한 건짜리 「원문 다시 불러오기」(POST /refetch-summary)와 **일부러 다른 길**이다:
+          · 이쪽은 **제목만** 고친다. 저장된 요약은 네이버 검색의 「검색어 주변 발췌」라
+            그 기사가 왜 걸렸는지를 담고 있는데, 원문 og:description(본문 맨 앞)으로
+            수십 건을 한꺼번에 갈아치우면 그 정보가 통째로 사라진다(§3.3).
+          · **✏️로 직접 고친 제목은 건너뛴다**(§4). 한 건짜리는 담당자가 그 기사를 보고
+            누른 것이라 덮는 게 맞지만, 일괄은 눌러 놓고 결과를 나중에 본다.
+
+        기사마다 화면이 보고 있는 값(url·title·pubDate)을 같은 순서로 되풀이해 싣는다 —
+        저장소를 다시 뒤지면 화면과 판정이 다른 값을 볼 수 있다(여러 기사 숨기기와 같은 식).
+
+        응답은 JSON `{rows, counts}` — 화면이 결과 줄과 행 표시를 그린다. 화면 파일을
+        다시 굽지 않는다: 확정본·초안은 이 버튼이 없고, 두 보관함은 요청마다 새로 그린다.
+        """
+        urls = form.get("url", [])
+        if not urls:
+            self._respond_json({"rows": {}, "counts": {}})
+            return
+
+        def field(name: str, i: int) -> str:
+            values = form.get(name, [])
+            return (values[i] if i < len(values) else "") or ""
+
+        articles = [
+            {"url": url, "title": field("title", i), "pub_date": field("pubDate", i)}
+            for i, url in enumerate(urls)
+            if url
+        ]
+        self._respond_json(refetch_titles(articles))
+
     def _handle_edit_summary(self, form: dict) -> None:
         """✏️ 「기사 정보 직접 수정」이 fetch로 호출한다(editSummary) — 🔄가 원문에서도
         못 찾는 경우의 최후 수단으로, 담당자가 직접 타이핑한 언론사·제목·요약을 그대로
@@ -7363,7 +7743,7 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self.send_response(400)
             self.end_headers()
             return
-        set_summary_override(url, title or None, summary or None, outlet or None)
+        set_summary_override(url, title or None, summary or None, outlet or None, manual=True)
         self._regenerate_screens()
         self.send_response(204)
         self.end_headers()

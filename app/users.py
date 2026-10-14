@@ -21,7 +21,7 @@ from datetime import datetime
 from typing import Optional
 
 from app.atomic_write import atomic_write_text
-from app.config import AUTH_MIN_PASSWORD_LEN, USERS_FILE
+from app.config import AUTH_MIN_PASSWORD_LEN, PRIVACY_CONSENT_REQUIRED, USERS_FILE
 
 # pbkdf2-sha256 반복 횟수. OWASP 권고값(600,000)이고, 맥에서 한 번 계산에 0.2초쯤이라
 # 로그인 한 번에는 느껴지지 않으면서 사전 대입은 충분히 비싸진다.
@@ -148,8 +148,18 @@ def create_user(
     question: str,
     answer: str,
     department: str = "",
+    consent: bool = False,
 ) -> dict:
-    """새 계정을 만들어 돌려준다. **첫 사용자가 관리자**가 된다."""
+    """새 계정을 만들어 돌려준다. **첫 사용자가 관리자**가 된다.
+
+    **동의 없이는 계정이 만들어지지 않는다 — 판정이 여기 있는 이유다.**
+    화면에서만 막으면 막은 게 아니고(폼은 누구든 직접 보낼 수 있다), 계정을
+    만드는 길이 하나뿐이라 이 자리를 지나지 않고 생기는 계정도 없다.
+    그래서 이 뒤로는 `consent_at`이 빈 계정이 생기지 않는다
+    (동의를 넣기 전에 만든 계정에는 없고, 소급해서 적지 않는다 — 받은 적이 없다).
+    """
+    if not consent:
+        raise UserError(PRIVACY_CONSENT_REQUIRED)
     email_n = normalize_email(email)
     if "@" not in email_n or "." not in email_n.split("@")[-1]:
         raise UserError("이메일 주소를 확인해 주세요.")
@@ -179,6 +189,8 @@ def create_user(
             "role": "admin" if not data["users"] else "member",
             "created_at": now,
             "password_changed_at": now,
+            # 동의했다는 사실은 시각으로 남긴다 — 아무 데도 안 남으면 받을 이유가 없다.
+            "consent_at": now,
         }
         data["users"].append(user)
         _save(data)

@@ -309,9 +309,25 @@ def _summary_signal_at_tail(summary: str) -> bool:
 #     을 쓰는 세 신호 모두에 걸린다.
 # 실측(저장 회차·수시 카드·캐시 고유 기사 9,555건 전수, 아래 도장 잘림 신호 포함): 기존
 # 적중 917건 → 950건, 신규 33건 전부 캡션, **잃은 적중 0건·오탐 0건**.
+#
+# [수정: 2026-10-08] 서술어 뒤에 사람의 직함이 아니라 **정당 이름**이 오는 꼴을 같은 패턴에
+# 더했다(사용자 제보 — 뉴스핌 `재경위 국감 퇴장하는 더불어민주당`이 배지 없이 떴다). 사진에
+# 찍힌 대상이 한 사람이 아니라 당 전체일 때 통신사가 쓰는 제목 틀이고, 요약은 캡션 문장이
+# `…퇴장하고... `처럼 `고 있다.`에 닿기 전에 잘려 날짜 도장·기자 이메일이 통째로 사라진다
+# (자체 도메인이라 원문 층도 못 본다). **약칭은 넣지 않는다** — 제목이 `민주당`으로 끝나는
+# 2건 중 1건이 세계일보 `…'부자감세' 지적받는 민주당`(일반 기사)이라, 지금은 따옴표 가드가
+# 막아 주고 있을 뿐이다. 실측(저장 회차·articles_trash·기관 기사 원장·수시 카드·캐시 고유
+# 기사 14,600건 전수): 제목이 정당 정식명칭으로 끝나는 기사 15건이 **전부 캡션**이고 신규
+# 적중 3건(연합뉴스·뉴스1 `재경위 퇴장하는 국민의힘`, 이 제보), 오탐 0건. 표본에 실제로
+# 나온 건 더불어민주당·국민의힘·조국혁신당 셋이고 나머지는 같은 꼴의 원내 정당 정식명칭이다.
+_CAPTION_PARTIES = (
+    "더불어민주당", "국민의힘", "조국혁신당", "개혁신당",
+    "진보당", "기본소득당", "사회민주당", "정의당",
+)
 _PHOTO_CAPTION_TITLE_PATTERN = re.compile(
     r"[가-힣]+(는|은|한|던)\s+[^\"'“”‘’…\[]*"
-    r"(부총리|장관|위원장|대통령|차관|청장|총리|의원|사장|회장|처장|본부장)(?:\s*후보자?)?\s*$"
+    r"(?:(?:부총리|장관|위원장|대통령|차관|청장|총리|의원|사장|회장|처장|본부장)"
+    r"(?:\s*후보자?)?|(?:" + "|".join(_CAPTION_PARTIES) + r"))\s*$"
 )
 _TITLE_QUOTE_PATTERN = re.compile(r"[\"'“”‘’…\[]")
 
@@ -415,6 +431,34 @@ def _looks_like_truncated_position_caption(title: str, summary: str) -> bool:
     return "다." not in summary[last_position.end():]
 
 
+# [추가: 2026-10-07] 날짜 도장도 기자 이메일도 없이 캡션 문장이 **잘리지 않고 그대로 끝나는**
+# 사진기사. 사용자 제보 — 뉴스핌 `'경제6단체장 간담회 겸 기업혁신지원 민관협의체'`(요약이
+# `…최태원 대한상의 회장 등 경제6단체장과 기념사진을 찍고 있다.`로 끝남). 같은 행사의 형제
+# 기사는 요약 끝에 `2026.10.07` 도장이 남아 잡혔는데 이 건만 도장이 없어, 한 사건의 사진
+# 뭉치 중 일부만 배지가 붙는 상태였다. 자체 도메인(newspim.com)이라 원문 층도 못 본다.
+#
+# 틀은 위 요약 신호의 마지막 항목(도장이 통째로 잘린 꼴)과 같은 **주어 + N일 + …고 있다.**
+# 인데 뒤에 잘림 표시가 없다. 잘림 요구만 떼면 일반 기사(`…실질적인 성과를 거두고 있다.`)가
+# 걸리므로 — 실측 오탐 1건, 투데이에너지 가스공사 기사 — **제목이 서술형 종결어미로 끝나지
+# 않을 것**을 더 요구한다. 진짜 기사 제목은 문장형이고 캡션 제목은 명사구라는
+# _looks_like_truncated_position_caption과 같은 전제다. **따옴표 가드는 걸지 않는다** —
+# 이 제보 자체가 제목 전체를 작은따옴표로 감싼 꼴이라 가드를 걸면 제보 건이 도로 빠진다.
+#
+# 실측(저장 회차·articles_trash·기관 기사 원장·수시 카드·캐시 고유 기사 13,899건 전수):
+# 신규 적중 9건 전부 캡션(뉴스1 암참 간담회, 노컷뉴스 예결위 3건, 뉴스핌 이 제보,
+# newsway `[한 컷]` 3건, 일요신문 당정협의 — 서로 독립적인 사례), 오탐 0건.
+_CAPTION_PLAIN_SENTENCE_RE = re.compile(
+    r"(?:^|다\.\s)[^.]*?[이가]\s+(?:지난달\s+|지난\s+)?(?:\d{1,2}월\s*)?\d{1,2}일"
+    r"(?:\s*\(현지시간\))?\s[^.]*?고\s*있다\.\s*$"
+)
+
+
+def _looks_like_plain_caption_sentence(title: str, summary: str) -> bool:
+    if _CAPTION_VERB_ENDING_RE.search(title):
+        return False
+    return bool(_CAPTION_PLAIN_SENTENCE_RE.search(summary))
+
+
 def looks_like_photo_caption(article: dict, fetch_body: bool = True) -> bool:
     """사진기사인지 판정한다 (아래 신호 중 하나라도 걸리면 True).
 
@@ -464,7 +508,9 @@ def looks_like_photo_caption(article: dict, fetch_body: bool = True) -> bool:
         or _PHOTO_CAPTION_NAME_CANDIDATE_TITLE_PATTERN.search(title)
     ):
         return True
-    return _looks_like_truncated_position_caption(title, summary)
+    if _looks_like_truncated_position_caption(title, summary):
+        return True
+    return _looks_like_plain_caption_sentence(title, summary)
 
 
 def exclude_photo_articles(articles: list[dict]) -> list[dict]:

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from app.atomic_write import atomic_write_text
-from app.config import ARTICLES_DIR, RETENTION_DAYS
+from app.config import ARTICLES_DIR, DELETED_RESTORE_DAYS, RETENTION_DAYS
 from app.run_index import find_path as _index_find_path
 from app.run_index import list_run_meta, load_entries
 
@@ -405,6 +405,10 @@ def delete_expired_runs(retention_days: int = RETENTION_DAYS, now: Optional[date
 # 새로 짓는다 — 목록을 그릴 때 파일을 한 개도 열지 않고 날짜·회차·지운 시각을 알 수 있고,
 # 2026-08-26 이전의 어긋난 옛 파일명도 되살릴 때 올바른 이름으로 돌아간다.
 _DELETED_RUN_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})_(\d{2})-(\d{2})\.deleted-(\d{14})\.json$")
+# [추가: 2026-10-12] 되살릴 수 있는 기간(DELETED_RESTORE_DAYS)이 지나면 기사를 떼고
+# `.deleted-`를 `.purged-`로 바꾼다 — 「삭제 기록」에 줄은 남고 되살리기만 빠진다.
+# restore_run은 `.deleted-`만 받으므로(아래 정규식이 안 맞는다) 되살리기는 저절로 막힌다.
+_PURGED_RUN_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})_(\d{2})-(\d{2})\.purged-(\d{14})\.json$")
 _run_trash_lock = threading.Lock()
 
 
@@ -492,8 +496,12 @@ def delete_run(date_str: str, run_slot: str, stamp: Optional[str] = None,
 def list_deleted_runs() -> list[dict]:
     """담당자가 지운 회차 목록(지운 시각 최신 먼저) — 파일을 한 개도 열지 않는다.
 
-    각 항목: {"date", "run_slot", "deleted_at": datetime, "trash_name"}
+    각 항목: {"date", "run_slot", "deleted_at": datetime, "trash_name", "restorable"}
     같은 날짜·회차가 여럿이면(지웠다 되살렸다 다시 지운 경우) 가장 최근 것 하나만 남긴다.
+
+    [수정: 2026-10-12] 되살릴 기간이 지난 껍데기(.purged-)도 함께 돌려준다 — restorable이
+    거짓이다. 「삭제 기록」이 그 줄을 흐리게 그리고, 정기 보관함은 이 목록으로 **지운
+    회차 자리에 아무 줄도 안 그린다**(「수집 기록 없음」이 뜨면 앱이 못 모은 날이 된다).
     """
     trash_dir = _runs_trash_dir()
     if not trash_dir.exists():
@@ -501,7 +509,10 @@ def list_deleted_runs() -> list[dict]:
     entries = {}
     for path in trash_dir.glob("*.json"):
         m = _DELETED_RUN_RE.match(path.name)
-        if not m:
+        restorable = m is not None
+        if m is None:
+            m = _PURGED_RUN_RE.match(path.name)
+        if m is None:
             continue
         date_str, hh, mm, stamp = m.groups()
         entry = {
@@ -509,6 +520,7 @@ def list_deleted_runs() -> list[dict]:
             "run_slot": f"{hh}:{mm}",
             "deleted_at": datetime.strptime(stamp, "%Y%m%d%H%M%S"),
             "trash_name": path.name,
+            "restorable": restorable,
         }
         key = (date_str, entry["run_slot"])
         if key not in entries or entries[key]["deleted_at"] < entry["deleted_at"]:
@@ -539,3 +551,93 @@ def restore_run(trash_name: str) -> Optional[dict]:
         src.replace(target)
     logger.info("정기 회차 되살림 — %s → %s", trash_name, target.name)
     return {"date": date_str, "run_slot": run_slot}
+
+
+def _purge_run_file(path: Path) -> bool:
+    """되살릴 기간이 지난 회차 파일을 껍데기로 만든다 — 기사를 떼고 `.purged-`로 이름을 바꾼다.
+
+    껍데기에 남기는 건 「삭제 기록」 한 줄이 쓰는 것뿐이다(회차·지운 시각은 파일 이름에
+    있고, 건수만 파일에서 읽는다). 파일을 아예 지우지 않는 이유는 둘이다 — 그 줄이
+    사라지면 "내가 그때 뭘 지웠지"에 답할 수 없고, 정기 보관함이 그 자리에 「수집 기록
+    없음」을 다시 그린다(담당자가 지운 걸 앱이 못 모은 것처럼 보이게 하면 거짓말이다).
+    """
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    articles = data.get("articles") or []
+    shell = {k: v for k, v in data.items() if k != "articles"}
+    shell["purged"] = True
+    shell["article_count"] = len(articles)
+    dest = path.with_name(path.name.replace(".deleted-", ".purged-", 1))
+    try:
+        atomic_write_text(dest, json.dumps(shell, ensure_ascii=False, indent=2))
+    except OSError:
+        return False
+    path.unlink(missing_ok=True)
+    return True
+
+
+def purge_expired_deleted_runs(
+    restore_days: int = DELETED_RESTORE_DAYS, now: Optional[datetime] = None
+) -> int:
+    """지운 지 restore_days일이 지난 회차를 껍데기로 바꾼다(되살리기만 빠진다). 바꾼 개수.
+
+    나이는 **지운 시각**(파일 이름) 기준이다 — 회차 자체가 언제 것이냐가 아니라 담당자가
+    언제 지웠느냐가 되살릴 창의 시작이다.
+    """
+    now = now or datetime.now()
+    cutoff = now - timedelta(days=restore_days)
+    trash_dir = _runs_trash_dir()
+    if not trash_dir.exists():
+        return 0
+    purged = 0
+    with _run_trash_lock:
+        for path in sorted(trash_dir.glob("*.deleted-*.json")):
+            m = _DELETED_RUN_RE.match(path.name)
+            if m is None or datetime.strptime(m.group(4), "%Y%m%d%H%M%S") > cutoff:
+                continue
+            if _purge_run_file(path):
+                purged += 1
+    if purged:
+        logger.info("정기 삭제 기록 — 되살릴 기간이 지난 회차 %d개를 껍데기로 바꿈", purged)
+    return purged
+
+
+def empty_deleted_runs() -> int:
+    """「삭제 기록」의 비우기 — 지운 회차 파일을 **진짜로** 지운다. 지운 개수.
+
+    화면에 보이는 것(.deleted- · .purged-)만 지운다. 보관 기한이 지나 앱이 옮긴
+    것(.expired-)은 담당자가 지운 적이 없어 그 화면에 안 서고, 아래 정리가 맡는다.
+    """
+    trash_dir = _runs_trash_dir()
+    if not trash_dir.exists():
+        return 0
+    removed = 0
+    with _run_trash_lock:
+        for path in list(trash_dir.glob("*.json")):
+            if _DELETED_RUN_RE.match(path.name) or _PURGED_RUN_RE.match(path.name):
+                path.unlink(missing_ok=True)
+                removed += 1
+    if removed:
+        logger.info("정기 삭제 기록 비우기 — %d개 파일 삭제", removed)
+    return removed
+
+
+def deleted_run_article_count(trash_name: str) -> Optional[int]:
+    """「삭제 기록」 한 줄의 건수 — 지운 회차 파일(또는 껍데기)에서 읽는다.
+
+    목록을 그리는 list_deleted_runs()는 파일을 한 개도 안 열겠다는 약속이 있어서, 건수가
+    필요한 이 화면만 줄마다 따로 읽는다(지운 회차는 수가 적다).
+    """
+    if not (_DELETED_RUN_RE.match(trash_name or "") or _PURGED_RUN_RE.match(trash_name or "")):
+        return None
+    path = _runs_trash_dir() / trash_name
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if "articles" in data:
+        return len(data["articles"] or [])
+    count = data.get("article_count")
+    return count if isinstance(count, int) else None

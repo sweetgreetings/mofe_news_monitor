@@ -96,6 +96,7 @@ from app.config import (
     COLOR_SEP_FAINT,
     COLOR_TEXT_FAINT,
     COLOR_TEXT_MUTED,
+    DELETED_LOG_TITLE,
     FONT_STACK,
     PALETTE,
 )
@@ -556,7 +557,6 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     border: 1px solid {adhoc_border_soft}; border-radius: var(--r-pill); padding: 1px 8px; font-weight: 600; }}
   .date-block > summary .dcnt {{ margin-left: auto; }}
   .date-block > summary .n {{ margin-left: auto; }}
-  .date-block > summary .n .restore-btn {{ margin-left: 6px; }}
   .date-block > summary .exp {{ visibility: hidden; }}
   .date-block > summary:hover .exp, .date-block > summary:focus-within .exp {{ visibility: visible; }}
   .date-block > summary .day-del {{ margin: 0 -6px 0 -4px; }}
@@ -1131,6 +1131,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     cursor: pointer; box-shadow: var(--sh-float); z-index: 200;
     display: flex; align-items: center; justify-content: center; }}
   .ok-note {{ background: {ok_bg}; border: 1px solid {ok_border}; color: {ok_text}; border-radius: var(--r-lg); padding: 11px 14px; margin: 12px 0; font-size: var(--fs-md); }}
+  .ok-note .ok-link {{ color: inherit; font-weight: 600; margin-left: 6px; }}
   .sent-done {{ margin-left: 8px; font-size: var(--fs-sm); font-weight: 500; color: {muted}; white-space: nowrap; }}
   a.sent-done {{ text-decoration: none; }}
   a.sent-done:hover {{ color: {accent}; text-decoration: underline; }}
@@ -1170,17 +1171,6 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .row-del {{ flex: none; border: none; background: none; color: {text_faint}; cursor: pointer;
     padding: 4px 6px; border-radius: var(--r-sm); line-height: 1; display: inline-flex; font-size: 0.95rem; }}
   .row-del:hover {{ color: {error}; background: {error_bg}; }}
-  /* 방금 지운 회차 — 제자리에 남는 「삭제함 · 되살리기」 줄(정기 보관함의 같은 줄과 같은 모양). */
-  .run-line.gone {{ background: {bg}; color: {text_faint}; }}
-  .run-line.gone:hover {{ background: {bg}; }}
-  .run-line.gone .run-row, .run-line.gone .run-row .win, .run-line.gone .run-row .iss, .run-line.gone .run-row .n {{ color: {text_faint}; }}
-  .gone-tag {{ flex: none; font-size: var(--fs-xs); border: 1px dashed {dash_border}; border-radius: var(--r-pill);
-    padding: 0 8px; color: {muted}; background: {card}; font-weight: 400; }}
-  .restore-btn {{ flex: none; border: none; background: none; color: {accent}; font: inherit; font-size: var(--fs-sm);
-    cursor: pointer; padding: 2px 4px; margin-left: auto; }}
-  .run-line .restore-btn {{ margin-left: 0; }}
-  .restore-btn:hover {{ text-decoration: underline; text-underline-offset: 3px; }}
-  .run-line.just-restored {{ background: {row_moved}; }}
   /* 선택 삭제 모드 — body.arch-tidy일 때만 체크박스가 나오고, 꺼내는 동작(복사·txt·xlsx·
      열기)과 줄 끝 🗑는 숨는다. 고른 줄은 확정본에서 체크한 기사 행과 같은 옅은 파랑. */
   input.pick {{ display: none; width: var(--chk-md); height: var(--chk-md); margin: 0; flex: none;
@@ -1192,6 +1182,19 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .run-line:has(input.pick:checked) {{ background: {hover}; }}
   .tidy-only {{ display: none; }}
   body.arch-tidy .tidy-only {{ display: inline-flex; }}
+  /* [추가: 2026-10-12] 「삭제 기록」으로 가는 글자 링크 — 정기 보관함과 같은 자리·같은 모양.
+     건수는 안 적는다(적으면 보관함이 다시 어수선해진다). */
+  .deleted-link {{ margin-left: auto; color: {text_soft}; text-decoration: none; font-size: var(--fs-sm);
+    font-weight: 500; white-space: nowrap; }}
+  .deleted-link:hover {{ color: {accent}; text-decoration: underline; text-underline-offset: 3px; }}
+  .result-bar .deleted-link + .tidy-btn {{ margin-left: 0; }}
+  body.arch-tidy .deleted-link {{ display: none; }}
+  /* [추가: 2026-10-12] 카드 화면 맨 아래 줄 — 「삭제 기록」 글자 링크 + (탭 줄이 없을 때)
+     「사안 목록에서 삭제」. 링크의 margin-left:auto 가 둘을 오른쪽으로 민다. */
+  .card-del-row {{ display: flex; gap: 12px; align-items: center; justify-content: flex-end; margin-top: 14px; }}
+  /* 좁은 화면에선 오른쪽 아래 발송 ●(fixed)가 이 줄을 덮는다 — 떠 있는 것들 위로 비켜 세운다.
+     960px 이하부터 카드 오른쪽 끝과 발송 ●의 자리가 겹치기 시작한다(실측). */
+  @media (max-width: 960px) {{ .card-del-row {{ margin-bottom: 72px; }} }}
   .tidy-btn {{ margin-left: auto; border: 1px solid {border}; background: {card}; color: {muted}; border-radius: var(--r-md);
     padding: 6px 13px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; white-space: nowrap; }}
   .tidy-btn:hover {{ border-color: {error_border}; color: {error}; background: {error_bg}; }}
@@ -1209,18 +1212,6 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .sel-bar .sp {{ flex: 1; }}
   .sel-bar .clr {{ background: transparent; color: {muted}; border: 1px solid {border}; border-radius: var(--r-md);
     padding: 5px 10px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; }}
-  /* 맨 아래 「최근 삭제」 — 기본은 접힌 한 줄. */
-  details.recent-del {{ margin-top: 16px; border: 1px dashed {dash_border}; border-radius: var(--r-lg); background: {bg}; }}
-  details.recent-del > summary {{ list-style: none; cursor: pointer; padding: 9px 12px; font-size: var(--fs-sm);
-    color: {muted}; display: flex; align-items: center; gap: 7px; }}
-  details.recent-del > summary::-webkit-details-marker {{ display: none; }}
-  details.recent-del > summary::before {{ content: "▸"; font-size: 0.72rem; }}
-  details.recent-del[open] > summary::before {{ content: "▾"; }}
-  .rbatch {{ border-top: 1px solid {border}; padding: 6px 12px 8px; }}
-  .rbatch-h {{ display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: {muted}; margin: 2px 0 4px; }}
-  .rrow {{ display: flex; align-items: center; gap: 10px; padding: 4px 0 4px 14px; font-size: var(--fs-sm); color: {muted}; }}
-  .rrow .rnm {{ color: {text}; }}
-  .rrow .noname {{ color: {muted}; }}
   /* [추가: 2026-08-18] 🏷 라벨(PRD.md 기능10) — app.renderer/app.preview_renderer의
      라벨 CSS와 같은 앰버 값(당시 시안의 --label-bg/--label-text). 이 화면은
      실제 <form> 제출 방식(app/adhoc/renderer.py 상단 라우팅 계약 주석)이라 팝오버
@@ -1507,7 +1498,7 @@ def render_new_card_page(
       <span class="n-opts">
         <label><input type="checkbox" name="use_outlet_whitelist" value="1"> 등록 언론사만</label>
         <label><input type="checkbox" name="exclude_photo" value="1"> 사진기사 제외</label>
-        <label><input type="checkbox" name="exclude_personnel" value="1"> 인사 발령 제외</label>
+        <label><input type="checkbox" name="exclude_personnel" value="1"> 인사기사 제외</label>
       </span>
       <button type="submit" class="btn">{icon("search")} 수집</button>
     </div>
@@ -2931,12 +2922,22 @@ def render_card_page(
     # 그려지면 탭의 × 가 그 역할이라 하단 버튼은 빼고, 탭 줄이 없는 경우(어제 이전
     # 카드를 수시 보관함에서 열었을 때)에만 하단 버튼을 그린다. 둘 다 보이면 같은
     # 파괴적 동작의 입구가 둘이라 "뭘 눌러야 하지"가 다시 생긴다(사용자 지적).
+    # [추가: 2026-10-12] 「삭제 기록」으로 가는 글자 링크 — 이 화면에도 삭제 입구(탭 × ·
+    # 아래 버튼)가 있는데 지운 것을 되살릴 길은 두 보관함에만 있었다. 지우는 자리 옆에
+    # 지운 것을 보는 자리를 둔다(보관함 결과 줄과 같은 모양·같은 글자, 건수는 안 적는다).
+    # 상단바엔 안 둔다 — 가는 곳만 두는 자리이고 두 흐름 칸이 이미 꽉 찼다.
+    # 삭제 버튼은 탭 줄이 없을 때만이지만(파괴적 동작의 입구는 언제나 하나), 링크는 늘 그린다.
     delete_btn_html = (
-        ""
-        if tabs_html
-        else f'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
-        f'<button type="button" class="btn danger sm" onclick="deleteCard(\'{html.escape(card["id"])}\')">'
-        f"{icon('trash')} 사안 목록에서 삭제</button></div>"
+        '<div class="card-del-row">'
+        f'<a class="deleted-link" href="/deleted">{DELETED_LOG_TITLE} →</a>'
+        + (
+            ""
+            if tabs_html
+            else '<button type="button" class="btn danger sm" '
+            f'onclick="deleteCard(\'{html.escape(card["id"])}\')">'
+            f"{icon('trash')} 사안 목록에서 삭제</button>"
+        )
+        + "</div>"
     )
     if not is_stale:
         warn_html = ""

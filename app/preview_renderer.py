@@ -2908,8 +2908,11 @@ def _render_preview_groups(
     ai_names: set = frozenset(), subheading_format: str = DEFAULT_SUBHEADING_FORMAT_TEMPLATE,
     scrap_date: str = "", scrap_end: str = "",
     group_copy_texts: Optional[dict] = None,
-) -> str:
-    """소제목별 화면을 렌더링한다 (app.renderer._render_groups와 구성은 같지만, ↑/↓ 버튼이
+) -> tuple:
+    """소제목별 화면을 렌더링한다. 돌려주는 값은 app.renderer._render_groups와 같은
+    (소제목 칸들, 📂 소제목 미분류 칸) 둘이고, 미분류는 💬 요약 블록 아래에 그린다.
+
+    (app.renderer._render_groups와 구성은 같지만, ↑/↓ 버튼이
     호출하는 JS만 previewMoveArticle로 다르다 — 미리보기는 저장된 회차가 없어
     app.curation.move_article이 기대하는 "현재 회차의 저장된 기사 목록 갱신"을 쓸 수
     없고, 소제목 경계를 넘는 이동(group_overrides.json)만 반영한다).
@@ -2924,6 +2927,7 @@ def _render_preview_groups(
     """
     all_names = [g["name"] for g in groups]
     sections = []
+    unclassified_html = ""
     # [수정: 2026-09-10] app.renderer._render_groups와 같은 이유 — ▼는 "옮길 수 있는 마지막
     # 소제목"에서 잠근다(그 아래엔 고정 칸인 기타·📂 미분류만 온다).
     orderable_indexes = [i for i, g in enumerate(groups) if not is_order_locked(g["name"], labels)]
@@ -3101,12 +3105,16 @@ def _render_preview_groups(
         split_attrs = f' data-group="{original_name}"' + (
             ' data-renamed="1"' if display_name != original_name else ""
         )
-        sections.append(
+        section_html = (
             f'<section class="{section_class}" id="subheading-{group_index}" data-toc-name="{toc_name}"'
             f"{locked_attr}{split_attrs}>"
             f"{heading}{body}</section>"
         )
-    return "\n".join(sections)
+        if group["name"] == UNCLASSIFIED_GROUP_NAME:
+            unclassified_html = section_html
+        else:
+            sections.append(section_html)
+    return "\n".join(sections), unclassified_html
 
 
 def _render_preview_bottom(
@@ -3471,7 +3479,7 @@ def _actions_html(
     keyword_note_btn_html = (
         ""
         if load_manual_keyword_note()
-        else '<button class="create-group-btn" type="button" onclick="toggleKeywordNote(this)"><span class="plus-glyph">+</span>한 줄 메모</button>'
+        else '<button class="create-group-btn" type="button" onclick="toggleKeywordNote(this)">한 줄 메모</button>'
     )
     # [수정: 2026-08-12] "🤖 미분류 기사 분류"(증분 배정)는 📂 소제목 미분류 칸의 헤더로
     # 옮겼다(_render_preview_groups 참고) — 미분류를 발견하는 자리에서 바로 누르도록,
@@ -3631,7 +3639,7 @@ def _compute_preview_content(
     if not render_groups:
         body = '<div class="empty">💤<br>아직 모인 기사가 없어요</div>'
     else:
-        body = _classify_degraded_html(classify_degraded, len(articles), round_id) + _render_preview_groups(
+        groups_html, unclassified_html = _render_preview_groups(
             render_groups, highlight_words, line_template, labels, rank_by_url, set(custom_names), ai_names,
             subheading_format,
             scrap_date=label_scrap_date, scrap_end=label_scrap_end,
@@ -3639,8 +3647,11 @@ def _compute_preview_content(
                 slot, render_groups, line_template, labels, subheading_format,
             ),
         )
+        body = _classify_degraded_html(classify_degraded, len(articles), round_id) + groups_html
         if groups:
             body += _render_preview_bottom(groups, highlight_words, labels, subheading_format)
+        # 📂 소제목 미분류는 요약 블록 아래, 📌 담아둔 기사 칸 바로 위에 선다(app.renderer와 같다).
+        body += unclassified_html
     body += _manual_section_html(
         highlight_words, line_template, render_groups, labels, set(custom_names),
         scrap_date=label_scrap_date, scrap_end=label_scrap_end,

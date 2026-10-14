@@ -13,6 +13,12 @@ from app.config import (
     AUTH_MIN_PASSWORD_LEN,
     FONT_STACK,
     PALETTE,
+    PRIVACY_CONSENT_LABEL,
+    PRIVACY_CONSENT_LEAD,
+    PRIVACY_CONSENT_REQUIRED,
+    PRIVACY_CONSENT_ROWS,
+    PRIVACY_CONSENT_TAIL,
+    PRIVACY_CONSENT_TITLE,
     SECURITY_QUESTIONS,
     SETTINGS_SERVER_HOST,
     SETTINGS_SERVER_PORT,
@@ -95,6 +101,58 @@ _FORM_STYLE = """
   .status-info {{ background: {hover}; color: {header}; border: 1px solid {accent_border}; }}
   .status-ok {{ background: {ok_bg}; color: {ok_text}; border: 1px solid {ok_border}; }}
 
+  /* ── 개인정보 수집·이용 동의(회원가입) ──────────────────────────────
+     동의 줄은 네모(누르면 뭔가 한다)도 알약(상태)도 아닌 평범한 체크 줄이라
+     「로그인 상태 유지」(.keep)와 같은 문법을 쓴다 — 보조 줄에 선 체크라 14px. */
+  .consent {{ display: flex; align-items: center; gap: 7px; margin: 22px 0 0;
+    font-size: var(--fs-md); color: {text}; line-height: 1.5; }}
+  /* 「내용 보기」는 <label> 밖이다 — 안에 두면 누를 때 체크가 같이 토글된다. */
+  .consent .cl {{ display: flex; align-items: center; gap: 7px; cursor: pointer; }}
+  .consent input[type=checkbox] {{ width: var(--chk-sm); height: var(--chk-sm);
+    accent-color: {accent}; flex: none; margin: 0; }}
+  .consent .req {{ color: {muted}; font-size: var(--fs-sm); }}
+  .consent .open {{ margin-left: auto; flex: none; background: none; border: none; padding: 0;
+    font-family: inherit; font-size: var(--fs-sm); font-weight: 600; color: {accent}; cursor: pointer; }}
+  .consent .open:hover {{ text-decoration: underline; }}
+  /* 동의하지 않고 「가입하기」를 누른 순간에만 앰버 주의다. 평소엔 아무 색도 없다. */
+  .consent.is-missing {{ background: {warn_bg}; border: 1px solid {warn_border};
+    border-radius: var(--r-md); padding: 8px 10px; margin: 22px -10px 0; }}
+  .status.is-off {{ display: none; }}
+
+  /* 창은 담는 틀이라 --r-lg + --sh-modal. */
+  .ov {{ position: fixed; inset: 0; background: {modal_backdrop}; z-index: 60;
+    display: none; align-items: center; justify-content: center; padding: 20px; }}
+  .ov.is-open {{ display: flex; }}
+  .modal {{ background: {card}; border-radius: var(--r-lg); box-shadow: var(--sh-modal);
+    width: 560px; max-width: 100%; max-height: calc(100vh - 40px); overflow: auto;
+    box-sizing: border-box; }}
+  .modal .mh {{ display: flex; align-items: center; gap: 12px;
+    padding: 18px 22px 14px; border-bottom: 1px solid {border}; }}
+  .modal .mh h2 {{ font-size: var(--fs-lg); color: {header}; margin: 0; flex: 1 1 auto; }}
+  /* 닫기 ×는 회색이다 — 이 앱에서 빨강은 오류와 [단독]·[속보]뿐이고,
+     창을 닫는 건 오류가 아니다. 상자는 휴지통·원장 행과 같은 30×26. */
+  .modal .mh .x {{ flex: none; background: none; border: none; cursor: pointer; color: {muted};
+    font-size: 1.1rem; line-height: 1; width: 30px; height: 26px; border-radius: var(--r-sm); }}
+  .modal .mh .x:hover {{ background: {pill_bg}; color: {text}; }}
+  .modal .mb {{ padding: 18px 22px 20px; }}
+  .modal .lead {{ font-size: var(--fs-md); color: {text}; line-height: 1.65; margin: 0 0 14px; }}
+  .modal .tail {{ font-size: var(--fs-sm); color: {muted}; line-height: 1.65; margin: 14px 0 0; }}
+  .modal .mf {{ display: flex; align-items: center; justify-content: flex-end; padding: 0 22px 20px; }}
+  /* 이 창의 대표 동작 하나라 채운 파랑이다. */
+  .modal .mf button.agree {{ background: {accent}; color: {on_fill}; border: none;
+    border-radius: var(--r-md); height: var(--h-lg); padding: 0 22px;
+    font-size: var(--fs-md); font-weight: 600; font-family: inherit; cursor: pointer; }}
+  .modal .mf button.agree:hover {{ background: {header}; }}
+
+  .ctable {{ width: 100%; border-collapse: collapse; border: 1px solid {border};
+    border-radius: var(--r-md); overflow: hidden; }}
+  .ctable th, .ctable td {{ border-bottom: 1px solid {border}; padding: 11px 14px;
+    font-size: var(--fs-md); line-height: 1.6; text-align: left; vertical-align: top; }}
+  .ctable tr:last-child th, .ctable tr:last-child td {{ border-bottom: none; }}
+  .ctable th {{ width: 108px; background: {bg}; color: {header}; font-weight: 600; white-space: nowrap; }}
+  .ctable td {{ color: {text}; }}
+  .ctable td .sub {{ display: block; color: {muted}; font-size: var(--fs-sm); margin-top: 3px; }}
+
   .foot {{ margin: 18px 0 0; font-size: var(--fs-sm); color: {muted}; text-align: center; }}
   .foot a {{ color: {accent}; text-decoration: none; }}
   .foot a:hover {{ text-decoration: underline; }}
@@ -114,6 +172,11 @@ _FORM_STYLE = """
     .login-card, .login-card.sign {{ width: 100%; max-width: 440px; }}
     .lg-head {{ flex-wrap: wrap; }}
     .lg-head .ttl {{ padding-left: 0; border-left: 0; }}
+    /* 「내용 보기」가 아랫줄로 내려가되 체크 글자와 왼쪽을 맞춘다(7 + 14). */
+    .consent {{ flex-wrap: wrap; }}
+    .consent .open {{ margin-left: 21px; }}
+    .ctable th {{ width: 86px; padding: 10px; }}
+    .ctable td {{ padding: 10px; }}
   }}
 """
 
@@ -200,6 +263,66 @@ def render_login_page(error: str = "", email: str = "", notice: str = "") -> str
     return _page("로그인", "AI 뉴스 모니터링", "언론 모니터링", body, foot, notice_html)
 
 
+# ── 개인정보 수집·이용 동의 ──────────────────────────────────────────────
+# **문구 원본은 `app/config.py` 한 곳이다** — 여기엔 모양만 있다.
+# 「동의합니다」를 누르면 체크가 켜지고, 체크 없이 「가입하기」를 누르면
+# 버튼을 잠그는 대신 그 줄이 앰버 주의로 바뀐다(잠긴 버튼은 왜 못 누르는지
+# 스스로 말하지 못한다 — 앱의 다른 거부와 같은 문법이다).
+
+def _consent_modal_html() -> str:
+    rows = []
+    for name, body, sub in PRIVACY_CONSENT_ROWS:
+        sub_html = f'<span class="sub">{html.escape(sub)}</span>' if sub else ""
+        rows.append(
+            f"<tr><th>{html.escape(name)}</th>"
+            f"<td>{html.escape(body)}{sub_html}</td></tr>"
+        )
+    return f"""
+    <div class="ov" id="consent-modal" onclick="if (event.target === this) consentClose()">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="consent-ttl">
+        <div class="mh">
+          <h2 id="consent-ttl">{html.escape(PRIVACY_CONSENT_TITLE)}</h2>
+          <button class="x" type="button" onclick="consentClose()" aria-label="닫기">&#10005;</button>
+        </div>
+        <div class="mb">
+          <p class="lead">{html.escape(PRIVACY_CONSENT_LEAD)}</p>
+          <table class="ctable">{"".join(rows)}</table>
+          <p class="tail">{html.escape(PRIVACY_CONSENT_TAIL)}</p>
+        </div>
+        <div class="mf">
+          <button class="agree" type="button" onclick="consentAgree()">동의합니다</button>
+        </div>
+      </div>
+    </div>"""
+
+
+_CONSENT_SCRIPT = """
+<script>
+function consentRow() { return document.getElementById('consent-chk').closest('.consent'); }
+function consentOpen(e) { if (e) e.preventDefault();
+  document.getElementById('consent-modal').classList.add('is-open'); }
+function consentClose() { document.getElementById('consent-modal').classList.remove('is-open'); }
+function consentAgree() { document.getElementById('consent-chk').checked = true;
+  consentSync(); consentClose(); }
+function consentSync() {
+  var on = document.getElementById('consent-chk').checked;
+  consentRow().querySelector('.open').textContent = on ? '다시 보기' : '내용 보기';
+  if (on) { consentRow().classList.remove('is-missing');
+    document.getElementById('consent-missing').classList.add('is-off'); }
+}
+function consentCheck() {
+  if (document.getElementById('consent-chk').checked) return true;
+  consentRow().classList.add('is-missing');
+  var note = document.getElementById('consent-missing');
+  note.classList.remove('is-off');
+  note.scrollIntoView({ block: 'nearest' });
+  return false;
+}
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') consentClose(); });
+consentSync();
+</script>"""
+
+
 # ── 2. 회원가입 ──────────────────────────────────────────────────────────
 
 def render_signup_page(error: str = "", form: Optional[dict] = None, first: bool = False) -> str:
@@ -214,8 +337,18 @@ def render_signup_page(error: str = "", form: Optional[dict] = None, first: bool
         "동작하고, 나중에 사람이 늘 때 쓸 표시입니다.</span></div>"
         if first else ""
     )
+    consent_missing = error == PRIVACY_CONSENT_REQUIRED
+    missing_cls = " is-missing" if consent_missing else ""
+    consent_mark = " checked" if v("consent") == "1" else ""
+    consent_label = html.escape(PRIVACY_CONSENT_LABEL)
+    consent_note = (
+        f'<div class="status status-warn{"" if consent_missing else " is-off"}" id="consent-missing">'
+        f"<span>⚠</span><span>{html.escape(PRIVACY_CONSENT_REQUIRED)}</span></div>"
+    )
+    notice_html = "" if consent_missing else _warn(error)
+
     body = f"""
-    <form class="f" method="POST" action="/signup">
+    <form class="f" method="POST" action="/signup" onsubmit="return consentCheck()">
       <label class="field" for="email">이메일</label>
       <input type="email" id="email" name="email" value="{v('email')}"
              placeholder="name@korea.kr" autocomplete="username" autofocus>
@@ -256,11 +389,20 @@ def render_signup_page(error: str = "", form: Optional[dict] = None, first: bool
       <p class="fhint"><strong>띄어쓰기 없이 붙여서</strong> 적어 주세요(대소문자는 가리지 않습니다).
       적어 둔 답은 <strong>다시 볼 수 없고</strong>, 「나의 정보 관리」에서 바꾸기만 됩니다.</p>
 
+      <div class="consent{missing_cls}">
+        <label class="cl">
+          <input type="checkbox" id="consent-chk" name="consent" value="1"{consent_mark}
+                 onchange="consentSync()">
+          <span>{consent_label} <span class="req">(필수)</span></span>
+        </label>
+        <button type="button" class="open" onclick="consentOpen(event)">내용 보기</button>
+      </div>
+
       <button class="primary" type="submit">가입하기</button>
-    </form>"""
+    </form>""" + _consent_modal_html() + _CONSENT_SCRIPT
     foot = f'<p class="foot">이미 계정이 있으세요? <a href="/login">로그인</a>{_back_home()}</p>'
     return _page("회원가입", "회원가입", "AI 뉴스 모니터링",
-                 first_note + body, foot, _warn(error), wide=True)
+                 first_note + consent_note + body, foot, notice_html, wide=True)
 
 
 # ── 3. 비밀번호 찾기 ─────────────────────────────────────────────────────

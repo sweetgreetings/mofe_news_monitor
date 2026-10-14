@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>검색어 — [단독]·[속보] 알림 스위치 시안</title>
+<style>
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+    --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%; --h-tb: 28px; }
+  body { margin: 0; padding: 28px 20px 70px; background: #F8FAFC; color: #1F2937;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif; }
+  .page { max-width: 800px; margin: 0 auto; }
+  h1 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 6px; }
+  .sub { color: #6B7280; font-size: var(--fs-md); margin: 0 0 26px; line-height: 1.7; }
+  h2 { font-size: var(--fs-lg); color: #1E3A5F; margin: 34px 0 4px; }
+  .note { color: #6B7280; font-size: var(--fs-sm); line-height: 1.75; margin: 0 0 12px; }
+  .verdict { font-size: var(--fs-sm); border-radius: var(--r-md); padding: 7px 11px; margin: 10px 0 0; line-height: 1.6; }
+  .verdict.good { background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
+  .verdict.bad  { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; }
+
+  /* ── 실제 /keywords 화면에서 그대로 가져온 값 ── */
+  #kwGroups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+  @media (max-width: 780px) { #kwGroups { grid-template-columns: minmax(0, 1fr); } }
+  .group-block { border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 10px 12px; margin: 0;
+    background: #FFFFFF; }
+  .group-block.off .group-body, .group-block.off .kw-count { opacity: .5; }
+  .group-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-bottom: 8px; }
+  .group-head .group-name-input { font-weight: 700; flex: 1 1 5em; min-width: 5em; background: transparent;
+    color: #1E3A5F; border: 1px solid transparent; border-radius: var(--r-md); padding: 3px 6px;
+    font-size: var(--fs-base); font-family: inherit; }
+  .group-head .group-name-input:hover { border-color: #E5E7EB; }
+  .group-off-tag { display: none; font-size: var(--fs-xs); color: #6B7280; background: #F8FAFC;
+    border-radius: var(--r-pill); padding: 2px 9px; }
+  .group-block.off .group-off-tag { display: inline-block; }
+  .head-ctrl { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; }
+  .dest-pair { display: inline-flex; align-items: center; gap: 11px; flex-shrink: 0; }
+  .dest-sw { position: relative; display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+    cursor: pointer; white-space: nowrap; font-size: var(--fs-sm); color: #6B7280; }
+  .dest-sw.on { color: #1E3A5F; font-weight: 600; }
+  .dest-sw input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .pill { position: relative; width: 30px; height: 18px; border-radius: var(--r-pill); background: #CBD5E1;
+    transition: background .16s; flex-shrink: 0; }
+  .pill::after { content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px;
+    border-radius: var(--r-circle); background: #FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .16s; }
+  .dest-sw input:checked ~ .pill { background: #2563EB; }
+  .dest-sw input:checked ~ .pill::after { transform: translateX(12px); }
+  .group-trash { background: transparent; border: 1px solid transparent; border-radius: var(--r-md);
+    width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+    color: #6B7280; cursor: pointer; flex-shrink: 0; }
+  .group-trash:hover { color: #DC2626; background: #FEF2F2; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  .chip { display: inline-flex; align-items: center; border-radius: var(--r-pill); font-size: var(--fs-md);
+    line-height: 1; padding: 4px 10px; }
+  .chip.on { background: #EFF6FF; border: 1px solid #2563EB; color: #1E3A5F; font-weight: 600; }
+  .kw-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    margin-top: 8px; }
+  .kw-count { font-size: var(--fs-sm); color: #6B7280; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* ── C안 전용: 알림 스위치를 아랫줄로 ── */
+  .kw-foot .dest-sw { font-size: var(--fs-sm); }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>검색어 — [단독]·[속보] 알림 스위치 자리</h1>
+  <p class="sub">세 안 모두 <b>실제 /keywords 화면의 CSS·폭 그대로</b>입니다(카드 두 장 배치, 한 장 ≈ 364px).<br>
+     보실 것은 하나 — <b>그룹명이 안 잘리고 스위치가 한 줄에 서는가.</b></p>
+
+  <!-- ══════════ A안 ══════════ -->
+  <h2>A안 — 머리줄에 스위치 셋, 이름표 「알림」</h2>
+  <p class="note">가장 짧은 이름표. 무슨 알림인지는 말풍선이 말합니다(「[단독]·[속보] 기사가 올라오면 텔레그램으로 알립니다」).</p>
+  <div id="kwGroups">
+    <div class="group-block">
+      <div class="group-head">
+        <input class="group-name-input" value="재정경제부" readonly>
+        <span class="group-off-tag">꺼짐</span>
+        <span class="head-ctrl">
+          <span class="dest-pair">
+            <label class="dest-sw on">오늘 전체 기사<input type="checkbox" checked><span class="pill"></span></label>
+            <label class="dest-sw on">초안·확정본<input type="checkbox" checked><span class="pill"></span></label>
+            <label class="dest-sw on" title="[단독]·[속보] 기사가 올라오면 텔레그램으로 알립니다.">알림<input type="checkbox" checked><span class="pill"></span></label>
+          </span>
+          <button class="group-trash">🗑</button>
+        </span>
+      </div>
+      <div class="group-body"><div class="chips">
+        <span class="chip on">재정경제부</span><span class="chip on">재경부</span><span class="chip on">기획재정부</span>
+      </div></div>
+      <div class="kw-foot"><span class="kw-count">5/10</span></div>
+    </div>
+
+    <div class="group-block">
+      <div class="group-head">
+        <input class="group-name-input" value="재경위" readonly>
+        <span class="group-off-tag">꺼짐</span>
+        <span class="head-ctrl">
+          <span class="dest-pair">
+            <label class="dest-sw on">오늘 전체 기사<input type="checkbox" checked><span class="pill"></span></label>
+            <label class="dest-sw on">초안·확정본<input type="checkbox" checked><span class="pill"></span></label>
+            <label class="dest-sw">알림<input type="checkbox"><span class="pill"></span></label>
+          </span>
+          <button class="group-trash">🗑</button>
+        </span>
+      </div>
+      <div class="group-body"><div class="chips">
+        <span class="chip on">재경위</span><span class="chip on">재정경제기획위원회</span>
+      </div></div>
+      <div class="kw-foot"><span class="kw-count">2/10</span></div>
+    </div>
+  </div>
+  <div class="verdict good">↑ 국감 잡음의 범인이던 <b>재경위만 알림을 끈 모습</b>입니다. 기사는 초안·확정본에 그대로 들어오고 텔레그램만 조용해집니다.</div>
+  <div class="verdict bad">실제로 재어 보니 <b>짧은 「재경위」에서도 스위치 묶음이 아랫줄로 내려갑니다</b> — 이름 60 + 스위치 셋 250 + 🗑 28 + 틈이 카드 안쪽 폭(370px)을 넘깁니다.
+     두 장 배치에서 <b>머리줄이 항상 두 줄</b>이 되고, 그만큼 카드가 세로로 길어집니다(그룹 7개 기준 화면이 한 뼘 더 길어집니다).</div>
+
+  <div id="kwGroups" style="margin-top:12px">
+    <div class="group-block">
+      <div class="group-head">
+        <input class="group-name-input" value="세제개편안 모니터링" readonly>
+        <span class="head-ctrl">
+          <span class="dest-pair">
+            <label class="dest-sw on">오늘 전체 기사<input type="checkbox" checked><span class="pill"></span></label>
+            <label class="dest-sw">초안·확정본<input type="checkbox"><span class="pill"></span></label>
+            <label class="dest-sw on">알림<input type="checkbox" checked><span class="pill"></span></label>
+          </span>
+          <button class="group-trash">🗑</button>
+        </span>
+      </div>
+      <div class="group-body"><div class="chips">
+        <span class="chip on">양도세</span><span class="chip on">종부세</span><span class="chip on">보유세</span>
+      </div></div>
+      <div class="kw-foot"><span class="kw-count">7/10</span></div>
+    </div>
+    <div class="group-block">
+      <div class="group-head">
+        <input class="group-name-input" value="예결위" readonly>
+        <span class="head-ctrl">
+          <span class="dest-pair">
+            <label class="dest-sw">오늘 전체 기사<input type="checkbox"><span class="pill"></span></label>
+            <label class="dest-sw">초안·확정본<input type="checkbox"><span class="pill"></span></label>
+            <label class="dest-sw on">알림<input type="checkbox" checked><span class="pill"></span></label>
+          </span>
+          <button class="group-trash">🗑</button>
+        </span>
+      </div>
+      <div class="group-body"><div class="chips">
+        <span class="chip on">예결위</span><span class="chip on">예산결산특별위원회</span>
+      </div></div>
+      <div class="kw-foot"><span class="kw-count">2/10</span></div>
+    </div>
+  </div>
+  <div class="verdict good">↑ 오른쪽은 <b>「알림만 켠 그룹」</b> — 보고서엔 안 넣고 속보만 받습니다. 지금 예결위가 딱 이 상태라, 셋이 서로 독립이어야 그대로 옮겨집니다(「꺼짐」은 셋 다 꺼야).</div>
+
+  <!-- ══════════ B안 ══════════ -->
+  <h2>B안 — 이름표 「[단독]·[속보]」</h2>
+  <p class="note">말풍선을 안 봐도 뜻이 보입니다. 대신 이름표가 길어 그룹명 칸을 더 먹습니다.</p>
+  <div id="kwGroups">
+    <div class="group-block">
+      <div class="group-head">
+        <input class="group-name-input" value="재정경제부" readonly>
+        <span class="head-ctrl">
+          <span class="dest-pair">
+            <label class="dest-sw on">오늘 전체 기사<input type="checkbox" checked><span class="pill"></span></label>
+            <label class="dest-sw on">초안·확정본<input type="checkbox" checked><span class="pill"></span></label>
+            <label class="dest-sw on">[단독]·[속보]<input type="checkbox" checked><span class="pill"></span></label>
+          </span>
+          <button class="group-trash">🗑</button>
+        </span>
+      </div>
+      <div class="group-body"><div class="chips">
+        <span class="chip on">재정경제부</span><span class="chip on">재경부</span>
+      </div></div>
+      <div class="kw-foot"><span class="kw-count">5/10</span></div>
+    </div>
+    <div class="group-block">
+      <div class="group-head">
+        <input class="group-name-input" value="재경위" readonly>
+        <span class="head-ctrl">
+          <span class="dest-pair">
+            <label class="dest-sw on">오늘 전체 기사<input type="checkbox" checked><span class="pill"></span></label>
+            <label class="dest-sw on">초안·확정본<input type="checkbox" checked><span class="pill"></span></label>
+            <label class="dest-sw">[단독]·[속보]<input type="checkbox"><span class="pill"></span></label>
+          </span>
+          <button class="group-trash">🗑</button>
+        </span>
+      </div>
+      <div class="group-body"><div class="chips">
+        <span class="chip on">재경위</span><span class="chip on">재정경제기획위원회</span>
+      </div></div>
+      <div class="kw-foot"><span class="kw-count">2/10</span></div>
+    </div>
+  </div>
+  <div class="verdict bad">A안과 같은 문제에 이름표만 50px 더 깁니다. <b>A안보다 나을 이유가 없습니다.</b></div>
+
+  <!-- ══════════ C안 ══════════ -->
+  <h2>C안 — 목적지 둘은 머리줄, 알림은 아랫줄 <span style="font-size:var(--fs-sm);color:#2563EB">← 추천</span></h2>
+  <p class="note">「어디에 보이나(목적지)」와 「알려줄까(알림)」는 성격이 다르니 줄을 가릅니다. 아랫줄은 지금 키워드 수만 있어 자리가 넉넉합니다.</p>
+  <div id="kwGroups">
+    <div class="group-block">
+      <div class="group-head">
+        <input class="group-name-input" value="재정경제부" readonly>
+        <span class="head-ctrl">
+          <span class="dest-pair">
+            <label class="dest-sw on">오늘 전체 기사<input type="checkbox" checked><span class="pill"></span></label>
+            <label class="dest-sw on">초안·확정본<input type="checkbox" checked><span class="pill"></span></label>
+          </span>
+          <button class="group-trash">🗑</button>
+        </span>
+      </div>
+      <div class="group-body"><div class="chips">
+        <span class="chip on">재정경제부</span><span class="chip on">재경부</span><span class="chip on">기획재정부</span>
+      </div></div>
+      <div class="kw-foot">
+        <label class="dest-sw on">[단독]·[속보] 알림<input type="checkbox" checked><span class="pill"></span></label>
+        <span class="kw-count">5/10</span>
+      </div>
+    </div>
+    <div class="group-block">
+      <div class="group-head">
+        <input class="group-name-input" value="세제개편안 모니터링" readonly>
+        <span class="head-ctrl">
+          <span class="dest-pair">
+            <label class="dest-sw on">오늘 전체 기사<input type="checkbox" checked><span class="pill"></span></label>
+            <label class="dest-sw">초안·확정본<input type="checkbox"><span class="pill"></span></label>
+          </span>
+          <button class="group-trash">🗑</button>
+        </span>
+      </div>
+      <div class="group-body"><div class="chips">
+        <span class="chip on">양도세</span><span class="chip on">종부세</span><span class="chip on">보유세</span>
+      </div></div>
+      <div class="kw-foot">
+        <label class="dest-sw">[단독]·[속보] 알림<input type="checkbox"><span class="pill"></span></label>
+        <span class="kw-count">7/10</span>
+      </div>
+    </div>
+  </div>
+  <div class="verdict good">머리줄이 <b>지금 화면과 글자 하나 다르지 않게</b> 유지됩니다(왼쪽 카드). 이름표를 「[단독]·[속보] 알림」으로 다 적을 수 있어 말풍선 없이도 뜻이 보이고,
+     아랫줄은 지금 키워드 수(<code>5/10</code>)만 있어 자리가 그대로 남습니다.</div>
+  <div class="verdict good">줄이 갈리는 게 오히려 뜻에 맞습니다 — 머리줄 둘은 <b>「어느 화면에 보이나」</b>(목적지)이고, 아랫줄은 <b>「텔레그램으로 알릴까」</b>(발송)입니다. 성격이 다릅니다.</div>
+</div>
+
+<script>
+  // 실제 /keywords의 fitNameWidth 그대로 — 그룹명 칸의 최소 폭 = 글자 폭(카드 폭이 상한).
+  // 이름이 다 안 들어가면 스위치 묶음이 아랫줄로 내려간다(.group-head flex-wrap).
+  var _nameCanvas = document.createElement("canvas").getContext("2d");
+  function fitNameWidth(input) {
+    var cs = getComputedStyle(input);
+    _nameCanvas.font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
+    var text = input.value || input.placeholder;
+    var extra = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) +
+      parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth) + 4;
+    var px = Math.ceil(_nameCanvas.measureText(text).width + extra);
+    input.style.minWidth = "min(100%, max(5em, " + px + "px))";
+  }
+  document.querySelectorAll(".group-name-input").forEach(fitNameWidth);
+</script>
+</body>
+</html>

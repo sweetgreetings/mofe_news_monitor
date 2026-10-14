@@ -1,7 +1,8 @@
 # Design Ref: 사용자 요청(2026-09-23) — 발송해도 받는 사람에게 갔는지 확인할 곳이 없었다.
 # 시안 mockups/SEND_LOG_MOCKUP.html.
 #
-# 앱이 보낸 모든 메시지 — 정기·수시 보고서, [단독]·[속보]·몰림 알림, 호출 한도 경고 — 를
+# 앱이 보낸 모든 메시지 — 정기·수시 보고서, [단독]·[속보]·몰림 알림, 제목 바뀜 알림,
+# 호출 한도 경고 — 를
 # **발송 한 번 = 기록 한 줄**로 남긴다. 사람마다 도착했는지·못 받았으면 왜인지까지.
 #
 # 「읽었는지」는 적지 않는다. 텔레그램 봇은 읽음 표시를 받을 수 없고, 메일 읽음 확인(추적
@@ -22,9 +23,9 @@ from app.config import SEND_LOG_DIR, SEND_LOG_RETENTION_DAYS
 
 logger = logging.getLogger(__name__)
 
-# 종류 — 화면의 칩·필터가 이 키를 쓴다. 보고서 둘과 알림 넷.
+# 종류 — 화면의 칩·필터가 이 키를 쓴다. 보고서 둘과 알림 다섯.
 REPORT_KINDS = ("regular", "adhoc")
-ALERT_KINDS = ("scoop", "flash", "burst", "quota")
+ALERT_KINDS = ("scoop", "flash", "burst", "quota", "title_change")
 _ALERT_KIND_BY_HEADLINE = {"단독": "scoop", "속보": "flash"}
 
 _lock = threading.Lock()

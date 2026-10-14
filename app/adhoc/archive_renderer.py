@@ -26,7 +26,7 @@ from app.adhoc.renderer import (
     build_adhoc_plain_text,
     page_nav,
 )
-from app.config import COLOR_ERROR
+from app.config import COLOR_ERROR, DELETED_LOG_TITLE
 from app.excel_export import date_range_label, sanitize_filename_part
 from app.icons import icon
 
@@ -240,15 +240,6 @@ def _group_by_issue(cards: list[dict], issues_by_id: dict, sort: str) -> list[tu
     return rows
 
 
-def _is_gone(c: dict) -> bool:
-    """방금 지워 제자리에 「삭제함」 줄로 남는 카드인가(card.list_deleted_cards가 붙인 표식)."""
-    return bool(c.get("_trash_name"))
-
-
-def _live(cards: list[dict]) -> list[dict]:
-    return [c for c in cards if not _is_gone(c)]
-
-
 def _visible_count(c: dict) -> int:
     return sum(1 for a in c["articles"] if not a.get("hidden"))
 
@@ -447,16 +438,6 @@ def _render_run_row(c: dict, today: str, issue: Optional[dict], q: str = "", vie
         cells = _date_time_html(c) + '<span class="kwv"></span>'
     else:
         cells = _time_html(c) + _issue_cells_html(issue, q)
-    if _is_gone(c):
-        return (
-            f'<div class="run-line gone" data-card-id="{cid}">'
-            '<span class="pick-sp"></span>'
-            f'<span class="run-row">{cells}<span class="n">{count}건</span></span>'
-            '<span class="gone-tag">삭제함</span>'
-            f'<button type="button" class="restore-btn" data-trash="{html.escape(c["_trash_name"])}" '
-            'onclick="restoreCards([this.dataset.trash])">되살리기</button>'
-            "</div>"
-        )
     is_today = c.get("collect_date") == today
     bundle_attr = ' data-bundle="1"' if card.is_bundle(c) else ""
     return (
@@ -505,7 +486,7 @@ def _render_group_block(
     지금 화면에 보이는 회차만이다(사안명 검색 중이면 걸린 회차만). 묶음이 통째로 「삭제함」이
     되면 그 줄에 「모두 되살리기」를 둔다.
     """
-    live = _live(cards)
+    live = cards
     rows_html = "".join(
         _render_run_row(c, today, issues_by_id.get(c.get("issue_id")), q, view) for c in cards
     )
@@ -518,16 +499,7 @@ def _render_group_block(
             f'onclick="event.preventDefault(); event.stopPropagation(); deleteDay(this);">{icon("trash")}</button>'
         )
     else:
-        gone = [c for c in cards if _is_gone(c)]
-        restore_all = (
-            '<button type="button" class="restore-btn" '
-            f'data-trash="{html.escape(json.dumps([c["_trash_name"] for c in gone]))}" '
-            'onclick="event.preventDefault(); event.stopPropagation(); '
-            'restoreCards(JSON.parse(this.dataset.trash));">모두 되살리기</button>'
-            if len(gone) > 1
-            else ""
-        )
-        meta_html = f'<span class="n"><span class="gone-tag">삭제함</span>{restore_all}</span>'
+        meta_html = ""
     return f"""<details class="date-block{block_cls}"{' open' if is_open else ''} data-day-label="{html.escape(label)}" data-unit="{unit}">
   <summary>{_group_pick_html(live)}{title_html}{chip_html}{mid_html}
     {meta_html}</summary>
@@ -593,65 +565,24 @@ def _render_issue_block(
         mid_html=f'<span class="ikw">{html.escape(keywords)}</span>',
         chip_html=(
             '<span class="chip-today">오늘</span>'
-            if any(c.get("collect_date") == today for c in _live(cards))
+            if any(c.get("collect_date") == today for c in cards)
             else ""
         ),
     )
 
 
-def _deleted_when_label(deleted_at: datetime, today: str) -> str:
-    """「최근 삭제」 묶음 머리의 지운 시각 — 오늘이면 "오늘 10:12", 아니면 "9월 10일 10:12"."""
-    hm = deleted_at.strftime("%H:%M")
-    if deleted_at.strftime("%Y-%m-%d") == today:
-        return f"오늘 {hm}"
-    return f"{deleted_at.month}월 {deleted_at.day}일 {hm}"
+def _gone_note_html(gone: str) -> str:
+    """지운 직후의 초록 안내 — 사라진 회차 줄의 자리를 받는다.
 
-
-def _render_recent_deleted(deleted_cards: list[dict], issues_by_id: dict, today: str) -> str:
-    """맨 아래 「최근 삭제」 — 제자리 줄(지운 직후 화면)이 아닌, 이전에 지운 카드 전부.
-
-    [추가: 2026-09-11] 수시는 정기와 달리 지운 자리가 목록에 남지 않는다(사안·날짜 줄이
-    카드로만 생기므로 비면 줄째 사라진다). 그래서 다시 열었을 때 되살릴 곳을 한 군데로
-    모은다. 기본은 접힌 한 줄이고, 한 번에 지운 것(같은 초에 옮긴 것)은 한 묶음으로 보인다.
-    기한은 없다 — trash를 사람이 직접 비우기 전까지 여기서 되살릴 수 있다.
+    [추가: 2026-10-12] 줄 끝 🗑에 확인창이 없는 건 되살릴 자리가 눈앞에 남아서였다.
+    그 줄을 없애면서 이 한 줄이 그 자리를 대신한다 — 화면을 다시 열면 사라지고,
+    그 뒤로는 「삭제 기록」(/deleted)이 받는다. 수시 카드 화면의 .ok-note와 같은 문법이다.
     """
-    if not deleted_cards:
+    if not gone:
         return ""
-    batches: "OrderedDict[datetime, list[dict]]" = OrderedDict()
-    for c in deleted_cards:  # 이미 지운 시각 최신 먼저
-        batches.setdefault(c["_deleted_at"], []).append(c)
-    parts = []
-    for deleted_at, cards in batches.items():
-        rows = []
-        for c in cards:
-            issue = issues_by_id.get(c.get("issue_id"))
-            name_html = (
-                html.escape(issue["name"]) if issue else f'<i class="noname">{_ORPHAN_LABEL}</i>'
-            )
-            window = (f"{card.bundle_time(c)} 기준" if card.bundle_time(c) else "확정본") if card.is_bundle(c) else (
-                f'{card.window_of(c)["start"]}~{card.window_of(c)["end"]}'
-            )
-            date_label = _format_date_kr_full(c["collect_date"]) if c.get("collect_date") else ""
-            rows.append(
-                f'<div class="rrow"><span class="rnm">{name_html}</span>'
-                f'<span class="rmeta">{html.escape(date_label)} {html.escape(window)} · {_visible_count(c)}건</span>'
-                f'<button type="button" class="restore-btn" data-trash="{html.escape(c["_trash_name"])}" '
-                'onclick="restoreCards([this.dataset.trash])">되살리기</button></div>'
-            )
-        all_btn = (
-            '<button type="button" class="restore-btn" '
-            f'data-trash="{html.escape(json.dumps([c["_trash_name"] for c in cards]))}" '
-            'onclick="restoreCards(JSON.parse(this.dataset.trash))">모두 되살리기</button>'
-            if len(cards) > 1
-            else ""
-        )
-        parts.append(
-            f'<div class="rbatch"><div class="rbatch-h">{_deleted_when_label(deleted_at, today)}에 삭제 · '
-            f"회차 {len(cards)}개{all_btn}</div>{''.join(rows)}</div>"
-        )
     return (
-        f'<details class="recent-del"><summary>{icon("trash")} 최근 삭제 · 회차 {len(deleted_cards)}개</summary>'
-        f'{"".join(parts)}</details>'
+        f'<div class="ok-note">{icon("check")} {html.escape(gone)} 지웠어요.'
+        f'<a class="ok-link" href="/deleted">{DELETED_LOG_TITLE} →</a></div>'
     )
 
 
@@ -667,6 +598,7 @@ def _tidy_controls_html(empty_count: int) -> str:
         else ""
     )
     return (
+        f'<a class="deleted-link normal-only" href="/deleted">{DELETED_LOG_TITLE} →</a>'
         '<button type="button" class="tidy-btn normal-only" onclick="setArchiveTidy(true)">선택 삭제</button>'
         f'<span class="tidy-bar tidy-only"><span class="tidy-hint">지울 회차를 고르세요</span>{empty_btn}'
         '<button type="button" class="done-btn" onclick="setArchiveTidy(false)">완료</button></span>'
@@ -685,8 +617,7 @@ def render_archive_page(
     start: str = "",
     end: str = "",
     preset: str = "",
-    deleted_ids: Optional[list] = None,
-    restored_id: str = "",
+    gone: str = "",
     view: str = "",
     sort: str = "",
 ) -> str:
@@ -699,14 +630,13 @@ def render_archive_page(
     "원본" 화면의 검색어 자동완성용으로 쓰인다 — ADHOC_DESIGN.md §3.5, 여기 안
     보인다고 사안이 삭제된 게 아니다).
 
-    [추가: 2026-09-11] deleted_ids — 방금 지운 카드 id(삭제 후 되돌아온 주소의 `deleted`).
-    그 카드들은 목록에서 빠지는 대신 제자리에 「삭제함 · 되살리기」 줄로 남는다. 주소에
-    실려 있을 때만이라, 화면을 다시 열면(조회를 다시 누르는 등) 맨 아래 「최근 삭제」로
-    옮겨간다. restored_id — 방금 되살린 카드. 그 줄로 스크롤해 잠깐 칠해 보여준다.
+    [수정: 2026-10-12] 지운 회차는 이 목록에서 **흔적 없이** 사라진다 — 「삭제함」 줄도
+    맨 아래 「최근 삭제」도 없앴다(같은 삭제가 두 자리에 나타나 어디서 되살리는지
+    헷갈렸다). gone — 방금 지운 것의 이름. 그 자리를 초록 안내 한 줄이 받고, 되살리는
+    길은 「삭제 기록」(/deleted)이다. 주소에 실려 있을 때만이라 다시 열면 사라진다.
     """
     q = q.strip()
     today = _today_str()
-    deleted_ids = set(deleted_ids or [])
     view = view if view in _VIEWS else "date"
     sort = sort if sort in _ISSUE_SORTS else "name"
 
@@ -730,24 +660,21 @@ def render_archive_page(
     # 4단 흐름). 필드가 없는 옛 원본(소제목·숨김까지 하던 「원본 겸 확정본」)은 그대로 남긴다
     # (사용자 결정). 지운 원본은 「최근 삭제」에 그대로 둬 되살릴 수 있게 한다.
     all_cards = [c for c in card.list_cards() if not card.is_raw(c)]
-    trashed = card.list_deleted_cards()
-    gone_cards = [c for c in trashed if c["id"] in deleted_ids]
-    recent_cards = [c for c in trashed if c["id"] not in deleted_ids]
 
     # 사안 목록도 카드처럼 한 번만 읽어 이 함수 안에서 재사용한다 — q 매칭
     # (_filter_cards)과 사안 이름 조회(issues_by_id) 둘 다 issues.json을 다시 읽지 않는다.
     all_issues = card.load_issues()
     issues_by_id = {i["id"]: i for i in all_issues}
-    recent_html = _render_recent_deleted(recent_cards, issues_by_id, today)
-    page_script = _ARCHIVE_SCRIPT.replace("__RESTORED_ID__", json.dumps(restored_id))
+    gone_html = _gone_note_html(gone)
+    page_script = _ARCHIVE_SCRIPT
 
-    if not all_cards and not gone_cards:
+    if not all_cards:
         body = f"""
 <div class="card">
   <h1 class="page-title">수시 보관함</h1>
   <p class="empty">아직 보관된 확정본이 없습니다.</p>
   <a class="btn" href="/adhoc/new">{icon("search")} 새 수집 시작</a>
-  {recent_html}
+  {gone_html}
 </div>"""
         return base_page("수시 모니터링 — 수시 보관함", body, script=page_script, nav=page_nav("archive"))
 
@@ -757,9 +684,8 @@ def render_archive_page(
         f'<p class="fixhint" style="color:{COLOR_ERROR}">{html.escape(range_error)}</p>' if range_error else ""
     )
     filtered = _filter_cards(all_cards, all_issues, q, start, end)
-    gone_filtered = _filter_cards(gone_cards, all_issues, q, start, end)
 
-    if not filtered and not gone_filtered:
+    if not filtered:
         suggestion = _empty_suggestion(all_cards, all_issues, q, start, end, view, sort)
         body = f"""
 <div class="card">
@@ -770,13 +696,13 @@ def render_archive_page(
   <p class="result-line">{html.escape(_condition_text(q, start, end))} · <b>결과 없음</b></p>
   {f'<p class="fixhint">{suggestion}</p>' if suggestion else ''}
   <p class="empty">조건에 맞는 수집 결과가 없습니다.</p>
-  {recent_html}
+  {gone_html}
 </div>"""
         return base_page(
             "수시 모니터링 — 수시 보관함", body, script=page_script, nav=page_nav("archive")
         )
 
-    shown_cards = filtered + gone_filtered
+    shown_cards = filtered
 
     # build_adhoc_plain_text(카드)는 결과 전체(top) → 날짜 두 층에서 카드별로 두 번 쓰이므로,
     # 카드 1건당 한 번만 계산해 나눠 쓴다.
@@ -788,10 +714,9 @@ def render_archive_page(
             text_cache[cid] = build_adhoc_plain_text(c)
         return text_cache[cid]
 
-    focus_ids = deleted_ids | ({restored_id} if restored_id else set())
-    # 펼침: 사안명으로 검색했으면 걸린 묶음 전부, 방금 지우거나 되살린 카드가 든 묶음도 전부.
-    # 그 밖에는 날짜별만 최근 두 날짜(_OPEN_DATES)를 펼친다 — 사안별은 이름을 훑는 화면이라
-    # 처음엔 모두 접어 둔다(가나다순에서 "앞 두 개"는 최근이라는 뜻이 아니다).
+    # 펼침: 사안명으로 검색했으면 걸린 묶음 전부. 그 밖에는 날짜별만 최근 두
+    # 날짜(_OPEN_DATES)를 펼친다 — 사안별은 이름을 훑는 화면이라 처음엔 모두 접어
+    # 둔다(가나다순에서 "앞 두 개"는 최근이라는 뜻이 아니다).
     if view == "issue":
         sections = [
             _render_issue_block(
@@ -803,7 +728,7 @@ def render_archive_page(
                 q,
                 cached_text,
                 today=today,
-                is_open=bool(q) or any(c["id"] in focus_ids for c in cards),
+                is_open=bool(q),
             )
             for key, name, keywords, cards in _group_by_issue(shown_cards, issues_by_id, sort)
         ]
@@ -816,7 +741,7 @@ def render_archive_page(
                 q,
                 cached_text,
                 today=today,
-                is_open=bool(q) or i < _OPEN_DATES or any(c["id"] in focus_ids for c in cards),
+                is_open=bool(q) or i < _OPEN_DATES,
             )
             for i, (d, cards) in enumerate(_group_by_date(shown_cards).items())
         ]
@@ -830,6 +755,7 @@ def render_archive_page(
   <p class="page-sub">{sub_label} · {_retention_label()} 보관됩니다</p>
   {filter_bar_html}
   {error_html}
+  {gone_html}
   <div class="result-bar">
     <p class="result-line">{html.escape(_condition_text(q, start, end))}</p>
     {_tidy_controls_html(empty_count)}
@@ -837,7 +763,6 @@ def render_archive_page(
   </div>
   {_SEL_BAR_HTML}
   {"".join(sections)}
-  {recent_html}
 </div>"""
 
     # 보관함은 "홈" 하나만 — 수집 원본·카드로 가는 길은 이 화면 본문(목록/버튼)이
@@ -881,7 +806,6 @@ function archivePost(action, name, values) {
 }
 // 🗑 하나든 선택 삭제든 같은 길 — 확인창은 선택 삭제(deletePicked)에서만 띄운다.
 function deleteCards(ids) { if (ids.length) { archivePost('/adhoc/archive/delete', 'id', ids); } }
-function restoreCards(names) { if (names.length) { archivePost('/adhoc/archive/restore', 'name', names); } }
 
 function setArchiveTidy(on) {
   document.body.classList.toggle('arch-tidy', on);
@@ -962,15 +886,4 @@ document.addEventListener('click', function (e) {
   cb.checked = !cb.checked;
   onPickChange();
 }, true);
-(function () {
-  var restored = __RESTORED_ID__;
-  var target = document.querySelector('.run-line.gone')
-    || (restored && document.querySelector('.run-line[data-card-id="' + restored + '"]'));
-  if (!target) { return; }
-  target.scrollIntoView({block: 'center'});
-  if (!target.classList.contains('gone')) {
-    target.classList.add('just-restored');
-    setTimeout(function () { target.classList.remove('just-restored'); }, 1500);
-  }
-})();
 </script>"""

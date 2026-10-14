@@ -8,9 +8,9 @@ from typing import Optional
 from app.atomic_write import atomic_write_text
 from app.config import TELEGRAM_CHAT_ID, TELEGRAM_RECIPIENTS_FILE
 
-# 받는 것 여섯 칸. 저장 키 = 화면 폼 필드 꼬리 이름.
+# 받는 것 일곱 칸. 저장 키 = 화면 폼 필드 꼬리 이름.
 RECEIVE_FIELDS = (
-    "alert_scoop", "alert_flash",
+    "alert_scoop", "alert_flash", "alert_title_change",
     "regular_articles", "regular_summary",
     "adhoc_articles", "adhoc_summary",
 )
@@ -113,9 +113,26 @@ def active_recipient_chat_ids() -> list:
     return [r["chat_id"] for r in load_telegram_recipients() if r["regular_articles"]]
 
 
+# 알림 종류 → 받는 것 칸. **표로 둔다** — 예전엔 `"alert_scoop" if kind == "단독" else
+# "alert_flash"`라 「단독이 아닌 모든 kind」가 조용히 속보 칸으로 떨어졌다. 종류가 셋이
+# 된 지금 그대로 두면 「제목 바뀜」을 끈 사람에게도 가고, 받는 사람은 왜 오는지 알 길이
+# 없다. 새 알림을 만들면 여기에 한 줄을 더한다.
+_ALERT_FIELD_BY_KIND = {
+    "단독": "alert_scoop",
+    "속보": "alert_flash",
+    "제목": "alert_title_change",
+}
+
+
 def active_alert_chat_ids(kind: str) -> list:
-    """[단독]/[속보] 즉시 알림을 받기로 한 사람의 chat id. kind는 "단독"|"속보"."""
-    field = "alert_scoop" if kind == "단독" else "alert_flash"
+    """이 종류의 즉시 알림을 받기로 한 사람의 chat id. kind는 _ALERT_FIELD_BY_KIND의 키.
+
+    모르는 종류면 **빈 목록**이다 — 엉뚱한 칸으로 떨어뜨려 끈 사람에게 보내는 것보다
+    안 보내고 멈추는 쪽이 낫다(그쪽은 발송 기록에 「받는 사람 없음」으로 남는다).
+    """
+    field = _ALERT_FIELD_BY_KIND.get(kind)
+    if field is None:
+        return []
     return [r["chat_id"] for r in load_telegram_recipients() if r.get(field, False)]
 
 

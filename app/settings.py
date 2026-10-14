@@ -55,6 +55,9 @@ def _base_group() -> dict:
         "mode": "OR",
         "include_in_live": True,
         "include_in_scrap": True,
+        # [추가] 세 번째 스위치 — 이 그룹에 걸린 [단독]·[속보] 기사를 알릴까
+        # (app.breaking_alert_sender의 폴링·바닥 두 경로가 이 값 하나만 본다).
+        "include_in_alert": True,
         "disabled_keywords": [],
         "enabled": True,
     }
@@ -367,6 +370,9 @@ def validate_keyword_groups(groups: list) -> list:
         mode = "OR"
         include_in_live = group_in_live(group)
         include_in_scrap = group_in_scrap(group)
+        # 저장은 **적힌 값 그대로**다 — group_in_alert로 꺾어 저장하면 꺼진 그룹의
+        # 알림 설정이 굳어 다시 켤 때 안 돌아온다(alert_switch_of 주석 참고).
+        include_in_alert = alert_switch_of(group)
         disabled_keywords = [k for k in group.get("disabled_keywords", []) if k in keywords]
         if not name and not keywords:
             continue
@@ -383,6 +389,7 @@ def validate_keyword_groups(groups: list) -> list:
                 "mode": mode,
                 "include_in_live": include_in_live,
                 "include_in_scrap": include_in_scrap,
+                "include_in_alert": include_in_alert,
                 "disabled_keywords": disabled_keywords,
                 "enabled": include_in_live or include_in_scrap,
             }
@@ -449,6 +456,34 @@ def group_in_scrap(group: dict) -> bool:
     if "include_in_live" in group:
         return bool(group.get("include_in_scrap"))
     return bool(group.get("include_in_scrap")) and bool(group.get("enabled", True))
+
+
+def alert_switch_of(group: dict) -> bool:
+    """그룹에 **적혀 있는** 알림 스위치 값(화면에 그리고 저장할 값).
+
+    판정(`group_in_alert`)과 가르는 이유: 판정은 꺼진 그룹을 False로 꺾는데, 그 값을
+    그대로 저장하면 **담당자가 켜 뒀던 설정이 조용히 굳는다** — 그룹을 잠시 껐다 켜면
+    알림이 꺼진 채로 돌아온다. 꺼둔 키워드(`disabled_keywords`)를 그룹이 꺼져도 그대로
+    보존하는 것과 같은 원칙이다. 키가 없는 저장분은 켜짐으로 읽는다(group_in_alert와
+    같은 이유 — 이관 전 상태)."""
+    return bool(group.get("include_in_alert", True))
+
+
+def group_in_alert(group: dict) -> bool:
+    """이 그룹에 걸린 [단독]·[속보]를 알릴까(화면 아랫줄의 「[단독]·[속보] 알림」 스위치).
+
+    [단독]·[속보] 알림의 범위를 정하는 자리는 이 스위치 하나다 — 텔레그램으로 울리는
+    것과 홈 화면 [단독]/[속보] 목록이 **같은 범위**를 쓴다(홈 목록은 알림 발송 기록을
+    그대로 읽으므로 저절로 따라온다). 예전엔 /breaking-alert 설정의 group_names(그룹
+    **이름 문자열** 목록)였는데, 그룹명을 바꾸면 감시가 조용히 풀렸고 무엇보다 회차
+    수집의 「바닥」 경로(app.scraper.collect_run)가 그 설정을 통째로 무시해서 담당자가
+    끌 수가 없었다.
+
+    꺼진 그룹(목적지 둘 다 끔)은 알림도 안 간다 — 어느 화면에도 안 보이는 그룹이
+    텔레그램만 울리는 조합은 뜻이 없다. 키가 없는 저장분(이 스위치 이전 형식)은 켜진
+    것으로 읽는다: 이관(app.alert_groups.transplant_alert_groups)이 돌기 전 잠깐의
+    상태라, 여기서 꺼짐으로 읽으면 그 사이 알림이 조용히 멈춘다."""
+    return group_in_use(group) and alert_switch_of(group)
 
 
 def group_in_use(group: dict) -> bool:

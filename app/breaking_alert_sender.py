@@ -31,7 +31,7 @@ from app.breaking_burst import check_and_alert_burst
 from app.config import BURST_MAX_OUTLET_NAMES, DEFAULT_ARTICLE_LINE_TEMPLATE
 from app.filters import headline_kind
 from app.naver_api import kst_today_at, search_keywords
-from app.settings import active_search_groups, load_settings
+from app.settings import active_search_groups, group_in_alert, load_settings
 from app.telegram_bot import send_text as send_telegram_text
 from app.telegram_recipients import active_alert_chat_ids, load_telegram_recipients
 
@@ -272,24 +272,48 @@ def detect_and_alert(
     return len(newly_handled)
 
 
-def _watched_keywords(settings: dict, group_names: list) -> list:
-    """감시 대상으로 고른 그룹들의 활성 키워드를 순서 유지·중복 없이 모은다.
+def _watched_keywords(settings: dict) -> list:
+    """「[단독]·[속보] 알림」을 켠 그룹들의 활성 키워드를 순서 유지·중복 없이 모은다.
+
+    [수정] 감시 대상을 고르는 자리는 검색어 화면의 그룹 스위치(include_in_alert) 하나다
+    — 예전엔 /breaking-alert 설정의 group_names(그룹 **이름 문자열** 목록)라 그룹명을
+    바꾸면 감시가 조용히 풀렸고, 무엇보다 회차 수집의 「바닥」 경로가 그 설정을 무시해서
+    담당자가 알림을 끌 수가 없었다(app.alert_groups).
 
     그룹의 OR/AND 매칭 규칙(app.naver_api.match_articles_to_groups)은 여기서 재현하지
     않는다 — 알림은 "이 그룹이 검색하는 키워드 중 뭐든 걸리면 살펴본다"는 넓은 감시이지,
     회차에 넣을지 말지를 정확히 가르는 판단이 아니다(app.live_renderer의
     matched_keywords 태그도 같은 이유로 그룹 로직이 아니라 키워드 단위로 계산한다)."""
     groups = active_search_groups(settings, settings.get("keyword_groups", []))
-    selected = set(group_names)
     flat, seen = [], set()
     for group in groups:
-        if group.get("name") not in selected:
+        if not group_in_alert(group):
             continue
         for keyword in group.get("keywords", []):
             if keyword not in seen:
                 seen.add(keyword)
                 flat.append(keyword)
     return flat
+
+
+def articles_in_alert_scope(articles: list, settings: Optional[dict] = None) -> list:
+    """회차 기사 중 「알림」을 켠 그룹에 걸린 것만 — 「바닥」 경로(app.scraper)가 쓴다.
+
+    예전엔 이 경로가 설정을 통째로 무시하고 회차 기사 전부를 알렸다("담당자가 수시
+    감시를 켜지 않았어도 회차 안에서는 놓치지 않게"). 그 결과 **담당자가 알림을 끌
+    방법이 없었다** — 설정 화면에서 그룹 체크를 풀어도 그 그룹이 초안·확정본에 들어가는
+    한 알림은 그대로 나갔다. 끌 수 있게 하는 것이 이 변경의 목적이라 그 안전장치를
+    뗐다. 기사 자체는 초안·확정본에 그대로 들어온다 — 안 가는 것은 텔레그램 알림뿐이다.
+
+    판정은 기사의 matched_keywords(그 회차 수집 당시 실제로 걸린 검색어)와 알림 키워드의
+    겹침 하나다. 겹치는 게 없거나 matched_keywords가 아예 없는 기사(담당자가 수기로 담은
+    기사 등)는 제외한다 — 어느 그룹에서 왔는지 모르는 기사를 보내면 끈 그룹의 기사가
+    새어 나가고, 그러면 스위치가 스위치가 아니게 된다.
+    """
+    watched = set(_watched_keywords(settings if settings is not None else load_settings()))
+    if not watched:
+        return []
+    return [a for a in articles if watched.intersection(a.get("matched_keywords") or ())]
 
 
 def _resolve_after(last_poll_at: Optional[str], now: datetime, window_start: str) -> datetime:
@@ -336,7 +360,7 @@ def poll_and_alert_tick(now: Optional[datetime] = None) -> None:
     """
     now = now or datetime.now()
     config = load_breaking_alert_settings()
-    if not config["enabled"] or not config["group_names"]:
+    if not config["enabled"]:
         return
     now_hm = now.strftime("%H:%M")
     if not is_within_window(now_hm, config["start"], config["end"]):
@@ -354,7 +378,7 @@ def poll_and_alert_tick(now: Optional[datetime] = None) -> None:
         return
 
     settings = load_settings()
-    keywords = _watched_keywords(settings, config["group_names"])
+    keywords = _watched_keywords(settings)
     today = now.strftime("%Y-%m-%d")
     if not keywords:
         save_state({**state, "last_poll_at": now.isoformat(timespec="seconds"), "polled_date": today})
@@ -424,10 +448,10 @@ def catch_up_on_wake(now: Optional[datetime] = None) -> None:
     """
     now = now or datetime.now()
     config = load_breaking_alert_settings()
-    if not config["enabled"] or not config["catch_up_enabled"] or not config["group_names"]:
+    if not config["enabled"] or not config["catch_up_enabled"]:
         return
     settings = load_settings()
-    keywords = _watched_keywords(settings, config["group_names"])
+    keywords = _watched_keywords(settings)
     if not keywords:
         return
     try:

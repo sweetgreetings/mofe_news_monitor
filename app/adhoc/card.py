@@ -1132,6 +1132,11 @@ def delete_card(card_id: str, reason: str = "deleted", stamp: Optional[str] = No
 # 실어 와도 이 폴더 밖을 못 건드리게 못 박는다. 되살리기는 담당자가 지운 것(reason="deleted")만 고른다.
 _CARD_ID_RE = re.compile(r"^\d{8}-\d{6}-[0-9a-f]+$")
 _DELETED_CARD_RE = re.compile(r"^(\d{8}-\d{6}-[0-9a-f]+)\.deleted-(\d{14})\.json$")
+# [추가: 2026-10-12] 되살릴 수 있는 기간(DELETED_RESTORE_DAYS)이 지난 카드 — 기사를 떼고
+# 이름 가운데만 바꾼다. 「삭제 기록」에 줄은 남고 되살리기만 빠진다(restore_card는 위
+# 정규식만 받으므로 저절로 막힌다). `.expired-`(보관 기한으로 앱이 옮긴 것)와는 다르다.
+_PURGED_CARD_RE = re.compile(r"^(\d{8}-\d{6}-[0-9a-f]+)\.purged-(\d{14})\.json$")
+_EXPIRED_CARD_RE = re.compile(r"^(\d{8}-\d{6}-[0-9a-f]+)\.expired-(\d{14})\.json$")
 
 
 def list_deleted_cards() -> list[dict]:
@@ -1139,20 +1144,26 @@ def list_deleted_cards() -> list[dict]:
     `_deleted_at`(datetime)을 덧붙여 돌려준다. 같은 id가 여럿이면(지웠다 되살렸다 다시
     지운 경우) 가장 최근 것 하나만. 이미 되살아나 카드 폴더에 있는 id는 뺀다.
 
-    이 목록은 수시 보관함 한 화면을 그릴 때 한 번만 부른다 — 파일을 열어야 사안·시간창·
+    이 목록은 「삭제 기록」 한 화면을 그릴 때 한 번만 부른다 — 파일을 열어야 사안·시간창·
     건수를 알 수 있지만, 쌓이는 건 담당자가 손으로 지운 것뿐이라 수가 적다.
+
+    [수정: 2026-10-12] 되살릴 기간이 지난 껍데기(.purged-)도 함께 돌려준다 —
+    `_restorable`이 거짓이고, 기사는 비어 있다(건수는 `article_count`에 적혀 있다).
     """
     latest: dict = {}
     for path in TRASH_DIR.glob("*.json"):
         m = _DELETED_CARD_RE.match(path.name)
-        if not m:
+        restorable = m is not None
+        if m is None:
+            m = _PURGED_CARD_RE.match(path.name)
+        if m is None:
             continue
         card_id, stamp = m.groups()
         if card_id in latest and latest[card_id][1] >= stamp:
             continue
-        latest[card_id] = (path, stamp)
+        latest[card_id] = (path, stamp, restorable)
     cards = []
-    for card_id, (path, stamp) in latest.items():
+    for card_id, (path, stamp, restorable) in latest.items():
         if _card_path(card_id).exists():
             continue
         try:
@@ -1161,8 +1172,10 @@ def list_deleted_cards() -> list[dict]:
         except (json.JSONDecodeError, KeyError, TypeError):
             continue
         data.setdefault("must_keywords", [])
+        data.setdefault("articles", [])
         data["_trash_name"] = path.name
         data["_deleted_at"] = datetime.strptime(stamp, "%Y%m%d%H%M%S")
+        data["_restorable"] = restorable
         cards.append(data)
     # 한 번에 지운 묶음 안에서는 만든 시각 최신 먼저 — 보관함 목록과 같은 순서다.
     return sorted(cards, key=lambda c: (c["_deleted_at"], c.get("created_at", "")), reverse=True)
@@ -1181,6 +1194,76 @@ def restore_card(trash_name: str) -> Optional[str]:
             return None
         src.replace(_card_path(card_id))
         return card_id
+
+
+def _purge_card_file(path: "Path") -> bool:
+    """되살릴 기간이 지난 카드를 껍데기로 만든다 — 기사를 떼고 `.purged-`로 이름을 바꾼다.
+
+    남기는 건 「삭제 기록」 한 줄이 쓰는 것뿐이다(사안·기준 시각·건수). 파일을 아예
+    지우지 않는 이유는 그 줄이 사라지면 "내가 그때 뭘 지웠지"에 답할 수 없어서다.
+    app.storage._purge_run_file과 같은 규칙이다.
+    """
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    articles = data.get("articles") or []
+    shell = {k: v for k, v in data.items() if k != "articles"}
+    shell["articles"] = []
+    shell["purged"] = True
+    shell["article_count"] = len([a for a in articles if not a.get("hidden")])
+    dest = path.with_name(path.name.replace(".deleted-", ".purged-", 1))
+    try:
+        atomic_write_text(dest, json.dumps(shell, ensure_ascii=False, indent=2))
+    except OSError:
+        return False
+    path.unlink(missing_ok=True)
+    return True
+
+
+def purge_expired_deleted_cards(
+    restore_days: Optional[int] = None, now: Optional[datetime] = None
+) -> int:
+    """지운 지 restore_days일이 지난 카드를 껍데기로 바꾼다. 바꾼 개수.
+
+    덤으로, 보관 기한이 지나 앱이 옮긴 것(.expired-)은 EXPIRED_TRASH_KEEP_DAYS가 지나면
+    **진짜로 지운다** — 담당자 눈에 안 보이는 파일이라 되살릴 창이 필요 없고, 치우려고
+    옮긴 건데 디스크에 영원히 남으면 옮긴 의미가 없다.
+    """
+    from app.config import DELETED_RESTORE_DAYS, EXPIRED_TRASH_KEEP_DAYS
+
+    restore_days = DELETED_RESTORE_DAYS if restore_days is None else restore_days
+    now = now or datetime.now()
+    purged = 0
+    cutoff = now - timedelta(days=restore_days)
+    for path in sorted(TRASH_DIR.glob("*.deleted-*.json")):
+        m = _DELETED_CARD_RE.match(path.name)
+        if m is None or datetime.strptime(m.group(2), "%Y%m%d%H%M%S") > cutoff:
+            continue
+        with card_lock(m.group(1)):
+            if path.exists() and _purge_card_file(path):
+                purged += 1
+    expired_cutoff = now - timedelta(days=EXPIRED_TRASH_KEEP_DAYS)
+    for path in sorted(TRASH_DIR.glob("*.expired-*.json")):
+        m = _EXPIRED_CARD_RE.match(path.name)
+        if m is None or datetime.strptime(m.group(2), "%Y%m%d%H%M%S") > expired_cutoff:
+            continue
+        path.unlink(missing_ok=True)
+    return purged
+
+
+def empty_deleted_cards() -> int:
+    """「삭제 기록」의 비우기 — 담당자가 지운 카드 파일을 **진짜로** 지운다. 지운 개수.
+
+    화면에 보이는 것(.deleted- · .purged-)만 지운다 — `.expired-`는 담당자가 지운 적이
+    없어 그 화면에 안 서고, 위 정리가 맡는다.
+    """
+    removed = 0
+    for path in list(TRASH_DIR.glob("*.json")):
+        if _DELETED_CARD_RE.match(path.name) or _PURGED_CARD_RE.match(path.name):
+            path.unlink(missing_ok=True)
+            removed += 1
+    return removed
 
 
 def delete_expired_cards(retention_days: Optional[int] = None, now: Optional[datetime] = None) -> list[str]:

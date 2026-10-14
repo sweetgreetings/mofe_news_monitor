@@ -8,6 +8,7 @@
 # 중복 제출되지 않는다). 실패는 카드 화면으로 되돌리며 error 쿼리로 메시지를 싣는다
 # (ADHOC_DESIGN.md §6.9 — 즉시 표시, 자동 재시도 없음).
 from datetime import datetime
+from typing import Optional
 from urllib.parse import parse_qs, quote, urlencode, urlsplit
 
 from app.adhoc import archive_renderer, card, renderer, undo
@@ -35,25 +36,21 @@ def _query(path: str) -> dict:
     return parse_qs(urlsplit(path).query)
 
 
-def _id_list(value: str) -> list:
-    """주소의 `deleted=id1,id2` → [id1, id2]."""
-    return [v for v in value.split(",") if v]
+def _archive_redirect(handler, back: str, gone: str = "") -> None:
+    """수시 보관함으로 되돌린다 — 보던 조회 조건(back)은 그대로 두고, 방금 지운 것의
+    이름(gone)만 실어 보낸다. 그 이름으로 화면이 초록 안내 한 줄을 그린다.
 
-
-def _archive_redirect(handler, back: str, deleted: list, restored: str = "") -> None:
-    """수시 보관함으로 되돌린다 — 보던 조회 조건(back)을 그대로 두고, 제자리 「삭제함」 줄로
-    그릴 id(deleted)와 방금 되살린 id(restored)만 갈아 끼운다.
+    [수정: 2026-10-12] 예전엔 지운 id를 실어 보내 제자리에 「삭제함 · 되살리기」 줄을
+    그렸다. 지금은 목록에서 흔적 없이 사라지고, 되살리는 길은 「삭제 기록」(/deleted)이다.
 
     back은 화면이 실어 보낸 자기 주소다. /adhoc 밖으로는 절대 안 보낸다(열린 리다이렉트 방어).
     """
     parts = urlsplit(back or "/adhoc")
     if parts.path != "/adhoc" or parts.netloc or parts.scheme:
         parts = urlsplit("/adhoc")
-    query = {k: v for k, v in parse_qs(parts.query).items() if k not in ("deleted", "restored")}
-    if deleted:
-        query["deleted"] = [",".join(deleted)]
-    if restored:
-        query["restored"] = [restored]
+    query = {k: v for k, v in parse_qs(parts.query).items() if k not in ("deleted", "restored", "gone")}
+    if gone:
+        query["gone"] = [gone]
     handler._redirect("/adhoc" + (f"?{urlencode(query, doseq=True)}" if query else ""))
 
 
@@ -85,8 +82,7 @@ def handle_get(handler, path: str) -> bool:
                 start=query.get("start", [""])[0],
                 end=query.get("end", [""])[0],
                 preset=query.get("preset", [""])[0],
-                deleted_ids=_id_list(query.get("deleted", [""])[0]),
-                restored_id=query.get("restored", [""])[0],
+                gone=query.get("gone", [""])[0],
                 view=query.get("view", [""])[0],
                 sort=query.get("sort", [""])[0],
             )
@@ -219,9 +215,6 @@ def handle_post(handler, path: str, form: dict) -> bool:
     if path == "/adhoc/archive/delete":
         _handle_archive_delete(handler, form)
         return True
-    if path == "/adhoc/archive/restore":
-        _handle_archive_restore(handler, form)
-        return True
     if path == "/adhoc/card/undo":
         _handle_undo(handler, form)
         return True
@@ -304,7 +297,7 @@ def _handle_edit_summary(handler, form: dict) -> None:
     if not url or not (title or summary or outlet):
         _card_redirect(handler, card_id, error="언론사·제목·요약 중 하나는 입력해주세요.")
         return
-    set_summary_override(url, title or None, summary or None, outlet or None)
+    set_summary_override(url, title or None, summary or None, outlet or None, manual=True)
     _card_redirect(handler, card_id)
 
 
@@ -857,9 +850,9 @@ def _handle_delete(handler, form: dict) -> None:
         handler.send_response(404)
         handler.end_headers()
         return
-    # 삭제된 카드 화면으로 되돌아갈 수 없으니 목록으로 — [수정: 2026-09-11] 그 카드가 있던
-    # 자리에 「삭제함 · 되살리기」 줄이 보이도록 방금 지운 id를 실어 보낸다.
-    _archive_redirect(handler, "/adhoc", [card_id])
+    # 삭제된 카드 화면으로 되돌아갈 수 없으니 목록으로 — 보관함에 도착하면 초록 안내
+    # 한 줄이 「되살리려면 삭제 기록으로」를 말한다.
+    _archive_redirect(handler, "/adhoc", _gone_label(card_id, 1))
 
 
 def _handle_archive_delete(handler, form: dict) -> None:
@@ -867,24 +860,96 @@ def _handle_archive_delete(handler, form: dict) -> None:
     삭제일 때만 띄우고, 서버는 둘을 가르지 않는다. 한 요청에서 지운 것은 같은 시각(stamp)을
     붙여 「최근 삭제」에서 한 묶음으로 보이게 한다.
 
-    앞서 지워 제자리 줄로 떠 있던 것(back의 deleted)은 그대로 이어 붙인다 — 하나 더 지웠다고
-    방금 전 「삭제함」 줄이 사라지면 되살릴 자리가 옮겨가 헷갈린다.
+    지운 회차는 목록에서 흔적 없이 사라지고, 그 자리를 초록 안내 한 줄이 받는다 —
+    되살리는 길은 「삭제 기록」(/deleted) 한 곳이다.
     """
     back = _field(form, "back", "/adhoc")
     stamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    deleted = [cid for cid in form.get("id", []) if cid and card.delete_card(cid, stamp=stamp)]
-    earlier = _id_list(parse_qs(urlsplit(back).query).get("deleted", [""])[0])
-    _archive_redirect(handler, back, earlier + [cid for cid in deleted if cid not in earlier])
+    ids = [cid for cid in form.get("id", []) if cid]
+    # 지우기 전에 이름을 읽어 둔다 — 지운 뒤엔 카드가 trash에 있어 다시 찾아야 한다.
+    label = _gone_label(ids[0], len(ids)) if ids else ""
+    deleted = [cid for cid in ids if card.delete_card(cid, stamp=stamp)]
+    _archive_redirect(handler, back, label if deleted else "")
 
 
-def _handle_archive_restore(handler, form: dict) -> None:
-    """제자리 「되살리기」·맨 아래 「최근 삭제」의 되살리기·모두 되살리기가 같이 쓴다."""
-    back = _field(form, "back", "/adhoc")
-    restored = [cid for cid in (card.restore_card(name) for name in form.get("name", [])) if cid]
-    earlier = _id_list(parse_qs(urlsplit(back).query).get("deleted", [""])[0])
-    _archive_redirect(
-        handler, back, [cid for cid in earlier if cid not in restored], restored[0] if restored else ""
-    )
+def _gone_label(card_id: str, n: int) -> str:
+    """초록 안내가 쓰는 「무엇을 지웠나」 — 한 건이면 사안명+기준 시각, 여럿이면 건수.
+
+    한 건일 때 이름을 적는 이유: 바로 다음에 할 수 있는 일이 「잘못 지웠나?」 확인이라
+    무엇이 사라졌는지가 그 자리에 있어야 한다. 여럿이면 이름을 다 적을 수 없다.
+    """
+    if n != 1:
+        return f"회차 {n}개를"
+    c = card.load_card(card_id)
+    if c is None:
+        return "회차를"
+    issues = {i["id"]: i for i in card.load_issues()}
+    issue = issues.get(c.get("issue_id"))
+    name = f'「{issue["name"]}」' if issue else ""
+    # window_of()는 확정본에도 빈 dict를 돌려준다(끝 시각 없음이 계약) — 값으로 가른다.
+    end = card.window_of(c)["end"] or card.bundle_time(c)
+    head = " ".join(part for part in (name, f"{end} 기준" if end else "") if part)
+    return f"{head} 회차를" if head else "회차를"
+
+
+# ── 삭제 기록(/deleted)이 쓰는 창구 ───────────────────────────────────────────
+# 그 화면은 정기·수시를 한 목록으로 보여주지만 app/settings_server.py는 app.adhoc를
+# **이 모듈 하나로만** 만난다(수시 경계 규칙). 그래서 수시 몫은 여기서 꺼내 준다.
+
+ORPHAN_ISSUE_LABEL = "이름 없는 사안"
+
+
+def deleted_log_rows() -> list[dict]:
+    """담당자가 지운 수시 회차 — 삭제 기록 한 줄에 필요한 것만 추려 돌려준다.
+
+    각 항목: {"at": datetime, "name", "noname": bool, "what", "count", "restorable", "trash"}
+    """
+    issues_by_id = {i["id"]: i for i in card.load_issues()}
+    rows = []
+    for c in card.list_deleted_cards():
+        issue = issues_by_id.get(c.get("issue_id"))
+        # card.window_of()는 확정본에도 빈 dict를 돌려주므로(끝 시각 없음이 계약이다)
+        # 값이 실제로 있는지로 가른다 — dict 자체는 언제나 참이다.
+        window = card.window_of(c)
+        if window["start"] and window["end"]:
+            when = f'{window["start"]}~{window["end"]}'
+        else:
+            when = f'{card.bundle_time(c)} 기준' if card.bundle_time(c) else "확정본"
+        date_label = _deleted_date_label(c.get("collect_date"))
+        count = c.get("article_count")
+        if not isinstance(count, int):
+            count = len([a for a in c.get("articles", []) if not a.get("hidden")])
+        rows.append({
+            "at": c["_deleted_at"],
+            "name": issue["name"] if issue else ORPHAN_ISSUE_LABEL,
+            "noname": issue is None,
+            "what": f"{date_label} {when}".strip(),
+            "count": count,
+            "restorable": c.get("_restorable", True),
+            "trash": c["_trash_name"],
+        })
+    return rows
+
+
+def _deleted_date_label(date_str: Optional[str]) -> str:
+    """"2026-09-23" → "9월 23일" — 삭제 기록 줄의 「무엇을 지웠나」 앞칸."""
+    if not date_str:
+        return ""
+    try:
+        d = datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        return ""
+    return f"{d.month}월 {d.day}일"
+
+
+def restore_deleted_card(trash_name: str) -> Optional[str]:
+    """삭제 기록의 되살리기 — 되살린 카드 id, 못 하면 None."""
+    return card.restore_card(trash_name)
+
+
+def empty_deleted_cards() -> int:
+    """삭제 기록의 비우기 — 지운 수시 카드 파일을 진짜로 지운다."""
+    return card.empty_deleted_cards()
 
 
 def _handle_undo(handler, form: dict) -> None:
