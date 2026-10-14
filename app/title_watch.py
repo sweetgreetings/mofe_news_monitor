@@ -158,7 +158,7 @@ def build_message(items: list, now: datetime) -> str:
     수정 시각을 못 읽으면 그 줄에서 뺀다 — 지어내지 않는다([단독]·[속보] 알림이 게시
     시각을 못 읽을 때와 같다).
     """
-    head = f"✎ 라벨 붙인 기사 제목이 바뀌었어요 {len(items)}건"
+    head = f"✎ 라벨 붙인 기사 제목이 변경됐어요 {len(items)}건"
     blocks = []
     for item in items:
         where = " · ".join(filter(None, [
@@ -192,7 +192,7 @@ def load_state() -> dict:
     try:
         data = json.loads(TITLE_WATCH_FILE.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError, TypeError):
-        logger.warning("제목 바뀜 알림 상태 파일을 읽지 못했습니다 — 처음부터 시작합니다.")
+        logger.warning("제목 변경 알림 상태 파일을 읽지 못했습니다 — 처음부터 시작합니다.")
         return blank
     if not isinstance(data, dict):
         return blank
@@ -224,7 +224,7 @@ def _save_state(state: dict, keep_urls: Optional[set] = None) -> bool:
         ))
         return True
     except OSError:
-        logger.warning("제목 바뀜 알림 상태를 저장하지 못했습니다.")
+        logger.warning("제목 변경 알림 상태를 저장하지 못했습니다.")
         return False
 
 
@@ -284,7 +284,7 @@ def _run_once(state: dict, chat_ids: list, now: datetime) -> int:
     fresh = unalerted(found, state["alerted"])
     counts = result["counts"]
     logger.info(
-        "제목 바뀜 확인: %d건 확인 · 바뀜 %d건(새로 알릴 것 %d건) · 못 받음 %d건",
+        "제목 변경 확인: %d건 확인 · 변경 %d건(새로 알릴 것 %d건) · 못 받음 %d건",
         counts.get("checked", 0), counts.get("title_changed", 0), len(fresh),
         counts.get("failed", 0),
     )
@@ -296,7 +296,7 @@ def _run_once(state: dict, chat_ids: list, now: datetime) -> int:
     if not _send(fresh, chat_ids, now):
         # 아무에게도 못 갔다 — 알린 것으로 적지 않아 다음 주기에 다시 보낸다.
         # (주기가 짧아 따로 재시도 횟수를 둘 필요가 없다.)
-        logger.warning("제목 바뀜 알림을 아무에게도 보내지 못했습니다 — 다음 주기에 다시 보냅니다.")
+        logger.warning("제목 변경 알림을 아무에게도 보내지 못했습니다 — 다음 주기에 다시 보냅니다.")
         _save_state(state, keep_urls=keep)
         return 0
 
@@ -350,7 +350,7 @@ def watch_tick(now: Optional[datetime] = None, *, background: bool = True) -> in
             except Exception:
                 # 여기서 막지 않으면 스케줄러까지 올라가 그 tick의 보관 기간 정리가
                 # 통째로 건너뛰어진다(app.labels가 읽기 권한 오류를 안 잡는다).
-                logger.exception("제목 바뀜 확인 중 오류 — 다음 주기에 다시 시도합니다")
+                logger.exception("제목 변경 확인 중 오류 — 다음 주기에 다시 시도합니다")
                 return 0
             finally:
                 _lock.release()

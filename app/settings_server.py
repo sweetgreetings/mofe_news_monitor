@@ -2203,28 +2203,32 @@ _TELEGRAM_TIPS = {
     "h_reg": (
         "정기 보고서",
         "회차가 마감되면 만들어지는 정기 확정본입니다. 소제목별로 묶인 그 회차 전체가 나갑니다.",
-        "직접 (발송)을 누르지 않아도 유예 시간이 지나면 자동으로 나갑니다 — 시간은 「자동발송 대기시간 및 ON/OFF」에서.",
+        # 꼬리말은 자동발송 스위치를 읽어 고른다(_reg_tip_foot) — 꺼져 있는데 "자동으로 나갑니다"라고
+        # 말하면 거짓이다. 머리글 아랫줄(.who)과 같은 사실을 말해야 한다.
+        "",
     ),
     "h_adh": (
         "수시 보고서",
         "수시 확정본에서 (발송)을 누르면 나갑니다. 사안 하나를 따로 모아 만든 보고서입니다.",
-        "수시엔 자동발송이 없습니다. 누를 때 이 명단이 확인창에 뜨고, 그 한 번만 뺄 수 있습니다.",
+        # "수시엔 자동발송이 없습니다"는 뗐다 — 머리글이 「직접 발송」이라고 이미 적었고,
+        # 없는 것을 해명하는 문장이다(본업 화면은 자기를 해명하지 않는다).
+        "누를 때 이 명단이 확인창에 뜨고, 그 한 번만 뺄 수 있습니다.",
     ),
     "h_notify": (
         "알림이 울리는 시간",
         "고른 시간에만 소리·진동으로 알립니다. 그 밖의 시간엔 메시지가 알림 없이 조용히 옵니다 — 내용은 그대로 받습니다.",
-        "[단독]·[속보]·제목 바뀜·정기·수시 모두에 적용됩니다. 텔레그램에만 해당합니다.",
+        "[단독]·[속보]·제목 변경·정기·수시 모두에 적용됩니다. 텔레그램에만 해당합니다.",
     ),
     "h_title_chg": (
-        "제목이 바뀌면 알림",
-        "라벨 붙인 기사의 제목이 원문에서 바뀌면 30분 안에 알려 줍니다 — 언론사는 기사를 내보낸 뒤에도 제목을 고칩니다.",
+        "제목이 변경되면 알림",
+        "라벨 붙인 기사의 제목이 원문에서 변경되면 30분 안에 알려 줍니다 — 언론사는 기사를 내보낸 뒤에도 제목을 고칩니다.",
         "알려만 주고 화면 제목은 그대로 둡니다. 반영은 라벨 보관함의 「제목 다시 불러오기」로 합니다.",
     ),
     "c_scoop": ("[단독] 알림 받기", "제목이 [단독]으로 시작하는 기사를 이 사람에게 즉시 보냅니다.", ""),
     "c_flash": ("[속보] 알림 받기", "제목이 [속보]로 시작하는 기사를 이 사람에게 즉시 보냅니다.", ""),
     "c_title_chg": (
-        "제목 바뀜 알림 받기",
-        "라벨 붙인 기사의 제목이 바뀌면 전·후 제목을 이 사람에게 보냅니다. 하루 한 번(아침)만 갑니다.",
+        "제목 변경 알림 받기",
+        "라벨 붙인 기사의 제목이 변경되면 전·후 제목을 이 사람에게 보냅니다. 하루 한 번(아침)만 갑니다.",
         "",
     ),
     "reg_a": ("정기 — 기사 목록", "그 회차의 기사 목록 전체를 보냅니다. 소제목·언론사·제목·링크가 화면 그대로 들어갑니다.", ""),
@@ -2256,9 +2260,10 @@ _TELEGRAM_TIPS = {
 }
 
 
-def _tip_html(key: str, right: bool = False, body: Optional[str] = None) -> str:
-    """말풍선 한 개. body를 주면 그 글자로 본문을 갈아 끼운다(알림 칸처럼 값에 따라 바뀌는 곳)."""
-    title, default_body, foot = _TELEGRAM_TIPS[key]
+def _tip_html(key: str, right: bool = False, body: Optional[str] = None, foot: Optional[str] = None) -> str:
+    """말풍선 한 개. body·foot을 주면 그 글자로 갈아 끼운다(알림 칸·정기 칸처럼 값에 따라 바뀌는 곳)."""
+    title, default_body, default_foot = _TELEGRAM_TIPS[key]
+    foot = default_foot if foot is None else foot
     return (
         f'<span class="tip{" r" if right else ""}"><b>{html.escape(title)}</b>'
         f'{html.escape(default_body if body is None else body)}'
@@ -2302,11 +2307,31 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
     padding: 10px 12px; font-size: var(--fs-sm); color: {text}; line-height: 1.65; margin: 14px 0 4px;
   }}
 
-  /* 한 줄 격자 — 머리글과 칸이 같은 열을 쓴다(예전 flex는 머리글과 입력칸 폭이 어긋났다). */
-  .rcp-head, .rcp-row {{
-    display: grid; align-items: center; column-gap: 7px;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) 52px 52px 52px 94px 94px 90px 24px;
+  /* 한 줄 격자 — 머리글과 칸이 같은 열을 쓴다(예전 flex는 머리글과 입력칸 폭이 어긋났다).
+     묶음 머리줄(.rcp-group)도 같은 열을 쓴다 — 밑줄이 칩 폭과 정확히 맞아야 묶음이 보인다.
+     열 폭은 **칩 일곱이 모두 한쪽 8px씩 같은 여백**을 갖도록 역산했다(합 752 = 본문 800 − 틈 6×8).
+     .container가 content-box라 안쪽 폭이 800px이다(패딩 24px은 그 바깥).
+     이름·chat id에 **최소 폭을 박지 않는다** — 박으면 열 합이 굳어 800px 아래에서 가로 스크롤이
+     생긴다(640~800px 띠는 아직 아래 좁은 화면 배치가 안 켜진다). 비율만으로 99 / 117px이 나온다. */
+  .rcp-group, .rcp-head, .rcp-row {{
+    display: grid; align-items: center; column-gap: 6px;
+    grid-template-columns:
+      minmax(0, 0.85fr) minmax(0, 1fr)  /* 이름 99 · chat id 117 */
+      51px 51px 76px                    /* 단독 속보 제목 변경 */
+      106px 106px                       /* 정기(기사|요약) 수시(기사|요약) */
+      118px                             /* 울림 */
+      28px;                             /* 🗑 */
   }}
+  /* 묶음 머리줄 — 밑줄이 그 묶음의 열 폭만큼만 그려져 6px 틈에서 끊긴다. 세로선을 모든 줄에
+     긋지 않고도 묶음이 보인다. **울림은 두 밑줄 밖에 혼자 선다** — 받는 것이 아니라 소리·진동을
+     정하는 칸이라, 「받는 것이 아니다」를 글자로 적는 대신 자리로 말한다. */
+  .rcp-group {{ align-items: end; font-size: var(--fs-xs); font-weight: 700; color: {muted}; margin: 0 0 4px; }}
+  .rcp-group .g {{ text-align: center; padding: 0 0 4px; border-bottom: 1px solid {group_rule}; }}
+  .g-alert {{ grid-column: 3 / 6; }}
+  .g-report {{ grid-column: 6 / 8; }}
+  /* 열 머리글 두 줄 — 윗줄이 이름, 아랫줄이 「누가 보내나」(자동발송 스위치를 읽어 적는다) */
+  .rcp-head .hh {{ display: block; }}
+  .rcp-head .who {{ display: block; font-weight: 500; color: {text_faint}; margin-top: 1px; }}
   .rcp-head {{ font-size: var(--fs-xs); font-weight: 700; color: {muted}; padding: 0 0 5px; border-bottom: 1px solid {border}; margin: 0 0 3px; }}
   .rcp-head > span {{ text-align: center; }}
   .rcp-head > .l {{ text-align: left; }}
@@ -2349,6 +2374,10 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
   /* 「제목」만 앰버다 — 빨강은 [단독]·[속보](새로 올라온 기사)의 색이고, 이쪽은 이미 담은
      기사가 고쳐졌다는 주의다. 새 색 세트를 만들지 않고 주의 세트를 그대로 쓴다. */
   .rchip.titlechg:has(input:checked) {{ border: 1px solid {warn_border}; background: {warn_bg}; color: {warn_text}; }}
+  /* 글자는 --fs-sm — 한 줄에 선 칩 일곱이 같은 크기여야 한 종류로 읽힌다. 예전엔 기사·요약·울림만
+     --fs-xs라 단독·속보·제목 변경보다 한 단계 작았다. --fs-xs는 규칙서 글자 단계에서 「작은 칩 안
+     **보조** 글자」 자리인데 기사·요약은 보조가 아니라 제 이름이다. --fs-sm에서 「✓ 기사」는 35px로
+     「✓ 단독」과 같다. */
   /* 정기·수시 「기사 | 요약」 — 둘 중 하나를 고르는 칸이 아니라 각각 켜고 끄는 칸이라 4px 띄우고
      칸마다 제 테두리를 준다. 켜짐은 기사·요약 같은 모양(옅은 흐름 색 + 실선 + ✓), 꺼짐은 점선.
      시안 mockups/TELEGRAM_PAIR_CHIP_MOCKUP.html B안. */
@@ -2356,7 +2385,7 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
   .rpair label {{
     position: relative; display: inline-flex; align-items: center; justify-content: center; height: 30px;
     box-sizing: border-box; border: 1px dashed {border}; border-radius: var(--r-md);
-    font-size: var(--fs-xs); font-weight: 600; color: {text_faint}; background: {card}; cursor: pointer; user-select: none;
+    font-size: var(--fs-sm); font-weight: 600; color: {text_faint}; background: {card}; cursor: pointer; user-select: none;
     white-space: nowrap;
   }}
   .rpair input {{ position: absolute; opacity: 0; width: 0; height: 0; }}
@@ -2369,7 +2398,7 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
   .nchip {{
     position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 100%; height: 30px;
     box-sizing: border-box; border: 1px solid {notify_chip_border}; border-radius: var(--r-md); background: {notify_chip_bg};
-    color: {notify_chip_text}; font-size: var(--fs-xs); font-weight: 600; cursor: pointer; white-space: nowrap; padding: 0 4px;
+    color: {notify_chip_text}; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; white-space: nowrap; padding: 0 4px;
     font-variant-numeric: tabular-nums;
   }}
   .nchip:hover {{ background: {notify_chip_bg}; border-color: {muted}; }}
@@ -2411,7 +2440,7 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
 
   /* 좁은 화면 — 이름·chat id가 한 줄, 받는 것·알림이 그 아래 줄. 칩마다 이름이 적혀 있어 머리글은 숨긴다. */
   @media (max-width: 640px) {{
-    .rcp-head {{ display: none; }}
+    .rcp-group, .rcp-head {{ display: none; }}
     .tip {{ display: none !important; }}
     .rcp-row {{
       grid-template-columns: repeat(4, minmax(0, 1fr)) 24px; row-gap: 6px;
@@ -2420,16 +2449,16 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
     .rcp-row > .c-name {{ grid-column: 1 / 3; grid-row: 1; }}
     .rcp-row > .c-id {{ grid-column: 3 / 5; grid-row: 1; }}
     .rcp-row > .rcp-del {{ grid-column: 5; grid-row: 1; }}
-    /* 받는 것 칩 셋([단독]·[속보]·제목)이 한 줄, 알림 칩은 그 아래 줄 왼쪽 2칸이다.
+    /* 받는 것 칩 셋(단독·속보·제목 변경)이 한 줄, 울림 칩은 그 아래 줄 왼쪽 2칸이다.
        칩이 둘일 때는 알림이 같은 줄 3~5열에 들어갔는데, 셋이 되면서 그 자리가 찼다 —
        1칸(약 73px)으로 좁히면 「22:00~07:00」 같은 값이 잘린다. */
     .rcp-row > .rchip {{ grid-row: 2; }}
     .rcp-row > .nchip {{ grid-column: 1 / 3; grid-row: 3; }}
-    /* 머리글이 없으니 두 「기사 | 요약」이 어느 흐름인지 칸 위에 적는다 */
+    /* 머리글이 없으니 두 「기사 | 요약」이 어느 흐름인지, 누가 보내는지 칸 위에 적는다 */
     .rcp-row > .rpair {{ grid-column: span 2; grid-row: 4; position: relative; margin-top: 14px; }}
     .rcp-row > .rpair::before {{ position: absolute; left: 2px; top: -15px; font-size: var(--fs-xs); font-weight: 700; color: {muted}; }}
-    .rcp-row > .rpair.reg::before {{ content: "정기"; }}
-    .rcp-row > .rpair.adh::before {{ content: "수시"; }}
+    .rcp-row > .rpair.reg::before {{ content: "정기 · {reg_send_mode}"; }}
+    .rcp-row > .rpair.adh::before {{ content: "수시 · 직접 발송"; }}
   }}
 </style>
 </head>
@@ -2455,13 +2484,18 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
   </div>
   <form method="POST" action="/save-telegram" id="tgForm">
     <p class="caption">받는 사람 (최대 {max_recipients}명) — 칸을 눌러 끄면 지우지 않고도 잠깐 대상에서 뺄 수 있습니다.</p>
+    <div class="rcp-group">
+      <span></span><span></span>
+      <span class="g g-alert">즉시 알림</span>
+      <span class="g g-report">보고서</span>
+      <span></span><span></span>
+    </div>
     <div class="rcp-head">
       <span class="l">이름</span><span class="l">chat id</span>
-      <span class="span2"><span class="tw">단독/속보{tip_alert}</span></span>
-      <span><span class="tw">제목{tip_title_chg}</span></span>
-      <span><span class="tw">정기{tip_reg}</span></span>
-      <span><span class="tw">수시{tip_adh}</span></span>
-      <span><span class="tw">알림{tip_notify}</span></span><span></span>
+      <span class="span2"><span class="tw">{tip_alert}</span></span><span><span class="tw">{tip_title_chg}</span></span>
+      <span><span class="tw"><span class="hh">정기</span><span class="who">{reg_send_mode}</span>{tip_reg}</span></span>
+      <span><span class="tw"><span class="hh">수시</span><span class="who">직접 발송</span>{tip_adh}</span></span>
+      <span><span class="tw"><span class="hh">울림</span>{tip_notify}</span></span><span></span>
     </div>
     <div id="rcpRows">
     {recipient_rows}
@@ -2469,10 +2503,6 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
     <p class="add-row">
       <button type="submit" formaction="/telegram/add-recipient-slot"{add_disabled}><span class="plus-glyph">+</span>받는 사람 추가</button>
     </p>
-    <div class="note">
-      "나"처럼 정기·수시는 다 끄고 [단독]·[속보]만 받을 수 있습니다 — 두 발송은 서로 독립적입니다
-      (정기·수시는 보고서 전체, 알림은 해당 기사 1~3건만 즉시).
-    </div>
     <div class="save-bar"><div class="save-bar-inner">
       <div class="save-msg dirty{dirty_class}" id="tgSaveMsg"><span class="dot"></span><span>아직 저장하지 않았습니다.</span></div>
       <button type="submit">저장</button>
@@ -2616,9 +2646,9 @@ def _render_telegram_recipient_rows(recipients: list, slots: int) -> str:
             '<div class="rcp-row">'
             f'<input type="text" class="c-name" name="{prefix}_name" value="{html.escape(r.get("name", ""))}" placeholder="이름">'
             f'<input type="text" class="c-id" name="{prefix}_chat_id" value="{html.escape(r.get("chat_id", ""))}" placeholder="chat id">'
-            f'<label class="rchip tw"><input type="checkbox" name="{prefix}_alert_scoop" value="1"{ck("alert_scoop")}>[단독]{_tip_html("c_scoop")}</label>'
-            f'<label class="rchip tw"><input type="checkbox" name="{prefix}_alert_flash" value="1"{ck("alert_flash")}>[속보]{_tip_html("c_flash")}</label>'
-            f'<label class="rchip titlechg tw"><input type="checkbox" name="{prefix}_alert_title_change" value="1"{ck("alert_title_change")}>제목{_tip_html("c_title_chg")}</label>'
+            f'<label class="rchip tw"><input type="checkbox" name="{prefix}_alert_scoop" value="1"{ck("alert_scoop")}>단독{_tip_html("c_scoop")}</label>'
+            f'<label class="rchip tw"><input type="checkbox" name="{prefix}_alert_flash" value="1"{ck("alert_flash")}>속보{_tip_html("c_flash")}</label>'
+            f'<label class="rchip titlechg tw"><input type="checkbox" name="{prefix}_alert_title_change" value="1"{ck("alert_title_change")}>제목 변경{_tip_html("c_title_chg")}</label>'
             '<div class="rpair reg">'
             f'<label class="a tw"><input type="checkbox" name="{prefix}_regular_articles" value="1"{ck("regular_articles")}>기사{_tip_html("reg_a")}</label>'
             f'<label class="s tw"><input type="checkbox" name="{prefix}_regular_summary" value="1"{ck("regular_summary")}>요약{_tip_html("reg_s")}</label>'
@@ -2763,6 +2793,15 @@ def render_telegram_settings(
         )
     times = [f"{h:02d}:{m}" for h in range(24) for m in ("00", "30")]
     plain = {k: html.escape(v) for k, v in _TELEGRAM_TIPS.items() if isinstance(v, str)}
+    # 「누가 보내나」는 자동발송 스위치가 정한다 — 머리글 아랫줄과 말풍선 꼬리말이 같은 사실을
+    # 말해야 한다. 꺼져 있는데 "자동으로 나갑니다"라고 적으면 그 자리가 거짓이 된다.
+    auto_on = is_auto_send_enabled()
+    reg_send_mode = "자동발송" if auto_on else "직접 발송"
+    reg_foot = (
+        "직접 (발송)을 누르지 않아도 유예 시간이 지나면 자동으로 나갑니다 — 시간은 「자동발송 대기시간 및 ON/OFF」에서."
+        if auto_on
+        else "지금은 자동발송이 꺼져 있어 확정본에서 (발송)을 눌러야 나갑니다 — 「자동발송 대기시간 및 ON/OFF」에서 켭니다."
+    )
     return _TELEGRAM_SETTINGS_TEMPLATE.format(
         **_theme(),
         status_class=status_class,
@@ -2773,7 +2812,8 @@ def render_telegram_settings(
         dirty_class=" show" if dirty else "",
         tip_alert=_tip_html("h_alert"),
         tip_title_chg=_tip_html("h_title_chg"),
-        tip_reg=_tip_html("h_reg"),
+        tip_reg=_tip_html("h_reg", foot=reg_foot),
+        reg_send_mode=reg_send_mode,
         tip_adh=_tip_html("h_adh"),
         tip_notify=_tip_html("h_notify", right=True),
         time_options="".join(f"<option>{t}</option>" for t in times),
@@ -4950,7 +4990,7 @@ _SEND_LOG_TEMPLATE = (
     + _LOG_LIST_STYLE
     + """
   .k-scoop, .k-flash, .k-burst {{ background: {error_bg}; color: {scoop_text}; border-color: {error_border}; }}
-  /* 「제목 바뀜」은 앰버 — 빨강은 [단독]·[속보](새로 올라온 기사)의 색이고, 이쪽은 이미
+  /* 「제목 변경」은 앰버 — 빨강은 [단독]·[속보](새로 올라온 기사)의 색이고, 이쪽은 이미
      담은 기사가 고쳐졌다는 주의다. 텔레그램 받는 사람 화면의 「제목」 칩과 같은 색이어야
      한다(같은 뜻의 칩이 화면마다 다른 색이면 안 된다). */
   .k-quota, .k-title_change {{ background: {warn_bg}; color: {warn_text}; border-color: {warn_border}; }}
@@ -5035,7 +5075,7 @@ _SEND_LOG_TEMPLATE = (
 
 _SEND_LOG_KIND_LABELS = {
     "regular": "정기", "adhoc": "수시", "scoop": "[단독]", "flash": "[속보]", "burst": "🔥 몰림", "quota": "한도 경고",
-    "title_change": "✎ 제목 바뀜",
+    "title_change": "✎ 제목 변경",
 }
 
 

@@ -5351,7 +5351,7 @@ function refetchTitles(btn) {
       strike.className = "t";
       strike.textContent = prev;
       was.appendChild(strike);
-      if (meta) meta.insertAdjacentHTML("afterbegin", '<span class="chip-changed">✎ 제목 바뀜</span>');
+      if (meta) meta.insertAdjacentHTML("afterbegin", '<span class="chip-changed">✎ 제목 변경</span>');
     } else {
       was.className = "refetch-was touched";
       was.appendChild(document.createTextNode("제목은 그대로예요 — 원문만 손댔어요"));

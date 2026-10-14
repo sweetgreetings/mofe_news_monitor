@@ -216,7 +216,7 @@ def refetch_titles(articles: list, *, apply: bool = True) -> dict:
 
     돌려주는 것:
       rows   `{url: 판정}` — 판정에 `state`가 붙는다
-             changed(제목 바뀜) · touched(원문만 손댐) · same · protected(✏️라 안 건드림)
+             changed(제목 변경) · touched(원문만 손댐) · same · protected(✏️라 안 건드림)
              · skipped(언론사 자체 주소라 확인 안 함) · failed(못 받음)
       counts 결과 줄에 적을 건수 + skipped·failed
 
@@ -227,7 +227,7 @@ def refetch_titles(articles: list, *, apply: bool = True) -> dict:
     저장은 **맨 끝에 한 번**이다(app.summary_overrides.apply_title_refetch) — 기사마다
     쓰면 60건에 파일을 120번 쓰고, 겹치면 앞 기사의 수정이 사라진다.
 
-    `apply=False`면 **아무것도 저장하지 않고 보기만 한다** — 뒤에서 도는 「제목 바뀜 알림」
+    `apply=False`면 **아무것도 저장하지 않고 보기만 한다** — 뒤에서 도는 「제목 변경 알림」
     (app.title_watch)이 쓰는 길이다. 담당자가 안 보는 사이에 제목을 갈아치우면 이미 복사해
     쓴 보고서와 화면이 말없이 어긋나므로, 알림은 알리기만 하고 반영은 담당자가 버튼을
     누를 때(`apply=True`) 한다. 기준점(`seen_modified_at`)도 그때 적힌다.

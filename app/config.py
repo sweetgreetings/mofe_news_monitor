@@ -450,6 +450,9 @@ COLOR_SCOOP_CHIP_BORDER = COLOR_ERROR_BORDER_MID   # 켜진 [단독]·[속보] �
 COLOR_ADHOC_BORDER_STRONG = COLOR_FLOW_ENTRY_ADHOC_BORDER  # 켜진 수시 칩 테두리(청록 알파)
 COLOR_NOTIFY_CHIP_BG = COLOR_PILL_BG               # 「알림」 칩 — 늘 값이 있어 켜짐/꺼짐이 없는 중립 회색
 COLOR_NOTIFY_CHIP_BORDER = COLOR_TOGGLE_OFF
+# 묶음 머리줄 밑줄 — 텔레그램 받는 사람 화면의 「즉시 알림」·「보고서」 두 묶음을 가르는 선.
+# 값은 꺼진 토글과 같지만 뜻이 달라 따로 둔다(한쪽을 바꿔도 다른 쪽이 안 따라가야 한다).
+COLOR_GROUP_RULE = COLOR_TOGGLE_OFF
 # 화면 이름 칩 — 초안·확정본·수시 원본·수시 확정본 제목 맨 앞의 (초안)/(확정본)/(원본) 칩.
 # 새 색은 없다: 다듬기 전 화면(초안·원본)은 중립 회색, 보고서 화면은 흐름의 색(정기 파랑·수시 청록).
 COLOR_SCREEN_TAG_WORK_BG = COLOR_DIVIDER_SOFT      # (초안)·(원본)
@@ -636,6 +639,7 @@ PALETTE = {
     "adhoc_border_strong": COLOR_ADHOC_BORDER_STRONG,
     "notify_chip_bg": COLOR_NOTIFY_CHIP_BG,
     "notify_chip_border": COLOR_NOTIFY_CHIP_BORDER,
+    "group_rule": COLOR_GROUP_RULE,
     "notify_chip_text": COLOR_NOTIFY_CHIP_TEXT,
 }
 
@@ -924,7 +928,7 @@ NEGATIVE_GUESS_KEYWORDS = ("재정경제부", "재경부")   # 제목·요약에
 NEGATIVE_GUESS_RETRY_MIN = 5                         # 판정이 실패한 회차는 5분 뒤 다시(회차마다 최대 3번)
 NEGATIVE_GUESS_MAX_ATTEMPTS = 3
 
-# 「제목 바뀜 알림」(app.title_watch) — 라벨 붙인 기사의 제목이 원문에서 바뀌었는지
+# 「제목 변경 알림」(app.title_watch) — 라벨 붙인 기사의 제목이 원문에서 변경됐는지
 # 30분마다 돌아보고 텔레그램으로 알린다. 판정은 app.title_refetch(담당자가 버튼을
 # 누를 때 쓰는 것과 **같은 비교 규칙**)를 그대로 쓰고, 이 기능이 더하는 건 「때맞춰
 # 도는 것」과 「이미 알린 건 다시 안 알리는 것」뿐이다.

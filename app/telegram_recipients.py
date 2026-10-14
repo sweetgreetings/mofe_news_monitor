@@ -115,7 +115,7 @@ def active_recipient_chat_ids() -> list:
 
 # 알림 종류 → 받는 것 칸. **표로 둔다** — 예전엔 `"alert_scoop" if kind == "단독" else
 # "alert_flash"`라 「단독이 아닌 모든 kind」가 조용히 속보 칸으로 떨어졌다. 종류가 셋이
-# 된 지금 그대로 두면 「제목 바뀜」을 끈 사람에게도 가고, 받는 사람은 왜 오는지 알 길이
+# 된 지금 그대로 두면 「제목 변경」을 끈 사람에게도 가고, 받는 사람은 왜 오는지 알 길이
 # 없다. 새 알림을 만들면 여기에 한 줄을 더한다.
 _ALERT_FIELD_BY_KIND = {
     "단독": "alert_scoop",

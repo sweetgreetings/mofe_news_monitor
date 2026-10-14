@@ -35,16 +35,19 @@
          박으면 열 폭 합이 751px이 되어 800px 아래에서 가로 스크롤이 생긴다(640~800px 띠).
          비율만으로도 752px에서 87 / 109px이 나오고, 좁아지면 지금처럼 그냥 눌린다.
        · 「제목 변경」은 글자가 늘어 52 → 78px이어야 ✓까지 한 줄에 들어간다.
-     옛 값: minmax(0,1fr) minmax(0,1.1fr) 52px 52px 52px 94px 94px 90px 24px / gap 7px */
+     본문 .container는 content-box라 **안쪽 폭이 800px**이다(패딩 24px은 그 바깥).
+     800 − 틈 6×8 = 752px을 아홉 열이 나눠 쓴다 — 아래 합이 정확히 752다.
+     옛 값: minmax(0,1fr) minmax(0,1.1fr) 52px 52px 52px 94px 94px 90px 24px / gap 7px
+            → 실측 이름 136 · chat id 150 · 칩 52 · 쌍 94 · 울림 90 · 🗑 24 */
   .rcp-group, .rcp-head, .rcp-row {
     display: grid; align-items: center; column-gap: 6px;
     grid-template-columns:
-      minmax(0, 0.8fr)      /* 이름 — 752px에서 87px */
-      minmax(0, 1fr)        /* chat id — 752px에서 109px */
-      58px 58px 78px        /* [단독] [속보] 제목 변경 */
-      98px 98px             /* 정기(기사|요약) 수시(기사|요약) */
-      92px                  /* 울림 */
-      26px;                 /* 🗑 */
+      minmax(0, 0.85fr)     /* 이름 — 본문 800px에서 99px */
+      minmax(0, 1fr)        /* chat id — 117px (10자리 + 여백) */
+      51px 51px 76px        /* 단독 속보 제목 변경 */
+      106px 106px           /* 정기(기사|요약) 수시(기사|요약) */
+      118px                 /* 울림 */
+      28px;                 /* 🗑 */
   }
   .rcp-head { font-size: var(--fs-xs); font-weight: 700; color: #6B7280; padding: 0 0 5px; border-bottom: 1px solid #E5E7EB; margin: 0 0 3px; }
   .rcp-head > span { text-align: center; }
@@ -69,10 +72,13 @@
   .rchip:has(input:checked) { border: 1px solid #FCA5A5; background: #FEF2F2; color: #B91C1C; }
   .rchip.titlechg:has(input:checked) { border: 1px solid #FDE68A; background: #FFFBEB; color: #92400E; }
   .rpair { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  /* [바뀐 것] --fs-xs → --fs-sm. 한 줄에 선 칩 일곱이 같은 글자 크기여야 한 종류로 읽힌다.
+     규칙서 글자 단계에서도 --fs-xs는 「작은 칩 안 **보조** 글자」 자리인데, 기사·요약은
+     보조가 아니라 그 칩의 제 이름이다. --fs-sm에서 「✓ 기사」는 35px — 「✓ 단독」과 같다. */
   .rpair label {
     position: relative; display: inline-flex; align-items: center; justify-content: center; height: 30px;
     box-sizing: border-box; border: 1px dashed #E5E7EB; border-radius: var(--r-md);
-    font-size: var(--fs-xs); font-weight: 600; color: #9CA3AF; background: #FFFFFF; cursor: pointer; user-select: none;
+    font-size: var(--fs-sm); font-weight: 600; color: #9CA3AF; background: #FFFFFF; cursor: pointer; user-select: none;
     white-space: nowrap;
   }
   .rpair input { position: absolute; opacity: 0; width: 0; height: 0; }
@@ -82,7 +88,7 @@
   .nchip {
     position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 100%; height: 30px;
     box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: var(--r-md); background: #F3F4F6;
-    color: #4B5563; font-size: var(--fs-xs); font-weight: 600; cursor: pointer; white-space: nowrap; padding: 0 4px;
+    color: #4B5563; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; white-space: nowrap; padding: 0 4px;
     font-variant-numeric: tabular-nums; font-family: inherit;
   }
   .nchip svg { width: 12px; height: 12px; flex-shrink: 0; }
@@ -105,6 +111,7 @@
     column-gap: 7px;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) 52px 52px 52px 94px 94px 90px 24px;
   }
+  .oldw .rpair label, .oldw .nchip { font-size: var(--fs-xs); }
 
   /* 시안 설명 조각 */
   .panel { margin: 0 auto 20px; }
@@ -149,7 +156,7 @@
     <h2>지금 화면<span class="tag now">현재</span></h2>
     <p class="why">
       다섯 칸이 같은 간격으로 나란히 서서 <b>어디까지가 알림이고 어디부터가 보고서인지</b> 선이 없다.
-      그래서 맨 아래 안내 한 줄이 그 일을 떠맡는다. 칩 칸은 좁은데(52px) <b>이름·chat id가 238px을 쓴다.</b>
+      그래서 맨 아래 안내 한 줄이 그 일을 떠맡는다. 칩 칸은 좁은데(52px) <b>이름·chat id가 286px을 쓴다.</b>
     </p>
     <p class="caption">받는 사람 (최대 15명) — 칸을 눌러 끄면 지우지 않고도 잠깐 대상에서 뺄 수 있습니다.</p>
     <div class="rcp-head">
@@ -194,7 +201,9 @@
     <p class="why">
       묶음 밑줄이 <b>그 묶음의 열 폭만큼만</b> 그려져 6px 틈에서 끊긴다 —
       세로선을 모든 줄에 긋지 않고도 묶음이 보인다. <b>울림은 두 밑줄 밖에 혼자 선다</b>(받는 것이 아니라는 말이 자리로 된다).
-      칩 칸이 넓어져 <code>제목 변경</code>이 ✓까지 한 줄에 들어가고, <b>기사 줄 마크업은 라벨 한 글자 말고는 안 바뀐다.</b>
+      칩 칸이 넓어져 <code>제목 변경</code>이 ✓까지 한 줄에 들어가고,
+      꺾쇠를 뗀 <code>단독</code>·<code>속보</code>가 나머지 칩과 같은 민글자가 된다.
+      <b>기사 줄 마크업은 라벨 글자 말고는 안 바뀐다.</b>
     </p>
     <p class="caption">받는 사람 (최대 15명) — 칸을 눌러 끄면 지우지 않고도 잠깐 대상에서 뺄 수 있습니다.</p>
     <div class="rcp-group">
@@ -212,8 +221,8 @@
     </div>
     <div class="rcp-row">
       <input type="text" value="담당자" placeholder="이름"><input type="text" value="8427535869" placeholder="chat id">
-      <label class="rchip"><input type="checkbox" checked>[단독]</label>
-      <label class="rchip"><input type="checkbox" checked>[속보]</label>
+      <label class="rchip"><input type="checkbox" checked>단독</label>
+      <label class="rchip"><input type="checkbox" checked>속보</label>
       <label class="rchip titlechg"><input type="checkbox">제목 변경</label>
       <div class="rpair reg"><label><input type="checkbox" checked>기사</label><label><input type="checkbox" checked>요약</label></div>
       <div class="rpair adh"><label><input type="checkbox" checked>기사</label><label><input type="checkbox" checked>요약</label></div>
@@ -222,8 +231,8 @@
     </div>
     <div class="rcp-row">
       <input type="text" value="과장님" placeholder="이름"><input type="text" value="7731004512" placeholder="chat id">
-      <label class="rchip"><input type="checkbox" checked>[단독]</label>
-      <label class="rchip"><input type="checkbox" checked>[속보]</label>
+      <label class="rchip"><input type="checkbox" checked>단독</label>
+      <label class="rchip"><input type="checkbox" checked>속보</label>
       <label class="rchip titlechg"><input type="checkbox" checked>제목 변경</label>
       <div class="rpair reg"><label><input type="checkbox">기사</label><label><input type="checkbox" checked>요약</label></div>
       <div class="rpair adh"><label><input type="checkbox">기사</label><label><input type="checkbox">요약</label></div>
@@ -232,8 +241,8 @@
     </div>
     <div class="rcp-row">
       <input type="text" value="국장님" placeholder="이름"><input type="text" value="5518820341" placeholder="chat id">
-      <label class="rchip"><input type="checkbox" checked>[단독]</label>
-      <label class="rchip"><input type="checkbox">[속보]</label>
+      <label class="rchip"><input type="checkbox" checked>단독</label>
+      <label class="rchip"><input type="checkbox">속보</label>
       <label class="rchip titlechg"><input type="checkbox">제목 변경</label>
       <div class="rpair reg"><label><input type="checkbox">기사</label><label><input type="checkbox" checked>요약</label></div>
       <div class="rpair adh"><label><input type="checkbox">기사</label><label><input type="checkbox" checked>요약</label></div>
@@ -271,8 +280,8 @@
     </div>
     <div class="rcp-row">
       <input type="text" value="담당자" placeholder="이름"><input type="text" value="8427535869" placeholder="chat id">
-      <label class="rchip"><input type="checkbox" checked>[단독]</label>
-      <label class="rchip"><input type="checkbox" checked>[속보]</label>
+      <label class="rchip"><input type="checkbox" checked>단독</label>
+      <label class="rchip"><input type="checkbox" checked>속보</label>
       <label class="rchip titlechg"><input type="checkbox">제목 변경</label>
       <div class="rpair reg"><label><input type="checkbox" checked>기사</label><label><input type="checkbox" checked>요약</label></div>
       <div class="rpair adh"><label><input type="checkbox" checked>기사</label><label><input type="checkbox" checked>요약</label></div>
@@ -287,22 +296,25 @@
   <div class="container">
     <h2>칸 폭이 어떻게 바뀌나</h2>
     <p class="why">
-      본문 안쪽 폭 752px은 그대로다 — <b>이름·chat id에서 뺀 만큼이 칩 칸으로 간다.</b>
-      칸 사이 틈도 7 → 6px(여덟 틈 × 1px = 8px 확보).
-      이름·chat id는 <code>fr</code> 비율만 줄인다(<code>1 : 1.1</code> → <code>0.8 : 1</code>) —
+      본문 안쪽 폭 <b>800px</b>은 그대로다(<code>.container</code>가 <code>content-box</code>라 패딩 24px은 그 바깥) —
+      <b>이름·chat id에서 뺀 68px이 칩 칸으로 간다.</b> 칸 사이 틈도 7 → 6px(여덟 틈 × 1px = 8px 더).
+      칸 폭은 <b>칩 일곱이 모두 한쪽 8px씩 똑같은 여백</b>을 갖도록 역산했다
+      (<code>단독</code> 35+16, <code>제목 변경</code> 60+16, <code>기사</code>·<code>요약</code> 35+16,
+      <code>울림</code> 102+16) — 그래서 「단독만 헐렁하다」가 사라진다.
+      이름·chat id는 <code>fr</code> 비율만 줄인다(<code>1 : 1.1</code> → <code>0.85 : 1</code>) —
       <b>최소 폭을 박지 않는다.</b> 박으면 열 폭 합이 751px이 되어 <b class="bad">800px 아래에서 가로 스크롤</b>이 생긴다.
     </p>
     <table class="w">
       <tr><th>칸</th><th>지금</th><th>A안</th><th>차이</th></tr>
-      <tr><td>이름</td><td>113</td><td>87</td><td class="dn">−26</td></tr>
-      <tr><td>chat id</td><td>125</td><td>108</td><td class="dn">−17</td></tr>
-      <tr><td>[단독]</td><td>52</td><td>58</td><td class="up">+6</td></tr>
-      <tr><td>[속보]</td><td>52</td><td>58</td><td class="up">+6</td></tr>
-      <tr><td>제목 변경</td><td>52</td><td>78</td><td class="up">+26</td></tr>
-      <tr><td>정기 (기사·요약)</td><td>94</td><td>98</td><td class="up">+4</td></tr>
-      <tr><td>수시 (기사·요약)</td><td>94</td><td>98</td><td class="up">+4</td></tr>
-      <tr><td>울림</td><td>90</td><td>92</td><td class="up">+2</td></tr>
-      <tr><td>🗑</td><td>24</td><td>26</td><td class="up">+2</td></tr>
+      <tr><td>이름</td><td>136</td><td>99</td><td class="dn">−37</td></tr>
+      <tr><td>chat id</td><td>150</td><td>117</td><td class="dn">−33</td></tr>
+      <tr><td>단독</td><td>52</td><td>51</td><td class="dn">−1</td></tr>
+      <tr><td>속보</td><td>52</td><td>51</td><td class="dn">−1</td></tr>
+      <tr><td>제목 변경</td><td>52</td><td>76</td><td class="up">+24</td></tr>
+      <tr><td>정기 (기사·요약)</td><td>94</td><td>106</td><td class="up">+12</td></tr>
+      <tr><td>수시 (기사·요약)</td><td>94</td><td>106</td><td class="up">+12</td></tr>
+      <tr><td>울림</td><td>90</td><td>118</td><td class="up">+28</td></tr>
+      <tr><td>🗑</td><td>24</td><td>28</td><td class="up">+4</td></tr>
       <tr><td>칸 사이 틈</td><td>7</td><td>6</td><td class="dn">−1</td></tr>
     </table>
   </div>
@@ -313,8 +325,18 @@
   <div class="container">
     <h2>함께 고치는 글자</h2>
     <ol class="axes">
-      <li><b>칩 <code>제목</code> → <code>제목 변경</code></b>. 다만 말풍선·규칙서·알림 메시지는 전부 <b>「제목 바뀜」</b>이라 쓴다 —
-        한 가지를 두 이름으로 부르게 되니 <b>그쪽도 「제목 변경」으로 맞출지</b> 정해 주세요(권장: 맞춘다).</li>
+      <li><b>「제목 바뀜」을 앱 전체에서 「제목 변경」으로 맞춘다</b> — 칩·말풍선·알림 메시지·규칙서까지.
+        한 가지를 두 이름으로 부르지 않는다.</li>
+      <li><b>칩 일곱의 글자 크기를 <code>--fs-sm</code> 하나로 모은다</b> —
+        지금은 <code>단독</code>·<code>속보</code>·<code>제목 변경</code>만 12.8px이고
+        <code>기사</code>·<code>요약</code>·<code>울림</code>은 11.52px이라 <b>한 단계 작다</b>(돌고 있는 앱의 상태다).
+        한 줄에 선 같은 종류의 칩이 두 크기로 갈리면 다른 종류로 읽힌다.
+        규칙서 글자 단계에서도 <code>--fs-xs</code>는 「작은 칩 안 <b>보조</b> 글자」 자리인데
+        <code>기사</code>·<code>요약</code>은 보조가 아니라 그 칩의 제 이름이다.</li>
+      <li><b>칩 <code>[단독]</code>·<code>[속보]</code> → <code>단독</code>·<code>속보</code></b> — 꺾쇠를 뗀다.
+        칩 라벨이 전부 민글자(<code>단독</code>·<code>속보</code>·<code>제목 변경</code>·<code>기사</code>·<code>요약</code>)가 되어
+        글자 크기·안쪽 여백이 서로 맞는다. <b>말풍선 글은 그대로 <code>[단독]</code>이다</b> —
+        거기서는 칸 이름이 아니라 <b>제목에 실제로 붙는 말머리</b>를 가리킨다.</li>
       <li>머리글 <code>알림</code> → <code>울림</code> — 「알림」이 [단독]·[속보](<b>즉시 알림</b>)과 말이 겹친다.
         그 칩이 정하는 건 받는 것이 아니라 소리·진동이다.</li>
       <li>정기 말풍선 꼬리말이 <b>자동발송 스위치를 읽는다</b> — 꺼져 있는데 "유예 시간이 지나면 자동으로 나갑니다"면 거짓이다.</li>

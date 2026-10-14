@@ -269,7 +269,7 @@ def run_scheduler(
     # 부르는 테스트가 전부 실제 data/agency_archive/를 쓰고 네이버까지 부른다. 실제로
     # 그랬다(CODING_CONVENTIONS §1 — 재봤더니 엉뚱한 날짜 파일이 생겼다).
     collect_agency_archive: Callable[[datetime], int] = lambda _now: 0,
-    # 「제목 바뀜 알림」(app.title_watch) — 라벨 붙인 기사의 제목이 원문에서 바뀌었는지
+    # 「제목 변경 알림」(app.title_watch) — 라벨 붙인 기사의 제목이 원문에서 변경됐는지
     # 30분마다 돌아보고 텔레그램으로 알린다. **기본값을 빈 람다로 두고 main.py가
     # 실제 함수를 주입한다**(collect_agency_archive와 같은 이유) — 기본값이 진짜 함수면
     # run_scheduler를 부르는 테스트가 실제 data/·네이버·텔레그램까지 탄다.
@@ -345,7 +345,7 @@ def run_scheduler(
             check_breaking_alert(now)
             check_negative_guess(now)
             collect_agency_archive(now)
-            # 제목 바뀜 알림 — 아침 시각 전이거나 오늘 이미 돌았으면 즉시 돌아온다(비용 0).
+            # 제목 변경 알림 — 아침 시각 전이거나 오늘 이미 돌았으면 즉시 돌아온다(비용 0).
             check_title_watch(now)
             cleanup()
             cleanup_overrides()

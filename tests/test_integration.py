@@ -5579,7 +5579,7 @@ def test_refetch_titles_bulk():
     print("58) 제목 일괄 불러오기: 통과 (여섯 갈래, 자체 도메인 안 받음, 저장 한 번, 기준점 이동)")
 
 def test_title_watch_alert():
-    """「제목 바뀜 알림」이 주기마다 돌고, 알리기만 하고 아무것도 덮지 않는 길을 지킨다.
+    """「제목 변경 알림」이 주기마다 돌고, 알리기만 하고 아무것도 덮지 않는 길을 지킨다.
 
     이 기능의 중심 규칙이 **「알리고 끝」**이라, 깨지면 담당자가 안 보는 사이에 화면 제목이
     바뀌어 이미 복사해 쓴 보고서와 말없이 어긋난다. 그래서 여기서 가장 강하게 보는 것이
@@ -5757,7 +5757,7 @@ def test_title_watch_alert():
         with patch("app.labels.load_labels", boom):
             assert tick(now + timedelta(hours=8)) == 0
 
-    print("✓ 제목 바뀜 알림 — 30분마다, 알리기만 하고 덮지 않는다")
+    print("✓ 제목 변경 알림 — 30분마다, 알리기만 하고 덮지 않는다")
 
 
 def test_refetch_titles_widget_contract():
