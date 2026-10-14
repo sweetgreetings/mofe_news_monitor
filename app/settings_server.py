@@ -7944,7 +7944,7 @@ class _SettingsHandler(BaseHTTPRequestHandler):
                             name = "기타"
                         else:
                             accepted_new.add(name)
-                set_group_override(url, name)
+                set_group_override(url, name, by="ai")
             # 새로 생긴 소제목은 등록해둬야 다음 렌더링에서도 목적지로 남는다(위 [수정:
             # 2026-08-26] 1번) — "기타"로 떨어진 것은 새 소제목이 아니라 제외한다.
             for name in accepted_new:
@@ -7959,7 +7959,7 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             # 아니라 항상 열려 있는 칸이라 room 계산과 무관하게 바로 보낼 수 있다.
             leftover_urls = {a["url"] for a in pending} - set(assigned)
             for url in leftover_urls:
-                set_group_override(url, "기타")
+                set_group_override(url, "기타", by="ai")
                 assigned[url] = "기타"  # 응답·화면 하이라이트에도 포함시킨다
             self._regenerate_screens()
             # 배정된 URL을 돌려준다 — 화면이 그 기사들만 연보라로 한 번 표시한다
@@ -8105,7 +8105,7 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             undo_push("AI 기사 나누기")
             moves = plan["moves"]
             for url, name in moves.items():
-                set_group_override(url, name)
+                set_group_override(url, name, by="ai")
             # 새 이름은 등록해둬야 다음 렌더링에서도 목적지로 남는다(「AI 기사 배정」과 같은 이유 —
             # 캐시에 없는 이름으로의 배정은 _apply_forced_groups가 조용히 무시한다).
             for name in plan["new_names"]:

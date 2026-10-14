@@ -55,6 +55,7 @@ from app.assigned_groups import load_assigned_groups
 from app.atomic_write import atomic_write_text
 from app.curation import (
     bulk_move_articles,
+    load_ai_assigned_urls,
     bulk_reassign_group,
     display_group_name,
     filter_hidden,
@@ -97,6 +98,7 @@ from app.renderer import (
     apply_subheading_format,
     format_slot_time_kr,
     known_label_chips_html,
+    ai_assigned_badge_style,
     late_badge_style,
     kw_inline_style,
     kw_inline_script,
@@ -695,6 +697,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     position: relative; top: -0.15em;  /* [수정: 2026-08-21] 제목보다 글자가 작은 알약이라 baseline 정렬만으론 약간 아래로 보인다(실측: 위 여백 +1px, 아래 -2.3px) — 반 칸(0.15em) 올려 제목 글자 높이 한가운데에 맞춘다. */
   }}
 {late_badge_style}
+{ai_assigned_badge_style}
 {export_links_style}
   .article-summary {{ margin: 6px 0 4px 20px; color: {text}; font-size: var(--fs-md); }}
   /* [수정: 2026-07-30] "이미 확인함"을 영구 기억(localStorage)하지 않고 "지금 펼쳐서
@@ -2579,6 +2582,7 @@ def _theme() -> dict:
         # 만든 값을 그대로 받는다. 초안도 확정본과 같은 창을 보게 되면서 이 칩이 여기에도
         # 붙기 때문이고, .photo-badge처럼 복붙해 두면 한쪽만 고쳤을 때 어긋난다.
         "late_badge_style": late_badge_style(),
+        "ai_assigned_badge_style": ai_assigned_badge_style(),
         "export_links_style": export_links_style(),
         # [추가: 2026-09-14] 🔍 검색어 CSS·툴팁 — 확정본과 한 곳에서 만든 값(같은 이유).
         "kw_inline_style": kw_inline_style(),
@@ -2908,6 +2912,7 @@ def _render_preview_groups(
     ai_names: set = frozenset(), subheading_format: str = DEFAULT_SUBHEADING_FORMAT_TEMPLATE,
     scrap_date: str = "", scrap_end: str = "",
     group_copy_texts: Optional[dict] = None,
+    ai_assigned_urls: Optional[set] = None,
 ) -> tuple:
     """소제목별 화면을 렌더링한다. 돌려주는 값은 app.renderer._render_groups와 같은
     (소제목 칸들, 📂 소제목 미분류 칸) 둘이고, 미분류는 💬 요약 블록 아래에 그린다.
@@ -2974,6 +2979,7 @@ def _render_preview_groups(
                     scrap_date=scrap_date,
                     scrap_end=scrap_end,
                     show_matched_keywords=True,
+                    ai_assigned_urls=ai_assigned_urls,
                 )
                 for i, a in enumerate(group["articles"])
             )
@@ -3646,6 +3652,8 @@ def _compute_preview_content(
             group_copy_texts=_build_preview_group_copy_texts(
                 slot, render_groups, line_template, labels, subheading_format,
             ),
+            # 「🤖 AI 배정」 칩의 근거 — 화면마다 한 번만 읽는다(app.renderer와 같다).
+            ai_assigned_urls=load_ai_assigned_urls(),
         )
         body = _classify_degraded_html(classify_degraded, len(articles), round_id) + groups_html
         if groups:

@@ -1833,6 +1833,7 @@ def test_split_group():
             overrides = curation.load_group_overrides()
             assert overrides == {**{u: "비거주 논란" for u in urls[:3]}, **{u: "정책 구상" for u in urls[3:]}}, overrides
             assert set(assigned_groups.load_assigned_groups()) == {"비거주 논란", "정책 구상"}, "새 이름이 목적지로 등록 안 됨"
+            assert curation.load_ai_assigned_urls() == set(urls), "나눈 기사에 「AI 배정」 표식이 안 남음"
             # 다음 렌더링(초안·마감 후 확정본이 거치는 것과 같은 두 단계)에서 원래 자리에 나오는지
             round_id = llm_classifier.round_id_for_slot(slot)
             rendered = classifier._apply_forced_groups(
@@ -5841,6 +5842,90 @@ def test_refetch_titles_widget_contract():
 
     print("59) 제목 불러오기 장치 계약: 통과 (표식 넷, 기본 꺼짐, 결과 줄 자리, 이름 안 겹침)")
 
+
+def test_ai_assigned_badge():
+    """「🤖 AI 배정」 칩 — 색은 「방금」, 칩은 「사실」.
+
+    연보라 배경(.just-classified)은 버튼을 누른 직후 한 번만 칠하고 새로고침에 사라진다.
+    「AI가 넣었으니 한 번 봐야 한다」는 그보다 오래 남아야 하는 사실이라, 그 몫은 이 칩이
+    맡는다(앱 공통 문법: 색은 방금, 칩은 사실). 지키는 것 다섯:
+
+      · 저장 — AI가 정한 자리만 by="ai"다. 담당자가 그 기사를 직접 옮기면 저절로 덮여
+        칩이 사라진다(set_group_override의 by 기본값이 "manual"이라서). 그래서 이 집합은
+        곧 "AI가 넣었고 내가 아직 손대지 않은 기사"다.
+      · 마감 자동 배정(by="finalize")은 빠진다 — 그 기사엔 이미 「🤖 마감 후 자동 배정」
+        배지·왼쪽 띠·음영이 붙어 있어 같은 말을 두 번 하게 된다.
+      · by를 적기 전에 저장된 옛 기록은 "manual"로 읽는다 — 틀리는 방향이 "없는 표식을
+        지어내지 않는다"여야 한다.
+      · **기본은 꺼짐** — 안 넘기면 한 글자도 안 바뀐다(정기 보관함은 그 회차에 저장된
+        그림을 보여주는 자리라, 나중에 쌓인 전역 배정 기록을 덧칠하면 그때 보낸 보고서와
+        어긋난다).
+      · 한 행에 🤖는 하나 — 마감 후 자동 배정 배지가 있으면 이 칩을 안 그린다.
+    """
+    _require_isolation()
+    from app.renderer import ai_assigned_badge_style, render_article
+
+    with tempfile.TemporaryDirectory() as tmp:
+        overrides_file = Path(tmp) / "overrides.json"
+        with patch.object(curation, "GROUP_OVERRIDES_FILE", overrides_file):
+            curation.set_group_override("u1", "인사청문회", by="ai")
+            curation.set_group_override("u2", "세제 개편", by="finalize")
+            curation.set_group_override("u3", "예산", by="ai")
+            assert curation.load_ai_assigned_urls() == {"u1", "u3"}, "AI가 정한 자리만 모아야 함"
+
+            # 담당자가 직접 옮기면(「다른 소제목」·선택 바) 표식이 덮인다 — 이제 담당자 결정이다.
+            curation.bulk_reassign_group(["u3"], "기타")
+            assert curation.load_ai_assigned_urls() == {"u1"}, "직접 옮긴 기사에 칩이 남음"
+            assert curation.load_group_overrides()["u3"] == "기타", "옮긴 자리 자체는 남아야 함"
+
+            # 나이 정리가 돌아도 표식은 그대로다(at만 도장을 찍는다).
+            curation.cleanup_group_overrides()
+            assert curation.load_ai_assigned_urls() == {"u1"}, "정리가 표식을 지움"
+
+            # 옛 형식(값이 소제목 이름 문자열) — 누가 옮겼는지 알 수 없으니 칩을 안 받는다.
+            overrides_file.write_text('{"u9": "인사청문회"}', encoding="utf-8")
+            assert curation.load_ai_assigned_urls() == set(), "옛 기록에 AI 표식을 지어냄"
+
+    article = {
+        "url": "https://n.news.naver.com/mnews/article/023/0004003321",
+        "title": "재정경제부, 가상자산 과세 보완 방안 발표",
+        "outlet": "조선일보", "summary": "요약",
+        "pub_date": "2026-10-14T13:40:00+09:00",
+    }
+    # (1) 기본은 꺼짐.
+    assert "ai-assigned-badge" not in render_article(article, [])
+    # 집합을 넘겼어도 그 기사가 아니면 안 그린다.
+    assert "ai-assigned-badge" not in render_article(article, [], ai_assigned_urls={"https://other"})
+
+    # (2) 켜면 메타 줄에 칩이 선다 — 제목 줄이 아니다(📷·🤖 마감 배지가 이미 서는 자리).
+    on = render_article(article, [], ai_assigned_urls={article["url"]})
+    assert "ai-assigned-badge" in on and "AI 배정" in on, on[:400]
+    assert on.index("ai-assigned-badge") > on.index('class="action-row"'), \
+        "칩이 메타 줄이 아니라 제목 줄에 붙었습니다"
+    # 칩은 화면 전용이라 복사·txt·발송 텍스트엔 안 나간다(별도 <span>, 이름 문자열 밖).
+    assert "AI 배정" not in article["title"]
+
+    # (3) 한 행에 🤖는 하나.
+    both = render_article(
+        dict(article, finalize_auto_assigned=True), [], ai_assigned_urls={article["url"]}
+    )
+    assert "finalize-added-badge" in both, "마감 배지가 사라짐"
+    assert "ai-assigned-badge" not in both, "한 행에 🤖가 둘 붙음"
+
+    # (4) CSS는 app.renderer 한 곳에서 나와 확정본·초안이 같이 받는다 — 복붙해 두면
+    #     한쪽만 고쳤을 때 조용히 어긋난다.
+    assert ".ai-assigned-badge" in ai_assigned_badge_style()
+    root = Path(__file__).resolve().parent.parent
+    for path in ("app/renderer.py", "app/preview_renderer.py"):
+        src = (root / path).read_text(encoding="utf-8")
+        assert "{ai_assigned_badge_style}" in src, f"{path} 템플릿에 칩 CSS 자리가 없음"
+        assert "ai_assigned_badge_style()" in src, f"{path}가 칩 CSS를 안 넘김"
+    # 초안 쪽에 같은 규칙을 복붙해 두면 안 된다(한쪽만 고쳤을 때 조용히 갈린다).
+    assert ".ai-assigned-badge {" not in (root / "app/preview_renderer.py").read_text(encoding="utf-8")
+
+    print("60) 🤖 AI 배정 칩: 통과 (AI 자리만, 직접 옮기면 사라짐, 기본 꺼짐, 🤖는 한 행에 하나)")
+
+
 if __name__ == "__main__":
     tests = [
         test_unclassified_sits_below_summary,
@@ -5857,6 +5942,7 @@ if __name__ == "__main__":
         test_summary_override_provenance,
         test_refetch_titles_bulk,
         test_refetch_titles_widget_contract,
+        test_ai_assigned_badge,
         test_title_watch_alert,
         test_photo_override_is_one_place,
         test_outlet_override_is_one_place,

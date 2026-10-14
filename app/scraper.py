@@ -320,7 +320,9 @@ def collect_run(
         round_id=round_id_for_run({"run_at": run_at, "run_slot": run_slot}),
     )
     for url, group_name in new_forced.items():
-        set_group_override(url, group_name)
+        # by="finalize" — 마감 때 AI가 정한 자리다. 「🤖 AI 배정」 칩이 붙는 "ai"와 가른다:
+        # 이 기사엔 바로 아래 finalize_auto_assigned가 제 배지·왼쪽 띠·음영을 이미 달아 준다.
+        set_group_override(url, group_name, by="finalize")
 
     # [추가: 2026-08-12] 이 회차의 첫 분류가 "정말 실패해서 규칙 기반으로 떨어졌는지"를
     # 회차 파일에 같이 남긴다 — classify_for_finalize 안에서 classify_with_llm이 방금

@@ -31,6 +31,10 @@ _hidden_lock = threading.Lock()
 # 자세한 배경은 cleanup_group_overrides 참고.
 _overrides_lock = threading.Lock()
 
+# [추가: 2026-10-14] 배정 기록에 적는 "누가 옮겼나" — 모르는 값은 "manual"로 읽는다
+# (set_group_override·_read_override_records 참고).
+_OVERRIDE_ACTORS = ("manual", "ai", "finalize")
+
 
 def _recent_days(days: int, now: Optional[datetime] = None) -> set:
     """오늘부터 days일치의 날짜 문자열 집합("YYYY-MM-DD") — days=1이면 오늘 하루."""
@@ -300,10 +304,17 @@ def _read_override_records() -> dict:
     records = {}
     for url, value in raw.items():
         if isinstance(value, str):
-            records[url] = {"group": value, "at": None}
+            records[url] = {"group": value, "at": None, "by": "manual"}
         elif isinstance(value, dict) and isinstance(value.get("group"), str):
             at = value.get("at")
-            records[url] = {"group": value["group"], "at": at if isinstance(at, str) else None}
+            by = value.get("by")
+            records[url] = {
+                "group": value["group"],
+                "at": at if isinstance(at, str) else None,
+                # 누가 옮겼는지 적기 전에 저장된 기록은 "manual"로 읽는다 — 틀리는 방향이
+                # "AI 배정 칩을 안 붙인다"가 되게(없는 표식을 지어내는 것보다 안전하다).
+                "by": by if by in _OVERRIDE_ACTORS else "manual",
+            }
     return records
 
 
@@ -320,18 +331,43 @@ def _write_override_records(records: dict) -> None:
     atomic_write_text(GROUP_OVERRIDES_FILE, json.dumps(records, ensure_ascii=False, indent=2))
 
 
-def set_group_override(url: str, group_name: str, now: Optional[datetime] = None) -> None:
+def set_group_override(
+    url: str, group_name: str, now: Optional[datetime] = None, by: str = "manual"
+) -> None:
     """기사 하나를 특정 소제목에 강제로 배정한다 (PRD.md 기능1 규칙 21).
 
     [수정: 2026-08-21] 배정한 시각(at)을 함께 남긴다 — 이 기록을 언제 지워도 되는지
     판단하는 유일한 근거다(cleanup_group_overrides). 읽기-수정-쓰기라 잠금으로 감싼다
     (기사별 "다른 소제목" 드롭다운은 화면에서 동시에 여러 번 불릴 수 있다 — 숨김
     기록이 같은 이유로 잠금을 쓴다, CODING_CONVENTIONS.md §7-4).
+
+    [추가: 2026-10-14] by — 누가 이 자리를 정했는가("manual" 담당자 / "ai" 버튼으로 부른
+    AI 배정·나누기 / "finalize" 마감 때 자동 배정). 기본값이 "manual"이라는 것이 이 인자의
+    안전장치다: 담당자가 그 뒤 「다른 소제목」으로 직접 옮기면 ai 표식이 저절로 덮여
+    사라지고(이제 담당자 결정이다), 인자를 빠뜨린 새 호출부도 AI 표식을 지어내지 않는다.
+    화면이 읽는 자리는 load_ai_assigned_urls 하나다.
     """
     with _overrides_lock:
         records = _read_override_records()
-        records[url] = {"group": group_name, "at": (now or datetime.now()).isoformat(timespec="seconds")}
+        records[url] = {
+            "group": group_name,
+            "at": (now or datetime.now()).isoformat(timespec="seconds"),
+            "by": by if by in _OVERRIDE_ACTORS else "manual",
+        }
         _write_override_records(records)
+
+
+def load_ai_assigned_urls() -> set:
+    """「AI 기사 배정」·「AI 기사 나누기」가 지금 자리를 정해 둔 기사 URL 집합.
+
+    화면이 메타 줄에 🤖 칩을 붙이는 유일한 근거다(app.renderer.render_article). 담당자가
+    그 기사를 직접 옮기면 by가 "manual"로 덮여 여기서 빠진다 — 그래서 이 집합은 곧
+    "AI가 넣었고 내가 아직 손대지 않은 기사"다.
+
+    마감 자동 배정("finalize")은 빠진다 — 그 기사엔 이미 「🤖 마감 후 자동 배정」 배지와
+    왼쪽 띠·음영이 붙어 있어 같은 말을 두 번 하게 된다.
+    """
+    return {url for url, record in _read_override_records().items() if record["by"] == "ai"}
 
 
 def clear_group_overrides_for(group_name: str) -> int:
