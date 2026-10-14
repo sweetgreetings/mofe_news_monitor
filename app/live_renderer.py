@@ -209,6 +209,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     font-weight: 600; cursor: pointer; white-space: nowrap;
   }}
   .live-new-strip .lns-note {{ color: {muted}; font-size: var(--fs-sm); }}
+  /* 쓰던 글자가 사라질 자리가 열려 있어 갈아끼우기를 미룬 동안만 주의 색이다
+     (새 색 세트를 만들지 않고 주의 세트를 쓴다). */
+  .live-new-strip .lns-note.is-blocked {{ color: {warn_text}; }}
   /* [추가: 2026-07-26] '스크랩 언론사만 보기' — 서버 재검색 없이 이미 불러온 기사
      중에서 /outlets에 등록된 언론사만 화면에서 걸러 보여준다(노이즈 완화 목적).
      실시간 현황 자체의 "전체 언론사 라이브 미러" 성격은 그대로 유지된다. */
@@ -1128,6 +1131,8 @@ var _autoChecking = false;   // 확인이 겹치지 않게(한 번이 몇 초 �
 var _autoPendingHtml = null; // 마지막으로 받아온 목록 HTML(누를 때 이걸로 갈아끼운다)
 var _autoNewUrls = [];       // 그 안에서 지금 화면에 없는 기사 — 갈아끼운 뒤 노랑 표시용
 var _autoLastCheck = 0;
+var _lnsNoteText = "";    // 띠 안내줄의 평소 글자(「HH:MM 확인」)
+var _lnsNoteTimer = null; // 막힘 안내를 되돌리는 타이머
 function autoSw() {{ return document.getElementById("auto-refresh-sw"); }}
 function autoChk() {{ return document.getElementById("auto-refresh-chk"); }}
 function autoIntSelect() {{ return document.getElementById("auto-refresh-int"); }}
@@ -1249,7 +1254,10 @@ function showNewStrip(count) {{
   var note = document.getElementById("lns-note");
   if (note) {{
     var d = new Date();
-    note.textContent = ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2) + " 확인";
+    _lnsNoteText = ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2) + " 확인";
+    if (_lnsNoteTimer) {{ clearTimeout(_lnsNoteTimer); _lnsNoteTimer = null; }}
+    note.textContent = _lnsNoteText;
+    note.classList.remove("is-blocked");
   }}
   document.body.classList.add("has-new-live");
   // 시간대 머리줄을 이 띠 높이만큼 더 내려 붙이게 한다(CSS의 --live-new-h).
@@ -1259,7 +1267,42 @@ function hideNewStrip() {{
   document.body.classList.remove("has-new-live");
   document.body.style.setProperty("--live-new-h", "0px");
 }}
+// 갈아끼우기는 #live-body를 통째로 바꾸므로, 그 안에 열려 있던 것은 복원 목록에
+// 열거된 것(필터·검색어·그룹 칩·시간대 접힘·키워드 펼침)만 돌아온다. 그 목록에 없는 건
+// 말없이 사라지므로 **담당자가 쓰던 글자가 있으면 갈아끼우지 않는다**. 막는 기준은
+// 「잃을 글자가 있나」 하나다 — ⋯ 메뉴와 글자를 안 친 라벨 팝오버는 막지 않는다(다시
+// 여는 데 한 번이면 되고, 팝오버는 어차피 바깥을 누르면 닫히는 규칙이다).
+function liveSwapBlockReason() {{
+  // 「기사 정보 직접 수정」 — 행에 끼워 넣는 칸이라 바깥을 눌러도 안 닫힌다.
+  if (document.querySelector("#live-body .edit-summary-form")) {{
+    return "고쳐 쓰던 칸을 저장하거나 닫은 뒤에 눌러주세요";
+  }}
+  // 라벨 이름을 치던 중 — 열려만 있고 비어 있으면 잃을 글자가 없다.
+  var typing = false;
+  document.querySelectorAll("#live-body .lab-pop:not(.hidden) .lab-input").forEach(function (el) {{
+    if (el.value && el.value.trim()) typing = true;
+  }});
+  if (typing) return "쓰던 라벨 이름을 끝낸 뒤에 눌러주세요";
+  return "";
+}}
+// 막힌 이유를 띠의 안내줄 자리에 잠깐 적는다 — 누르면 아무 일도 안 일어나는 버튼이
+// 되면 안 된다. 띠는 그대로 떠 있으니 칸을 닫고 다시 누르면 된다.
+function noteSwapBlocked(why) {{
+  var note = document.getElementById("lns-note");
+  if (!note) return;
+  if (_lnsNoteTimer) clearTimeout(_lnsNoteTimer);
+  note.textContent = why;
+  note.classList.add("is-blocked");
+  _lnsNoteTimer = setTimeout(function () {{
+    note.textContent = _lnsNoteText;
+    note.classList.remove("is-blocked");
+    _lnsNoteTimer = null;
+  }}, 4000);
+}}
 function applyNewArticles() {{
+  // 쓰던 글자가 사라질 자리가 열려 있으면 미룬다(위 liveSwapBlockReason).
+  var blocked = liveSwapBlockReason();
+  if (blocked) {{ noteSwapBlocked(blocked); return; }}
   // 받아둔 게 없으면(자동 새로고침을 끈 뒤 등) 눌렀을 때 평소처럼 다시 불러온다.
   if (!_autoPendingHtml) {{ location.reload(); return; }}
   var doc = new DOMParser().parseFromString(_autoPendingHtml, "text/html");
@@ -1406,7 +1449,10 @@ _AUTO_REFRESH_TOGGLE = (
 _NEW_STRIP_HTML = (
     '<div class="live-new-strip" id="live-new-strip">'
     '<button type="button" class="lns-btn" onclick="applyNewArticles()">'
-    f'{icon("refresh")} 새 기사 <span id="lns-count">0</span>건 보기</button>'
+    # 글자는 한 겹으로 감싼다 — 버튼이 flex라 벗겨 두면 「새 기사」·건수·「건 보기」가
+    # 저마다 flex 항목이 돼 gap이 숫자와 「건」 사이까지 벌린다(30 건 보기).
+    f'{icon("refresh")}<span class="lns-txt">새 기사 '
+    '<span id="lns-count">0</span>건 보기</span></button>'
     '<span class="lns-note" id="lns-note"></span>'
     "</div>"
 )
