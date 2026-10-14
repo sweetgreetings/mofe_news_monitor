@@ -1237,6 +1237,8 @@ function autoCheckNow() {{
     if (!added.length) {{ _autoPendingHtml = null; _autoNewUrls = []; hideNewStrip(); return; }}
     _autoPendingHtml = text;
     _autoNewUrls = added;
+    // 맨 위를 보고 있고 아무것도 안 열려 있으면 띠를 거치지 않고 바로 반영한다.
+    if (liveAutoSwapOk()) {{ applyNewArticles(); return; }}
     showNewStrip(added.length);
   }}).catch(function () {{
     // 앱이 잠깐 안 떠 있어도 조용히 넘긴다 — 다음 주기에 다시 본다.
@@ -1272,6 +1274,23 @@ function hideNewStrip() {{
 // 말없이 사라지므로 **담당자가 쓰던 글자가 있으면 갈아끼우지 않는다**. 막는 기준은
 // 「잃을 글자가 있나」 하나다 — ⋯ 메뉴와 글자를 안 친 라벨 팝오버는 막지 않는다(다시
 // 여는 데 한 번이면 되고, 팝오버는 어차피 바깥을 누르면 닫히는 규칙이다).
+// 맨 위를 보고 있으면 읽고 있는 줄이 없다는 뜻이라, 그때는 띠를 띄우지 않고 그 자리에서
+// 갈아끼운다(새 기사는 목록 맨 위에 붙고 노랑으로 칠해진다). 아래로 내려가 읽는 중이면
+// 예전처럼 띠만 — 그게 이 기능의 원래 규칙이다.
+var LIVE_AUTO_TOP_PX = 4;  // 「맨 위」로 보는 한계(주소창 보정 등으로 0이 아닐 수 있다)
+function liveAtTop() {{
+  var y = window.scrollY || document.documentElement.scrollTop || 0;
+  return y <= LIVE_AUTO_TOP_PX;
+}}
+// 저절로 할 때는 한 걸음 더 깐깐하다 — 담당자가 누른 게 아니니 **열려 있는 것이 하나라도
+// 있으면 건드리지 않는다**(⋯ 메뉴·라벨 팝오버는 눌러서 갈아끼울 땐 안 막는다).
+function liveAutoSwapOk() {{
+  if (!liveAtTop()) return false;
+  if (liveSwapBlockReason()) return false;
+  if (document.querySelector("#live-body .more-wrap.is-open")) return false;
+  if (document.querySelector("#live-body .lab-pop:not(.hidden)")) return false;
+  return true;
+}}
 function liveSwapBlockReason() {{
   // 「기사 정보 직접 수정」 — 행에 끼워 넣는 칸이라 바깥을 눌러도 안 닫힌다.
   if (document.querySelector("#live-body .edit-summary-form")) {{
@@ -1326,6 +1345,21 @@ function applyNewArticles() {{
   var list = document.getElementById("live-list");
   var ungrouped = !!(list && list.classList.contains("is-ungrouped"));
   var breakdownOpen = !!document.querySelector("#keyword-breakdown.is-open");
+  // 펼쳐 본 요약(<details class="live-title">)도 주소로 적어 둔다 — 복원 목록에 없으면
+  // 갈아끼울 때 통째로 접힌다. 저절로 갈아끼우면 읽던 요약이 스스로 닫히는 셈이 된다.
+  var openSummaries = {{}};
+  document.querySelectorAll("#live-body .live-row").forEach(function (row) {{
+    if (row.querySelector(".live-title[open]")) {{
+      var u = _rowUrl(row);
+      if (u) openSummaries[u] = 1;
+    }}
+  }});
+  // 골라 둔 체크박스도 적어 둔다 — 「📌 담아두기」로 고른 기사가 갈아끼우며 말없이
+  // 풀리면 띠를 누른 담당자는 몇 건을 골랐었는지 다시 세야 한다.
+  var picked = {{}};
+  document.querySelectorAll("#live-body .live-select:checked").forEach(function (box) {{
+    if (box.dataset.url) picked[box.dataset.url] = 1;
+  }});
 
   host.innerHTML = fresh.innerHTML;
   // 머리줄의 「0시~HH:MM 누적」도 같이 갈아끼운다(건수는 아래 applyLiveFilters가 다시 센다).
@@ -1338,6 +1372,10 @@ function applyNewArticles() {{
   document.querySelectorAll("#live-body .live-row").forEach(function (row) {{
     var u = _rowUrl(row);
     if (u && newSet[u]) row.classList.add("is-new-arrival");
+    if (u && openSummaries[u]) {{
+      var det = row.querySelector(".live-title");
+      if (det) det.open = true;
+    }}
   }});
   // 적어 둔 화면 상태를 되돌린다.
   LIVE_FILTER_IDS.forEach(function (id) {{
@@ -1372,6 +1410,11 @@ function applyNewArticles() {{
     var panel = document.getElementById("keyword-breakdown");
     if (panel) panel.classList.add("is-open");
   }}
+  // 골라 둔 기사를 다시 체크한다(갈아끼운 목록에서 사라진 기사는 자연히 빠진다).
+  document.querySelectorAll("#live-body .live-select").forEach(function (box) {{
+    if (box.dataset.url && picked[box.dataset.url]) box.checked = true;
+  }});
+  updateLiveBulkBar();
   renderRelativeTimes();
   markTruncatedKeywords();
   applyLiveFilters();
