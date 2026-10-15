@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>툴바 단추 틀 시안</title>
+<style>
+:root {
+  --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem;
+  --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+  --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px;
+  --h-sm: 24px; --h-tb: 28px; --h-md: 30px; --h-lg: 36px;
+}
+body { margin: 0; background: #F8FAFC; color: #1F2937;
+  font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+.page { max-width: 1000px; margin: 28px auto 80px; padding: 0 20px; }
+.page > h1 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 6px; }
+.page > p.lead { font-size: var(--fs-md); color: #6B7280; line-height: 1.7; margin: 0 0 26px; }
+.page > p.lead b { color: #1F2937; }
+
+/* ── 한 안을 담는 틀 ───────────────────────────────── */
+.case { margin: 0 0 30px; }
+.case > .cap { display: flex; align-items: baseline; gap: 10px; margin: 0 0 8px; flex-wrap: wrap; }
+.case > .cap .nm { font-size: var(--fs-lg); font-weight: 700; color: #1E3A5F; }
+.case > .cap .spec { font-size: var(--fs-sm); color: #4B5563; font-variant-numeric: tabular-nums;
+  background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 2px 10px; }
+.case > .cap .why { font-size: var(--fs-sm); color: #6B7280; }
+.case.now > .cap .nm { color: #6B7280; }
+.case.pick > .cap .nm::after { content: ' ← 추천'; font-size: var(--fs-sm); color: #2563EB; font-weight: 600; }
+
+/* 실제 화면과 같은 카드 폭(800px) */
+.screen { max-width: 800px; background: #FFFFFF; border: 1px solid #E5E7EB;
+  border-radius: var(--r-lg); padding: 20px 24px 22px; }
+
+/* ── 제목 줄 ─────────────────────────────────────── */
+.screen h2 { font-size: var(--fs-xl); margin: 0 0 16px; color: #1E3A5F; font-weight: 700; }
+.screen-tag { display: inline-flex; align-items: center; font-size: var(--fs-sm); font-weight: 700;
+  padding: 3px 11px; border-radius: var(--r-pill); border: 1px solid; margin-right: 10px;
+  vertical-align: 0.18em; line-height: 1.3;
+  background: #F1F5F9; border-color: #E5E7EB; color: #6B7280; }
+.head-sub { font-size: 0.72em; font-weight: 500; color: #6B7280; margin-left: 6px; }
+.pending-count-badge { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px;
+  vertical-align: 0.2em; font-size: var(--fs-sm); font-weight: 700; color: #92400E;
+  background: #FEF3C7; border: 1px solid #FDE68A; border-radius: var(--r-pill);
+  padding: 1px 9px; cursor: pointer; }
+.pending-count-badge .ic { width: 1.05em; height: 1.05em; }
+
+/* ── 툴바 ────────────────────────────────────────── */
+.actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.actions button, .actions a.btn {
+  background: #EFF6FF; color: #2563EB; font-weight: 600; border-radius: var(--r-md);
+  border: none; font-size: var(--fs-md); font-family: inherit; cursor: pointer;
+  appearance: none; -webkit-appearance: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  user-select: none;
+  height: var(--btn-h); padding: 0 var(--btn-px); box-sizing: border-box;
+}
+.actions .create-group-btn {
+  background: transparent; color: #2563EB; border: 1px solid #BFDBFE;
+  border-radius: var(--r-md); font-weight: 500;
+}
+.actions .create-group-btn:hover { background: #EFF6FF; border-color: #A9C6F5; }
+.actions .reclassify-btn { background: #F0EAFB; color: #4A3F8F; border: 1px solid #DCD0F2; }
+.actions .reclassify-btn:hover { background: #E7DBFA; border-color: #CBB9EC; }
+.actions-divider { width: 1px; height: 24px; background: #E5E7EB; margin: 0 2px; }
+.plus-glyph { font-size: 1.2em; font-weight: 600; line-height: 0; margin-right: 4px; }
+
+.actions .actions-right { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.actions .export-links { display: inline-flex; align-items: center; }
+.actions .export-links button {
+  background: transparent; border: none; color: #4B5563; font-weight: 500;
+  height: var(--btn-h); padding: 0 8px; box-sizing: border-box; border-radius: var(--r-md);
+}
+.actions .export-links button:hover { background: transparent; color: #2563EB;
+  text-decoration: underline; text-underline-offset: 3px; }
+.view-mode-select {
+  border: 1px solid #2563EB; border-radius: var(--r-md); font-size: var(--fs-md);
+  height: var(--btn-h); padding: 0 9px; box-sizing: border-box;
+  color: #1F2937; background: #FFFFFF; font-family: inherit;
+}
+.actions .refresh-link {
+  background: transparent; border: none; cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 4px;
+  height: var(--btn-h); padding: 0 8px; box-sizing: border-box; border-radius: var(--r-md);
+  font-size: var(--fs-md); font-weight: 500; color: #4B5563; white-space: nowrap;
+  font-family: inherit;
+}
+.actions .refresh-link:hover { color: #2563EB; text-decoration: underline; text-underline-offset: 3px; }
+
+/* ── 폴백 경고 배너(빨강) ─────────────────────────── */
+.classify-degraded {
+  background: #FEF2F2; border: 1px solid #FECACA; border-left: 4px solid #DC2626;
+  border-radius: var(--r-lg); padding: 12px 14px; margin: 14px 0 0;
+}
+.classify-degraded .msg { font-size: var(--fs-md); color: #DC2626; line-height: 1.8; }
+.classify-degraded .msg b { color: #DC2626; }
+.classify-degraded .btn-ref {
+  display: inline-flex; align-items: center; gap: 4px; background: #F0EAFB;
+  border: 1px solid #DCD0F2; border-radius: var(--r-sm);
+  padding: var(--chip-py) var(--chip-px-r) var(--chip-py) var(--chip-px-l);
+  font-weight: 700; color: #4A3F8F; white-space: nowrap;
+}
+.classify-degraded .btn-ref .ic { width: 0.95em; height: 0.95em; }
+
+.ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+  stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+
+/* ── 치수별 값 ───────────────────────────────────── */
+.v-now  { --btn-h: 28px; --btn-px: 9px;  --chip-py: 1px; --chip-px-l: 6px;  --chip-px-r: 8px; }
+.v-a    { --btn-h: 28px; --btn-px: 14px; --chip-py: 2px; --chip-px-l: 8px;  --chip-px-r: 10px; }
+.v-b    { --btn-h: 30px; --btn-px: 14px; --chip-py: 3px; --chip-px-l: 8px;  --chip-px-r: 10px; }
+.v-c    { --btn-h: 32px; --btn-px: 16px; --chip-py: 4px; --chip-px-l: 9px;  --chip-px-r: 12px; }
+
+/* ── 네 안을 바로 포개어 보는 줄 ──────────────────── */
+.stack { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+  padding: 18px 22px 20px; max-width: 800px; }
+.stack h3 { font-size: var(--fs-lg); color: #1E3A5F; margin: 0 0 4px; }
+.stack p { font-size: var(--fs-sm); color: #6B7280; margin: 0 0 14px; line-height: 1.6; }
+.srow { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px dashed #E5E7EB; }
+.srow:first-of-type { border-top: none; }
+.srow .lbl { width: 108px; flex: none; font-size: var(--fs-sm); color: #6B7280;
+  font-variant-numeric: tabular-nums; }
+.srow .lbl b { color: #1F2937; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>툴바 단추 틀 — 지금 vs 세 가지 시안</h1>
+<p class="lead">
+  지금 툴바 단추는 <b>높이 28px · 좌우 여백 9px · 글자 0.88rem</b>입니다.
+  글자가 틀 양옆에 거의 붙어 빡빡해 보이는 건 <b>좌우 여백 9px</b> 때문입니다.
+  아래 셋 중에 고르시면 그대로 반영하겠습니다. 빨간 배너 안의
+  「AI 모든 기사 재분류」 칩도 같은 비율로 같이 키웠습니다.
+</p>
+
+<!-- ══ 포개어 보기 ══ -->
+<div class="stack">
+  <h3>단추 셋만 포개어 보기</h3>
+  <p>같은 단추를 네 치수로 나란히 둔 것입니다. 줄을 위아래로 훑으면 차이가 바로 보입니다.</p>
+
+  <div class="srow v-now">
+    <span class="lbl"><b>지금</b><br>28 / 9</span>
+    <span class="actions" style="gap:8px">
+      <button class="create-group-btn" type="button"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn" type="button">한 줄 메모</button>
+      <span class="actions-divider"></span>
+      <button class="create-group-btn reclassify-btn" type="button">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+        &nbsp;AI 모든 기사 재분류</button>
+    </span>
+  </div>
+
+  <div class="srow v-a">
+    <span class="lbl"><b>A안</b><br>28 / 14</span>
+    <span class="actions" style="gap:8px">
+      <button class="create-group-btn" type="button"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn" type="button">한 줄 메모</button>
+      <span class="actions-divider"></span>
+      <button class="create-group-btn reclassify-btn" type="button">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+        &nbsp;AI 모든 기사 재분류</button>
+    </span>
+  </div>
+
+  <div class="srow v-b">
+    <span class="lbl"><b>B안</b><br>30 / 14</span>
+    <span class="actions" style="gap:8px">
+      <button class="create-group-btn" type="button"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn" type="button">한 줄 메모</button>
+      <span class="actions-divider"></span>
+      <button class="create-group-btn reclassify-btn" type="button">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+        &nbsp;AI 모든 기사 재분류</button>
+    </span>
+  </div>
+
+  <div class="srow v-c">
+    <span class="lbl"><b>C안</b><br>32 / 16</span>
+    <span class="actions" style="gap:8px">
+      <button class="create-group-btn" type="button"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn" type="button">한 줄 메모</button>
+      <span class="actions-divider"></span>
+      <button class="create-group-btn reclassify-btn" type="button">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+        &nbsp;AI 모든 기사 재분류</button>
+    </span>
+  </div>
+</div>
+
+<div style="height:34px"></div>
+
+<!-- ══ 지금 ══ -->
+<div class="case now">
+  <div class="cap">
+    <span class="nm">지금</span>
+    <span class="spec">높이 28 · 좌우 9</span>
+    <span class="why">글자와 테두리 사이가 좁아 단추가 눌려 보입니다.</span>
+  </div>
+  <div class="screen v-now">
+    <h2><span class="screen-tag">초안</span>언론 모니터링 17시 기준<span class="head-sub">(예정, 지금 16시 05분 기준)</span><span class="pending-count-badge"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18.5V6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.6h7.8A1.5 1.5 0 0 1 20 9.1V10.5"/><path d="M3 18.5 5.6 11.6A1.5 1.5 0 0 1 7 10.5h13.6a1 1 0 0 1 .95 1.3l-2.2 7A1.5 1.5 0 0 1 17.9 20H4.5A1.5 1.5 0 0 1 3 18.5Z"/></svg>3</span></h2>
+    <div class="actions">
+      <button class="create-group-btn" type="button"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn" type="button">한 줄 메모</button>
+      <span class="actions-divider"></span>
+      <button class="create-group-btn reclassify-btn" type="button">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+        &nbsp;AI 모든 기사 재분류</button>
+      <span class="actions-right">
+        <span class="export-links">
+          <button type="button">복사</button>
+          <button type="button">텍스트</button>
+          <button type="button">엑셀</button>
+        </span>
+        <select class="view-mode-select">
+          <option>소제목 내 언론사순</option>
+        </select>
+        <span class="actions-divider"></span>
+        <a class="refresh-link" href="#">
+          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+          새로고침</a>
+      </span>
+    </div>
+    <div class="classify-degraded"><div class="msg">
+      ⚠️ <b>AI가 소제목을 짓지 못했어요.</b> 지금 보이는 소제목은 AI가 지은 이름이 아니라,
+      단어 빈도수에 따라 기계적으로 뽑은 단어입니다.<br>
+      위의 <span class="btn-ref"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>AI 모든 기사 재분류</span> 를 눌러 다시 요청해주세요.
+    </div></div>
+  </div>
+</div>
+
+<!-- ══ A안 ══ -->
+<div class="case pick">
+  <div class="cap">
+    <span class="nm">A안 — 좌우만 넓힌다</span>
+    <span class="spec">높이 28 · 좌우 14</span>
+    <span class="why">높이는 그대로라 툴바 한 줄의 가지런함(가져가기 글자·보기 순서·새로고침)이 하나도 안 흔들립니다.</span>
+  </div>
+  <div class="screen v-a">
+    <h2><span class="screen-tag">초안</span>언론 모니터링 17시 기준<span class="head-sub">(예정, 지금 16시 05분 기준)</span><span class="pending-count-badge"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18.5V6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.6h7.8A1.5 1.5 0 0 1 20 9.1V10.5"/><path d="M3 18.5 5.6 11.6A1.5 1.5 0 0 1 7 10.5h13.6a1 1 0 0 1 .95 1.3l-2.2 7A1.5 1.5 0 0 1 17.9 20H4.5A1.5 1.5 0 0 1 3 18.5Z"/></svg>3</span></h2>
+    <div class="actions">
+      <button class="create-group-btn" type="button"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn" type="button">한 줄 메모</button>
+      <span class="actions-divider"></span>
+      <button class="create-group-btn reclassify-btn" type="button">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+        &nbsp;AI 모든 기사 재분류</button>
+      <span class="actions-right">
+        <span class="export-links">
+          <button type="button">복사</button>
+          <button type="button">텍스트</button>
+          <button type="button">엑셀</button>
+        </span>
+        <select class="view-mode-select">
+          <option>소제목 내 언론사순</option>
+        </select>
+        <span class="actions-divider"></span>
+        <a class="refresh-link" href="#">
+          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+          새로고침</a>
+      </span>
+    </div>
+    <div class="classify-degraded"><div class="msg">
+      ⚠️ <b>AI가 소제목을 짓지 못했어요.</b> 지금 보이는 소제목은 AI가 지은 이름이 아니라,
+      단어 빈도수에 따라 기계적으로 뽑은 단어입니다.<br>
+      위의 <span class="btn-ref"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>AI 모든 기사 재분류</span> 를 눌러 다시 요청해주세요.
+    </div></div>
+  </div>
+</div>
+
+<!-- ══ B안 ══ -->
+<div class="case">
+  <div class="cap">
+    <span class="nm">B안 — 좌우 + 높이 한 칸</span>
+    <span class="spec">높이 30 · 좌우 14</span>
+    <span class="why">툴바 단추가 입력칸과 같은 30px이 됩니다. 수시 화면·선택 바·사진 모아 보기 띠 단추까지 같이 2px 커집니다.</span>
+  </div>
+  <div class="screen v-b">
+    <h2><span class="screen-tag">초안</span>언론 모니터링 17시 기준<span class="head-sub">(예정, 지금 16시 05분 기준)</span><span class="pending-count-badge"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18.5V6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.6h7.8A1.5 1.5 0 0 1 20 9.1V10.5"/><path d="M3 18.5 5.6 11.6A1.5 1.5 0 0 1 7 10.5h13.6a1 1 0 0 1 .95 1.3l-2.2 7A1.5 1.5 0 0 1 17.9 20H4.5A1.5 1.5 0 0 1 3 18.5Z"/></svg>3</span></h2>
+    <div class="actions">
+      <button class="create-group-btn" type="button"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn" type="button">한 줄 메모</button>
+      <span class="actions-divider"></span>
+      <button class="create-group-btn reclassify-btn" type="button">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+        &nbsp;AI 모든 기사 재분류</button>
+      <span class="actions-right">
+        <span class="export-links">
+          <button type="button">복사</button>
+          <button type="button">텍스트</button>
+          <button type="button">엑셀</button>
+        </span>
+        <select class="view-mode-select">
+          <option>소제목 내 언론사순</option>
+        </select>
+        <span class="actions-divider"></span>
+        <a class="refresh-link" href="#">
+          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+          새로고침</a>
+      </span>
+    </div>
+    <div class="classify-degraded"><div class="msg">
+      ⚠️ <b>AI가 소제목을 짓지 못했어요.</b> 지금 보이는 소제목은 AI가 지은 이름이 아니라,
+      단어 빈도수에 따라 기계적으로 뽑은 단어입니다.<br>
+      위의 <span class="btn-ref"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>AI 모든 기사 재분류</span> 를 눌러 다시 요청해주세요.
+    </div></div>
+  </div>
+</div>
+
+<!-- ══ C안 ══ -->
+<div class="case">
+  <div class="cap">
+    <span class="nm">C안 — 넉넉하게</span>
+    <span class="spec">높이 32 · 좌우 16</span>
+    <span class="why">가장 여유롭지만 툴바가 보고서 목록보다 무거워집니다. 좁은 창에서 오른쪽 묶음이 더 빨리 아랫줄로 내려갑니다.</span>
+  </div>
+  <div class="screen v-c">
+    <h2><span class="screen-tag">초안</span>언론 모니터링 17시 기준<span class="head-sub">(예정, 지금 16시 05분 기준)</span><span class="pending-count-badge"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18.5V6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.6h7.8A1.5 1.5 0 0 1 20 9.1V10.5"/><path d="M3 18.5 5.6 11.6A1.5 1.5 0 0 1 7 10.5h13.6a1 1 0 0 1 .95 1.3l-2.2 7A1.5 1.5 0 0 1 17.9 20H4.5A1.5 1.5 0 0 1 3 18.5Z"/></svg>3</span></h2>
+    <div class="actions">
+      <button class="create-group-btn" type="button"><span class="plus-glyph">+</span>새 소제목</button>
+      <button class="create-group-btn" type="button">한 줄 메모</button>
+      <span class="actions-divider"></span>
+      <button class="create-group-btn reclassify-btn" type="button">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+        &nbsp;AI 모든 기사 재분류</button>
+      <span class="actions-right">
+        <span class="export-links">
+          <button type="button">복사</button>
+          <button type="button">텍스트</button>
+          <button type="button">엑셀</button>
+        </span>
+        <select class="view-mode-select">
+          <option>소제목 내 언론사순</option>
+        </select>
+        <span class="actions-divider"></span>
+        <a class="refresh-link" href="#">
+          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+          새로고침</a>
+      </span>
+    </div>
+    <div class="classify-degraded"><div class="msg">
+      ⚠️ <b>AI가 소제목을 짓지 못했어요.</b> 지금 보이는 소제목은 AI가 지은 이름이 아니라,
+      단어 빈도수에 따라 기계적으로 뽑은 단어입니다.<br>
+      위의 <span class="btn-ref"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>AI 모든 기사 재분류</span> 를 눌러 다시 요청해주세요.
+    </div></div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

@@ -404,7 +404,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      이 툴바 안에서만 덮어쓰고, 🗑️/↑/↓ 등 다른 버튼은 그대로 원색 유지. */
   .actions button, .actions a.btn {{
     background: {hover}; color: {accent}; font-weight: 600; border-radius: var(--r-md);
-    height: var(--h-tb); padding: 0 9px; box-sizing: border-box;
+    height: var(--h-tb); padding: 0 14px; box-sizing: border-box; gap: 5px;
   }}
   .actions button:hover, .actions a.btn:hover {{ background: {accent_tonal}; }}
   /* [수정: 2026-08-03] "+ 새 소제목 만들기"만 나머지 툴바 버튼과 기능이 달라(내용을
@@ -5297,7 +5297,7 @@ REFETCH_TITLES_STYLE = """
   /* 제목을 바꾸는 동작이라 **테두리 박스**다(글자 버튼은 가져가거나 보기만 바꾸는 것).
      높이·여백·굵기는 확정본·초안 툴바 버튼과 같은 값. */
   .title-refetch-btn {{
-    height: var(--h-tb); padding: 0 9px; font-size: var(--fs-md); font-weight: 500;
+    height: var(--h-tb); padding: 0 14px; font-size: var(--fs-md); font-weight: 500;
     background: {card}; color: {text_soft}; border: 1px solid {border};
     border-radius: var(--r-md); display: inline-flex; align-items: center; gap: 5px;
     cursor: pointer; font-family: inherit; white-space: nowrap; flex: none;

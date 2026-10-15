@@ -639,7 +639,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* AI 버튼은 언제나 채운 연보라(정기 「AI 모든 기사 재분류」와 같은 값). */
   .btn.ai {{ background: {ai_bg}; color: {ai_text}; border-color: {ai_border}; }}
   .btn.ai:hover {{ background: {ai_bg_hover}; border-color: {ai_border_hover}; }}
-  .btn.sm {{ font-size: var(--fs-md); height: var(--h-tb); padding: 0 9px; box-sizing: border-box; }}
+  .btn.sm {{ font-size: var(--fs-md); height: var(--h-tb); padding: 0 14px; box-sizing: border-box; }}
   .btn:disabled {{ opacity: 0.45; cursor: not-allowed; }}
   .adv {{ margin-top: 8px; border-top: 1px dashed {border}; padding-top: 13px; }}
   .adv-h {{ font-size: var(--fs-sm); color: {muted}; font-weight: 700; margin-bottom: 10px; }}

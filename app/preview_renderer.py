@@ -211,7 +211,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      읽히게 한다(app.preview_renderer._actions_html의 .reclassify-btn과 배색 통일). */
   .classify-degraded .btn-ref {{
     display: inline-flex; align-items: center; gap: 4px; background: {ai_bg};
-    border: 1px solid {ai_border}; border-radius: var(--r-sm); padding: 1px 8px 1px 6px;
+    border: 1px solid {ai_border}; border-radius: var(--r-sm); padding: 2px 10px 2px 8px;
     font-weight: 700; color: {ai_text}; white-space: nowrap;
   }}
   .classify-degraded .btn-ref .ic {{ width: 0.95em; height: 0.95em; }}
@@ -595,7 +595,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* [수정: 2026-08-03] app.renderer와 동일한 이유로 액션 툴바만 소프트 필로(시안 B) */
   .actions button, .actions a.btn {{
     background: {hover}; color: {accent}; font-weight: 600; border-radius: var(--r-md);
-    height: var(--h-tb); padding: 0 9px; box-sizing: border-box;
+    height: var(--h-tb); padding: 0 14px; box-sizing: border-box; gap: 5px;
   }}
   .actions button:hover, .actions a.btn:hover {{ background: {accent_tonal}; }}
   /* scroll-margin-top — .topbar가 position:fixed라, 목차·"미분류 N건"으로 뛰어오면
