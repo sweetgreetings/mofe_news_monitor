@@ -184,7 +184,9 @@ from app.credentials import (
     telegram_source,
     save_naver_credentials,
 )
-from app.summary_overrides import load_summary_overrides, set_summary_override
+from app.summary_overrides import (
+    load_summary_overrides, set_summary_override, title_history_of,
+)
 from app.title_refetch import refetch_titles
 
 from app.photo_overrides import set_photo_override
@@ -203,6 +205,7 @@ from app.renderer import (
     build_group_copy_texts,
     generate_screen,
     known_label_chips_html,
+    refetch_title_marks,
     refetch_titles_button_html,
     refetch_titles_note_html,
     refetch_titles_script,
@@ -4876,11 +4879,18 @@ def _render_label_archive_row(
     # [추가: 2026-10-12] 「⟳ 제목 다시 불러오기」가 읽는 표식 넷(app.renderer의 그 절).
     # 보내는 값은 **화면이 지금 보여주는 제목**이라야 한다 — data-refetch-title이 가리키는
     # 글자가 곧 그 값이고, 위에서 override를 이미 입혔다.
+    # [추가: 2026-10-15] 저장된 제목 변경 이력 — 칩·옛 제목 줄·이력 블록을 서버가 그려
+    # 새로고침해도 남는다(app.renderer.refetch_title_marks가 가는 자리까지 정한다).
+    chip_html, was_html, hist_html = refetch_title_marks(
+        title_history_of(url, overrides)
+    )
     return (
         f'<div class="arc-row" data-refetch-row data-url="{html.escape(url, quote=True)}" '
         f'data-pub="{html.escape(pub_date or "", quote=True)}">'
         f'<div class="arc-title" data-refetch-title>{title}</div>'
-        f'<div class="arc-meta" data-refetch-meta>{"".join(meta_parts)}</div>'
+        f"{was_html}"
+        f'<div class="arc-meta" data-refetch-meta>{chip_html}{"".join(meta_parts)}</div>'
+        f"{hist_html}"
         "</div>"
     )
 
@@ -7763,7 +7773,19 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             for i, url in enumerate(urls)
             if url
         ]
-        self._respond_json(refetch_titles(articles))
+        result = refetch_titles(articles)
+        # [추가: 2026-10-15] 제목이 바뀐 줄의 칩·옛 제목 줄·이력 블록 HTML을 같이 보낸다 —
+        # **화면이 따로 짓지 않게 하려는 것**이다. 새로고침한 뒤에는 서버가 저장된 이력에서
+        # 같은 함수로 그리므로, 화면이 제 나름대로 지으면 같은 기사가 누른 직후와 새로고침
+        # 뒤에 두 모습이 된다. 저장이 이미 끝난 뒤라 여기서 읽으면 방금 쓴 이력이 들어 있다.
+        overrides = load_summary_overrides()
+        for url, row in (result.get("rows") or {}).items():
+            if row.get("state") != "changed":
+                continue
+            row["chip"], row["was"], row["hist"] = refetch_title_marks(
+                title_history_of(url, overrides)
+            )
+        self._respond_json(result)
 
     def _handle_edit_summary(self, form: dict) -> None:
         """✏️ 「기사 정보 직접 수정」이 fetch로 호출한다(editSummary) — 🔄가 원문에서도

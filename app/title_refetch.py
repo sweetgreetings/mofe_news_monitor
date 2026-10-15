@@ -281,8 +281,12 @@ def refetch_titles(articles: list, *, apply: bool = True) -> dict:
         )
         rows[url] = verdict
         # 보호된 항목은 제목을 안 적는다. 기준점은 적는다 — 확인은 했기 때문이다.
+        # `old_title`은 **화면이 지금 보여주고 있던 제목**이다 — 저장소에는 한 번도 고친
+        # 적 없는 기사의 옛 제목이 아예 없어서(override가 없다), 이력을 적는 자리에서
+        # 되찾을 길이 없다. 여기서 들고 넘긴다.
         writes[url] = {
             "title": verdict["new_title"],
+            "old_title": verdict["old_title"],
             "modified_at": verdict["modified_at"],
         }
 

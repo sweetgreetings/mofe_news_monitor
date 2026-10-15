@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제목 변경 이력 — 시안</title>
+<style>
+
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  /* [수정: 2026-09-11] 폭은 확정본·초안과 같은 800px 하나다 — 본문 카드·상단바·하단
+     저장 바 세 자리가 같은 값이어야 한다(하나만 넓히면 상단 링크·저장 버튼이 본문과
+     어긋난다). 예전엔 설정 폼용 480px이 기본이고 기사 목록 화면 셋만 body.wide로
+     800px을 썼는데, 목록이 길어지는 설정 화면(검색어·언론사 등)까지 좁아져 스크롤만
+     길어졌다. 폭만 넓히면 한 줄에 하나씩 쌓는 화면은 오른쪽만 비므로, 긴 화면 여섯은
+     각자 템플릿에서 여러 칸 배치를 함께 쓴다(각 템플릿의 "[추가: 2026-09-11]" 참고). */
+  .container {
+    max-width: 800px; margin: 24px auto; padding: 24px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+  }
+  /* [수정: 2026-07-26] 모든 설정 세부 페이지에 상단(뒤로/HOME)·하단(저장) 고정 바를
+     적용하면서, 내용이 그 바에 가리지 않도록 컨테이너 위쪽에 여백을 더했다. 하단
+     여백(저장 버튼 있는 페이지만 필요)은 페이지마다 필요할 때만 덧붙인다. */
+  /* [수정: 2026-09-16] 카드 위 여백 60→44px — 60px은 상단 고정바(54px)를 피하려는 값인데 글자 위로
+     30px이 비었다. 44px이면 16px 남는다. 확정본·초안·실시간·정기 보관함·설정·수시·정책 단어 추이
+     일곱 화면이 같은 값을 써야 화면을 오갈 때 제목이 들썩이지 않는다(수시·추이는 84→68px 형태).
+     시안 파일은 정리하며 없앴다(당시 B안). */
+  .container { padding-top: 44px; }
+  h1 { font-size: var(--fs-xl); color: #1E3A5F; }
+  .hint { color: #6B7280; font-size: var(--fs-md); margin-bottom: 16px; }
+  .caption { color: #6B7280; font-size: var(--fs-sm); margin: 0 0 12px; }
+  .error { color: #DC2626; margin: 12px 0; }
+
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem; --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%; --h-sm: 24px; --h-tb: 28px; --h-md: 30px; --h-lg: 36px; --fab-lg: 56px; --fab-sm: 48px; --chk-md: 16px; --chk-sm: 14px; --sh-float: 0 4px 12px rgba(15, 23, 42, 0.12); --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14); --sh-modal: 0 16px 40px rgba(15, 23, 42, 0.22); }
+  .plus-glyph { font-size: 1.2em; font-weight: 600; line-height: 0; margin-right: 4px; }
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    background: #FFFFFF; border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .topbar-inner {
+    max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: flex-start; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .topbar-inner > .tn { color: #2563EB; text-decoration: none; font-size: var(--fs-md); font-weight: 600;
+    padding: 5px 14px; border: 1px solid transparent; border-radius: var(--r-pill); white-space: nowrap; }
+  .topbar-inner > a.tn:hover { background: #EFF6FF; }
+  .topbar-inner > .tn-sep { width: 1px; height: 18px; background: #E5E7EB; margin: 0 16px; }
+  .topbar-inner > .tn.is-current { cursor: default; background: #EFF6FF;
+    border-color: #BFDBFE; color: #2563EB; }
+  .topbar.adhoc .topbar-inner > .tn.is-current { background: #E3F1EE;
+    border-color: rgba(20, 107, 94, 0.45); color: #146B5E; }
+  .topbar-inner > .tn.is-empty { color: #6B7280; opacity: 0.55; cursor: not-allowed; }
+  .topbar-inner > a.tn.back { color: #4B5563; }
+  .topbar-inner > a.tn.back:hover { color: #2563EB; }
+  @media (max-width: 480px) {
+    .topbar-inner { padding: 12px 12px; gap: 2px; }
+    .topbar-inner > .tn { padding: 5px 8px; }
+    .topbar-inner > .tn-sep { margin: 0 8px; }
+  }
+
+  .save-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    background: #FFFFFF; border-top: 1px solid #E5E7EB; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  }
+  .save-bar-inner { max-width: 800px; margin: 0 auto; padding: 12px 24px; }
+  .save-bar button { width: 100%; }
+  /* [수정: 2026-08-03] app.renderer와 동일한 이유 — button은 a와 달리 font-family를
+     상속받지 않고, appearance:auto(네이티브 OS 버튼 껍데기)까지 남아있어 폰트만 맞춰선
+     완전히 똑같이 안 보인다. 크롬이 button 텍스트만 내부적으로 수직 중앙 정렬해주는
+     것까지 발견해 align-items: center를 직접 지정했다. */
+  button, a.btn {
+    background: #2563EB; color: #FFFFFF; border: none; border-radius: var(--r-md);
+    padding: 8px 16px; font-size: var(--fs-base); font-family: inherit; cursor: pointer; text-decoration: none;
+    appearance: none; -webkit-appearance: none;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  button:hover, a.btn:hover { background: #1E3A5F; }
+  button:disabled { background: #E5E7EB; color: #6B7280; cursor: not-allowed; }
+  input[type=text], input[type=number] {
+    background: #F8FAFC; color: #1F2937; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    padding: 6px 10px; font-size: var(--fs-base);
+  }
+  .del-btn {
+    background: transparent; color: #6B7280; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    padding: 4px 10px; font-size: var(--fs-sm); margin-left: 6px; cursor: pointer;
+  }
+  .del-btn:hover { background: #EFF6FF; color: #DC2626; border-color: #DC2626; }
+  /* [추가: 2026-08-13] 이모지 대신 쓰는 단색 SVG 아이콘(app.icons) 공통 크기·색 —
+     currentColor라 부모의 글자색(회색/파랑 호버/헤더 남색 등)을 그대로 물려받는다. */
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+
+  /* [추가: 2026-09-02] 좌하단 ↩ 되돌리기 — `_label_undo_fab_html`이 예전부터
+     .undo-fab 클래스를 달고 나갔는데 이 파일 어디에도 그 CSS가 없어서, 좌하단 고정
+     원형 버튼이 아니라 본문 안 파란 네모 버튼으로 그려지고 있었다(라벨 보관함은 카드
+     안쪽에, 라벨 관리는 화면 왼쪽 끝에 — 삽입 위치까지 두 화면이 서로 달랐다).
+     값은 app/renderer.py의 .undo-fab을 그대로 가져온다. bottom을 20px이 아니라
+     88px(위 칸)으로 두는 건 확정본·초안·수시에서 ↩가 늘 그 자리이기 때문이다 —
+     이 두 화면엔 아래 칸을 쓰는 휴지통이 없지만, 같은 버튼이 화면마다 높이를
+     바꾸는 것보다 왼쪽 아래 모서리가 비는 편이 낫다. */
+  .undo-fab {
+    position: fixed; left: 20px; bottom: 88px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
+    background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; font-size: 1.3rem;
+    cursor: pointer; box-shadow: var(--sh-float); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .undo-fab:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .undo-fab:disabled { opacity: 0.5; cursor: progress; }
+  .lab-topbar {
+    display: flex; align-items: center; gap: 10px; padding-bottom: 12px;
+    border-bottom: 1px solid #E5E7EB; margin-bottom: 16px; flex-wrap: wrap;
+  }
+  .lab-topbar h1 { margin: 0; font-size: var(--fs-xl); }
+  .lab-topbar .spacer { margin-left: auto; }
+  a.btn.ghost { background: transparent; color: #6B7280; border: 1px solid #E5E7EB; }
+  a.btn.ghost:hover { background: #EFF6FF; color: #2563EB; }
+  .lab-filter-chip {
+    display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-sm); font-weight: 600;
+    background: #FFFFFF; border: 1px solid #E5E7EB; color: #1F2937; border-radius: var(--r-pill);
+    padding: 5px 12px; margin: 0 6px 6px 0; text-decoration: none;
+  }
+  .lab-filter-chip .n { color: #6B7280; font-weight: 500; font-size: var(--fs-xs); }
+  .lab-filter-chip:hover { background: #FBF0DA; }
+  .lab-filter-chip.on { background: #8A5A14; border-color: #8A5A14; color: #FFFFFF; }
+  .lab-filter-chip.on .n { color: rgba(255, 255, 255, 0.75); }
+  .lab-chipbar { margin-bottom: 6px; }
+  .lab-listhead {
+    display: flex; align-items: center; gap: 8px; margin: 12px 0 10px; font-size: var(--fs-md); color: #1E3A5F;
+    font-weight: 700;
+  }
+  /* [추가: 2026-09-15] 라벨 보관함 [복사][txt][xlsx] — 정기·수시 보관함의 .exp
+     (app/history_renderer.py)와 같은 값이다. 한쪽을 바꾸면 이쪽도 같이 바꾼다.
+     예전 xlsx 버튼은 class="btn ghost sm"이었지만 이 파일엔 a.btn.ghost(링크용)만
+     있고 .sm은 아예 없어, 공용 button 규칙대로 큰 파란 채움 버튼으로 그려지고 있었다. */
+  /* 모양은 확정본·초안 툴바의 가져가기 버튼(app.renderer.export_links_style)과 같다 —
+     테두리·배경 없는 글자 버튼, hover에서만 accent + 밑줄. 네 자리(정기 보관함 .exp/
+     .slot-export-actions, 수시 보관함 .exp, 라벨 보관함 .exp)가 같은 값이다. */
+  .exp { display: inline-flex; gap: 2px; flex: none; margin-left: auto; }
+  .exp button { border: none; background: transparent; color: #4B5563; font-weight: 500;
+    border-radius: var(--r-md); padding: 4px 8px; font-size: var(--fs-sm); cursor: pointer;
+    font-family: inherit; white-space: nowrap; }
+  .exp button:hover { background: transparent; color: #2563EB;
+    text-decoration: underline; text-underline-offset: 3px; }
+  .exp.lg button { padding: 6px 8px; }
+  .arc-row { border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 10px 12px; margin-bottom: 8px; }
+  .arc-row:hover { background: #EFF6FF; }
+  .arc-title { font-size: var(--fs-md); color: #1F2937; }
+  .arc-meta {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 7px;
+    font-size: var(--fs-xs); color: #6B7280;
+  }
+  .snap-tag { font-size: var(--fs-xs); background: #F8FAFC; color: #1F2937; border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 1px 6px; }
+  .snap-tag.sub { background: #EFF6FF; color: #1E3A5F; }
+  .snap-tag.src-reg, .snap-tag.src-agency, .snap-tag.src-live { background: #F8FAFC; color: #6B7280; }
+  .snap-tag.src-adhoc { background: #E3F1EE; color: #146B5E; }
+  .snap-tag.gone { background: #FFFBEB; color: #92400E; border-color: #FDE68A; }
+  /* 정기 보고서에 있나 — 「스크랩됨」/「숨김」 한 칸. 오늘 전체 기사의 행 상태와 같은 말. */
+  .snap-tag.state { display: inline-flex; align-items: center; gap: 3px; }
+  .snap-tag.state .ic { width: 0.95em; height: 0.95em; stroke-width: 2; }
+  .snap-tag.state.is-hid { color: #6B7280; }
+  .arc-meta a.origin-link { color: #2563EB; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 3px; }
+  .arc-meta a.origin-link .ic { width: 0.9em; height: 0.9em; }
+  .arc-labels { display: inline-flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+  .lab-chip {
+    display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs); font-weight: 700;
+    color: #8A5A14; background: #FBF0DA; border: 1px solid rgba(138, 90, 20, 0.28);
+    border-radius: var(--r-pill); padding: 2px 8px; white-space: nowrap;
+  }
+  .lab-chip form { display: inline; }
+  .lab-chip .x-btn {
+    background: none; border: none; padding: 0; margin: 0; color: #8A5A14; opacity: 0.55;
+    cursor: pointer; font-weight: 700; font-size: 0.9rem; line-height: 1;
+  }
+  .lab-chip .x-btn:hover { opacity: 1; background: none; }
+  table.manage { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
+  table.manage th {
+    text-align: left; padding: 8px; border-bottom: 1px solid #E5E7EB; color: #6B7280;
+    font-size: var(--fs-xs); font-weight: 700;
+  }
+  table.manage td { padding: 9px 8px; border-bottom: 1px solid #E5E7EB; vertical-align: middle; }
+  table.manage tr:hover td { background: #EFF6FF; }
+  table.manage td.name { font-weight: 700; color: #8A5A14; }
+  table.manage td.cnt, table.manage td.at { color: #6B7280; font-size: var(--fs-sm); white-space: nowrap; }
+  table.manage td.act { text-align: right; white-space: nowrap; }
+  table.manage td.act form { display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; }
+  .mini {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: var(--fs-xs); padding: 4px 9px; border-radius: var(--r-sm); cursor: pointer;
+    background: #FFFFFF; border: 1px solid #E5E7EB; color: #6B7280;
+  }
+  .mini .ic { width: 0.95em; height: 0.95em; }
+  .mini:hover { background: #EFF6FF; color: #2563EB; }
+  .mini.danger:hover { background: #FEF2F2; color: #DC2626; border-color: #F5C2C2; }
+  select.merge-sel {
+    font-size: var(--fs-xs); color: #6B7280; border: 1px solid #E5E7EB; border-radius: var(--r-sm);
+    padding: 4px 5px; background: #FFFFFF;
+  }
+  input[name="new_name"] { font-size: var(--fs-sm); padding: 5px 8px; width: 120px; }
+  .reject-box {
+    margin: 8px 0 14px; font-size: var(--fs-sm); line-height: 1.8;
+    background: #FEF2F2; border: 1px solid #F5C2C2; border-radius: var(--r-md); padding: 10px 12px;
+  }
+  .reject-box .goto {
+    font-size: var(--fs-sm); font-weight: 700; padding: 4px 10px; border-radius: var(--r-sm); cursor: pointer;
+    background: #FBF0DA; color: #8A5A14; border: 1px solid rgba(138, 90, 20, 0.28); margin-left: 4px;
+  }
+
+  /* 제목을 바꾸는 동작이라 **테두리 박스**다(글자 버튼은 가져가거나 보기만 바꾸는 것).
+     높이·여백·굵기는 확정본·초안 툴바 버튼과 같은 값. */
+  .title-refetch-btn {
+    height: var(--h-tb); padding: 0 9px; font-size: var(--fs-md); font-weight: 500;
+    background: #FFFFFF; color: #4B5563; border: 1px solid #E5E7EB;
+    border-radius: var(--r-md); display: inline-flex; align-items: center; gap: 5px;
+    cursor: pointer; font-family: inherit; white-space: nowrap; flex: none;
+  }
+  .title-refetch-btn:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .title-refetch-btn:disabled { background: #FFFFFF; color: #4B5563; border-color: #E5E7EB;
+    cursor: progress; }
+  .title-refetch-btn.is-busy .ic { animation: refetch-spin 0.9s linear infinite; }
+  @keyframes refetch-spin { to { transform: rotate(360deg); } }
+  /* 결과 줄 — 「잘 됐다」 안내라 초록 세트다. 바뀐 게 0건이어도 같은 색이다
+     (확인이 끝난 것 자체가 결과다). */
+  .refetch-note {
+    margin: 0 0 10px; padding: 8px 12px; font-size: var(--fs-sm); line-height: 1.7;
+    background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: var(--r-md);
+    color: #166534;
+  }
+  .refetch-note[hidden] { display: none; }
+  .refetch-note .sub { opacity: 0.85; }
+  /* 제목이 바뀐 줄만 세이지 — 담당자가 눌러서 일어난 일이라 「방금 손댄 것」 색이다.
+     행 hover(회색·파랑)에 지지 않게 속성 선택자로 명시도를 한 칸 올린다. */
+  [data-refetch-row].refetch-row-changed,
+  [data-refetch-row].refetch-row-changed:hover { background: #E7EFE8; }
+  .chip-changed {
+    display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs);
+    font-weight: 700; color: #92400E; background: #FEF3C7;
+    border: 1px solid #FDE68A; border-radius: var(--r-pill); padding: 2px 8px;
+    white-space: nowrap;
+  }
+  /* 제목은 그대로인데 원문만 손댄 줄 — **우리 값이 하나도 안 바뀌었으므로** 세이지를
+     안 칠하고 칩도 중립 회색이다. 「고쳐졌다」는 사실만 알린다. */
+  .chip-touched {
+    display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs);
+    font-weight: 600; color: #4B5563; background: #F3F4F6;
+    border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 2px 8px;
+    white-space: nowrap;
+  }
+  .refetch-was { margin-top: 5px; font-size: var(--fs-xs); color: #4B5563; line-height: 1.6; }
+  .refetch-was .k { color: #92400E; font-weight: 700; margin-right: 4px; }
+  .refetch-was .t { text-decoration: line-through; text-decoration-color: #4B5563; }
+  .refetch-was.touched .k { color: #4B5563; }
+
+
+  /* ───── 시안 전용 (설명용 틀) ───── */
+  body { background: #F8FAFC; }
+  .mk-sec { margin: 0 0 34px; }
+  .mk-h { display: flex; align-items: baseline; gap: 10px; margin: 0 0 6px; }
+  .mk-h h2 { margin: 0; font-size: var(--fs-lg); color: #1E3A5F; }
+  .mk-tag { font-size: var(--fs-xs); font-weight: 700; border-radius: var(--r-pill);
+            padding: 2px 9px; background: #EFF6FF; color: #1E3A5F; border: 1px solid #BFDBFE; }
+  .mk-tag.now { background: #F3F4F6; color: #4B5563; border-color: #E5E7EB; }
+  .mk-p { margin: 0 0 12px; font-size: var(--fs-md); color: #4B5563; line-height: 1.8; }
+  .mk-p b { color: #1F2937; }
+  .mk-card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 16px; }
+  .mk-note { margin: 10px 0 0; font-size: var(--fs-sm); color: #6B7280; line-height: 1.8; }
+  .mk-note .n { color: #92400E; font-weight: 700; }
+
+  /* ───── 저장된 변경 표시 (A안) ───── */
+  /* 세이지는 누른 그 순간만, 칩과 옛 제목 줄은 저장된 사실이라 남는다. */
+  .arc-row.just-refetched { background: #E7EFE8; }
+  .arc-row.just-refetched:hover { background: #E7EFE8; }
+  .chip-changed, .chip-touched {
+    display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs);
+    border-radius: var(--r-pill); padding: 2px 8px; white-space: nowrap;
+  }
+  .chip-changed { font-weight: 700; color: #92400E; background: #FEF3C7; border: 1px solid #FDE68A; }
+  .chip-touched { font-weight: 600; color: #4B5563; background: #F3F4F6; border: 1px solid #E5E7EB; }
+  button.chip-changed { font-family: inherit; cursor: pointer; }
+  button.chip-changed:hover { background: #FDE68A; }
+  button.chip-changed .ca { font-weight: 500; opacity: .85; }
+  .refetch-was { margin-top: 5px; font-size: var(--fs-xs); color: #4B5563; line-height: 1.6; }
+  .refetch-was .k { color: #92400E; font-weight: 700; margin-right: 4px; }
+  .refetch-was .t { text-decoration: line-through; text-decoration-color: #4B5563; }
+
+  /* ───── 그 기사의 변경 이력 (칩을 누르면 펼침) ───── */
+  .hist { margin: 8px 0 2px 0; border-left: 2px solid #FDE68A; padding: 2px 0 2px 12px; }
+  .hist[hidden] { display: none; }
+  .hist-h { font-size: var(--fs-xs); font-weight: 700; color: #92400E; margin-bottom: 6px; }
+  .hist-l { list-style: none; margin: 0; padding: 0; }
+  .hist-l li { padding: 5px 0; border-bottom: 1px solid #F3F4F6; }
+  .hist-l li:last-child { border-bottom: none; }
+  .hist-l .w { display: block; font-size: var(--fs-xs); color: #6B7280; }
+  .hist-l .w .m { opacity: .85; }
+  .hist-l .tt { display: block; font-size: var(--fs-sm); color: #1F2937; line-height: 1.6; }
+  .hist-l .tt.old { color: #6B7280; text-decoration: line-through; text-decoration-color: #D1D5DB; }
+  .hist-l .nowchip { display: inline-block; margin-left: 6px; font-size: var(--fs-xs);
+    background: #F3F4F6; color: #4B5563; border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 1px 7px; }
+
+  /* 버튼 옆 「마지막 확인」 */
+  .last-check { font-size: var(--fs-xs); color: #6B7280; }
+
+  /* ───── B안: 제목 변경 기록 화면 ───── */
+  .log-filter { display: flex; align-items: center; gap: 6px; margin: 0 0 12px; }
+  .log-chip { font-size: var(--fs-sm); font-weight: 600; background: #FFFFFF; border: 1px solid #E5E7EB;
+    color: #1F2937; border-radius: var(--r-pill); padding: 4px 12px; text-decoration: none; }
+  .log-chip.on { background: #2563EB; color: #FFFFFF; border-color: #2563EB; }
+  .log-day > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px;
+    font-size: var(--fs-lg); color: #1E3A5F; padding: 8px 0; }
+  .log-day > summary::-webkit-details-marker { display: none; }
+  .log-day > summary::before { content: "\25B8"; font-size: var(--fs-sm); color: #6B7280; }
+  .log-day[open] > summary::before { content: "\25BE"; }
+  .log-day .dcnt { font-size: var(--fs-sm); color: #9CA3AF; font-weight: 500; }
+  .log-rows { border-left: 2px solid #E5E7EB; margin: 0 0 10px 6px; padding-left: 12px; }
+  .log-row { padding: 9px 0; border-bottom: 1px solid #F3F4F6; }
+  .log-row:last-child { border-bottom: none; }
+  .log-row .hd { display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+                 font-size: var(--fs-xs); color: #6B7280; margin-bottom: 4px; }
+  .log-row .ba { display: block; font-size: var(--fs-sm); line-height: 1.6; }
+  .log-row .ba .k { display: inline-block; width: 1.6em; color: #6B7280; font-weight: 700; }
+  .log-row .ba.before .v { color: #6B7280; text-decoration: line-through; text-decoration-color: #D1D5DB; }
+  .log-row .ba.after .v { color: #1F2937; }
+  .log-row a.origin-link { color: #2563EB; text-decoration: none; }
+
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="topbar-inner">
+  <a class="tn" href="#">홈</a>
+</div></div>
+<div class="container">
+
+  <h1>제목 변경 이력 — 시안</h1>
+  <p class="hint">지금은 「✎ 제목 변경」 표시가 누른 그 화면에만 있고 새로고침하면 사라집니다.
+  저장되는 것은 <b>새 제목</b>뿐이고 옛 제목·바뀐 시각은 어디에도 안 남습니다.</p>
+
+  <!-- ===================== 지금 ===================== -->
+  <div class="mk-sec">
+    <div class="mk-h"><h2>지금</h2><span class="mk-tag now">새로고침 한 번에 사라짐</span></div>
+    <p class="mk-p">눌렀을 때만 보이는 모습입니다 — 세이지 배경·칩·옛 제목 줄 셋 다 JS가 그 자리에서 그린 것입니다.</p>
+    <div class="mk-card">
+      <div class="arc-row just-refetched">
+        <div class="arc-title">&quot;그게 네 거냐?&quot;…&#x27;63조 제로섬 게임&#x27; 벌이는 재경부·예산처 [김익환의 부처 핸즈업]</div>
+        <div class="refetch-was"><span class="k">✎ 오늘 08:12 수정</span><span class="t">&quot;그게 네 거냐?&quot;…&#x27;63조 제로섬 게임&#x27; 벌이는 재경부·예산처</span></div>
+        <div class="arc-meta">
+          <span class="chip-changed">✎ 제목 변경</span>
+          <span class="snap-tag src-reg">회차</span><span>2026-10-13 11:00</span><span>·</span><span>2026-10-13 10:37 발행</span><span>·</span><span>한국경제</span>
+          <a class="origin-link" href="#">원문보기</a>
+          <span class="arc-labels"><span class="lab-chip">별도 보고 </span></span>
+        </div>
+      </div>
+      <p class="mk-note">새로고침하면 <span class="n">위 세 줄이 모두 사라지고</span> 제목만 조용히 바뀐 채로 남습니다.</p>
+    </div>
+  </div>
+
+  <!-- ===================== A안 ===================== -->
+  <div class="mk-sec">
+    <div class="mk-h"><h2>A안 — 행에 남는 기록</h2><span class="mk-tag">권함</span></div>
+    <p class="mk-p"><b>색은 「방금」, 칩은 「사실」</b> — AI 배정 칩과 같은 문법입니다.
+    세이지 배경은 누른 그 순간만, <b>✎ 칩과 옛 제목 줄은 저장돼 새로고침해도 남습니다.</b>
+    칩을 누르면 그 기사가 지나온 제목이 전부 펼쳐집니다.</p>
+    <div class="mk-card">
+      <div class="lab-listhead" style="margin-top:0">별도 보고 · 6건
+        <button type="button" class="title-refetch-btn"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>제목 다시 불러오기</button>
+        <span class="last-check">마지막 확인 오늘 14:02</span>
+      </div>
+
+      <!-- 1번 바뀐 기사 -->
+      <div class="arc-row">
+        <div class="arc-title">정부, 전략수출기금 기업 부담 ‘기여금 하향’ 검토…업계 반발</div>
+        <div class="refetch-was"><span class="k">✎ 10/7 16:41 수정</span><span class="t">정부, 전략수출기금 기업 부담 ‘기여금 하향’ 검토</span></div>
+        <div class="arc-meta">
+          <button type="button" class="chip-changed" onclick="tog('h1')">✎ 제목 변경</button>
+          <span class="snap-tag src-reg">회차</span><span>2026-10-07 17:00</span><span>·</span><span>2026-10-07 16:07 발행</span><span>·</span><span>조선비즈</span>
+          <span class="snap-tag state is-hid">✓ 스크랩됨</span>
+          <a class="origin-link" href="#">원문보기</a>
+          <span class="arc-labels"><span class="lab-chip">별도 보고 </span></span>
+        </div>
+        <div class="hist" id="h1" hidden>
+          <div class="hist-h">제목 변경 기록 · 1번</div>
+          <ol class="hist-l">
+            <li><span class="w">10/7 17:02 확인 <span class="m">· 원문 16:41 수정</span></span>
+              <span class="tt">정부, 전략수출기금 기업 부담 ‘기여금 하향’ 검토…업계 반발<span class="nowchip">지금 제목</span></span></li>
+            <li><span class="w">10/7 17:00 수집</span>
+              <span class="tt old">정부, 전략수출기금 기업 부담 ‘기여금 하향’ 검토</span></li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- 2번 바뀐 기사 — 이력 펼친 채로 -->
+      <div class="arc-row">
+        <div class="arc-title">&quot;그게 네 거냐?&quot;…&#x27;63조 제로섬 게임&#x27; 벌이는 재경부·예산처 [김익환의 부처 핸즈업]</div>
+        <div class="refetch-was"><span class="k">✎ 오늘 13:50 수정</span><span class="t">&quot;그게 네 거냐?&quot;…&#x27;63조 제로섬 게임&#x27; 벌이는 재경부·예산처</span></div>
+        <div class="arc-meta">
+          <button type="button" class="chip-changed" onclick="tog('h2')">✎ 제목 변경 <span class="ca">2번</span></button>
+          <span class="snap-tag src-reg">회차</span><span>2026-10-13 11:00</span><span>·</span><span>2026-10-13 10:37 발행</span><span>·</span><span>한국경제</span>
+          <a class="origin-link" href="#">원문보기</a>
+          <span class="arc-labels"><span class="lab-chip">별도 보고 </span></span>
+        </div>
+        <div class="hist" id="h2">
+          <div class="hist-h">제목 변경 기록 · 2번</div>
+          <ol class="hist-l">
+            <li><span class="w">오늘 14:02 확인 <span class="m">· 원문 13:50 수정</span></span>
+              <span class="tt">&quot;그게 네 거냐?&quot;…&#x27;63조 제로섬 게임&#x27; 벌이는 재경부·예산처 [김익환의 부처 핸즈업]<span class="nowchip">지금 제목</span></span></li>
+            <li><span class="w">오늘 09:41 확인 <span class="m">· 원문 08:12 수정</span></span>
+              <span class="tt old">&quot;그게 네 거냐?&quot;…&#x27;63조 제로섬 게임&#x27; 벌이는 재경부·예산처</span></li>
+            <li><span class="w">10/13 11:00 수집</span>
+              <span class="tt old">&#x27;63조 제로섬 게임&#x27; 벌이는 재경부·예산처</span></li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- 안 바뀐 기사 -->
+      <div class="arc-row">
+        <div class="arc-title">국내 포상금은 비과세, 美정부가 주면 86억 세금?… 5년째 법정 공방</div>
+        <div class="arc-meta">
+          <span class="snap-tag src-reg">회차</span><span>2026-09-15 17:00</span><span>·</span><span>2026-09-15 16:37 발행</span><span>·</span><span>한국일보</span>
+          <span class="snap-tag state is-hid">✓ 스크랩됨</span>
+          <a class="origin-link" href="#">원문보기</a>
+          <span class="arc-labels"><span class="lab-chip">별도 보고 </span></span>
+        </div>
+      </div>
+
+      <p class="mk-note">· 세이지 배경은 <span class="n">누른 그 화면에만</span> 칠해집니다 — 새로고침하면 위의 흰 행처럼 되고, 칩과 옛 제목 줄만 남습니다.<br>
+      · 저장은 기사별 제목·요약을 담아 둔 자리(<code>summary_overrides</code>)에 <code>title_history</code> 한 칸을 더하는 것입니다 — <b>새 파일을 안 만들고, 라벨처럼 나이로 안 지우고 남습니다.</b><br>
+      · 「✎ 원문 수정」(제목은 그대로)은 <b>안 남깁니다</b> — 우리 값이 한 글자도 안 바뀌었으니 적을 이력이 없습니다.</p>
+    </div>
+  </div>
+
+  <!-- ===================== B안 ===================== -->
+  <div class="mk-sec">
+    <div class="mk-h"><h2>B안 — 「제목 변경 기록」 화면</h2><span class="mk-tag">A안 위에 얹을 수 있음</span></div>
+    <p class="mk-p">바뀐 것만 <b>날짜별로 모아 보는</b> 화면입니다. 발송 기록·삭제 기록과 같은 문법·같은 조각을 쓰고,
+    설정 메뉴 「정기, 수시 공통」 묶음에 한 줄로 들어갑니다.
+    <b>A안이 먼저고 B안은 그 위에 얹는 것</b>입니다 — 저장하는 값은 둘이 같습니다.</p>
+    <div class="mk-card">
+      <div class="lab-topbar" style="margin-bottom:6px"><h1 style="font-size:var(--fs-xl)">✎ 제목 변경 기록</h1></div>
+      <p class="caption">언론사가 내보낸 뒤 고친 제목을 「제목 다시 불러오기」로 잡은 기록입니다.</p>
+      <div class="log-filter">
+        <a class="log-chip on" href="#">전체</a>
+        <a class="log-chip" href="#">라벨 붙인 기사만</a>
+        <a class="log-chip" href="#">알림으로 알게 된 것만</a>
+      </div>
+
+      <details class="log-day" open>
+        <summary>10월 15일 (수) <span class="snap-tag" style="background:#E3F1EE;color:#146B5E;border-color:#A7D9D0">오늘</span> <span class="dcnt">2건</span></summary>
+        <div class="log-rows">
+          <div class="log-row">
+            <div class="hd"><b style="color:#1F2937">14:02</b><span>·</span><span>한국경제</span><span>·</span>
+              <span class="snap-tag src-reg">회차 10/13 11:00</span>
+              <span class="lab-chip">별도 보고</span>
+              <span>· 원문 13:50 수정</span>
+              <a class="origin-link" href="#">원문보기</a></div>
+            <span class="ba before"><span class="k">전</span><span class="v">&quot;그게 네 거냐?&quot;…&#x27;63조 제로섬 게임&#x27; 벌이는 재경부·예산처</span></span>
+            <span class="ba after"><span class="k">후</span><span class="v">&quot;그게 네 거냐?&quot;…&#x27;63조 제로섬 게임&#x27; 벌이는 재경부·예산처 [김익환의 부처 핸즈업]</span></span>
+          </div>
+          <div class="log-row">
+            <div class="hd"><b style="color:#1F2937">09:41</b><span>·</span><span>한국경제</span><span>·</span>
+              <span class="snap-tag src-reg">회차 10/13 11:00</span>
+              <span class="lab-chip">별도 보고</span>
+              <span>· 원문 08:12 수정</span>
+              <a class="origin-link" href="#">원문보기</a></div>
+            <span class="ba before"><span class="k">전</span><span class="v">&#x27;63조 제로섬 게임&#x27; 벌이는 재경부·예산처</span></span>
+            <span class="ba after"><span class="k">후</span><span class="v">&quot;그게 네 거냐?&quot;…&#x27;63조 제로섬 게임&#x27; 벌이는 재경부·예산처</span></span>
+          </div>
+        </div>
+      </details>
+
+      <details class="log-day">
+        <summary>10월 7일 (화) <span class="dcnt">1건</span></summary>
+        <div class="log-rows">
+          <div class="log-row">
+            <div class="hd"><b style="color:#1F2937">17:02</b><span>·</span><span>조선비즈</span><span>·</span>
+              <span class="snap-tag src-reg">회차 10/7 17:00</span>
+              <span class="lab-chip">별도 보고</span>
+              <span>· 원문 16:41 수정</span>
+              <a class="origin-link" href="#">원문보기</a></div>
+            <span class="ba before"><span class="k">전</span><span class="v">정부, 전략수출기금 기업 부담 ‘기여금 하향’ 검토</span></span>
+            <span class="ba after"><span class="k">후</span><span class="v">정부, 전략수출기금 기업 부담 ‘기여금 하향’ 검토…업계 반발</span></span>
+          </div>
+        </div>
+      </details>
+
+      <p class="mk-note">· 줄을 누르면 그 기사가 있는 라벨 보관함·정기 보관함으로 갑니다.<br>
+      · 보고서로는 안 나갑니다(화면 전용) — 복사·텍스트·엑셀엔 지금 제목만 실립니다.</p>
+    </div>
+  </div>
+
+  <div class="mk-sec">
+    <div class="mk-h"><h2>정해 주실 것</h2></div>
+    <p class="mk-p">① A안만 바로 할까요, 아니면 A·B 둘 다 할까요?<br>
+    ② 이력을 <b>어느 화면까지</b> 보일까요 — 지금 「제목 다시 불러오기」 버튼은 라벨 보관함·정기 보관함 둘에만 있습니다.
+    확정본·초안에도 칩을 보일지 정해야 합니다.</p>
+  </div>
+
+</div>
+<script>
+function tog(id) { var e = document.getElementById(id); if (e) e.hidden = !e.hidden; }
+</script>
+
+</body>
+</html>

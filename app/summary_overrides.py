@@ -121,6 +121,51 @@ def apply_summary_overrides(articles: list) -> list:
 # 이 칸은 _DISPLAY_FIELDS 밖이라 기사 dict로 새지 않는다.
 _SEEN_MODIFIED_KEY = "seen_modified_at"
 
+# [추가: 2026-10-15] 제목이 바뀐 **이력**. 지금까지는 새 제목으로 덮어쓰기만 해서, 화면의
+# 「✎ 제목 변경」 칩과 취소선 옛 제목이 **새로고침 한 번에 사라졌다** — 담당자에게는 그
+# 기록이 업무 자체다(기관 요청으로 제목이 고쳐지는 일이 있다). 「색은 방금, 칩은 사실」
+# (AI 배정 칩과 같은 문법): 세이지 배경만 1회성이고 이력은 남는다.
+#
+# 새 파일을 안 만든다 — 「이 기사의 제목이 언제 무엇에서 무엇으로 바뀌었나」는 seen_modified_at과
+# 똑같이 **그 URL이 가리키는 기사에 관한 사실**이고, 새 저장소를 만들면 보관 기간·정리 규칙이
+# 하나 더 생긴다. 라벨처럼 **나이로 안 지운다**(지우면 기록이 아니다).
+#
+# 한 기사가 끝없이 고쳐지는 경우를 대비해 URL당 상한만 둔다 — 넘으면 **오래된 쪽부터** 버린다.
+# 이 칸도 _DISPLAY_FIELDS 밖이라 기사 dict로 새지 않는다.
+_TITLE_HISTORY_KEY = "title_history"
+_MAX_TITLE_HISTORY = 20
+
+
+def title_history_of(url: str, overrides: Optional[dict] = None) -> list:
+    """이 기사의 제목 변경 이력 — `[{"at", "from", "to", "modified_at"}]`, **오래된 것부터**.
+
+    가장 오래된 항목의 `from`이 곧 **처음 담았을 때의 제목**이다(수집 시각은 적지 않는다 —
+    이력은 「확인했을 때」만 알고, 없는 시각을 지어내지 않는다).
+
+    화면이 기사를 여럿 그릴 땐 `overrides`에 `load_summary_overrides()` 결과를 넘겨
+    파일을 한 번만 읽는다(title_check_baseline과 같은 이유).
+    """
+    data = load_summary_overrides() if overrides is None else overrides
+    rows = (data.get(url) or {}).get(_TITLE_HISTORY_KEY)
+    return rows if isinstance(rows, list) else []
+
+
+def title_history_map(overrides: Optional[dict] = None) -> dict:
+    """이력이 있는 기사만 모은 `{url: [기록…]}` — 화면이 **한 번만** 읽어
+    `render_article(..., refetch_history=)`로 넘긴다(기사마다 읽으면 기사 수만큼 같은
+    파일을 다시 파싱한다 — labels_lookup과 같은 이유).
+
+    이력이 없는 기사는 아예 안 담는다. 대부분의 기사엔 이력이 없어서, 담으면 화면 하나에
+    쓸모없는 빈 칸이 수백 개 생긴다.
+    """
+    data = load_summary_overrides() if overrides is None else overrides
+    return {
+        url: entry[_TITLE_HISTORY_KEY]
+        for url, entry in data.items()
+        if isinstance(entry, dict) and isinstance(entry.get(_TITLE_HISTORY_KEY), list)
+        and entry[_TITLE_HISTORY_KEY]
+    }
+
 
 def title_check_baseline(url: str, overrides: Optional[dict] = None) -> Optional[str]:
     """이 기사를 **마지막으로 확인했을 때** 페이지에 찍혀 있던 기사수정 시각.
@@ -160,7 +205,8 @@ def record_title_check(url: str, modified_at: Optional[str]) -> None:
 def apply_title_refetch(results: dict) -> None:
     """「제목 다시 불러오기」의 결과를 **한 번에** 적는다 — 파일을 한 번 읽고 한 번 쓴다.
 
-    results: `{url: {"title": 새 제목 or None, "modified_at": 기사수정 시각 or None}}`
+    results: `{url: {"title": 새 제목 or None, "old_title": 덮기 전 제목,
+    "modified_at": 기사수정 시각 or None}}`
 
     여러 건을 돌릴 때 기사마다 set_summary_override·record_title_check를 부르면 60건에
     파일을 120번 읽고 쓴다 — 느린 것보다 **중간에 겹치면 앞 기사의 수정이 사라지는 것**이
@@ -181,6 +227,19 @@ def apply_title_refetch(results: dict) -> None:
             before = dict(entry)
             title = (found.get("title") or "").strip()
             if title:
+                # 덮기 **전에** 이력을 적는다 — 옛 제목은 호출하는 쪽이 들고 온다.
+                # 저장된 override가 없는 기사(한 번도 안 고친 기사)는 여기 entry에
+                # 옛 제목이 아예 없어서, 이 자리에서는 되찾을 길이 없기 때문이다.
+                was = (found.get("old_title") or "").strip()
+                if was and was != title:
+                    history = list(entry.get(_TITLE_HISTORY_KEY) or [])
+                    history.append({
+                        "at": now,
+                        "from": was,
+                        "to": title,
+                        "modified_at": (found.get("modified_at") or "").strip() or None,
+                    })
+                    entry[_TITLE_HISTORY_KEY] = history[-_MAX_TITLE_HISTORY:]
                 entry["title"] = title
                 entry["refetched_at"] = now
                 marked = [f for f in (entry.get("manual") or []) if f != "title"]

@@ -2463,6 +2463,11 @@ def render_article(
     # 자리라, 나중에 쌓인 전역 배정 기록을 덧칠하면 그때 보낸 보고서와 어긋난다).
     # 파일은 화면마다 한 번만 읽어 넘긴다(labels_lookup과 같은 이유).
     ai_assigned_urls: Optional[set] = None,
+    # [추가: 2026-10-15] 저장된 제목 변경 이력 `{url: [기록…]}`(app.summary_overrides.
+    # title_history_of). 넘기면 「✎ 제목 변경」 칩·옛 제목 줄·이력 블록을 **서버가 그려**
+    # 새로고침해도 남는다. refetch_marks와 함께일 때만 쓴다 — 버튼이 없는 화면에 표식만
+    # 달지 않는다는 그 규칙 그대로다. 파일은 화면마다 한 번만 읽어 넘긴다.
+    refetch_history: Optional[dict] = None,
 ) -> str:
     """기사 한 건을 렌더링한다.
 
@@ -2864,17 +2869,24 @@ def render_article(
             label_row_html = f'<div class="lab-row"><span class="tagmark">{icon("tag")}</span>{attached_html}</div>'
     row_mark = f' data-refetch-row data-pub="{pub_date_attr}"' if refetch_marks else ""
     meta_mark = " data-refetch-meta" if refetch_marks else ""
+    # 저장된 제목 변경 이력 — 세 조각이 가는 자리는 refetch_title_marks의 설명 그대로다.
+    refetch_chip_html = refetch_was_html = refetch_hist_html = ""
+    if refetch_marks and refetch_history:
+        refetch_chip_html, refetch_was_html, refetch_hist_html = refetch_title_marks(
+            refetch_history.get(article.get("url")) or []
+        )
     return (
         f'<div class="{article_class}" data-url="{url}" data-outlet-rank="{outlet_rank}"'
         f"{row_mark}>"
         "<details>"
         "<summary>"
         f'<div class="title-row">{checkbox_html}<span class="title-line">{line_html}</span>{photo_badge_html}{finalize_badge_html}</div>'
+        f"{refetch_was_html}"
         f'<div class="action-row"{meta_mark}>'
         # [수정: 2026-09-14] 칩을 검색어 앞으로 — 검색어가 남는 자리만큼 잘리게 되면서, 뒤에
         # 두면 칩의 가로 위치가 검색어 길이만큼 행마다 달라진다(목업 실측 108px 차이).
         # 원문보기보다는 뒤라 누르는 링크 자리는 안 흔들린다. KW_CHIP_MOCKUP.html C안.
-        f'{time_row_html}{late_badge_html}{ai_assigned_badge_html}{kw_inline_html}'
+        f'{refetch_chip_html}{time_row_html}{late_badge_html}{ai_assigned_badge_html}{kw_inline_html}'
         f'<span class="article-actions">{extra_buttons_html}{group_select_html}{label_btn_html}'
         f"{more_menu_html}{hide_btn_html}{move_html}</span>"
         "</div>"
@@ -2882,6 +2894,9 @@ def render_article(
         "</summary>"
         f'<p class="article-summary">{summary_html}</p>'
         "</details>"
+        # 이력 블록은 <details> **밖**이다 — 안에 두면 이력을 읽으려고 누를 때마다
+        # 기사 요약이 같이 접혔다 펼쳐진다.
+        f"{refetch_hist_html}"
         "</div>"
     )
 
@@ -5323,6 +5338,29 @@ REFETCH_TITLES_STYLE = """
   .refetch-was .k {{ color: {warn_text}; font-weight: 700; margin-right: 4px; }}
   .refetch-was .t {{ text-decoration: line-through; text-decoration-color: {text_soft}; }}
   .refetch-was.touched .k {{ color: {text_soft}; }}
+  /* 「✎ 제목 변경」 칩은 **누를 수 있다** — 그 기사가 지나온 제목이 펼쳐진다. 모양은 위
+     .chip-changed 그대로고(칩은 알약 규칙), 누를 수 있다는 것은 hover 색과 옆의 횟수가
+     말한다. 횟수는 2번부터 적는다 — 1번이면 바로 밑 취소선 한 줄이 이미 전부다. */
+  button.chip-changed {{ font-family: inherit; cursor: pointer; }}
+  button.chip-changed:hover {{ background: {warn_border}; }}
+  button.chip-changed .ca {{ font-weight: 500; opacity: 0.85; margin-left: 2px; }}
+  /* 이력 블록 — <details> **밖**에 둔다. 안에 두면 이력을 읽으려고 누를 때마다 기사
+     요약이 같이 접혔다 펼쳐진다. */
+  .refetch-hist {{
+    margin: 8px 0 2px; padding: 2px 0 2px 12px; border-left: 2px solid {warn_border};
+  }}
+  .refetch-hist[hidden] {{ display: none; }}
+  .refetch-hist .hh {{ font-size: var(--fs-xs); font-weight: 700; color: {warn_text}; margin-bottom: 6px; }}
+  .refetch-hist ol {{ list-style: none; margin: 0; padding: 0; }}
+  .refetch-hist li {{ padding: 5px 0; border-bottom: 1px solid {row_hover}; }}
+  .refetch-hist li:last-child {{ border-bottom: none; }}
+  .refetch-hist .w {{ display: block; font-size: var(--fs-xs); color: {text_soft}; }}
+  .refetch-hist .tt {{ display: block; font-size: var(--fs-sm); color: {text}; line-height: 1.6; }}
+  .refetch-hist .tt.old {{ color: {text_soft}; text-decoration: line-through; text-decoration-color: {border}; }}
+  .refetch-hist .nowchip {{
+    display: inline-block; margin-left: 6px; font-size: var(--fs-xs); background: {pill_bg};
+    color: {text_soft}; border: 1px solid {border}; border-radius: var(--r-pill); padding: 1px 7px;
+  }}
 """
 
 # 한 번에 보내는 기사 수 — 서버가 동시 4개로 받아오므로 두 바퀴다. 통째로 보내지 않는
@@ -5387,32 +5425,35 @@ function refetchTitles(btn) {
     if (!v) return;
     var old = row.querySelector(".refetch-was");
     if (old) old.remove();
+    var oldHist = row.querySelector(".refetch-hist");
+    if (oldHist) oldHist.remove();
     row.querySelectorAll(".chip-changed, .chip-touched").forEach(function (c) { c.remove(); });
     row.classList.remove("refetch-row-changed");
     if (v.state !== "changed" && v.state !== "touched") return;
     var title = row.querySelector("[data-refetch-title]");
     var meta = row.querySelector("[data-refetch-meta]");
+    if (v.state === "changed") {
+      // 세이지는 **누른 그 화면에만** 칠한다 — 「색은 방금」. 칩·옛 제목 줄·이력 블록은
+      // 저장된 이력에서 서버가 구워 보낸 것을 그대로 꽂는다(화면이 따로 짓지 않는다 —
+      // 새로고침한 뒤와 마크업이 갈리면 같은 기사가 두 모습이 된다).
+      row.classList.add("refetch-row-changed");
+      if (title && v.new_title) title.textContent = v.new_title;
+      if (meta && v.chip) meta.insertAdjacentHTML("afterbegin", v.chip);
+      if (meta && v.was) meta.insertAdjacentHTML("beforebegin", v.was);
+      if (v.hist) row.insertAdjacentHTML("beforeend", v.hist);
+      return;
+    }
+    // 「원문만 손댔다」는 **저장하지 않는다**(우리 값이 한 글자도 안 바뀌었다) — 적을
+    // 이력이 없어서 이 줄만 화면이 짓고, 새로고침하면 사라지는 것이 맞다.
     var was = document.createElement("div");
+    was.className = "refetch-was touched";
     var when = stamp(v.modified_at);
     var key = document.createElement("span");
     key.className = "k";
     key.textContent = "✎ " + (when ? when + " 수정" : "수정됨");
     was.appendChild(key);
-    if (v.state === "changed") {
-      was.className = "refetch-was";
-      row.classList.add("refetch-row-changed");
-      var prev = title ? title.textContent.trim() : (v.old_title || "");
-      if (title && v.new_title) title.textContent = v.new_title;
-      var strike = document.createElement("span");
-      strike.className = "t";
-      strike.textContent = prev;
-      was.appendChild(strike);
-      if (meta) meta.insertAdjacentHTML("afterbegin", '<span class="chip-changed">✎ 제목 변경</span>');
-    } else {
-      was.className = "refetch-was touched";
-      was.appendChild(document.createTextNode("제목은 그대로예요 — 원문만 손댔어요"));
-      if (meta) meta.insertAdjacentHTML("afterbegin", '<span class="chip-touched">✎ 원문 수정</span>');
-    }
+    was.appendChild(document.createTextNode("제목은 그대로예요 — 원문만 손댔어요"));
+    if (meta) meta.insertAdjacentHTML("afterbegin", '<span class="chip-touched">✎ 원문 수정</span>');
     if (meta && meta.parentNode) meta.parentNode.insertBefore(was, meta);
   }
   function stamp(raw) {
@@ -5439,6 +5480,16 @@ function refetchTitles(btn) {
   }
   chunk(0);
 }
+
+/* 「✎ 제목 변경」 칩 — 그 기사가 지나온 제목을 펼친다. 이력 블록은 <details> 밖에 있어
+   눌러도 기사 요약이 접혔다 펼쳐지지 않는다(칩의 stopPropagation은 제목 줄 토글용). */
+function toggleRefetchHist(btn) {
+  var row = btn.closest("[data-refetch-row]");
+  var box = row && row.querySelector(".refetch-hist");
+  if (!box) return;
+  box.hidden = !box.hidden;
+  btn.setAttribute("aria-expanded", box.hidden ? "false" : "true");
+}
 """
 
 
@@ -5462,6 +5513,88 @@ def refetch_titles_button_html(scope: str = "", tip: str = "") -> str:
 def refetch_titles_note_html() -> str:
     """결과 줄이 들어갈 빈 자리 — 버튼이 맡는 묶음 안에 하나 둔다."""
     return '<p class="refetch-note" hidden></p>'
+
+
+def _refetch_when(raw) -> str:
+    """시각 문자열 → `오늘 14:02` / `10/15 14:02`. 못 읽으면 **빈 문자열**이다.
+
+    두 모양이 들어온다 — 이력의 `at`은 ISO(`2026-10-15T14:02:11`), 원문 수정 시각은
+    페이지에 찍힌 `2026-10-15 13:50:00`. 못 읽은 시각을 지어내지 않는다.
+    """
+    text = (raw or "").strip().replace("T", " ")[:16]
+    if len(text) < 16:
+        return ""
+    if text[:10] == datetime.now().strftime("%Y-%m-%d"):
+        return f"오늘 {text[11:]}"
+    try:
+        return f"{int(text[5:7])}/{int(text[8:10])} {text[11:]}"
+    except ValueError:
+        return ""
+
+
+def refetch_title_marks(history: list) -> tuple:
+    """저장된 제목 변경 이력 → `(칩, 옛 제목 줄, 이력 블록)` HTML. 이력이 없으면 세 칸 다 빈 값.
+
+    **「색은 방금, 칩은 사실」** — 세이지 배경(`.refetch-row-changed`)은 담당자가 버튼을
+    누른 그 화면에서만 칠해지고 새로고침 한 번에 사라지지만, 여기서 짓는 셋은 저장된
+    이력에서 나오므로 **남는다**(app.summary_overrides.title_history_of).
+
+    **짓는 자리가 한 곳인 게 이 함수의 요지다** — 서버가 화면을 그릴 때와 버튼을 누른
+    직후 JS가 끼워 넣을 때가 같은 마크업이어야 한다. 그래서 눌렀을 때도 화면이 따로 짓지
+    않고 `/refetch-titles` 응답에 실려 온 이 HTML을 그대로 꽂는다.
+
+    세 조각이 가는 자리:
+      칩   `[data-refetch-meta]` 맨 앞
+      줄   `[data-refetch-meta]` **바로 앞**(제목 밑)
+      이력 `[data-refetch-row]` 맨 뒤 — `<details>` **밖**이라야 눌러도 요약이 안 접힌다
+    """
+    rows = [r for r in (history or []) if isinstance(r, dict) and (r.get("to") or "").strip()]
+    if not rows:
+        return "", "", ""
+    newest = rows[-1]
+    when = _refetch_when(newest.get("modified_at"))
+    was = (
+        '<div class="refetch-was">'
+        f'<span class="k">{html.escape("✎ " + (when + " 수정" if when else "수정됨"))}</span>'
+        f'<span class="t">{html.escape(newest.get("from") or "")}</span></div>'
+    )
+    count = len(rows)
+    # 횟수는 2번부터 적는다 — 1번이면 바로 밑 취소선 한 줄이 이미 전부를 말한다.
+    times = f'<span class="ca">{count}번</span>' if count > 1 else ""
+    chip = (
+        '<button type="button" class="chip-changed" aria-expanded="false" '
+        'onclick="event.stopPropagation(); toggleRefetchHist(this)" '
+        'title="눌러서 제목 변경 기록 보기">✎ 제목 변경'
+        f"{times}</button>"
+    )
+    items = []
+    for i, row in enumerate(reversed(rows)):
+        at, mod = _refetch_when(row.get("at")), _refetch_when(row.get("modified_at"))
+        label = f"{at} 확인" if at else "확인"
+        if mod:
+            # 같은 날이면 뒤쪽 날짜는 뗀다 — `오늘 14:02 확인 · 원문 오늘 13:50 수정`처럼
+            # 한 줄에 같은 날짜가 두 번 서면 읽는 눈이 걸린다.
+            if (row.get("at") or "")[:10] == (row.get("modified_at") or "")[:10]:
+                mod = mod.split(" ")[-1]
+            label += f" · 원문 {mod} 수정"
+        now_chip = '<span class="nowchip">지금 제목</span>' if i == 0 else ""
+        items.append(
+            f'<li><span class="w">{html.escape(label)}</span>'
+            f'<span class="tt{"" if i == 0 else " old"}">'
+            f'{html.escape(row.get("to") or "")}{now_chip}</span></li>'
+        )
+    # 가장 오래된 항목의 `from`이 곧 처음 담았을 때의 제목이다. **시각은 안 적는다** —
+    # 이력은 「확인했을 때」만 알고, 수집 시각은 여기서 알 수 없다.
+    items.append(
+        '<li><span class="w">처음 담은 제목</span>'
+        f'<span class="tt old">{html.escape(rows[0].get("from") or "")}</span></li>'
+    )
+    hist = (
+        '<div class="refetch-hist" hidden>'
+        f'<div class="hh">제목 변경 기록 · {count}번</div>'
+        f'<ol>{"".join(items)}</ol></div>'
+    )
+    return chip, was, hist
 
 
 def refetch_titles_script(host: str, port: int) -> str:

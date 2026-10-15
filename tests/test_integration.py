@@ -5577,7 +5577,40 @@ def test_refetch_titles_bulk():
         again = tr.refetch_titles([articles[2]])
         assert again["rows"][touched_url]["state"] == "same", again["rows"][touched_url]
 
-    print("58) 제목 일괄 불러오기: 통과 (여섯 갈래, 자체 도메인 안 받음, 저장 한 번, 기준점 이동)")
+        # (8) **제목이 바뀐 이력이 남는다.** 이게 없으면 화면의 「✎ 제목 변경」 칩과 취소선
+        #     옛 제목이 새로고침 한 번에 사라진다 — 담당자에게는 그 기록이 업무 자체다.
+        #     옛 제목은 **덮기 전 값**(화면이 보고 있던 제목)이라야 한다.
+        hist = so.title_history_of(changed_url)
+        assert len(hist) == 1, hist
+        assert hist[0]["from"] == "성장자금 162조 ‘쌈짓돈’ 현실화", hist[0]
+        assert hist[0]["to"] == "성장자금 162조 ‘쌈짓돈’ 현실화 우려", hist[0]
+        assert hist[0]["modified_at"] == "2026-10-07T17:22:19+09:00", hist[0]
+        # 바뀌지 않은 쪽엔 이력이 없다 — 「원문만 손댐」은 우리 값이 한 글자도 안 바뀌었고,
+        # ✏️ 제목은 애초에 건드리지 않았다.
+        assert so.title_history_of(same_url) == []
+        assert so.title_history_of(touched_url) == [], "원문만 손댄 기사엔 적을 이력이 없습니다"
+        assert so.title_history_of(kept_url) == [], "✏️ 제목은 건드리지 않았으므로 이력도 없습니다"
+
+        # (9) 또 바뀌면 **쌓인다**. 마지막 하나만 들고 있으면 언론사가 옛 제목으로 되돌렸을 때
+        #     무엇이 어떤 차례로 바뀌었는지 영영 알 수 없다.
+        page[changed_url] = {"title": "성장자금 162조 ‘쌈짓돈’ 현실화 우려 확산",
+                             "pub_date": "2026-10-07T12:11:13+09:00",
+                             "modified_at": "2026-10-08T09:10:00+09:00"}
+        tr.refetch_titles([{"url": changed_url,
+                            "title": "성장자금 162조 ‘쌈짓돈’ 현실화 우려",
+                            "pub_date": "2026-10-07T12:11:13+09:00"}])
+        hist = so.title_history_of(changed_url)
+        assert [h["to"] for h in hist] == ["성장자금 162조 ‘쌈짓돈’ 현실화 우려",
+                                           "성장자금 162조 ‘쌈짓돈’ 현실화 우려 확산"], hist
+        # 가장 오래된 from이 곧 **처음 담았을 때의 제목**이다(화면이 마지막 줄에 그 값을 적는다).
+        assert hist[0]["from"] == "성장자금 162조 ‘쌈짓돈’ 현실화", hist[0]
+
+        # (10) 화면은 저장소를 **한 번만** 읽는다 — 이력 없는 기사는 아예 안 담는다.
+        table = so.title_history_map()
+        assert table[changed_url] == hist
+        assert same_url not in table and touched_url not in table, table.keys()
+
+    print("58) 제목 일괄 불러오기: 통과 (여섯 갈래, 자체 도메인 안 받음, 저장 한 번, 기준점 이동, 이력 쌓임)")
 
 def test_title_watch_alert():
     """「제목 변경 알림」이 주기마다 돌고, 알리기만 하고 아무것도 덮지 않는 길을 지킨다.
@@ -5840,7 +5873,34 @@ def test_refetch_titles_widget_contract():
     assert 'class="refetch-btn"' not in btn
     assert refetch_titles_note_html().count("refetch-note") == 1
 
-    print("59) 제목 불러오기 장치 계약: 통과 (표식 넷, 기본 꺼짐, 결과 줄 자리, 이름 안 겹침)")
+    # (7) **저장된 이력이 있으면 서버가 세 조각을 그린다** — 「✎ 제목 변경」 칩·옛 제목
+    #     취소선 줄·이력 블록. 여기가 깨지면 담당자가 버튼을 누른 직후에는 보이는데
+    #     새로고침하면 사라지는, 지금 고친 바로 그 상태로 되돌아간다.
+    story = [{"at": "2026-10-15T14:02:00", "from": "옛 제목",
+              "to": article["title"], "modified_at": "2026-10-15 13:50:00"}]
+    marked = render_article(article, [], refetch_marks=True,
+                            refetch_history={article["url"]: story})
+    assert 'class="chip-changed"' in marked and "toggleRefetchHist" in marked, marked[:400]
+    assert 'class="refetch-was"' in marked and "옛 제목" in marked
+    assert 'class="refetch-hist"' in marked
+    # **세이지는 안 붙인다** — 「색은 방금, 칩은 사실」. 저장된 이력에 색까지 칠하면
+    # 한 번 바뀐 기사는 영영 「방금 손댄 것」으로 보인다.
+    assert "refetch-row-changed" not in marked, "저장된 이력에 세이지를 칠했습니다"
+    # 이력 블록은 <details> **밖**이라야 눌러도 기사 요약이 같이 접혔다 펼쳐지지 않는다.
+    assert marked.index('class="refetch-hist"') > marked.rindex("</details>"), \
+        "이력 블록이 <details> 안에 있습니다 — 누르면 요약이 같이 토글됩니다"
+    # 이력이 없으면 세 조각 다 안 그리고, refetch_marks가 꺼진 화면은 이력이 있어도
+    # 한 글자도 안 바뀐다(버튼 없는 화면에 표식만 달지 않는다는 그 규칙).
+    assert "chip-changed" not in render_article(article, [], refetch_marks=True)
+    assert "chip-changed" not in render_article(article, [],
+                                                refetch_history={article["url"]: story})
+    # (8) 누른 직후와 새로고침 뒤가 **같은 마크업**이어야 한다 — 그래서 화면은 짓지 않고
+    #     서버가 응답에 실어 보낸 chip/was/hist를 그대로 꽂는다.
+    for key in ("v.chip", "v.was", "v.hist"):
+        assert key in js, f"JS가 {key}를 안 씁니다 — 화면이 제 나름대로 짓고 있습니다"
+    assert "toggleRefetchHist" in js
+
+    print("59) 제목 불러오기 장치 계약: 통과 (표식 넷, 기본 꺼짐, 결과 줄 자리, 저장된 이력은 서버가 그림)")
 
 
 def test_ai_assigned_badge():

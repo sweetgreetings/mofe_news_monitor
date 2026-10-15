@@ -31,7 +31,7 @@ from app.group_order import apply_group_order
 from app.labels import labels_for_url
 from app.llm_classifier import UNCLASSIFIED_GROUP_NAME, round_id_for_run
 from app.manual_keyword_note import load_manual_keyword_note
-from app.summary_overrides import apply_summary_overrides
+from app.summary_overrides import apply_summary_overrides, title_history_map
 from app.icons import icon
 from app.labels import load_labels
 from app import send_log
@@ -1208,6 +1208,9 @@ def _render_slot(
     # 라벨 저장소는 기사마다가 아니라 이 회차에 한 번만 읽는다(실측: 504건 화면에서
     # 기사마다 읽으면 83ms — 라벨이 늘수록 같이 커진다).
     labels_lookup = load_labels()
+    # 저장된 제목 변경 이력 — 이 회차에 한 번만 읽는다(labels_lookup과 같은 이유).
+    # 「✎ 제목 변경」 칩·옛 제목 줄·이력 블록이 새로고침해도 남는 근거다.
+    refetch_history = title_history_map()
     label_scrap_date = (run.get("run_at") or datetime.now().isoformat())[:10]
     if not articles:
         body = '<div class="slot-empty">💤<div class="cute-caption">뉴스가 잠잠</div></div>'
@@ -1231,6 +1234,7 @@ def _render_slot(
                         known_labels_html=known_labels_html,
                         scrap_date=label_scrap_date, scrap_end=run["run_slot"],
                         labels_lookup=labels_lookup, refetch_marks=True,
+                        refetch_history=refetch_history,
                     )
                     for a in group_articles
                 )
@@ -1243,6 +1247,7 @@ def _render_slot(
                     show_label_control=True, known_labels_html=known_labels_html,
                     scrap_date=label_scrap_date, scrap_end=run["run_slot"],
                     labels_lookup=labels_lookup, refetch_marks=True,
+                    refetch_history=refetch_history,
                 )
                 for a in articles
             )
