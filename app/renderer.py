@@ -2741,7 +2741,9 @@ def render_article(
     # 자리를 정한 기사. 연보라 배경(.just-classified)은 "방금 눌렀다"는 1회성 신호라
     # 새로고침 한 번에 사라지는데, "AI가 넣었으니 한 번 봐야 한다"는 사실은 그보다 오래
     # 남아야 한다 — 색은 방금, 칩은 사실이라는 앱 공통 문법대로 칩으로 남긴다(🤖 마감 후
-    # 자동 배정 배지와 같은 모양·같은 색). 담당자가 그 기사를 직접 옮기면 저절로 사라진다
+    # 자동 배정 배지와 같은 배색, 글자는 없고 아이콘만 — 뜻은 툴팁이 말한다. 그 배지는
+    # 행마다 하나씩 붙지만 이 칩은 버튼 한 번에 여러 행에 한꺼번에 붙는다).
+    # 담당자가 그 기사를 직접 옮기면 저절로 사라진다
     # (app.curation.set_group_override의 by 기본값이 "manual"이라서).
     # 한 행에 🤖는 하나다 — 마감 후 자동 배정 배지가 이미 있으면 안 그린다(그 행은 배지에
     # 왼쪽 띠·음영까지 딸려 있어 "AI가 넣었다"를 이미 말하고 있다).
@@ -2749,7 +2751,7 @@ def render_article(
     ai_assigned_badge_html = (
         '<span class="ai-assigned-badge" title="「AI 기사 배정」·「AI 기사 나누기」가 이 소제목에 '
         '넣은 기사입니다 — 직접 다른 소제목으로 옮기면 이 표시는 사라집니다">'
-        f'{icon("bot")} AI 배정</span>'
+        f'{icon("bot")}</span>'
         if ai_assigned and not finalize_added
         else ""
     )
@@ -4514,11 +4516,21 @@ AI_ASSIGNED_BADGE_STYLE = """
      아니라 메타 줄 — 제목 줄엔 📷·🤖(마감) 배지가 이미 서고, 이 칩은 버튼을 누를
      때마다 여러 행에 한꺼번에 붙어 제목 줄을 밀어낸다(.late-badge와 같은 판단).
      왼쪽 띠는 주지 않는다 — 띠는 한 화면에 하나이고 마감 후 자동 배정이 쓰고 있다. */
+  /* 글자(「AI 배정」)는 떼고 🤖 하나만 남긴다 — 버튼 한 번에 여러 행이 한꺼번에 이 칩을
+     달아, 같은 글자가 메타 줄마다 되풀이되면 정작 읽어야 할 시각·검색어가 밀린다. 뜻은
+     툴팁이 말한다(「📂 미분류」·「📌 담아둔 기사」 배지와 같은 방식 — 글자 없이 아이콘).
+     **알약은 벗기지 않는다**: 맨 아이콘만 두면 바로 오른쪽 🏷·⋯·🗑과 같은 실루엣이 돼
+     누를 수 있는 버튼으로 읽힌다(알약 = 상태를 알려 주는 것). 시안
+     mockups/AI_BADGE_ICON_MOCKUP.html A안. */
   .ai-assigned-badge {{
-    flex-shrink: 0; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-pill);
-    font-size: var(--fs-xs); font-weight: 700; white-space: nowrap;
+    flex-shrink: 0; margin-left: 6px; padding: 1px 6px; border-radius: var(--r-pill);
+    display: inline-flex; align-items: center; cursor: help;
     color: {ai_text}; background: {card}; border: 1px solid {ai_border};
   }}
+  /* 틀(font-size)이 아니라 글리프 크기를 직접 잡는다 — 이 알약엔 글자가 없어 기준이 될
+     글자 크기가 없다. 0.95rem은 같은 줄 원문보기·돋보기(0.75em ≈ 0.6rem)보다 크고 행
+     아이콘(1rem)보다 작은 값이라, 메타 줄에서 혼자 튀지 않으면서 로봇 모양이 읽힌다. */
+  .ai-assigned-badge .ic {{ width: 0.95rem; height: 0.95rem; }}
 """
 
 

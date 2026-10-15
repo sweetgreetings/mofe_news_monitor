@@ -5959,9 +5959,17 @@ def test_ai_assigned_badge():
 
     # (2) 켜면 메타 줄에 칩이 선다 — 제목 줄이 아니다(📷·🤖 마감 배지가 이미 서는 자리).
     on = render_article(article, [], ai_assigned_urls={article["url"]})
-    assert "ai-assigned-badge" in on and "AI 배정" in on, on[:400]
+    assert "ai-assigned-badge" in on, on[:400]
     assert on.index("ai-assigned-badge") > on.index('class="action-row"'), \
         "칩이 메타 줄이 아니라 제목 줄에 붙었습니다"
+    # 칩 안엔 🤖 하나뿐이고 글자가 없다 — 버튼 한 번에 여러 행이 같은 칩을 달아, 글자를
+    # 두면 메타 줄마다 같은 말이 되풀이된다. 뜻은 툴팁이 들고 있다(그 둘은 한 쌍이라
+    # 글자를 떼면서 툴팁을 같이 빼면 이 표시가 무슨 뜻인지 알 길이 없어진다).
+    chip = on[on.index('<span class="ai-assigned-badge"'):]
+    chip = chip[: chip.index("</span>") + len("</span>")]
+    assert "AI 배정" not in chip, f"칩에 글자가 남아 있습니다: {chip}"
+    assert "<svg" in chip, f"칩에 🤖 아이콘이 없습니다: {chip}"
+    assert "title=" in chip and "넣은 기사입니다" in chip, f"칩에 툴팁이 없습니다: {chip}"
     # 칩은 화면 전용이라 복사·txt·발송 텍스트엔 안 나간다(별도 <span>, 이름 문자열 밖).
     assert "AI 배정" not in article["title"]
 
@@ -5983,7 +5991,7 @@ def test_ai_assigned_badge():
     # 초안 쪽에 같은 규칙을 복붙해 두면 안 된다(한쪽만 고쳤을 때 조용히 갈린다).
     assert ".ai-assigned-badge {" not in (root / "app/preview_renderer.py").read_text(encoding="utf-8")
 
-    print("60) 🤖 AI 배정 칩: 통과 (AI 자리만, 직접 옮기면 사라짐, 기본 꺼짐, 🤖는 한 행에 하나)")
+    print("60) 🤖 AI 배정 칩: 통과 (AI 자리만, 직접 옮기면 사라짐, 기본 꺼짐, 글자 없이 🤖 하나)")
 
 
 if __name__ == "__main__":
