@@ -759,15 +759,6 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .copy-btn .icon-done, .group-copy-btn .icon-done {{ display: none; }}
   .copy-btn.is-copied .icon-default, .group-copy-btn.is-copied .icon-default {{ display: none; }}
   .copy-btn.is-copied .icon-done, .group-copy-btn.is-copied .icon-done {{ display: inline-flex; }}
-  /* [추가: 2026-08-05] 원문 다시 가져오기 버튼 — 평소엔 숨겨두고 그 기사 카드에
-     마우스를 올렸을 때만 나타난다(제목 옆이 붐비지 않게). */
-  .refetch-btn {{
-    flex-shrink: 0; background: transparent; border: none; color: {muted}; font-size: var(--fs-base);
-    cursor: pointer; padding: 2px 6px; user-select: none; -webkit-user-select: none;
-    opacity: 0; transition: opacity 0.15s;
-  }}
-  .article:hover .refetch-btn {{ opacity: 1; }}
-  .refetch-btn:disabled {{ opacity: 0.35 !important; cursor: not-allowed; }}
   /* [추가: 2026-08-11] "⋯ 더보기" 메뉴 — 원문 다시 불러오기 / 기사 정보 직접 수정.
      예전엔 이 둘과 복사하기까지 셋이 제목 줄에 아이콘으로 직접 붙어 있었고
      .refetch-btn의 opacity:0으로 숨겼다가 카드 호버 시에만 나타났는데, (1) 호버할
@@ -2618,9 +2609,9 @@ def render_article(
         f'title="이 기사 숨기기 (되돌리기 가능)">{icon("trash")}</button>'
     )
     # [추가: 2026-08-10] 기사 전체가 아니라 이 기사 한 건만 복사해야 할 때(가끔 1개
-    # 기사만 보고하는 경우) — 🔄/✏️와 같은 자리·같은 숨김 방식(.refetch-btn, 평소엔
-    # 안 보이다가 카드에 마우스를 올리면 나타남)을 그대로 써서, 기본 화면은 지금처럼
-    # 깔끔하게 두면서도 아이콘을 더 늘리지 않는다. 복사 본문은 전체 복사(PLAIN_TEXT)와
+    # 기사만 보고하는 경우) — 만들 때는 🔄/✏️와 같은 자리·같은 숨김 방식(옛 .refetch-btn은
+    # 평소엔 안 보이다가 카드에 마우스를 올리면 나타났다)을 그대로 써서, 기본 화면을
+    # 깔끔하게 두면서도 아이콘을 더 늘리지 않았다. 복사 본문은 전체 복사(PLAIN_TEXT)와
     # 같은 줄 형식("ㅇ (언론사) 제목" + URL)이라 붙여넣었을 때 형식이 어긋나지 않는다.
     copy_line = apply_line_template(line_template, article["outlet"], article["title"])
     copy_text_attr = html.escape(f"{copy_line}\n{article['url']}")

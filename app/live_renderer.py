@@ -511,14 +511,6 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     cursor: pointer; padding: 4px 6px;
   }}
   .hide-from-live-btn:hover {{ color: {error}; }}
-  /* [추가: 2026-08-05] 원문 다시 가져오기 버튼 — app.renderer.render_article과 동일한
-     이유·동작(평소 숨김, 그 행에 마우스를 올리면 나타남). */
-  .refetch-btn {{
-    flex-shrink: 0; background: transparent; border: none; color: {muted}; font-size: var(--fs-base);
-    cursor: pointer; padding: 4px 6px; opacity: 0; transition: opacity 0.15s;
-  }}
-  .live-row:hover .refetch-btn {{ opacity: 1; }}
-  .refetch-btn:disabled {{ opacity: 0.35 !important; cursor: not-allowed; }}
   /* [추가: 2026-08-05] app.renderer와 동일 — ✏️ 직접 수정 인라인 편집 칸. */
   .edit-summary-form {{
     margin: 8px 0 4px 20px; padding: 10px 12px; border: 1px solid {accent}; border-radius: var(--r-lg);

@@ -749,14 +749,6 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .copy-btn .icon-done, .group-copy-btn .icon-done {{ display: none; }}
   .copy-btn.is-copied .icon-default, .group-copy-btn.is-copied .icon-default {{ display: none; }}
   .copy-btn.is-copied .icon-done, .group-copy-btn.is-copied .icon-done {{ display: inline-flex; }}
-  /* [추가: 2026-08-05] app.renderer와 동일 — 원문 다시 가져오기 버튼, 평소 숨김. */
-  .refetch-btn {{
-    flex-shrink: 0; background: transparent; border: none; color: {muted}; font-size: var(--fs-base);
-    cursor: pointer; padding: 2px 6px; user-select: none; -webkit-user-select: none;
-    opacity: 0; transition: opacity 0.15s;
-  }}
-  .article:hover .refetch-btn {{ opacity: 1; }}
-  .refetch-btn:disabled {{ opacity: 0.35 !important; cursor: not-allowed; }}
   /* [추가: 2026-08-11] "⋯ 더보기" 메뉴 — 원문 다시 불러오기 / 기사 정보 직접 수정.
      예전엔 이 둘과 복사하기까지 셋이 제목 줄에 아이콘으로 직접 붙어 있었고
      .refetch-btn의 opacity:0으로 숨겼다가 카드 호버 시에만 나타났는데, (1) 호버할
