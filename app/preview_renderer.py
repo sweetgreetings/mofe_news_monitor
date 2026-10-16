@@ -74,7 +74,12 @@ from app.group_order import apply_group_order, is_order_locked
 from app.draft_articles import add_draft_pending_article, load_draft_pending_articles
 from app.draft_seen import load_draft_seen, record_draft_seen, search_condition
 from app.preview_cache import load_preview_cache, save_preview_cache
-from app.preview_order import apply_preview_order, load_preview_order, save_preview_order
+from app.preview_order import (
+    apply_preview_order,
+    load_preview_order,
+    save_preview_order,
+    urls_not_in_order,
+)
 from app.filters import (
     deduplicate_by_title,
     filter_by_outlet_whitelist,
@@ -138,7 +143,7 @@ from app.renderer import (
 from app.scheduler import next_pending_slot
 from app.scraper import _already_published_urls, _slot_end_for_pub_date
 from app.settings import active_schedule_times, active_search_groups, all_search_keywords, group_in_scrap, load_settings
-from app.sorter import sort_by_outlet_priority
+from app.sorter import place_new_articles, sort_by_outlet_priority
 from app.summarizer import summarize_groups
 
 logger = logging.getLogger(__name__)
@@ -3594,6 +3599,24 @@ def _compute_preview_content(
     # 배너(classify_degraded)와 재분류 버튼의 data-degraded는 사실 판정 그대로다 —
     # 이름이 단어 빈도로 지어진 건 키가 없든 있든 사실이기 때문이다.
     confirm_degraded = classify_degraded and llm_is_configured()
+
+    # [추가: 2026-10-16] 손수 맞춘 순서(preview_order)에 없던 기사를 **제 소제목 안** 언론사 순위
+    # 자리에 끼워 넣는다 — 확정본 저장(app.scraper.collect_run)이 부르는 것과 **같은
+    # 함수·같은 대상 판정**이라야 두 화면의 순서가 갈리지 않는다. 한 줄 목록을 먼저
+    # 고치고 groups를 그 순서로 다시 세우는 이유도 같다: 회차 파일에 저장되는 건 한 줄
+    # 목록이고, 확정본은 거기서 소제목별 순서를 읽는다(groups_from_snapshot).
+    newly_arrived = urls_not_in_order(articles, load_preview_order())
+    if newly_arrived and groups:
+        group_by_url = {a["url"]: g["name"] for g in groups for a in g["articles"]}
+        articles = place_new_articles(
+            articles,
+            newly_arrived,
+            lambda a: group_by_url.get(a["url"]),
+            priority_outlets=load_settings().get("outlet_order") or None,
+        )
+        order_index = {a["url"]: i for i, a in enumerate(articles)}
+        for group in groups:
+            group["articles"] = sorted(group["articles"], key=lambda a: order_index[a["url"]])
 
     # [추가: 2026-07-30] "+ 새 소제목 만들기"로 미리 만들어둔, 아직 기사가 하나도 없는
     # 소제목도 화면에 같이 보여준다 — 실제 분류 결과(groups)와 합쳐서 한 번에 렌더링해야

@@ -2,6 +2,7 @@
 from datetime import datetime
 from typing import Optional
 
+from app.filters import headline_kind
 from app.naver_api import PRIORITY_OUTLETS
 
 
@@ -82,3 +83,88 @@ def sort_by_pub_desc(articles: list[dict]) -> list[dict]:
     완전 정렬이라 같은 입력이면 항상 같은 결과가 나온다 — pub_date가 없거나 깨진 기사는
     없는 시각을 지어내지 않고 맨 뒤로 보낸다(_pub_desc_key)."""
     return sorted(articles, key=lambda a: (_pub_desc_key(a), a.get("url") or ""))
+
+
+def place_new_in_group(
+    articles: list[dict],
+    new_urls: set,
+    priority_outlets: Optional[list] = None,
+) -> list[dict]:
+    """**한 소제목 안에서**, 새로 들어온 기사만 제자리에 끼워 넣는다 — 이 앱의 "새 기사
+    자리" 규칙이 사는 한 곳이다.
+
+    자리는 두 단계로 정한다:
+      1. `[단독]`이면 그 소제목 맨 위 구간(앞에서부터 이어지는 [단독] 줄) 안으로,
+         아니면 그 아래 구간으로 간다 — app.filters.sort_scoop_first와 **같은 서열**이다.
+         [속보]는 그 함수와 똑같이 자리를 안 바꾼다(한 회차에 여러 건 나와서 전부 올리면
+         정작 [단독]이 묻힌다는 그 판단 그대로다).
+      2. 그 구간 안에서 언론사 순위 자리를 찾는다. 정렬 키는 sort_by_outlet_priority와
+         같은 outlet_sort_key 하나다 — 정렬과 삽입이 각자 키를 만들면 한쪽만 고쳤을 때
+         조용히 어긋난다(수시 확정본 app.adhoc.card._insert_by_outlet과 같은 이유).
+
+    **이미 자리를 잡은 기사는 한 칸도 안 움직인다** — 담당자가 ↑↓로 맞춰 둔 순서를 전체
+    재정렬로 지워버리는 건 CLAUDE.md "담당자 > AI: 정렬·분류 우선순위"가 금지한 동작이다.
+    여기서 하는 일은 새 기사를 **끼워 넣는 것**뿐이라 기존 상대 순서가 그대로 보존된다.
+
+    new_urls가 비어 있으면 입력을 그대로 돌려준다(손수 맞춘 순서가 없는 평소 경로는
+    이 함수가 아무 일도 하지 않는다).
+    """
+    if not new_urls:
+        return articles
+    fresh = [a for a in articles if a.get("url") in new_urls]
+    if not fresh:
+        return articles
+    placed = [a for a in articles if a.get("url") not in new_urls]
+    for article in fresh:
+        placed.insert(_slot_in_group(placed, article, priority_outlets), article)
+    return placed
+
+
+def _slot_in_group(placed: list[dict], article: dict, priority_outlets: Optional[list]) -> int:
+    """placed(이미 자리를 잡은 같은 소제목 기사들) 안에서 article이 들어갈 칸 번호."""
+    # 맨 앞에서부터 이어지는 [단독] 줄 = sort_scoop_first가 만들어 둔 최상단 구간.
+    head = 0
+    while head < len(placed) and headline_kind(placed[head].get("title", "")) == "단독":
+        head += 1
+    if headline_kind(article.get("title", "")) == "단독":
+        low, high = 0, head
+    else:
+        low, high = head, len(placed)
+    key = outlet_sort_key(article, priority_outlets)
+    for i in range(low, high):
+        if outlet_sort_key(placed[i], priority_outlets) > key:
+            return i
+    return high
+
+
+def place_new_articles(
+    articles: list[dict],
+    new_urls: set,
+    group_of=None,
+    priority_outlets: Optional[list] = None,
+) -> list[dict]:
+    """한 줄 목록(회차 파일에 저장되는 그 순서) 위에서 place_new_in_group을 적용한다.
+
+    **소제목 안에서만 자리를 바꾼다** — 소제목끼리 섞여 있는 패턴은 한 칸도 안 건드리고,
+    각 소제목이 차지하던 칸에 그 소제목의 새 순서를 그대로 다시 꽂는다. 그래서 숨긴
+    기사처럼 화면에 안 보이는 기사도 제 소제목 안에서 같이 따라 움직이고, 회차 파일의
+    "소제목별 상대 순서"(app.classifier.groups_from_snapshot이 읽는 바로 그 순서)가
+    화면과 어긋나지 않는다.
+
+    group_of: 기사 → 소제목 이름. 기본값은 저장된 "group" 필드다.
+    """
+    if not new_urls:
+        return articles
+    group_of = group_of or (lambda a: a.get("group"))
+    buckets: dict = {}
+    for article in articles:
+        buckets.setdefault(group_of(article), []).append(article)
+    for name, items in buckets.items():
+        buckets[name] = place_new_in_group(items, new_urls, priority_outlets)
+    cursor = {name: 0 for name in buckets}
+    out = []
+    for article in articles:
+        name = group_of(article)
+        out.append(buckets[name][cursor[name]])
+        cursor[name] += 1
+    return out

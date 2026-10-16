@@ -26,9 +26,14 @@ from app.filters import (
 )
 from app.credentials import naver_is_configured
 from app.naver_api import NaverNotConfiguredError, kst_today_at, search_articles_by_groups
-from app.preview_order import apply_preview_order, clear_preview_order, load_preview_order
+from app.preview_order import (
+    apply_preview_order,
+    clear_preview_order,
+    load_preview_order,
+    urls_not_in_order,
+)
 from app.settings import active_schedule_times, active_search_groups, all_search_keywords, group_in_scrap, load_settings
-from app.sorter import sort_by_outlet_priority
+from app.sorter import place_new_articles, sort_by_outlet_priority
 from app.custom_groups import load_custom_groups
 from app.last_slot_topup import find_run, last_window, schedule_times_now, topup_due_at
 from app.storage import load_run_file, load_today_runs, save_run, update_run_articles
@@ -270,7 +275,11 @@ def collect_run(
     # 넘어가는 순간 애써 정리한 순서가 다시 언론사 우선순위로 리셋돼버린다. 한 번
     # 반영했으면 이 회차의 "진행 중" 상태는 끝난 것이므로 저장소를 비워, 다음 회차가
     # 지난 회차의 순서를 잘못 이어받지 않게 한다.
-    articles = apply_preview_order(articles, load_preview_order())
+    saved_order = load_preview_order()
+    # 손수 맞춘 순서에 없던 기사 = apply_preview_order가 맨 뒤로 몰아 붙이는 기사들.
+    # 비우기 전에 받아 둬야 아래 place_new_articles가 쓸 수 있다.
+    newly_arrived = urls_not_in_order(articles, saved_order)
+    articles = apply_preview_order(articles, saved_order)
     clear_preview_order()
 
     # [추가: 2026-08-20] [단독]·[속보] 기사 알림 "바닥" 경로 — 이 회차가 어차피 검색한
@@ -352,6 +361,13 @@ def collect_run(
             }
         )
     articles = snapshotted
+    # [추가: 2026-10-16] 손수 맞춘 순서에 없던 기사를 **제 소제목 안** 언론사 순위 자리에 끼워 넣는다
+    # (app.sorter.place_new_articles — 초안 화면이 부르는 함수와 같은 것이다). 분류가
+    # 끝난 **뒤**라야 "제 소제목 안"을 알 수 있어 여기가 자리다. 이미 자리를 잡은 기사는
+    # 한 칸도 안 움직이고, newly_arrived가 비면(= ↑↓를 안 눌렀다) 아무 일도 하지 않는다.
+    articles = place_new_articles(
+        articles, newly_arrived, priority_outlets=outlet_order or None
+    )
 
     path = save_run(
         run_slot,
@@ -400,9 +416,10 @@ def _topup_groups_for(fresh: list[dict], run: dict) -> None:
     이름을 바꿀 방법 자체가 없다. 담당자가 직접 만든 소제목은 후보에서 뺀다(특정 기사만
     넣으려고 만든 칸일 수 있는데 모델은 그 의도를 모른다 — /assign-unclassified와 같은 이유).
 
-    소제목별 요약(group_summary)은 그 소제목의 첫 기사에 붙어 있는 값을 그대로 물려받는다.
-    덧붙는 기사는 목록 맨 뒤로 가므로 첫 기사가 바뀌지 않아 요약은 보존된다 — 다만 그
-    요약에 이 기사 내용은 안 들어 있다(「AI 기사 나누기」의 요약 한계와 같은 자리다).
+    소제목별 요약(group_summary)은 그 소제목의 첫 기사에 붙어 있는 값을 그대로 물려받아
+    **새 기사에도 적는다** — 끼워 넣기(app.sorter.place_new_articles)로 보충분이 그 소제목
+    맨 앞에 설 수 있으므로, groups_from_snapshot이 items[0]에서 읽을 값이 거기 있어야 한다.
+    다만 그 요약에 이 기사 내용은 안 들어 있다(「AI 기사 나누기」의 요약 한계와 같은 자리다).
     """
     # group 필드가 없는 옛 회차 파일(이 스냅샷 기능이 생기기 전 저장된 것)도 안전하게
     # 지나가게 한다 — groups_from_snapshot은 그 필드를 당연히 있는 것으로 읽는다.
@@ -441,9 +458,13 @@ def top_up_last_run(
     보충했는지의 판단은 거기서 한다. 이 함수를 직접 불러도 안전하게 한 번만 돌도록
     같은 조건을 다시 확인한다.
 
-    **덧붙이기다, 다시 수집이 아니다.** 이미 저장된 기사·순서·숨김·이름표·소제목 구성은
-    하나도 안 건드리고 새 기사를 목록 **맨 뒤**에 붙인다(그래서 각 소제목 안에서도 맨 뒤에
-    선다). 회차 이름·run_at·헤더 시각도 그대로다 — 보고서는 여전히 그 회차의 보고서다.
+    **덧붙이기다, 다시 수집이 아니다.** 이미 저장된 기사끼리의 순서·숨김·이름표·소제목
+    구성은 하나도 안 건드리고 새 기사만 **제 소제목 안 언론사 순위 자리**에 끼워 넣는다
+    (app.sorter.place_new_articles — 초안·확정본 저장이 부르는 것과 같은 함수다. 「어디서
+    들어온 기사냐」로 자리가 갈리면 담당자는 같은 화면에서 어떤 기사는 제자리에, 어떤
+    기사는 뒤에 붙은 걸 보게 되는데 그 차이를 화면이 설명해 주지 못한다 — 「마감 뒤에
+    들어온 기사」라는 말은 ⏱ 칩·앰버 배너·「N건 보기」가 이미 하고 있다).
+    회차 이름·run_at·헤더 시각도 그대로다 — 보고서는 여전히 그 회차의 보고서다.
 
     새 기사에 붙는 표식:
       - late_pickup: 확정본의 앰버 배너·⏱ 칩이 읽는 기존 표식을 그대로 쓴다.
@@ -529,7 +550,17 @@ def top_up_last_run(
     except Exception:
         logger.exception("[단독]·[속보] 알림(보충 훑기 경로) 실패 — 보충 저장은 정상 진행됩니다")
 
-    merged = run.get("articles", []) + fresh
+    # [수정: 2026-10-16] 보충분도 **제 소제목 안** 언론사 순위 자리에 끼워 넣는다 — 「어디서 들어온
+    # 기사냐」로 자리가 갈리면 담당자는 같은 화면에서 어떤 기사는 제자리에, 어떤 기사는
+    # 뒤에 붙은 걸 보게 되는데 그 차이를 화면이 설명해 주지 못한다. 「마감 뒤에 들어온
+    # 기사」라는 말은 ⏱ 칩·앰버 배너·「N건 보기」가 이미 하고 있어 위치까지 그 말을
+    # 되풀이할 필요가 없다. 소제목 요약은 _topup_groups_for가 이미 새 기사에 물려
+    # 줬으므로(group_summary), 맨 앞에 서도 groups_from_snapshot이 읽을 값이 있다.
+    merged = place_new_articles(
+        run.get("articles", []) + fresh,
+        {a["url"] for a in fresh},
+        priority_outlets=outlet_order or None,
+    )
     updated = {**run, "articles": merged, "topup_at": now.isoformat(timespec="seconds")}
     if not update_run_articles(updated, merged):
         logger.warning("보충 훑기 결과를 저장할 회차 파일을 못 찾았습니다 (회차=%s)", window["end"])

@@ -155,6 +155,9 @@ def sort_scoop_first(articles: list[dict]) -> list[dict]:
     [속보]는 서열상 [단독] 다음이라 자리를 옮기지 않는다 — 색으로만 눈에 띄게 하고
     정렬은 건드리지 않는다(속보는 한 회차에 여러 건 나올 수 있어, 전부 끌어올리면
     정작 가장 중요한 [단독]이 그 사이에 묻힌다).
+
+    나중에 들어온 기사 한 건을 끼워 넣을 때도 **같은 서열**을 쓴다 —
+    app.sorter.place_new_in_group이 [단독]만 맨 위 구간으로 보낸다.
     """
     return sorted(articles, key=lambda a: headline_kind(a["title"]) != "단독")
 

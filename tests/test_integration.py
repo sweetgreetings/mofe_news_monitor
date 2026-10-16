@@ -3793,7 +3793,8 @@ def test_last_slot_topup_adds_late_articles():
 
       1) 보충 시각 규칙 — 마감 + 30분, 23:50에서 잘림, 23:50 이후 마감이면 보충 없음
       2) 마지막 회차도 **정시에** 수집 대상이 된다(지연이 사라졌다)
-      3) 보충은 **새 기사만 덧붙인다** — 기존 기사·순서·숨김·소제목은 그대로
+      3) 보충은 **새 기사만 덧붙인다** — 기존 기사끼리의 순서·숨김·소제목은 그대로이고,
+         새 기사는 제 소제목 안 **언론사 순위 자리**에 끼워 들어간다(맨 뒤가 아니다)
       4) 새 기사엔 late_pickup + topup_pickup이 붙고 late_pickup_slot은 **안 붙는다**
          (앞 회차 기사가 아니라 이 회차 시간대 기사라 회차 이름을 적으면 안 된다)
       5) 이미 있는 제목과 같은 기사는 안 붙는다(담당자가 보던 기사가 밀려나지 않는다)
@@ -3839,7 +3840,10 @@ def test_last_slot_topup_adds_late_articles():
     curation.hide_article(hidden_one["url"], outlet=hidden_one["outlet"], title=hidden_one["title"])
 
     # 마감 뒤 네이버가 뒤늦게 준 기사들
-    late_new = {**_article("마감뒤-들어온-기사"), "pub_date": f"{today}T16:55:00+09:00"}
+    # 언론사를 갈라 둬야 "맨 뒤"가 아니라 "언론사 순위 자리"에 들어가는지 볼 수 있다 —
+    # 조선일보는 PRIORITY_OUTLETS 안이고 테스트일보는 목록 밖(맨 뒤 순위)이다.
+    late_new = {**_article("마감뒤-들어온-기사"), "outlet": "조선일보",
+                "pub_date": f"{today}T16:55:00+09:00"}
     same_title = {**_article("다른-주소"), "title": kept["title"],
                   "pub_date": f"{today}T16:58:00+09:00"}
     captured = {}
@@ -3871,16 +3875,20 @@ def test_last_slot_topup_adds_late_articles():
 
     run = last_slot_topup.find_run(today, "17:00")
     urls = [a["url"] for a in run["articles"]]
-    # 3) 기존 기사는 그대로, 새 기사는 맨 뒤
-    assert urls[:2] == [kept["url"], hidden_one["url"]], f"기존 기사 순서가 바뀌었다: {urls}"
-    assert urls[-1] == late_new["url"], "새 기사가 목록 맨 뒤에 붙지 않았다"
+    # 3) 기존 기사끼리의 순서는 그대로, 새 기사는 제 소제목 안 언론사 순위 자리
+    assert urls.index(kept["url"]) < urls.index(hidden_one["url"]), (
+        f"기존 기사끼리의 상대 순서가 바뀌었다: {urls}"
+    )
+    assert urls[0] == late_new["url"], (
+        f"보충분이 언론사 순위 자리에 안 들어갔다(조선일보 > 테스트일보): {urls}"
+    )
     assert run["run_slot"] == "17:00" and run["run_at"] == f"{today}T17:00:06", (
         "보충이 회차 이름·시각을 바꿨다 — 보고서는 여전히 그 회차의 보고서여야 한다"
     )
     # 5) 같은 제목은 안 붙는다
     assert same_title["url"] not in urls, "이미 있는 제목과 같은 기사가 덧붙었다"
 
-    fresh = run["articles"][-1]
+    fresh = next(a for a in run["articles"] if a["url"] == late_new["url"])
     # 4) 표식
     assert fresh.get("late_pickup") and fresh.get("topup_pickup"), "보충 표식이 안 붙었다"
     assert not fresh.get("late_pickup_slot"), (
@@ -3930,6 +3938,109 @@ def test_last_slot_topup_adds_late_articles():
 
     print("47) 마지막 회차 보충 훑기: 통과 (정시 확정본 + 마감 뒤 덧붙이기, 23:50 마감선, 표식·배너, 한 번만)")
 
+
+def test_new_article_placement():
+    """새로 들어온 기사는 **제 소제목 안 언론사 순위 자리**에 끼워 들어간다.
+
+    예전엔 담당자가 ↑↓를 한 번이라도 누르면 그 뒤에 색인된 기사가 전부 목록 맨 뒤로
+    붙었다(apply_preview_order의 `known + unknown`). 그래서 조선일보 기사가 매일신문
+    아래에 서는 일이 생겼다(2026-10-16 「10월 최근 경제동향」). 이 테스트가 보는 것:
+
+      1) 언론사 순위 자리에 들어가고, **이미 자리를 잡은 기사는 한 칸도 안 움직인다**
+      2) `[단독]`은 그 소제목 맨 위 구간으로 — sort_scoop_first와 같은 서열이다
+         ([속보]는 그 함수와 똑같이 자리를 안 바꾼다)
+      3) 소제목 **사이** 배치는 안 건드린다(한 줄 목록에서 각 소제목이 쓰던 칸 그대로)
+      4) 끼워 넣을 대상이 없으면 입력을 그대로 돌려준다 — ↑↓를 안 누른 평소 경로는
+         이 규칙이 아무 일도 하지 않는다
+      5) **초안과 확정본이 같은 함수·같은 대상 판정을 쓴다** — 한쪽만 고치면 화면 2번이
+         확정본 10번이 된다(CLAUDE.md가 되풀이해 경고하는 초안↔확정본 어긋남)
+    """
+    import inspect
+
+    from app import preview_renderer, scraper
+    from app.preview_order import urls_not_in_order
+    from app.sorter import place_new_articles, place_new_in_group
+
+    order = ["KBS", "조선일보", "한국일보", "매일신문"]
+
+    def art(outlet, title="제목", url=None, group="그린북"):
+        return {
+            "outlet": outlet, "title": title, "url": url or outlet,
+            "pub_date": "2026-10-16T10:30:00+09:00", "group": group,
+        }
+
+    # 1) 언론사 순위 자리 — 기존 기사는 그대로
+    placed = [art("KBS"), art("한국일보"), art("매일신문")]
+    out = place_new_in_group(placed + [art("조선일보")], {"조선일보"}, order)
+    assert [a["outlet"] for a in out] == ["KBS", "조선일보", "한국일보", "매일신문"], (
+        f"언론사 순위 자리에 안 들어갔다: {[a['outlet'] for a in out]}"
+    )
+    # 담당자가 손으로 흐트러뜨린 순서도 상대 순서 그대로 유지된다
+    manual = [art("매일신문"), art("KBS"), art("한국일보")]
+    out = place_new_in_group(manual + [art("조선일보")], {"조선일보"}, order)
+    assert [a["outlet"] for a in out if a["outlet"] != "조선일보"] == [
+        "매일신문", "KBS", "한국일보"
+    ], "손수 맞춘 순서가 흐트러졌다 — 끼워 넣기는 기존 기사를 안 움직여야 한다"
+
+    # 2) [단독]은 맨 위 구간으로, [속보]는 자리를 안 바꾼다
+    with_scoop = [art("매일신문", "[단독] 먼저 난 특종"), art("KBS"), art("한국일보")]
+    out = place_new_in_group(with_scoop + [art("조선일보")], {"조선일보"}, order)
+    assert out[0]["title"].startswith("[단독]"), "[단독]이 맨 위에서 밀려났다"
+    assert [a["outlet"] for a in out] == ["매일신문", "KBS", "조선일보", "한국일보"], (
+        f"평범한 새 기사가 [단독] 아래 구간에 안 들어갔다: {[a['outlet'] for a in out]}"
+    )
+    out = place_new_in_group(
+        with_scoop + [art("조선일보", "[단독] 새 특종")], {"조선일보"}, order
+    )
+    assert [a["outlet"] for a in out[:2]] == ["조선일보", "매일신문"], (
+        f"새 [단독]이 맨 위 구간 안 언론사 순위 자리에 안 섰다: {[a['outlet'] for a in out]}"
+    )
+    out = place_new_in_group(
+        [art("KBS"), art("한국일보")] + [art("조선일보", "[속보] 새 속보")], {"조선일보"}, order
+    )
+    assert [a["outlet"] for a in out] == ["KBS", "조선일보", "한국일보"], (
+        "[속보]를 맨 위로 끌어올렸다 — sort_scoop_first는 [단독]만 올린다"
+    )
+
+    # 3) 소제목 사이 배치는 그대로
+    flat = [
+        art("매일신문", url="m", group="A"),
+        art("KBS", url="k", group="B"),
+        art("한국일보", url="h", group="A"),
+        art("조선일보", url="c", group="A"),
+    ]
+    out = place_new_articles(flat, {"c"}, priority_outlets=order)
+    assert [a["group"] for a in out] == ["A", "B", "A", "A"], (
+        f"소제목이 쓰던 칸 패턴이 바뀌었다: {[a['group'] for a in out]}"
+    )
+    assert [a["outlet"] for a in out] == ["조선일보", "KBS", "매일신문", "한국일보"], (
+        f"A 소제목 안에서 순위 자리에 안 들어갔다: {[a['outlet'] for a in out]}"
+    )
+
+    # 4) 대상이 없으면 손대지 않는다 — ↑↓를 안 누른 평소 경로
+    assert place_new_articles(flat, set(), priority_outlets=order) is flat
+    assert urls_not_in_order(flat, []) == set(), (
+        "손수 맞춘 순서가 없는데 끼워 넣을 대상이 생겼다"
+    )
+    assert urls_not_in_order(flat, ["m", "k"]) == {"h", "c"}
+
+    # 5) 초안과 확정본이 같은 함수·같은 대상 판정을 쓴다
+    for module, name in ((preview_renderer, "초안"), (scraper, "확정본 저장·보충 훑기")):
+        src = inspect.getsource(module)
+        assert "place_new_articles(" in src, (
+            f"{name} 경로가 공용 끼워 넣기 함수를 안 쓴다 — 두 화면의 순서가 갈린다"
+        )
+        assert "urls_not_in_order(" in src, (
+            f"{name} 경로가 공용 대상 판정을 안 쓴다 — 같은 기사를 다르게 센다"
+        )
+    assert inspect.getsource(scraper).count("place_new_articles(") == 2, (
+        "확정본 저장과 보충 훑기 두 자리 모두에서 불러야 한다"
+    )
+
+    print(
+        "48) 새 기사 끼워 넣기: 통과 "
+        "(소제목 안 언론사 순위 자리, [단독]만 맨 위, 기존 순서 보존, 초안·확정본 같은 함수)"
+    )
 
 def test_trend_end_day_follows_today_completion():
     """정책 단어 추이의 끝 날짜 — 오늘 예정 회차가 전부 저장되기 전까지는 어제다.
@@ -6162,6 +6273,7 @@ if __name__ == "__main__":
         test_auto_send_does_not_resend_forever,
         test_undo_stack_dedupes_snapshots,
         test_last_slot_topup_adds_late_articles,
+        test_new_article_placement,
         test_trend_end_day_follows_today_completion,
         test_trend_today_partial_column,
         test_alert_scope_follows_keyword_switch,

@@ -50,6 +50,12 @@ def apply_preview_order(articles: list, order: list) -> list:
 
     order에 있는 URL의 기사는 그 순서대로 앞쪽에, order에 없는(그 사이 새로 나온) 기사는
     원래 순서(언론사 우선순위 등 이미 정렬된 입력 순서)를 유지한 채 뒤에 이어붙인다.
+
+    **여기서 뒤로 붙은 기사는 소제목이 정해진 뒤 제자리로 간다** — 소제목을 모르는 이
+    시점엔 "어느 소제목 안 몇 번째"를 고를 수 없어서, 분류가 끝난 다음에
+    app.sorter.place_new_articles가 그 기사들(urls_not_in_order가 고른 집합)을 제 소제목
+    안 언론사 순위 자리에 끼워 넣는다. 초안 화면과 확정본 저장이 **둘 다** 그 단계를
+    거친다 — 한쪽만 거치면 화면 2번이 확정본 10번이 된다.
     app.classifier.classify_articles가 "그룹 내 기사 순서는 입력 순서를 유지"하므로,
     여기서 정한 순서가 소제목별 화면 순서로 그대로 이어진다.
     """
@@ -60,3 +66,19 @@ def apply_preview_order(articles: list, order: list) -> list:
     unknown = [a for a in articles if a["url"] not in position]
     known.sort(key=lambda a: position[a["url"]])
     return known + unknown
+
+
+def urls_not_in_order(articles: list, order: list) -> set:
+    """"손수 맞춰 둔 순서에 없는 기사" = apply_preview_order가 맨 뒤로 몰아 붙이는 기사들.
+
+    이 집합이 곧 app.sorter.place_new_articles가 제자리에 끼워 넣을 대상이다 — 초안
+    화면과 확정본 저장이 **같은 정의**를 봐야 두 화면의 순서가 갈리지 않으므로 판정을
+    여기 한 곳에 둔다.
+
+    order가 비어 있으면(담당자가 아직 ↑↓를 한 번도 안 눌렀다) 빈 집합이다 — 그때는
+    목록 전체가 이미 언론사 순위대로 서 있어서 끼워 넣을 것이 없다.
+    """
+    if not order:
+        return set()
+    known = set(order)
+    return {a["url"] for a in articles if a.get("url") not in known}
