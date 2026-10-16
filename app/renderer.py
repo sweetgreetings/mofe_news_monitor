@@ -696,6 +696,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     border: 1px solid {warn_border}; background: {card}; color: {warn_text};
     border-radius: var(--r-md); padding: 2px 7px; font-size: var(--fs-sm); cursor: help; line-height: 1.4;
   }}
+  /* [메모: 2026-10-16] render_article이 모든 화면에서 이 알약을 내보내므로 CSS가 다섯
+     파일에 복제돼 있다 — renderer·preview_renderer·history_renderer·adhoc/renderer·
+     agency_archive_renderer(마지막은 선택자가 .art.is-photo). 한쪽만 고치지 않는다.
+     규칙이 빠진 화면에선 알약이 아니라 서식 없는 맨 글자로 뜬다(보관함이 그랬다). */
   .photo-badge {{
     flex-shrink: 0; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
     color: {photo_badge_text}; background: {photo_badge_bg}; border: 1px solid {photo_badge_border}; white-space: nowrap;

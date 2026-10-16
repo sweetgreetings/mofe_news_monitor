@@ -304,6 +304,18 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .t-flash {{ color: {flash_text}; font-weight: 600; }}
   /* [추가: 2026-08-05] app.renderer와 동일 — 마우스 오버 시 연한 회색 표시. */
   .article:hover {{ background: {row_hover}; }}
+  /* [추가: 2026-10-16] 사진 추정 기사 흐림 — app.renderer와 **같은 값**이다(한쪽을
+     바꾸면 다른 쪽도 바꾼다). render_article이 모든 화면에서 is-photo를 붙이는데 이
+     화면엔 규칙이 없어 사진 행이 흐려지지도 않았다. 뜻은 확정본과 같다: "훑을 때는
+     건너뛰고, 확인하고 싶으면 마우스를 올린다" — 읽기 전용이라는 게 뺄 이유가 되지
+     않는다(오히려 이 화면은 훑기만 하는 자리다). 같은 읽기 전용인 기관 기사 찾기도
+     같은 값으로 흐리게 한다(app.agency_archive_renderer .art.is-photo). 연보라 음영을
+     이 화면에서 뺀 것과는 다른 판단이다 — 그건 "지금 확인해라"는 끌 수 없는 할 일
+     알림이었고, 이건 훑기를 돕는 표시이며 마우스를 올리면 그 자리에서 풀린다.
+     체크박스가 없는 화면이라 :has(.article-select:checked) 조건은 빼고, ⋯ 메뉴를 연
+     행은 또렷하게 한다 — 그 메뉴 안에 「사진 추정 해제」가 있다. */
+  .article.is-photo {{ opacity: 0.55; }}
+  .article.is-photo:hover, .article.is-photo:has(.more-wrap.is-open) {{ opacity: 1; }}
   /* [수정: 2026-08-27] 초안 마감 시점에 자동 배정된 기사(render_article이
      article["finalize_auto_assigned"]를 보고 항상 붙이는 마크업, 이 화면도
      render_article을 그대로 재사용한다)의 **연보라 음영·왼쪽 선을 이 화면에서만 뺐다**
@@ -332,6 +344,16 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .late-badge {{
     flex-shrink: 0; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
     color: {warn_text}; background: {warn_chip_bg}; border: 1px solid {warn_border}; white-space: nowrap;
+  }}
+  /* [추가: 2026-10-16] 📷 사진 추정 알약 — app.renderer의 .photo-badge와 **같은 값**이다
+     (한쪽을 바꾸면 다른 쪽도 바꾼다). 이 화면도 render_article을 그대로 재사용하는데
+     규칙이 빠져 있어, 배지가 .title-row(flex) 안에서 블록으로 부풀어 알약도 아닌 맨
+     글자(16px)로 떴다. 위 .finalize-added-badge·.late-badge와 같은 이유로 **남긴다** —
+     보관함에서 이건 할 일 알림이 아니라 "이 기사는 사진기사로 봤다"는 기록이다. */
+  .photo-badge {{
+    flex-shrink: 0; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
+    color: {photo_badge_text}; background: {photo_badge_bg}; border: 1px solid {photo_badge_border}; white-space: nowrap;
+    position: relative; top: -0.15em;  /* 제목보다 글자가 작은 알약이라 반 칸(0.15em) 올려 제목 글자 높이 한가운데에 맞춘다. */
   }}
   /* 기사 한 줄 — **이 화면만** 메타 줄(시각·원문보기·아이콘)을 제목 줄 오른쪽 끝에
      올린다. 확정본·초안·수시는 2행 그대로다. 보관함은 손대지 않고 훑기만 하는 화면이고

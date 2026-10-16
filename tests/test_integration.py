@@ -4484,6 +4484,98 @@ def test_photo_override_is_one_place():
     print("48) 사진 추정 해제: 통과 (판정 한 곳, 표식까지 이김, 사진 행에만 메뉴 줄, 되돌리면 추정 복귀)")
 
 
+def _photo_badge_declarations(src: str, name: str = "") -> set:
+    """파일 텍스트에서 `.photo-badge` 규칙의 **선언만** 뽑는다(주석·줄바꿈은 떼고).
+
+    같은 값인지를 글자 배치가 아니라 선언 집합으로 보는 이유는, 네 파일이 줄바꿈 자리만
+    조금씩 다르게 복제돼 있기 때문이다(한 파일은 white-space·position을 한 줄에 붙여 뒀다).
+    """
+    import re
+
+    # 줄 맨 앞에서 시작하는 규칙만 — `body.photo-gather .photo-badge {{ display: none; }}`
+    # (사진 모아 보는 동안 칩을 감추는 줄)이 파일에 따라 먼저 나온다.
+    m = re.search(r"(?m)^\s*\.photo-badge \{\{", src)
+    assert m, f"{name}: .photo-badge 규칙이 아예 없습니다 — 그 화면에선 알약이 맨 글자로 뜹니다"
+    head = m.start()
+    body = src[m.end():src.index("}}", m.end())]
+    body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)       # 설명 주석은 값이 아니다
+    return {" ".join(d.split()) for d in body.split(";") if d.strip()}
+
+
+def test_photo_badge_css_is_in_every_screen():
+    """📷 사진 추정 알약 — **마크업을 내보내는 화면은 CSS도 같이 낸다**는 계약.
+
+    `render_article`은 화면을 가리지 않고 `<span class="photo-badge">`와 `is-photo`를
+    내보내는데, CSS는 화면 파일마다 복제돼 있다. 규칙이 빠진 화면에선 그 span이
+    `.title-row`(flex) 안에서 블록으로 부풀어 **알약도 아닌 서식 없는 맨 글자**로 뜨고,
+    흐림 규칙까지 없으면 사진 행이 눈에 띄지도 않는다 — 2026-10-16 정기 보관함이
+    실제로 그 상태였다(배지 19개가 16px 맨 글자, 행도 안 흐림). 서버 로그엔 아무것도
+    안 남고 테스트도 다 통과하므로, 누가 화면을 열어 보기 전까지 아무도 모른다.
+
+    그래서 두 겹으로 지킨다:
+      (1) 소스 — 네 벌(`renderer`·`preview_renderer`·`history_renderer`·`adhoc/renderer`)의
+          선언이 **글자 하나까지 같은지**. 기관 기사 찾기는 행이 한 줄이라 알약을
+          inline-flex로 따로 짜 뒀으므로 값까지 같을 수 없다 — 거기선 「알약 모양인가」만 본다.
+      (2) 렌더링 — 실제로 그린 확정본·정기 보관함 HTML 안에 **마크업과 규칙이 함께**
+          들어 있는지. 소스 검사만 두면 "규칙은 있는데 그 화면 템플릿에 안 꽂혔다"를 놓친다.
+    """
+    _require_isolation()
+    root = Path(__file__).resolve().parent.parent
+    screens = ("renderer.py", "preview_renderer.py", "history_renderer.py", "adhoc/renderer.py")
+    sources = {name: (root / "app" / name).read_text(encoding="utf-8") for name in screens}
+
+    # (1) 네 벌의 선언이 같은 값인가 — 기준은 render_article이 사는 renderer.py다.
+    base = _photo_badge_declarations(sources["renderer.py"], "renderer.py")
+    assert "border-radius: var(--r-pill)" in base and "font-size: var(--fs-xs)" in base, base
+    for name in screens[1:]:
+        got = _photo_badge_declarations(sources[name], name)
+        assert got == base, (
+            f"{name}의 .photo-badge가 renderer.py와 갈렸습니다 — 한쪽만 고치면 "
+            f"그 화면의 알약만 다르게 보입니다.\n  여기만 있음: {sorted(got - base)}"
+            f"\n  여기에 없음: {sorted(base - got)}"
+        )
+
+    # 흐림과 "또렷해지는 조건" — 체크 여부는 화면마다 다르지만(보관함엔 체크박스가 없다)
+    # hover와 ⋯ 메뉴는 넷 다 있어야 한다. 메뉴 안에 「사진 추정 해제」가 있어서,
+    # 흐린 채로 두면 판정이 맞는지 보면서 누를 수가 없다.
+    for name, src in sources.items():
+        assert ".article.is-photo {{ opacity: 0.55; }}" in src, f"{name}: 사진 행 흐림 규칙이 없습니다"
+        assert ".article.is-photo:hover" in src, f"{name}: 마우스를 올려도 안 또렷해집니다"
+        assert ".article.is-photo:has(.more-wrap.is-open)" in src, \
+            f"{name}: ⋯ 메뉴를 연 행이 흐린 채로 남습니다 — 그 안에 「사진 추정 해제」가 있습니다"
+
+    # 다섯째 — 기관 기사 찾기는 선택자(.art)도 레이아웃도 달라 값까지 같지 않다.
+    agency = (root / "app" / "agency_archive_renderer.py").read_text(encoding="utf-8")
+    assert ".art.is-photo {{ opacity: 0.55; }}" in agency, "기관 기사 찾기: 흐림 값이 다릅니다"
+    assert ".art.is-photo:hover" in agency, "기관 기사 찾기: 마우스를 올려도 안 또렷해집니다"
+    agency_badge = _photo_badge_declarations(agency, "agency_archive_renderer.py")
+    assert "border-radius: var(--r-pill)" in agency_badge and "font-size: var(--fs-xs)" in agency_badge, \
+        f"기관 기사 찾기: 알약이 아닙니다 {sorted(agency_badge)}"
+
+    # (2) 그린 화면에 마크업과 규칙이 **함께** 있는가.
+    photo = {"outlet": "뉴스1", "title": "발언하는 이형일 부총리",
+             "url": "https://n.news.naver.com/mnews/article/001/21",
+             "summary": "재경부", "pub_date": "2026-10-16T14:00:00+09:00", "group": "인사"}
+    line_template, sub_format = "ㅇ ({outlet}) {title}", "<{section}>"
+
+    confirmed = renderer.render_page("14:00", [photo], ["재경부"], [], line_template, sub_format)
+    today = datetime.now().strftime("%Y-%m-%d")
+    storage.save_run("14:00", [photo], run_at=f"{today}T14:01:00")
+    archive = history_renderer.render_history_page(
+        storage.list_runs_for_date(today), [], line_template, sub_format,
+        all_dates=[today], latest_key=storage.latest_run_key(),
+    )
+    for screen, page in (("확정본", confirmed), ("정기 보관함", archive)):
+        assert 'class="photo-badge"' in page, f"{screen}: 사진 기사인데 배지 마크업이 없습니다"
+        assert "article is-photo" in page, f"{screen}: 사진 행에 is-photo가 안 붙었습니다"
+        assert ".photo-badge {" in page, \
+            f"{screen}: 배지를 내보내면서 CSS는 안 냅니다 — 화면엔 서식 없는 맨 글자로 뜹니다"
+        assert ".article.is-photo { opacity: 0.55; }" in page, \
+            f"{screen}: 배지는 있는데 행이 안 흐려집니다"
+
+    print("61) 📷 사진 추정 알약: 통과 (네 벌 같은 값, 흐림·또렷 조건, 그린 화면에 마크업+CSS 함께)")
+
+
 def test_agency_archive_filters():
     """기관 기사 찾기 거르기 줄 — **원문을 새로 받지 않는 것**이 이 테스트의 핵심이다.
 
@@ -6013,6 +6105,7 @@ if __name__ == "__main__":
         test_ai_assigned_badge,
         test_title_watch_alert,
         test_photo_override_is_one_place,
+        test_photo_badge_css_is_in_every_screen,
         test_outlet_override_is_one_place,
         test_agency_archive_filters,
         test_agency_archive_keeps_every_date,
