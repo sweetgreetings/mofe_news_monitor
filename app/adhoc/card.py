@@ -292,10 +292,11 @@ def new_card(
     raw: 로데이터 원본으로 만든다(is_raw 참고). False는 옛 원본을 흉내 내야 하는 테스트용이다.
     """
     now = now or datetime.now()
-    report_title = report_title.strip()
-    if not report_title:
-        raise AdhocCardError("사안명을 입력해주세요.")
     _validate_keywords(keywords)
+    # 원본엔 사안명이 없다 — 이름은 확정본으로 처음 보낼 때 담당자가 짓는다(새 수집 폼에
+    # 사안 칸이 없는 이유). report_title은 검색어로 채워 두는 **속 이름**이라, 검색어를
+    # 못 읽는 옛 경로(삭제 기록·파일명 폴백)가 빈칸을 보지 않는다.
+    report_title = report_title.strip() or " · ".join(k.strip() for k in keywords if k.strip())
     _validate_must_keywords(must_keywords or [])
     _validate_window(window_start, window_end)
 
@@ -990,14 +991,14 @@ def _insert_by_outlet(bundle: dict, articles: list[dict], group: Optional[str], 
 
 
 def move_targets(bundle: dict, bundles: list[dict]) -> list[dict]:
-    """[추가: 2026-09-17] 확정본의 「옮기기 ▾」 → 「다른 사안 확정본으로」에 올릴 확정본 —
-    bundles(그 날짜 확정본) 중 **사안이 다른** 것만, 만든 순서대로.
+    """[추가: 2026-09-17] 확정본의 「옮기기 ▾」 → 「다른 확정본으로」에 올릴 확정본 —
+    bundles(그 날짜 확정본) 중 자기만 뺀 전부, 만든 순서대로.
 
-    같은 사안의 다른 시각 확정본은 뺀다 — 사안을 가르는 동작이지 회차를 옮기는 동작이
-    아니다(시안 ADHOC_MOVE_DROPDOWN_MOCKUP.html). 사안 id가 없는 옛 확정본은 사안명으로 맞춘다.
+    예전엔 **사안이 다른** 것만 올렸다. 사안이 수집할 때 정해지던 시절의 규칙인데, 이제
+    사안은 확정본에 이름을 지을 때 태어나므로 **이름이 다르면 다른 보고서**다 — 같은
+    이름을 쓴 두 확정본(시각만 다른 것)끼리 옮기는 것도 담당자가 할 수 있는 일이다.
     """
-    own = issue_key(bundle)
-    return [b for b in bundles if b["id"] != bundle["id"] and issue_key(b) != own]
+    return [b for b in bundles if b["id"] != bundle["id"]]
 
 
 def move_to_bundle(

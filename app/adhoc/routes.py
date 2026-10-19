@@ -313,8 +313,8 @@ def _handle_collect(handler, form: dict) -> None:
     (ADHOC_DESIGN.md §5.2, "담당자가 세팅하는 건 사안·검색어·시간대뿐"이라는 원칙대로
     이 한 번의 제출로 카드가 만들어지고 바로 채워진다).
     """
-    issue_id = _field(form, "issue_id")
-    new_issue_name = _field(form, "new_issue_name").strip()
+    # 사안은 여기서 안 정한다 — 모을 땐 뭐가 나올지 모르고, 이름은 확정본으로 처음 보낼 때
+    # 담당자가 짓는다(그때 사안이 태어난다). 원본은 자기가 한 검색으로 선다.
     keywords = form.get("keywords", [])
     # [수정] 「하나라도 | 모두」 두 칸은 없앴다 — 검색어끼리는 언제나 OR이고, "둘 다 든
     # 기사"는 검색어 하나 안에서 `가상자산+과세`처럼 묶어 네이버에 그대로 넘긴다(공백도
@@ -330,16 +330,9 @@ def _handle_collect(handler, form: dict) -> None:
     }
 
     try:
-        if issue_id == _NEW_ISSUE_SENTINEL or not issue_id:
-            issue = card.get_or_create_issue(new_issue_name)
-        else:
-            issue = card.find_issue(issue_id)
-            if issue is None:
-                raise AdhocCardError("사안을 찾을 수 없습니다. 새로고침 후 다시 시도해주세요.")
-
         new_card = card.new_card(
-            issue_id=issue["id"],
-            report_title=issue["name"],
+            issue_id="",
+            report_title="",
             window_start=window_start,
             window_end=window_end,
             keywords=keywords,
@@ -352,8 +345,6 @@ def _handle_collect(handler, form: dict) -> None:
         # 30초 입력 목표상 재입력 비용이 크지 않다고 판단했다).
         handler._respond(renderer.render_new_card_page(error=str(error)), status=400)
         return
-
-    card.update_issue_last_keywords(issue["id"], new_card["keywords"])
 
     try:
         run_collect(new_card["id"])
@@ -733,7 +724,7 @@ def _handle_move_article(handler, form: dict) -> None:
 
 
 def _handle_move_to_bundle(handler, form: dict) -> None:
-    """[추가: 2026-09-17] 확정본의 「옮기기 ▾」 → 「다른 사안 확정본으로」 (행 하나 · 선택 바 여러 건).
+    """[추가: 2026-09-17] 확정본의 「옮기기 ▾」 → 「다른 확정본으로」 (행 하나 · 선택 바 여러 건).
 
     이동이다 — 이 확정본에선 숨겨지고 받는 확정본에 들어간다(card.move_to_bundle). 받을 수
     있는 곳은 화면 메뉴와 같은 card.move_targets(오늘 · 다른 사안)로 서버가 다시 확인한다 —
@@ -763,9 +754,9 @@ def _handle_move_to_bundle(handler, form: dict) -> None:
     if not card.visible_urls_among(source, urls):
         _card_redirect(handler, card_id)
         return
-    label = "다른 사안으로 옮기기"
+    label = "다른 확정본으로 옮기기"
     undo.push(card_id, label)
-    undo.push(target_id, "다른 사안에서 옮겨오기")
+    undo.push(target_id, "다른 확정본에서 옮겨오기")
     try:
         result = card.move_to_bundle(card_id, target_id, urls)
     except AdhocCardError as error:

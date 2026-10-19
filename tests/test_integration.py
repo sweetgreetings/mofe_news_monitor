@@ -1931,8 +1931,10 @@ def test_adhoc_move_to_other_issue_bundle():
 
             # 1) 메뉴
             page = adhoc_renderer.render_card_page(card.load_card(src["id"]))
-            assert f'data-bundle="{dst["id"]}"' in page, "다른 사안 확정본이 메뉴에 없음"
-            assert f'data-bundle="{same["id"]}"' not in page, "같은 사안 확정본이 메뉴에 올라옴"
+            # 사안은 이제 확정본 이름을 지을 때 태어난다 — 이름이 다르면 다른 보고서이고,
+            # 같은 이름의 다른 시각 확정본으로 옮기는 것도 담당자가 할 수 있는 일이다.
+            assert f'data-bundle="{dst["id"]}"' in page, "오늘 다른 확정본이 메뉴에 없음"
+            assert f'data-bundle="{same["id"]}"' in page, "같은 이름 확정본이 메뉴에서 빠짐"
             assert "moveArticleTo(this)" in page and "bulkMoveTo(this)" in page
             assert "bulk-group-select" not in page and "moveArticle(this)" not in page, "옛 드롭다운이 남아 있음"
 
@@ -1942,8 +1944,8 @@ def test_adhoc_move_to_other_issue_bundle():
                 def _redirect(self, target):
                     calls.append(target)
 
-            # 3) 같은 사안으로는 거부
-            adhoc_routes._handle_move_to_bundle(_Handler(), {"id": [src["id"]], "bundle": [same["id"]], "urls": ["https://a.x/1"]})
+            # 3) 자기 자신으로는 거부
+            adhoc_routes._handle_move_to_bundle(_Handler(), {"id": [src["id"]], "bundle": [src["id"]], "urls": ["https://a.x/1"]})
             assert "error=" in calls[-1], calls[-1]
             assert not card.load_card(src["id"])["articles"][0]["hidden"]
 
@@ -1962,7 +1964,7 @@ def test_adhoc_move_to_other_issue_bundle():
             assert "https://a.x/1" in card.sent_index("raw-1", card.bundles_for_date(today)), "원본의 보냄 표시가 풀림"
 
             # 받는 쪽 ↩는 그 확정본 안에서만 — 이 동작이 스택 맨 위에 있어야 한다
-            assert adhoc_undo.peek_label(dst["id"]) == "다른 사안에서 옮겨오기"
+            assert adhoc_undo.peek_label(dst["id"]) == "다른 확정본에서 옮겨오기"
 
             # 5) 보낸 쪽 ↩
             adhoc_undo.undo(src["id"])

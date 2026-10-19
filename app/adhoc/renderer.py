@@ -663,12 +663,6 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .adv-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: var(--fs-md); }}
   .adv-grid label {{ display: flex; gap: 8px; align-items: center; cursor: pointer; }}
   .warn {{ background: {error_bg}; border: 1px solid {error_border_mid}; color: {error}; border-radius: var(--r-lg); padding: 11px 14px; margin: 12px 0; font-size: var(--fs-md); }}
-  .issue-warn {{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0 0 88px;
-    background: {warn_bg}; border: 1px solid {warn_border}; color: {warn_text}; border-radius: var(--r-lg); padding: 7px 11px; font-size: var(--fs-sm); }}
-  .issue-warn.hidden {{ display: none; }}
-  .issue-warn button {{ font: inherit; font-size: var(--fs-sm); font-weight: 600; padding: 3px 10px; border-radius: var(--r-md); cursor: pointer; }}
-  .issue-warn .use {{ background: {warn_accent}; color: {on_fill}; border: none; }}
-  .issue-warn .keep {{ background: {card}; color: {warn_text}; border: 1px solid {warn_border}; }}
   /* 오늘의 수집 결과 — 사안명 탭. 오늘 만든 카드가 2개 이상일 때만 그려진다. */
   .tabwrap {{ background: {adhoc_bg}; margin: -22px -24px 18px; padding: 12px 18px 0; border-radius: var(--r-lg) var(--r-lg) 0 0; }}
   .tabwrap-h {{ font-size: var(--fs-xs); font-weight: 700; color: {adhoc_text}; margin-bottom: 9px; }}
@@ -746,12 +740,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   #new-card .field {{ gap: 8px; margin: 0 0 9px; }}
   #new-card .field > label {{ width: 64px; font-size: var(--fs-md); }}
   #new-card .field input[type=text], #new-card .field select {{ height: 36px; box-sizing: border-box; }}
-  #new-card #issue-select {{ flex: none; width: 170px; }}
   #new-card .kw-box {{ min-height: 36px; box-sizing: border-box; padding: 3px 8px; }}
   #new-card .kw-note {{ font-size: var(--fs-sm); color: {text_faint}; margin: -4px 0 9px 72px; }}
   #new-card .kw-box input[type=text] {{ height: auto; }}
   #new-card select.hm-sel {{ width: 70px; }}
-  #new-card .issue-warn {{ margin: -3px 0 9px 72px; }}
   #new-card .n-quick {{ display: inline-flex; gap: 5px; margin-left: 6px; flex-wrap: wrap; }}
   #new-card .n-last {{ margin: 12px 0 0; padding-top: 12px; border-top: 1px dashed {border}; }}
   #new-card .n-opts {{ display: flex; gap: 16px; flex-wrap: wrap; flex: 1; font-size: var(--fs-md); }}
@@ -761,8 +753,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   #new-card .btn:disabled {{ opacity: 0.45; cursor: not-allowed; }}
   @media (max-width: 640px) {{
     #new-card .field > label {{ width: 100%; }}
-    #new-card #issue-select {{ width: 100%; }}
-    #new-card .kw-note, #new-card .issue-warn {{ margin-left: 0; }}
+    #new-card .kw-note {{ margin-left: 0; }}
     #new-card .n-quick {{ margin-left: 0; }}
     #new-card .n-last .btn {{ width: 100%; justify-content: center; }}
   }}
@@ -1396,7 +1387,7 @@ _WEEKDAYS_KR = "월화수목금토일"
 
 def _history_entries() -> list[dict]:
     """[추가: 2026-09-15] 새 수집의 「지난 수집」 — 원본 카드마다 한 줄(최신순), 같은 날·
-    같은 사안·같은 검색어·같은 검색 방식은 한 줄로 합쳐 `count`로 센다(실측: 카드 25장 → 16줄).
+    같은 검색어·같은 검색 방식은 한 줄로 합쳐 `count`로 센다.
 
     보관 기간이 1년이라 목록도 저절로 1년치다. 카드 파일은 요약 캐시(list_card_summaries)로만
     읽는다 — 이 화면은 자주 여는데 카드를 통째로 열면 1년치에서 초 단위가 걸린다.
@@ -1416,7 +1407,8 @@ def _history_entries() -> list[dict]:
         normalize_condition(cond)
         keywords = cond["keywords"]
         all_mode = is_match_all(cond)
-        key = (s.get("collect_date"), s.get("report_title"), tuple(keywords), all_mode)
+        # 사안명은 더 이상 원본의 이름이 아니다 — 같은 날 같은 검색이면 한 줄이다.
+        key = (s.get("collect_date"), tuple(keywords), all_mode)
         if key in index:
             index[key]["count"] += 1
             index[key]["card_ids"].append(s["id"])
@@ -1437,7 +1429,7 @@ def _history_entries() -> list[dict]:
 
 
 def _history_html(entries: list[dict]) -> str:
-    """「지난 수집」 카드 — 줄마다 날짜 · 사안명 · 검색어(단어만). 누르면 폼이 채워지고,
+    """「지난 수집」 카드 — 줄마다 날짜 · 검색어. 누르면 폼이 채워지고,
     올리면 오른쪽에 「원본 열기 →」. 달이 바뀌면 옅은 구분선. 목록이 비면 카드째 안 그린다."""
     if not entries:
         return ""
@@ -1455,7 +1447,7 @@ def _history_html(entries: list[dict]) -> str:
             rows.append(f'<div class="hm">{label}</div>')
             last_month = month
         kw_html = html.escape(" · ".join(e["keywords"]))
-        hay = f'{e["title"]} {" ".join(e["keywords"])}'
+        hay = " ".join(e["keywords"])
         count_html = (
             f'<span class="h-x" title="같은 조건으로 {e["count"]}번 모았어요">×{e["count"]}</span>'
             if e["count"] > 1
@@ -1463,9 +1455,8 @@ def _history_html(entries: list[dict]) -> str:
         )
         rows.append(
             f'<div class="hr" data-i="{i}" data-hay="{html.escape(hay)}" onclick="pickHistory(this)" '
-            f'title="누르면 이 사안·검색어로 위 칸을 채워요">'
+            f'title="누르면 이 검색어로 위 칸을 채워요">'
             f'<span class="h-d">{d.month}/{d.day} ({_WEEKDAYS_KR[d.weekday()]})</span>'
-            f'<span class="h-is">{html.escape(e["title"])}</span>'
             f'<span class="h-kw">{kw_html}</span>{count_html}'
             f'<a class="h-open" href="/adhoc/card?id={quote(e["card_id"])}" onclick="event.stopPropagation();">'
             f"원본 열기 →</a></div>"
@@ -1475,16 +1466,14 @@ def _history_html(entries: list[dict]) -> str:
   <div class="hist-h">
     <h2>지난 수집</h2>
     <span class="hist-sub">누르면 위 칸이 채워져요</span>
-    <input type="search" id="hist-q" placeholder="사안명·검색어로 찾기" oninput="filterHistory(this.value)">
+    <input type="search" id="hist-q" placeholder="검색어로 찾기" oninput="filterHistory(this.value)">
   </div>
   <div class="hist" id="hist">{"".join(rows)}<div class="hist-none" id="hist-none" hidden>찾은 수집이 없어요</div></div>
 </div>"""
 
 
-def render_new_card_page(
-    issues: Optional[list[dict]] = None, error: Optional[str] = None, kind: str = "", pick: str = ""
-) -> str:
-    """사안·검색어·시간대 3줄 입력 + 접힌 고급 설정. 입력이 30초 안에 끝나야 한다는
+def render_new_card_page(error: Optional[str] = None, kind: str = "", pick: str = "") -> str:
+    """검색어·수집 시간·거르기 세 줄 입력. 사안 칸은 없다 — 이름은 확정본에서 짓는다. 입력이 30초 안에 끝나야 한다는
     원칙(ADHOC_DESIGN.md §5.2)에 따라 필수 입력을 최소화했다.
 
     error: 카드 생성 자체가 실패했을 때(routes.py의 검증 실패) 폼 위에 보여줄 메시지.
@@ -1497,15 +1486,7 @@ def render_new_card_page(
     """
     if kind == "bundle":
         return render_new_bundle_page(error=error)
-    issues = issues if issues is not None else load_issues()
     now_hhmm = datetime.now().strftime("%H:%M")
-
-    issue_options = "".join(
-        f'<option value="{html.escape(i["id"])}" '
-        f'data-keywords=\'{html.escape(__import__("json").dumps(i.get("last_keywords", [])))}\'>'
-        f'{html.escape(i["name"])}</option>'
-        for i in issues
-    )
     error_html = f'<div class="warn">{icon("alert")} {html.escape(error)}</div>' if error else ""
 
     # [수정: 2026-09-15] 「또는 검색 없이 빈 수집 확정본 만들기 →」 링크는 뺐다 — 확정본은
@@ -1518,16 +1499,9 @@ def render_new_card_page(
   {error_html}
 
   <form method="POST" action="/adhoc/collect" id="new-card-form">
-    <div class="field">
-      <label>사안</label>
-      <select id="issue-select" name="issue_id" onchange="onIssueChange()">
-        <option value="__new__"><span class="plus-glyph">+</span>새 사안 만들기</option>
-        {issue_options}
-      </select>
-      <input type="text" id="new-issue-name" name="new_issue_name" placeholder="새 사안 이름 (예: 재경위)"
-             oninput="checkSimilarIssue(this)">
-    </div>
-    <div class="issue-warn hidden" id="issue-sim-warn"></div>
+    <!-- 사안 줄은 없앴다 — 모을 땐 뭐가 나올지 모르고, 이름은 보고서를 낼 때 비로소
+         필요하다. 원본은 자기가 한 검색(검색어)으로 서고, 사안은 확정본으로 처음 보낼 때
+         담당자가 짓는다. -->
     <div class="field">
       <label>검색어</label>
       <div class="kw-box" id="kw-box">
@@ -1626,69 +1600,6 @@ function kwKeydown(ev) {{
   }}
 }}
 
-function onIssueChange() {{
-  var select = document.getElementById('issue-select');
-  var nameInput = document.getElementById('new-issue-name');
-  var isNew = select.value === '__new__';
-  nameInput.style.display = isNew ? '' : 'none';
-  nameInput.required = isNew;
-  if (!isNew) {{
-    var opt = select.options[select.selectedIndex];
-    try {{
-      var last = JSON.parse(opt.dataset.keywords || '[]');
-      keywords = last.slice(0, MAX_KEYWORDS);
-      renderKeywords();
-    }} catch (e) {{}}
-  }}
-}}
-
-// [추가: 2026-08-25] 같은 사안을 매번 새 이름으로 타이핑하면(예: "예결위" → "예결위 상정")
-// 보관함에서 다른 사안으로 갈라진다 — get_or_create_issue가 이름 완전 일치로만 묶기
-// 때문(app/adhoc/card.py). 완전 차단하지 않고 라벨의 "비슷한 라벨 있어요"와 같은 방식으로
-// 안내만 한다(막으면 정말 새 사안인 경우를 못 만든다).
-var ISSUE_NAMES = {__import__("json").dumps([i["name"] for i in issues], ensure_ascii=False)};
-function issueEditDistance1(a, b) {{
-  if (a === b) {{ return true; }}
-  var la = a.length, lb = b.length;
-  if (Math.abs(la - lb) > 1) {{ return false; }}
-  var i = 0, j = 0, edits = 0;
-  while (i < la && j < lb) {{
-    if (a[i] === b[j]) {{ i++; j++; continue; }}
-    edits++;
-    if (edits > 1) {{ return false; }}
-    if (la === lb) {{ i++; j++; }}
-    else if (la > lb) {{ i++; }}
-    else {{ j++; }}
-  }}
-  return true;
-}}
-function checkSimilarIssue(input) {{
-  var warn = document.getElementById('issue-sim-warn');
-  var typed = input.value.trim();
-  if (!typed) {{ warn.classList.add('hidden'); return; }}
-  var match = ISSUE_NAMES.find(function (name) {{
-    if (name === typed) {{ return false; }}
-    return issueEditDistance1(name, typed) || name.indexOf(typed) === 0 || typed.indexOf(name) === 0;
-  }});
-  if (!match) {{ warn.classList.add('hidden'); return; }}
-  warn.classList.remove('hidden');
-  var safe = match.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  var attrSafe = safe.replace(/"/g, '&quot;');
-  warn.innerHTML = '비슷한 사안 <b>"' + safe + '"</b>이 있어요.'
-    + '<button type="button" class="use" onclick="useSimilarIssue(this)" data-name="' + attrSafe + '">' + safe + ' 선택</button>'
-    + '<button type="button" class="keep" onclick="document.getElementById(\\'issue-sim-warn\\').classList.add(\\'hidden\\');">새로 만들기</button>';
-}}
-function useSimilarIssue(btn) {{
-  var name = btn.dataset.name;
-  var select = document.getElementById('issue-select');
-  var opt = Array.prototype.find.call(select.options, function (o) {{ return o.textContent === name; }});
-  if (opt) {{
-    select.value = opt.value;
-    onIssueChange();
-  }}
-  document.getElementById('issue-sim-warn').classList.add('hidden');
-}}
-
 {_TIME_INPUT_JS}
 attachHmSelect('win-start');
 attachHmSelect('win-end');
@@ -1704,19 +1615,12 @@ document.getElementById('new-card-form').addEventListener('submit', function (e)
   }}
 }});
 
-// [추가: 2026-09-15] 「지난 수집」 — 줄을 누르면 그 사안·검색어·검색 방식으로 위 칸을 채운다.
-// 수집 시간은 안 가져온다(지난날의 시간창은 오늘 의미가 없다). 사안이 목록에 없으면(사안
-// 정보가 지워진 옛 카드) 「새 사안」 칸에 그 이름을 적어 둔다 — 같은 이름이면 서버가 같은
-// 사안으로 묶는다(get_or_create_issue).
+// [추가: 2026-09-15] 「지난 수집」 — 줄을 누르면 그 검색어로 위 칸을 채운다.
+// 수집 시간은 안 가져온다(지난날의 시간창은 오늘 의미가 없다).
 var HISTORY = {history_json};
 function pickHistory(row) {{
   var h = HISTORY[+row.dataset.i];
   if (!h) return;
-  var select = document.getElementById('issue-select');
-  var known = Array.prototype.some.call(select.options, function (o) {{ return o.value === h.issue_id; }});
-  select.value = known ? h.issue_id : '__new__';
-  onIssueChange();
-  if (!known) document.getElementById('new-issue-name').value = h.title;
   keywords = h.keywords.slice(0, MAX_KEYWORDS);
   renderKeywords();
   document.querySelectorAll('#hist .hr.picked').forEach(function (r) {{ r.classList.remove('picked'); }});
@@ -1739,7 +1643,6 @@ function filterHistory(q) {{
   var none = document.getElementById('hist-none');
   if (none) none.hidden = any;
 }}
-onIssueChange();
 renderKeywords();
 // ?from=<카드 id> — 지난 원본의 「이 조건으로 오늘 새로 모으기」가 이 화면을 채운 채로 연다.
 (function () {{
@@ -2040,7 +1943,7 @@ def _move_menu_html(group_names: list[str], bundles_html: str, onclick: str, own
     if bundles_html:
         if parts:
             parts.append('<span class="menu-sep"></span>')
-        parts.append('<span class="move-h">다른 사안 확정본으로</span>')
+        parts.append('<span class="move-h">다른 확정본으로</span>')
         parts.append(bundles_html.replace("__ONCLICK__", onclick))
     return "".join(parts)
 
@@ -2348,7 +2251,7 @@ def _render_article_row(
 
     # 원본(raw)엔 「옮기기」·숨기기·🏷 라벨이 없다 — 판단은 확정본에서 한다.
     # [수정: 2026-09-17] 「다른 소제목」 <select> → 「옮기기 ▾」 버튼 + 앱이 그리는 메뉴
-    # (시안 ADHOC_MOVE_DROPDOWN_MOCKUP.html). 확정본에선 다른 사안 확정본으로도 옮기고, 브라우저
+    # (시안 ADHOC_MOVE_DROPDOWN_MOCKUP.html). 확정본에선 오늘 다른 확정본으로도 옮기고, 브라우저
     # 기본 드롭다운은 화면 아래에서 스크롤 화살표가 붙어 위로 못 연다.
     move_menu_body = "" if raw else _move_menu_html(
         other_group_names, move_bundles_html, "moveArticleTo(this)", own_label="이 확정본의 소제목" if is_bundle(card) else "소제목"
@@ -2356,7 +2259,7 @@ def _render_article_row(
     group_select_html = (
         f'<span class="more-wrap move-wrap" data-id="{card_id}" data-url="{url}">'
         '<button type="button" class="sel-sm move-btn" onclick="event.stopPropagation(); toggleArticleMenu(this)" '
-        'title="다른 소제목이나 다른 사안 확정본으로 옮기기">옮기기 <span class="caret">▾</span></button>'
+        'title="다른 소제목이나 다른 확정본으로 옮기기">옮기기 <span class="caret">▾</span></button>'
         f'<span class="more-menu move-menu" onclick="event.stopPropagation();">{move_menu_body}</span></span>'
         if move_menu_body
         else ""
