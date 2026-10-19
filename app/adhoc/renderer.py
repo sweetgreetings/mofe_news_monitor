@@ -1261,6 +1261,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* 확정본 이름 짓는 창 — 뼈대·크기·줄 구성은 정기 「소제목 이름 고르기 창」
      (app.renderer NAME_PICKER_STYLE)과 같은 값이고 **색만 수시 청록**이다. 초록은 이 앱에서
      발송 ●(COLOR_SEND)과 「잘 됐다」 안내(COLOR_OK_*)가 이미 쓰고 있어 새로 만들지 않는다. */
+  /* 이 앱엔 공용 `.hidden`이 없다 — 숨기는 요소마다 제 규칙을 적는다(.edit-box.hidden,
+     .lab-pop.hidden과 같은 줄). 이걸 빠뜨리면 창과 **화면 전체를 덮는 막**이 늘 떠 있어
+     모든 클릭이 막에 먹히고, 화면이 통째로 먹통이 된다(글자는 멀쩡해 눈치채기 어렵다). */
+  #bundle-namer.hidden, #namer-back.hidden {{ display: none; }}
   #namer-back {{ position: fixed; inset: 0; z-index: 39; background: rgba(15,23,42,0.12); }}
   #bundle-namer {{ position: fixed; top: 13vh; left: 50%; transform: translateX(-50%); z-index: 40;
     width: 372px; max-width: calc(100vw - 32px); background: {card}; border: 1px solid {border};
@@ -1288,6 +1292,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     margin-top: 8px; padding-top: 7px; border-top: 1px solid {border}; }}
   .np-msg {{ font-size: var(--fs-xs); color: {muted}; flex: 1; }}
   .np-msg.new {{ color: {adhoc_text}; }}
+  /* 빈 칸으로 「만들어 보내기」를 눌렀을 때 — 새 색을 만들지 않고 주의 세트를 쓴다.
+     말없이 아무 일도 안 하면 창이 먹통으로 보인다. */
+  .np-msg.warn {{ color: {warn_text}; font-weight: 700; }}
   .np-btns {{ display: flex; gap: 6px; }}
   .np-btns button {{ font: inherit; font-size: var(--fs-sm); padding: 5px 12px; border-radius: var(--r-md); cursor: pointer; }}
   .np-cancel {{ background: {card}; color: {muted}; border: 1px solid {border}; }}
@@ -1530,7 +1537,7 @@ def render_new_card_page(error: Optional[str] = None, kind: str = "", pick: str 
       <label>거르기</label>
       <span class="n-opts">
         <label><input type="checkbox" name="use_outlet_whitelist" value="1"> 등록 언론사만</label>
-        <label><input type="checkbox" name="exclude_photo" value="1"> 사진기사 제외</label>
+        <label><input type="checkbox" name="exclude_photo" value="1"> 사진 추정 제외</label>
         <label><input type="checkbox" name="exclude_personnel" value="1"> 인사기사 제외</label>
       </span>
       <button type="submit" class="btn">{icon("search")} 수집</button>
@@ -1953,6 +1960,8 @@ def _render_article_row(
     known_labels_html: str = "", sent_to: str = "", bundle_options_html: str = "",
     is_new: bool = False, raw_menu_html: str = "", raw_hidden_tip: str = "",
     move_bundles_html: str = "", outlet_rank: int = 0,
+    raw_send_target: str = "__auto__",
+    raw_send_tip: str = "확정본으로 보냅니다 (원본에는 그대로 남아요)",
 ) -> str:
     """sent_to: 이 기사를 이미 받아간 모음 이름(없으면 빈 문자열). 저장된 값이 아니라
     card.sent_index가 매번 다시 계산한 값이다 — 모음에서 숨기면 그 즉시 풀려야 하므로
@@ -1978,7 +1987,12 @@ def _render_article_row(
 
     outlet_rank: 툴바의 「보기 순서」가 「언론사순」으로 다시 세울 때 쓰는 자리 번호 —
     정기 확정본(app.renderer.render_article)과 같은 뜻·같은 이름이다. 화면 전용이라
-    저장값·복사·발송엔 안 나간다."""
+    저장값·복사·발송엔 안 나간다.
+
+    raw_send_target: 기본 「확정본으로」 단추가 가리킬 곳 — 이 원본이 보낸 확정본이 있으면
+    `__auto__`, 없으면 `__new__`(이름부터 묻는다). **「확정본으로 ▾」 메뉴가 `__auto__` 줄을
+    그리는 조건과 같은 판정이어야 한다** — 어긋나면 메뉴엔 없는 곳을 단추만 가리켜 서버가
+    거부하고, 담당자 눈엔 단추가 먹통으로 보인다."""
     raw = is_raw(card)
     settings = load_settings()
     # [추가: 2026-09-02] 제목 맨 앞 [단독]/[속보]는 배지로 감싸지 않고 글자색만 바꾼다 —
@@ -2207,9 +2221,9 @@ def _render_article_row(
         elif raw_menu_html:
             bundle_select_html = (
                 f'<span class="send-split" data-id="{card_id}" data-url="{url}">'
-                '<button type="button" class="send-go" data-bundle="__auto__" '
+                f'<button type="button" class="send-go" data-bundle="{raw_send_target}" '
                 'onclick="event.stopPropagation(); sendRaw(this)" '
-                'title="이 원본의 확정본으로 보냅니다 (원본에는 그대로 남아요)">확정본으로</button>'
+                f'title="{html.escape(raw_send_tip)}">확정본으로</button>'
                 '<span class="more-wrap">'
                 '<button type="button" class="send-more" onclick="event.stopPropagation(); toggleArticleMenu(this)" '
                 'title="다른 확정본으로 보내기" aria-label="다른 확정본으로 보내기">▾</button>'
@@ -2676,6 +2690,11 @@ def render_card_page(
     raw_default_name = raw_default["report_title"] if raw_default else ""
     raw_default_when = bundle_time(raw_default) if raw_default else ""
     raw_default_label = f"{raw_default_name} {raw_default_when}".strip()
+    # 기본 「확정본으로」 단추 셋(행·선택 바·「모든 기사 확정본으로」)이 가리킬 곳 —
+    # **메뉴가 `__auto__` 줄을 그리는 조건과 같은 판정이다**(_raw_menu의 own). 아직 아무 데도
+    # 안 보낸 원본에서 단추만 `__auto__`를 들고 있으면 서버가 거부해 먹통으로 보인다.
+    raw_send_target = "__auto__" if raw_default else "__new__"
+    raw_send_where = f"「{raw_default_label}」 확정본" if raw_default else "새 확정본"
     # 「지금까지 다시 수집」 뒤 새 확정본을 만들 때 창에 채워 둘 이름(엔터 한 번이면 끝).
     name_hint = last_bundle_name_for(card, day_bundles) if raw_mode else ""
     # 원본 행 상태 — 보냄 / 숨김(원본에서 🗑, 또는 확정본에서 뺌). 처리 안 한 기사는 안 담긴다.
@@ -2784,6 +2803,8 @@ def render_card_page(
                     is_new=a["url"] in new_urls and not _raw_hidden_tip(a["url"]),
                     raw_menu_html=raw_menu_html,
                     raw_hidden_tip=_raw_hidden_tip(a["url"]),
+                    raw_send_target=raw_send_target,
+                    raw_send_tip=f"{raw_send_where}으로 보냅니다 (원본에는 그대로 남아요)",
                 )
                 for a in raw_articles
             )
@@ -3178,9 +3199,10 @@ def render_card_page(
         if can_send and raw_open_n:
             send_all_html = (
                 f'<button type="button" class="btn sm send-all" data-id="{card_id_esc}" '
-                f'data-count="{raw_open_n}" data-skip="{raw_sent_n + raw_hidden_n}" data-target="{html.escape(raw_default_label)}" '
+                f'data-count="{raw_open_n}" data-skip="{raw_sent_n + raw_hidden_n}" '
+                f'data-bundle="{raw_send_target}" data-target="{html.escape(raw_default_label)}" '
                 f'onclick="sendAllOpen(this)" '
-                f'title="숨김·보냄 표시가 없는 기사를 모두 「{html.escape(raw_default_label)}」 확정본으로 보내요 '
+                f'title="숨김·보냄 표시가 없는 기사를 모두 {html.escape(raw_send_where)}으로 보내요 '
                 f'(원본에는 그대로 남아요)">{icon("to_bundle")} 모든 기사 확정본으로</button>'
             )
     bulk_bundle_html = (
@@ -3265,8 +3287,9 @@ def render_card_page(
         bulk_menu_html = _raw_menu("bulkSendRaw(this)")
         bulk_actions_html = (
             f'<span class="send-split" data-id="{card_id_attr}">'
-            '<button type="button" class="send-go" data-bundle="__auto__" onclick="bulkSendRaw(this)" '
-            'title="고른 기사를 이 원본의 확정본으로 보냅니다 (원본에는 그대로 남아요)">확정본으로 보내기</button>'
+            f'<button type="button" class="send-go" data-bundle="{raw_send_target}" onclick="bulkSendRaw(this)" '
+            f'title="고른 기사를 {html.escape(raw_send_where)}으로 보냅니다 (원본에는 그대로 남아요)">'
+            '확정본으로 보내기</button>'
             '<span class="more-wrap">'
             '<button type="button" class="send-more" onclick="toggleArticleMenu(this)" '
             'title="다른 확정본으로 보내기" aria-label="다른 확정본으로 보내기">▾</button>'
@@ -3749,7 +3772,15 @@ function closeBundleNamer() {{
 }}
 function confirmBundleNamer() {{
   var name = (document.getElementById('namer-input').value || '').trim();
-  if (!name) {{ document.getElementById('namer-input').focus(); return; }}
+  // 빈 칸이면 **말을 한다** — 조용히 돌아서면 창이 먹통으로 보인다(아래 왼쪽 자리가
+  // 평소 비어 있는 건 할 말이 생기면 내주기 위해서다).
+  if (!name) {{
+    var m = document.getElementById('namer-msg');
+    m.textContent = '이름을 적어야 만들 수 있어요';
+    m.classList.add('warn');
+    document.getElementById('namer-input').focus();
+    return;
+  }}
   var run = _namerRun;
   closeBundleNamer();
   if (run) run(name);
@@ -3775,6 +3806,7 @@ function filterNamerRows() {{
   if (q && hit === 0) {{ rows.forEach(function (r) {{ r.style.display = ''; }}); }}
   seps.forEach(function (sp) {{ sp.style.display = (q && hit > 0) ? 'none' : ''; }});
   var msg = document.getElementById('namer-msg');
+  msg.classList.remove('warn');
   if (q && !exact) {{ msg.textContent = '새 사안으로 만들어요'; msg.classList.add('new'); }}
   else {{ msg.textContent = 'Enter 만들기 · Esc 닫기'; msg.classList.remove('new'); }}
 }}
@@ -3858,10 +3890,14 @@ function syncRawSelectAll() {{
 // 「모든 기사 확정본으로」 — 무엇을 보낼지는 서버가 다시 센다(all_open). 보냄·숨김 기사는 빠진다.
 function sendAllOpen(btn) {{
   var skip = Number(btn.dataset.skip || 0);
-  if (!confirm(btn.dataset.count + '건을 「' + btn.dataset.target + '」 확정본으로 보낼까요?'
+  // 아직 아무 데도 안 보낸 원본이면 가리킬 이름이 없다 — 「」 빈 괄호를 적지 않고
+  // 「새 확정본」이라 쓰고, 확인창을 지난 뒤에 이름 창이 뜬다(확인창이 늘 먼저다).
+  var where = btn.dataset.target ? '「' + btn.dataset.target + '」 확정본' : '새 확정본';
+  if (!confirm(btn.dataset.count + '건을 ' + where + '으로 보낼까요?'
       + (skip ? '\\n이미 보냈거나 숨긴 ' + skip + '건은 빼요.' : '') + '\\n\\n'
       + '원본에는 그대로 남아요. 빼려면 「✓ 보냄」을 다시 누르면 돼요.')) return;
-  post('/adhoc/card/send-to-bundle', {{id: btn.dataset.id, bundle: '__auto__', all_open: '1'}});
+  withBundle(btn.dataset.bundle || '__auto__', {{id: btn.dataset.id, all_open: '1'}},
+    function (fields) {{ post('/adhoc/card/send-to-bundle', fields); }});
 }}
 function bulkSendRaw(btn) {{
   var split = btn.closest('.send-split');

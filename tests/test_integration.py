@@ -2156,6 +2156,17 @@ def test_adhoc_screen_name():
             assert adhoc_renderer.download_filename(card.load_card(many["id"])).startswith(
                 f"{today}_수시모니터링_가 외3_원본"), "파일명이 첫 검색어 + 외N이 아님"
 
+            # 3b) 이름 창과 그 뒤를 덮는 막은 **닫혀 있을 때 진짜로 사라져야 한다.**
+            # 이 앱엔 공용 `.hidden`이 없어 규칙을 빠뜨리면 막(inset:0)이 늘 떠 있고,
+            # 화면의 모든 클릭이 거기 먹혀 **카드 화면이 통째로 먹통**이 된다.
+            assert "#bundle-namer.hidden" in page and "#namer-back.hidden" in page, \
+                "이름 창·막을 숨기는 CSS가 없음 — 막이 화면을 덮어 모든 클릭을 먹는다"
+
+            # 3c) 기본 「확정본으로」 단추는 메뉴와 같은 곳을 가리킨다 — 보낸 적이 없으면
+            # __auto__는 서버가 거부하므로 단추만 그걸 들고 있으면 먹통으로 보인다.
+            assert 'class="send-go" data-bundle="__new__"' in page, \
+                "보낸 적 없는 원본인데 단추가 __auto__를 가리킴"
+
             calls = []
 
             class _Handler:
