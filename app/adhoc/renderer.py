@@ -2543,8 +2543,25 @@ def _send_fab_and_modal_html(card: dict) -> str:
 </div>"""
 
 
+def gone_note_html(gone: str) -> str:
+    """지운 직후의 초록 안내 — 사라진 그 자리를 받는다.
+
+    보관함 줄 끝 🗑·카드 화면 탭 × 에 확인창이 없는 건 되살릴 자리가 눈앞에 남아서다.
+    이 한 줄이 그 자리를 대신한다 — 화면을 다시 열면 사라지고, 그 뒤로는 「삭제 기록」
+    (/deleted)이 받는다. **수시 보관함과 카드 화면이 같은 함수를 쓴다** — 한쪽만 고치면
+    같은 삭제가 화면에 따라 두 모습이 된다.
+    """
+    if not gone:
+        return ""
+    return (
+        f'<div class="ok-note">{icon("check")} {html.escape(gone)} 지웠어요.'
+        f'<a class="ok-link" href="/deleted">{DELETED_LOG_TITLE} →</a></div>'
+    )
+
+
 def render_card_page(
-    card: dict, error: Optional[str] = None, notice: Optional[str] = None, notice_card: Optional[str] = None
+    card: dict, error: Optional[str] = None, notice: Optional[str] = None,
+    notice_card: Optional[str] = None, gone: str = ""
 ) -> str:
     """카드 정리 화면(ADHOC_DESIGN.md §5.3) — 요약은 페이지 맨 아래(§6.6), 소제목
     아래에는 기사 제목만 나열해 담당자가 흐름을 훑는 데 방해가 안 되게 한다.
@@ -2999,6 +3016,9 @@ def render_card_page(
             else ""
         )
         error_html = f'<div class="ok-note">{icon("check")} {html.escape(notice)}{notice_link}</div>'
+    elif gone and not error:
+        # 남의 탭 × 로 다른 카드를 지우고 이 화면에 머물렀을 때 — 되살릴 길이 눈앞에 남는다.
+        error_html = gone_note_html(gone)
     limit_warn_html = (
         f'<div class="warn">{icon("alert")} 기사 {unclassified_count}건 — 소제목 자동 배정은 '
         f'{MAX_ARTICLES_FOR_CLASSIFY}건까지만 됩니다. 시간대를 좁히거나 검색어를 줄여주세요.</div>'
@@ -3287,6 +3307,7 @@ def render_card_page(
     copy_full_text = build_adhoc_plain_text(card)
     script = f"""<script>
 var ADHOC_PLAIN_TEXT = {__import__("json").dumps(copy_full_text)};
+var ADHOC_CARD_ID = {__import__("json").dumps(card["id"])};
 
 // [추가: 2026-09-17] 수시 확정본 (발송) 확인창 — 체크를 푼 사람은 exclude로 실어 보낸다
 // (이번 발송에서만 빠지고 저장하지 않는다).
@@ -3752,10 +3773,13 @@ function applyUnsentFilter() {{
   }});
 }}
 function deleteCard(id) {{
-  // 확인창 없이 바로 지운다 — 지운 직후 도착하는 수시 보관함의 그 자리에 「삭제함 ·
-  // 되살리기」 줄이 펼쳐진 채 뜬다(routes._handle_delete가 deleted= 로 실어 보낸다).
-  // 되살리는 자리가 눈앞에 있으면 확인창을 두지 않는다 — 보관함 줄 끝 🗑와 같은 규칙.
-  post('/adhoc/card/delete', {{id: id}});
+  // 확인창 없이 바로 지운다 — 되살리는 자리가 눈앞에 남기 때문이다(보관함 줄 끝 🗑와
+  // 같은 규칙). 지운 직후의 초록 안내가 어디로 가든 따라붙고 「삭제 기록 →」을 가리킨다.
+  //
+  // 지울 카드(id)와 **지금 보고 있는 카드**(ADHOC_CARD_ID)를 같이 보낸다 — 이 둘이 다르면
+  // (남의 탭 × ) 보던 화면이 멀쩡히 살아 있으니 서버가 그 자리로 되돌린다. 안 보내면
+  // 서버는 어느 화면에서 눌렀는지 알 길이 없어 늘 수시 보관함으로 보낸다.
+  post('/adhoc/card/delete', {{id: id, from: ADHOC_CARD_ID}});
 }}
 function toggleHiddenPanel() {{ document.getElementById('hidden-panel').classList.toggle('is-open'); }}
 document.addEventListener('click', function (e) {{

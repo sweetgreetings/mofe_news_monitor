@@ -54,7 +54,10 @@ def _archive_redirect(handler, back: str, gone: str = "") -> None:
     handler._redirect("/adhoc" + (f"?{urlencode(query, doseq=True)}" if query else ""))
 
 
-def _card_redirect(handler, card_id: str, error: str = "", notice: str = "", notice_card: str = "") -> None:
+def _card_redirect(
+    handler, card_id: str, error: str = "", notice: str = "",
+    notice_card: str = "", gone: str = "",
+) -> None:
     target = f"/adhoc/card?id={quote(card_id)}"
     if error:
         target += f"&error={quote(error)}"
@@ -62,6 +65,8 @@ def _card_redirect(handler, card_id: str, error: str = "", notice: str = "", not
         target += f"&notice={quote(notice)}"
     if notice and notice_card:
         target += f"&notice_card={quote(notice_card)}"
+    if gone:
+        target += f"&gone={quote(gone)}"
     handler._redirect(target)
 
 
@@ -109,9 +114,11 @@ def handle_get(handler, path: str) -> bool:
         error = query.get("error", [""])[0]
         notice = query.get("notice", [""])[0]
         notice_card = query.get("notice_card", [""])[0]
+        gone = query.get("gone", [""])[0]
         handler._respond(
             renderer.render_card_page(
-                c, error=error or None, notice=notice or None, notice_card=notice_card or None
+                c, error=error or None, notice=notice or None,
+                notice_card=notice_card or None, gone=gone,
             )
         )
         return True
@@ -844,15 +851,55 @@ def _handle_move_group_order(handler, form: dict) -> None:
     _card_redirect(handler, card_id)
 
 
+def _neighbor_tab(card_id: str) -> str:
+    """이 카드를 탭 줄에서 뺐을 때 바로 옆에 설 카드 — 오른쪽 먼저, 없으면 왼쪽.
+
+    탭 줄과 **같은 목록**을 본다(renderer._render_issue_tabs): 그 날짜 카드 중 같은 종류만,
+    만든 순서대로. 다르게 세면 화면에서 사라진 탭과 서버가 고른 카드가 어긋난다.
+    탭 줄이 아예 없는 화면(어제 이전 카드)이면 빈 문자열이다 — 돌아갈 탭도 없다.
+    """
+    c = card.load_card(card_id)
+    if c is None or c.get("collect_date") != datetime.now().strftime("%Y-%m-%d"):
+        return ""
+    ids = [
+        s["id"] for s in card.cards_for_date(c["collect_date"])
+        if card.card_kind(s) == card.card_kind(c)
+    ]
+    if card_id not in ids:
+        return ""
+    idx = ids.index(card_id)
+    rest = [i for i in ids if i != card_id]
+    if not rest:
+        return ""
+    # 지운 자리가 비면 그 자리를 오른쪽 카드가 메운다. 맨 끝이었으면 왼쪽 카드다.
+    return rest[idx] if idx < len(rest) else rest[-1]
+
+
 def _handle_delete(handler, form: dict) -> None:
+    """탭 × 와 하단 「사안 목록에서 삭제」가 같이 쓴다 — 지우는 카드가 서로 다르다.
+
+    **돌아갈 자리는 「지운 게 지금 보던 그 카드인가」로 갈린다.** 남의 탭을 지웠으면
+    보던 화면은 멀쩡히 살아 있으니 그 자리에 머문다(탭만 사라진다) — 예전엔 이 경우까지
+    수시 보관함으로 튕겼다. 지금 카드를 지웠으면 머물 화면이 없어 남은 탭 중 가까운
+    카드로 가고, 그마저 없을 때만 보관함이다.
+
+    이름(gone)도 이웃 탭도 **지우기 전에** 읽어 둔다 — 지운 뒤엔 카드가 trash에 있어
+    다시 못 찾는다(보관함 쪽 _handle_archive_delete와 같은 이유).
+    """
     card_id = _field(form, "id")
+    viewing = _field(form, "from")
+    gone = _gone_label(card_id, 1)
+    neighbor = _neighbor_tab(card_id)
     if not card.delete_card(card_id):
         handler.send_response(404)
         handler.end_headers()
         return
-    # 삭제된 카드 화면으로 되돌아갈 수 없으니 목록으로 — 보관함에 도착하면 초록 안내
-    # 한 줄이 「되살리려면 삭제 기록으로」를 말한다.
-    _archive_redirect(handler, "/adhoc", _gone_label(card_id, 1))
+    stay = viewing if viewing and viewing != card_id else neighbor
+    if stay and card.load_card(stay) is not None:
+        _card_redirect(handler, stay, gone=gone)
+        return
+    # 갈 카드가 없을 때만 목록으로 — 거기서도 같은 초록 안내 한 줄이 「삭제 기록」을 가리킨다.
+    _archive_redirect(handler, "/adhoc", gone)
 
 
 def _handle_archive_delete(handler, form: dict) -> None:

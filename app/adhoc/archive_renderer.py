@@ -24,6 +24,7 @@ from app.adhoc.renderer import (
     base_page,
     build_adhoc_excel_rows,
     build_adhoc_plain_text,
+    gone_note_html,
     page_nav,
 )
 from app.config import COLOR_ERROR, DELETED_LOG_TITLE
@@ -571,21 +572,6 @@ def _render_issue_block(
     )
 
 
-def _gone_note_html(gone: str) -> str:
-    """지운 직후의 초록 안내 — 사라진 회차 줄의 자리를 받는다.
-
-    [추가: 2026-10-12] 줄 끝 🗑에 확인창이 없는 건 되살릴 자리가 눈앞에 남아서였다.
-    그 줄을 없애면서 이 한 줄이 그 자리를 대신한다 — 화면을 다시 열면 사라지고,
-    그 뒤로는 「삭제 기록」(/deleted)이 받는다. 수시 카드 화면의 .ok-note와 같은 문법이다.
-    """
-    if not gone:
-        return ""
-    return (
-        f'<div class="ok-note">{icon("check")} {html.escape(gone)} 지웠어요.'
-        f'<a class="ok-link" href="/deleted">{DELETED_LOG_TITLE} →</a></div>'
-    )
-
-
 def _tidy_controls_html(empty_count: int) -> str:
     """결과 줄 오른쪽 — 평소엔 [선택 삭제], 선택 삭제 중엔 안내·빈 회차 고르기·[완료].
 
@@ -665,7 +651,7 @@ def render_archive_page(
     # (_filter_cards)과 사안 이름 조회(issues_by_id) 둘 다 issues.json을 다시 읽지 않는다.
     all_issues = card.load_issues()
     issues_by_id = {i["id"]: i for i in all_issues}
-    gone_html = _gone_note_html(gone)
+    gone_html = gone_note_html(gone)
     page_script = _ARCHIVE_SCRIPT
 
     if not all_cards:

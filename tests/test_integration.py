@@ -6152,6 +6152,95 @@ def test_refetch_titles_widget_contract():
     print("59) 제목 불러오기 장치 계약: 통과 (표식 넷, 기본 꺼짐, 결과 줄 자리, 저장된 이력은 서버가 그림)")
 
 
+def test_adhoc_tab_delete_stays_put():
+    """수시 카드 탭의 × — 남의 탭을 지우면 보던 화면에 머물고, 지금 카드를 지울 때만
+    남은 탭(오른쪽 먼저, 맨 끝이면 왼쪽)으로, 그마저 없을 때만 수시 보관함으로 간다.
+
+    화면과 서버가 **같은 약속**을 지켜야 돈다 — 화면은 지금 보는 카드를 `from`으로 실어
+    보내고(ADHOC_CARD_ID), 서버는 그 값으로 「남의 탭인가」를 가른다. 한쪽만 고치면 서버는
+    어느 화면에서 눌렀는지 알 길이 없어 예전처럼 늘 보관함으로 튕긴다.
+
+    이름(gone)은 **지우기 전에** 읽어야 한다 — 지운 뒤엔 카드가 trash에 있어 못 찾는다.
+    """
+    _require_isolation()
+    from urllib.parse import quote
+
+    from app.adhoc import card, renderer, routes
+
+    class _H:
+        def __init__(self):
+            self.target = None
+            self.code = None
+
+        def _redirect(self, target):
+            self.target = target
+
+        def send_response(self, code):
+            self.code = code
+
+        def end_headers(self):
+            pass
+
+    def _delete(card_id, viewing):
+        h = _H()
+        routes._handle_delete(h, {"id": [card_id], "from": [viewing]})
+        return h.target or ""
+
+    with tempfile.TemporaryDirectory() as tmp:
+        adhoc_dir = Path(tmp)
+        (adhoc_dir / "cards").mkdir()
+        (adhoc_dir / "trash").mkdir()
+        with patch.object(card, "CARDS_DIR", adhoc_dir / "cards"), \
+             patch.object(card, "TRASH_DIR", adhoc_dir / "trash"), \
+             patch.object(card, "ISSUES_FILE", adhoc_dir / "issues.json"):
+            issue = card.get_or_create_issue("증안펀드")
+            now = datetime.now()
+            tabs = [
+                card.new_card(issue["id"], "증안펀드", "00:00", f"1{i}:00", ["증권시장안정펀드"],
+                              now=now - timedelta(minutes=30 - i))
+                for i in range(3)
+            ]
+            # 같은 날 확정본 — 탭 줄은 같은 종류끼리만 서므로 이웃 후보에 끼면 안 된다.
+            bundle = card.new_bundle_card(
+                "증안펀드", issue_id=issue["id"], basis_time="14:55", source_card_id=tabs[0]["id"],
+            )
+
+            # 화면이 지키는 약속 — 지금 보는 카드를 `from` 으로 함께 보낸다.
+            page = renderer.render_card_page(tabs[2])
+            assert f'var ADHOC_CARD_ID = "{tabs[2]["id"]}"' in page, "화면이 지금 카드 id를 안 들고 있음"
+            assert "post('/adhoc/card/delete', {id: id, from: ADHOC_CARD_ID})" in page, \
+                "deleteCard가 보던 카드를 안 보냄 — 서버가 남의 탭인지 가를 수 없다"
+
+            # 1) 남의 탭 × — 보던 화면(#3)은 멀쩡하니 그 자리에 머문다. 이름이 안내에 실린다.
+            target = _delete(tabs[0]["id"], tabs[2]["id"])
+            assert f'/adhoc/card?id={tabs[2]["id"]}' in target, f"남의 탭을 지웠는데 화면이 바뀜: {target}"
+            assert "gone=" in target and quote("증안펀드") in target, \
+                f"지운 이름이 안 실림(지운 뒤에 읽었나): {target}"
+
+            # 2) 지금 카드 — 오른쪽 탭으로. 확정본은 종류가 달라 후보가 아니다.
+            target = _delete(tabs[1]["id"], tabs[1]["id"])
+            assert f'/adhoc/card?id={tabs[2]["id"]}' in target, f"오른쪽 탭으로 안 감: {target}"
+            assert bundle["id"] not in target, "다른 종류(확정본) 탭이 이웃 후보에 섞임"
+
+            # 3) 맨 끝 탭이면 왼쪽으로 물러난다.
+            left = card.new_card(issue["id"], "증안펀드", "00:00", "09:00", ["증권시장안정펀드"],
+                                 now=now - timedelta(minutes=40))
+            target = _delete(tabs[2]["id"], tabs[2]["id"])
+            assert f'/adhoc/card?id={left["id"]}' in target, f"왼쪽 탭으로 안 물러남: {target}"
+
+            # 4) 남은 탭이 없으면 그때만 보관함 — 거기서도 같은 초록 안내가 뜬다.
+            target = _delete(left["id"], left["id"])
+            assert target.startswith("/adhoc?") or target == "/adhoc", f"보관함으로 안 감: {target}"
+            assert "gone=" in target, f"보관함 초록 안내가 안 실림: {target}"
+
+            # 5) 옛 화면(캐시된 HTML)이 from 없이 보내도 안 깨진다 — 예전처럼 보관함으로.
+            h = _H()
+            routes._handle_delete(h, {"id": [bundle["id"]]})
+            assert h.target and (h.target.startswith("/adhoc?") or h.target == "/adhoc"), h.target
+
+    print("55) 수시 탭 × 삭제: 통과 (남의 탭은 제자리, 지금 카드는 오른쪽→왼쪽 탭, 없으면 보관함, 이름은 지우기 전에)")
+
+
 if __name__ == "__main__":
     tests = [
         test_unclassified_sits_below_summary,
@@ -6199,6 +6288,7 @@ if __name__ == "__main__":
         test_draft_keeps_what_it_showed,
         test_regular_run_delete_and_restore,
         test_adhoc_card_delete_and_restore,
+        test_adhoc_tab_delete_stays_put,
         test_photo_caption_name_list_title,
         test_photo_caption_candidate_title_and_cut_stamp,
         test_outlet_photo_tag,

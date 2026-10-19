@@ -539,7 +539,9 @@ URL
 - **지우기 = trash로 옮기기.** 되살리면 파일째 돌아온다.
 - **정기** (`delete_run`/`restore_run`/`list_deleted_runs`, `data/articles_trash/{run_at 날짜}_{HH-MM}.deleted-{시각}.json`): **오늘 회차와 가장 최근 회차는 못 지운다**(`run_lock_reason`, 서버도 `RunLockedError`) — 가장 최근을 지우면 앞 회차가 `load_latest_run()`이 돼 자동발송될 수 있다(이 잠금을 풀려면 자동발송에 "오늘 회차만" 조건부터 넣는다). fetch(`/history/delete-runs`)가 지운 키를 돌려주고 화면이 그 줄을 없앤다. 선택 삭제 중에만 회차별 건수를 보인다.
   - **지운 자리엔 「수집 기록 없음」도 안 그린다**(`_render_day_slots`가 `deleted_entries`의 회차를 `collected`에 미리 넣는다) — 담당자가 지운 걸 앱이 못 모은 날처럼 보이게 하면 거짓말이다. 보관함은 예정표가 아니라 쌓인 것을 보는 곳이라 **안 그리는 것 자체는 거짓이 아니다.** 그 줄은 정말로 못 모은 회차에만 남는다.
-- **수시** (`delete_card(reason=)`/`list_deleted_cards`/`restore_card`, `/adhoc/archive/delete`): 파일명 가운데가 이유 — `.deleted-`(담당자) / `.expired-`(보관 기한) / `.purged-`(아래 기한이 지난 껍데기). 카드 id는 `_CARD_ID_RE`로 먼저 검증. form 제출 + 303. 사안 정보가 없는 카드는 삭제 기록에서 「이름 없는 사안」. **카드 화면의 삭제(탭 ×·「사안 목록에서 삭제」)도 같은 길이고 확인창이 없다** — 보관함에 도착하면 그 초록 안내가 떠 있다.
+- **수시** (`delete_card(reason=)`/`list_deleted_cards`/`restore_card`, `/adhoc/archive/delete`): 파일명 가운데가 이유 — `.deleted-`(담당자) / `.expired-`(보관 기한) / `.purged-`(아래 기한이 지난 껍데기). 카드 id는 `_CARD_ID_RE`로 먼저 검증. form 제출 + 303. 사안 정보가 없는 카드는 삭제 기록에서 「이름 없는 사안」. **카드 화면의 삭제(탭 ×·「사안 목록에서 삭제」)도 같은 길이고 확인창이 없다** — 지운 직후의 초록 안내가 어디로 가든 따라붙는다(`gone_note_html`, 수시 보관함과 **같은 함수**다).
+  - **돌아갈 자리는 「지운 게 지금 보던 그 카드인가」로 갈린다** — 화면이 보고 있는 카드를 `from`으로 함께 보내고(`ADHOC_CARD_ID`) 서버가 둘을 댄다. **남의 탭 × 는 보던 화면에 머문다**(탭만 사라진다). 지금 카드를 지웠을 때만 **남은 탭 중 가까운 카드**로 가고(`_neighbor_tab` — 오른쪽 먼저, 맨 끝이었으면 왼쪽, 탭 줄과 같은 목록이라 같은 날·같은 종류만), **남은 탭이 없을 때만 수시 보관함**이다. `from`을 안 보내면 서버는 어느 화면에서 눌렀는지 알 길이 없어 늘 보관함으로 튕긴다.
+  - **이름(`_gone_label`)도 이웃 탭도 지우기 전에 읽는다** — 지운 뒤엔 카드가 trash에 있어 다시 못 찾는다. `tests/test_integration.py` `test_adhoc_tab_delete_stays_put`이 이 상태를 지킨다.
 - 시안 [mockups/DELETED_LOG_MOCKUP.html](mockups/DELETED_LOG_MOCKUP.html)·[mockups/ARCHIVE_DELETE_MOCKUP.html](mockups/ARCHIVE_DELETE_MOCKUP.html). → H: 보관함 삭제 — 흔적은 없애고 기록은 한 곳으로
 
 ### 삭제 기록 (`/deleted`, `app/settings_server.py` `render_deleted_log_page`)
