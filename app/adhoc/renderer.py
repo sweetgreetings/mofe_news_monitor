@@ -78,10 +78,9 @@ from app.adhoc.card import (
     ordered_group_names,
     raw_row_states,
     sent_index,
-    source_version_suffix,
-    version_ids,
+    last_bundle_name_for,
+    load_issues,
     screen_name,
-    version_suffix,
     window_of,
 )
 from app.adhoc.collector import (
@@ -1268,6 +1267,41 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     font-size: var(--fs-xs); font-weight: 700; padding: 5px 10px; border-radius: var(--r-sm); cursor: pointer;
     background: {label_bg}; color: {label_text}; border: 1px solid {label_border};
   }}
+  /* 확정본 이름 짓는 창 — 뼈대·크기·줄 구성은 정기 「소제목 이름 고르기 창」
+     (app.renderer NAME_PICKER_STYLE)과 같은 값이고 **색만 수시 청록**이다. 초록은 이 앱에서
+     발송 ●(COLOR_SEND)과 「잘 됐다」 안내(COLOR_OK_*)가 이미 쓰고 있어 새로 만들지 않는다. */
+  #namer-back {{ position: fixed; inset: 0; z-index: 39; background: rgba(15,23,42,0.12); }}
+  #bundle-namer {{ position: fixed; top: 13vh; left: 50%; transform: translateX(-50%); z-index: 40;
+    width: 372px; max-width: calc(100vw - 32px); background: {card}; border: 1px solid {border};
+    border-radius: var(--r-lg); box-shadow: var(--sh-modal); padding: 11px 12px 9px; }}
+  #bundle-namer .np-title {{ font-size: var(--fs-sm); font-weight: 700; color: {header};
+    margin: 0 0 7px; display: flex; align-items: center; gap: 7px; }}
+  #bundle-namer .np-title .chip {{ margin: 0; }}
+  .np-input {{ width: 100%; font: inherit; font-size: var(--fs-md); padding: 6px 9px; box-sizing: border-box;
+    border: 1px solid {border}; border-radius: var(--r-md); color: {text}; background: {card}; }}
+  .np-input:focus {{ outline: none; border-color: {adhoc_text}; box-shadow: 0 0 0 3px {adhoc_bg}; }}
+  .np-lead {{ font-size: var(--fs-xs); color: {muted}; margin: 8px 6px 1px; }}
+  .np-list {{ max-height: 100px; overflow-y: auto; margin: 0 -4px; }}
+  .np-row {{ display: flex; align-items: baseline; gap: 8px; width: calc(100% - 8px);
+    margin: 0 4px; padding: 3px 8px; border: none; background: none; border-radius: var(--r-sm);
+    font: inherit; text-align: left; cursor: pointer; color: {text}; }}
+  .np-row:hover {{ background: {adhoc_bg}; }}
+  .np-row .np-nm {{ flex: 1; font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+  /* 볼드 = 오늘 담당자가 이미 지은 이름(정기 창의 .np-mine과 같은 뜻). */
+  .np-row.np-mine .np-nm {{ font-weight: 700; }}
+  .np-row .np-when {{ font-size: var(--fs-xs); color: {muted}; white-space: nowrap; }}
+  .np-sep {{ font-size: var(--fs-xs); color: {muted}; margin: 6px 8px 1px; padding-top: 5px;
+    border-top: 1px dashed {border}; }}
+  .np-sep:first-child {{ border-top: none; padding-top: 0; margin-top: 1px; }}
+  .np-foot {{ display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    margin-top: 8px; padding-top: 7px; border-top: 1px solid {border}; }}
+  .np-msg {{ font-size: var(--fs-xs); color: {muted}; flex: 1; }}
+  .np-msg.new {{ color: {adhoc_text}; }}
+  .np-btns {{ display: flex; gap: 6px; }}
+  .np-btns button {{ font: inherit; font-size: var(--fs-sm); padding: 5px 12px; border-radius: var(--r-md); cursor: pointer; }}
+  .np-cancel {{ background: {card}; color: {muted}; border: 1px solid {border}; }}
+  /* 이 창의 대표 동작 하나라 채운 색 — 수시 청록이다(발송 초록이면 「누르면 나간다」로 읽힌다). */
+  .np-ok {{ background: {adhoc_text}; color: {on_fill}; border: none; font-weight: 700; }}
   .lab-row {{ display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin: 4px 0 0 25px; }}
   .lab-row .tagmark {{ color: {label_text}; opacity: 0.75; }}
   .lab-chip {{
@@ -1753,8 +1787,8 @@ def _render_issue_tabs(card: dict, today_cards: list[dict]) -> str:
         cls = "tab on" if is_on else "tab"
         cid = html.escape(c["id"])
         # 확정본은 불러올 때마다 같은 이름으로 새로 생기므로 시각을 곁들인다(card.bundle_label).
-        # 원본은 같은 사안이 여럿이면 「#2」로 가른다(card.version_suffix) — 건수로 가르면 숨기거나
-        # 다시 수집할 때마다 이름이 바뀌고, 무엇이 다른지도 말해 주지 않는다. 다른 점(검색어·시간)은 툴팁.
+        # 원본 탭은 그 원본이 한 검색이다(card.screen_name) — 건수로 가르면 숨기거나 다시
+        # 수집할 때마다 이름이 바뀌고, 사안명으로 가르면 같은 사안 판이 전부 같은 이름으로 선다.
         if is_bundle(c):
             # 건수는 탭에서 떼고 툴팁으로 — 머리줄 끝 건수 배지가 그 말을 한다(정기 초안·
             # 확정본과 같은 자리). 원본 탭이 이미 같은 규칙이다.
@@ -1815,7 +1849,7 @@ def _render_edit_panel(card: dict, quick_chips_html: str, recollect_disabled: st
     원본 하나 = 검색 조건 하나. 검색어·검색 방식을 이 원본에서 고치면 고치기 전에 보낸 기사와
     뒤에 보낸 기사가 한 확정본에 섞이고, 원본이 무엇을 모은 건지 기록도 사라진다. 그래서 검색어는
     읽기 전용으로 보여주고, 바꾸려면 같은 조건이 채워진 새 수집으로 보낸다(같은 사안의 새 원본은
-    화면에서 「사안명 #2」로 갈린다 — card.version_suffix).
+    화면에서 검색어로 갈린다 — card.screen_name).
     """
     card_id = html.escape(card["id"])
     mode = "모두 있는 기사" if is_match_all(card) else "하나라도 있는 기사"
@@ -1881,6 +1915,80 @@ def _render_bundle_meta_chips(card: dict) -> str:
     # 「전체 N건」 칩은 없앴다 — 합계는 머리줄 끝 건수 배지가 말한다(정기 초안·확정본과
     # 같은 자리). 여기 칩들은 출처별 내역만 맡는다.
     return f'<div class="meta-row">{chips}</div>'
+
+
+_NAMER_RECENT_ROWS = 8  # 「최근」 줄 수 — 목록 상한 100px 안에서 훑히는 만큼
+
+
+def _bundle_namer_html(card: dict, day_bundles: list[dict], hint: str) -> str:
+    """확정본 이름을 짓는 창 — **사안이 태어나는 자리**다(새 수집이 아니라 여기).
+
+    뼈대·크기·줄 구성은 정기의 「소제목 이름 고르기 창」(app.renderer NAME_PICKER_STYLE)
+    그대로이고 **색만 수시 청록**이다 — 하는 일이 다른 두 창이 생김새까지 같으면 어느
+    쪽인지 매번 다시 읽어야 한다(사용자 지적). 초록을 새로 만들지 않는 이유는 이 앱에서
+    초록에 이미 임자가 둘 있어서다: 발송 ● 버튼과 「잘 됐다」 안내. 청록은 이미 확정본의
+    색이라(머리줄 「확정본」 칩) 창이 그 집안 물건으로 선다.
+
+    목록에서 고르면 그 사안(issue_id)을 물려받아 수시 보관함 「사안별 보기」가 그대로
+    돈다 — 그래서 사안을 없애는 게 아니라 **태어나는 자리를 옮기는** 것이다.
+    """
+    rows: list[str] = []
+    seen: set = set()
+    for b in sorted(day_bundles, key=lambda b: b.get("created_at") or "", reverse=True):
+        name = (b.get("report_title") or "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        when = bundle_time(b)
+        rows.append(
+            f'<button type="button" class="np-row np-mine" data-name="{html.escape(name)}">'
+            f'<span class="np-nm">{html.escape(name)}</span>'
+            f'<span class="np-when">{html.escape(when + " 확정본" if when else "확정본")}</span></button>'
+        )
+    today_rows = f'<div class="np-sep">오늘</div>{"".join(rows)}' if rows else ""
+
+    # 「최근」은 **마지막으로 쓴 날** 순이다 — issues.json의 created_at(만든 날)로 세면
+    # 매일 쓰는 사안이 맨 아래로 가라앉는다. 요약 목록은 mtime 캐시라 파일을 다시 안 연다.
+    last_used: dict = {}
+    for row_ in list_card_summaries():
+        iid, date = row_.get("issue_id"), row_.get("collect_date") or ""
+        if iid and date > last_used.get(iid, ""):
+            last_used[iid] = date
+    recent = sorted(load_issues(), key=lambda i: last_used.get(i["id"], ""), reverse=True)
+    rec_rows = []
+    for issue in recent:
+        name = (issue.get("name") or "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        when = last_used.get(issue["id"], "")
+        when = f"{int(when[5:7])}/{int(when[8:10])}" if len(when) == 10 else ""
+        rec_rows.append(
+            f'<button type="button" class="np-row" data-name="{html.escape(name)}">'
+            f'<span class="np-nm">{html.escape(name)}</span>'
+            f'<span class="np-when">{when}</span></button>'
+        )
+        if len(rec_rows) >= _NAMER_RECENT_ROWS:
+            break
+    recent_rows = f'<div class="np-sep">최근</div>{"".join(rec_rows)}' if rec_rows else ""
+
+    return f"""<div id="namer-back" class="hidden" onclick="closeBundleNamer()"></div>
+<div id="bundle-namer" class="hidden" role="dialog" aria-label="확정본 이름">
+  <div class="np-title"><span class="chip bundle-tag">확정본</span>이름</div>
+  <input id="namer-input" class="np-input" autocomplete="off"
+         placeholder="보고서 첫 줄에 나갈 이름 (예: {html.escape(card["report_title"])})"
+         value="{html.escape(hint)}" oninput="filterNamerRows()"
+         onkeydown="namerKeydown(event)">
+  <div class="np-lead" id="namer-lead">최근 사안 · 치면 걸러져요</div>
+  <div class="np-list" id="namer-list">{today_rows}{recent_rows}</div>
+  <div class="np-foot">
+    <span class="np-msg" id="namer-msg">Enter 만들기 · Esc 닫기</span>
+    <span class="np-btns">
+      <button type="button" class="np-cancel" onclick="closeBundleNamer()">취소</button>
+      <button type="button" class="np-ok" onclick="confirmBundleNamer()">만들어 보내기</button>
+    </span>
+  </div>
+</div>"""
 
 
 def _render_meta_chips(card: dict) -> str:
@@ -2650,9 +2758,10 @@ def render_card_page(
     # 셌는데, 지난 원본을 「지난 수집」에서 다시 열었을 때 무엇을 보냈는지가 안 보였다.
     day_bundles = bundles_for_date(card["collect_date"]) if not bundle_mode else []
     today_bundles = day_bundles if can_send else []
-    # 같은 사안의 다른 판(#1·#2)에서 보낸 기사도 「✓ 보냄」 — 같은 기사를 두 번 보내지 않게.
+    # 「✓ 보냄」은 **이 원본이 보낸 기사**만이다 — 화살표가 원본 → 확정본이라, 옆 판이
+    # 보낸 기사까지 보냄으로 칠하면 내가 한 적 없는 일이 내 화면에 적힌다.
     day_cards = cards_for_date(card["collect_date"]) if not bundle_mode else []
-    source_ids = version_ids(card, day_cards) if not bundle_mode else set()
+    source_ids = {card["id"]} if not bundle_mode else set()
     sent_map = sent_index(source_ids, day_bundles) if not bundle_mode else {}
     # [추가: 2026-09-15] 마지막 불러오기로 새로 들어온 기사 — 노랑으로 칠한다.
     new_urls = last_collect_new_urls(card)
@@ -2660,14 +2769,12 @@ def render_card_page(
     # 「확정본으로 ▾」 메뉴. 확정본은 처음 보내는 순간 서버가 만든다(__auto__).
     raw_mode = is_raw(card)
     raw_default = default_bundle_for(card, day_bundles) if raw_mode else None
-    # [추가: 2026-09-15] 「불러올 때마다 새 확정본」 — 이 원본 시각의 확정본이 아직 없으면 보낼
-    # 때 이 이름으로 생긴다(card.bundle_label과 같은 모양).
-    raw_default_name = (
-        raw_default["report_title"] + source_version_suffix(raw_default) if raw_default
-        else card["report_title"] + version_suffix(card, day_cards)
-    )
-    raw_default_when = bundle_time(raw_default) if raw_default else window_of(card)["end"]
+    # 이 원본이 이미 보낸 확정본(없으면 None — 그때는 이름을 묻는 창이 뜬다).
+    raw_default_name = raw_default["report_title"] if raw_default else ""
+    raw_default_when = bundle_time(raw_default) if raw_default else ""
     raw_default_label = f"{raw_default_name} {raw_default_when}".strip()
+    # 「지금까지 다시 수집」 뒤 새 확정본을 만들 때 창에 채워 둘 이름(엔터 한 번이면 끝).
+    name_hint = last_bundle_name_for(card, day_bundles) if raw_mode else ""
     # 원본 행 상태 — 보냄 / 숨김(원본에서 🗑, 또는 확정본에서 뺌). 처리 안 한 기사는 안 담긴다.
     raw_states = raw_row_states(card, day_bundles, source_ids) if raw_mode else {}
 
@@ -2701,12 +2808,15 @@ def render_card_page(
                 + "</button>"
             )
 
+        # 칸 머리가 「이 원본이 보낸 확정본」이다 — 사안으로 묶던 것을 「내가 보냈나」로
+        # 묶기 때문이고, 그게 default_bundle_for가 하는 일이다. 아직 아무 데도 안 보냈으면
+        # 이 칸을 아예 안 그린다: 그때 할 일은 「+ 새 확정본 만들어 보내기」 하나다.
         own = (
-            '<span class="mh">이 원본의 확정본</span>'
+            '<span class="mh">이 원본이 보낸 확정본</span>'
             + row("__auto__", raw_default_name, raw_default_when)
-        )
+        ) if raw_default else ""
         other_rows = "".join(
-            row(b["id"], b["report_title"] + source_version_suffix(b), bundle_time(b))
+            row(b["id"], b["report_title"], bundle_time(b))
             for b in today_bundles
             if not raw_default or b["id"] != raw_default["id"]
         )
@@ -3342,6 +3452,8 @@ def render_card_page(
   {bulk_actions_html}
   <button type="button" class="btn sm clear-btn" onclick="clearBulkSelection()">선택 해제</button>
 </div></div>
+
+{_bundle_namer_html(card, day_bundles, name_hint) if raw_mode and can_send else ""}
 """
 
     copy_full_text = build_adhoc_plain_text(card)
@@ -3699,55 +3811,118 @@ function bulkMoveTo(btn) {{
 // --- 모음으로 보내기 (ADHOC_DESIGN.md §6.13) ---------------------------------
 // 셋 다 같은 라우트를 쓴다 — 다른 건 "무엇을 보낼지 고르는 방법"뿐이고, 보내는
 // 동작 자체(복사·원본 그대로 유지)는 완전히 같기 때문이다.
-function bundleFields(bundleId, extra) {{
-  // "+ 새 모음 만들기"를 고르면 이름부터 받는다. 취소하면 null을 돌려줘 호출부가 멈춘다.
+// 「+ 새 확정본 만들어 보내기」를 고르면 **이름부터 받는다** — 사안이 태어나는 자리다.
+// 창이 뜨는 동안 보내기를 멈춰야 하므로 값을 돌려주지 않고 이어서 할 일(run)을 받는다
+// (브라우저 prompt()는 동기라 그냥 돌려줄 수 있었지만, 창에는 「이미 쓴 이름」 목록이
+// 있어야 해서 그 길을 쓸 수 없다 — 정기 이름 고르기 창과 같은 이유다).
+var _namerRun = null;
+function withBundle(bundleId, extra, run) {{
   var fields = extra || {{}};
   fields.bundle = bundleId;
-  if (bundleId === '__new__') {{
-    var name = prompt('새 확정본의 이름을 입력하세요.', fields.bundle_name_hint || '');
-    if (!name || !name.trim()) return null;
-    fields.bundle_name = name.trim();
-  }}
+  var hint = fields.bundle_name_hint || '';
   delete fields.bundle_name_hint;
-  return fields;
+  if (bundleId !== '__new__') {{ run(fields); return; }}
+  openBundleNamer(hint, function (name) {{ fields.bundle_name = name; run(fields); }});
 }}
+function openBundleNamer(hint, done) {{
+  var box = document.getElementById('bundle-namer');
+  var back = document.getElementById('namer-back');
+  if (!box) return;
+  _namerRun = done;
+  var input = document.getElementById('namer-input');
+  // 「지금까지 다시 수집」 뒤에는 직전 확정본 이름을 채워 **전체 선택**해 둔다 —
+  // 엔터 한 번이면 끝이고, 고치려면 그대로 치면 덮인다(정기 「이름 바꾸기」와 같은 처방).
+  if (hint) {{ input.value = hint; }}
+  box.classList.remove('hidden');
+  back.classList.remove('hidden');
+  input.focus();
+  if (input.value) input.select();
+  filterNamerRows();
+}}
+function closeBundleNamer() {{
+  _namerRun = null;
+  document.getElementById('bundle-namer').classList.add('hidden');
+  document.getElementById('namer-back').classList.add('hidden');
+}}
+function confirmBundleNamer() {{
+  var name = (document.getElementById('namer-input').value || '').trim();
+  if (!name) {{ document.getElementById('namer-input').focus(); return; }}
+  var run = _namerRun;
+  closeBundleNamer();
+  if (run) run(name);
+}}
+function namerKeydown(e) {{
+  if (e.key === 'Enter') {{ e.preventDefault(); confirmBundleNamer(); }}
+  else if (e.key === 'Escape') {{ e.preventDefault(); closeBundleNamer(); }}
+}}
+// 치면 같은 목록에서 평평하게 거른다(정기 창과 같은 규칙) — 0건이면 기본 목록으로
+// 되돌리고 안내줄만 바꾼다. 「없다」를 산문으로 설명하지 않는다.
+function filterNamerRows() {{
+  var q = (document.getElementById('namer-input').value || '').trim();
+  var rows = document.querySelectorAll('#namer-list .np-row');
+  var seps = document.querySelectorAll('#namer-list .np-sep');
+  var hit = 0, exact = false;
+  rows.forEach(function (r) {{
+    var name = r.dataset.name || '';
+    var ok = !q || name.indexOf(q) !== -1;
+    if (ok) hit++;
+    if (name === q) exact = true;
+    r.style.display = (!q || ok) ? '' : 'none';
+  }});
+  if (q && hit === 0) {{ rows.forEach(function (r) {{ r.style.display = ''; }}); }}
+  seps.forEach(function (sp) {{ sp.style.display = (q && hit > 0) ? 'none' : ''; }});
+  var msg = document.getElementById('namer-msg');
+  if (q && !exact) {{ msg.textContent = '새 사안으로 만들어요'; msg.classList.add('new'); }}
+  else {{ msg.textContent = 'Enter 만들기 · Esc 닫기'; msg.classList.remove('new'); }}
+}}
+document.addEventListener('click', function (e) {{
+  var row = e.target.closest('#namer-list .np-row');
+  if (!row) return;
+  var input = document.getElementById('namer-input');
+  input.value = row.dataset.name || '';
+  input.focus();
+  filterNamerRows();
+}});
 function sendToBundle(sel) {{
   if (!sel.value) return;
-  var fields = bundleFields(sel.value, {{id: sel.dataset.id, urls: sel.dataset.url}});
-  if (!fields) {{ sel.selectedIndex = 0; return; }}
-  post('/adhoc/card/send-to-bundle', fields);
+  var v = sel.value;
+  sel.selectedIndex = 0;
+  withBundle(v, {{id: sel.dataset.id, urls: sel.dataset.url}}, function (fields) {{
+    post('/adhoc/card/send-to-bundle', fields);
+  }});
 }}
 function bulkSendToBundle(id) {{
   var sel = document.getElementById('bulk-bundle-select');
   var urls = checkedUrls();
   if (!sel || !sel.value || urls.length === 0) return;
-  var fields = bundleFields(sel.value, {{id: id}});
-  if (!fields) {{ sel.selectedIndex = 0; return; }}
-  postWithUrls('/adhoc/card/send-to-bundle', fields, urls);
+  var v = sel.value;
+  sel.selectedIndex = 0;
+  withBundle(v, {{id: id}}, function (fields) {{
+    postWithUrls('/adhoc/card/send-to-bundle', fields, urls);
+  }});
 }}
 function sendGroupToBundle(btn) {{
   var name = btn.dataset.name, n = btn.dataset.count;
-  // 소제목 이름을 새 모음 이름의 기본값으로 미리 채운다 — 소제목을 통째로 보내면
-  // 그 이름이 모음으로 따라가므로(§6.13), 대개 그대로 쓰면 맞다.
-  var fields = bundleFields(btn.dataset.bundle,
-    {{id: btn.dataset.id, group: name, bundle_name_hint: name}});
-  if (!fields) return;
+  // 확인창이 **이름 창보다 먼저** 뜬다 — 거꾸로면 이름을 다 짓고 나서 물린다.
   // 이 블록은 파이썬 f-string이라 JS 줄바꿈 이스케이프는 역슬래시를 두 번 적는다 —
   // 한 번만 적으면 출력에 진짜 줄바꿈이 박혀 JS 문자열이 끊기고, 스크립트 전체가
   // SyntaxError로 죽어 이 화면의 버튼(편집·복사·↑↓ …)이 전부 먹통이 된다.
   if (!confirm('「' + name + '」의 ' + n + '건을 확정본으로 보낼까요?\\n\\n'
       + '원본에는 그대로 남습니다 (복사예요).\\n소제목 이름도 함께 갑니다.')) return;
-  post('/adhoc/card/send-to-bundle', fields);
+  // 소제목 이름을 새 확정본 이름의 기본값으로 미리 채운다 — 소제목을 통째로 보내면
+  // 그 이름이 확정본으로 따라가므로(§6.13), 대개 그대로 쓰면 맞다.
+  withBundle(btn.dataset.bundle, {{id: btn.dataset.id, group: name, bundle_name_hint: name}},
+    function (fields) {{ post('/adhoc/card/send-to-bundle', fields); }});
 }}
 // [추가: 2026-09-15] 로데이터 원본의 「확정본으로」 — 기본 버튼·▾ 메뉴 항목이 같은 함수를
 // 쓴다. 보낼 확정본은 누른 버튼의 data-bundle(__auto__ = 이 원본의 확정본, 없으면 새로),
 // 카드·기사는 둘을 감싼 .send-split에서 읽는다(onclick 인자에 URL을 싣지 않는 규칙).
 function sendRaw(btn) {{
   var split = btn.closest('.send-split');
-  var fields = bundleFields(btn.dataset.bundle, {{id: split.dataset.id, urls: split.dataset.url}});
-  if (!fields) return;
   closeArticleMenus();
-  post('/adhoc/card/send-to-bundle', fields);
+  withBundle(btn.dataset.bundle, {{id: split.dataset.id, urls: split.dataset.url}}, function (fields) {{
+    post('/adhoc/card/send-to-bundle', fields);
+  }});
 }}
 // [추가: 2026-09-15] 원본의 🗑 / 「🗑 숨김」 다시 누르기 — 실시간 현황처럼 목록에서 빼지 않고
 // 표시만 붙이고 뗀다. 확인창은 없다: 기사가 제자리에 남아 바로 되돌릴 수 있어서다.
@@ -3789,10 +3964,10 @@ function bulkSendRaw(btn) {{
   var split = btn.closest('.send-split');
   var urls = checkedUrls();
   if (urls.length === 0) return;
-  var fields = bundleFields(btn.dataset.bundle, {{id: split.dataset.id}});
-  if (!fields) return;
   closeArticleMenus();
-  postWithUrls('/adhoc/card/send-to-bundle', fields, urls);
+  withBundle(btn.dataset.bundle, {{id: split.dataset.id}}, function (fields) {{
+    postWithUrls('/adhoc/card/send-to-bundle', fields, urls);
+  }});
 }}
 // ☑ 아직 안 보낸 기사만 — 감추기만 하고 순서는 안 건드린다. 소제목 건수는 화면에
 // 보이는 것과 어긋나면 안 되므로 여기서 같이 다시 센다(원래 값은 data-total에 보관).

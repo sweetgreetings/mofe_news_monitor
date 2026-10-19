@@ -326,20 +326,13 @@ def new_card(
     }
     if raw:
         card["raw"] = True
-    # 같은 날·같은 사안의 몇 번째 원본인가 — 화면에서 「인사청문회 #2」로 가른다(version_suffix).
-    # 만들 때 적어 두는 이유: 매번 순서로 세면 가운데 원본을 지웠을 때 뒤 원본의 번호가 바뀐다.
-    siblings = [
-        c for c in cards_for_date(card["collect_date"])
-        if card_kind(c) == KIND_COLLECT and issue_key(c) == issue_key(card)
-    ]
-    card["version"] = max((version_of(c, siblings) for c in siblings), default=0) + 1
     save_card(card)
     return card
 
 
 def new_bundle_card(
     name: str, now: Optional[datetime] = None, issue_id: str = "", basis_time: str = "",
-    source_card_id: str = "", source_version: int = 0,
+    source_card_id: str = "",
 ) -> dict:
     """모음 카드를 만든다 (ADHOC_DESIGN.md §6.13) — 검색어·시간창 검증을 타지 않는
     유일한 생성자다.
@@ -396,9 +389,6 @@ def new_bundle_card(
         card["basis_time"] = basis_time
     if source_card_id:
         card["source_card_id"] = source_card_id
-    if source_version:
-        # 처음 만든 원본의 판 번호 — 목록 이름(bundle_label)이 원본 탭과 같은 「#2」를 단다.
-        card["source_version"] = int(source_version)
     save_card(card)
     return card
 
@@ -544,22 +534,13 @@ def cards_for_date(date_str: str) -> list[dict]:
 
 
 # --- 같은 사안의 원본 판 번호 ---------------------------------------------------------
-# 원본 하나 = 검색 조건 하나다. 조건을 바꾸려면 새로 수집하고, 같은 날 같은 사안의 원본이
-# 여럿이면 화면에서 「인사청문회 #2」로 가른다. 첫 원본엔 번호를 안 붙인다 — 두 번째가 생기는
-# 순간 이미 보던 탭 이름이 바뀌면 안 된다. 번호는 화면 전용이라 사안명·보고서 첫 줄엔 없다.
+# 원본 하나 = 검색 조건 하나다. 조건을 바꾸려면 새로 수집한다. 같은 날 같은 조건으로
+# 여러 번 모으면 원본이 여러 장이 되는데, 그 판들을 가르는 것은 번호가 아니라 **검색어**다
+# (위 screen_name) — 검색어까지 같으면 남은 구별점인 수집 끝 시각이 그 자리를 받는다.
 #
-# 번호가 하는 일은 「이름이 같은 카드를 가르는 것」 하나뿐이다. 그래서 담당자가 머리줄에서
-# 이름을 고쳐 그 판만 다른 이름이 되면 번호를 떼고 보여준다(_name_shared) — 가를 것이 없는데
-# 남아 있으면 어디에도 없는 판을 가리킨다. 적어 둔 version 값은 그대로 두므로 이름을 되돌리면
-# 번호도 그대로 돌아오고, 가운데를 지워도 뒤 번호가 안 바뀐다.
-
-
-# --- 원본을 화면에서 가리키는 이름 — 그 원본이 한 검색 -------------------------
-#
-# 원본의 정체는 「검색어 + 시간창」이고(원본 하나 = 검색 조건 하나), 그중 검색어는
-# **수집 뒤 못 고친다**(조건을 바꾸려면 새로 수집한다). 그래서 탭 이름으로 쓸 수 있는
-# 「안 바뀌는 값」은 검색어뿐이다 — 건수는 숨기거나 다시 수집할 때마다 바뀌고 사안명은
-# ✏️로 언제든 바뀐다.
+# 예전엔 사안명이 같은 판에 `#2`·`#3`을 붙였다. 그 번호는 두 가지로 거짓말했다:
+# 두 판이 섞인 확정본이 한 판의 번호를 달았고, 번호를 켜고 끄는 판정이 **남의 카드 이름**
+# (원본의 report_title)을 봐서 확정본 라벨이 혼자 흔들렸다. → H: 수시 탭을 검색어로
 
 
 def keywords_text(card: dict) -> str:
@@ -609,55 +590,6 @@ def issue_key(card: dict) -> str:
     return card.get("issue_id") or f'name:{card.get("report_title", "")}'
 
 
-def raw_versions(card: dict, day_cards: Optional[list[dict]] = None) -> list[dict]:
-    """card와 같은 날·같은 사안의 원본들(card 포함), 만든 순서대로. day_cards를 주면 그 목록에서
-    고른다(이미 cards_for_date를 읽은 화면이 파일을 다시 열지 않게)."""
-    if day_cards is None:
-        day_cards = cards_for_date(card.get("collect_date") or "")
-    key = issue_key(card)
-    found = [c for c in day_cards if card_kind(c) == KIND_COLLECT and issue_key(c) == key]
-    if not any(c["id"] == card["id"] for c in found):
-        found.append(card)
-    return sorted(found, key=lambda c: c.get("created_at") or "")
-
-
-def version_of(card: dict, versions: Optional[list[dict]] = None) -> int:
-    """몇 번째 원본인가. 만들 때 적어 둔 값이 먼저이고, 그 전 카드는 만든 순서로 센다."""
-    if card.get("version"):
-        return int(card["version"])
-    versions = versions if versions is not None else raw_versions(card)
-    ids = [c["id"] for c in versions]
-    return ids.index(card["id"]) + 1 if card["id"] in ids else 1
-
-
-def _name_shared(row: dict, siblings: list[dict]) -> bool:
-    """같은 사안의 다른 원본이 이 카드와 같은 이름을 쓰고 있는가 — 번호를 보일지 가른다."""
-    name = (row.get("report_title") or "").strip()
-    return any(
-        c["id"] != row["id"] and (c.get("report_title") or "").strip() == name for c in siblings
-    )
-
-
-def _suffix_for(row: dict, siblings: list[dict], stored: int = 0) -> str:
-    """원본 한 장의 「 #2」 — 첫 판이거나 이름이 혼자면 빈 문자열."""
-    n = stored or version_of(row, siblings)
-    if n < 2 or not _name_shared(row, siblings):
-        return ""
-    return f" #{n}"
-
-
-def version_suffix(card: dict, day_cards: Optional[list[dict]] = None) -> str:
-    """화면 이름 뒤에 붙일 「 #2」 — 확정본·첫 원본·이름이 혼자인 판이면 빈 문자열."""
-    if is_bundle(card):
-        return ""
-    return _suffix_for(card, raw_versions(card, day_cards))
-
-
-def version_ids(card: dict, day_cards: Optional[list[dict]] = None) -> set:
-    """같은 사안 원본들의 id — 한 판에서 보낸 기사는 다른 판에서도 「✓ 보냄」으로 보인다."""
-    return {c["id"] for c in raw_versions(card, day_cards)}
-
-
 # --- 모음 카드 (ADHOC_DESIGN.md §6.13) -------------------------------------------
 
 
@@ -671,32 +603,44 @@ def bundles_for_date(date_str: str) -> list[dict]:
     return [c for c in cards_for_date(date_str) if is_bundle(c)]
 
 
+def _bundle_from_card(bundle: dict, source_id: str) -> bool:
+    """이 확정본이 그 원본에서 나왔나 — 만든 원본이거나, 그 원본이 보낸 기사가 들어 있거나."""
+    if bundle.get("source_card_id") == source_id:
+        return True
+    return any(
+        (a.get("sent_from") or {}).get("card_id") == source_id
+        for a in bundle.get("articles", [])
+    )
+
+
 def default_bundle_for(source_card: dict, bundles: list[dict]) -> Optional[dict]:
-    """[추가: 2026-09-15] 이 원본의 「확정본으로」가 기본으로 보낼 확정본 — bundles(그 날짜의
-    확정본 목록) 중 **같은 사안**이면서 **원본 기준 시각이 지금 원본과 같은** 가장 최근 것.
-    없으면 None이고, 그때는 처음 보내는 순간 routes가 새로 만든다(확정본은 따로 안 만들고
-    저절로 생긴다).
+    """이 원본의 「확정본으로」가 기본으로 보낼 확정본 — **이 원본이 이미 보낸 확정본** 중
+    원본 기준 시각이 지금과 같은 가장 최근 것. 없으면 None이고, 그때 처음 보내면서
+    담당자가 이름을 짓는다(이름을 묻는 창은 처음 한 번만 뜬다).
 
-    [수정: 2026-09-15, 2차] 「불러올 때마다 새 확정본」(사용자 결정, 시안
-    ADHOC_RAW_TRASH_ROUND_MOCKUP.html) — 「지금까지 불러오기」가 정기의 회차 마감 같은 경계다.
-    같은 원본 시각에서 보낸 기사는 몇 번에 나눠 눌러도 한 확정본으로 모이고, 다시 불러온 뒤
-    보내면 새 확정본이 생긴다. 「보낼 때마다」로 나누면 기사 한 건씩 누를 때마다 한 건짜리
-    확정본이 줄줄이 생겨서 기각했다. 사안으로 묶는 규칙은 그대로다 — 같은 날 같은 사안으로
-    원본을 여러 장 만들어도(실측: 9/2 「이형일」 원본 3장) 같은 시각이면 보고서는 하나다.
+    **사안으로 묶지 않는다** — 사안은 수집할 때가 아니라 이 이름을 지을 때 태어난다.
+    가르는 기준은 「내가 보냈나」 하나이고, 그래서 같은 사안의 다른 원본이 만든 확정본을
+    자동으로 이어 쓰는 일이 없다(조건이 다른 기사가 한 확정본에 섞이지 않는다).
 
-    시각은 확정본에 적어둔 basis_time으로 맞춘다. 그 필드가 생기기 전의 확정본은 담긴 기사의
-    원본 시각(bundle_basis_time)으로 대신 맞춘다 — 같은 날 먼저 쓰던 확정본을 그대로 이어 쓴다.
+    기준 시각 조건은 그대로다 — 「지금까지 다시 수집」을 누르면 창의 끝이 바뀌어 여기서
+    안 걸리고, 그래서 **다시 수집할 때마다 새 확정본**이 생긴다(정기의 회차 마감과 같은
+    경계). 그때 창은 직전 확정본 이름을 채워서 연다(last_bundle_name_for).
     """
     basis = window_of(source_card)["end"]
     same = [
         b for b in bundles
-        if b.get("issue_id") == source_card.get("issue_id")
+        if _bundle_from_card(b, source_card["id"])
         and (b.get("basis_time") or bundle_basis_time(b)) == basis
-        # 같은 사안의 다른 판(#2)이 만든 확정본은 기준 시각이 같아도 이어 쓰지 않는다 —
-        # 조건이 다른 원본의 기사가 한 확정본에 섞인다. 이 필드가 없는 옛 확정본은 예전대로.
-        and b.get("source_card_id", source_card["id"]) == source_card["id"]
     ]
     return max(same, key=lambda b: b["created_at"]) if same else None
+
+
+def last_bundle_name_for(source_card: dict, bundles: list[dict]) -> str:
+    """이 원본이 마지막으로 보낸 확정본의 이름 — 새 확정본을 만들 때 창에 채워 둔다.
+    「지금까지 다시 수집」 뒤에는 기준 시각이 달라 새 확정본이 생기는데, 그때마다 같은
+    이름을 다시 치게 하지 않는다(엔터 한 번이면 끝이고, 고치려면 그대로 치면 덮인다)."""
+    mine = [b for b in bundles if _bundle_from_card(b, source_card["id"])]
+    return max(mine, key=lambda b: b["created_at"])["report_title"] if mine else ""
 
 
 def bundle_basis_time(bundle: dict) -> str:
@@ -730,43 +674,15 @@ def bundle_label(bundle: dict) -> str:
     """확정본을 목록에서 가리키는 이름 — 「인사청문회 15:05」. 같은 날 같은 사안의 확정본이
     불러올 때마다 새로 생기므로 이름만으로는 서로 구분이 안 된다. 사안명(보고서 첫 줄로 나가는
     글자)엔 아무것도 안 붙이고, 목록에서만 시각을 곁들인다."""
-    name = bundle["report_title"] + source_version_suffix(bundle)
+    name = bundle["report_title"]
     t = bundle_time(bundle)
     return f"{name} {t}" if t else name
-
-
-def source_version_suffix(bundle: dict) -> str:
-    """확정본을 처음 만든 원본의 「 #2」 — 원본 탭 이름과 같은 번호를 목록 이름에 단다.
-    첫 원본에서 만들었거나 원본에서 만든 확정본이 아니면 빈 문자열.
-
-    **번호를 보일지는 지금 원본 이름으로 가른다**(version_suffix와 같은 규칙) — 담당자가
-    원본 이름을 고쳐 그 판에서 번호가 떨어졌는데 확정본 이름에만 남으면 화면 어디에도 없는
-    판을 가리킨다. 번호 값 자체는 만들 때 적어 둔 source_version이 먼저다.
-
-    카드 파일은 안 연다 — 요약 목록(list_card_summaries, mtime 캐시)에 이름·사안·판 번호가
-    다 있다. 원본이 지워졌으면 적어 둔 번호로 물러선다.
-    """
-    stored = int(bundle.get("source_version") or 0)
-    # source_card_id가 생기기 전 확정본은 담긴 기사를 보낸 원본으로 대신 센다.
-    src_id = bundle.get("source_card_id") or next(
-        ((a.get("sent_from") or {}).get("card_id") for a in bundle.get("articles", [])
-         if (a.get("sent_from") or {}).get("card_id")),
-        "",
-    )
-    if not src_id:
-        return ""
-    rows = list_card_summaries()
-    src = next((r for r in rows if r["id"] == src_id), None)
-    if src is None:
-        return f" #{stored}" if stored >= 2 else ""
-    day = [r for r in rows if r.get("collect_date") == src.get("collect_date")]
-    return _suffix_for(src, raw_versions(src, day), stored=stored)
 
 
 def sent_index(source_ids, bundles: list[dict]) -> dict:
     """{기사 URL: 그 기사를 받은 확정본 이름(bundle_label)} — 원본 목록에 「✓ 보냄」을 그리는 데 쓴다.
 
-    source_ids: 원본 id 하나 또는 id 묶음. 원본 화면은 같은 사안의 모든 판(version_ids)을 넘긴다 —
+    source_ids: 원본 id 하나 또는 id 묶음. 원본 화면은 **자기 id 하나**를 넘긴다 —
     #1에서 보낸 기사가 #2에서 처리 안 한 기사로 보이면 같은 기사를 또 보내게 된다.
 
     **저장하지 않고 매번 다시 계산한다**(§6.13 규칙 5). 그래야 규칙 9(모음에서 숨기기가
@@ -813,9 +729,11 @@ def raw_row_states(source_card: dict, bundles: list[dict], source_ids: Optional[
     값은 화면 툴팁용이다 — 원본에서 숨긴 건 빈 문자열, 확정본에서 뺀 건 그 확정본 이름.
     저장하지 않고 매번 다시 계산한다(sent_index와 같은 원칙).
 
-    보냄·확정본에서 뺌은 같은 사안의 모든 판(source_ids, 기본 version_ids)에서 보낸 사본을 본다.
+    **보냄은 「이 원본이 확정본으로 보낸 기사」만이다** — 화살표가 원본 → 확정본이라,
+    옆 판이 보낸 기사는 이 화면에서 「처리 안 함」으로 선다(같은 확정본으로 다시 보내면
+    URL 중복 제거가 막고, 다른 확정본으로 보내면 두 보고서에 들어가는 게 맞다).
     """
-    ids = source_ids if source_ids is not None else version_ids(source_card)
+    ids = source_ids if source_ids is not None else {source_card["id"]}
     sent: dict = {}
     pulled: dict = {}  # 확정본에서 뺀 사본 — {url: (가장 늦게 숨긴 시각, 확정본 이름)}
     for bundle in bundles:
@@ -879,7 +797,7 @@ def set_raw_mark(card_id: str, url: str, hide: bool, bundles: list[dict], now: O
         if hide:
             marks[url] = {"state": RAW_MARK_HIDDEN, "at": now.isoformat(timespec="seconds")}
         else:
-            ids = version_ids(c)
+            ids = {c["id"]}
             pulled = any(
                 a["url"] == url and a.get("hidden")
                 and (a.get("sent_from") or {}).get("card_id") in ids
@@ -907,8 +825,8 @@ def unsend_raw(card_id: str, url: str, bundles: list[dict], now: Optional[dateti
     now = now or datetime.now()
     stamp = now.isoformat(timespec="seconds")
     source = load_card(card_id)
-    # 같은 사안의 다른 판에서 보낸 사본도 취소한다 — 이 판에도 「✓ 보냄」으로 보였으니까.
-    ids = version_ids(source) if source is not None else {card_id}
+    # 이 원본이 보낸 사본만 취소한다 — 「✓ 보냄」이 그 원본이 보낸 것만 뜻하기 때문이다.
+    ids = {card_id}
     senders: set = set()
     touched: list[str] = []
     for bundle in bundles:

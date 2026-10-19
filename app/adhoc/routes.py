@@ -485,8 +485,8 @@ def _handle_raw_unsend(handler, form: dict) -> None:
     if not card.is_raw(c) or not url or c.get("collect_date") != today:
         _card_redirect(handler, card_id)
         return
-    # 같은 사안의 다른 판에서 보낸 사본도 대상이다 — 이 판에도 「✓ 보냄」으로 보였으니까.
-    ids = card.version_ids(c)
+    # 이 원본이 보낸 사본만 대상이다 — 「✓ 보냄」이 그것만 뜻하기 때문이다.
+    ids = {c["id"]}
     bundles = [
         b for b in card.bundles_for_date(today)
         if any(
@@ -632,7 +632,7 @@ def _handle_send_to_bundle(handler, form: dict) -> None:
         urls = form.get("urls", [])
     # 이미 보낸 기사는 조용히 건너뛴다(규칙 10 "다시 누르면 남은 것만") — 여기서 미리
     # 빼두면 아래 send_to_bundle의 URL 중복 제거와 이중으로 안전하다.
-    already_sent = card.sent_index(card.version_ids(source), today_bundles)
+    already_sent = card.sent_index(source["id"], today_bundles)
     urls = [u for u in urls if u not in already_sent]
     if not urls:
         _card_redirect(handler, card_id)
@@ -646,12 +646,24 @@ def _handle_send_to_bundle(handler, form: dict) -> None:
             # 같은** 오늘 확정본으로 보내고, 없으면 이 순간 원본과 같은 이름·같은 사안으로
             # 만든다. 「지금까지 불러오기」를 누른 뒤 보내면 그래서 새 확정본이 생긴다
             # (card.default_bundle_for — 정기의 회차 마감과 같은 경계).
-            bundle = card.default_bundle_for(source, today_bundles) or card.new_bundle_card(
-                source["report_title"], issue_id=source.get("issue_id") or "", basis_time=basis,
-                source_card_id=source["id"], source_version=card.version_of(source),
-            )
+            bundle = card.default_bundle_for(source, today_bundles)
+            if bundle is None:
+                # 이 원본이 아직 아무 데도 안 보냈다 — 확정본 이름은 담당자가 짓는다.
+                # 화면은 그때 __auto__ 줄을 아예 안 그리므로 여기 오는 건 열어둔 옛 탭뿐이다.
+                _card_redirect(
+                    handler, card_id,
+                    error="확정본 이름을 먼저 정해 주세요 — 「+ 새 확정본 만들어 보내기」로 보내주세요.",
+                )
+                return
         elif target == _NEW_ISSUE_SENTINEL:
-            bundle = card.new_bundle_card(_field(form, "bundle_name"), basis_time=basis)
+            # 사안이 태어나는 자리 — 새 수집이 아니라 여기다. 이름이 이미 쓰던 사안과 같으면
+            # 그 사안을 물려받아(get_or_create_issue) 수시 보관함 「사안별 보기」가 그대로 돈다.
+            _name = _field(form, "bundle_name").strip()
+            _issue = card.get_or_create_issue(_name) if _name else None
+            bundle = card.new_bundle_card(
+                _name, issue_id=_issue["id"] if _issue else "", basis_time=basis,
+                source_card_id=source["id"],
+            )
         else:
             bundle = card.load_card(_field(form, "bundle"))
             if bundle is None:

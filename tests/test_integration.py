@@ -2026,8 +2026,10 @@ def test_adhoc_four_step_flow():
                 def _redirect(self, target):
                     calls.append(target)
 
-            # 2) 처음 보내면 확정본이 생긴다 — 같은 사안·같은 이름
-            adhoc_routes._handle_send_to_bundle(_Handler(), {"id": [first["id"]], "bundle": ["__auto__"], "urls": ["https://f.x/1"]})
+            # 2) 처음 보낼 때 이름을 지으면 그 이름으로 확정본이 생긴다(사안도 여기서 태어난다)
+            adhoc_routes._handle_send_to_bundle(
+                _Handler(), {"id": [first["id"]], "bundle": ["__new__"],
+                             "bundle_name": ["인사청문회"], "urls": ["https://f.x/1"]})
             bundles = card.bundles_for_date(today)
             assert len(bundles) == 1 and bundles[0]["issue_id"] == issue["id"] and bundles[0]["report_title"] == "인사청문회", bundles
             bundle_id = bundles[0]["id"]
@@ -2082,14 +2084,15 @@ def test_adhoc_four_step_flow():
     print("26) 수시 4단 흐름: 통과 (원본 로데이터·자동 확정본·머리줄 원본 시각·보관함엔 확정본만·지난 수집)")
 
 
-def test_adhoc_raw_versions():
-    """원본 하나 = 검색 조건 하나 — 같은 날·같은 사안의 원본은 「#2」로 가른다.
+def test_adhoc_screen_name():
+    """원본의 이름은 「그 원본이 한 검색」이다 — 사안명도 #N도 아니다.
 
-      1) 첫 원본은 번호 없음, 둘째부터 #2·#3 — 만들 때 적어 두어 가운데를 지워도 안 바뀐다
-      2) 탭·머리줄·브라우저 탭 제목엔 #2, 보고서 첫 줄·사안명엔 없음
-      3) 편집 창엔 검색어 편집이 없고 「검색어를 바꿔 새로 수집」 링크만
-      4) #1에서 보낸 기사는 #2에서도 「✓ 보냄」, 보냄 취소는 두 판 모두 「처리 안 함」
-      5) 기준 시각이 같아도 #2는 #1의 확정본을 이어 쓰지 않는다, 확정본 📥 칩에 #2
+      1) screen_name = 검색어. 검색어까지 같은 원본이 오늘 둘 이상이면 끝 시각이 붙는다
+      2) 머리줄은 개수로 줄인다(ADHOC_HEAD_KEYWORDS_MAX, 「외 N개」) — 탭은 폭으로 줄인다
+      3) 화면·브라우저 탭 제목·보고서 첫 줄이 같은 값, ✏️·#N은 없다
+      4) 「✓ 보냄」은 이 원본이 보낸 기사만 — 옆 판이 보낸 기사는 「처리 안 함」
+      5) 자동 확정본은 「내가 보낸 것」으로 간다. 보낸 적이 없으면 이름부터 묻는다
+      6) 확정본 이름·출처 칩에 #N이 없고, 다시 수집하면 직전 이름을 채워 준다
     """
     _require_isolation()
     from app.adhoc import card, undo as adhoc_undo, renderer as adhoc_renderer, routes as adhoc_routes
@@ -2112,55 +2115,44 @@ def test_adhoc_raw_versions():
                         "group": None, "order": None, "hidden": False,
                         "added_at": f"{today}T13:00:00", "added_by": "collect"}
 
+            # 검색어가 같고 시간창만 다른 두 판 + 검색어가 다른 판
             first = card.new_card(issue["id"], "인사청문회", "09:00", "13:05", ["청문회"], now=now)
             first["articles"] = [art("https://v.x/1"), art("https://v.x/2")]
             card.save_card(first)
-            second = card.new_card(issue["id"], "인사청문회", "09:00", "13:05", ["청문회", "후보자"],
+            second = card.new_card(issue["id"], "인사청문회", "10:00", "14:05", ["청문회"],
                                    now=now + timedelta(seconds=1))
             second["articles"] = [art("https://v.x/1"), art("https://v.x/3")]
             card.save_card(second)
-            third = card.new_card(issue["id"], "인사청문회", "09:00", "13:05", ["의혹"], now=now + timedelta(seconds=2))
-            other = card.new_card(card.get_or_create_issue("세제")["id"], "세제", "09:00", "13:05", ["세제"],
-                                  now=now + timedelta(seconds=3))
+            third = card.new_card(issue["id"], "인사청문회", "09:00", "13:05", ["의혹", "후보자"],
+                                  now=now + timedelta(seconds=2))
 
-            # 1) 번호
-            assert [card.version_suffix(c) for c in (first, second, third, other)] == ["", " #2", " #3", ""]
-            card.delete_card(second["id"])
-            assert card.version_suffix(card.load_card(third["id"])) == " #3", "가운데를 지웠더니 번호가 바뀜"
-            fourth = card.new_card(issue["id"], "인사청문회", "09:00", "13:05", ["청문회"], now=now + timedelta(seconds=4))
-            assert card.version_suffix(fourth) == " #4", "지운 번호를 다시 씀"
-
-            # 1-1) 이름을 고치면 번호가 떨어진다 — 가를 것이 없는데 남으면 없는 판을 가리킨다.
-            #      확정본 목록 이름도 같은 규칙을 따르고, 이름을 되돌리면 번호도 돌아온다.
-            bundle = card.new_bundle_card("인사청문회", now=now + timedelta(seconds=5),
-                                          issue_id=issue["id"], basis_time="13:05",
-                                          source_card_id=third["id"], source_version=3)
-            assert card.source_version_suffix(bundle) == " #3"
+            # 1) 검색어가 이름이고, 겹치는 판에만 끝 시각이 붙는다
+            assert card.screen_name(first) == "청문회 13:05"
+            assert card.screen_name(second) == "청문회 14:05"
+            assert card.screen_name(third) == "의혹 · 후보자", "검색어가 혼자인데 시각이 붙음"
+            # 사안명을 고쳐도 이름이 안 흔들린다 — 더는 이름으로 가르지 않는다
             renamed = card.load_card(third["id"])
-            renamed["report_title"] = "의혹 따로"
+            renamed["report_title"] = "딴 이름"
             card.save_card(renamed)
-            assert card.version_suffix(card.load_card(third["id"])) == "", "이름이 혼자인데 번호가 남음"
-            assert card.source_version_suffix(bundle) == "", "원본에서 떨어진 번호가 확정본 이름에 남음"
-            assert card.version_suffix(fourth) == " #4", "남의 이름을 고쳤는데 번호가 흔들림"
-            assert card.version_suffix(card.load_card(first["id"])) == ""
-            renamed["report_title"] = "인사청문회"
-            card.save_card(renamed)
-            assert card.version_suffix(card.load_card(third["id"])) == " #3", "이름을 되돌렸는데 번호가 안 돌아옴"
-            card.delete_card(bundle["id"])
-            trashed = [c["_trash_name"] for c in card.list_deleted_cards() if c["id"] == second["id"]]
-            assert card.restore_card(trashed[0]) == second["id"]
+            assert card.screen_name(card.load_card(third["id"])) == "의혹 · 후보자"
 
-            # 2) 화면에만
+            # 2) 머리줄은 개수로 줄인다
+            many = card.new_card(issue["id"], "인사청문회", "09:00", "13:05",
+                                 ["가", "나", "다", "라"], now=now + timedelta(seconds=3))
+            assert card.keywords_label(many) == "가 · 나 · 다 외 1개"
+            assert card.keywords_text(many) == "가 · 나 · 다 · 라", "툴팁엔 전부 나와야 한다"
+            assert card.keywords_label(first) == "청문회", "안 넘치는데 줄임"
+
+            # 3) 화면·탭 제목·보고서 첫 줄이 같은 값
             page = adhoc_renderer.render_card_page(card.load_card(second["id"]))
-            assert "<title>원본 · 인사청문회 #2" in page, "브라우저 탭 제목에 #2가 없음"
-            assert 'class="ver-tag"' in page and "인사청문회 #3</a>" not in page
-            assert "인사청문회 #3" in page, "탭 줄에 #3이 없음"
-            assert adhoc_renderer.report_header_text(card.load_card(second["id"])).endswith("(인사청문회)"), \
-                "보고서 첫 줄에 번호가 샘"
-
-            # 3) 편집 창
-            assert "/adhoc/card/add-keyword" not in page and "set-match-mode" not in page, "검색어 편집이 남아 있음"
-            assert f'/adhoc/new?from={second["id"]}' in page and "검색어를 바꿔 새로 수집" in page
+            assert "<title>원본 · 청문회 14:05" in page, "브라우저 탭 제목이 검색어가 아님"
+            assert "기준(청문회)" in page, "머리줄 괄호 안이 검색어가 아님"
+            assert 'class="ver-tag"' not in page and "청문회 #" not in page, "판 번호가 남아 있음"
+            assert 'id="report-title-input"' not in page, "원본에 이름 고치는 칸이 남아 있음"
+            assert adhoc_renderer.report_header_text(card.load_card(second["id"])).endswith("(청문회)"), \
+                "보고서 첫 줄이 사안명으로 나감"
+            assert adhoc_renderer.download_filename(card.load_card(many["id"])).startswith(
+                f"{today}_수시모니터링_가 외3_원본"), "파일명이 첫 검색어 + 외N이 아님"
 
             calls = []
 
@@ -2168,29 +2160,41 @@ def test_adhoc_raw_versions():
                 def _redirect(self, target):
                     calls.append(target)
 
-            # 4) #1에서 보낸 기사는 #2에서도 보냄
-            adhoc_routes._handle_send_to_bundle(_Handler(), {"id": [first["id"]], "bundle": ["__auto__"], "urls": ["https://v.x/1"]})
-            states = card.raw_row_states(card.load_card(second["id"]), card.bundles_for_date(today))
-            assert states.get("https://v.x/1", ("",))[0] == "sent", "#1에서 보낸 기사가 #2에서 보냄으로 안 보임"
-            assert "https://v.x/3" in card.open_raw_urls(card.load_card(second["id"]), card.bundles_for_date(today))
-            assert "https://v.x/1" not in card.open_raw_urls(card.load_card(second["id"]), card.bundles_for_date(today))
+            # 5) 보낸 적이 없으면 __auto__는 거부한다 — 이름을 먼저 짓는 자리다
+            adhoc_routes._handle_send_to_bundle(
+                _Handler(), {"id": [first["id"]], "bundle": ["__auto__"], "urls": ["https://v.x/1"]})
+            assert card.bundles_for_date(today) == [], "이름 없이 확정본이 생김"
+            assert "error=" in calls[-1]
 
-            # 5) #2에서 보내면 #1의 확정본이 아니라 새 확정본
-            b1 = card.bundles_for_date(today)[0]["id"]
-            adhoc_routes._handle_send_to_bundle(_Handler(), {"id": [second["id"]], "bundle": ["__auto__"], "urls": ["https://v.x/3"]})
+            # 이름을 지어 보내면 그 이름으로 생기고 사안도 거기서 태어난다
+            adhoc_routes._handle_send_to_bundle(
+                _Handler(), {"id": [first["id"]], "bundle": ["__new__"],
+                             "bundle_name": ["청문회 종합"], "urls": ["https://v.x/1"]})
             bundles = card.bundles_for_date(today)
-            assert len(bundles) == 2, "기준 시각이 같다고 #2가 #1의 확정본으로 섞여 들어감"
-            b2 = [b for b in bundles if b["id"] != b1][0]
-            assert "인사청문회 #2 1건" in adhoc_renderer.render_card_page(card.load_card(b2["id"])), "📥 칩에 #2가 없음"
+            assert len(bundles) == 1 and bundles[0]["report_title"] == "청문회 종합"
+            assert bundles[0].get("issue_id"), "확정본이 사안을 못 물려받음"
+            assert card.find_issue_by_name("청문회 종합") is not None, "사안이 안 생김"
+            assert "#" not in card.bundle_label(bundles[0]), "확정본 이름에 판 번호가 남음"
 
-            # 4b) #2에서 보냄 취소 — #1이 보낸 사본이 빠지고, 두 판 모두 처리 안 함
-            adhoc_routes._handle_raw_unsend(_Handler(), {"id": [second["id"]], "url": ["https://v.x/1"]})
+            # 5b) 두 번째부터는 「내가 보낸 확정본」으로 간다
+            assert card.default_bundle_for(card.load_card(first["id"]), bundles)["id"] == bundles[0]["id"]
+            assert card.default_bundle_for(card.load_card(second["id"]), bundles) is None, \
+                "남이 만든 확정본을 자동으로 이어 씀"
+            assert card.last_bundle_name_for(card.load_card(first["id"]), bundles) == "청문회 종합"
+
+            # 4) 「✓ 보냄」은 이 원본이 보낸 기사만
             day = card.bundles_for_date(today)
-            for c in (first, second):
-                assert "https://v.x/1" not in card.raw_row_states(card.load_card(c["id"]), day), \
-                    "보냄 취소한 기사가 어느 판에선 숨김·보냄으로 남음"
-            assert all("error=" not in t for t in calls), calls
-    print("43) 수시 원본 판 번호: 통과 (#2·#3 고정, 화면에만, 편집 창은 시간만, 보냄 공유, 확정본 안 섞임)")
+            assert card.raw_row_states(card.load_card(first["id"]), day).get(
+                "https://v.x/1", ("",))[0] == "sent"
+            assert "https://v.x/1" not in card.raw_row_states(card.load_card(second["id"]), day), \
+                "옆 판이 보낸 기사가 이 원본에서도 보냄으로 보임"
+            assert "https://v.x/1" in card.open_raw_urls(card.load_card(second["id"]), day)
+
+            # 6) 확정본 출처 칩은 그 원본의 검색어다
+            bundle_page = adhoc_renderer.render_card_page(card.load_card(bundles[0]["id"]))
+            assert "청문회 13:05 1건" in bundle_page, "출처 칩이 검색어가 아님"
+            assert all("error=" not in t for t in calls[1:]), calls
+    print("43) 수시 원본 이름: 통과 (검색어가 이름, 겹치면 시각, 외 N개, 보냄은 내 것만, 이름은 확정본에서)")
 
 
 def test_adhoc_raw_trash_and_rounds():
@@ -2258,7 +2262,8 @@ def test_adhoc_raw_trash_and_rounds():
             adhoc_routes._handle_raw_mark(_Handler(), {"id": [rid], "url": ["https://r.x/1"]}, hide=True)
 
             # 2) 전부 보내기
-            adhoc_routes._handle_send_to_bundle(_Handler(), {"id": [rid], "bundle": ["__auto__"], "all_open": ["1"]})
+            adhoc_routes._handle_send_to_bundle(
+                _Handler(), {"id": [rid], "bundle": ["__new__"], "bundle_name": ["인사청문회"], "all_open": ["1"]})
             bundles = card.bundles_for_date(today)
             assert len(bundles) == 1 and bundles[0].get("basis_time") == "15:05", bundles
             b1 = bundles[0]["id"]
@@ -2303,7 +2308,10 @@ def test_adhoc_raw_trash_and_rounds():
             raw["articles"] += [art(5, "15:40"), art(6, "15:30")]
             card.save_card(raw)
             assert 'class="pair-link' not in page(), "다시 수집한 뒤인데 옛 시각 확정본 알약이 남음"
-            adhoc_routes._handle_send_to_bundle(_Handler(), {"id": [rid], "bundle": ["__auto__"], "urls": ["https://r.x/5"]})
+            # 다시 수집하면 기준 시각이 달라 자동 확정본이 없다 — 이름부터 다시 묻고(직전 이름이
+            # 채워져 있다) 그 뒤 같은 시각에서 보낸 건 그 확정본으로 간다.
+            adhoc_routes._handle_send_to_bundle(
+                _Handler(), {"id": [rid], "bundle": ["__new__"], "bundle_name": ["인사청문회"], "urls": ["https://r.x/5"]})
             adhoc_routes._handle_send_to_bundle(_Handler(), {"id": [rid], "bundle": ["__auto__"], "urls": ["https://r.x/6"]})
             bundles = sorted(card.bundles_for_date(today), key=lambda x: x["created_at"])
             assert len(bundles) == 2, f"불러온 뒤 보냈는데 확정본이 {len(bundles)}개"
@@ -6299,7 +6307,7 @@ if __name__ == "__main__":
         test_photo_gather_and_adhoc_bulk_hide,
         test_split_group,
         test_adhoc_four_step_flow,
-        test_adhoc_raw_versions,
+        test_adhoc_screen_name,
         test_adhoc_move_to_other_issue_bundle,
         test_destination_switches,
         test_adhoc_raw_trash_and_rounds,
