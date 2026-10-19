@@ -42,6 +42,13 @@ MAX_ADHOC_MUST_KEYWORDS = 3
 # 더 아래 계층인 여기 둔다.
 MAX_ADHOC_SUBHEADINGS = 5
 
+# 원본 머리줄 괄호 안에 검색어를 몇 개까지 적나 — 넘으면 「앞 3개 · 외 N개」로 줄이고
+# 전체는 마우스를 올려 본다. 실측(2026-10-19, 쌓인 원본 51장): 검색어 1개 5장 · 2개 45장 ·
+# 3개 1장이라 3이면 지금까지 만든 카드는 한 장도 안 줄어든다.
+# 줄이는 자가 자리마다 다르다 — 탭은 여럿이 가로로 서므로 **폭**으로 자르고(CSS 말줄임),
+# 머리줄은 한 줄뿐이라 **개수**로 자른다.
+ADHOC_HEAD_KEYWORDS_MAX = 3
+
 
 # ADHOC_DESIGN.md §6.13 — 카드의 두 종류. 모음 카드(bundle)는 "검색을 안 하는 카드"라
 # keywords/must_keywords가 비어 있고 window가 None이다. kind 필드가 아예 없는 옛 카드는
@@ -545,6 +552,56 @@ def cards_for_date(date_str: str) -> list[dict]:
 # 이름을 고쳐 그 판만 다른 이름이 되면 번호를 떼고 보여준다(_name_shared) — 가를 것이 없는데
 # 남아 있으면 어디에도 없는 판을 가리킨다. 적어 둔 version 값은 그대로 두므로 이름을 되돌리면
 # 번호도 그대로 돌아오고, 가운데를 지워도 뒤 번호가 안 바뀐다.
+
+
+# --- 원본을 화면에서 가리키는 이름 — 그 원본이 한 검색 -------------------------
+#
+# 원본의 정체는 「검색어 + 시간창」이고(원본 하나 = 검색 조건 하나), 그중 검색어는
+# **수집 뒤 못 고친다**(조건을 바꾸려면 새로 수집한다). 그래서 탭 이름으로 쓸 수 있는
+# 「안 바뀌는 값」은 검색어뿐이다 — 건수는 숨기거나 다시 수집할 때마다 바뀌고 사안명은
+# ✏️로 언제든 바뀐다.
+
+
+def keywords_text(card: dict) -> str:
+    """그 원본이 한 검색 — 「증안펀드 · 증시안전펀드」. 탭·툴팁·브라우저 탭 제목이 쓴다."""
+    return " · ".join(card.get("keywords") or [])
+
+
+def keywords_label(card: dict, limit: int = ADHOC_HEAD_KEYWORDS_MAX) -> str:
+    """머리줄 괄호 안 — 앞 limit개만 적고 나머지는 「외 N개」(전체는 hover)."""
+    kws = card.get("keywords") or []
+    if len(kws) <= limit:
+        return " · ".join(kws)
+    return " · ".join(kws[:limit]) + f" 외 {len(kws) - limit}개"
+
+
+def same_keyword_cards(card: dict, day_cards: Optional[list[dict]] = None) -> list[dict]:
+    """오늘 같은 검색어로 모은 원본들(card 포함). 검색어 순서는 안 따진다 —
+    같은 말을 다른 순서로 적은 것은 같은 검색이다."""
+    if day_cards is None:
+        day_cards = cards_for_date(card.get("collect_date") or "")
+    key = tuple(sorted(card.get("keywords") or []))
+    found = [
+        c for c in day_cards
+        if card_kind(c) == KIND_COLLECT and tuple(sorted(c.get("keywords") or [])) == key
+    ]
+    if not any(c["id"] == card["id"] for c in found):
+        found.append(card)
+    return found
+
+
+def screen_name(card: dict, day_cards: Optional[list[dict]] = None) -> str:
+    """원본의 화면 이름 — 검색어. **검색어까지 같은 원본이 오늘 둘 이상이면 끝 시각을
+    덧붙인다**(그 둘을 가르는 건 시간창뿐이라서). 검색어가 없는 옛 카드는 사안명으로
+    물러선다 — 마이그레이션 없이 예전 모양 그대로 선다."""
+    name = keywords_text(card)
+    if not name:
+        return card.get("report_title") or ""
+    if len(same_keyword_cards(card, day_cards)) >= 2:
+        end = (window_of(card) or {}).get("end") or ""
+        if end:
+            return f"{name} {end}"
+    return name
 
 
 def issue_key(card: dict) -> str:

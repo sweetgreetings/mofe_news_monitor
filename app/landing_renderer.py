@@ -1078,7 +1078,10 @@ def _flow_card_html(last_run: Optional[dict], settings: dict) -> str:
         win = adhoc_card.window_of(collect)
         keywords = ", ".join(collect.get("keywords") or [])
         detail = " · ".join(p for p in (f'{win["start"]}~{win["end"]}' if win["start"] else "", keywords) if p)
-        tips["collect"][0] = html.escape(collect.get("report_title") or "(이름 없음)")
+        # 원본의 화면 이름은 **그 원본이 한 검색**이다(사안명이 아니다) — 말풍선 굵은 줄도
+        # 탭·머리줄과 같은 값을 쓴다. 그래서 아랫줄 detail에는 시간창만 남긴다.
+        tips["collect"][0] = html.escape(adhoc_card.screen_name(collect) or "(이름 없음)")
+        detail = f'{win["start"]}~{win["end"]}' if win["start"] else ""
         tips["collect"][1] = (
             (f"{html.escape(detail)}<br>" if detail else "")
             + "조건에 걸린 기사를 거르지 않고 다 보여줘요. 누르면 이 카드가 열려요."

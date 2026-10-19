@@ -55,6 +55,8 @@ from app.topnav import adhoc_nav, topnav_style
 from app.adhoc import undo
 from app.adhoc.card import (
     MAX_ADHOC_KEYWORDS,
+    keywords_label,
+    keywords_text,
     MAX_ADHOC_SUBHEADINGS,
     bundle_label,
     bundle_sources,
@@ -78,6 +80,7 @@ from app.adhoc.card import (
     sent_index,
     source_version_suffix,
     version_ids,
+    screen_name,
     version_suffix,
     window_of,
 )
@@ -270,10 +273,14 @@ def report_header_text(card: dict) -> str:
     결정) — 받는 사람이 이 보고서가 언제 기준인지 알아야 해서다. 원본·정기와 같은 모양이다.
     시각이 없는 확정본(이 기능 전에 보낸 기사만 있는 것)은 예전처럼 시각 없이 나간다.
     """
+    # 원본 괄호 안은 **그 원본이 한 검색**이다 — 사안명은 확정본(보고서)의 것이고,
+    # 원본은 로데이터라 「무슨 조건으로 모았나」가 그 텍스트의 값이다. 검색어가 없는
+    # 옛 카드는 사안명으로 물러선다.
+    name = keywords_label(card) if is_raw(card) and card.get("keywords") else card["report_title"]
     basis = _basis_time(card)
     if not basis:
-        return f"수시 모니터링 ({card['report_title']})"
-    return f"수시 모니터링 {_format_hhmm_kr(basis)} 기준({card['report_title']})"
+        return f"수시 모니터링 ({name})"
+    return f"수시 모니터링 {_format_hhmm_kr(basis)} 기준({name})"
 
 
 def _article_groups(card: dict) -> list[tuple[Optional[str], list[dict]]]:
@@ -416,13 +423,24 @@ def build_adhoc_summary_text(card: dict, settings: Optional[dict] = None) -> str
     return "\n\n".join([AI_SUMMARY_HEADING] + lines)
 
 
+def _filename_title(card: dict) -> str:
+    """파일명 가운데 자리 — 확정본은 사안명, 원본은 **첫 검색어**(여럿이면 `외N`).
+    검색어를 전부 이으면 파일명이 길고 `·`가 섞여 읽기 어렵다. 파일명 금지 문자는 치환."""
+    kws = card.get("keywords") or []
+    if is_raw(card) and kws:
+        title = kws[0] + (f" 외{len(kws) - 1}" if len(kws) > 1 else "")
+    else:
+        title = card["report_title"]
+    return "".join(c if c not in '/:*?"<>|' else "_" for c in title)
+
+
 def download_filename(card: dict) -> str:
     """ADHOC_DESIGN.md §6.8 — 사안명에 파일명 금지 문자가 섞여 있으면 안전한 문자로 치환한다.
 
     [수정: 2026-08-18] 정기·수시 공통 파일명 규칙(날짜_종류_구분)으로 통일 —
     app.renderer.render_page의 export_filename과 동일한 형식.
     """
-    safe_title = "".join(c if c not in '/:*?"<>|' else "_" for c in card["report_title"])
+    safe_title = _filename_title(card)
     # [추가: 2026-09-22] 원본은 끝에 `_원본` — 같은 사안 확정본 파일과 구별된다(정기 초안의 `_초안`).
     return f"{card['collect_date']}_수시모니터링_{safe_title}{'_원본' if is_raw(card) else ''}.txt"
 
@@ -454,7 +472,7 @@ def build_adhoc_excel_rows(card: dict) -> list[dict]:
 
 def download_excel_filename(card: dict) -> str:
     """download_filename의 xlsx판 — 확장자만 다르다."""
-    safe_title = "".join(c if c not in '/:*?"<>|' else "_" for c in card["report_title"])
+    safe_title = _filename_title(card)
     return f"{card['collect_date']}_수시모니터링_{safe_title}{'_원본' if is_raw(card) else ''}.xlsx"
 
 
@@ -664,6 +682,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .tab.on {{ background: {card}; font-weight: 700; border-color: {border}; color: {header}; padding-bottom: 9px; }}
   .tab.on:hover {{ background: {card}; }}
   .tab .n {{ color: {muted}; font-weight: 500; font-size: var(--fs-xs); margin-left: 5px; }}
+  /* 탭 이름은 한 줄 말줄임 — 원본 탭이 검색어라 길어질 수 있다. 전체는 툴팁이 받는다
+     (사용자 결정). em 단위라 한글 글자 수로 읽힌다(ch는 숫자 0 폭이라 절반밖에 안 든다). */
+  .tab .nm {{ display: inline-block; max-width: 12em; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }}
   /* [수정: 2026-08-25] × 는 그 카드를 삭제한다(탭 갈아타기와 다른 동작이라
      preventDefault+stopPropagation으로 <a>의 이동을 막는다) — 사용자 확인:
      이 화면에 탭 전용의 별도 '치우기' 상태는 필요 없다(삭제만 있으면 된다). */
@@ -713,6 +735,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .edit-panel .kw-fixed a {{ margin-left: auto; color: {accent}; font-size: var(--fs-sm); font-weight: 600; text-decoration: none; }}
   .edit-panel .kw-fixed a:hover {{ text-decoration: underline; }}
   .ver-tag {{ margin-left: 6px; color: {muted}; font-weight: 600; }}
+  /* 원본 머리줄에서 검색어를 「외 N개」로 줄인 자리 — 점선 밑줄이 「마우스를 올리면
+     전체가 나온다」는 표시다(탭의 말줄임과 같은 약속). 안 줄였으면 이 표시도 없다. */
+  .kw-head {{ border-bottom: 1px dotted {muted}; }}
   /* 새 수집 폼 — 줄 간격을 좁히고 한 줄에 모은다. 빠른 시간 칩은 시간 입력
      옆, 거르기 체크 셋은 한 줄, 수집 버튼은 맨 아래 오른쪽. 전부 #new-card 아래로 묶는다. 시안 mockups/ADHOC_NEW_COMPACT_MOCKUP.html. */
   #new-card {{ padding: 18px 24px 16px; }}
@@ -1733,13 +1758,15 @@ def _render_issue_tabs(card: dict, today_cards: list[dict]) -> str:
         if is_bundle(c):
             # 건수는 탭에서 떼고 툴팁으로 — 머리줄 끝 건수 배지가 그 말을 한다(정기 초안·
             # 확정본과 같은 자리). 원본 탭이 이미 같은 규칙이다.
-            tab_label = html.escape(bundle_label(c))
+            tab_label = f'<span class="nm">{html.escape(bundle_label(c))}</span>'
             tab_tip = f' title="{visible_count}건"'
         else:
-            tab_label = html.escape(c["report_title"] + version_suffix(c, today_cards))
+            # 원본 탭은 **그 원본이 한 검색**이다 — 사안명은 넷이 다 같아 아무것도 못 가르고,
+            # 검색어는 수집 뒤 안 바뀌는 유일한 값이다. 길면 한 줄 말줄임이고 전체는 툴팁이 받는다.
+            tab_label = f'<span class="nm">{html.escape(screen_name(c, today_cards))}</span>'
             _win = window_of(c)
             tab_tip = (
-                f' title="{html.escape(" · ".join(c["keywords"]))}'
+                f' title="{html.escape(keywords_text(c))}'
                 f'{" (모두)" if is_match_all(c) else ""} / {_win["start"]}~{_win["end"]} / {visible_count}건"'
             )
         tabs.append(
@@ -1840,9 +1867,10 @@ def _render_bundle_meta_chips(card: dict) -> str:
             '원본 화면에서 「확정본으로」로 넣어주세요.</span></div>'
         )
     def _source_name(source_id: str, name: str) -> str:
-        # 같은 사안의 몇 번째 원본에서 왔는지(#2) — 원본이 지워졌으면 저장된 이름만.
+        # 어느 검색에서 왔는지 — 칩이 가리키는 원본의 화면 이름 그대로다.
+        # 원본이 지워졌으면 보낼 때 저장해 둔 사안명으로 물러선다.
         source = load_card(source_id)
-        return name + (version_suffix(source) if source is not None else "")
+        return screen_name(source) if source is not None else name
 
     chips = "".join(
         f'<a class="chip src" href="/adhoc/card?id={quote(source_id)}" '
@@ -1874,8 +1902,16 @@ def _render_meta_chips(card: dict) -> str:
         keywords_str = " · ".join(html.escape(k) for k in card["keywords"])
     _win = window_of(card)
     window_str = f"{_win['start']} ~ {_win['end']}"
+    # 머리줄이 검색어를 말하게 됐으므로 🔍 칩은 **더 말할 게 있을 때만** 그린다 —
+    # 검색어별 건수(오타 검색어가 0건으로 조용히 묻히지 않게)나 「모두」의 AND 관계가
+    # 그것이다. 이름만 되풀이하는 칩은 같은 말을 두 줄 연속으로 세우는 셈이라 뺀다.
+    _kw_chip = (
+        f'<span class="chip">{icon("search")} {keywords_str}</span>'
+        if is_match_all(card) or (len(card["keywords"]) >= 2 and card["collect_log"])
+        else ""
+    )
     return f"""<div class="meta-row">
-  <span class="chip">{icon("search")} {keywords_str}</span>
+  {_kw_chip}
   <span class="chip">{icon("clock")} {window_str}</span>
   <button type="button" class="edit-btn" id="edit-toggle" onclick="toggleCardEdit()">
     {icon("pencil")} <span>편집</span></button>
@@ -3077,15 +3113,19 @@ def render_card_page(
                 f'{icon("refresh")} <span>지금까지 다시 수집</span></button></form>'
             )
         )
-        # 같은 사안의 몇 번째 원본인가 — 괄호 밖에 둔다(괄호 안은 보고서 첫 줄의 사안명이다).
-        _ver = version_suffix(card, day_cards).strip()
-        _ver_html = (
-            f'<span class="ver-tag" title="오늘 같은 사안의 {_ver[1:]}번째 원본이에요 — 보고서엔 안 나가요">{_ver}</span>'
-            if _ver else ""
+        # 괄호 안은 **그 원본이 한 검색**이다 — 사안명·✏️·#N은 뗐다. 고칠 이름이 없어서다:
+        # 검색어는 수집 뒤 못 고치고(바꾸려면 새 수집), 이름을 짓는 자리는 확정본으로 옮겼다.
+        # 개수가 ADHOC_HEAD_KEYWORDS_MAX를 넘으면 「외 N개」로 줄이고 전체는 마우스를 올려 본다.
+        _kw_label = keywords_label(card) if card.get("keywords") else card["report_title"]
+        _kw_full = keywords_text(card)
+        _kw_html = (
+            f'<span class="kw-head" title="{html.escape(_kw_full)}">{html.escape(_kw_label)}</span>'
+            if _kw_full and _kw_label != _kw_full
+            else html.escape(_kw_label)
         )
         report_head_html = (
             f'<div class="report-head"><span class="chip raw-tag">원본</span>수시 모니터링 '
-            f'{_format_hhmm_kr(window_of(card)["end"])} 기준({_title_input}){_ver_html}{reload_now_html}</div>'
+            f'{_format_hhmm_kr(window_of(card)["end"])} 기준({_kw_html}){reload_now_html}</div>'
         )
 
     # 모음에는 검색어 편집 패널을 안 그린다 — 고칠 조건이 없다(§6.13).
@@ -3794,6 +3834,6 @@ document.addEventListener('click', function (e) {{
     # 확정본은 목록 이름(bundle_label, 「청문회 11:10」)이라 같은 사안 확정본끼리도 갈린다.
     page_title = (
         f"확정본 · {bundle_label(card)}" if is_bundle(card)
-        else f"원본 · {card['report_title']}{version_suffix(card)}"
+        else f"원본 · {screen_name(card)}"
     )
     return base_page(page_title, body, script, nav=nav)
