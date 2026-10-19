@@ -322,6 +322,30 @@ def load_group_overrides() -> dict:
     return {url: record["group"] for url, record in _read_override_records().items()}
 
 
+def group_override_names(days: int = 1, now: Optional[datetime] = None) -> set:
+    """최근 days일 안에 배정된 소제목 이름들 — 새 소제목이 피해 갈 자리를 고를 때 쓴다.
+
+    [추가: 2026-10-19] 「+ 새 소제목」의 자리 고르기(app.settings_server._existing_group_keys)
+    가 예전엔 배정 기록 **30일치 전부**를 「이미 쓰는 이름」으로 셌다. 그런데 _apply_forced_groups
+    가 소제목을 되살리는 조건은 "그 기사가 **지금 화면에 보일 때**"이고, 네이버는 당일 기사만
+    주므로 **어제 이전에 배정한 기사는 오늘 칸을 되살릴 수 없다** — 합쳐질 일이 없는데도
+    번호를 피해 다니느라 「기타 (10)」·「우리부 관련 (2)」 같은 속이름이 자꾸 지어졌다.
+    속이름은 매핑 한 겹으로만 가려지므로 적게 만들수록 안전하다(2026-10-19 사고).
+
+    at이 없는 옛 형식 기록은 **넣는다** — 모를 때는 넉넉한 쪽이 안전하다(빈자리를 고르는
+    일이라 넉넉해도 담당자에게 달라 보이는 게 없다).
+    """
+    dates = _recent_days(days, now)
+    names = set()
+    for record in _read_override_records().values():
+        at = record.get("at")
+        day = at[:10] if isinstance(at, str) and len(at) >= 10 else None
+        if day is None or day in dates:
+            if record.get("group"):
+                names.add(record["group"])
+    return names
+
+
 def _write_override_records(records: dict) -> None:
     atomic_write_text(GROUP_OVERRIDES_FILE, json.dumps(records, ensure_ascii=False, indent=2))
 

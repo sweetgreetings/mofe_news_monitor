@@ -56,6 +56,14 @@ def load_custom_group_labels(now: Optional[datetime] = None) -> dict:
     회차 단위인데 직접 만든 소제목은 하루를 산다 — 이름표에 적으면 다음 회차 화면에서
     속이름이 그대로 드러난다. 읽는 쪽은 app.curation.load_group_labels 한 곳이고,
     그 함수가 이 매핑을 밑에 깔고 그 위에 회차 이름표를 얹는다(✏️로 고친 이름이 이긴다).
+
+    **소제목 이름(names)은 하루를 살지만 이 매핑은 날짜로 비우지 않는다.** 둘의 수명이
+    달라야 하는 이유는 하나다 — 속이름으로 저장된 **기사**(회차 파일의 group, 배정 기록)가
+    이름보다 오래 살기 때문이다. 매핑이 먼저 죽으면 그 칸은 기사를 안고 그대로 남는데
+    가려 주던 이름만 사라져 「우리부 관련 (2)」 같은 속이름이 화면·복사·txt·엑셀로
+    그대로 나간다(2026-10-19 사고). 오래된 매핑이 엉뚱한 칸에 잘못 입혀질 위험도 없다 —
+    여기 적히는 건 「이름 (N)」 꼴, 즉 담당자가 친 이름이 겹쳐서 앱이 지어 준 속이름뿐이고
+    AI도 담당자도 그런 이름을 직접 짓지 않는다.
     """
     if not CUSTOM_GROUPS_FILE.exists():
         return {}
@@ -63,7 +71,7 @@ def load_custom_group_labels(now: Optional[datetime] = None) -> dict:
         data = json.loads(CUSTOM_GROUPS_FILE.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, TypeError):
         return {}
-    if not isinstance(data, dict) or data.get("date") != _today_str(now):
+    if not isinstance(data, dict):
         return {}
     labels = data.get("labels", {})
     return dict(labels) if isinstance(labels, dict) else {}
@@ -94,9 +102,18 @@ def unique_key(name: str, taken, now: Optional[datetime] = None) -> str:
     return f"{name} ({n})"
 
 
+# 화면 이름 매핑(labels)의 상한. 나이로 지우지 않는 대신 개수로만 막는다 — 하루 두세
+# 개가 쌓여도 1년치 회차(RETENTION_DAYS)를 덮고, 넘치면 오래된 것(적힌 순서가 곧 만든
+# 순서다)부터 버린다. 매핑 한 줄은 수십 바이트라 파일이 커질 걱정은 없고, 상한을 두는
+# 이유는 영원히 자라는 저장소를 만들지 않기 위해서다.
+_MAX_LABELS = 1000
+
+
 def _write(names: list, labels: Optional[dict] = None, now: Optional[datetime] = None) -> None:
     payload = {"date": _today_str(now), "names": names}
     if labels:
+        if len(labels) > _MAX_LABELS:
+            labels = dict(list(labels.items())[-_MAX_LABELS:])
         payload["labels"] = labels
     atomic_write_text(CUSTOM_GROUPS_FILE, json.dumps(payload, ensure_ascii=False))
 
@@ -148,5 +165,8 @@ def remove_custom_group(name: str, now: Optional[datetime] = None) -> None:
     목록 전체가 비워질 때와 동일한 자기 치유 동작).
     """
     names = [n for n in load_custom_groups(now) if n != name]
-    labels = {k: v for k, v in load_custom_group_labels(now).items() if k != name}
-    _write(names, labels, now)
+    # [수정: 2026-10-19] 화면 이름 매핑은 **같이 지우지 않는다.** 이 목록에서 빠져도 그
+    # 이름으로 저장된 기사(배정 기록·회차 파일)는 그대로 남고, _apply_forced_groups가
+    # 그 기사가 보이는 한 칸을 되살린다 — 매핑만 지우면 되살아난 칸이 속이름을 드러낸다.
+    # (load_custom_group_labels 참고: 매핑은 기사보다 오래 살아야 한다.)
+    _write(names, load_custom_group_labels(now), now)

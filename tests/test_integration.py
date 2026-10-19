@@ -5095,8 +5095,55 @@ def test_custom_group_with_taken_name_gets_its_own_box():
         # 세 번째 「기타」도 자리를 따로 잡는다.
         assert custom_groups.unique_key("기타", taken) == "기타 (3)", "이미 쓴 속이름을 또 내줬다"
 
+        # 소제목을 지워도 **화면 이름 매핑은 남는다** — 그 이름으로 저장된 기사가 아직
+        # 있어서, 매핑이 먼저 죽으면 되살아난 칸이 속이름을 드러낸다(아래 테스트).
         custom_groups.remove_custom_group(key)
-        assert custom_groups.load_custom_group_labels() == {}, "지운 소제목의 화면 이름이 남았다"
+        assert custom_groups.load_custom_groups() == [], "지운 소제목이 목록에 남았다"
+        assert custom_groups.load_custom_group_labels().get(key) == "기타", "지우면서 화면 이름까지 지웠다"
+
+
+def test_custom_group_alias_outlives_the_day_and_the_delete():
+    """직접 만든 소제목의 **속이름은 기사보다 오래 사는 매핑으로만 가려진다.**
+
+    소제목 이름 목록(names)은 하루살이고 🗑로 지우면 그 자리에서 사라지는데, 그 이름으로
+    저장된 기사는 배정 기록 30일·회차 파일 1년을 산다. 예전엔 매핑(labels)도 names와 같이
+    죽어서, 칸은 기사를 안고 되살아나는데 가려 주던 이름만 사라졌다 — 보관함·복사·txt·
+    엑셀에 「우리부 관련 (2)」가 그대로 나갔고(2026-10-19 제보), 이름표가 없어지니
+    🤖 AI 배지를 막던 조건(display_name == original_name)까지 풀려 담당자가 만든 소제목에
+    AI 배지가 붙었다.
+
+    같이 지킨다: 「+ 새 소제목」이 피해 갈 이름은 **오늘 배정한 것만** 센다 — 어제 쓰고
+    끝난 이름까지 피하면 속이름이 쓸데없이 많이 지어지고, 속이름이 많을수록 위 사고의
+    표면이 넓어진다.
+    """
+    tmp = Path(tempfile.mkdtemp())
+    with patch.object(custom_groups, "CUSTOM_GROUPS_FILE", tmp / "custom_groups.json"), \
+         patch.object(curation, "GROUP_OVERRIDES_FILE", tmp / "group_overrides.json"), \
+         patch.object(curation, "GROUP_LABELS_FILE", tmp / "group_labels.json"):
+        rid = ("2026-10-19", "09:30")
+        key = custom_groups.unique_key("우리부 관련", {"우리부 관련"})
+        assert key == "우리부 관련 (2)", key
+        custom_groups.add_custom_group("우리부 관련", key=key)
+
+        # (1) 자정이 지나도 — 어제 회차를 보관함에서 열었을 때 — 친 이름이 보인다.
+        tomorrow = datetime(2026, 10, 20, 9, 0)
+        assert custom_groups.load_custom_groups(tomorrow) == [], "소제목 이름까지 하루를 넘겨 살았다"
+        labels = curation.load_group_labels(rid)
+        assert curation.display_group_name(key, labels) == "우리부 관련", labels
+
+        # (2) 🗑로 지운 뒤에도 마찬가지다.
+        custom_groups.remove_custom_group(key)
+        assert curation.display_group_name(key, curation.load_group_labels(rid)) == "우리부 관련"
+
+        # (3) 어제 배정만 남은 이름은 오늘 칸을 되살릴 수 없으니 번호를 만들지 않는다.
+        curation.set_group_override("u-old", "세제 개편", now=datetime(2026, 10, 15, 9, 0))
+        curation.set_group_override("u-today", "국정감사", now=datetime(2026, 10, 19, 9, 0))
+        today_names = curation.group_override_names(now=datetime(2026, 10, 19, 10, 0))
+        assert today_names == {"국정감사"}, today_names
+        assert custom_groups.unique_key("세제 개편", today_names) == "세제 개편", "어제 이름을 피해 다녔다"
+        assert custom_groups.unique_key("국정감사", today_names) == "국정감사 (2)"
+
+    print("✓ 직접 만든 소제목 속이름: 자정·삭제를 넘겨 화면 이름이 남고, 오늘 배정만 피해 간다")
 
 
 def test_home_issue_card_uses_display_names():
@@ -6109,6 +6156,7 @@ if __name__ == "__main__":
     tests = [
         test_unclassified_sits_below_summary,
         test_custom_group_with_taken_name_gets_its_own_box,
+        test_custom_group_alias_outlives_the_day_and_the_delete,
         test_home_issue_card_uses_display_names,
         test_no_ai_key_is_not_a_failure,
         test_env_key_transplant,

@@ -97,6 +97,7 @@ from app.curation import (
     display_group_name,
     display_name_in_use,
     filter_hidden,
+    group_override_names,
     hide_articles,
     is_hidden,
     load_group_labels,
@@ -8418,9 +8419,13 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         배정 기록만 남은 이름, 회차 파일에 저장된 이름이 전부 나중에 되살아나 합쳐질 수
         있어서다. 「기타」·「📂 소제목 미분류」는 지금 없어도 늘 넣는다 — AI가 분류할
         때마다 다시 만드는 이름이라, 지금 비었다는 이유로 내주면 다음 분류에 합쳐진다.
+
+        [수정: 2026-10-19] **배정 기록은 오늘치만 센다**(group_override_names) — 30일치를
+        통째로 세던 때는 어제 이전에 쓰고 끝난 이름까지 피해 다니느라 속이름이 불필요하게
+        많이 지어졌다. 어제 배정한 기사는 오늘 회차에 없어서 칸을 되살리지 못한다.
         """
         keys = set(active_names) | set(forced_group_target_names())
-        keys |= {name for name in load_group_overrides().values() if name}
+        keys |= group_override_names()
         keys |= {ETC_GROUP_NAME, UNCLASSIFIED_GROUP_NAME}
         try:
             run = load_latest_run()
