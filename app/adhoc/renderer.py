@@ -666,13 +666,22 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* 오늘의 수집 결과 — 사안명 탭. 오늘 만든 카드가 2개 이상일 때만 그려진다. */
   .tabwrap {{ background: {adhoc_bg}; margin: -22px -24px 18px; padding: 12px 18px 0; border-radius: var(--r-lg) var(--r-lg) 0 0; }}
   .tabwrap-h {{ font-size: var(--fs-xs); font-weight: 700; color: {adhoc_text}; margin-bottom: 9px; }}
-  .tabs {{ display: flex; gap: 4px; align-items: flex-end; overflow-x: auto; scrollbar-width: none; }}
-  .tabs::-webkit-scrollbar {{ display: none; }}
+  /* 넘치면 아랫줄로 접는다 — 가로로 미는 대신 다 보여 준다. 실측(800px 카드·검색어 이름):
+     한 줄에 들어가는 건 3장까지이고 4장부터 넘치므로 넘침이 예외가 아니라 상례다. 접으면
+     8장까지 2줄, 10장이라야 3줄이다(한 줄 39px). 미는 값으로 39px을 아낄 자리가 아니고,
+     「+ 새 수집」 탭이 떠내려가 안 보이던 문제도 함께 없어진다. */
+  .tabs {{ display: flex; gap: 4px; row-gap: 5px; align-items: flex-end; flex-wrap: wrap; }}
   .tab {{ font-size: var(--fs-sm); padding: 8px 15px; border-radius: var(--r-md) var(--r-md) 0 0; background: rgba(255,255,255,0.5);
     color: {adhoc_text}; font-weight: 600; border: 1px solid transparent; border-bottom: none;
     white-space: nowrap; text-decoration: none; position: relative; top: 1px; display: inline-block; }}
   .tab:hover {{ background: rgba(255,255,255,0.8); }}
+  /* **아래가 뚫린 탭 모양은 마지막 줄에서만 뜻이 성립한다** — 윗줄 탭은 카드에 붙어 있지
+     않으므로 네 모서리를 둥글려 칩처럼 둔다. 몇째 줄인지는 CSS로 알 수 없어 markTabRows가
+     .upper를 달아 준다. 지금 보고 있는 탭이 윗줄에 걸리면 「붙어 있다」는 모양은 포기하고
+     흰 바탕과 테두리가 그 말을 대신한다. */
+  .tab.upper {{ border-radius: var(--r-md); top: 0; }}
   .tab.on {{ background: {card}; font-weight: 700; border-color: {border}; color: {header}; padding-bottom: 9px; }}
+  .tab.on.upper {{ padding-bottom: 8px; }}
   .tab.on:hover {{ background: {card}; }}
   .tab .n {{ color: {muted}; font-weight: 500; font-size: var(--fs-xs); margin-left: 5px; }}
   /* 탭 이름은 한 줄 말줄임 — 원본 탭이 검색어라 길어질 수 있다. 전체는 툴팁이 받는다
@@ -3935,6 +3944,27 @@ function deleteCard(id) {{
   // 서버는 어느 화면에서 눌렀는지 알 길이 없어 늘 수시 보관함으로 보낸다.
   post('/adhoc/card/delete', {{id: id, from: ADHOC_CARD_ID}});
 }}
+// 탭 줄이 두 줄 이상으로 접혔을 때, **마지막 줄이 아닌 탭**에 .upper를 단다 — 아래가 뚫린
+// 탭 모양은 카드에 붙은 마지막 줄에서만 뜻이 성립한다. 몇째 줄인지는 CSS가 알 수 없어서
+// 자리(offsetTop)로 가른다. 창 폭이 바뀌면 줄이 다시 나뉘므로 resize에서도 부른다.
+function markTabRows() {{
+  document.querySelectorAll('.tabs').forEach(markOneTabRow);
+}}
+function markOneTabRow(box) {{
+  var tabs = Array.prototype.slice.call(box.children);
+  if (!tabs.length) return;
+  // **윗선이 아니라 아랫선으로 가른다** — 줄은 `align-items: flex-end`라 같은 줄끼리 바닥이
+  // 맞고, 켜진 탭은 1px 더 높아(padding-bottom 9px) 윗선이 혼자 어긋난다. 윗선으로 재면
+  // 마지막 줄에 선 켜진 탭이 윗줄로 잘못 잡혀 혼자 둥글어진다. 6px은 그 1~2px 흔들림은
+  // 덮고 줄 높이(39px)에는 한참 못 미치는 값이다.
+  var bottoms = tabs.map(function (t) {{ return t.getBoundingClientRect().bottom; }});
+  var last = Math.max.apply(null, bottoms);
+  tabs.forEach(function (t, i) {{ t.classList.toggle('upper', last - bottoms[i] > 6); }});
+}}
+markTabRows();
+// 글꼴이 늦게 와 글자 폭이 바뀌면 줄이 다시 나뉜다 — load에서 한 번 더 잡는다.
+window.addEventListener('load', markTabRows);
+window.addEventListener('resize', markTabRows);
 function toggleHiddenPanel() {{ document.getElementById('hidden-panel').classList.toggle('is-open'); }}
 document.addEventListener('click', function (e) {{
   if (!e.target.closest('#hidden-panel') && !e.target.closest('#hidden-fab')) {{

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>수시 탭이 넘칠 때 — 세 가지 안</title>
+<style>
+  :root {
+    --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px;
+    --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+    --h-tb: 28px; --h-md: 30px;
+    --adhoc-bg: #E3F1EE; --adhoc-text: #146B5E;
+    --card: #fff; --border: #E5E7EB; --header: #1E3A5F; --muted: #6B7280; --text: #1F2937;
+    --accent: #2563EB; --warn: #B45309;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 28px 0 90px; background: #F8FAFC; color: var(--text);
+    font-family: Pretendard, "Noto Sans KR", -apple-system, sans-serif; font-size: 16px; }
+  .page { width: 880px; max-width: calc(100vw - 32px); margin: 0 auto; }
+  h1 { font-size: var(--fs-xl); color: var(--header); margin: 0 0 6px; }
+  .lead { font-size: var(--fs-md); color: var(--muted); margin: 0 0 22px; line-height: 1.7; }
+  .lead b { color: var(--text); }
+
+  /* 조절 바 — 탭 수를 바꿔 가며 네 안을 같은 조건에서 본다 */
+  .ctl { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--r-lg);
+    padding: 11px 14px; margin-bottom: 24px; font-size: var(--fs-md);
+    box-shadow: 0 4px 12px rgba(15,23,42,0.06); }
+  .ctl label { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+  .ctl input[type=range] { width: 150px; accent-color: var(--adhoc-text); }
+  .ctl input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--accent); }
+  .ctl .cnt { font-weight: 700; color: var(--adhoc-text); min-width: 2.2em; }
+  .ctl .stat { margin-left: auto; font-size: var(--fs-sm); color: var(--muted); }
+  .ctl .stat b { color: var(--text); }
+  .ctl .stat .over { color: #B45309; font-weight: 700; }
+
+  .opt { margin-bottom: 30px; }
+  .opt > h2 { font-size: var(--fs-lg); color: var(--header); margin: 0 0 3px; }
+  .opt > h2 .tag { font-size: var(--fs-xs); font-weight: 700; padding: 2px 8px; border-radius: var(--r-pill);
+    margin-right: 8px; vertical-align: 2px; }
+  .t-now { background: #FEF3C7; color: var(--warn); }
+  .t-a { background: var(--adhoc-bg); color: var(--adhoc-text); }
+  .t-b { background: #EFF6FF; color: var(--accent); }
+  .t-c { background: #F3F4F6; color: var(--muted); }
+  .opt > .why { font-size: var(--fs-sm); color: var(--muted); margin: 0 0 11px; line-height: 1.65; }
+
+  /* ── 실제 화면에서 그대로 가져온 값 ───────────────────────────── */
+  /* 실제 카드 폭과 같게 못 박는다 — 여기가 넓으면 넘치는 정도가 거짓이 된다
+     (.container: width 800px, padding 0 24px). */
+  .card { width: 800px; max-width: 100%; background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--r-lg); padding: 22px 24px 20px; }
+  .tabwrap { background: var(--adhoc-bg); margin: -22px -24px 18px; padding: 12px 18px 0;
+    border-radius: var(--r-lg) var(--r-lg) 0 0; }
+  .tabwrap-h { font-size: var(--fs-xs); font-weight: 700; color: var(--adhoc-text); margin-bottom: 9px;
+    display: flex; align-items: center; gap: 5px; }
+  .tabwrap-h svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round; }
+  .tabs { display: flex; gap: 4px; align-items: flex-end; overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { font-size: var(--fs-sm); padding: 8px 15px; border-radius: var(--r-md) var(--r-md) 0 0;
+    background: rgba(255,255,255,0.5); color: var(--adhoc-text); font-weight: 600;
+    border: 1px solid transparent; border-bottom: none; white-space: nowrap; text-decoration: none;
+    position: relative; top: 1px; display: inline-block; flex: none; cursor: pointer; }
+  .tab:hover { background: rgba(255,255,255,0.8); }
+  .tab.on { background: var(--card); font-weight: 700; border-color: var(--border); color: var(--header);
+    padding-bottom: 9px; }
+  .tab .nm { display: inline-block; max-width: 12em; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; vertical-align: bottom; }
+  body.narrow .tab .nm { max-width: 8em; }
+  .tab .del { margin-left: 7px; color: var(--muted); font-weight: 400; padding: 1px 3px;
+    border-radius: var(--r-sm); }
+  .tab .del:hover { color: #DC2626; background: rgba(0,0,0,0.06); }
+  .tab.add { background: rgba(20,107,94,0.08); color: var(--adhoc-text); font-weight: 500;
+    border: 1px dashed var(--adhoc-text); margin-left: 8px; }
+  .tab.add:hover { background: rgba(20,107,94,0.14); }
+  .plus-glyph { font-size: 1.2em; font-weight: 600; margin-right: 4px; }
+
+  /* 카드 본문 — 안마다 아래 내용이 얼마나 밀리는지 보려고 같이 그린다 */
+  .head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .chip-raw { font-size: var(--fs-xs); font-weight: 700; padding: 3px 9px; border-radius: var(--r-pill);
+    background: #F3F4F6; color: var(--muted); }
+  .title { font-size: var(--fs-xl); font-weight: 700; color: var(--header); }
+  .btn-fill { margin-left: auto; font-size: var(--fs-md); font-weight: 600; height: var(--h-md);
+    padding: 0 12px; border-radius: var(--r-md); border: none; background: var(--accent); color: #fff;
+    cursor: pointer; white-space: nowrap; }
+  .row-dim { margin-top: 14px; height: 9px; border-radius: var(--r-pill); background: #F1F5F9; }
+  .row-dim + .row-dim { margin-top: 9px; width: 72%; }
+
+  /* ── A안: 양끝 페이드 ─────────────────────────────────────────── */
+  .scroller { position: relative; }
+  .scroller::before, .scroller::after { content: ''; position: absolute; top: 0; bottom: 0; width: 34px;
+    pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 2; }
+  .scroller::before { left: 0;
+    background: linear-gradient(to right, var(--adhoc-bg) 30%, rgba(227,241,238,0)); }
+  .scroller::after { right: 0;
+    background: linear-gradient(to left, var(--adhoc-bg) 30%, rgba(227,241,238,0)); }
+  .scroller.can-l::before { opacity: 1; }
+  .scroller.can-r::after { opacity: 1; }
+
+  /* ── B안: 좌우 화살표 ─────────────────────────────────────────── */
+  .arrowbar { display: flex; align-items: flex-end; gap: 2px; }
+  .arrowbar .tabs { flex: 1; min-width: 0; }
+  .nav { flex: none; width: 26px; height: 32px; margin-bottom: 1px; border: none; background: none;
+    color: var(--adhoc-text); cursor: pointer; border-radius: var(--r-sm); display: flex;
+    align-items: center; justify-content: center; }
+  .nav:hover:not(:disabled) { background: rgba(255,255,255,0.7); }
+  .nav:disabled { opacity: 0.25; cursor: default; }
+  .nav svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.2;
+    stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ── C안: 여러 줄 ─────────────────────────────────────────────── */
+  .tabs.wrapmode { flex-wrap: wrap; overflow: visible; row-gap: 5px; }
+  /* 마지막 줄만 카드에 붙는다 — 윗줄은 떠 있으니 아래 모서리도 둥글려 칩처럼 둔다 */
+  .tabs.wrapmode.roundtop .tab.upper { border-radius: var(--r-md); top: 0; }
+
+  .note { font-size: var(--fs-sm); line-height: 1.7; margin: 10px 2px 0; color: var(--muted); }
+  .note b { color: var(--text); }
+  .note .bad { color: #B45309; font-weight: 700; }
+  .note .good { color: var(--adhoc-text); font-weight: 700; }
+  .verdict { background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--adhoc-text);
+    border-radius: 0 var(--r-lg) var(--r-lg) 0; padding: 16px 20px; margin-top: 6px;
+    font-size: var(--fs-md); line-height: 1.8; }
+  .verdict h3 { margin: 0 0 8px; font-size: var(--fs-base); color: var(--header); }
+  .verdict ul { margin: 8px 0 0; padding-left: 18px; }
+  .verdict li { margin-bottom: 5px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>수시 탭이 넘칠 때 — 세 가지 안</h1>
+  <p class="lead">
+    탭 줄(<code>.tabs</code>)은 <b>지금도 가로로 밀면 움직인다</b> — <code>overflow-x: auto</code>에
+    스크롤바만 감춰 뒀다. 그래서 진짜 문제는 「못 간다」가 아니라
+    <b>「더 있다는 걸 화면이 말하지 않는다」</b>이다. 아래 네 칸은 같은 탭을 같은 폭(800px, 실제 카드 폭)에
+    놓고 그린 것이다. 탭 수를 바꿔 가며 보라.
+  </p>
+
+  <div class="ctl">
+    <label>탭 수 <input type="range" id="cnt" min="2" max="10" value="5"><span class="cnt" id="cntv">5</span></label>
+    <label><input type="checkbox" id="narrow"> 탭 이름을 8em으로 줄이기</label>
+    <label><input type="checkbox" id="longname" checked> 긴 검색어 이름 쓰기</label>
+    <span class="stat" id="stat"></span>
+  </div>
+
+  <!-- 지금 -->
+  <section class="opt">
+    <h2><span class="tag t-now">지금</span>아무 말이 없는 가로 스크롤</h2>
+    <p class="why">넘치면 오른쪽 탭이 그냥 잘린다. 잘린 글자가 「더 있다」는 유일한 단서이고, 마지막 탭이
+      딱 맞아떨어지면 그 단서조차 없다.</p>
+    <div class="card">
+      <div class="tabwrap">
+        <div class="tabwrap-h"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg> 오늘의 원본</div>
+        <div class="tabs" data-tabs="now"></div>
+      </div>
+      <div class="head">
+        <span class="chip-raw">원본</span>
+        <span class="title">수시 모니터링 17시 38분 기준</span>
+        <button class="btn-fill">⟳ 지금까지 다시 수집</button>
+      </div>
+      <div class="row-dim"></div><div class="row-dim"></div>
+    </div>
+    <p class="note"><span class="bad">문제</span> · 「+ 새 수집」 탭도 같이 떠내려가 안 보인다.</p>
+  </section>
+
+  <!-- A안 -->
+  <section class="opt">
+    <h2><span class="tag t-a">A안</span>가로 스크롤 + 양끝 페이드</h2>
+    <p class="why">지금 동작 그대로 두고, 넘치는 쪽에만 옅은 그라데이션을 깐다. 밀 수 있는 쪽에만 뜬다 —
+      끝까지 밀면 그쪽 페이드가 사라져 「여기가 끝」이라고 말한다.</p>
+    <div class="card">
+      <div class="tabwrap">
+        <div class="tabwrap-h"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg> 오늘의 원본</div>
+        <div class="scroller"><div class="tabs" data-tabs="fade"></div></div>
+      </div>
+      <div class="head">
+        <span class="chip-raw">원본</span>
+        <span class="title">수시 모니터링 17시 38분 기준</span>
+        <button class="btn-fill">⟳ 지금까지 다시 수집</button>
+      </div>
+      <div class="row-dim"></div><div class="row-dim"></div>
+    </div>
+    <p class="note"><span class="good">좋은 점</span> 높이가 절대 안 변한다 · 탭이 몇 장이든 된다 ·
+      CSS 몇 줄과 스크롤 이벤트 하나로 끝난다.<br>
+      <span class="bad">아쉬운 점</span> 트랙패드가 아니면 미는 게 번거롭다 · 「+ 새 수집」이 여전히 떠내려간다.</p>
+  </section>
+
+  <!-- B안 -->
+  <section class="opt">
+    <h2><span class="tag t-b">B안</span>좌우 화살표</h2>
+    <p class="why">넘칠 때만 양끝에 ‹ › 가 선다. 누를 수 없는 쪽은 흐려진다(언론사 순서 화면의 화살표와 같은 문법).</p>
+    <div class="card">
+      <div class="tabwrap">
+        <div class="tabwrap-h"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg> 오늘의 원본</div>
+        <div class="arrowbar">
+          <button class="nav" data-nav="-1"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+          <div class="tabs" data-tabs="arrow"></div>
+          <button class="nav" data-nav="1"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+        </div>
+      </div>
+      <div class="head">
+        <span class="chip-raw">원본</span>
+        <span class="title">수시 모니터링 17시 38분 기준</span>
+        <button class="btn-fill">⟳ 지금까지 다시 수집</button>
+      </div>
+      <div class="row-dim"></div><div class="row-dim"></div>
+    </div>
+    <p class="note"><span class="good">좋은 점</span> 마우스만으로 간다 · 높이가 안 변한다.<br>
+      <span class="bad">아쉬운 점</span> 버튼 둘이 <b>탭 자리를 52px 먹는다</b>(탭 한 장 반) ·
+      한 번에 조금씩만 움직여 끝까지 가려면 여러 번 누른다 · 몇 장이 숨어 있는지는 여전히 모른다.</p>
+  </section>
+
+  <!-- C안 -->
+  <section class="opt">
+    <h2><span class="tag t-c">C안</span>여러 줄로 접기</h2>
+    <p class="why">넘치면 아랫줄로 내려 보낸다. 모든 탭이 한눈에 보인다.</p>
+    <p class="why"><label style="display:inline-flex;gap:7px;align-items:center;cursor:pointer">
+      <input type="checkbox" id="roundtop" checked style="width:14px;height:14px;accent-color:#146B5E">
+      윗줄 탭은 네 모서리를 둥글게 — 아래가 뚫린 모양은 마지막 줄만 쓴다</label></p>
+    <div class="card">
+      <div class="tabwrap">
+        <div class="tabwrap-h"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg> 오늘의 원본</div>
+        <div class="tabs wrapmode" data-tabs="wrap"></div>
+      </div>
+      <div class="head">
+        <span class="chip-raw">원본</span>
+        <span class="title">수시 모니터링 17시 38분 기준</span>
+        <button class="btn-fill">⟳ 지금까지 다시 수집</button>
+      </div>
+      <div class="row-dim"></div><div class="row-dim"></div>
+    </div>
+    <p class="note"><span class="good">좋은 점</span> 오늘 뭘 모았는지 통째로 보인다 · 「+ 새 수집」이 늘 보인다.<br>
+      <span class="bad">아쉬운 점</span> <b>윗줄 탭이 카드에서 떨어져 뜬다</b> — 탭 모양(아래가 뚫린 네모)은
+      한 줄일 때만 「카드에 붙어 있다」는 뜻이 성립한다 · 탭 수에 따라 머리줄이 39px씩 오르내린다 ·
+      <b>지금 보고 있는 탭이 윗줄에 걸리면</b> 「붙어 있다」는 모양을 포기해야 한다(흰 바탕과 테두리가
+      그 말을 대신 한다).</p>
+  </section>
+
+  <div class="verdict">
+    <h3>재 본 숫자 — 넘침은 예외가 아니라 상례다</h3>
+    800px 카드에 검색어 이름으로 재면 <b>3장까지만 한 줄에 들어간다.</b>
+    4장이면 벌써 69px이 숨고, 6장이면 368px, 8장이면 621px이 숨는다.
+    반대로 <b>접으면 8장까지 2줄이고, 10장이라야 3줄</b>이다(한 줄 늘 때마다 39px).
+    <ul>
+      <li>넘침이 날마다 일어나는 일이라면 A·B안은 <b>날마다 미는 일</b>이 된다. 그 값으로 39px을
+        아끼는 셈이다.</li>
+      <li>그래서 <b>C안(여러 줄)을 권한다</b> — 탭은 「오늘 뭘 모았나」를 훑고 건너뛰는 자리라
+        다 보이는 게 본업에 맞고, 「+ 새 수집」도 늘 보인다.</li>
+      <li>C안을 고르면 <b>윗줄 탭의 모양만 손보면 된다</b> — 아래가 뚫린 지금 모양은 한 줄일 때만
+        「카드에 붙어 있다」는 뜻이 성립한다. 윗줄은 네 모서리를 둥글게 두면 그 어색함이 사라진다.</li>
+      <li>B안은 한 줄을 지키면서 마우스로도 갈 수 있는 유일한 안이지만, 가장 좁은 이 자리에서
+        <b>탭 한 장 반을 버튼에 내준다</b>.</li>
+      <li>어느 안을 고르든 <b>탭 이름을 8em으로 줄이면</b>(체크박스) 한 장을 더 번다. 대신
+        <code>증안펀드 · 증시…</code>처럼 둘째 검색어가 잘려 두 탭이 같아 보인다 — 권하지 않는다.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+var LONG = ["증안펀드 · 증시안전펀드", "증권시장안정펀드+재정경제부", "증안펀드 · 증시안전펀드 · 공매도",
+            "공공기관 경영평가", "국정감사 대응", "세법개정안+재정경제부", "내년도 예산안",
+            "환율·외환시장", "가상자산 과세", "물가·장바구니"];
+var SHORT = ["증안펀드", "공매도", "경영평가", "국정감사", "세법", "예산안", "환율", "물가", "과세", "인사"];
+
+function build() {
+  var n = Number(document.getElementById('cnt').value);
+  var names = document.getElementById('longname').checked ? LONG : SHORT;
+  document.getElementById('cntv').textContent = n;
+  document.body.classList.toggle('narrow', document.getElementById('narrow').checked);
+
+  document.querySelectorAll('[data-tabs]').forEach(function (box) {
+    var html = '';
+    for (var i = 0; i < n; i++) {
+      html += '<a class="tab' + (i === 0 ? ' on' : '') + '" title="' + names[i % names.length] + '">'
+            + '<span class="nm">' + names[i % names.length] + '</span>'
+            + '<span class="del" title="이 카드 삭제">×</span></a>';
+    }
+    html += '<a class="tab add"><span class="plus-glyph">+</span>새 수집</a>';
+    box.innerHTML = html;
+    box.scrollLeft = 0;
+  });
+  syncFade();
+  syncArrows();
+  markUpper();
+  syncStat();
+}
+
+// 마지막 줄이 아닌 탭에 .upper를 단다 — CSS만으론 「몇째 줄인가」를 알 수 없다.
+function markUpper() {
+  var box = document.querySelector('[data-tabs="wrap"]');
+  box.classList.toggle('roundtop', document.getElementById('roundtop').checked);
+  var tabs = Array.prototype.slice.call(box.children);
+  var last = Math.max.apply(null, tabs.map(function (t) { return t.offsetTop; }));
+  tabs.forEach(function (t) { t.classList.toggle('upper', t.offsetTop < last); });
+}
+
+// 「몇 장부터 넘치나」를 눈으로 세지 않게 적어 준다 — 이 숫자가 곧 고르는 근거다.
+function syncStat() {
+  var f = document.querySelector('[data-tabs="fade"]');
+  var w = document.querySelector('[data-tabs="wrap"]');
+  var hidden = f.scrollWidth - f.clientWidth;
+  var lines = Math.round(w.getBoundingClientRect().height / 37.5);
+  document.getElementById('stat').innerHTML =
+    hidden > 0
+      ? '한 줄에 안 들어감 — <span class="over">' + hidden + 'px가 숨는다</span> · 접으면 <b>' + lines + '줄</b>'
+      : '한 줄에 다 들어간다 · 접어도 <b>1줄</b>';
+}
+
+function syncFade() {
+  var box = document.querySelector('[data-tabs="fade"]');
+  var sc = box.closest('.scroller');
+  sc.classList.toggle('can-l', box.scrollLeft > 2);
+  sc.classList.toggle('can-r', box.scrollLeft + box.clientWidth < box.scrollWidth - 2);
+}
+
+function syncArrows() {
+  var box = document.querySelector('[data-tabs="arrow"]');
+  var over = box.scrollWidth > box.clientWidth + 2;
+  document.querySelectorAll('.nav').forEach(function (b) {
+    b.style.display = over ? '' : 'none';
+    var dir = Number(b.dataset.nav);
+    b.disabled = dir < 0 ? box.scrollLeft <= 2
+                         : box.scrollLeft + box.clientWidth >= box.scrollWidth - 2;
+  });
+}
+
+document.querySelector('[data-tabs="fade"]').addEventListener('scroll', syncFade);
+document.querySelector('[data-tabs="arrow"]').addEventListener('scroll', syncArrows);
+document.querySelectorAll('.nav').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var box = document.querySelector('[data-tabs="arrow"]');
+    box.scrollBy({left: Number(b.dataset.nav) * 160, behavior: 'smooth'});
+  });
+});
+['cnt', 'narrow', 'longname', 'roundtop'].forEach(function (id) {
+  document.getElementById(id).addEventListener('input', build);
+});
+window.addEventListener('resize', function () { syncFade(); syncArrows(); });
+build();
+</script>
+</body>
+</html>
