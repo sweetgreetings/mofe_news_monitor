@@ -1474,7 +1474,7 @@ def render_new_card_page(
       <div class="kw-box" id="kw-box">
         <input type="text" id="kw-input" placeholder="검색어 입력"
                style="border: none; flex: 1; min-width: 110px; padding: 3px 4px;"
-               onkeydown="if(event.key==='Enter'){{event.preventDefault(); addKeyword();}}">
+               onkeydown="kwKeydown(event)">
         <button type="button" class="kw-add" id="kw-add-btn" onclick="addKeyword()"><span class="plus-glyph">+</span>추가</button>
         <span class="kw-cnt" id="kw-cnt">0 / {MAX_ADHOC_KEYWORDS}</span>
       </div>
@@ -1555,6 +1555,16 @@ function addKeyword() {{
 function removeKeyword(idx) {{
   keywords.splice(idx, 1);
   renderKeywords();
+}}
+
+// 빈 칸에서 백스페이스 = 마지막 칩의 × 와 같은 일. 글자가 남아 있으면 평소대로 글자를
+// 지우고, 한글을 조합하는 중(ev.isComposing)에는 자모를 지워야 하므로 건드리지 않는다.
+function kwKeydown(ev) {{
+  if (ev.key === 'Enter') {{ ev.preventDefault(); addKeyword(); return; }}
+  if (ev.key === 'Backspace' && !ev.isComposing && ev.target.value === '' && keywords.length) {{
+    ev.preventDefault();
+    removeKeyword(keywords.length - 1);
+  }}
 }}
 
 function onIssueChange() {{
