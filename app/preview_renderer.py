@@ -196,11 +196,17 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      같은 라벨의 "전체 기사 재분류" 버튼이 있고(스크롤 없이 90~120px 위, 실측), 같은
      라벨의 버튼이 화면에 둘이면 "다른 건가?"라는 새 의문만 늘어난다. 대신 문구가
      .btn-ref로 툴바 버튼을 가리킨다. */
+  /* [수정: 2026-10-20] 바로 위 툴바와 붙어 보여서 위아래 여백을 같은 14px로 맞추고,
+     상자를 한 단계 작게 줄였다 — 글자는 --fs-sm, 상자 안 여백 10/12, 문구는 두 줄
+     (무슨 일인가 / 할 일). 배너 글자는 보통 --fs-md인데 여기만 한 단계 내린 건,
+     이 상자가 보고서 내용이 아니라 "지금 보이는 이름을 믿지 마라"는 한때의 알림이라
+     세 줄짜리 빨간 덩어리가 기사 목록 머리를 통째로 차지하면 안 되기 때문이다.
+     시안 mockups/CLASSIFY_DEGRADED_COMPACT_MOCKUP.html B안. */
   .classify-degraded {{
     background: {degraded_bg}; border: 1px solid {degraded_border}; border-left: 4px solid {error};
-    border-radius: var(--r-lg); padding: 12px 14px; margin-bottom: 14px;
+    border-radius: var(--r-lg); padding: 10px 12px; margin: 14px 0;
   }}
-  .classify-degraded .msg {{ font-size: var(--fs-md); color: {degraded_text}; line-height: 1.6; }}
+  .classify-degraded .msg {{ font-size: var(--fs-sm); color: {degraded_text}; line-height: 1.55; }}
   .classify-degraded .msg b {{ color: {error}; }}
   /* AI 키가 없을 때만 같은 상자를 「주의」 세트(앰버)로 한 단계 낮춘다 — 키를 안 쓰기로
      한 담당자에게 매 회차 빨간 경고가 뜨면 진짜 실패(크레딧 부족·분류 실패)와 구분이
@@ -3409,10 +3415,9 @@ def _classify_degraded_html(degraded: bool, article_count: int, round_id: Option
         return (
             '<div class="classify-degraded"><div class="msg">'
             f"<b>⚠️ 지금 {article_count}건이라 AI가 소제목을 묶지 못했어요.</b> "
-            f"(상한 {MAX_ARTICLES_FOR_CLASSIFY}건) 지금 보이는 소제목은 AI가 지은 이름이 아니라, "
-            "단어 빈도수에 따라 기계적으로 뽑은 단어입니다.<br>"
-            f"<b>{over}건</b>을 줄이고 위의 {_reclassify_btn_ref_html()}를 다시 눌러 요청하시면, "
-            "기사들이 다시 묶입니다."
+            f"(상한 {MAX_ARTICLES_FOR_CLASSIFY}건)<br>"
+            "지금 소제목은 AI가 지은 이름이 아니라 단어 빈도로 뽑은 단어예요. "
+            f"<b>{over}건</b> 줄이고 위의 {_reclassify_btn_ref_html()}를 누르면 다시 묶입니다."
             "</div></div>"
         )
 
