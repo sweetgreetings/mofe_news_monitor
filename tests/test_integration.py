@@ -2195,19 +2195,55 @@ def test_adhoc_screen_name():
                 "남이 만든 확정본을 자동으로 이어 씀"
             assert card.last_bundle_name_for(card.load_card(first["id"]), bundles) == "청문회 종합"
 
-            # 4) 「✓ 보냄」은 이 원본이 보낸 기사만
+            # 4) 「✓ 보냄」은 이 원본이 보낸 기사만이고, 옆 원본이 보낸 건 「이미 보냄」으로
+            #    따로 선다 — 같은 기사가 여러 원본에 걸려도 「처리 안 함」과 안 섞인다.
             day = card.bundles_for_date(today)
             assert card.raw_row_states(card.load_card(first["id"]), day).get(
                 "https://v.x/1", ("",))[0] == "sent"
-            assert "https://v.x/1" not in card.raw_row_states(card.load_card(second["id"]), day), \
-                "옆 판이 보낸 기사가 이 원본에서도 보냄으로 보임"
-            assert "https://v.x/1" in card.open_raw_urls(card.load_card(second["id"]), day)
+            _second = card.load_card(second["id"])
+            _st = card.raw_row_states(_second, day)["https://v.x/1"]
+            assert _st[0] == "sent_other", "옆 원본이 보낸 기사가 「처리 안 함」으로 섞임"
+            assert _st[1] == card.bundle_label(bundles[0]), _st
+            assert _st[2] == first["id"], "셋째 값은 보낸 원본 카드 id여야 한다"
+            # 내가 보낸 게 아니므로 「✓ 보냄」도, 그 줄의 취소도 없다 — 취소·숨김 되돌리기가
+            # 전부 「내가 보낸 것」 기준이라 달아 두면 눌러도 아무 일이 안 일어난다.
+            _second_page = adhoc_renderer.render_card_page(_second)
+            # CSS 주석에도 걸리지 않게 마크업으로 센다
+            assert 'class="send-split sent-split"' in _second_page \
+                and 'class="se-label"' in _second_page, "옆 원본이 보낸 기사에 회색 표시가 안 붙음"
+            assert f"「청문회 13:05」 원본이 「{card.bundle_label(bundles[0])}」 확정본으로 이미 보낸" \
+                in _second_page, "말풍선이 보낸 원본의 검색어 이름을 안 적음"
+            assert "rawUnsend(this)" not in _second_page, "내가 한 적 없는 보냄에 취소 버튼이 달림"
+            # 그래도 **일부러** 다른 확정본으로 보내는 길은 ▾로 열려 있어야 한다
+            assert "그래도 다른 확정본으로 보내기" in _second_page, "보낼 길이 통째로 막힘"
+            # 「모든 기사 확정본으로」가 보낼 목록에서도 빠진다 — 확인창 건수와 실제가 같아야 한다
+            assert "https://v.x/1" not in card.open_raw_urls(_second, day)
+            assert "https://v.x/3" in card.open_raw_urls(_second, day)
+
+            # 4b) 그래도 같은 확정본으로 보내면 **이유를 적어 돌려보낸다** — 조용히 0건으로
+            #     끝나면 화면이 그대로 돌아와 버튼이 고장 난 것처럼 보인다.
+            adhoc_routes._handle_send_to_bundle(
+                _Handler(), {"id": [second["id"]], "bundle": [bundles[0]["id"]],
+                             "urls": ["https://v.x/1"]})
+            assert "error=" in calls[-1] and "%EC%9D%B4%EB%AF%B8" in calls[-1], calls[-1]
+            assert len(card.load_card(bundles[0]["id"])["articles"]) == 1, "중복이 들어감"
+
+            # 4c) 일부러 **다른** 확정본으로 보내는 길은 열려 있다(조건이 다른 두 보고서)
+            adhoc_routes._handle_send_to_bundle(
+                _Handler(), {"id": [second["id"]], "bundle": ["__new__"],
+                             "bundle_name": ["청문회 속보"], "urls": ["https://v.x/1"]})
+            assert len(card.bundles_for_date(today)) == 2, "다른 확정본으로 보내는 길이 막힘"
+            assert card.raw_row_states(card.load_card(second["id"]),
+                                       card.bundles_for_date(today))["https://v.x/1"][0] == "sent", \
+                "내가 보낸 뒤에도 「이미 보냄」에 머묾"
 
             # 6) 확정본 출처 칩은 그 원본의 검색어다
             bundle_page = adhoc_renderer.render_card_page(card.load_card(bundles[0]["id"]))
             assert "청문회 13:05 1건" in bundle_page, "출처 칩이 검색어가 아님"
-            assert all("error=" not in t for t in calls[1:]), calls
-    print("43) 수시 원본 이름: 통과 (검색어가 이름, 겹치면 시각, 외 N개, 보냄은 내 것만, 이름은 확정본에서)")
+            # 오류로 돌려보낸 건 **일부러 확인한 둘뿐**이다 — 이름 없이 __auto__(5),
+            # 같은 확정본에 이미 있는 기사(4b). 나머지는 조용히 성공해야 한다.
+            assert sum("error=" in t for t in calls) == 2, calls
+    print("43) 수시 원본 이름: 통과 (검색어가 이름, 옆 원본이 보낸 건 「이미 보냄」, 이름은 확정본에서)")
 
 
 def test_adhoc_raw_trash_and_rounds():

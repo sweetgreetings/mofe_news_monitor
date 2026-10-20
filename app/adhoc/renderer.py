@@ -840,6 +840,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
         같이 흐려져 정작 눈에 걸려야 할 신호가 약해진다. 신호는 100%, 내용만 55%.
      ③ 배경색은 안 건드린다 — 이 행엔 이미 hover 회색·체크 파랑·.out 점선이 붙어서,
         네 번째 배경색을 넣으면 겹칠 때 무엇이 이기는지 알 수 없게 된다. */
+  /* .is-sent = 이미 확정본에 들어간 기사. 내가 보낸 것과 옆 원본이 보낸 것이 같다 —
+     흐리기·툴바 필터·전체 선택 건너뛰기·Shift 범위 건너뛰기가 모두 이 한 클래스를 본다.
+     둘을 가르는 건 행 컨트롤의 색이다. (CSS 주석은 화면으로 나가므로 화면 글자를 안 적는다.) */
   .article.is-sent .a-title, .article.is-sent .a-bot {{ opacity: 0.55; transition: opacity 0.12s; }}
   .article.is-sent:hover .a-title, .article.is-sent:hover .a-bot {{ opacity: 1; }}
   .article.is-sent .a-top {{ align-items: center; }}
@@ -857,6 +860,17 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .send-split .send-more {{ padding: 3px 6px; border-left: 1px solid {adhoc_border_soft};
     border-radius: 0 var(--r-md) var(--r-md) 0; font-size: var(--fs-xs); }}
   .send-split .send-go:hover, .send-split .send-more:hover {{ filter: brightness(0.96); }}
+  /* 옆 원본이 이미 확정본으로 보낸 기사 — 같은 자리·같은 split 모양이고 색만 회색이다.
+     색이 「누가 한 일인가」를 말하는 규칙 그대로다(청록 = 내가 한 일, 회색 = 남이 한 일).
+     그래서 이 줄엔 취소를 안 단다 — 내가 한 적 없는 일이라 무를 것이 없다. ▾는 열어 둔다:
+     일부러 다른 확정본으로 보내는 길이 막히면 안 된다. */
+  .send-split.sent-split {{ border-color: {border}; background: {card}; }}
+  .sent-split .se-label {{ color: {text_faint}; font-size: var(--fs-sm); font-weight: 600;
+    padding: 3px 9px; min-width: 74px; display: inline-flex; align-items: center;
+    justify-content: center; gap: 3px; cursor: default; }}
+  .sent-split .se-label .ic {{ width: 0.95em; height: 0.95em; }}
+  .sent-split .send-more {{ background: {card}; color: {text_faint}; border-left-color: {border}; }}
+  .sent-split .send-more:hover {{ background: {adhoc_bg}; color: {adhoc_text}; filter: none; }}
   /* 「확정본으로 ▾」 목록 (시안 ADHOC_SEND_MENU_MOCKUP.html A안) — 칸 머리(.mh)로 「이 원본의
      확정본」과 「오늘 다른 확정본」을 가르고, 이름(.nm)은 한 줄 말줄임, 시각은 오른쪽 끝
      작은 회색. 「옮기기 ▾」(.move-menu)와 같은 문법이라 값도 같이 맞춘다. 이름을 줄바꿈시키면
@@ -1968,6 +1982,7 @@ def _render_article_row(
     card: dict, article: dict, group_names: list[str], is_first: bool, is_last: bool,
     known_labels_html: str = "", sent_to: str = "", bundle_options_html: str = "",
     is_new: bool = False, raw_menu_html: str = "", raw_hidden_tip: str = "",
+    raw_sent_other: tuple = (),
     move_bundles_html: str = "", outlet_rank: int = 0,
     raw_send_target: str = "__auto__",
     raw_send_tip: str = "확정본으로 보냅니다 (원본에는 그대로 남아요)",
@@ -1990,6 +2005,11 @@ def _render_article_row(
     (원본에서 🗑 / 확정본에서 뺌 — card.raw_row_states). 실시간 현황의 🗑와 같은 모양이다:
     행은 제자리에 흐리게 + 취소선으로 남고, 보내기 자리가 「🗑 숨김」 버튼이 돼 다시 누르면
     되돌린다.
+
+    raw_sent_other: **옆 원본이** 이미 확정본으로 보낸 기사면 (확정본 이름, 보낸 원본 이름).
+    보내기 자리가 회색 「이미 보냄」이 되고 ▾만 열려 있다 — 같은 기사가 여러 원본에 걸렸을 때
+    「아직 아무도 안 건드린 기사」와 섞이지 않게. 내가 보낸 것(sent_to)·내가 숨긴 것
+    (raw_hidden_tip)이 먼저이고 이건 맨 뒤다(card.raw_row_states의 우선순위와 같다).
 
     move_bundles_html: [추가: 2026-09-17] 확정본 행의 「옮기기 ▾」 메뉴 아랫칸 「다른 사안
     확정본으로」에 들어갈 버튼들(_move_menu_html). 빈 문자열이면 그 칸을 안 그린다.
@@ -2227,6 +2247,31 @@ def _render_article_row(
                 + f'><span class="when-rest">{icon("trash")} 숨김</span>'
                 f'<span class="when-hover">{icon("undo")} 되살리기</span></button>'
             )
+        elif raw_sent_other:
+            # [추가: 2026-10-19] 옆 원본이 이미 보낸 기사 — 회색 「이미 보냄」. 취소는 안 단다
+            # (내가 한 적 없는 일이라 무를 게 없고, unsend_raw가 내 사본만 다룬다). 그래도
+            # 보내려면 ▾로 다른 확정본을 고른다. 컨테이너가 .send-split이라야 sendRaw의
+            # closest('.send-split')가 data-id/url을 찾는다 — 색만 .sent-split로 덮는다.
+            _other_bundle, _other_src = (list(raw_sent_other) + ["", ""])[:2]
+            _other_tip = (
+                f"「{_other_src}」 원본이 「{_other_bundle}」 확정본으로 이미 보낸 기사예요"
+                if _other_src
+                else f"다른 원본이 「{_other_bundle}」 확정본으로 이미 보낸 기사예요"
+            )
+            _other_more = (
+                '<span class="more-wrap">'
+                '<button type="button" class="send-more" onclick="event.stopPropagation(); toggleArticleMenu(this)" '
+                'title="그래도 다른 확정본으로 보내기" aria-label="그래도 다른 확정본으로 보내기">▾</button>'
+                f'<span class="more-menu" onclick="event.stopPropagation();">{raw_menu_html}</span>'
+                "</span>"
+                if raw_menu_html
+                else ""
+            )
+            bundle_select_html = (
+                f'<span class="send-split sent-split" data-id="{card_id}" data-url="{url}">'
+                f'<span class="se-label" title="{html.escape(_other_tip)}">'
+                f'{icon("to_bundle")} 이미 보냄</span>{_other_more}</span>'
+            )
         elif raw_menu_html:
             bundle_select_html = (
                 f'<span class="send-split" data-id="{card_id}" data-url="{url}">'
@@ -2310,7 +2355,9 @@ def _render_article_row(
     article_class = "article"
     if is_new:
         article_class += " is-new-arrival"
-    if sent_to:
+    if sent_to or raw_sent_other:
+        # 옆 원본이 보낸 기사도 「이미 확정본에 들어감」이라 같은 클래스를 쓴다 — 흐리기·
+        # 「남은 기사만 보기」·전체 선택·Shift 범위가 전부 이 하나를 본다.
         article_class += " is-sent"
     if raw_hidden_tip:
         article_class += " is-raw-hid"
@@ -2717,6 +2764,21 @@ def render_card_page(
             return f"「{state[1]}」 확정본에서 뺀 기사예요 — 눌러서 「처리 안 함」으로 되돌려요"
         return "숨긴 기사예요 — 눌러서 되돌려요"
 
+    # 옆 원본의 화면 이름 — 확정본의 출처 칩(_bundle_source_chips)과 같은 규칙이다:
+    # 보낼 때 저장해 둔 사안명이 아니라 **그 원본이 한 검색**(screen_name)으로 부른다.
+    # 지워진 카드는 여기 없고, 그때 말풍선은 「다른 원본이」로 물러선다.
+    raw_source_names = (
+        {c["id"]: screen_name(c, day_cards) for c in day_cards if is_raw(c)} if raw_mode else {}
+    )
+
+    def _raw_sent_other(url: str) -> tuple:
+        """옆 원본이 이미 보낸 기사면 (확정본 이름, 보낸 원본의 화면 이름), 아니면 빈 튜플."""
+        state = raw_states.get(url)
+        if not state or state[0] != "sent_other":
+            return ()
+        source_id = state[2] if len(state) > 2 else ""
+        return (state[1], raw_source_names.get(source_id, ""))
+
     def _raw_menu(onclick: str) -> str:
         """원본 행·선택 바의 「확정본으로 ▾」 목록 (시안 ADHOC_SEND_MENU_MOCKUP.html A안).
 
@@ -2798,7 +2860,7 @@ def render_card_page(
         )
     }
     sections = []
-    raw_sent_n = raw_hidden_n = raw_open_n = 0
+    raw_sent_n = raw_hidden_n = raw_other_n = raw_open_n = 0
     if raw_mode:
         # 원본은 소제목 없이 한 목록 — 머리에 건수와 「최신순」만. .group-block·.cnt를 그대로
         # 쓰는 건 「아직 안 보낸 기사만」(applyUnsentFilter)이 그 자리의 건수를 다시 세기 때문이다.
@@ -2809,9 +2871,15 @@ def render_card_page(
                     card, a, [], False, False,
                     sent_to=sent_map.get(a["url"], ""),
                     # 숨김 표시가 붙은 기사는 노랑(새 기사)을 안 칠한다 — 이미 손댄 기사다.
-                    is_new=a["url"] in new_urls and not _raw_hidden_tip(a["url"]),
+                    # 숨김·이미 보냄 표시가 붙은 기사는 노랑(새 기사)을 안 칠한다.
+                    is_new=(
+                        a["url"] in new_urls
+                        and not _raw_hidden_tip(a["url"])
+                        and not _raw_sent_other(a["url"])
+                    ),
                     raw_menu_html=raw_menu_html,
                     raw_hidden_tip=_raw_hidden_tip(a["url"]),
+                    raw_sent_other=_raw_sent_other(a["url"]),
                     raw_send_target=raw_send_target,
                     raw_send_tip=f"{raw_send_where}으로 보냅니다 (원본에는 그대로 남아요)",
                 )
@@ -2823,13 +2891,15 @@ def render_card_page(
                     raw_sent_n += 1
                 elif state == "hidden":
                     raw_hidden_n += 1
+                elif state == "sent_other":
+                    raw_other_n += 1
                 elif not a.get("hidden"):
                     raw_open_n += 1
             # [추가: 2026-09-22] 「☐ 전체 선택」 — 다 고른 뒤 몇 건만 풀 때. 보냄·숨김 행은
             # 건너뛴다(Shift 범위 선택과 같은 규칙 — 체크해서 보내면 숨김 표시가 풀린다).
             # 보낼 수 없는(어제) 카드엔 선택 바가 없어 안 그린다.
             select_all_html = (
-                '<label class="sel-all" title="아직 손대지 않은 기사를 모두 체크해요 — 보냄·숨김 행은 건너뛰어요">'
+                '<label class="sel-all" title="아직 손대지 않은 기사를 모두 체크해요 — 보냄·이미 보냄·숨김 행은 건너뛰어요">'
                 '<input type="checkbox" id="raw-select-all" onchange="rawSelectAll(this.checked)"> 전체 선택</label>'
                 if raw_open_n
                 else ""
@@ -3193,10 +3263,12 @@ def render_card_page(
         # [수정: 2026-09-15] 원본은 「숨김」 표시가 생겨 이름이 실시간 현황과 같은 「아직 처리 안
         # 한 기사만」이 됐다 — 보냄·숨김을 둘 다 가린다. 둘 다 0이면 안 그린다.
         _done_parts = [
-            f"{label} {n}" for label, n in (("보냄", raw_sent_n), ("숨김", raw_hidden_n)) if n
+            f"{label} {n}"
+            for label, n in (("보냄", raw_sent_n), ("이미 보냄", raw_other_n), ("숨김", raw_hidden_n))
+            if n
         ]
         unsent_filter_html = (
-            '<label class="sent-filter" title="보냄·숨김 — 이미 손댄 기사를 가리고 남은 기사만 보여줘요">'
+            '<label class="sent-filter" title="보냄·이미 보냄·숨김 — 이미 보고서에 들어갔거나 손댄 기사를 가리고 남은 기사만 보여줘요">'
             '<input type="checkbox" id="unsent-only" onchange="applyUnsentFilter()"> '
             f'남은 기사만 보기 <small>({" · ".join(_done_parts)})</small></label>'
             if _done_parts
@@ -3208,7 +3280,7 @@ def render_card_page(
         if can_send and raw_open_n:
             send_all_html = (
                 f'<button type="button" class="btn sm send-all" data-id="{card_id_esc}" '
-                f'data-count="{raw_open_n}" data-skip="{raw_sent_n + raw_hidden_n}" '
+                f'data-count="{raw_open_n}" data-skip="{raw_sent_n + raw_other_n + raw_hidden_n}" '
                 f'data-bundle="{raw_send_target}" data-target="{html.escape(raw_default_label)}" '
                 f'onclick="sendAllOpen(this)" '
                 f'title="숨김·보냄 표시가 없는 기사를 모두 {html.escape(raw_send_where)}으로 보내요 '

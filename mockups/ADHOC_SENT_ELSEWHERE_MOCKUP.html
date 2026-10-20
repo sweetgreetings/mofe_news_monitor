@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>다른 원본이 이미 보낸 기사 — 표시 시안</title>
+<style>
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+    --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px;
+    --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14); }
+  body { margin: 0; background: #F8FAFC; color: #1F2937;
+    font-family: 'Pretendard', 'Noto Sans KR', -apple-system, sans-serif; }
+  .container { max-width: 980px; margin: 0 auto; padding: 40px 24px 100px; }
+  h1 { color: #1E3A5F; font-size: var(--fs-xl); margin: 0 0 6px; }
+  .lead { color: #6B7280; font-size: var(--fs-md); margin: 0 0 10px; line-height: 1.75; }
+  .lead b { color: #1F2937; }
+  .card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+    padding: 22px 24px; margin-bottom: 18px; }
+  .card h2 { font-size: var(--fs-lg); color: #1E3A5F; margin: 0 0 4px; }
+  .card h2 .pick { font-size: var(--fs-xs); color: #146B5E; background: #E3F1EE;
+    border: 1px solid rgba(20,107,94,0.24); border-radius: var(--r-pill);
+    padding: 1px 8px; margin-left: 8px; vertical-align: 2px; font-weight: 600; }
+  .card h2 .no { font-size: var(--fs-xs); color: #B91C1C; background: #FEF2F2;
+    border: 1px solid #FECACA; border-radius: var(--r-pill);
+    padding: 1px 8px; margin-left: 8px; vertical-align: 2px; font-weight: 600; }
+  .card h2 .now { font-size: var(--fs-xs); color: #92400E; background: #FFFBEB;
+    border: 1px solid #FDE68A; border-radius: var(--r-pill);
+    padding: 1px 8px; margin-left: 8px; vertical-align: 2px; font-weight: 600; }
+  .why { color: #4B5563; font-size: var(--fs-md); margin: 0 0 16px; line-height: 1.75; }
+  .why b { color: #1F2937; }
+  .stage { background: #F8FAFC; border: 1px dashed #E5E7EB; border-radius: var(--r-md);
+    padding: 14px 16px 18px; }
+  .note { margin: 14px 0 0; padding: 0; list-style: none; font-size: var(--fs-md); line-height: 1.8; }
+  .note li { padding-left: 22px; position: relative; color: #4B5563; }
+  .note li b { color: #1F2937; }
+  .note li::before { position: absolute; left: 0; font-weight: 700; }
+  .note li.bad::before { content: "✕"; color: #DC2626; }
+  .note li.ok::before { content: "✓"; color: #146B5E; }
+  .note li.flat::before { content: "·"; color: #9CA3AF; }
+
+  /* ---- 살아 있는 화면에서 그대로 옮겨온 값 (app/adhoc/renderer.py) ---- */
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+  .sub.raw-head { font-size: var(--fs-md); color: #6B7280; font-weight: 500;
+    display: flex; align-items: center; gap: 8px; margin: 0 0 4px; padding: 0 8px; }
+  .sub.raw-head .sel-all { display: inline-flex; align-items: center; gap: 6px; cursor: default; }
+  .sub.raw-head input { width: 16px; height: 16px; margin: 0; accent-color: #2563EB; }
+  .sub.raw-head .cnt { color: #1F2937; font-weight: 700; }
+  .sub.raw-head .raw-order { color: #9CA3AF; font-size: var(--fs-sm); }
+  .article { padding: 4px 8px; border-radius: var(--r-md); margin: 6px 0; line-height: 1.5; }
+  .article:hover { background: #F3F4F6; }
+  .a-top { display: flex; align-items: flex-start; gap: 8px; }
+  .bulk-chk { width: 16px; height: 16px; margin: 3px 3px 0 4px; flex: none; accent-color: #2563EB; }
+  .a-title { font-size: var(--fs-base); }
+  .a-title .outlet { color: #6B7280; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  .a-bot { display: flex; align-items: center; gap: 8px; margin: 2px 0 0 31px;
+    opacity: 0.55; transition: opacity 0.12s; }
+  .article:hover .a-bot { opacity: 1; }
+  .a-time { font-size: var(--fs-sm); color: #6B7280; white-space: nowrap; }
+  .a-time-sep { color: #6B7280; font-size: var(--fs-sm); margin: 0 2px; }
+  .origin-link { color: #6B7280; font-size: var(--fs-sm); text-decoration: none;
+    display: inline-flex; align-items: center; gap: 3px; }
+  .kw-inline { font-size: var(--fs-sm); color: #6B7280; display: inline-flex; align-items: center; gap: 4px; }
+  .kw-inline .kw-ic { width: 0.75em; height: 0.75em; color: #9CA3AF; }
+  .kw-inline .kw-v { color: #4B5563; }
+  .a-acts { display: flex; gap: 4px; align-items: center; margin-left: auto;
+    justify-content: flex-end; flex-shrink: 0; }
+  .icon-btn { border: none; background: none; color: #6B7280; border-radius: var(--r-md);
+    padding: 4px 6px; cursor: pointer; display: inline-flex; align-items: center; }
+  .send-split { display: inline-flex; align-items: stretch; border: 1px solid rgba(20, 107, 94, 0.24);
+    border-radius: var(--r-md); flex-shrink: 0; }
+  .send-split .send-go, .send-split .send-more { border: none; background: #E3F1EE; color: #146B5E;
+    font: inherit; font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
+  .send-split .send-go { padding: 3px 9px; border-radius: var(--r-md) 0 0 var(--r-md); min-width: 74px; }
+  .send-split .send-more { padding: 3px 6px; border-left: 1px solid rgba(20, 107, 94, 0.24);
+    border-radius: 0 var(--r-md) var(--r-md) 0; font-size: var(--fs-xs); }
+  .send-done { border: 1px solid #E5E7EB; background: #FFFFFF; color: #9CA3AF; font: inherit;
+    font-size: var(--fs-sm); font-weight: 600; border-radius: var(--r-md); padding: 3px 9px; min-width: 74px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 3px; flex-shrink: 0; }
+  .send-done.raw-unsend { color: #146B5E; border-color: rgba(20, 107, 94, 0.24); cursor: pointer; }
+  .send-done.raw-unsend:hover { color: #DC2626; border-color: #FECACA; background: #FEF2F2; }
+  .send-done .when-rest { display: inline-flex; align-items: center; gap: 3px; }
+  .send-done .when-hover { display: none; align-items: center; gap: 3px; }
+  .send-done .when-rest .ic, .send-done .when-hover .ic { width: 0.95em; height: 0.95em; }
+  .send-done.raw-unsend:hover .when-rest { display: none; }
+  .send-done.raw-unsend:hover .when-hover { display: inline-flex; }
+  .article.is-sent .a-title, .article.is-sent .a-bot { opacity: 0.55; transition: opacity 0.12s; }
+  .article.is-sent:hover .a-title, .article.is-sent:hover .a-bot { opacity: 1; }
+  .article.is-sent .a-top { align-items: center; }
+
+  /* ---- 이 시안이 새로 더하는 것 ---- */
+  /* B안 ① 버튼 자리의 회색 「이미 보냄」 — 「확정본으로 ▾」와 같은 split 모양, 색만 회색.
+     .send-done 기본색 그대로다(내가 한 일이 아니다). */
+  .sent-split { display: inline-flex; align-items: stretch; border: 1px solid #E5E7EB;
+    border-radius: var(--r-md); flex-shrink: 0; background: #FFFFFF; }
+  .sent-split .se-label { color: #9CA3AF; font-size: var(--fs-sm); font-weight: 600;
+    padding: 3px 9px; min-width: 74px; display: inline-flex; align-items: center;
+    justify-content: center; gap: 3px; cursor: default; }
+  .sent-split .se-label .ic { width: 0.95em; height: 0.95em; }
+  .sent-split .se-more { border: none; background: transparent; color: #9CA3AF; font: inherit;
+    font-size: var(--fs-xs); font-weight: 700; cursor: pointer; padding: 3px 6px;
+    border-left: 1px solid #E5E7EB; border-radius: 0 var(--r-md) var(--r-md) 0; }
+  .sent-split .se-more:hover { color: #146B5E; background: #E3F1EE; }
+  /* B안 ② 메타 줄의 칩 — 🔍 검색어와 같은 줄, 같은 크기 */
+  .in-bundle { font-size: var(--fs-sm); color: #6B7280; display: inline-flex; align-items: center;
+    gap: 4px; text-decoration: none; }
+  .in-bundle .ic { width: 0.85em; height: 0.85em; color: #9CA3AF; }
+  .in-bundle b { color: #4B5563; font-weight: 600; }
+  a.in-bundle:hover b { color: #146B5E; }
+
+  /* 시안 설명용 말풍선 — 화면에 안 들어간다 */
+  .tag { display: inline-block; font-size: var(--fs-xs); font-weight: 700; border-radius: var(--r-pill);
+    padding: 1px 8px; margin-left: 8px; vertical-align: 1px; }
+  .tag.bad { color: #B91C1C; background: #FEF2F2; border: 1px solid #FECACA; }
+  .tag.ok { color: #146B5E; background: #E3F1EE; border: 1px solid rgba(20,107,94,0.24); }
+  .where { color: #9CA3AF; font-size: var(--fs-sm); margin: 0 0 10px; padding: 0 8px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>같은 기사가 세 원본에 걸렸을 때 — 표시 시안</h1>
+  <p class="lead">
+    원본 <b>「증안펀드」</b>가 세 건을 <b>「증안펀드 17:54」 확정본</b>으로 이미 보냈다.
+    지금 보고 있는 화면은 같은 기사를 품은 다른 원본 <b>「이형일+증안펀드」</b>다.<br>
+    세 안 모두 <b>왼쪽 두 건은 다른 원본이 보낸 기사</b>, 맨 아래 한 건은 아무도 안 보낸 기사다.
+  </p>
+
+  <!-- ===================== 지금 ===================== -->
+  <div class="card">
+    <h2>지금<span class="now">고쳐야 할 자리</span></h2>
+    <p class="why">
+      보냄 표시를 <b>자기 카드 id 하나로만</b> 센다(<code>app/adhoc/renderer.py:2691</code>).
+      그래서 옆 원본이 보낸 기사가 <b>「아직 아무도 안 건드린 기사」와 똑같이</b> 선다 — 두 줄을 가를 단서가 화면에 하나도 없다.
+    </p>
+    <div class="stage">
+      <p class="where">원본 · 이형일+증안펀드</p>
+      <h2 class="sub raw-head"><label class="sel-all"><input type="checkbox"> 전체 선택</label><span class="cnt">3건</span><span class="raw-order">최신순</span></h2>
+
+      <div class="article">
+        <div class="a-top">
+          <input type="checkbox" class="bulk-chk">
+          <div class="a-title"><span class="outlet">이데일리</span>李 “지배경영권 남용 교정해야”…증시 정상화 추가 조치 검토</div>
+        </div>
+        <div class="a-bot">
+          <span class="a-time">17:32 · 25분 전</span>
+          <span class="a-time-sep">·</span>
+          <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="a-time-sep">·</span>
+          <span class="kw-inline"><svg class="ic kw-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">이형일+증안펀드</span></span>
+          <span class="a-acts">
+            <span class="send-split"><button type="button" class="send-go">확정본으로</button><button type="button" class="send-more">▾</button></span>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+          </span>
+        </div>
+      </div>
+
+      <div class="article">
+        <div class="a-top">
+          <input type="checkbox" class="bulk-chk">
+          <div class="a-title"><span class="outlet">머니투데이</span>"사라"더니 목표가 내려 '찬물'…급락장 속 증안펀드 등판론 솔솔</div>
+        </div>
+        <div class="a-bot">
+          <span class="a-time">16:42 · 1시간 전</span>
+          <span class="a-time-sep">·</span>
+          <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="a-time-sep">·</span>
+          <span class="kw-inline"><svg class="ic kw-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">이형일+증안펀드</span></span>
+          <span class="a-acts">
+            <span class="send-split"><button type="button" class="send-go">확정본으로</button><button type="button" class="send-more">▾</button></span>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+          </span>
+        </div>
+      </div>
+
+      <div class="article">
+        <div class="a-top">
+          <input type="checkbox" class="bulk-chk">
+          <div class="a-title"><span class="outlet">아주경제</span>이형일 "증시 안정조치 적기에"…증안펀드·공매도 중단 가능성 시사</div>
+        </div>
+        <div class="a-bot">
+          <span class="a-time">15:16 · 2시간 전</span>
+          <span class="a-time-sep">·</span>
+          <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="a-time-sep">·</span>
+          <span class="kw-inline"><svg class="ic kw-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">이형일+증안펀드</span></span>
+          <span class="a-acts">
+            <span class="send-split"><button type="button" class="send-go">확정본으로</button><button type="button" class="send-more">▾</button></span>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+          </span>
+        </div>
+      </div>
+    </div>
+    <ul class="note">
+      <li class="bad">위 두 건을 <b>같은 확정본</b>으로 보내면 <b>아무 일도 안 일어난다</b> — 화면이 그대로 돌아와 버튼이 고장 난 것처럼 보인다.</li>
+      <li class="bad">위 두 건을 <b>다른 확정본</b>으로 보내면 같은 기사가 두 보고서에 들어간다 — 일부러인지 실수인지 화면이 안 가른다.</li>
+      <li class="bad">「모든 기사 확정본으로」 확인창은 <b>3건</b>이라 하고 실제로는 <b>1건</b>만 간다.</li>
+    </ul>
+  </div>
+
+  <!-- ===================== A안 ===================== -->
+  <div class="card">
+    <h2>A안 — 그날 원본 전부를 보냄으로 친다<span class="no">권하지 않음</span></h2>
+    <p class="why">
+      옆 원본이 보낸 것도 내 <b>「✓ 보냄」</b>으로 칠한다. 한 줄이면 고쳐지고 건수도 맞아진다.
+      대신 <b>취소·숨김 되돌리기가 「내가 보낸 것」 기준 그대로라</b> 새 먹통이 생긴다.
+    </p>
+    <div class="stage">
+      <p class="where">원본 · 이형일+증안펀드</p>
+      <h2 class="sub raw-head"><label class="sel-all"><input type="checkbox"> 전체 선택</label><span class="cnt">3건</span><span class="raw-order">최신순</span></h2>
+
+      <div class="article is-sent">
+        <div class="a-top">
+          <input type="checkbox" class="bulk-chk" disabled>
+          <div class="a-title"><span class="outlet">이데일리</span>李 “지배경영권 남용 교정해야”…증시 정상화 추가 조치 검토</div>
+        </div>
+        <div class="a-bot">
+          <span class="a-time">17:32 · 25분 전</span>
+          <span class="a-time-sep">·</span>
+          <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="a-time-sep">·</span>
+          <span class="kw-inline"><svg class="ic kw-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">이형일+증안펀드</span></span>
+          <span class="a-acts">
+            <button type="button" class="send-done raw-unsend" title="「증안펀드 17:54」 확정본으로 보낸 기사예요 — 누르면 보냄을 취소해요"><span class="when-rest"><svg class="ic" viewBox="0 0 24 24"><path d="m20 6-11 11-5-5"/></svg> 보냄</span><span class="when-hover"><svg class="ic" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg> 보냄 취소</span></button>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+          </span>
+        </div>
+      </div>
+
+      <div class="article is-sent">
+        <div class="a-top">
+          <input type="checkbox" class="bulk-chk" disabled>
+          <div class="a-title"><span class="outlet">머니투데이</span>"사라"더니 목표가 내려 '찬물'…급락장 속 증안펀드 등판론 솔솔</div>
+        </div>
+        <div class="a-bot">
+          <span class="a-time">16:42 · 1시간 전</span>
+          <span class="a-time-sep">·</span>
+          <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="a-time-sep">·</span>
+          <span class="kw-inline"><svg class="ic kw-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">이형일+증안펀드</span></span>
+          <span class="a-acts">
+            <button type="button" class="send-done raw-unsend" title="「증안펀드 17:54」 확정본으로 보낸 기사예요 — 누르면 보냄을 취소해요"><span class="when-rest"><svg class="ic" viewBox="0 0 24 24"><path d="m20 6-11 11-5-5"/></svg> 보냄</span><span class="when-hover"><svg class="ic" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg> 보냄 취소</span></button>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+          </span>
+        </div>
+      </div>
+
+      <div class="article">
+        <div class="a-top">
+          <input type="checkbox" class="bulk-chk">
+          <div class="a-title"><span class="outlet">아주경제</span>이형일 "증시 안정조치 적기에"…증안펀드·공매도 중단 가능성 시사</div>
+        </div>
+        <div class="a-bot">
+          <span class="a-time">15:16 · 2시간 전</span>
+          <span class="a-time-sep">·</span>
+          <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="a-time-sep">·</span>
+          <span class="kw-inline"><svg class="ic kw-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">이형일+증안펀드</span></span>
+          <span class="a-acts">
+            <span class="send-split"><button type="button" class="send-go">확정본으로</button><button type="button" class="send-more">▾</button></span>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+          </span>
+        </div>
+      </div>
+    </div>
+    <ul class="note">
+      <li class="ok">중복이 한눈에 보이고 「모든 기사 확정본으로」 건수가 맞아진다.</li>
+      <li class="bad">위 두 줄에 마우스를 올려 보라 — <b>「↩ 보냄 취소」</b>가 뜨는데 <b>눌러도 아무 일이 안 일어난다</b>(<code>card.py:829</code>의 <code>ids = {card_id}</code>). 고친 자리에 먹통이 새로 선다.</li>
+      <li class="bad">그걸 고치려고 범위를 넓히면 이번엔 <b>내가 한 적 없는 보냄을 내가 무른다</b> — 옆 원본 담당 흐름이 조용히 깨진다.</li>
+      <li class="bad">확정본에서 뺀 기사를 되돌릴 때도 같은 자리가 어긋난다(<code>card.py:800</code> <code>set_raw_mark</code>).</li>
+      <li class="bad">조건이 다른 두 수집으로 <b>일부러</b> 두 보고서를 내는 길이 막힌다.</li>
+    </ul>
+  </div>
+
+  <!-- ===================== B안 ① ===================== -->
+  <div class="card">
+    <h2>B안 ① — 버튼 자리에 회색 「이미 보냄」<span class="pick">추천</span></h2>
+    <p class="why">
+      내가 보낸 것은 <b>청록 「✓ 보냄」</b>, 옆 원본이 보낸 것은 <b>회색 「이미 보냄」</b>.
+      색이 「누가 한 일인가」를 말하는 이 앱의 규칙 그대로다 — <b>내가 한 일이라고 적지 않으니 취소를 달 이유도 없고, A안의 먹통이 아예 안 생긴다.</b>
+      어느 확정본에 있는지는 말풍선이 말한다. 그래도 보내려면 <b>▾</b>로 다른 확정본을 고른다.
+    </p>
+    <div class="stage">
+      <p class="where">원본 · 이형일+증안펀드</p>
+      <h2 class="sub raw-head"><label class="sel-all"><input type="checkbox"> 전체 선택</label><span class="cnt">3건</span><span class="raw-order">최신순</span></h2>
+
+      <div class="article is-sent">
+        <div class="a-top">
+          <input type="checkbox" class="bulk-chk">
+          <div class="a-title"><span class="outlet">이데일리</span>李 “지배경영권 남용 교정해야”…증시 정상화 추가 조치 검토</div>
+        </div>
+        <div class="a-bot">
+          <span class="a-time">17:32 · 25분 전</span>
+          <span class="a-time-sep">·</span>
+          <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="a-time-sep">·</span>
+          <span class="kw-inline"><svg class="ic kw-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">이형일+증안펀드</span></span>
+          <span class="a-acts">
+            <span class="sent-split"><span class="se-label" title="「증안펀드」 원본이 「증안펀드 17:54」 확정본으로 이미 보낸 기사예요"><svg class="ic" viewBox="0 0 24 24"><path d="M9 8V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-2"/><path d="M3 12h13l-3-3"/><path d="m13 15 3-3"/></svg> 이미 보냄</span><button type="button" class="se-more" title="그래도 다른 확정본으로 보내기">▾</button></span>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+          </span>
+        </div>
+      </div>
+
+      <div class="article is-sent">
+        <div class="a-top">
+          <input type="checkbox" class="bulk-chk">
+          <div class="a-title"><span class="outlet">머니투데이</span>"사라"더니 목표가 내려 '찬물'…급락장 속 증안펀드 등판론 솔솔</div>
+        </div>
+        <div class="a-bot">
+          <span class="a-time">16:42 · 1시간 전</span>
+          <span class="a-time-sep">·</span>
+          <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="a-time-sep">·</span>
+          <span class="kw-inline"><svg class="ic kw-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">이형일+증안펀드</span></span>
+          <span class="a-acts">
+            <span class="sent-split"><span class="se-label" title="「증안펀드」 원본이 「증안펀드 17:54」 확정본으로 이미 보낸 기사예요"><svg class="ic" viewBox="0 0 24 24"><path d="M9 8V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-2"/><path d="M3 12h13l-3-3"/><path d="m13 15 3-3"/></svg> 이미 보냄</span><button type="button" class="se-more" title="그래도 다른 확정본으로 보내기">▾</button></span>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+          </span>
+        </div>
+      </div>
+
+      <div class="article">
+        <div class="a-top">
+          <input type="checkbox" class="bulk-chk">
+          <div class="a-title"><span class="outlet">아주경제</span>이형일 "증시 안정조치 적기에"…증안펀드·공매도 중단 가능성 시사</div>
+        </div>
+        <div class="a-bot">
+          <span class="a-time">15:16 · 2시간 전</span>
+          <span class="a-time-sep">·</span>
+          <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="a-time-sep">·</span>
+          <span class="kw-inline"><svg class="ic kw-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">이형일+증안펀드</span></span>
+          <span class="a-acts">
+            <span class="send-split"><button type="button" class="send-go">확정본으로</button><button type="button" class="send-more">▾</button></span>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+          </span>
+        </div>
+      </div>
+    </div>
+    <ul class="note">
+      <li class="ok">취소·숨김 되돌리기를 <b>한 글자도 안 건드린다</b> — A안의 먹통 셋이 생길 자리가 없다.</li>
+      <li class="ok">「모든 기사 확정본으로」에서 빠진다 — 확인창 건수와 실제로 가는 건수가 같아진다.</li>
+      <li class="ok">일부러 다른 확정본으로 보내는 길은 <b>▾</b>로 열려 있다.</li>
+      <li class="flat">행 상태가 셋이 된다(보냄 · 이미 보냄 · 숨김). <code>raw_row_states</code>가 이미 <code>(상태, 이름)</code> 튜플이라 자리는 있다.</li>
+    </ul>
+  </div>
+
+  <!-- ===================== B안 ② ===================== -->
+  <div class="card">
+    <h2>B안 ② — 메타 줄에 칩, 버튼은 그대로</h2>
+    <p class="why">
+      버튼 자리는 건드리지 않고 <b>🔍 검색어 옆에 칩</b>을 하나 더 단다 — <b>「↗ 증안펀드 17:54에 있음」</b>.
+      칩은 내 동작이 아니라 <b>기사에 관한 사실</b>을 적는 자리라 뜻이 더 정확하고, 누르면 그 확정본으로 간다.
+      대신 <b>훑을 때 눈에 덜 띈다</b> — 메타 줄은 평소 흐리게(0.55) 깔려 있다.
+    </p>
+    <div class="stage">
+      <p class="where">원본 · 이형일+증안펀드</p>
+      <h2 class="sub raw-head"><label class="sel-all"><input type="checkbox"> 전체 선택</label><span class="cnt">3건</span><span class="raw-order">최신순</span></h2>
+
+      <div class="article">
+        <div class="a-top">
+          <input type="checkbox" class="bulk-chk">
+          <div class="a-title"><span class="outlet">이데일리</span>李 “지배경영권 남용 교정해야”…증시 정상화 추가 조치 검토</div>
+        </div>
+        <div class="a-bot">
+          <span class="a-time">17:32 · 25분 전</span>
+          <span class="a-time-sep">·</span>
+          <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="a-time-sep">·</span>
+          <span class="kw-inline"><svg class="ic kw-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">이형일+증안펀드</span></span>
+          <span class="a-time-sep">·</span>
+          <a class="in-bundle" href="#" title="「증안펀드」 원본이 보낸 기사예요 — 누르면 그 확정본을 열어요"><svg class="ic" viewBox="0 0 24 24"><path d="M9 8V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-2"/><path d="M3 12h13l-3-3"/><path d="m13 15 3-3"/></svg><b>증안펀드 17:54</b>에 있음</a>
+          <span class="a-acts">
+            <span class="send-split"><button type="button" class="send-go">확정본으로</button><button type="button" class="send-more">▾</button></span>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+          </span>
+        </div>
+      </div>
+
+      <div class="article">
+        <div class="a-top">
+          <input type="checkbox" class="bulk-chk">
+          <div class="a-title"><span class="outlet">머니투데이</span>"사라"더니 목표가 내려 '찬물'…급락장 속 증안펀드 등판론 솔솔</div>
+        </div>
+        <div class="a-bot">
+          <span class="a-time">16:42 · 1시간 전</span>
+          <span class="a-time-sep">·</span>
+          <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="a-time-sep">·</span>
+          <span class="kw-inline"><svg class="ic kw-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">이형일+증안펀드</span></span>
+          <span class="a-time-sep">·</span>
+          <a class="in-bundle" href="#" title="「증안펀드」 원본이 보낸 기사예요 — 누르면 그 확정본을 열어요"><svg class="ic" viewBox="0 0 24 24"><path d="M9 8V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-2"/><path d="M3 12h13l-3-3"/><path d="m13 15 3-3"/></svg><b>증안펀드 17:54</b>에 있음</a>
+          <span class="a-acts">
+            <span class="send-split"><button type="button" class="send-go">확정본으로</button><button type="button" class="send-more">▾</button></span>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+          </span>
+        </div>
+      </div>
+
+      <div class="article">
+        <div class="a-top">
+          <input type="checkbox" class="bulk-chk">
+          <div class="a-title"><span class="outlet">아주경제</span>이형일 "증시 안정조치 적기에"…증안펀드·공매도 중단 가능성 시사</div>
+        </div>
+        <div class="a-bot">
+          <span class="a-time">15:16 · 2시간 전</span>
+          <span class="a-time-sep">·</span>
+          <a class="origin-link" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="a-time-sep">·</span>
+          <span class="kw-inline"><svg class="ic kw-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">이형일+증안펀드</span></span>
+          <span class="a-acts">
+            <span class="send-split"><button type="button" class="send-go">확정본으로</button><button type="button" class="send-more">▾</button></span>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button type="button" class="icon-btn"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+          </span>
+        </div>
+      </div>
+    </div>
+    <ul class="note">
+      <li class="ok">취소·숨김 경로를 안 건드린다(B안 ①과 같다). 칩을 누르면 그 확정본으로 간다.</li>
+      <li class="ok">「확정본으로」가 제자리에 남아 <b>일부러 보내기가 한 번에</b> 된다.</li>
+      <li class="bad">메타 줄은 평소 <b>흐리게 깔려 있어</b> 훑을 때 지나치기 쉽다 — 중복을 막자고 만드는 표시인데 눈에 덜 띈다.</li>
+      <li class="bad">같은 확정본으로 보내면 <b>여전히 조용히 아무 일도 안 일어난다</b>(버튼이 그대로라서) — 이건 따로 막아야 한다.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>결론</h2>
+    <p class="why">
+      <b>오류가 안 생기는 쪽은 B안이고, 그중 ①이다.</b>
+      A안은 한 줄로 끝나 보이지만 <b>취소·되돌리기 세 자리</b>를 같이 고쳐야 하고, 고치는 방향이 「내가 한 적 없는 일을 무른다」로 가서 더 나빠진다.
+      B안 ②는 뜻은 가장 정확한데 <b>흐린 줄에 적혀 지나치기 쉽고</b>, 버튼이 그대로라 조용한 먹통이 남는다.<br><br>
+      ①은 「보냄·이미 보냄·숨김」 셋을 <b>같은 자리 같은 모양으로</b> 세우고 색으로만 가른다 — 이 앱이 이미 쓰는 문법이고,
+      <b>고치는 자리가 <code>raw_row_states</code>·<code>open_raw_urls</code>·그리는 코드 셋뿐</b>이다.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

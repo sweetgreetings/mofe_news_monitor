@@ -724,25 +724,41 @@ def mark_hidden(article: dict, now: Optional[datetime] = None) -> None:
 
 
 def raw_row_states(source_card: dict, bundles: list[dict], source_ids: Optional[set] = None) -> dict:
-    """원본 행마다의 상태 — {URL: ("sent", 확정본 이름) | ("hidden", 확정본 이름 또는 "")}.
+    """원본 행마다의 상태 — {URL: (상태, 확정본 이름, 보낸 원본 이름)}.
 
-    처리 안 한 기사는 담지 않는다. 우선순위는 보냄 > 원본에서 숨김 > 확정본에서 뺌. 두 번째
-    값은 화면 툴팁용이다 — 원본에서 숨긴 건 빈 문자열, 확정본에서 뺀 건 그 확정본 이름.
-    저장하지 않고 매번 다시 계산한다(sent_index와 같은 원칙).
+    상태는 셋이다:
+      sent       — 이 원본이 보냈다(청록 「✓ 보냄」, 눌러서 취소)
+      hidden     — 이 원본에서 🗑를 눌렀거나 확정본에서 뺐다
+      sent_other — **옆 원본이** 이미 확정본으로 보냈다(회색 「이미 보냄」)
 
-    **보냄은 「이 원본이 확정본으로 보낸 기사」만이다** — 화살표가 원본 → 확정본이라,
-    옆 판이 보낸 기사는 이 화면에서 「처리 안 함」으로 선다(같은 확정본으로 다시 보내면
-    URL 중복 제거가 막고, 다른 확정본으로 보내면 두 보고서에 들어가는 게 맞다).
+    처리 안 한 기사는 담지 않는다. 우선순위는 보냄 > 원본에서 숨김 > 확정본에서 뺌 >
+    이미 보냄 — 앞의 셋은 **담당자가 이 화면에서 한 일**이라 남이 한 일보다 먼저 선다.
+    둘째 값은 확정본 이름(원본에서 숨긴 건 빈 문자열), 셋째 값은 sent_other일 때 그 기사를
+    보낸 **원본 카드 id**다 — 이름이 아니라 id를 돌려주는 건 화면 이름이 검색어라서다
+    (card.screen_name, 겹치면 시각이 붙는다). 이름을 짓는 건 화면 몫이고, 그 카드가 지워졌으면
+    「다른 원본이」로 물러선다. 저장하지 않고 매번 다시 계산한다(sent_index와 같은 원칙).
+
+    **「✓ 보냄」은 여전히 이 원본이 보낸 기사만이다** — 화살표가 원본 → 확정본이라 남이 한 일을
+    내가 한 일로 적을 수 없고, 적으면 그 줄의 「↩ 보냄 취소」가 **내가 한 적 없는 일을 무르게**
+    된다(취소·숨김 되돌리기가 전부 「내가 보낸 것」 기준으로 돈다 — unsend_raw·set_raw_mark).
+    그래서 옆 원본 몫은 색과 이름을 달리해 **따로 선다**: 같은 기사가 세 원본에 걸려도 「아직
+    아무도 안 건드린 기사」와 안 섞이고, 일부러 다른 확정본으로 보내는 길은 ▾로 열려 있다.
     """
     ids = source_ids if source_ids is not None else {source_card["id"]}
     sent: dict = {}
     pulled: dict = {}  # 확정본에서 뺀 사본 — {url: (가장 늦게 숨긴 시각, 확정본 이름)}
+    other: dict = {}   # 옆 원본이 보낸 사본 — {url: (확정본 이름, 보낸 원본 카드 id)}
     for bundle in bundles:
         label = bundle_label(bundle)
         for article in bundle["articles"]:
-            if (article.get("sent_from") or {}).get("card_id") not in ids:
-                continue
+            source = article.get("sent_from") or {}
             url = article["url"]
+            if source.get("card_id") not in ids:
+                # 숨긴 사본은 안 친다 — 그쪽이 보냄을 취소했거나 확정본에서 뺀 것이라
+                # 지금은 어느 보고서에도 안 들어 있다("이미 보냄"이 거짓이 된다).
+                if source.get("card_id") and not article.get("hidden"):
+                    other.setdefault(url, (label, source["card_id"]))
+                continue
             if not article.get("hidden"):
                 sent.setdefault(url, label)
                 continue
@@ -750,10 +766,10 @@ def raw_row_states(source_card: dict, bundles: list[dict], source_ids: Optional[
             if url not in pulled or at > pulled[url][0]:
                 pulled[url] = (at, label)
     marks = source_card.get("raw_marks") or {}
-    states = {url: ("sent", label) for url, label in sent.items()}
+    states = {url: ("sent", label, "") for url, label in sent.items()}
     for url, mark in marks.items():
         if url not in states and mark.get("state") == RAW_MARK_HIDDEN:
-            states[url] = ("hidden", "")
+            states[url] = ("hidden", "", "")
     for url, (at, label) in pulled.items():
         if url in states:
             continue
@@ -762,15 +778,19 @@ def raw_row_states(source_card: dict, bundles: list[dict], source_ids: Optional[
         # 안 적힌 옛 사본("")은 언제나 되돌림보다 앞선 것으로 본다.
         if mark.get("state") == RAW_MARK_SHOWN and at <= (mark.get("at") or ""):
             continue
-        states[url] = ("hidden", label)
+        states[url] = ("hidden", label, "")
+    # 맨 마지막이라 위 셋이 적어 둔 자리는 안 덮는다(담당자가 이 화면에서 한 일이 먼저다).
+    for url, (label, source_id) in other.items():
+        states.setdefault(url, ("sent_other", label, source_id))
     return states
 
 
 def open_raw_urls(source_card: dict, bundles: list[dict]) -> list[str]:
     """원본에서 아직 처리 안 한 기사 URL(화면 순서 그대로가 아니라 카드 순서) — 툴바의
-    「처리 안 한 N건 전부 확정본으로」가 보낼 목록. 화면에 보이는 기사(조건 안 + 숨기지
-    않음) 중 raw_row_states에 없는 것이다 — 화면이 센 건수와 서버가 보내는 건수가 같아야
-    한다(visible_group_urls와 같은 이유)."""
+    「모든 기사 확정본으로」가 보낼 목록. 화면에 보이는 기사(조건 안 + 숨기지 않음) 중
+    raw_row_states에 없는 것이다 — 화면이 센 건수와 서버가 보내는 건수가 같아야 한다
+    (visible_group_urls와 같은 이유). 그래서 **옆 원본이 이미 보낸 기사(sent_other)도
+    저절로 빠진다** — 확인창이 3건이라 하고 1건만 가던 어긋남이 여기서 닫힌다."""
     from app.adhoc.collector import article_in_condition
 
     states = raw_row_states(source_card, bundles)

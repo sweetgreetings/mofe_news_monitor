@@ -660,9 +660,18 @@ def _handle_send_to_bundle(handler, form: dict) -> None:
             if bundle is None:
                 raise AdhocCardError("확정본을 찾을 수 없습니다. 새로고침 후 다시 시도해주세요.")
         undo.push(bundle["id"], "확정본으로 보내기")
-        card.send_to_bundle(bundle["id"], source, urls, group_name=group_name)
+        sent_n, _ = card.send_to_bundle(bundle["id"], source, urls, group_name=group_name)
     except AdhocCardError as error:
         _card_redirect(handler, card_id, error=str(error))
+        return
+    if not sent_n:
+        # [추가: 2026-10-19] 고른 기사가 **전부** 그 확정본에 이미 있다 — URL 중복 제거가
+        # 조용히 건너뛰므로(card.send_to_bundle) 화면이 그대로 돌아와 버튼이 고장 난 것처럼
+        # 보인다. 같은 기사가 여러 원본에 걸리면 늘 일어나는 일이라 이유를 적어 돌려보낸다.
+        _card_redirect(
+            handler, card_id,
+            error=f"「{card.bundle_label(bundle)}」 확정본에 이미 있는 기사예요.",
+        )
         return
     if card.is_raw(source):
         card.clear_raw_marks(card_id, urls)
