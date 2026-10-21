@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>엑셀로 목록 만들기 — 시안</title>
+<style>
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+    --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%;
+    --h-sm: 24px; --h-tb: 28px; --h-md: 30px; --h-lg: 36px;
+    --chk-md: 16px; --chk-sm: 14px;
+    --sh-float: 0 4px 12px rgba(15, 23, 42, 0.12); --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14); }
+  * { box-sizing: border-box; }
+  .plus-glyph { font-size: 1.2em; font-weight: 600; line-height: 0; margin-right: 4px; }
+
+  /* ── 상단바 (app/topnav.py plain_nav, 흐름 밖 화면: 홈 │ ← 설정) ───────────── */
+  .topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    background: #FFFFFF; border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .topbar-inner { max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: flex-start; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .topbar-inner > .tn { color: #2563EB; text-decoration: none; font-size: var(--fs-md); font-weight: 600;
+    padding: 5px 14px; border: 1px solid transparent; border-radius: var(--r-pill); white-space: nowrap; }
+  .topbar-inner > a.tn:hover { background: #EFF6FF; }
+  .topbar-inner > .tn-sep { width: 1px; height: 18px; background: #E5E7EB; margin: 0 16px; }
+  .topbar-inner > a.tn.back { color: #4B5563; }
+
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  /* 위 여백 24 + 안쪽 44 — 다른 화면과 같은 값 */
+  .container { max-width: 800px; margin: 24px auto 80px; background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: var(--r-lg); padding: 44px 24px 26px; }
+  h1 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 6px; }
+  .hint { color: #4B5563; font-size: var(--fs-md); margin: 0 0 20px; line-height: 1.7; }
+
+  /* ── 단계 머리줄 ───────────────────────────────────────────────── */
+  .step { margin-top: 20px; }
+  .step:first-of-type { margin-top: 0; }
+  .shead { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; flex-wrap: wrap; }
+  .shead .n { font-size: var(--fs-lg); color: #1E3A5F; font-weight: 700; flex: none; }
+  .shead .sub { font-size: var(--fs-sm); color: #4B5563; min-width: 0; }
+  .shead .cnt { font-size: var(--fs-xs); font-weight: 700; color: #4B5563; background: #F1F5F9;
+    border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 1px 8px; white-space: nowrap; }
+
+  /* 가져가기 글자 버튼 묶음 (.exp) — 앱 전체 공통 값 */
+  .exp { display: inline-flex; gap: 2px; flex: none; margin-left: auto; }
+  .exp button { border: none; background: transparent; color: #4B5563; font-weight: 500;
+    border-radius: var(--r-md); padding: 4px 8px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; }
+  .exp button:hover { background: transparent; color: #2563EB; text-decoration: underline; }
+
+  /* ── ① 붙여넣기 칸 ─────────────────────────────────────────────── */
+  .inbox { border: 1px solid #E5E7EB; border-radius: var(--r-lg); background: #F8FAFC; padding: 12px 14px; }
+  textarea.paste { width: 100%; min-height: 108px; resize: vertical; border: 1px solid #E5E7EB;
+    border-radius: var(--r-md); padding: 8px 10px; background: #FFFFFF; color: #1F2937;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-sm); line-height: 1.7; }
+  textarea.paste:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+  .inrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .btn { height: var(--h-md); border: 1px solid #E5E7EB; background: #FFFFFF; color: #1F2937;
+    border-radius: var(--r-md); padding: 0 14px; font-size: var(--fs-md); font-weight: 500;
+    font-family: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+  .btn:hover { background: #EFF6FF; border-color: #BFDBFE; }
+  .btn-go { height: var(--h-md); background: #2563EB; color: #FFFFFF; border: none; border-radius: var(--r-md);
+    padding: 0 16px; font-size: var(--fs-md); font-weight: 600; font-family: inherit; cursor: pointer; }
+  .btn-go:hover { background: #1D4ED8; }
+  .btn-txt { border: none; background: transparent; color: #4B5563; font-size: var(--fs-sm); font-weight: 500;
+    font-family: inherit; cursor: pointer; padding: 4px 6px; border-radius: var(--r-md); }
+  .btn-txt:hover { color: #2563EB; text-decoration: underline; }
+  .or { font-size: var(--fs-sm); color: #6B7280; }
+  .inrow .right { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+
+  /* ── ② 열 맞추기 ──────────────────────────────────────────────── */
+  .maptable { width: 100%; border-collapse: collapse; }
+  .maptable th, .maptable td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #E5E7EB;
+    font-size: var(--fs-sm); vertical-align: middle; }
+  .maptable th { color: #4B5563; font-weight: 600; font-size: var(--fs-xs); white-space: nowrap; }
+  .maptable td.val { color: #1F2937; max-width: 330px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .maptable td.val.dim { color: #9CA3AF; }
+  select.map { height: var(--h-tb); border: 1px solid #E5E7EB; border-radius: var(--r-md); background: #FFFFFF;
+    color: #1F2937; font-size: var(--fs-sm); font-family: inherit; padding: 0 6px; cursor: pointer; }
+  select.map.unused { color: #9CA3AF; }
+  select.map.dup { border-color: #FDE68A; background: #FFFBEB; }
+
+  /* 정리 줄 — 보조 줄이라 체크는 --chk-sm (오늘 전체 기사 특수조건 줄과 같은 모양) */
+  .frow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+  .frow label { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-sm);
+    color: #1F2937; cursor: pointer; }
+  .frow input[type="checkbox"] { flex: none; width: var(--chk-sm); height: var(--chk-sm); margin: 0;
+    accent-color: #2563EB; cursor: pointer; }
+  .fsep { width: 1px; height: 14px; background: #E5E7EB; margin: 0 2px; }
+
+  /* ── ③ 결과 ───────────────────────────────────────────────────── */
+  pre.out { margin: 0; border: 1px solid #E5E7EB; border-radius: var(--r-lg); background: #F8FAFC;
+    padding: 14px 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: var(--fs-sm); line-height: 1.8; color: #1F2937; white-space: pre-wrap; word-break: break-all;
+    max-height: 380px; overflow: auto; }
+  .fmt-note { font-size: var(--fs-sm); color: #6B7280; margin: 8px 0 0; }
+  .fmt-note a { color: #2563EB; }
+
+  /* 안내 상자 — 앱의 주의(앰버)·오류(빨강)·잘 됐다(초록) 세트를 그대로 쓴다 */
+  .warn { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; border-radius: var(--r-lg);
+    padding: 10px 12px; font-size: var(--fs-md); line-height: 1.6; margin-top: 12px; }
+  .err { background: #FEF2F2; border: 1px solid #FECACA; color: #DC2626; border-radius: var(--r-lg);
+    padding: 10px 12px; font-size: var(--fs-md); line-height: 1.6; margin-top: 12px; }
+  .ok-note { background: #F0FDF4; border: 1px solid #BBF7D0; color: #166534; border-radius: var(--r-lg);
+    padding: 8px 12px; font-size: var(--fs-md); margin-top: 12px; }
+  .empty { color: #6B7280; font-size: var(--fs-lg); text-align: center; padding: 28px 0; }
+  .hidden { display: none; }
+
+  .mock-tag { position: fixed; right: 12px; bottom: 12px; z-index: 30; background: #1E3A5F; color: #fff;
+    font-size: var(--fs-xs); padding: 4px 10px; border-radius: var(--r-pill); opacity: .85; }
+
+  @media (max-width: 640px) {
+    .container { padding: 40px 14px 20px; margin: 16px 8px 60px; }
+    .maptable td.val { max-width: 150px; }
+    .inrow .right { margin-left: 0; width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="tn" href="#">홈</a>
+    <span class="tn-sep"></span>
+    <a class="tn back" href="#">← 설정</a>
+  </div>
+</div>
+
+<div class="container">
+  <h1>📋 엑셀로 목록 만들기</h1>
+  <p class="hint">언론사·제목·링크가 든 표를 보고서 한 줄 형식으로 바꿉니다.</p>
+
+  <!-- ① 표 붙여넣기 -->
+  <div class="step">
+    <div class="shead">
+      <span class="n">① 표 붙여넣기</span>
+      <span class="sub">엑셀에서 칸을 골라 복사(⌘C)한 뒤 아래에 붙여넣으세요</span>
+    </div>
+    <div class="inbox">
+      <textarea class="paste" id="paste" spellcheck="false" placeholder="언론사	제목	링크
+한국경제	가상자산 과세 2년 유예…	https://n.news.naver.com/mnews/article/015/0005123456"></textarea>
+      <div class="inrow">
+        <button class="btn" id="pickfile"><span class="plus-glyph">+</span>엑셀 파일 올리기</button>
+        <span class="or">또는 위 칸에 붙여넣기</span>
+        <input type="file" id="file" accept=".xlsx,.csv,.tsv,.txt" class="hidden" />
+        <span class="right">
+          <button class="btn-txt" id="clear">비우기</button>
+          <button class="btn-go" id="go">목록 만들기</button>
+        </span>
+      </div>
+      <div class="err hidden" id="filenote"></div>
+    </div>
+  </div>
+
+  <!-- ② 열 맞추기 -->
+  <div class="step hidden" id="step2">
+    <div class="shead">
+      <span class="n">② 열 맞추기</span>
+      <span class="sub" id="mapsub">표의 첫 줄을 보고 짐작해 뒀어요 — 다르면 고치세요</span>
+    </div>
+    <table class="maptable">
+      <thead>
+        <tr><th style="width:60px">표의 열</th><th>첫 기사 값</th><th style="width:132px">무엇으로 쓸까</th></tr>
+      </thead>
+      <tbody id="mapbody"></tbody>
+    </table>
+    <div class="frow">
+      <label><input type="checkbox" id="hasHeader" checked /> 첫 줄은 열 이름이에요</label>
+      <span class="fsep"></span>
+      <label><input type="checkbox" id="dedupe" checked /> 같은 링크는 한 번만</label>
+      <label><input type="checkbox" id="byOutlet" /> 등록 언론사 순서로 정렬</label>
+    </div>
+    <div class="warn hidden" id="skipnote"></div>
+  </div>
+
+  <!-- ③ 결과 -->
+  <div class="step hidden" id="step3">
+    <div class="shead">
+      <span class="n">③ 결과</span>
+      <span class="cnt" id="outcnt">0건</span>
+      <span class="exp">
+        <button id="cp">복사</button>
+        <button id="tx">텍스트</button>
+        <button id="xl">엑셀</button>
+      </span>
+    </div>
+    <pre class="out" id="out"></pre>
+    <p class="fmt-note">정기 「기사 제목 형식」(<code>ㅇ ({outlet}) {title}</code>)을 그대로 씁니다 —
+      바꾸려면 <a href="#">설정 → 텍스트 표출 형식</a>.</p>
+    <div class="ok-note hidden" id="cpnote">✓ 결과를 복사했어요.</div>
+  </div>
+
+</div>
+
+<div class="mock-tag">시안 · 붙여넣기는 실제로 동작합니다</div>
+
+<script>
+// ── 시안용 샘플 (실제 화면은 빈 칸으로 시작) ─────────────────────────
+var SAMPLE = [
+  "소제목\t언론사\t기사제목\t링크",
+  "세제\t한국경제\t[단독] 가상자산 과세 2년 더 유예…정부 방침 확정\thttps://n.news.naver.com/mnews/article/015/0005123456",
+  "세제\t매일경제\t종부세 공정시장가액비율 내년 동결 가닥\thttps://n.news.naver.com/mnews/article/009/0005412233",
+  "예산\t연합뉴스\t내년 예산 총지출 2.8% 증가…재량지출 구조조정\thttps://n.news.naver.com/mnews/article/001/0015120099",
+  "예산\tKBS\t\"民生 예산 우선\"…국회 예결위 심사 착수\thttps://n.news.naver.com/mnews/article/056/0011902233",
+  "\t서울경제\t기재부 \"대외 건전성 양호\"…외환시장 점검회의\thttps://n.news.naver.com/mnews/article/011/0004399112"
+].join("\n");
+
+var ROLES = [
+  ["skip", "— 안 씀"],
+  ["section", "소제목"],
+  ["outlet", "언론사"],
+  ["title", "제목"],
+  ["url", "링크"]
+];
+
+var rows = [];      // 붙여넣은 표 (2차원)
+var mapping = [];   // 열마다 역할
+
+var $ = function (id) { return document.getElementById(id); };
+
+function splitRows(text) {
+  var out = [];
+  text.replace(/\r/g, "").split("\n").forEach(function (line) {
+    if (!line.trim()) return;
+    var cells = line.indexOf("\t") >= 0 ? line.split("\t") : line.split(",");
+    out.push(cells.map(function (c) { return c.trim().replace(/^"|"$/g, ""); }));
+  });
+  return out;
+}
+
+function guessRole(header, sampleValue, used) {
+  var h = (header || "").replace(/\s/g, "");
+  var v = sampleValue || "";
+  var pick = null;
+  // 「소제목」이 「제목」을 품고 있어 소제목·구분을 먼저 본다 — 순서가 곧 규칙이다
+  if (/^https?:\/\//.test(v)) pick = "url";
+  else if (/링크|url|주소|기사링크/i.test(h)) pick = "url";
+  else if (/소제목|구분|분류|주제|섹션/.test(h)) pick = "section";
+  else if (/언론사|매체|신문|방송사/.test(h)) pick = "outlet";
+  else if (/제목|기사명|헤드/.test(h)) pick = "title";
+  if (pick && used.indexOf(pick) >= 0) pick = null;
+  return pick || "skip";
+}
+
+function buildMapping() {
+  var hasHeader = $("hasHeader").checked;
+  var header = hasHeader ? rows[0] : [];
+  var first = rows[hasHeader ? 1 : 0] || rows[0] || [];
+  var width = 0;
+  rows.forEach(function (r) { width = Math.max(width, r.length); });
+  var used = [];
+  mapping = [];
+  for (var i = 0; i < width; i++) {
+    var role = guessRole(header[i], first[i], used);
+    if (role !== "skip") used.push(role);
+    mapping.push(role);
+  }
+  // 못 짚은 자리를 순서대로 메운다 — 언론사·제목·링크 셋은 가장 흔한 순서가 그 순서다
+  ["outlet", "title", "url"].forEach(function (need) {
+    if (mapping.indexOf(need) >= 0) return;
+    for (var i = 0; i < mapping.length; i++) {
+      if (mapping[i] === "skip") { mapping[i] = need; return; }
+    }
+  });
+  renderMap(header, first, hasHeader);
+}
+
+function renderMap(header, first, hasHeader) {
+  var body = $("mapbody");
+  body.innerHTML = "";
+  var counts = {};
+  mapping.forEach(function (r) { if (r !== "skip") counts[r] = (counts[r] || 0) + 1; });
+  mapping.forEach(function (role, i) {
+    var tr = document.createElement("tr");
+    var name = hasHeader && header[i] ? header[i] : String.fromCharCode(65 + i);
+    var val = first[i] || "";
+    tr.innerHTML = '<td>' + esc(name) + '</td>' +
+      '<td class="val' + (val ? "" : " dim") + '">' + esc(val || "(빈 칸)") + '</td>';
+    var td = document.createElement("td");
+    var sel = document.createElement("select");
+    sel.className = "map" + (role === "skip" ? " unused" : "") + (counts[role] > 1 ? " dup" : "");
+    ROLES.forEach(function (r) {
+      var op = document.createElement("option");
+      op.value = r[0]; op.textContent = r[1];
+      if (r[0] === role) op.selected = true;
+      sel.appendChild(op);
+    });
+    sel.onchange = function () { mapping[i] = sel.value; render(); };
+    td.appendChild(sel);
+    tr.appendChild(td);
+    body.appendChild(tr);
+  });
+  var miss = [];
+  if (mapping.indexOf("outlet") < 0) miss.push("언론사");
+  if (mapping.indexOf("title") < 0) miss.push("제목");
+  if (mapping.indexOf("url") < 0) miss.push("링크");
+  $("mapsub").textContent = miss.length
+    ? miss.join("·") + " 칸을 고르면 결과가 나와요"
+    : "표의 첫 줄을 보고 짐작해 뒀어요 — 다르면 고치세요";
+}
+
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function render() {
+  var hasHeader = $("hasHeader").checked;
+  var data = rows.slice(hasHeader ? 1 : 0);
+  var ci = { section: mapping.indexOf("section"), outlet: mapping.indexOf("outlet"),
+             title: mapping.indexOf("title"), url: mapping.indexOf("url") };
+
+  if (ci.title < 0 || ci.url < 0) {
+    $("step3").classList.add("hidden");
+    $("skipnote").classList.add("hidden");
+    return;
+  }
+
+  var seen = {}, items = [], skipped = { nourl: [], dup: [], notitle: [] };
+  data.forEach(function (r, n) {
+    var line = n + 1 + (hasHeader ? 1 : 0);
+    var url = (r[ci.url] || "").trim();
+    var title = (r[ci.title] || "").trim();
+    if (!url || !/^https?:\/\//.test(url)) { if (title || url) skipped.nourl.push(line); return; }
+    if (!title) { skipped.notitle.push(line); return; }
+    if ($("dedupe").checked && seen[url]) { skipped.dup.push(line); return; }
+    seen[url] = 1;
+    items.push({
+      section: ci.section >= 0 ? (r[ci.section] || "").trim() : "",
+      outlet: ci.outlet >= 0 ? (r[ci.outlet] || "").trim() : "",
+      title: title, url: url
+    });
+  });
+
+  // 소제목별로 묶는다 — 표에 나온 순서 그대로, 소제목이 빈 기사는 「기타」
+  var order = [], buckets = {};
+  items.forEach(function (it) {
+    var key = it.section || (ci.section >= 0 ? "기타" : "");
+    if (!(key in buckets)) { buckets[key] = []; order.push(key); }
+    buckets[key].push(it);
+  });
+
+  var lines = [];
+  order.forEach(function (key) {
+    if (key) lines.push("<" + key + ">");
+    buckets[key].forEach(function (it) {
+      lines.push("ㅇ (" + it.outlet + ") " + it.title);
+      lines.push(it.url);
+      lines.push("");
+    });
+  });
+  var text = lines.join("\n").replace(/\n+$/, "\n");
+
+  $("out").textContent = items.length ? text : "";
+  $("out").classList.toggle("hidden", !items.length);
+  $("outcnt").textContent = items.length + "건";
+  $("step3").classList.remove("hidden");
+
+  var msgs = [];
+  if (skipped.nourl.length) msgs.push("링크 칸이 비었거나 주소가 아니에요 (" + skipped.nourl.join("·") + "번째 줄)");
+  if (skipped.notitle.length) msgs.push("제목 칸이 비었어요 (" + skipped.notitle.join("·") + "번째 줄)");
+  if (skipped.dup.length) msgs.push("같은 링크가 또 있어요 (" + skipped.dup.join("·") + "번째 줄)");
+  if (msgs.length) {
+    var n = skipped.nourl.length + skipped.notitle.length + skipped.dup.length;
+    $("skipnote").innerHTML = "⚠️ " + n + "줄은 건너뛰었어요 — " + msgs.map(esc).join(" · ");
+    $("skipnote").classList.remove("hidden");
+  } else {
+    $("skipnote").classList.add("hidden");
+  }
+}
+
+function run() {
+  rows = splitRows($("paste").value);
+  if (!rows.length) {
+    $("step2").classList.add("hidden");
+    $("step3").classList.add("hidden");
+    $("filenote").textContent = "붙여넣은 표가 없어요. 엑셀에서 칸을 골라 복사한 뒤 붙여넣으세요.";
+    $("filenote").classList.remove("hidden");
+    return;
+  }
+  $("filenote").classList.add("hidden");
+  $("step2").classList.remove("hidden");
+  buildMapping();
+  render();
+}
+
+$("go").onclick = run;
+$("hasHeader").onchange = function () { buildMapping(); render(); };
+$("dedupe").onchange = render;
+$("byOutlet").onchange = function () {
+  // 시안 안내: 언론사 순위는 설정값이라 서버가 정렬한다
+  if (this.checked) {
+    $("skipnote").innerHTML = "⚠️ 「등록 언론사 순서」는 설정 「언론사 선택 및 순서 지정」 값을 쓰기 때문에 이 시안에선 안 돌아요 — 실제 화면에선 서버가 정렬합니다.";
+    $("skipnote").classList.remove("hidden");
+  } else { render(); }
+};
+$("clear").onclick = function () {
+  $("paste").value = ""; rows = [];
+  $("step2").classList.add("hidden"); $("step3").classList.add("hidden");
+  $("filenote").classList.add("hidden");
+  $("paste").focus();
+};
+$("pickfile").onclick = function () { $("file").click(); };
+$("file").onchange = function () {
+  var f = this.files && this.files[0];
+  if (!f) return;
+  if (/\.xlsx$/i.test(f.name)) {
+    $("filenote").textContent = "시안에선 .xlsx를 못 읽어요 (실제 화면은 서버가 openpyxl로 읽습니다). 지금은 엑셀에서 칸을 복사해 붙여넣어 주세요.";
+    $("filenote").classList.remove("hidden");
+    this.value = "";
+    return;
+  }
+  var rd = new FileReader();
+  rd.onload = function () { $("paste").value = String(rd.result); run(); };
+  rd.readAsText(f, "utf-8");
+};
+$("cp").onclick = function () {
+  var t = $("out").textContent;
+  if (!t) return;
+  navigator.clipboard.writeText(t).then(function () {
+    $("cpnote").classList.remove("hidden");
+    setTimeout(function () { $("cpnote").classList.add("hidden"); }, 1800);
+  });
+};
+$("tx").onclick = function () {
+  var t = $("out").textContent;
+  if (!t) return;
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([t], { type: "text/plain;charset=utf-8" }));
+  a.download = "2026-10-21_언론모니터링_목록.txt";
+  a.click();
+};
+$("xl").onclick = function () {
+  alert("실제 화면에선 다른 화면과 같은 8열 엑셀(POST /download-excel)로 내려갑니다.");
+};
+
+// 시안이므로 샘플을 넣어 둔 채로 연다
+$("paste").value = SAMPLE;
+run();
+</script>
+</body>
+</html>

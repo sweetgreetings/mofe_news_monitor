@@ -6615,6 +6615,149 @@ def test_adhoc_tab_delete_stays_put():
     print("55) 수시 탭 × 삭제: 통과 (남의 탭은 제자리, 지금 카드는 오른쪽→왼쪽 탭, 없으면 보관함, 이름은 지우기 전에)")
 
 
+def test_excel_merge():
+    """「엑셀로 목록 만들기」 — 담당자가 들고 온 표를 보고서 형식으로 바꾼다.
+
+    이 테스트가 지키는 것 다섯:
+      (1) **표를 읽는 일이 조용히 틀리지 않는다** — 가운데 빈 줄은 건너뛰고, 날짜 칸은
+          `2026-10-21 00:00:00`이 아니라 사람이 적는 모양이며, 제목 칸에만 링크가 걸린
+          표(주소 열이 없는 표)는 **보이는 열 하나로 꺼내 준다**. 안 꺼내면 담당자는
+          「표를 올렸는데 0건」을 만난다. 줄 수를 넘으면 **잘라 주지 않고 거절한다** —
+          조용히 자르면 다 담긴 줄 알고 보고서를 보낸다.
+      (2) **AI 배정이 이미 적힌 소제목을 한 글자도 안 건드린다.** 정기 초안의 「AI 기사
+          배정」·수시 카드와 같은 안전장치다 — 빈 칸만 채운다.
+      (3) **모델이 응답에서 빠뜨린 기사는 「기타」로 간다** — 한 번 눌러 미분류가 항상
+          비도록(정기·수시가 같은 버그를 겪고 고친 자리).
+      (4) **AI 키가 없으면 실패가 아니라 담당자의 선택이다** — 눌러도 같은 결과인 버튼을
+          그리지 않고 앰버 안내로 바꾼다(빨강은 오류의 색이다).
+      (5) **아무것도 저장하지 않는다** — 이 화면은 흐름 밖이라 정기 큐레이션 파일
+          (배정·숨김·커스텀 소제목·소제목 순서)을 건드릴 이유가 없다.
+    """
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from openpyxl import Workbook
+
+    import app.excel_merge as em
+    from app.excel_merge import TableReadError, assign_subheadings, read_xlsx_rows
+    from app.excel_merge_renderer import render_excel_merge_page
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+
+        # (1) 표 읽기 ────────────────────────────────────────────────
+        def _book(rows, link_col=None):
+            wb = Workbook()
+            ws = wb.active
+            for r in rows:
+                ws.append(r)
+            if link_col:
+                for i, url in link_col.items():
+                    ws.cell(row=i, column=3).hyperlink = url
+            path = tmp_dir / "t.xlsx"
+            wb.save(path)
+            return path.read_bytes()
+
+        raw = _book(
+            [
+                ["소제목", "언론사", "기사제목", "발행일"],
+                ["세제", "한국경제", "가상자산 과세 2년 유예", datetime(2026, 10, 21, 9, 14)],
+                [None, None, None, None],
+                ["", "매일경제", "종부세 동결", datetime(2026, 10, 21)],
+            ],
+            link_col={2: "https://n.news.naver.com/mnews/article/015/1",
+                      4: "https://n.news.naver.com/mnews/article/009/2"},
+        )
+        rows = read_xlsx_rows(raw)
+        assert len(rows) == 3, f"빈 줄을 안 건너뜀: {rows}"
+        assert rows[1][3] == "2026-10-21 09:14", f"발행일 모양: {rows[1][3]}"
+        assert rows[2][3] == "2026-10-21", f"시각 없는 날짜에 00:00을 붙임: {rows[2][3]}"
+        assert rows[1][-1].startswith("http"), f"셀에 걸린 링크를 열로 안 꺼냄: {rows[1]}"
+        assert rows[0][-1] == "", f"머리줄 자리에 엉뚱한 값: {rows[0]}"
+
+        try:
+            read_xlsx_rows(b"not an xlsx")
+            assert False, "깨진 파일을 받아들임"
+        except TableReadError:
+            pass
+        with patch.object(em, "MAX_TABLE_ROWS", 2):
+            try:
+                read_xlsx_rows(_book([["a"], ["b"], ["c"], ["d"]]))
+                assert False, "줄 수를 넘겼는데 잘라서 돌려줌 — 거절해야 한다"
+            except TableReadError as exc:
+                assert "나눠서" in str(exc), f"할 일을 안 알려줌: {exc}"
+
+        # (2)(3) AI 배정 ────────────────────────────────────────────
+        items = [
+            {"url": "u1", "title": "가상자산 과세 유예", "outlet": "한국경제", "section": "세제"},
+            {"url": "u2", "title": "예산 총지출 증가", "outlet": "연합뉴스", "section": ""},
+            {"url": "u3", "title": "외환시장 점검회의", "outlet": "서울경제", "section": ""},
+        ]
+        with patch.object(em, "llm_is_configured", lambda: True), \
+             patch.object(em, "assign_to_existing", lambda arts, groups: {"u2": "세제"}) as _a, \
+             patch.object(em, "classify_isolated", lambda *a, **k: (_ for _ in ()).throw(AssertionError(
+                 "소제목이 이미 있는데 처음부터 분류했다"))):
+            out = assign_subheadings(items)
+        assigned = out["assigned"]
+        assert "u1" not in assigned, "이미 적힌 소제목을 건드렸다"
+        assert assigned["u2"] == "세제", assigned
+        assert assigned["u3"] == "기타", f"응답에서 빠진 기사를 미분류로 남김: {assigned}"
+
+        # 소제목이 하나도 없으면 처음부터 묶는다 — 「기타」 칸은 늘 열려 있다.
+        blank = [dict(a, section="") for a in items]
+        groups = [{"name": "세제·예산", "articles": [{"url": "u1"}, {"url": "u2"}], "summary": "…"}]
+        with patch.object(em, "llm_is_configured", lambda: True), \
+             patch.object(em, "classify_isolated", lambda *a, **k: groups), \
+             patch.object(em, "assign_to_existing", lambda *a, **k: (_ for _ in ()).throw(AssertionError(
+                 "소제목이 없는데 기존 칸에 끼워 넣으려 했다"))):
+            out = assign_subheadings(blank)
+        assert out["assigned"] == {"u1": "세제·예산", "u2": "세제·예산", "u3": "기타"}, out
+
+        # (4) 키가 없으면 부르지 않는다 — 이유를 돌려주고 네트워크로 안 나간다.
+        with patch.object(em, "llm_is_configured", lambda: False), \
+             patch.object(em, "classify_isolated", lambda *a, **k: (_ for _ in ()).throw(AssertionError(
+                 "키가 없는데 AI를 불렀다"))):
+            assert assign_subheadings(blank) == {"reason": "no_key"}
+        assert "LLM(AI) 연동" in em.ASSIGN_REASONS["no_key"], "할 일(키 등록)을 안 알려줌"
+
+        # 화면: 키가 있으면 버튼, 없으면 앰버 안내 한 줄.
+        with patch("app.excel_merge_renderer.llm_is_configured", lambda: True):
+            html_on = render_excel_merge_page()
+        with patch("app.excel_merge_renderer.llm_is_configured", lambda: False):
+            html_off = render_excel_merge_page()
+        assert 'id="ai"' in html_on and "AI 소제목 배정" in html_on, "AI 버튼이 없다"
+        assert 'id="ai"' not in html_off, "키가 없는데 눌러도 같은 결과인 버튼을 그렸다"
+        assert "LLM(AI) 연동" in html_off and 'class="warn"' in html_off, "키 없음을 안내하지 않는다"
+        assert "error" not in html_off.split('class="warn">')[1][:200], "키 없음을 오류(빨강)로 그렸다"
+
+        # 화면 계약: 세 단계 · 가져가기 셋 · **정기** 텍스트 형식을 구워 넣는다.
+        for probe in ("① 표 붙여넣기", "② 열 맞추기", "③ 결과",
+                      'action="/download-text"', 'action="/download-excel"'):
+            assert probe in html_on, f"화면에 {probe}가 없다"
+
+        # 흐름 밖 화면은 **정기** 텍스트 형식을 쓴다(CLAUDE.md 「텍스트 형식」) — 두 흐름의
+        # 값을 다르게 두고 어느 쪽이 구워지는지 본다. 전용 형식 설정을 만들지 않는 근거다.
+        both = {
+            "article_line_template": "ㅇ ({outlet}) {title}",
+            "subheading_format_template": "<{section}>",
+            "adhoc_article_line_template": "— 수시전용 {outlet} {title}",
+            "adhoc_subheading_format_template": "[[{section}]]",
+            "outlet_order": ["KBS", "한국경제"],
+        }
+        with patch("app.excel_merge_renderer.load_settings", lambda: both):
+            html_fmt = render_excel_merge_page()
+        assert "ㅇ ({outlet}) {title}" in html_fmt and "<{section}>" in html_fmt, "정기 형식을 안 구웠다"
+        assert "수시전용" not in html_fmt and "[[" not in html_fmt, "흐름 밖 화면인데 수시 값을 끌어왔다"
+
+        # (5) 저장하지 않는다 — 정기 큐레이션 파일이 하나도 안 생긴다.
+        for name in ("group_overrides.json", "hidden_articles.json",
+                     "custom_groups.json", "group_order.json"):
+            assert not (tmp_dir / name).exists(), f"{name}을 건드렸다"
+
+    print("56) 엑셀로 목록 만들기: 통과 (빈 줄·날짜·셀 링크, 줄 수 초과는 거절, AI는 빈 소제목만·빠진 기사는 기타, 키 없으면 안내)")
+
+
 if __name__ == "__main__":
     tests = [
         test_unclassified_sits_below_summary,
@@ -6641,6 +6784,7 @@ if __name__ == "__main__":
         test_agency_archive_keeps_every_date,
         test_agency_archive_labels,
         test_live_labels,
+        test_excel_merge,
         test_draft_all_first_classified_hidden_shows_unclassified,
         test_partial_cache_survives_non_hidden_drops,
         test_assigned_articles_keep_subheading_after_ai_members_hidden,

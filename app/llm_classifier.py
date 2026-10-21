@@ -1114,6 +1114,42 @@ _ASSIGN_SCHEMA = {
 }
 
 
+def classify_isolated(articles: list, max_subheadings: int) -> Optional[list]:
+    """정기 회차의 전역 `_last_names`(직전 소제목 이름 이어쓰기 힌트)를 건드리지 않고
+    classify_with_llm을 부른다 — 회차가 없는 호출부(수시 카드·「엑셀로 목록 만들기」)가 쓴다.
+
+    안 그러면 양방향으로 오염된다(ADHOC_DESIGN.md §6.5):
+      (1) 호출 전 — 정기 회차의 소제목 이름이 이 호출의 프롬프트에 "직전에 쓰던 이름"으로
+          잘못 들어가 엉뚱한 이름을 재사용하려 든다. 그래서 호출 직전에 비워둔다.
+      (2) 호출 후 — classify_with_llm이 끝나면 `_last_names`를 이번 이름으로 덮어쓰고,
+          **그 상태로 캐시 파일까지 디스크에 저장**한다(_persist_cache_locked가 그 안에서
+          이미 호출됨). 메모리만 되돌리고 끝내면 다음 재시작 때 _ensure_cache_hydrated가
+          디스크의 그 이름을 다시 불러와 정기 쪽을 오염시킨다 — 그래서 되돌린 뒤 캐시
+          파일도 다시 써서 디스크까지 맞춘다(실측으로 확인하고 고친 사고다).
+
+    **이 함수가 그 처방을 두는 유일한 자리다** — 호출부마다 베껴 두면 한쪽만 고쳤을 때
+    조용히 오염이 돌아온다(app/adhoc/classifier.py·app/excel_merge.py가 이걸 부른다).
+    """
+    saved = list(_last_names)
+    _reset_last_names()
+    try:
+        return classify_with_llm(articles, max_subheadings=max_subheadings)
+    finally:
+        with _cache_lock:
+            _restore_last_names(saved)
+            _persist_cache_locked()
+
+
+def _reset_last_names() -> None:
+    global _last_names
+    _last_names = []
+
+
+def _restore_last_names(saved: list) -> None:
+    global _last_names
+    _last_names = saved
+
+
 _ASSIGN_SAMPLE_TITLES = 3
 _ASSIGN_TITLE_CHARS = 45
 

@@ -1,4 +1,6 @@
 # Design Ref: archive/DESIGN.md §1 설정 화면 목업(메뉴+하위 6페이지), §3 "최소 로컬 서버" (PRD 규칙 17)
+import base64
+import binascii
 import html
 import json
 import logging
@@ -129,6 +131,8 @@ from app.agency_archive_renderer import (
     render_agency_archive_day_fragment,
     render_agency_archive_page,
 )
+from app.excel_merge import ASSIGN_REASONS, TableReadError, assign_subheadings, read_xlsx_rows
+from app.excel_merge_renderer import render_excel_merge_page
 from app.trend_renderer import render_trend_page
 from app.trend_export import build_trend_workbook_bytes
 from app.landing_renderer import generate_landing_page
@@ -457,6 +461,7 @@ _MENU_TEMPLATE = (
     <div class="category-name">정기, 수시 공통</div>
     <div class="menu">
       <a href="/outlets">언론사 선택 및 순서 지정<span class="menu-chev">›</span></a>
+      <a href="/excel-merge">엑셀로 목록 만들기<span class="menu-note">표를 보고서 형식으로</span><span class="menu-chev">›</span></a>
       <a href="/deleted">삭제 기록<span class="menu-note">지운 회차 되살리기</span><span class="menu-chev">›</span></a>
     </div>
   </div>
@@ -5909,6 +5914,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._respond(render_llm_settings_page())
         elif self.path == "/keys":
             self._respond(render_key_status_page())
+        elif self.path == "/excel-merge":
+            self._respond(render_excel_merge_page())
         elif self.path == "/email-sender":
             self._respond(render_email_sender_page())
         elif self.path.startswith("/adhoc"):
@@ -6341,6 +6348,10 @@ class _SettingsHandler(BaseHTTPRequestHandler):
 
         if self.path == "/download-text":
             self._handle_download_text(form)
+        elif self.path == "/excel-merge/read":
+            self._handle_excel_merge_read(form)
+        elif self.path == "/excel-merge/classify":
+            self._handle_excel_merge_classify(form)
         elif self.path == "/download-excel":
             self._handle_download_excel(form)
         elif self.path == "/download-excel-history":
@@ -6697,6 +6708,54 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         text = form.get("text", [""])[0]
         filename = form.get("filename", ["download.txt"])[0]
         self._respond_download(text, filename)
+
+    def _handle_excel_merge_read(self, form: dict) -> None:
+        """「엑셀로 목록 만들기」의 .xlsx 읽기 — 표를 2차원 글자 배열로 돌려준다.
+
+        화면이 파일 원본을 **base64 한 덩어리**로 실어 보낸다(`data=`). multipart를 쓰지
+        않는 이유는 do_POST가 본문을 urlencoded 하나로만 읽기 때문이다 — 여기만 바이너리
+        파서를 들이면 그 자리가 이 앱에서 유일하게 다른 길이 된다. 1000줄짜리 표는 50KB
+        안쪽이라 base64로 부풀려도 문제가 없다.
+
+        붙여넣기는 이 자리를 거치지 않는다(화면이 바로 읽는다) — 서버가 하는 일은 「브라우저가
+        못 읽는 형식을 글자로 바꿔 주는 것」 하나다. 읽은 표는 저장하지 않는다.
+        """
+        try:
+            raw = base64.b64decode(form.get("data", [""])[0], validate=True)
+        except (binascii.Error, ValueError):
+            self._respond_json({"error": "파일을 받지 못했어요. 다시 올려 주세요."}, status=400)
+            return
+        try:
+            rows = read_xlsx_rows(raw)
+        except TableReadError as exc:
+            # 이유를 그대로 화면에 적는다 — 「읽지 못했어요」만 띄우면 할 일을 알 수 없다.
+            self._respond_json({"error": str(exc)})
+            return
+        logger.info("엑셀로 목록 만들기 — 표 %d줄 읽음", len(rows))
+        self._respond_json({"rows": rows})
+
+    def _handle_excel_merge_classify(self, form: dict) -> None:
+        """「엑셀로 목록 만들기」의 AI 소제목 배정 — 담당자가 버튼을 눌렀을 때만 들어온다.
+
+        아무것도 저장하지 않는다(회차·카드·배정·캐시 어디에도) — 받은 목록에 소제목 이름만
+        붙여 돌려주고, 화면이 그걸 얹어 다시 그린다. 실패하면 이유 한 줄을 돌려준다
+        (조용히 아무 일도 안 일어난 것처럼 보이면 버튼이 고장 난 것으로 읽힌다).
+        """
+        try:
+            items = json.loads(form.get("items", ["[]"])[0])
+        except json.JSONDecodeError:
+            self._respond_json({"reason": "요청이 올바르지 않습니다. 새로고침 후 다시 시도해주세요."}, status=400)
+            return
+        if not isinstance(items, list):
+            self._respond_json({"reason": "요청이 올바르지 않습니다. 새로고침 후 다시 시도해주세요."}, status=400)
+            return
+        result = assign_subheadings([a for a in items if isinstance(a, dict)])
+        if "reason" in result:
+            logger.info("엑셀로 목록 만들기 — AI 배정 못함(%s)", result["reason"])
+            self._respond_json({"reason": ASSIGN_REASONS.get(result["reason"], ASSIGN_REASONS["failed"])})
+            return
+        logger.info("엑셀로 목록 만들기 — AI가 소제목 %d건 배정", len(result["assigned"]))
+        self._respond_json({"assigned": result["assigned"]})
 
     def _handle_download_excel(self, form: dict) -> None:
         """엑셀 내보내기(PRD.md 기능11) 공용 핸들러 — _handle_download_text의 xlsx판.

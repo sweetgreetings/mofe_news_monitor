@@ -12,35 +12,19 @@
 #     정확히 같은 안전장치이자 같은 코드 경로다.
 from typing import Optional
 
-import app.llm_classifier as llm_classifier
-from app.llm_classifier import assign_to_existing, classify_with_llm
+from app.llm_classifier import assign_to_existing, classify_isolated
 
 from app.adhoc.collector import articles_in_condition
 from app.adhoc.card import MAX_ADHOC_SUBHEADINGS, card_lock, current_group_names, load_card, save_card
 
 
 def _classify_isolated(articles: list, max_subheadings: int) -> Optional[list]:
-    """정기 스크랩의 전역 `_last_names`(직전 소제목 이름 이어쓰기 힌트)를 건드리지
-    않고 classify_with_llm을 호출한다. 안 그러면 양방향으로 오염된다(ADHOC_DESIGN.md §6.5):
+    """정기 회차의 `_last_names`를 건드리지 않고 분류한다 — 처방은
+    app.llm_classifier.classify_isolated 한 곳에 있다(그 함수 주석에 왜 필요한지가 있다).
 
-      (1) 호출 전 — 정기 회차의 소제목 이름이 이 카드 프롬프트에 "직전에 쓰던 이름"으로
-          잘못 들어가 엉뚱한 이름을 재사용하려 든다. 그래서 호출 직전에 비워둔다.
-      (2) 호출 후 — classify_with_llm이 끝나면 `_last_names`를 이 카드의 이름으로
-          덮어쓰고, **그 상태로 캐시 파일까지 디스크에 저장**한다(_persist_cache_locked가
-          classify_with_llm 안에서 이미 호출됨). 메모리만 되돌리고 끝내면, 다음에 앱을
-          재시작할 때 _ensure_cache_hydrated가 디스크의 이 카드 이름을 다시 불러와
-          정기 쪽을 오염시킨다 — 그래서 되돌린 뒤 캐시 파일도 다시 써서 디스크까지
-          맞춰둔다(실제로 이 문제를 실측으로 확인하고 고쳤다: 최초 구현은 메모리만
-          되돌리고 디스크는 그대로 둬, 재시작 시나리오에서 오염이 남아 있었다).
+    여기 이름을 남겨 두는 건 아래 호출부가 「정기와 격리해서 부른다」를 말하기 위해서다.
     """
-    saved = list(llm_classifier._last_names)
-    llm_classifier._last_names = []
-    try:
-        return classify_with_llm(articles, max_subheadings=max_subheadings)
-    finally:
-        with llm_classifier._cache_lock:
-            llm_classifier._last_names = saved
-            llm_classifier._persist_cache_locked()
+    return classify_isolated(articles, max_subheadings)
 
 
 def classify_card(card_id: str) -> Optional[dict]:
