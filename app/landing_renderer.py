@@ -1088,7 +1088,8 @@ def _flow_card_html(last_run: Optional[dict], settings: dict) -> str:
         )
     bundle = adhoc["bundle"]
     if bundle:
-        # 불러올 때마다 같은 이름의 확정본이 새로 생기므로 시각까지 적는다(「인사청문회 15:05」).
+        # 불러올 때마다 같은 이름의 확정본이 새로 생기므로, 같은 이름이 또 있으면
+        # 번호로 가른다(「인사청문회 (2)」 — adhoc_card.bundle_label, 시각은 안 적는다).
         tips["bundle"][0] = html.escape(adhoc_card.bundle_label(bundle) if bundle.get("report_title") else "(이름 없음)")
         tips["bundle"][1] = "원본에서 보낸 기사를 언론사 순으로 정리해요. 소제목·숨기기는 여기서 해요."
 

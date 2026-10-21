@@ -2203,7 +2203,7 @@ def test_adhoc_screen_name():
             _second = card.load_card(second["id"])
             _st = card.raw_row_states(_second, day)["https://v.x/1"]
             assert _st[0] == "sent_other", "옆 원본이 보낸 기사가 「처리 안 함」으로 섞임"
-            assert _st[1] == card.bundle_label(bundles[0]), _st
+            assert _st[1] == "청문회 종합", _st  # bundle_label은 시각을 안 붙인다
             assert _st[2] == first["id"], "셋째 값은 보낸 원본 카드 id여야 한다"
             # 내가 보낸 게 아니므로 「✓ 보냄」도, 그 줄의 취소도 없다 — 취소·숨김 되돌리기가
             # 전부 「내가 보낸 것」 기준이라 달아 두면 눌러도 아무 일이 안 일어난다.
@@ -2211,8 +2211,8 @@ def test_adhoc_screen_name():
             # CSS 주석에도 걸리지 않게 마크업으로 센다
             assert 'class="send-split sent-split"' in _second_page \
                 and 'class="se-label"' in _second_page, "옆 원본이 보낸 기사에 회색 표시가 안 붙음"
-            assert f"「청문회 13:05」 원본이 「{card.bundle_label(bundles[0])}」 확정본으로 이미 보낸" \
-                in _second_page, "말풍선이 보낸 원본의 검색어 이름을 안 적음"
+            assert "「청문회 13:05」 원본이 「청문회 종합」 확정본으로 이미 보낸" in _second_page, \
+                "말풍선이 보낸 원본의 검색어 이름을 안 적음"
             assert "rawUnsend(this)" not in _second_page, "내가 한 적 없는 보냄에 취소 버튼이 달림"
             # 그래도 **일부러** 다른 확정본으로 보내는 길은 ▾로 열려 있어야 한다
             assert "그래도 다른 확정본으로 보내기" in _second_page, "보낼 길이 통째로 막힘"
@@ -2369,9 +2369,21 @@ def test_adhoc_raw_trash_and_rounds():
             assert adhoc_renderer.report_header_text(b2) == "수시 모니터링 16시 10분 기준(인사청문회)"
             assert all("error=" not in t for t in calls), calls
 
-            # 5) 탭·보관함
+            # 5) 탭·보관함 — 같은 이름 확정본은 **번호**로 갈린다(시각이 아니다).
+            # 시각은 머리줄이 이미 말하고(「16시 10분 기준」), 탭에서 되풀이하면 담당자가
+            # 같은 이름 둘을 숫자로 대조해 가려야 한다. 보고서 첫 줄은 번호 없이 그대로다.
+            # 테스트는 두 확정본을 같은 초에 만든다 — 실제로는 몇 분씩 벌어지는 일이라,
+            # 만든 순서가 또렷하도록 여기서만 created_at을 떼어 놓는다.
+            for _bid, _when in ((b1, "15:05:00"), (b2["id"], "16:10:00")):
+                _c = card.load_card(_bid)
+                _c["created_at"] = f"{today}T{_when}"
+                card.save_card(_c)
             bp = adhoc_renderer.render_card_page(card.load_card(b2["id"]))
-            assert "인사청문회 15:05" in bp and "인사청문회 16:10" in bp, "확정본 탭에 시각이 없음"
+            assert "인사청문회 (2)" in bp, "같은 이름 확정본에 번호가 안 붙음"
+            assert "인사청문회 15:05" not in bp and "인사청문회 16:10" not in bp, "화면 이름에 시각이 남음"
+            assert card.bundle_label(card.load_card(b1)) == "인사청문회", "첫 확정본에 번호가 붙음"
+            assert adhoc_renderer.report_header_text(card.load_card(b2["id"])) == (
+                "수시 모니터링 16시 10분 기준(인사청문회)"), "보고서 첫 줄에 번호가 샘"
             archive = archive_renderer.render_archive_page(preset="all")
             assert "15:05 기준" in archive and "16:10 기준" in archive, "보관함 줄에 시각이 없음"
     print("28) 수집 원본 🗑 · 전부 보내기 · 불러올 때마다 새 확정본: 통과")

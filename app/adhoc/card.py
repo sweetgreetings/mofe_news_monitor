@@ -671,13 +671,48 @@ def bundle_time(bundle: dict) -> str:
     return bundle_basis_time(bundle) or bundle.get("basis_time") or ""
 
 
-def bundle_label(bundle: dict) -> str:
-    """확정본을 목록에서 가리키는 이름 — 「인사청문회 15:05」. 같은 날 같은 사안의 확정본이
-    불러올 때마다 새로 생기므로 이름만으로는 서로 구분이 안 된다. 사안명(보고서 첫 줄로 나가는
-    글자)엔 아무것도 안 붙이고, 목록에서만 시각을 곁들인다."""
-    name = bundle["report_title"]
-    t = bundle_time(bundle)
-    return f"{name} {t}" if t else name
+def bundle_ordinal(bundle: dict, siblings: list[dict]) -> int:
+    """같은 날 같은 이름의 확정본 중 몇 번째로 만들어졌나 — 1부터. 혼자면 1.
+
+    **만든 순서로 그때그때 센다 — 번호를 카드에 적어 두지 않는다.** 적어 두면 앞 확정본을
+    지웠을 때 (1) 없는 (2)만 남아, 가리킬 데 없는 번호가 화면에 선다.
+
+    **siblings를 다시 정렬하지 않고 받은 순서로 센다.** cards_for_date·bundles_for_date가
+    만든 순서로 돌려주고 탭 줄도 그 목록을 그대로 그리므로, 여기서 제 나름의 키로 다시
+    정렬하면 같은 초에 만들어진 두 확정본에서 **탭 차례와 번호가 어긋날 수 있다**
+    (왼쪽 탭이 (2)가 된다). 세는 순서는 보이는 순서여야 한다.
+    """
+    name = (bundle.get("report_title") or "").strip()
+    n = 0
+    for b in siblings:
+        if not is_bundle(b) or (b.get("report_title") or "").strip() != name:
+            continue
+        n += 1
+        if b.get("id") == bundle.get("id"):
+            return n
+    return 1
+
+
+def bundle_label(bundle: dict, siblings: Optional[list[dict]] = None) -> str:
+    """확정본을 화면에서 가리키는 이름 — 「증안펀드」, 같은 날 같은 이름이 또 있으면 「증안펀드 (2)」.
+
+    **시각을 붙이지 않는다.** 예전엔 「증안펀드 14:55」였는데 그 시각(bundle_time)은 기준
+    시각이라 머리줄 「수시 모니터링 14시 55분 기준(증안펀드)」이 이미 하는 말이고, 탭에서
+    되풀이하면 담당자는 같은 이름 둘을 숫자로 대조해 가려야 한다. 번호 모양은 정기 소제목
+    속이름(app.custom_groups.unique_key → 「기타 (2)」)과 같다.
+
+    **보고서 첫 줄에는 안 붙는다** — 이건 화면 이름이고, 복사·txt·발송 머리줄은
+    app.adhoc.renderer.report_header_text가 report_title을 그대로 쓴다. 첫 번째가 번호 없이
+    서므로 둘째가 생겨도 앞 확정본 이름은 그대로다(열어 둔 탭 이름이 뒤에서 안 바뀐다).
+
+    siblings: 같은 날 확정본 전부. 되풀이해 부르는 자리(sent_index·raw_row_states·탭 줄)는
+    이미 들고 있는 목록을 넘긴다 — 안 넘기면 부를 때마다 그 날짜 카드를 다시 연다.
+    """
+    name = (bundle.get("report_title") or "").strip()
+    if siblings is None:
+        siblings = bundles_for_date(bundle.get("collect_date") or "")
+    n = bundle_ordinal(bundle, siblings)
+    return f"{name} ({n})" if n > 1 else name
 
 
 def sent_index(source_ids, bundles: list[dict]) -> dict:
@@ -692,7 +727,7 @@ def sent_index(source_ids, bundles: list[dict]) -> dict:
     ids = {source_ids} if isinstance(source_ids, str) else set(source_ids)
     index: dict = {}
     for bundle in bundles:
-        label = bundle_label(bundle)  # 확정본마다 한 번만 — 기사마다 부르면 카드 목록을 되풀이해 훑는다
+        label = bundle_label(bundle, bundles)  # 확정본마다 한 번만 — 기사마다 부르면 카드 목록을 되풀이해 훑는다
         for article in bundle["articles"]:
             if article.get("hidden"):
                 continue
@@ -749,7 +784,8 @@ def raw_row_states(source_card: dict, bundles: list[dict], source_ids: Optional[
     pulled: dict = {}  # 확정본에서 뺀 사본 — {url: (가장 늦게 숨긴 시각, 확정본 이름)}
     other: dict = {}   # 옆 원본이 보낸 사본 — {url: (확정본 이름, 보낸 원본 카드 id)}
     for bundle in bundles:
-        label = bundle_label(bundle)
+        # 확정본마다 한 번만 — 목록을 안 넘기면 부를 때마다 그 날짜 카드를 다시 연다.
+        label = bundle_label(bundle, bundles)
         for article in bundle["articles"]:
             source = article.get("sent_from") or {}
             url = article["url"]

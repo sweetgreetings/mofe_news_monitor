@@ -1719,13 +1719,14 @@ def _render_issue_tabs(card: dict, today_cards: list[dict]) -> str:
         is_on = c["id"] == card["id"]
         cls = "tab on" if is_on else "tab"
         cid = html.escape(c["id"])
-        # 확정본은 불러올 때마다 같은 이름으로 새로 생기므로 시각을 곁들인다(card.bundle_label).
+        # 확정본은 불러올 때마다 같은 이름으로 새로 생기므로, 같은 이름이 또 있으면
+        # 「증안펀드 (2)」로 번호를 붙여 가른다(card.bundle_label — 시각은 안 적는다).
         # 원본 탭은 그 원본이 한 검색이다(card.screen_name) — 건수로 가르면 숨기거나 다시
         # 수집할 때마다 이름이 바뀌고, 사안명으로 가르면 같은 사안 판이 전부 같은 이름으로 선다.
         if is_bundle(c):
             # 건수는 탭에서 떼고 툴팁으로 — 머리줄 끝 건수 배지가 그 말을 한다(정기 초안·
             # 확정본과 같은 자리). 원본 탭이 이미 같은 규칙이다.
-            tab_label = f'<span class="nm">{html.escape(bundle_label(c))}</span>'
+            tab_label = f'<span class="nm">{html.escape(bundle_label(c, today_cards))}</span>'
             tab_tip = f' title="{visible_count}건"'
         else:
             # 원본 탭은 **그 원본이 한 검색**이다 — 사안명은 넷이 다 같아 아무것도 못 가르고,
@@ -1867,6 +1868,12 @@ def _bundle_namer_html(card: dict, day_bundles: list[dict], hint: str) -> str:
     """
     rows: list[str] = []
     seen: set = set()
+    # 이름마다 오늘 몇 개나 있나 — 고르면 붙을 번호(data-next)가 그 다음 수다.
+    day_count: dict = {}
+    for b in day_bundles:
+        nm = (b.get("report_title") or "").strip()
+        if nm:
+            day_count[nm] = day_count.get(nm, 0) + 1
     for b in sorted(day_bundles, key=lambda b: b.get("created_at") or "", reverse=True):
         name = (b.get("report_title") or "").strip()
         if not name or name in seen:
@@ -1874,7 +1881,8 @@ def _bundle_namer_html(card: dict, day_bundles: list[dict], hint: str) -> str:
         seen.add(name)
         when = bundle_time(b)
         rows.append(
-            f'<button type="button" class="np-row np-mine" data-name="{html.escape(name)}">'
+            f'<button type="button" class="np-row np-mine" data-name="{html.escape(name)}" '
+            f'data-next="{day_count[name] + 1}">'
             f'<span class="np-nm">{html.escape(name)}</span>'
             f'<span class="np-when">{html.escape(when + " 확정본" if when else "확정본")}</span></button>'
         )
@@ -2729,7 +2737,9 @@ def render_card_page(
     can_send = not bundle_mode and card.get("collect_date") == _today
     # [수정: 2026-09-15] 보낸 표시는 그 카드 날짜의 확정본으로 센다 — 예전엔 오늘 카드에서만
     # 셌는데, 지난 원본을 「지난 수집」에서 다시 열었을 때 무엇을 보냈는지가 안 보였다.
-    day_bundles = bundles_for_date(card["collect_date"]) if not bundle_mode else []
+    # 같은 날 확정본 전부 — 원본은 보낼 곳 목록으로, 확정본은 제 화면 이름의 번호와
+    # 「옮기기 ▾」로 쓴다(bundle_label은 형제를 봐야 몇 번째인지 안다).
+    day_bundles = bundles_for_date(card["collect_date"])
     today_bundles = day_bundles if can_send else []
     # 「✓ 보냄」은 **이 원본이 보낸 기사**만이다 — 화살표가 원본 → 확정본이라, 옆 판이
     # 보낸 기사까지 보냄으로 칠하면 내가 한 적 없는 일이 내 화면에 적힌다.
@@ -2743,9 +2753,8 @@ def render_card_page(
     raw_mode = is_raw(card)
     raw_default = default_bundle_for(card, day_bundles) if raw_mode else None
     # 이 원본이 이미 보낸 확정본(없으면 None — 그때는 이름을 묻는 창이 뜬다).
-    raw_default_name = raw_default["report_title"] if raw_default else ""
     raw_default_when = bundle_time(raw_default) if raw_default else ""
-    raw_default_label = f"{raw_default_name} {raw_default_when}".strip()
+    raw_default_label = bundle_label(raw_default, day_bundles) if raw_default else ""
     # 기본 「확정본으로」 단추 셋(행·선택 바·「모든 기사 확정본으로」)이 가리킬 곳 —
     # **메뉴가 `__auto__` 줄을 그리는 조건과 같은 판정이다**(_raw_menu의 own). 아직 아무 데도
     # 안 보낸 원본에서 단추만 `__auto__`를 들고 있으면 서버가 거부해 먹통으로 보인다.
@@ -2806,10 +2815,10 @@ def render_card_page(
         # 이 칸을 아예 안 그린다: 그때 할 일은 「+ 새 확정본 만들어 보내기」 하나다.
         own = (
             '<span class="mh">이 원본이 보낸 확정본</span>'
-            + row("__auto__", raw_default_name, raw_default_when)
+            + row("__auto__", raw_default_label, raw_default_when)
         ) if raw_default else ""
         other_rows = "".join(
-            row(b["id"], b["report_title"], bundle_time(b))
+            row(b["id"], bundle_label(b, day_bundles), bundle_time(b))
             for b in today_bundles
             if not raw_default or b["id"] != raw_default["id"]
         )
@@ -2824,20 +2833,20 @@ def render_card_page(
     # [추가: 2026-09-17] 확정본의 「옮기기 ▾」 아랫칸 — 오늘 만든 **다른 사안의** 확정본
     # (card.move_targets, 서버도 같은 함수로 다시 확인한다). 어제 확정본엔 없다(자정 잠금).
     move_bundles = (
-        move_targets(card, bundles_for_date(_today))
+        move_targets(card, day_bundles)
         if bundle_mode and card.get("collect_date") == _today
         else []
     )
     move_bundles_html = "".join(
         f'<button type="button" data-bundle="{html.escape(b["id"])}" onclick="__ONCLICK__">'
-        f'{icon("folder")} {html.escape(bundle_label(b))}'
+        f'{icon("folder")} {html.escape(bundle_label(b, day_bundles))}'
         f'<small>{sum(1 for a in b["articles"] if not a.get("hidden"))}건</small></button>'
         for b in move_bundles
     )
     bundle_options_html = (
         (
             "".join(
-                f'<option value="{html.escape(b["id"])}">{html.escape(bundle_label(b))}</option>'
+                f'<option value="{html.escape(b["id"])}">{html.escape(bundle_label(b, day_bundles))}</option>'
                 for b in today_bundles
             )
             + '<option value="__new__"><span class="plus-glyph">+</span>새 확정본 만들기</option>'
@@ -3009,7 +3018,7 @@ def render_card_page(
                 f'<button type="button" data-id="{card_id_esc}" '
                 f'data-name="{html.escape(group_name)}" data-bundle="{html.escape(b["id"])}" '
                 f'data-count="{len(unsent)}" onclick="sendGroupToBundle(this)">'
-                f'「{html.escape(bundle_label(b))}」로 {len(unsent)}건</button>'
+                f'「{html.escape(bundle_label(b, day_bundles))}」로 {len(unsent)}건</button>'
                 for b in today_bundles
             )
             send_group_html = (
@@ -3353,7 +3362,7 @@ def render_card_page(
             pair_n = sum(1 for a in raw_default["articles"] if not a.get("hidden"))
             pair_html = (
                 f'<a class="pair-link" href="/adhoc/card?id={quote(raw_default["id"])}" '
-                f'title="「{html.escape(bundle_label(raw_default))}」 확정본 열기">'
+                f'title="「{html.escape(raw_default_label)}」 확정본 열기">'
                 f'{icon("to_bundle")} {html.escape(bundle_time(raw_default))} 확정본 {pair_n}건</a>'
             )
         else:
@@ -3876,12 +3885,13 @@ function filterNamerRows() {{
   var q = (document.getElementById('namer-input').value || '').trim();
   var rows = document.querySelectorAll('#namer-list .np-row');
   var seps = document.querySelectorAll('#namer-list .np-sep');
-  var hit = 0, exact = false;
+  var hit = 0, exact = false, nextNo = '';
   rows.forEach(function (r) {{
     var name = r.dataset.name || '';
     var ok = !q || name.indexOf(q) !== -1;
     if (ok) hit++;
-    if (name === q) exact = true;
+    // 오늘 쓴 이름이면 몇 번이 붙을지 그 줄이 들고 있다(data-next).
+    if (name === q) {{ exact = true; if (r.dataset.next) nextNo = r.dataset.next; }}
     r.style.display = (!q || ok) ? '' : 'none';
   }});
   if (q && hit === 0) {{ rows.forEach(function (r) {{ r.style.display = ''; }}); }}
@@ -3889,6 +3899,11 @@ function filterNamerRows() {{
   var msg = document.getElementById('namer-msg');
   msg.classList.remove('warn');
   if (q && !exact) {{ msg.textContent = '새 사안으로 만들어요'; msg.classList.add('new'); }}
+  else if (q && nextNo) {{
+    // 보고서 첫 줄은 이름 그대로고, 번호는 탭·목록에만 붙는다 — 그 말을 여기서 한 번 한다.
+    msg.textContent = '오늘 쓴 이름이라 화면에 「(' + nextNo + ')」가 붙어요';
+    msg.classList.add('new');
+  }}
   else {{ msg.textContent = 'Enter 만들기 · Esc 닫기'; msg.classList.remove('new'); }}
 }}
 document.addEventListener('click', function (e) {{
@@ -4047,9 +4062,9 @@ document.addEventListener('click', function (e) {{
 
     nav = page_nav("bundle" if is_bundle(card) else "collect")
     # 탭 제목은 화면 이름을 맨 앞에 — 같은 사안의 원본·확정본 탭이 좁아져도 갈린다.
-    # 확정본은 목록 이름(bundle_label, 「청문회 11:10」)이라 같은 사안 확정본끼리도 갈린다.
+    # 확정본은 화면 이름(bundle_label)이라 같은 이름 확정본끼리도 번호로 갈린다.
     page_title = (
-        f"확정본 · {bundle_label(card)}" if is_bundle(card)
+        f"확정본 · {bundle_label(card, day_bundles)}" if is_bundle(card)
         else f"원본 · {screen_name(card)}"
     )
     return base_page(page_title, body, script, nav=nav)

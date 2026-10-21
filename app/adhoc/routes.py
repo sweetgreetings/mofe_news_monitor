@@ -478,8 +478,11 @@ def _handle_raw_unsend(handler, form: dict) -> None:
         return
     # 이 원본이 보낸 사본만 대상이다 — 「✓ 보냄」이 그것만 뜻하기 때문이다.
     ids = {c["id"]}
+    # 번호(「증안펀드 (2)」)는 **그 날 확정본 전부**를 봐야 나온다 — 아래 bundles는
+    # 이 기사를 받은 것만 추린 부분집합이라 이름을 지을 때 쓰면 번호가 어긋난다.
+    day_bundles = card.bundles_for_date(today)
     bundles = [
-        b for b in card.bundles_for_date(today)
+        b for b in day_bundles
         if any(
             a["url"] == url and not a.get("hidden")
             and (a.get("sent_from") or {}).get("card_id") in ids
@@ -496,7 +499,7 @@ def _handle_raw_unsend(handler, form: dict) -> None:
     touched = card.unsend_raw(card_id, url, bundles)
     for bundle_id in touched:
         undo.attach_link(card_id, label, bundle_id, [], [], pulled=[url])
-    names = "·".join(f"「{card.bundle_label(b)}」" for b in bundles if b["id"] in touched)
+    names = "·".join(f"「{card.bundle_label(b, day_bundles)}」" for b in bundles if b["id"] in touched)
     _card_redirect(handler, card_id, notice=f"{names} 확정본에서 뺐어요." if names else "")
 
 
