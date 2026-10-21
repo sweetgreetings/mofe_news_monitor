@@ -12,6 +12,7 @@
 import ast
 import json
 import os
+import re
 import sys
 import tempfile
 from contextlib import ExitStack
@@ -3596,6 +3597,57 @@ def test_unclassified_sits_below_summary():
     print("48) 📂 소제목 미분류 자리: 통과 (요약 아래·담아둔 기사 위, 확정본·초안 같음, 메모 버튼 + 뗌)")
 
 
+def test_empty_custom_group_appears_once_in_group_list():
+    """빈 커스텀 소제목이 「이동할 소제목」 드롭다운에 **한 번만** 선다(확정본·초안 같다).
+
+    이 화면들이 소제목 목록을 세는 자리는 `.subheading h2 .rename-btn[data-current]`
+    하나다(getAllGroups·moveGroupOrder). 기사가 0건인 커스텀 소제목의 🗑은 ✏️와 같은
+    `rename-btn` 클래스를 쓰는데 거기에 `data-current`까지 달려 있어, 그 칸만 목록에
+    **두 번** 걸렸다(2026-10-16 제보 — 소제목을 하나 만들었는데 드롭다운에 같은 이름이
+    둘). 🗑이 읽는 이름은 `data-del-current`로 옮겼다.
+    """
+    _require_isolation()
+    empty_name = "10월 최근 경제동향"
+
+    def art(url, title, group):
+        return {"outlet": "연합뉴스", "title": title, "url": url,
+                "summary": "정부가 세수 대책을 내놨다.", "pub_date": "2026-10-16T10:00:00+09:00",
+                "group": group}
+
+    articles = [art("https://e.x/1", "세제 개편 발표", "세제")]
+
+    def check(label, page):
+        # 목록에 걸리는 표식은 **소제목 칸 하나당 많아야 하나**다(📂 미분류 칸엔 아예 없다).
+        blocks = page.split('<section class="subheading')[1:]
+        assert blocks, f"{label}: 소제목이 하나도 안 그려졌다"
+        for block in blocks:
+            name = re.search(r'data-toc-name="([^"]*)"', block)
+            marks = block.count('data-current="')
+            assert marks <= 1, \
+                f"{label}: 「{name and name.group(1)}」 칸에 목록 표식이 {marks}개 — 드롭다운에 두 번 선다"
+        assert page.count(f'data-current="{empty_name}"') == 1, \
+            f"{label}: 빈 소제목이 목록에 한 번만 서야 한다"
+        # 🗑은 목록에서 빠지되 확인창에 보일 이름은 그대로 들고 있어야 한다.
+        assert f'data-del-current="{empty_name}"' in page, f"{label}: 🗑이 화면 이름을 잃었다"
+
+    # 1) 확정본
+    with patch.object(renderer, "load_custom_groups", return_value=[empty_name]):
+        page = renderer.render_page("11:00", articles, ["세제"], [], "ㅇ ({outlet}) {title}", "<{section}>")
+    check("확정본", page)
+
+    # 2) 초안 — 분류 결과만 심어 같은 자리를 확인한다(AI 호출 없음)
+    groups = [{"name": "세제", "articles": [articles[0]]}]
+    with patch.object(preview_renderer, "classify_articles", return_value=groups), \
+         patch.object(preview_renderer, "load_custom_groups", return_value=[empty_name]):
+        content = preview_renderer._compute_preview_content(
+            {"start": "09:00", "end": "11:00"}, articles, ["세제"], [],
+            "ㅇ ({outlet}) {title}", "10:18",
+        )
+    check("초안", content["body"])
+
+    print("83) 빈 커스텀 소제목: 통과 (드롭다운·순서 목록에 한 번만, 🗑은 data-del-current)")
+
+
 def test_send_log():
     """발송 기록(2026-09-23, mockups/SEND_LOG_MOCKUP.html).
 
@@ -6416,6 +6468,7 @@ def test_adhoc_tab_delete_stays_put():
 if __name__ == "__main__":
     tests = [
         test_unclassified_sits_below_summary,
+        test_empty_custom_group_appears_once_in_group_list,
         test_custom_group_with_taken_name_gets_its_own_box,
         test_custom_group_alias_outlives_the_day_and_the_delete,
         test_home_issue_card_uses_display_names,

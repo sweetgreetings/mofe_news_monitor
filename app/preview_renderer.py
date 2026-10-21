@@ -2195,7 +2195,9 @@ function removeCustomGroup(btn) {{
   // data-name(자동 생성된 원래 단어)을 그대로 보여줘서, ✏️로 이름을 바꿔둔 소제목을
   // 지우려 하면 "내가 본 적 없는 이름"이 뜨는 버그가 있었다(사용자 제보). 서버로
   // 보내는 건 여전히 원래 단어 name이다 — 저장 키가 그것이기 때문.
-  if (!confirm('"' + (btn.dataset.current || name) + '" 소제목을 삭제할까요?')) return;
+  // [수정: 2026-10-21] 읽는 칸이 data-current가 아니라 data-del-current다 — 그 이름을 쓰는 이유는
+  // 이 버튼이 소제목 목록 선택자에 걸리면 안 되기 때문이다(_render_preview_groups 주석).
+  if (!confirm('"' + (btn.dataset.delCurrent || name) + '" 소제목을 삭제할까요?')) return;
   fetch("http://{settings_host}:{settings_port}/remove-custom-group", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
@@ -2947,9 +2949,13 @@ def _render_preview_groups(
                 '<p class="empty-group-hint">아직 기사가 없어요 — 체크박스로 선택하거나 '
                 "드롭다운으로 기사를 여기로 옮겨보세요.</p>"
             )
+            # 화면에 보일 이름은 data-del-current에 담는다 — data-current를 쓰면
+            # ".subheading h2 .rename-btn[data-current]"(= 이 화면의 소제목 목록)에
+            # ✏️와 이 🗑이 **둘 다** 걸려 빈 소제목이 「이동할 소제목」 드롭다운·
+            # 순서 저장 목록에 두 번 선다.
             delete_btn = (
                 f'<button class="rename-btn group-hide-btn" type="button" data-name="{original_name}" '
-                f'data-current="{display_name}" '
+                f'data-del-current="{display_name}" '
                 f'onclick="removeCustomGroup(this)" title="이 빈 소제목 삭제">{icon("trash")}</button>'
             )
         else:
