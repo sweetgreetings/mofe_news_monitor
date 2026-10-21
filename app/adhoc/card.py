@@ -8,7 +8,7 @@ import json
 import re
 import secrets
 import threading
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -210,6 +210,26 @@ def _validate_window(start: str, end: str) -> None:
         raise AdhocCardError(f"끝나는 시각이 시작 시각보다 빠릅니다 ({start} ~ {end}).")
 
 
+def _validate_collect_date(collect_date: Optional[str], now: datetime) -> str:
+    """"어느 날 기사를 모으나"를 확인해 "YYYY-MM-DD"로 돌려준다. 없으면 오늘이다.
+
+    여기서 보는 건 **형식과 미래 여부**뿐이다 — "얼마나 지난 날짜까지 허용하나"는
+    실제 수집 시점의 판단이라 app.adhoc.collector(_validate_collectable)에 있다
+    (_validate_window가 "미래 시각인가"를 수집 쪽에 맡기는 것과 같은 선이다).
+    """
+    today = now.strftime("%Y-%m-%d")
+    if not collect_date:
+        return today
+    collect_date = collect_date.strip()
+    try:
+        date.fromisoformat(collect_date)
+    except ValueError:
+        raise AdhocCardError(f"날짜는 YYYY-MM-DD 형식으로 골라주세요 ({collect_date}).")
+    if collect_date > today:
+        raise AdhocCardError(f"{collect_date}은 아직 오지 않은 날짜예요.")
+    return collect_date
+
+
 # --- 사안(issue) CRUD -----------------------------------------------------------
 
 
@@ -283,6 +303,7 @@ def new_card(
     now: Optional[datetime] = None,
     must_keywords: Optional[list[str]] = None,
     raw: bool = True,
+    collect_date: Optional[str] = None,
 ) -> dict:
     """카드를 새로 만들어 저장하고, 만든 카드를 돌려준다.
 
@@ -299,12 +320,16 @@ def new_card(
     report_title = report_title.strip() or " · ".join(k.strip() for k in keywords if k.strip())
     _validate_must_keywords(must_keywords or [])
     _validate_window(window_start, window_end)
+    # collect_date는 "어느 날 기사를 모으나"이고 now는 "언제 만들었나"다 — 지난 날짜를
+    # 모을 수 있게 되면서 둘이 갈라졌다. now로 날짜를 대신하면 카드 id(파일명 사전순 =
+    # 만든 순서)와 created_at까지 과거로 끌려가 목록 정렬이 뒤집힌다.
+    collect_date = _validate_collect_date(collect_date, now)
 
     card = {
         "id": _generate_card_id(now),
         "issue_id": issue_id,
         "report_title": report_title,
-        "collect_date": now.strftime("%Y-%m-%d"),
+        "collect_date": collect_date,
         "window": {"start": window_start, "end": window_end},
         "keywords": [k.strip() for k in keywords if k.strip()],
         # [수정: 2026-09-01] 수집 원본 화면에서 "검색어가 모두 있는 기사만"을 고르면
@@ -333,7 +358,7 @@ def new_card(
 
 def new_bundle_card(
     name: str, now: Optional[datetime] = None, issue_id: str = "", basis_time: str = "",
-    source_card_id: str = "",
+    source_card_id: str = "", collect_date: Optional[str] = None,
 ) -> dict:
     """모음 카드를 만든다 (ADHOC_DESIGN.md §6.13) — 검색어·시간창 검증을 타지 않는
     유일한 생성자다.
@@ -362,12 +387,17 @@ def new_bundle_card(
         raise AdhocCardError("확정본 이름을 입력해주세요.")
     issue_id = issue_id or get_or_create_issue(name, now=now)["id"]
     basis_time = basis_time if _HHMM_RE.match(basis_time or "") else ""
+    # 확정본은 **자기를 만든 원본과 같은 날짜**에 선다 — 지난 날짜 원본에서 보내면 그
+    # 날짜의 확정본이 생긴다. 오늘로 박으면 어제 기사가 오늘 보고서에 담겨 머리줄
+    # 「N시 기준」이 어느 날 기준인지 말할 수 없게 되고, 수시 보관함에서도 엉뚱한
+    # 날짜 아래 선다. id·created_at은 new_card와 같은 이유로 now 그대로다.
+    collect_date = _validate_collect_date(collect_date, now)
     card = {
         "id": _generate_card_id(now),
         "kind": KIND_BUNDLE,
         "issue_id": issue_id,
         "report_title": name,
-        "collect_date": now.strftime("%Y-%m-%d"),
+        "collect_date": collect_date,
         # 검색을 안 하므로 시간창·검색어·수집 이력은 구조적으로 비어 있다(window_of 참고).
         "window": None,
         "keywords": [],

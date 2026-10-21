@@ -6,12 +6,13 @@
 # (app.naver_api.search_keywords)을 그대로 쓰고, 저장은 app.adhoc.card에
 # 맡긴다. 정기의 전역 큐레이션 파일(hidden_articles.json 등)은 여기서도 건드리지 않는다.
 import threading
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from app.adhoc.card import AdhocCardError, append_collect_log, card_lock, load_card, save_card
 from app.filters import deduplicate_by_title, exclude_personnel_articles, exclude_photo_articles, filter_by_outlet_whitelist
-from app.naver_api import _MAX_START, kst_today_at, search_keywords
+from app.config import ADHOC_PAST_COLLECT_DAYS
+from app.naver_api import _MAX_START, kst_at, search_keywords
 from app.settings import load_settings
 from app.sorter import sort_by_outlet_priority
 
@@ -80,7 +81,9 @@ def _search_with_cache(
     if not missing:
         return cached, [], cached_capped
 
-    fresh, failed, fresh_capped = search_keywords(missing, after=after, before=before)
+    # day=collect_date — 이 한 줄이 "어느 날을 모으나"를 정한다(app.naver_api._is_on_collect_day).
+    # 캐시 키에 이미 collect_date가 들어 있어(_cache_key) 날짜가 다른 수집끼리 섞이지 않는다.
+    fresh, failed, fresh_capped = search_keywords(missing, after=after, before=before, day=collect_date)
     with _search_cache_lock:
         for keyword, results in fresh.items():
             if keyword in failed:
@@ -111,12 +114,23 @@ def _validate_collectable(card: dict, now: datetime) -> None:
     구조 검증과는 성격이 달라 여기(collector)에 둔다.
     """
     today = now.strftime("%Y-%m-%d")
-    if card["collect_date"] != today:
-        raise AdhocCollectError(
-            f"이 카드는 {card['collect_date']} 기준으로 수집한 카드입니다 (오늘은 {today}). "
-            "시간대를 그대로 다시 수집하면 오늘 날짜로 검색됩니다 — 같은 사안 아래 "
-            "오늘 회차를 새로 만들어주세요."  # ADHOC_DESIGN.md §6.3 — 기준일 변경 = 새 카드
-        )
+    collect_date = card["collect_date"]
+    if collect_date > today:
+        raise AdhocCollectError(f"{collect_date}은 아직 오지 않은 날짜예요.")
+    if collect_date < today:
+        # [수정: 2026-10-21] 예전엔 지난 날짜 카드의 수집을 통째로 막았다(ADHOC_DESIGN.md
+        # §6.3 자정 잠금). 막은 이유는 하나였다 — 검색이 언제나 "오늘"로 고정돼 있어서
+        # (app.naver_api의 당일 하드 스톱) 어제 카드를 다시 수집하면 어제 창에 오늘
+        # 기사가 담겼다. 이제 검색이 카드의 collect_date를 그대로 쓰므로 그 이유가
+        # 사라졌고, 거꾸로 **막는 것이 틀린 동작**이 됐다(어제 날짜로 모으려면 수집을
+        # 해야 한다). 날짜 자체의 한도만 본다.
+        age = (date.fromisoformat(today) - date.fromisoformat(collect_date)).days
+        if age > ADHOC_PAST_COLLECT_DAYS:
+            raise AdhocCollectError(
+                f"{collect_date}은 {ADHOC_PAST_COLLECT_DAYS}일보다 더 지난 날짜예요 "
+                f"({age}일 전). 더 가까운 날짜로 모아주세요."
+            )
+        return  # 지난 날짜는 하루가 이미 끝났으므로 아래 "아직 그 시각이 안 됐다" 검사가 없다
     window_end = card["window"]["end"]
     now_hhmm = now.strftime("%H:%M")
     if window_end > now_hhmm:
@@ -206,7 +220,33 @@ def out_of_condition_reason(article: dict, card: dict) -> Optional[str]:
     return None
 
 
-def _search_card(card: dict, now: datetime) -> dict[str, list[dict]]:
+def _shortfall(results: dict[str, list[dict]], capped: set[str], card: dict) -> list[dict]:
+    """조회 상한에 걸려 **요청한 구간까지 못 닿은** 검색어를 추린다 — 카드 화면의 빨간
+    경고가 읽는 값이다.
+
+    네이버는 검색어당 최신 1000건까지만 준다(_MAX_START). 그래서 지금부터 수집 날짜까지
+    쌓인 기사가 그보다 많으면 요청한 구간에 닿기 전에 결과가 끊기는데, **네이버는 이때
+    오류를 내지 않고 조용히 멈춘다.** 적어 두지 않으면 담당자 화면에서 "그날 기사가
+    없었다"와 구별할 수 없고, 그 상태로 보고서가 나가는 게 이 앱이 가장 경계하는
+    모양이다(CODING_CONVENTIONS.md §3 — 담당자 작업은 조용히 사라지지 않는다).
+
+    `reached`는 그 검색어가 실제로 받아온 기사 중 가장 오래된 게시 시각이다. 창 밖
+    기사는 이미 걸러져 있어 그 값이 곧 "여기까지만 닿았다"는 지점이고, **한 건도 못
+    받았으면 None**이다 — 구간에 닿지도 못한 경우라, 화면이 "0건"으로 적으면 안 되는
+    바로 그 경우다.
+    """
+    if not capped:
+        return []
+    shortfall = []
+    for keyword in dict.fromkeys(card["keywords"] + card.get("must_keywords", [])):
+        if keyword not in capped:
+            continue
+        stamps = sorted(a["pub_date"] for a in results.get(keyword, []) if a.get("pub_date"))
+        shortfall.append({"keyword": keyword, "reached": stamps[0] if stamps else None})
+    return shortfall
+
+
+def _search_card(card: dict, now: datetime) -> tuple[dict[str, list[dict]], list[dict]]:
     """이 카드의 검색어 + 꼭 포함할 검색어를 전부 검색해 {키워드: 결과}로 돌려준다.
 
     naver_api 쪽이 이미 키워드 단위 재시도(_KEYWORD_RETRY_ATTEMPTS)를 거친 뒤에도 실패한
@@ -215,13 +255,14 @@ def _search_card(card: dict, now: datetime) -> dict[str, list[dict]]:
     반영으로 생기는 애매한 상태("어디까지 반영됐는지 모르겠다")를 만들지 않는다.
     """
     window = card["window"]
+    collect_date = card["collect_date"]
     keywords = list(dict.fromkeys(card["keywords"] + card.get("must_keywords", [])))
     results, failed, capped = _search_with_cache(
-        card["collect_date"],
+        collect_date,
         keywords,
         window,
-        after=kst_today_at(window["start"]),
-        before=kst_today_at(window["end"]),
+        after=kst_at(collect_date, window["start"]),
+        before=kst_at(collect_date, window["end"]),
     )
     if failed:
         names = ", ".join(f"'{k}'" for k in failed)
@@ -239,11 +280,11 @@ def _search_card(card: dict, now: datetime) -> dict[str, list[dict]]:
     for keyword in card.get("must_keywords", []):
         if keyword in capped:
             raise AdhocKeywordCapError(
-                f"'{keyword}'{josa_eun(keyword)} 오늘 기사가 {_MAX_START:,}건을 넘어 "
-                "정확히 거를 수 없어요. "
+                f"'{keyword}'{josa_eun(keyword)} 지금부터 {collect_date} 사이 기사가 "
+                f"{_MAX_START:,}건을 넘어 정확히 거를 수 없어요. "
                 "수집 시간대를 좁히거나 더 구체적인 말을 써주세요."
             )
-    return results
+    return results, _shortfall(results, capped, card)
 
 
 def run_collect(card_id: str, now: Optional[datetime] = None, log: bool = True) -> dict:
@@ -275,7 +316,10 @@ def run_collect(card_id: str, now: Optional[datetime] = None, log: bool = True) 
             raise AdhocCardError(f"카드를 찾을 수 없습니다: {card_id}")
         _validate_collectable(card, now)
 
-        results = _search_card(card, now)
+        results, shortfall = _search_card(card, now)
+        # 못 닿은 검색어는 카드에 적어 둔다 — 화면을 다시 열어도 경고가 남아야 하고,
+        # 요청 한 번의 사정이 아니라 "이 카드의 결과가 불완전하다"는 사실이기 때문이다.
+        card["capped_keywords"] = shortfall
 
         # URL별로 "지금 어느 검색어에 걸렸는가" — 조건 판정과 검색어별 건수의 근거가 된다.
         url_keywords: dict[str, list[str]] = {}

@@ -41,7 +41,9 @@ _FIXTURE_BY_KEYWORD = {
 }
 
 
-def _fake_search_one_keyword(keyword, after=None, before=None, include_unparsed_dates=False):
+def _fake_search_one_keyword(keyword, after=None, before=None, include_unparsed_dates=False, day=None):
+    # day: 어느 날짜를 모으나(지난 날짜 수집). 픽스처는 늘 "오늘" 기사를 돌려주므로
+    # 값을 쓰지 않지만, 실제 함수와 시그니처가 어긋나면 호출 자체가 터진다.
     # [수정: 2026-08-24] _search_one_keyword의 반환값이 (기사 목록, 조회 상한에 걸렸는지)
     # 튜플로 바뀌어(app.adhoc.collector의 §6.4b AND 상한 오판 수정), 이 목도 같은 모양을
     # 돌려줘야 한다 — 테스트 픽스처는 상한에 걸릴 일이 없으므로 항상 False.
@@ -1182,6 +1184,154 @@ def test_adhoc_card_delete_and_restore():
             assert card.restore_card("../issues.json") is None
 
     print("18) 수시 카드 삭제·되살리기: 통과 (이름 없는 사안 표시, 보관함엔 흔적 없이 초록 안내, 기한 뒤 껍데기·비우기, 되살리기)")
+
+
+def test_adhoc_past_date_collect():
+    """수시 수집을 지난 날짜로 — 어제는 없던 검색어로 어제 기사를 모을 수 있나.
+
+    [추가: 2026-10-21] 네이버 검색 API에는 기간 칸이 없고 최신순으로만 주므로, "그 날짜가
+    아니면 멈춘다"는 판정 한 곳(app.naver_api._compare_collect_day)이 곧 "어느 날을
+    모으나"를 정한다. 검색어를 언제 등록했는지는 네이버가 모르기 때문에, 오늘 처음 만든
+    검색어로도 지난 날 기사가 그대로 나온다.
+
+      1) **날짜 판정은 세 갈래여야 한다** — 참/거짓으로 묶으면 목록 맨 앞의 "오늘" 기사에서
+         그대로 멈춰 0건이 나오고, 그게 "그날 기사가 없었다"와 똑같이 보인다(실측 재현).
+      2) new_card(collect_date=)는 날짜만 과거로 두고 id·created_at은 now 그대로 — 카드
+         id가 파일명 사전순 = 만든 순서라 과거로 끌려가면 목록 정렬이 뒤집힌다.
+      3) 지난 날짜 카드도 수집된다(옛 자정 잠금은 "검색이 늘 오늘이었다"는 사라진 이유였다).
+         미래·한도 밖 날짜는 거부한다.
+      4) 1000건 상한에 걸려 못 닿은 구간은 카드에 적히고(capped_keywords) 화면에 **빨간**
+         경고로 선다 — 한 건도 못 받은 경우(reached=None)와 일부만 받은 경우를 가른다.
+      5) 지난 날짜 원본 배너는 더 이상 "다시 수집하면 오늘 날짜로 검색됩니다"라고 하지
+         않는다(그 문장이 거짓이 됐다) — 재수집 칸도 잠기지 않는다.
+    """
+    _require_isolation()
+    from app import naver_api
+    from app.adhoc import card, collector as adhoc_collector, renderer as adhoc_renderer
+
+    kst = naver_api._KST
+    now = datetime.now().replace(second=0, microsecond=0)
+    today = now.strftime("%Y-%m-%d")
+    yday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # 1) 세 갈래 판정 — 오늘 기사는 "새것"(건너뜀)이고 그제 기사는 "오래됨"(중단)이다.
+    assert naver_api._compare_collect_day(naver_api.kst_at(today, "09:00"), yday) > 0, \
+        "지난 날짜를 모으는데 오늘 기사를 '오래된 기사'로 봐서 첫 건에서 멈춘다"
+    assert naver_api._compare_collect_day(naver_api.kst_at(yday, "09:00"), yday) == 0
+    assert naver_api._compare_collect_day(
+        naver_api.kst_at((now - timedelta(days=2)).strftime("%Y-%m-%d"), "23:00"), yday) < 0
+    # day를 안 주면 예전 그대로 "오늘"이다.
+    assert naver_api._compare_collect_day(datetime.now(kst)) == 0
+
+    with tempfile.TemporaryDirectory() as tmp:
+        adhoc_dir = Path(tmp)
+        (adhoc_dir / "cards").mkdir()
+        (adhoc_dir / "trash").mkdir()
+        with patch.object(card, "CARDS_DIR", adhoc_dir / "cards"), \
+             patch.object(card, "TRASH_DIR", adhoc_dir / "trash"), \
+             patch.object(card, "ISSUES_FILE", adhoc_dir / "issues.json"):
+            # 2) 날짜만 과거, id·created_at은 지금
+            c = card.new_card("", "", "00:00", "23:59", ["세법개정"], now=now, collect_date=yday)
+            assert c["collect_date"] == yday
+            assert c["id"].startswith(now.strftime("%Y%m%d")), "카드 id가 과거로 끌려갔다"
+            assert card.new_card("", "", "00:00", "23:59", ["x"], now=now)["collect_date"] == today
+            for bad in (f"{now.year + 1}-01-01", "20261020"):
+                try:
+                    card.new_card("", "", "00:00", "23:59", ["x"], now=now, collect_date=bad)
+                except card.AdhocCardError:
+                    pass
+                else:
+                    raise AssertionError(f"잘못된 날짜를 받아들임: {bad}")
+
+            # 3) 지난 날짜 카드도 수집된다 — 그 날짜로 검색이 걸리는지 day 인자로 확인한다.
+            seen = {}
+
+            def _fake(keywords, after=None, before=None, include_unparsed_dates=False, day=None):
+                seen["day"] = day
+                seen["window"] = (after, before)
+                return ({keywords[0]: [{
+                    "outlet": "한국일보", "title": "세법개정안 국회 제출", "url": "https://n.news.naver.com/a/1",
+                    "summary": "요약", "pub_date": naver_api.kst_at(yday, "15:30").isoformat(),
+                }]}, [], [])
+
+            with patch.object(adhoc_collector, "search_keywords", _fake):
+                adhoc_collector.run_collect(c["id"], now=now, log=False)
+            assert seen["day"] == yday, f"수집이 그 날짜로 검색하지 않음: {seen['day']}"
+            assert seen["window"][0] == naver_api.kst_at(yday, "00:00"), "창이 오늘 날짜 위에 섰다"
+            saved = card.load_card(c["id"])
+            assert len(saved["articles"]) == 1 and not saved.get("capped_keywords")
+
+            future = dict(saved, collect_date=f"{now.year + 1}-01-01")
+            old = dict(saved, collect_date=(now - timedelta(days=9999)).strftime("%Y-%m-%d"))
+            for bad_card, why in ((future, "미래"), (old, "한도 밖")):
+                try:
+                    adhoc_collector._validate_collectable(bad_card, now)
+                except adhoc_collector.AdhocCollectError:
+                    pass
+                else:
+                    raise AssertionError(f"{why} 날짜 수집을 막지 않음")
+
+            # 4) 못 닿은 구간 — 한 건도 못 받은 경우와 일부만 받은 경우를 가른다.
+            got = {"넓은말": [], "세법개정": [{"pub_date": naver_api.kst_at(yday, "13:20").isoformat()}]}
+            shortfall = adhoc_collector._shortfall(
+                got, {"넓은말", "세법개정"}, {"keywords": ["넓은말", "세법개정"]})
+            assert {i["keyword"]: i["reached"] for i in shortfall} == {
+                "넓은말": None, "세법개정": naver_api.kst_at(yday, "13:20").isoformat()
+            }, f"못 닿은 구간을 잘못 적음: {shortfall}"
+            assert adhoc_collector._shortfall(got, set(), {"keywords": []}) == []
+
+            warn = adhoc_renderer._capped_warn_html(dict(saved, capped_keywords=shortfall))
+            assert 'class="warn capped"' in warn, "못 닿음 경고가 빨간 .warn이 아니다"
+            assert "stale" not in warn, "못 닿음은 사실 알림(앰버)이 아니라 불완전한 결과다"
+            assert "한 건도" in warn and "13:20" in warn
+            assert adhoc_renderer._capped_warn_html(saved) == "", "닿았는데 경고가 떴다"
+
+            # 5) 새 수집 폼의 날짜 칸 + 지난 날짜 배너 문구
+            form = adhoc_renderer.render_new_card_page()
+            assert 'name="collect_date"' in form and f'max="{today}"' in form
+            assert "setCollectDate(1)" in form, "「어제」 칩이 없다"
+            # 칩이 "지금 고른 날짜"를 말한다(시안 A안) — 누르는 쪽과 불 켜는 쪽이 **같은
+            # 날짜 셈**(dateMinusDays)을 봐야 "눌렀는데 안 켜지는" 어긋남이 안 생긴다.
+            assert form.count('data-days="0"') == 1 and form.count('data-days="1"') == 1
+            assert ".qchip.on" in form, "켜진 칩 CSS가 없다 — 눌러도 모양이 안 변한다"
+            assert "syncDateChips();" in form, "화면을 열 때 「오늘」이 안 켜진다"
+            # 시간 줄의 빠른 칩(0시부터·최근 N시간)은 켜짐이 없는 동작 버튼이다.
+            assert 'data-days' not in form.split("0시부터")[0].rsplit("<span class=\"n-quick\">", 1)[-1]
+            page = adhoc_renderer.render_card_page(saved)
+            assert "오늘 날짜로 검색" not in page, "거짓이 된 옛 문구가 남아 있다"
+            assert f"다시 수집해도 <b>{yday}</b> 날짜로 검색돼요" in page
+            assert 'id="recol-start" name="window_start" value="00:00" disabled' not in page
+
+            # 6) **확정본으로 보낼 수 있어야 쓸모가 있다** — 모으기만 되고 보고서를 못
+            #    만들면 반쪽이다. 보내는 곳은 **원본과 같은 날짜의 확정본**이라 날짜가
+            #    섞이지 않는다(옛 자정 잠금이 막으려던 바로 그것).
+            from app.adhoc import routes as adhoc_routes, undo as adhoc_undo
+
+            with patch.object(adhoc_undo, "UNDO_DIR", adhoc_dir / "undo"):
+                (adhoc_dir / "undo").mkdir(exist_ok=True)
+                redirects = []
+
+                class _H:
+                    def _redirect(self, target):
+                        redirects.append(target)
+
+                adhoc_routes._handle_send_to_bundle(_H(), {
+                    "id": [c["id"]], "urls": ["https://n.news.naver.com/a/1"],
+                    "bundle": ["__new__"], "bundle_name": ["세법개정 점검"],
+                })
+                assert redirects and "error=" not in redirects[-1], f"보내기가 막힘: {redirects}"
+                day_bundles = card.bundles_for_date(yday)
+                assert len(day_bundles) == 1, "지난 날짜 원본에서 확정본으로 못 보냄"
+                assert day_bundles[0]["collect_date"] == yday, \
+                    "확정본이 오늘 날짜로 섰다 — 어제 기사가 오늘 보고서에 담긴다"
+                assert len(day_bundles[0]["articles"]) == 1
+                assert card.bundles_for_date(today) == [], "오늘 확정본이 생겼다"
+                assert card.sent_index(c["id"], day_bundles), "원본에 ✓ 보냄이 안 붙었다"
+
+            page = adhoc_renderer.render_card_page(card.load_card(day_bundles[0]["id"]))
+            assert "기사를 더 보낼 수 없어요" not in page, "거짓이 된 옛 확정본 배너가 남아 있다"
+
+    print("55) 수시 지난 날짜 수집: 통과 (세 갈래 날짜 판정, 날짜만 과거, 못 닿음 빨간 경고, 폼 날짜 칸, 같은 날짜 확정본으로 보내기)")
 
 
 def test_adhoc_reload_to_now():
@@ -6520,6 +6670,7 @@ if __name__ == "__main__":
         test_outlet_photo_tag,
         test_photo_body_verdict,
         test_undo_returns_only_what_the_user_touched,
+        test_adhoc_past_date_collect,
         test_adhoc_reload_to_now,
         test_label_archive_copy_and_order,
         test_photo_gather_and_adhoc_bulk_hide,

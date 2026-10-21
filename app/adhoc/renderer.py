@@ -46,7 +46,7 @@
 # 액션마다 새로 짤 필요가 없기 때문이다.
 import html
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from urllib.parse import quote
 
@@ -94,6 +94,7 @@ from app.adhoc.collector import (
 )
 from app.excel_export import format_pub_datetime
 from app.config import (
+    ADHOC_PAST_COLLECT_DAYS,
     COLOR_ACCENT,
     COLOR_ADHOC_BG,
     COLOR_ADHOC_TEXT,
@@ -107,6 +108,9 @@ from app.config import (
 )
 from app.filters import HEADLINE_TAG_RE, headline_kind, looks_like_photo_caption, photo_badge_tip
 from app.sorter import outlet_sort_key, sort_by_pub_desc
+# 1000건 상한 숫자는 네이버가 정한 값이라 화면이 따로 적지 않고 그 자리에서 가져온다 —
+# 숫자를 두 군데 적으면 한쪽만 고쳤을 때 경고문이 거짓이 된다.
+from app.naver_api import _MAX_START
 from app.icons import icon
 from app.labels import labels_for_url
 from app import photo_overrides
@@ -231,7 +235,7 @@ function setQuick(startId, endId, kind) {
   setHM(startId, kind === 'midnight' ? '00:00' : subMinutesFloor30(now, kind === '1h' ? 60 : 180));
 }
 var HM_RE = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
-function validWindow(startId, endId) {
+function validWindow(startId, endId, isToday) {
   var s = document.getElementById(startId).value;
   var e = document.getElementById(endId).value;
   if (!HM_RE.test(s) || !HM_RE.test(e)) {
@@ -242,6 +246,10 @@ function validWindow(startId, endId) {
     alert('끝나는 시각이 시작 시각보다 빠릅니다 (' + s + ' ~ ' + e + ').');
     return false;
   }
+  // [수정: 2026-10-21] "아직 그 시각이 안 됐다"는 **오늘을 모을 때만** 맞는 말이다 —
+  // 지난 날짜는 하루가 이미 끝나 23:59도 지난 시각이다. 서버도 같은 선으로 가른다
+  // (app.adhoc.collector._validate_collectable). isToday를 안 넘기면 오늘로 본다.
+  if (isToday === false) return true;
   var now = nowHM();
   if (e > now) {
     alert('아직 ' + e + '이 안 됐어요 (지금 ' + now + '). ' + now + '까지만 수집할 수 있어요.');
@@ -634,6 +642,14 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .qchip {{ font-size: var(--fs-sm); padding: 4px 11px; border-radius: var(--r-pill); border: 1px dashed {border};
     background: {card}; color: {text_soft}; cursor: pointer; font-family: inherit; }}
   .qchip:hover {{ border-color: {accent}; color: {accent}; border-style: solid; }}
+  /* [추가: 2026-10-21] 켜진 칩 — 날짜 칩(오늘·어제)이 "지금 고른 날짜"를 말한다.
+     **새 모양을 만들지 않는다**: 수집 시간 설정의 요일 칩(.day-chip)이 이미 쓰는
+     켜고 끄는 알약 언어(꺼짐 점선 + 흐린 글자 / 켜짐 실선 accent + 옅은 파랑 바탕)를
+     그대로 가져왔다. 시간 줄의 빠른 칩(0시부터·최근 N시간)은 누르면 값을 채우고 마는
+     동작이라 켜짐이 없다 — data-days가 붙은 날짜 칩에만 선다.
+     시안 mockups/ADHOC_DATE_CHIP_MOCKUP.html A안. */
+  .qchip.on {{ border: 1px solid {accent}; border-style: solid; background: {hover};
+    color: {accent}; font-weight: 600; }}
   /* [수정: 2026-08-25] 시작 시각 -1h/+1h 스테퍼는 만들었다가 도로 뺐다 — 시간 줄에
      테두리 상자가 셋(스테퍼 묶음·종료 입력·칩 줄)으로 늘어 패널이 지저분해졌고,
      0시~지금/최근 1시간/최근 3시간 프리셋이 이미 같은 일을 한 번에 한다. */
@@ -673,7 +689,11 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .warn.stale {{ background: {warn_bg}; border-color: {warn_border}; color: {warn_text}; }}
   /* 이 배너 안의 링크는 배너 색을 따른다 — 기본 파랑이면 배너에서 혼자 튄다.
      빨간 .warn(오류·상한 안내)엔 링크가 없어 거기까지 넓히지 않는다. */
-  .warn.stale a {{ color: inherit; font-weight: 700; }}
+  .warn.stale a {{ color: inherit; font-weight: 700; white-space: nowrap; }}
+  /* 못 닿은 구간 경고 — 빨간 .warn 그대로 쓰고 안쪽 목록만 더한다(새 색 세트를 만들지 않는다). */
+  .warn .capped-list {{ margin: 6px 0 0; padding-left: 18px; }}
+  .warn .capped-list li {{ margin: 2px 0; }}
+  .warn .capped-todo {{ display: block; margin-top: 6px; }}
   /* 오늘의 수집 결과 — 사안명 탭. 오늘 만든 카드가 2개 이상일 때만 그려진다. */
   .tabwrap {{ background: {adhoc_bg}; margin: -22px -24px 18px; padding: 12px 18px 0; border-radius: var(--r-lg) var(--r-lg) 0 0; }}
   .tabwrap-h {{ font-size: var(--fs-xs); font-weight: 700; color: {adhoc_text}; margin-bottom: 9px; }}
@@ -757,6 +777,12 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   #new-card .n-head {{ display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }}
   #new-card .n-head .page-title {{ margin: 0; }}
   #new-card .n-sub {{ font-size: var(--fs-sm); color: {text_faint}; }}
+  /* 날짜 칸 — 입력칸이라 네모(--r-md)·높이 30px로 같은 줄의 시/분 드롭다운과 맞춘다. */
+  #new-card .n-date {{ height: var(--h-md); border: 1px solid {border}; border-radius: var(--r-md);
+    padding: 0 8px; font-size: var(--fs-md); color: {text}; background: #fff; font-family: inherit; }}
+  #new-card .n-date:focus {{ outline: none; border-color: {accent}; box-shadow: 0 0 0 3px {hover}; }}
+  /* 지난 날짜를 골랐을 때만 한 줄 — 평소엔 빈 칸이라 아무 자리도 차지하지 않는다. */
+  #new-card .n-date-note {{ font-size: var(--fs-sm); color: {text_faint}; }}
   #new-card .field {{ gap: 8px; margin: 0 0 9px; }}
   #new-card .field > label {{ width: 64px; font-size: var(--fs-md); }}
   #new-card .field input[type=text], #new-card .field select {{ height: 36px; box-sizing: border-box; }}
@@ -1534,6 +1560,40 @@ def _history_html(entries: list[dict]) -> str:
 </div>"""
 
 
+def _capped_warn_html(card: dict) -> str:
+    """조회 상한에 걸려 요청한 날짜까지 못 닿은 검색어를 빨간 경고로 적는다.
+
+    **빨강이 맞다** — 이 앱에서 빨강은 오류와 [단독]·[속보]의 색이고, 지난 날짜 카드의
+    「사실 알림」(앰버 .warn.stale)과는 성격이 다르다. 결과가 담당자가 요청한 구간을
+    덮지 못했다는 뜻이라 수집 실패의 한 종류이고, 같은 1000건 상한에 걸린
+    AdhocKeywordCapError가 이미 빨간 .warn으로 선다(그 식구다).
+
+    **없애면 안 되는 이유는 하나다**: 네이버는 이때 오류를 내지 않고 조용히 멈추므로,
+    이 줄이 없으면 "그날 기사가 없었다"와 똑같이 보인다. reached가 None이면 아예 한
+    건도 못 받은 것이라 특히 그렇다.
+    """
+    shortfall = card.get("capped_keywords") or []
+    if not shortfall:
+        return ""
+    rows = []
+    for item in shortfall:
+        keyword = html.escape(str(item.get("keyword", "")))
+        reached = item.get("reached")
+        if reached:
+            # 받아온 가장 오래된 기사 = 닿은 지점. 그 앞 구간이 빠졌다는 뜻이다.
+            rows.append(f"<li><b>‘{keyword}’</b> — {html.escape(reached[11:16])}까지만 닿았어요"
+                        f" (그 앞 기사는 빠졌습니다)</li>")
+        else:
+            rows.append(f"<li><b>‘{keyword}’</b> — 이 날짜에 <b>한 건도</b> 닿지 못했어요</li>")
+    return (
+        f'<div class="warn capped">{icon("alert")} '
+        f'네이버가 검색어당 최신 {_MAX_START:,}건까지만 주기 때문에 '
+        f'<b>{html.escape(card.get("collect_date", ""))}</b>까지 닿지 못한 검색어가 있어요.'
+        f'<ul class="capped-list">{"".join(rows)}</ul>'
+        f'<span class="capped-todo">검색어를 좁히거나 더 가까운 날짜로 모아주세요.</span></div>'
+    )
+
+
 def render_new_card_page(error: Optional[str] = None, kind: str = "", pick: str = "") -> str:
     """검색어·수집 시간·거르기 세 줄 입력. 사안 칸은 없다 — 이름은 확정본에서 짓는다. 입력이 30초 안에 끝나야 한다는
     원칙(ADHOC_DESIGN.md §5.2)에 따라 필수 입력을 최소화했다.
@@ -1549,6 +1609,11 @@ def render_new_card_page(error: Optional[str] = None, kind: str = "", pick: str 
     if kind == "bundle":
         return render_new_bundle_page(error=error)
     now_hhmm = datetime.now().strftime("%H:%M")
+    today = datetime.now().strftime("%Y-%m-%d")
+    # 고를 수 있는 날짜의 바깥 테두리. 여기까지 "닿는다"는 약속은 아니다 — 실제로 어디까지
+    # 닿는지는 검색어마다 다르고(네이버 최신 1000건), 못 닿은 구간은 수집한 뒤 카드 화면의
+    # 빨간 경고가 사실대로 말한다.
+    oldest_date = (datetime.now() - timedelta(days=ADHOC_PAST_COLLECT_DAYS)).strftime("%Y-%m-%d")
     error_html = f'<div class="warn">{icon("alert")} {html.escape(error)}</div>' if error else ""
 
     # [수정: 2026-09-15] 「또는 검색 없이 빈 수집 확정본 만들기 →」 링크는 뺐다 — 확정본은
@@ -1557,7 +1622,7 @@ def render_new_card_page(error: Optional[str] = None, kind: str = "", pick: str 
     history_entries = _history_entries()
     body = f"""
 <div class="card" id="new-card">
-  <div class="n-head"><h1 class="page-title">새 수집</h1><span class="n-sub">오늘 안에서 시간대를 정해 한 번에 모아요</span></div>
+  <div class="n-head"><h1 class="page-title">새 수집</h1><span class="n-sub">날짜와 시간대를 정해 한 번에 모아요</span></div>
   {error_html}
 
   <form method="POST" action="/adhoc/collect" id="new-card-form">
@@ -1577,15 +1642,27 @@ def render_new_card_page(error: Optional[str] = None, kind: str = "", pick: str 
     </div>
     <div class="kw-note">검색어는 하나씩 따로 걸립니다. 띄어 쓴 말은 붙어 있는 그대로 찾고, 두 낱말이 다 든 기사는 「가상자산+과세」처럼 +로 묶으세요.</div>
     <div class="field">
+      <label>날짜</label>
+      <input type="date" class="n-date" id="collect-date" name="collect_date"
+             value="{today}" min="{oldest_date}" max="{today}" onchange="onDateChange()">
+      <span class="n-quick">
+        <button type="button" class="qchip" data-days="0" aria-pressed="false" onclick="setCollectDate(0)">오늘</button>
+        <button type="button" class="qchip" data-days="1" aria-pressed="false" onclick="setCollectDate(1)">어제</button>
+      </span>
+      <span class="n-date-note" id="date-note"></span>
+    </div>
+    <div class="field">
       <label>수집시간</label>
       {_hm_select_html("win-start", "window_start", "00:00", now_hhmm)}
       <span class="tilde">~</span>
       {_hm_select_html("win-end", "window_end", now_hhmm, now_hhmm)}
-      <button type="button" class="now-btn" onclick="setNow('win-end')">지금</button>
-      <span class="n-quick">
-        <button type="button" class="qchip" onclick="setQuick('win-start','win-end','midnight')">0시부터</button>
-        <button type="button" class="qchip" onclick="setQuick('win-start','win-end','1h')">최근 1시간</button>
-        <button type="button" class="qchip" onclick="setQuick('win-start','win-end','3h')">최근 3시간</button>
+      <span id="today-only-time">
+        <button type="button" class="now-btn" onclick="setNow('win-end')">지금</button>
+        <span class="n-quick">
+          <button type="button" class="qchip" onclick="setQuick('win-start','win-end','midnight')">0시부터</button>
+          <button type="button" class="qchip" onclick="setQuick('win-start','win-end','1h')">최근 1시간</button>
+          <button type="button" class="qchip" onclick="setQuick('win-start','win-end','3h')">최근 3시간</button>
+        </span>
       </span>
     </div>
     <div class="field n-last">
@@ -1612,6 +1689,79 @@ def render_new_card_page(error: Optional[str] = None, kind: str = "", pick: str 
     script = f"""<script>
 var MAX_KEYWORDS = {MAX_ADHOC_KEYWORDS};   // 검색어 상한 — 「하나라도 | 모두」를 없애 하나뿐이다
 var keywords = [];
+
+// ---- 날짜 칸 ----------------------------------------------------------------
+// 시 드롭다운은 평소 "오늘 지난 시각까지"만 담는다(_hm_select_html). 지난 날짜를 고르면
+// 그 하루가 이미 끝났으므로 24시간을 전부 열고, 오늘로 돌아오면 다시 지난 시각까지로
+// 줄인다 — 열어 둔 채 오늘로 돌아오면 아직 오지 않은 시각을 고를 수 있고, 그건 서버가
+// 거부한다(앱이 고르게 해놓고 서버가 물리는 모양을 만들지 않는다).
+function hmAllHours(id) {{
+  var s = hmSelects(id);
+  if (!s[0]) return;
+  for (var h = 0; h < 24; h++) hmEnsureOption(s[0], String(h).padStart(2, '0'));
+}}
+function hmLimitHours(id, lastHour) {{
+  var s = hmSelects(id);
+  if (!s[0]) return;
+  for (var i = s[0].options.length - 1; i >= 0; i--) {{
+    if (parseInt(s[0].options[i].value, 10) > lastHour) s[0].remove(i);
+  }}
+}}
+function onDateChange() {{
+  var el = document.getElementById('collect-date');
+  var note = document.getElementById('date-note');
+  var todayOnly = document.getElementById('today-only-time');
+  syncDateChips();
+  // max가 곧 오늘이다(서버가 박아 보낸다) — 화면에서 날짜를 따로 계산하지 않는다.
+  var isToday = !el.value || el.value === el.max;
+  // 「지금」·「최근 1·3시간」은 지금을 기준으로 삼는 버튼이라 지난 날짜에선 뜻이 없다.
+  todayOnly.style.display = isToday ? '' : 'none';
+  if (isToday) {{
+    hmLimitHours('win-start', new Date().getHours());
+    hmLimitHours('win-end', new Date().getHours());
+    setHM('win-start', '00:00');
+    setHM('win-end', nowHM());
+    note.textContent = '';
+    note.classList.remove('is-past');
+    return;
+  }}
+  hmAllHours('win-start');
+  hmAllHours('win-end');
+  setHM('win-start', '00:00');
+  setHM('win-end', '23:59');
+  // 지난 날짜를 골랐을 때만 한 줄. 네이버는 검색어당 최신 1000건까지만 주므로 기사가
+  // 많은 검색어는 그 날까지 닿지 못한다 — 여기선 "그럴 수 있다"까지만 말하고, 실제로
+  // 못 닿았는지는 수집한 뒤 카드 화면의 빨간 경고가 사실대로 말한다.
+  var days = Math.round((new Date(el.max) - new Date(el.value)) / 86400000);
+  // 어제는 "1일 전"이라 하지 않는다 — 사람이 쓰는 말이 따로 있는데 숫자로 적으면 한 번 센다.
+  note.textContent = (days === 1 ? '어제' : days + '일 전') +
+    ' 하루 전체 · 기사가 많은 검색어는 못 닿을 수 있어요';
+  note.classList.add('is-past');
+}}
+// 날짜 셈은 한 곳에서만 한다 — 칩을 누를 때와 칩에 불을 켤 때가 같은 값을 봐야
+// "눌렀는데 안 켜지는" 어긋남이 안 생긴다. 기준은 늘 el.max(서버가 박아 보낸 오늘)다.
+function dateMinusDays(days) {{
+  var el = document.getElementById('collect-date');
+  var d = new Date(el.max);
+  d.setDate(d.getDate() - days);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+         '-' + String(d.getDate()).padStart(2, '0');
+}}
+// 고른 날짜와 같은 칩에만 불이 켜진다. **날짜 칸에서 직접 고르면 둘 다 꺼진다** —
+// 칩은 지름길이고 날짜의 주인은 날짜 칸이라는 관계가 그대로 보여야 한다.
+function syncDateChips() {{
+  var el = document.getElementById('collect-date');
+  if (!el) return;
+  document.querySelectorAll('.qchip[data-days]').forEach(function (b) {{
+    var on = el.value === dateMinusDays(parseInt(b.dataset.days, 10));
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }});
+}}
+function setCollectDate(daysAgo) {{
+  document.getElementById('collect-date').value = dateMinusDays(daysAgo);
+  onDateChange();
+}}
 
 function renderKeywords() {{
   document.querySelectorAll('.kw-chip').forEach(function (el) {{ el.remove(); }});
@@ -1665,6 +1815,10 @@ function kwKeydown(ev) {{
 {_TIME_INPUT_JS}
 attachHmSelect('win-start');
 attachHmSelect('win-end');
+// 열자마자 「오늘」이 켜진 채로 선다. onDateChange()를 부르지 않는 이유 — 그 함수는
+// 수집시간까지 다시 맞추는데, 서버가 이미 채워 보낸 끝 시각(now_hhmm)을 화면 시계로
+// 덮으면 1분쯤 어긋난 값이 소리 없이 들어간다. 여기서 필요한 건 칩 불뿐이다.
+syncDateChips();
 
 document.getElementById('new-card-form').addEventListener('submit', function (e) {{
   if (keywords.length === 0) {{
@@ -1672,7 +1826,8 @@ document.getElementById('new-card-form').addEventListener('submit', function (e)
     alert('검색어를 하나 이상 입력해주세요.');
     return;
   }}
-  if (!validWindow('win-start', 'win-end')) {{
+  var dateEl = document.getElementById('collect-date');
+  if (!validWindow('win-start', 'win-end', !dateEl || !dateEl.value || dateEl.value === dateEl.max)) {{
     e.preventDefault();
   }}
 }});
@@ -3247,33 +3402,50 @@ def render_card_page(
         # 모음은 검색을 안 하므로 §6.3의 원래 근거("시간창이 오늘로 해석된다")가 안
         # 걸린다 — 그래도 수시 전체를 하루 단위로 유지하려고 같은 잠금을 건다(규칙 2).
         # 문구는 그 사실만 말한다: 재수집·시간대 얘기를 하면 이 화면에 없는 걸 가리킨다.
-        # [수정: 2026-09-15] 확정본은 이제 원본에서 처음 보낼 때 저절로 생긴다 — 「새로
-        # 만들어주세요」 대신 그 길을 가리킨다.
+        # [수정: 2026-10-21] 예전 문구는 "지난 날짜의 확정본에는 기사를 더 보낼 수
+        # 없어요"였다 — 지난 날짜 원본에서 **같은 날짜 확정본으로** 보내는 길이 열리면서
+        # 그 문장이 거짓이 됐다. 이 배너는 이제 "이 보고서가 언제 기준인가"만 말하고,
+        # 더 보내는 길을 그대로 가리킨다. 발송(텔레그램)도 날짜와 무관하게 된다.
         warn_html = (
-            f'<div class="warn stale">{icon("clock")} <b>{card["collect_date"]}에 만든 확정본</b>입니다 '
-            f"(오늘은 {today_str}). 지난 날짜의 확정본에는 기사를 더 보낼 수 없어요 — "
-            f'오늘 <a href="/adhoc/new">새 수집</a>의 원본에서 보내면 오늘 확정본이 새로 생겨요.</div>'
+            f'<div class="warn stale">{icon("clock")} <b>{card["collect_date"]} 기준 확정본</b>입니다 '
+            f"(오늘은 {today_str}). 같은 날짜 원본에서 기사를 더 보낼 수 있어요.</div>"
         )
     else:
         # [수정: 2026-09-15] 같은 조건으로 오늘 새로 모으는 길을 바로 건다 — 새 수집이 이
         # 카드의 사안·검색어를 채운 채로 열린다(render_new_card_page의 pick).
+        # [수정: 2026-10-21] 예전 문구는 "다시 수집하면 오늘 날짜로 검색됩니다"였다 —
+        # 수집이 카드의 collect_date를 그대로 쓰게 된 뒤로 **그 문장이 거짓**이다. 다시
+        # 수집해도 이 카드의 날짜 그대로이고, 그게 지난 날짜 수집이 돌아가는 방식이다.
+        # 그래서 이 배너는 경고가 아니라 "이 카드가 언제 것인지"를 말하는 자리로 남는다.
         warn_html = (
             f'<div class="warn stale">{icon("clock")} <b>{card["collect_date"]} 기준</b>으로 수집한 카드입니다 '
-            f'(오늘은 {today_str}). 시간대를 그대로 다시 수집하면 <b>{today_str}</b> 날짜로 검색됩니다 — '
-            f'<a href="/adhoc/new?from={quote(card["id"])}">이 조건으로 오늘 새로 모으기 →</a></div>'
+            f'(오늘은 {today_str}). 다시 수집해도 <b>{card["collect_date"]}</b> 날짜로 검색돼요 — '
+            f'<a href="/adhoc/new?from={quote(card["id"])}">같은 조건으로 오늘 모으기 →</a></div>'
         )
 
-    recollect_disabled = "disabled" if is_stale else ""
+    # [수정: 2026-10-21] 예전엔 지난 날짜 카드의 재수집 칸을 통째로 잠갔다 — 수집이
+    # 언제나 "오늘"로 검색해서 그 카드의 창에 오늘 기사가 담겼기 때문이다. 이제 수집이
+    # 카드의 collect_date를 그대로 쓰므로 잠글 이유가 사라졌고, 바로 위 배너가 "다시
+    # 수집해도 그 날짜로 검색돼요"라고 적는 터라 **잠긴 채로 두면 화면이 자기 말을
+    # 어긴다.** 「지금까지 다시 수집」만 여전히 안 그린다(아래) — 지난 날짜엔 "지금"이
+    # 없는 시각이다.
+    recollect_disabled = ""
     # 재수집 종료시각은 열 때마다 현재 시각으로 미리 채운다 — "지금까지 끌어오기"가
     # 클릭 한 번(다시 수집)으로 끝나게 하려는 것. 시작시각은 저장된 창을 그대로 보여준다
     # (위 회색 칩의 "지금까지 모은 기준"과 나란히 비교돼야 하므로). 이미 잠긴(stale) 카드는
     # 미리 채우지 않는다 — 어차피 못 누르는데 오늘 시각이 떠 있으면 더 헷갈린다.
+    # 지난 날짜 카드는 하루가 이미 끝났으므로 "지금"을 채우지 않고 저장된 창을 보여준다.
     recollect_end_value = window_of(card)["end"] if is_stale else now_hhmm
     # [수정: 2026-08-25] margin-left 오프셋을 없앴다 — 이제 이 칩 줄이
     # _render_edit_panel의 시간 입력 바로 아래 열(label 폭만큼 이미 들여진 flex
     # 컬럼) 안에 놓이므로, 예전처럼 자기 몫의 왼쪽 여백을 또 더하면 이중으로 밀린다.
+    # 지난 날짜 카드엔 「지금」을 기준으로 삼는 칩이 뜻이 없다 — 그 하루 전체 칩 하나로
+    # 바꾼다(새 수집 폼이 지난 날짜에서 00:00~23:59로 맞추는 것과 같은 선).
     quick_chips_html = (
-        ""
+        """
+    <div class="quick" style="margin:0">
+      <button type="button" class="qchip" onclick="setHM('recol-start','00:00');setHM('recol-end','23:59')">하루 전체</button>
+    </div>"""
         if is_stale
         else """
     <div class="quick" style="margin:0">
@@ -3294,6 +3466,9 @@ def render_card_page(
     elif gone and not error:
         # 남의 탭 × 로 다른 카드를 지우고 이 화면에 머물렀을 때 — 되살릴 길이 눈앞에 남는다.
         error_html = gone_note_html(gone)
+    capped_warn_html = _capped_warn_html(card)
+    # 화면 JS의 "아직 그 시각이 안 됐다" 검사를 켤지 — 지난 날짜 카드엔 뜻이 없다.
+    is_today_js = "false" if is_stale else "true"
     limit_warn_html = (
         f'<div class="warn">{icon("alert")} 기사 {unclassified_count}건 — 소제목 자동 배정은 '
         f'{MAX_ARTICLES_FOR_CLASSIFY}건까지만 됩니다. 시간대를 좁히거나 검색어를 줄여주세요.</div>'
@@ -3551,6 +3726,7 @@ def render_card_page(
 
   {error_html}
   {warn_html}
+  {capped_warn_html}
   {limit_warn_html}
 
   {edit_panel_html}
@@ -3675,7 +3851,7 @@ attachHmSelect('recol-end');
 var recollectForm = document.getElementById('recollect-form');
 if (recollectForm) {{
   recollectForm.addEventListener('submit', function (e) {{
-    if (!validWindow('recol-start', 'recol-end')) {{
+    if (!validWindow('recol-start', 'recol-end', {is_today_js})) {{
       e.preventDefault();
     }}
   }});

@@ -879,6 +879,45 @@ def kst_today_at(hhmm: str) -> datetime:
     return datetime.now(_KST).replace(hour=hour, minute=minute, second=0, microsecond=0)
 
 
+def kst_at(date_str: str, hhmm: str) -> datetime:
+    """"YYYY-MM-DD" + "HH:MM"을 KST datetime으로 합친다.
+
+    kst_today_at이 "오늘"로 박아 두던 자리를 날짜를 골라 쓸 수 있게 한 것이다 — 수시
+    모니터링이 지난 날짜로 수집할 때(어제는 없던 검색어로 어제 기사를 찾는 경우) 창의
+    경계가 그 날짜 위에 서야 한다. 날짜 문자열은 카드의 collect_date 형식 그대로다.
+    """
+    year, month, day = map(int, date_str.split("-"))
+    hour, minute = map(int, hhmm.split(":"))
+    return datetime(year, month, day, hour, minute, tzinfo=_KST)
+
+
+def _compare_collect_day(pub_date: datetime, day: Optional[str] = None) -> int:
+    """이 기사가 수집 대상 날짜(KST)보다 **새것인지(+1) 같은 날인지(0) 오래된 것인지(-1)**.
+    day가 없으면 대상 날짜는 "오늘"이다(기존 동작).
+
+    **세 갈래여야 한다 — 참/거짓이면 안 된다.** 네이버는 늘 최신순으로 주므로, 지난
+    날짜를 모을 때는 목록 맨 앞이 그 날보다 **새 기사**(오늘·그 뒤 날짜)로 시작한다.
+    "그 날이 아니다"를 한 덩어리로 묶어 중단 신호로 쓰면 첫 기사에서 그대로 멈춰
+    **0건이 나오고, 그게 "그날 기사가 없었다"와 똑같이 보인다**(실측으로 재현: 어제
+    날짜 + '세법개정' = 0건). 새 기사는 건너뛰며 계속 넘기고, 오래된 기사를 만났을
+    때에만 멈춰야 한다.
+
+    네이버 검색 API에는 기간을 지정하는 칸이 없고 최신순으로만 주므로, **"그 날짜가
+    아니면 페이지 넘기기를 멈춘다"는 이 판정 한 곳이 곧 "어느 날을 모으나"를 정한다.**
+    그래서 지난 날짜 수집은 여기에 day를 넘기는 것으로 끝난다 — 검색어를 언제 등록했는지는
+    네이버가 알지 못해, 오늘 처음 만든 검색어로도 그 날 기사가 그대로 나온다.
+
+    단 한계가 하나 있다: 네이버는 **검색어당 최신 1000건까지만** 돌려준다(_MAX_START).
+    그래서 닿을 수 있는 날짜는 "지금부터 그 날까지 쌓인 기사가 1000건 미만인 날"까지이고,
+    못 닿으면 결과가 조용히 잘린다 — 그 사실은 capped로 호출부에 보고한다.
+    실측(2026-10-21): 하루 0.7건인 '증안펀드'는 1,442일 전까지, 하루 25건인 '세법개정'은
+    40일 전까지, 하루 500건인 '재정경제부'는 2일 전까지 닿았다.
+    """
+    target = day or datetime.now(_KST).strftime("%Y-%m-%d")
+    stamp = pub_date.astimezone(_KST).strftime("%Y-%m-%d")
+    return (stamp > target) - (stamp < target)
+
+
 def incremental_search_after(last_seen: datetime, earliest: datetime, now: Optional[datetime] = None) -> datetime:
     """증분 검색(초안 app.preview_renderer / 실시간 현황 app.live_renderer)의 하한을 정한다.
 
@@ -1005,6 +1044,7 @@ def _search_one_keyword(
     after: Optional[datetime] = None,
     before: Optional[datetime] = None,
     include_unparsed_dates: bool = False,
+    day: Optional[str] = None,
 ) -> tuple[list[dict], bool]:
     """
     한 키워드로 검색해 당일(KST) 게시된 기사만 모은다 (PRD.md 기능1 규칙 2).
@@ -1100,9 +1140,14 @@ def _search_one_keyword(
                     pending.append((item, None))
                 continue  # 날짜를 못 읽으면 이 기사만 건너뛴다 (페이지네이션 중단 신호로는 안 씀)
             deepest_pub_date = pub_date
-            if not _is_today_kst(pub_date):
+            day_cmp = _compare_collect_day(pub_date, day)
+            if day_cmp < 0:
                 reached_older_article = True
                 break  # 최신순 정렬이므로 여기서부터는 전부 더 오래된 기사
+            if day_cmp > 0:
+                # 수집 날짜보다 새 기사 — 지난 날짜를 모을 때 목록 맨 앞이 여기다.
+                # 건너뛰되 페이지네이션은 계속한다(아래 before 검사와 같은 이유).
+                continue
             if after is not None and pub_date <= after:
                 reached_older_article = True
                 break  # 이 창의 하한보다 오래된 기사 -> 여기서부터는 전부 이전 창(또는 그 이전)
@@ -1211,6 +1256,7 @@ def search_keywords(
     after: Optional[datetime] = None,
     before: Optional[datetime] = None,
     include_unparsed_dates: bool = False,
+    day: Optional[str] = None,
 ) -> tuple[dict[str, list[dict]], list[str], list[str]]:
     """
     키워드 목록 각각을 검색해 {키워드: 검색결과} 딕셔너리로 돌려준다. 그룹 OR/AND
@@ -1260,7 +1306,8 @@ def search_keywords(
         for attempt in range(_KEYWORD_RETRY_ATTEMPTS):
             try:
                 results, capped = _search_one_keyword(
-                    keyword, after=keyword_after, before=before, include_unparsed_dates=include_unparsed_dates
+                    keyword, after=keyword_after, before=before,
+                    include_unparsed_dates=include_unparsed_dates, day=day,
                 )
                 return results, False, capped
             except requests.exceptions.RequestException as error:

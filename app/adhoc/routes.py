@@ -330,6 +330,9 @@ def _handle_collect(handler, form: dict) -> None:
     must_keywords: list = []
     window_start = _field(form, "window_start")
     window_end = _field(form, "window_end")
+    # 비어 오면 오늘이다(card._validate_collect_date) — 날짜 칸이 없던 때 만든 북마크·
+    # 외부 폼이 그대로 돌게 한다.
+    collect_date = _field(form, "collect_date")
     options = {
         "use_outlet_whitelist": "use_outlet_whitelist" in form,
         "exclude_photo": "exclude_photo" in form,
@@ -345,6 +348,7 @@ def _handle_collect(handler, form: dict) -> None:
             keywords=keywords,
             options=options,
             must_keywords=must_keywords,
+            collect_date=collect_date,
         )
     except AdhocCardError as error:
         # 아직 카드가 안 만들어진 단계의 실패라 되돌아갈 카드가 없다 — 수집 원본 폼
@@ -479,15 +483,18 @@ def _handle_raw_unsend(handler, form: dict) -> None:
         handler.send_response(404)
         handler.end_headers()
         return
-    today = datetime.now().strftime("%Y-%m-%d")
-    if not card.is_raw(c) or not url or c.get("collect_date") != today:
+    # [수정: 2026-10-21] 「오늘 카드인가」가 아니라 **이 카드의 날짜**를 본다 — 지난
+    # 날짜 원본도 확정본으로 보내므로(자정 잠금 해제), 보낸 것을 무르는 길도 같이 열려
+    # 있어야 한다. 안 그러면 보낼 수는 있는데 취소만 못 하는 반쪽이 된다.
+    day = c.get("collect_date") or datetime.now().strftime("%Y-%m-%d")
+    if not card.is_raw(c) or not url:
         _card_redirect(handler, card_id)
         return
     # 이 원본이 보낸 사본만 대상이다 — 「✓ 보냄」이 그것만 뜻하기 때문이다.
     ids = {c["id"]}
     # 번호(「증안펀드 (2)」)는 **그 날 확정본 전부**를 봐야 나온다 — 아래 bundles는
     # 이 기사를 받은 것만 추린 부분집합이라 이름을 지을 때 쓰면 번호가 어긋난다.
-    day_bundles = card.bundles_for_date(today)
+    day_bundles = card.bundles_for_date(day)
     bundles = [
         b for b in day_bundles
         if any(
@@ -610,18 +617,14 @@ def _handle_send_to_bundle(handler, form: dict) -> None:
         _card_redirect(handler, card_id, error="확정본에서 다른 확정본으로는 보낼 수 없습니다.")
         return
 
-    today = datetime.now().strftime("%Y-%m-%d")
-    if source.get("collect_date") != today:
-        _card_redirect(
-            handler,
-            card_id,
-            error=f"{source.get('collect_date')} 기준으로 수집한 카드입니다 (오늘은 {today}). "
-            "지난 날짜의 카드에서는 확정본으로 보낼 수 없어요.",
-        )
-        return
+    # [수정: 2026-10-21] 지난 날짜 카드의 보내기 잠금을 풀었다. 원래 근거는 §6.3
+    # 자정 잠금("어제 원본에서 오늘 확정본으로 보내면 날짜가 섞인다")이었는데, 보내는
+    # 곳을 **원본과 같은 날짜의 확정본**으로 못박으면 섞이지 않는다. 잠근 채로 두면
+    # 지난 날짜 수집이 반쪽이 된다 — 모으기만 하고 보고서를 못 만든다.
+    day = source.get("collect_date") or datetime.now().strftime("%Y-%m-%d")
 
     group_name = _field(form, "group")
-    today_bundles = card.bundles_for_date(today)
+    today_bundles = card.bundles_for_date(day)
     if _field(form, "all_open") and card.is_raw(source):
         # [추가: 2026-09-15] 원본 툴바의 「처리 안 한 N건 전부 확정본으로」 — 무엇을 보낼지는
         # 화면이 아니라 서버가 센다(소제목 통째 보내기와 같은 이유: 화면이 센 건수와 실제로
@@ -661,9 +664,10 @@ def _handle_send_to_bundle(handler, form: dict) -> None:
             # 그 사안을 물려받아(get_or_create_issue) 수시 보관함 「사안별 보기」가 그대로 돈다.
             _name = _field(form, "bundle_name").strip()
             _issue = card.get_or_create_issue(_name) if _name else None
+            # collect_date=day — 확정본은 자기를 만든 원본과 같은 날짜에 선다(위 day 참고).
             bundle = card.new_bundle_card(
                 _name, issue_id=_issue["id"] if _issue else "", basis_time=basis,
-                source_card_id=source["id"],
+                source_card_id=source["id"], collect_date=day,
             )
         else:
             bundle = card.load_card(_field(form, "bundle"))
@@ -761,11 +765,13 @@ def _handle_move_to_bundle(handler, form: dict) -> None:
         handler.send_response(404)
         handler.end_headers()
         return
-    today = datetime.now().strftime("%Y-%m-%d")
-    if not card.is_bundle(source) or source.get("collect_date") != today:
+    # 옮기는 곳도 같은 날짜의 확정본끼리다(아래 move_targets) — 날짜가 다른 확정본으로
+    # 옮기면 보고서 머리줄이 어느 날 기준인지 말할 수 없게 된다.
+    day = source.get("collect_date") or datetime.now().strftime("%Y-%m-%d")
+    if not card.is_bundle(source):
         _card_redirect(handler, card_id, error="오늘 확정본에서만 다른 사안으로 옮길 수 있어요.")
         return
-    targets = {b["id"]: b for b in card.move_targets(source, card.bundles_for_date(today))}
+    targets = {b["id"]: b for b in card.move_targets(source, card.bundles_for_date(day))}
     target = targets.get(target_id)
     if target is None:
         _card_redirect(handler, card_id, error="옮길 확정본을 찾을 수 없어요. 새로고침 후 다시 시도해주세요.")

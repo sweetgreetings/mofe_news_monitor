@@ -1,0 +1,1021 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>수시 새 수집 — 날짜 칩 선택 상태 시안</title>
+<style>
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+  /* [수정: 2026-09-16] 카드 위 여백 60→44px — 60px은 상단 고정바(54px)를 피하려는 값인데 글자 위로
+     30px이 비었다. 44px이면 16px 남는다. 확정본·초안·실시간·정기 보관함·설정·수시·정책 단어 추이
+     일곱 화면이 같은 값을 써야 화면을 오갈 때 제목이 들썩이지 않는다(수시·추이는 84→68px 형태).
+     시안 파일은 정리하며 없앴다(당시 B안). */
+  .container { max-width: 800px; margin: 0 auto; padding: 68px 24px 80px; }
+  .card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 22px 24px; margin-bottom: 14px; }
+  /* 상단바 CSS는 app/topnav.py 한 곳 — 모든 화면이 같은 값을 쓴다. */
+
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem; --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%; --h-sm: 24px; --h-tb: 28px; --h-md: 30px; --h-lg: 36px; --fab-lg: 56px; --fab-sm: 48px; --chk-md: 16px; --chk-sm: 14px; --sh-float: 0 4px 12px rgba(15, 23, 42, 0.12); --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14); --sh-modal: 0 16px 40px rgba(15, 23, 42, 0.22); }
+  .plus-glyph { font-size: 1.2em; font-weight: 600; line-height: 0; margin-right: 4px; }
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    background: #FFFFFF; border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .topbar-inner {
+    max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: flex-start; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .topbar-inner > .tn { color: #2563EB; text-decoration: none; font-size: var(--fs-md); font-weight: 600;
+    padding: 5px 14px; border: 1px solid transparent; border-radius: var(--r-pill); white-space: nowrap; }
+  .topbar-inner > a.tn:hover { background: #EFF6FF; }
+  .topbar-inner > .tn-sep { width: 1px; height: 18px; background: #E5E7EB; margin: 0 16px; }
+  .topbar-inner > .tn.is-current { cursor: default; background: #EFF6FF;
+    border-color: #BFDBFE; color: #2563EB; }
+  .topbar.adhoc .topbar-inner > .tn.is-current { background: #E3F1EE;
+    border-color: rgba(20, 107, 94, 0.45); color: #146B5E; }
+  .topbar-inner > .tn.is-empty { color: #6B7280; opacity: 0.55; cursor: not-allowed; }
+  .topbar-inner > a.tn.back { color: #4B5563; }
+  .topbar-inner > a.tn.back:hover { color: #2563EB; }
+  @media (max-width: 480px) {
+    .topbar-inner { padding: 12px 12px; gap: 2px; }
+    .topbar-inner > .tn { padding: 5px 8px; }
+    .topbar-inner > .tn-sep { margin: 0 8px; }
+  }
+
+  h1.page-title { color: #1E3A5F; font-size: var(--fs-xl); margin: 0 0 4px; }
+  .page-sub { color: #6B7280; font-size: var(--fs-sm); margin: 0 0 16px; }
+  /* [추가: 2026-08-18] 수시 보관함(archive_renderer)의 엑셀 내보내기 헤더 — history.html
+     의 .hist-head/.hist-excel-btn과 같은 모양(둘 다 "지금 펼친 것"을 그대로 내보낸다). */
+  .arch-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .arch-excel-btn {
+    background: #2563EB; color: #FFFFFF; border: none; border-radius: var(--r-md); padding: 7px 14px;
+    font-size: var(--fs-md); font-family: inherit; cursor: pointer; flex-shrink: 0;
+  }
+  .arch-excel-btn:hover { filter: brightness(1.08); }
+  /* [추가: 2026-08-20] 수시 보관함 — 사안명·기간 조회 + 사안 ▸ 날짜 ▸ 회차 3단.
+     세그먼트 버튼(1일/7일/1개월/전체)은 GET 폼의 submit 버튼이다(서버가 오늘 날짜
+     기준으로 실제 start/end를 계산 — JS로 "오늘"을 흉내내지 않는다). */
+  .period-bar { border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 10px 12px; background: #F8FAFC; margin: 14px 0; }
+  .period-bar form { margin: 0; }
+  .prow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .prow + .prow, .period-bar form + form { margin-top: 9px; padding-top: 9px; border-top: 1px solid #E5E7EB; }
+  /* [추가: 2026-09-16] 기간 줄 안에서 빠른 설정과 직접 입력을 가르는 세로선 — 정기 보관함과 같다. */
+  .prow .pdiv { width: 1px; align-self: stretch; background: #E5E7EB; margin: 0 2px; }
+  .prow .jlab { color: #6B7280; font-size: var(--fs-sm); font-weight: 600; width: 44px; flex: none; }
+  .prow input[type=search] { font: inherit; font-size: var(--fs-md); border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    background: #FFFFFF; color: #1F2937; padding: 6px 10px; flex: 1; min-width: 160px; }
+  .prow input[type=search]:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 2px #EFF6FF; }
+  .prow input[type=date] { font: inherit; font-size: var(--fs-md); border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    background: #FFFFFF; color: #1F2937; padding: 5px 8px; font-variant-numeric: tabular-nums; }
+  .prow .tilde { color: #6B7280; margin: 0 2px; font-weight: 600; }
+  .prow .clr { border: 1px solid #E5E7EB; background: #FFFFFF; color: #6B7280; border-radius: var(--r-md);
+    padding: 5px 12px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; text-decoration: none; }
+  .prow .clr:hover { background: #EFF6FF; color: #2563EB; }
+  .prow .go { border: 1px solid #2563EB; background: #2563EB; color: #FFFFFF; border-radius: var(--r-md);
+    padding: 6px 14px; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; font-family: inherit; }
+  .prow .go:hover { filter: brightness(1.08); }
+  .jhint { font-size: var(--fs-sm); color: #6B7280; }
+  .seg { display: inline-flex; border: 1px solid #E5E7EB; border-radius: var(--r-md); overflow: hidden; background: #FFFFFF; }
+  .seg-btn { border: none; background: #FFFFFF; color: #6B7280; font: inherit; font-size: var(--fs-sm);
+    padding: 6px 15px; cursor: pointer; border-right: 1px solid #E5E7EB; }
+  .seg-btn:last-child { border-right: none; }
+  .seg-btn.on { background: #2563EB; color: #FFFFFF; font-weight: 600; }
+  /* 보기 전환(날짜별/사안별)·사안 순서 칩 — 기간 빠른 설정과 같은 세그먼트지만 링크(GET)다. */
+  .seg a.seg-btn { display: inline-flex; align-items: center; text-decoration: none; }
+  .seg a.seg-btn:hover { background: #EFF6FF; color: #2563EB; }
+  .seg a.seg-btn.on:hover { background: #2563EB; color: #FFFFFF; }
+  .badge-custom { font-size: var(--fs-sm); background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE;
+    border-radius: var(--r-pill); padding: 3px 11px; font-weight: 600; }
+  .result-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 2px 8px; }
+  .result-line { font-size: var(--fs-sm); color: #6B7280; display: flex; align-items: center; gap: 8px;
+    flex-wrap: wrap; flex: 1; min-width: 0; margin: 0; }
+  .result-line b { color: #1E3A5F; }
+  .fixhint { margin: 0 2px 10px; font-size: var(--fs-sm); color: #6B7280; }
+  .fixhint a { color: #2563EB; }
+  .qmark { background: #EFF6FF; border-radius: var(--r-sm); padding: 0 2px; }
+  /* 복사/txt/엑셀 — 결과 전체·사안·날짜 세 층 모두 같은 모양. 렌더링 시점에 이미
+     계산된 텍스트/rows를 hidden input에 심어 기존 공용 /download-text·/download-excel로
+     보낸다(app.history_renderer의 회차별 복사·다운로드 버튼과 같은 패턴). */
+  /* 모양은 확정본·초안 툴바의 가져가기 버튼(app.renderer.export_links_style)과 같다 —
+     테두리·배경 없는 글자 버튼, hover에서만 accent + 밑줄. 네 자리(정기 보관함 .exp/
+     .slot-export-actions, 수시 보관함 .exp, 라벨 보관함 .exp)가 같은 값이다. */
+  .exp { display: inline-flex; gap: 2px; flex: none; margin-left: auto; }
+  .exp button { border: none; background: transparent; color: #4B5563; font-weight: 500;
+    border-radius: var(--r-md); padding: 4px 8px; font-size: var(--fs-sm); cursor: pointer;
+    font-family: inherit; white-space: nowrap; }
+  .exp button:hover { background: transparent; color: #2563EB;
+    text-decoration: underline; text-underline-offset: 3px; }
+  .exp.lg button { padding: 6px 8px; }
+  /* 수시 보관함 — 날짜 줄이 카드(정기 보관함처럼 맨 위 층), 회차 줄은 그 밑 왼쪽 세로선에 매달린
+     「시각 기준 · 사안명 · 검색어」. 날짜 줄의 복사·txt·xlsx는 올렸을 때만, 🗑는 늘 보인다.
+     CSS는 자식 선택자로만 쓴다. 시안 mockups/ADHOC_ARCHIVE_BY_DATE_MOCKUP.html A안. */
+  details.date-block { margin: 8px 0; }
+  details.date-block > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: var(--r-lg); border: 1px solid #E5E7EB; background: #FFFFFF; font-size: var(--fs-md); }
+  details.date-block > summary::-webkit-details-marker { display: none; }
+  details.date-block > summary::before { content: "▸"; color: #6B7280; font-size: 0.78rem; }
+  details.date-block[open] > summary::before { content: "▾"; }
+  details.date-block > summary:hover { background: #EFF6FF; }
+  .date-block > summary .dt { font-weight: 600; color: #1E3A5F; font-size: var(--fs-lg); font-variant-numeric: tabular-nums; }
+  .date-block > summary .chip-today { font-size: var(--fs-xs); background: #E3F1EE; color: #146B5E;
+    border: 1px solid rgba(20, 107, 94, 0.24); border-radius: var(--r-pill); padding: 1px 8px; font-weight: 600; }
+  .date-block > summary .dcnt { margin-left: auto; }
+  .date-block > summary .n { margin-left: auto; }
+  .date-block > summary .exp { visibility: hidden; }
+  .date-block > summary:hover .exp, .date-block > summary:focus-within .exp { visibility: visible; }
+  .date-block > summary .day-del { margin: 0 -6px 0 -4px; }
+  .date-block > .runs { margin: 4px 0 4px 17px; padding-left: 14px; border-left: 2px solid #E5E7EB; }
+  .date-block > .runs > .run-line { padding-left: 8px; }
+  .dcnt { font-size: var(--fs-sm); color: #9CA3AF; font-variant-numeric: tabular-nums; }
+  .run-row .iss { font-weight: 600; color: #1F2937; font-size: var(--fs-base); white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; min-width: 0; }
+  .run-row .iss.noname { font-style: italic; font-weight: 500; color: #6B7280; }
+  .run-row .kwv { flex: 1; min-width: 0; color: #9CA3AF; font-size: var(--fs-sm); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .run-row .kwv + .n { margin-left: 0; }
+  @media (max-width: 640px) { .run-row .kwv { visibility: hidden; } }
+  .run-row .win { flex: none; color: #6B7280; font-size: var(--fs-base); min-width: 90px; font-variant-numeric: tabular-nums; }
+  /* 사안별 보기 — 머리줄이 사안명(+검색어), 회차 줄 앞칸은 「9/17(목) 15:05 기준」이라 더 넓다. */
+  .run-row .win.wd { min-width: 182px; }
+  .date-block > summary .dcnt { flex: none; white-space: nowrap; }  /* 「57건」이 두 줄로 쪼개지지 않게 */
+  /* 사안명은 날짜와 달리 길다 — 좁은 화면에서 글자 단위로 쪼개지지 않게 한 줄로 두고 말줄임. */
+  .issue-block > summary .dt { font-variant-numeric: normal; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .issue-block > summary .dt.noname { font-style: italic; font-weight: 500; color: #6B7280; }
+  .issue-block > summary .ikw { flex: 1; min-width: 0; color: #9CA3AF; font-size: var(--fs-sm);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 좁은 화면(640px 이하): 머리줄을 한 줄로 지킨다 — 검색어와 hover 전용 내보내기 묶음을
+     내려놓아 이름·날짜가 글자 단위로 쪼개지지 않게 한다(touch에는 hover가 없어 어차피
+     누를 수 없는 버튼이다. 결과 전체 복사·txt·xlsx는 위 줄에 그대로 있다). */
+  @media (max-width: 640px) {
+    .issue-block > summary .ikw { display: none; }
+    .date-block > summary .exp { display: none; }
+    .date-block > summary .dt { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .run-row .n, .run-row .go { white-space: nowrap; }
+    /* 좁은 화면에선 기준 시각 칸의 최소폭을 푼다 — 안 그러면 그 칸이 자리를
+       차지해 사안명이 「꽃…」처럼 한 글자만 남는다(실측). */
+    .run-row .win, .run-row .win.wd { min-width: 0; }
+  }
+  .run-row .go { color: #2563EB; font-size: var(--fs-sm); }
+  /* ADHOC_DESIGN.md §6.13 — 수시 보관함에서 모음 카드를 가리키는 유일한 표시.
+     같은 자리·같은 폭(.win)이라 수집 카드와 나란히 서도 줄이 안 흔들린다. */
+  .run-row .bundle-mark { background: #E3F1EE; border: 1px solid rgba(20, 107, 94, 0.24);
+    color: #146B5E; border-radius: var(--r-pill); padding: 1px 8px; font-size: var(--fs-xs); font-weight: 700; }
+  .field { display: flex; align-items: center; gap: 10px; margin: 14px 0; flex-wrap: wrap; }
+  .field > label { width: 78px; flex: none; font-size: var(--fs-md); color: #6B7280; font-weight: 600; }
+  input[type=text], input[type=time], select, textarea {
+    font: inherit; font-size: var(--fs-md); padding: 7px 11px; border: 1px solid #E5E7EB;
+    border-radius: var(--r-md); background: #FFFFFF; color: #1F2937;
+  }
+  input[type=text] { flex: 1; min-width: 120px; }
+  select.hm-sel { flex: none; width: 66px; padding: 7px 6px 7px 10px; font-variant-numeric: tabular-nums; cursor: pointer; }
+  select.hm-sel:disabled { cursor: not-allowed; opacity: 0.6; }
+  .colon { color: #6B7280; margin: 0 -5px; }
+  .now-btn { font: inherit; font-size: var(--fs-sm); font-weight: 600; padding: 6px 11px; border-radius: var(--r-md); cursor: pointer;
+    border: 1px solid #BFDBFE; background: #EFF6FF; color: #2563EB; flex: none; }
+  .now-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .quick { display: flex; gap: 6px; flex-wrap: wrap; margin: -4px 0 0 88px; }
+  .qchip { font-size: var(--fs-sm); padding: 4px 11px; border-radius: var(--r-pill); border: 1px dashed #E5E7EB;
+    background: #FFFFFF; color: #4B5563; cursor: pointer; font-family: inherit; }
+  .qchip:hover { border-color: #2563EB; color: #2563EB; border-style: solid; }
+  /* [수정: 2026-08-25] 시작 시각 -1h/+1h 스테퍼는 만들었다가 도로 뺐다 — 시간 줄에
+     테두리 상자가 셋(스테퍼 묶음·종료 입력·칩 줄)으로 늘어 패널이 지저분해졌고,
+     0시~지금/최근 1시간/최근 3시간 프리셋이 이미 같은 일을 한 번에 한다. */
+  /* [수정: 2026-08-25] '지금' 버튼(종료시각 채우기)은 '다시 불러오기'보다 훨씬
+     자주 쓰는 동작이 아니라 입력을 거드는 부속품이라, 링크 톤으로 낮춰 실제
+     실행 버튼(다시 불러오기)과 무게를 가른다. */
+  .now-link { font: inherit; font-size: var(--fs-sm); color: #2563EB; background: none; border: none; cursor: pointer;
+    text-decoration: underline; text-underline-offset: 3px; padding: 4px 2px; flex: none; }
+  .now-link:disabled { opacity: 0.45; cursor: not-allowed; text-decoration: none; }
+  .recollect-action { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    border-top: 1px solid #E5E7EB; margin-top: 4px; padding-top: 10px; }
+  .recollect-hint { font-size: var(--fs-sm); color: #9CA3AF; }
+  .kw-box { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; border: 1px solid #E5E7EB; border-radius: var(--r-md); padding: 6px 8px; background: #FFFFFF; min-width: 200px; }
+  .kw-chip { background: #EFF6FF; color: #2563EB; border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 3px 10px; font-size: var(--fs-sm); display: inline-flex; gap: 6px; align-items: center; }
+  .kw-chip button { border: none; background: none; color: #6B7280; cursor: pointer; font-size: var(--fs-md); line-height: 1; padding: 0; }
+  .kw-add { border: none; background: none; color: #2563EB; cursor: pointer; font-size: var(--fs-sm); font-weight: 600; padding: 3px 6px; flex: none; }
+  .kw-cnt { font-size: var(--fs-sm); color: #6B7280; margin-left: auto; }
+  .tilde { color: #6B7280; }
+  .btn { font: inherit; font-size: var(--fs-md); height: var(--h-md); padding: 0 14px; box-sizing: border-box; border-radius: var(--r-md); cursor: pointer; border: 1px solid #2563EB; background: #2563EB; color: #FFFFFF; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+  .btn.ghost { background: #FFFFFF; color: #2563EB; }
+  .btn.mute { background: #FFFFFF; color: #6B7280; border-color: #E5E7EB; }
+  .btn.danger { background: #FFFFFF; color: #DC2626; border-color: #DC2626; }
+  /* AI 버튼은 언제나 채운 연보라(정기 「AI 모든 기사 재분류」와 같은 값). */
+  .btn.ai { background: #F0EAFB; color: #4A3F8F; border-color: #DCD0F2; }
+  .btn.ai:hover { background: #E7DBFA; border-color: #CBB8ED; }
+  .btn.sm { font-size: var(--fs-md); height: var(--h-tb); padding: 0 14px; box-sizing: border-box; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .adv { margin-top: 8px; border-top: 1px dashed #E5E7EB; padding-top: 13px; }
+  .adv-h { font-size: var(--fs-sm); color: #6B7280; font-weight: 700; margin-bottom: 10px; }
+  .adv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: var(--fs-md); }
+  .adv-grid label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .warn { background: #FEF2F2; border: 1px solid #FCA5A5; color: #DC2626; border-radius: var(--r-lg); padding: 11px 14px; margin: 12px 0; font-size: var(--fs-md); }
+  /* [추가: 2026-10-21] 「지난 날짜 카드입니다」는 오류가 아니라 **사실 알림**이라 주의(앰버)다 —
+     빨강은 오류와 [단독]·[속보]의 색이다(CLAUDE.md 디자인 절). 상단바가 더는 지난 카드로
+     데려가지 않게 된 뒤로 이 배너는 담당자가 보관함·「지난 수집」에서 **일부러 열었을 때만**
+     뜬다 — 사고가 아니다. 새 색 세트를 만들지 않고 이미 있는 주의 세트를 쓴다. */
+  .warn.stale { background: #FFFBEB; border-color: #FDE68A; color: #92400E; }
+  /* 이 배너 안의 링크는 배너 색을 따른다 — 기본 파랑이면 배너에서 혼자 튄다.
+     빨간 .warn(오류·상한 안내)엔 링크가 없어 거기까지 넓히지 않는다. */
+  .warn.stale a { color: inherit; font-weight: 700; white-space: nowrap; }
+  /* 못 닿은 구간 경고 — 빨간 .warn 그대로 쓰고 안쪽 목록만 더한다(새 색 세트를 만들지 않는다). */
+  .warn .capped-list { margin: 6px 0 0; padding-left: 18px; }
+  .warn .capped-list li { margin: 2px 0; }
+  .warn .capped-todo { display: block; margin-top: 6px; }
+  /* 오늘의 수집 결과 — 사안명 탭. 오늘 만든 카드가 2개 이상일 때만 그려진다. */
+  .tabwrap { background: #E3F1EE; margin: -22px -24px 18px; padding: 12px 18px 0; border-radius: var(--r-lg) var(--r-lg) 0 0; }
+  .tabwrap-h { font-size: var(--fs-xs); font-weight: 700; color: #146B5E; margin-bottom: 9px; }
+  /* 넘치면 아랫줄로 접는다 — 가로로 미는 대신 다 보여 준다. 실측(800px 카드·검색어 이름):
+     한 줄에 들어가는 건 3장까지이고 4장부터 넘치므로 넘침이 예외가 아니라 상례다. 접으면
+     8장까지 2줄, 10장이라야 3줄이다(한 줄 39px). 미는 값으로 39px을 아낄 자리가 아니고,
+     「+ 새 수집」 탭이 떠내려가 안 보이던 문제도 함께 없어진다. */
+  .tabs { display: flex; gap: 4px; row-gap: 5px; align-items: flex-end; flex-wrap: wrap; }
+  .tab { font-size: var(--fs-sm); padding: 8px 15px; border-radius: var(--r-md) var(--r-md) 0 0; background: rgba(255,255,255,0.5);
+    color: #146B5E; font-weight: 600; border: 1px solid transparent; border-bottom: none;
+    white-space: nowrap; text-decoration: none; position: relative; top: 1px; display: inline-block; }
+  .tab:hover { background: rgba(255,255,255,0.8); }
+  /* **아래가 뚫린 탭 모양은 마지막 줄에서만 뜻이 성립한다** — 윗줄 탭은 카드에 붙어 있지
+     않으므로 네 모서리를 둥글려 칩처럼 둔다. 몇째 줄인지는 CSS로 알 수 없어 markTabRows가
+     .upper를 달아 준다. 지금 보고 있는 탭이 윗줄에 걸리면 「붙어 있다」는 모양은 포기하고
+     흰 바탕과 테두리가 그 말을 대신한다. */
+  .tab.upper { border-radius: var(--r-md); top: 0; }
+  .tab.on { background: #FFFFFF; font-weight: 700; border-color: #E5E7EB; color: #1E3A5F; padding-bottom: 9px; }
+  .tab.on.upper { padding-bottom: 8px; }
+  .tab.on:hover { background: #FFFFFF; }
+  .tab .n { color: #6B7280; font-weight: 500; font-size: var(--fs-xs); margin-left: 5px; }
+  /* 탭 이름은 한 줄 말줄임 — 원본 탭이 검색어라 길어질 수 있다. 전체는 툴팁이 받는다
+     (사용자 결정). em 단위라 한글 글자 수로 읽힌다(ch는 숫자 0 폭이라 절반밖에 안 든다). */
+  .tab .nm { display: inline-block; max-width: 12em; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+  /* [수정: 2026-08-25] × 는 그 카드를 삭제한다(탭 갈아타기와 다른 동작이라
+     preventDefault+stopPropagation으로 <a>의 이동을 막는다) — 사용자 확인:
+     이 화면에 탭 전용의 별도 '치우기' 상태는 필요 없다(삭제만 있으면 된다). */
+  .tab .del { margin-left: 7px; color: #6B7280; font-weight: 400; padding: 1px 3px; border-radius: var(--r-sm); }
+  .tab .del:hover { color: #DC2626; background: rgba(0,0,0,0.06); }
+  /* [수정: 2026-08-25] 다른 탭과 헷갈리지 않게 옅은 청록 음영 + 점선 테두리로
+     "이동"이 아니라 "만들기"라는 걸 구분한다 — opacity로 흐리기만 하던 예전
+     방식은 비활성 탭처럼 보였다(사용자 지적). */
+  .tab.add { background: rgba(20,107,94,0.08); color: #146B5E; font-weight: 500;
+    border: 1px dashed #146B5E; margin-left: 8px; }
+  .tab.add:hover { background: rgba(20,107,94,0.14); }
+  .report-head { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; font-size: var(--fs-xl); font-weight: 700; color: #1E3A5F; }
+  /* 사안명 칸 — 이름을 고치는 자리는 이 한 곳뿐이라(탭엔 연필을 안 단다) 연필이 칸 안
+     오른쪽 끝에 붙어 「여기가 고치는 칸」이라고 말한다. 칸 폭은 180px 고정이 아니라 글자
+     폭에 맞춘다(fitIssueWidth) — 고정이면 짧은 이름 뒤에 빈 밑줄이 길게 남아 연필이
+     이름에서 멀찍이 떨어져 선다. */
+  .name-field { display: inline-flex; align-items: center; background: #EFF6FF;
+    border-bottom: 2px dashed #2563EB; border-radius: var(--r-sm) var(--r-sm) 0 0; padding-right: 6px; }
+  .name-field:hover { filter: brightness(0.98); }
+  .name-field:focus-within { border-bottom-style: solid; }
+  .issue-input { font: inherit; font-size: var(--fs-base); font-weight: 700; color: #1E3A5F;
+    border: none; background: transparent; padding: 2px 4px 2px 8px; width: 6em; min-width: 0;
+    box-sizing: border-box; }
+  .issue-input:focus { outline: none; }
+  .name-field .pen { display: inline-flex; color: #2563EB; font-size: var(--fs-md); padding: 2px; cursor: pointer; }
+  /* 머리줄 끝 건수 — 정기 초안·확정본의 제목 옆 배지와 같은 자리·같은 값
+     (app.renderer / app.preview_renderer의 .total-count-badge). */
+  .total-count-badge { margin-left: 8px; font-size: var(--fs-sm); font-weight: 700; color: #6B7280;
+    background: #F3F4F6; border-radius: var(--r-pill); padding: 2px 10px; vertical-align: middle; }
+  .meta-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-size: var(--fs-sm); }
+  .chip { background: #F1F5F9; border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 3px 11px; color: #6B7280; }
+  /* ADHOC_DESIGN.md §6.4a — 검색어 편집 패널. 평소엔 접혀 있고, 접힌 상태가 곧 위
+     메타 칩 줄이다(새 줄을 만들지 않는다). 펼치면 검색어·검색 방식·시간창이 나온다. */
+  .edit-btn { font: inherit; font-size: var(--fs-sm); padding: 3px 11px; border-radius: var(--r-md); cursor: pointer;
+    border: 1px dashed #BFDBFE; background: #FFFFFF; color: #2563EB; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 5px; }
+  .edit-btn:hover { background: #EFF6FF; border-style: solid; }
+  .edit-panel { display: none; border: 1px solid #BFDBFE; background: #FFFFFF;
+    border-radius: var(--r-lg); padding: 14px 16px 10px; margin-top: 12px; }
+  .edit-panel.on { display: block; }
+  .edit-panel .field { margin: 0 0 4px; }
+  .edit-panel .field > label { width: 104px; line-height: 1.25; }
+  /* 원본 하나 = 검색 조건 하나 — 편집 창의 검색어는 읽기 전용이고, 바꾸려면 새 원본(#2)으로. */
+  .edit-panel .kw-fixed { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; flex: 1; min-width: 0;
+    font-size: var(--fs-md); color: #1F2937; padding-top: 2px; }
+  .edit-panel .kw-fixed .mode { color: #6B7280; font-size: var(--fs-sm); }
+  .edit-panel .kw-fixed a { margin-left: auto; color: #2563EB; font-size: var(--fs-sm); font-weight: 600; text-decoration: none; }
+  .edit-panel .kw-fixed a:hover { text-decoration: underline; }
+  .ver-tag { margin-left: 6px; color: #6B7280; font-weight: 600; }
+  /* 원본 머리줄에서 검색어를 「외 N개」로 줄인 자리 — 점선 밑줄이 「마우스를 올리면
+     전체가 나온다」는 표시다(탭의 말줄임과 같은 약속). 안 줄였으면 이 표시도 없다. */
+  .kw-head { border-bottom: 1px dotted #6B7280; }
+  /* 새 수집 폼 — 줄 간격을 좁히고 한 줄에 모은다. 빠른 시간 칩은 시간 입력
+     옆, 거르기 체크 셋은 한 줄, 수집 버튼은 맨 아래 오른쪽. 전부 #new-card 아래로 묶는다. 시안 mockups/ADHOC_NEW_COMPACT_MOCKUP.html. */
+  #new-card { padding: 18px 24px 16px; }
+  #new-card .n-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  #new-card .n-head .page-title { margin: 0; }
+  #new-card .n-sub { font-size: var(--fs-sm); color: #9CA3AF; }
+  /* 날짜 칸 — 입력칸이라 네모(--r-md)·높이 30px로 같은 줄의 시/분 드롭다운과 맞춘다. */
+  #new-card .n-date { height: var(--h-md); border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    padding: 0 8px; font-size: var(--fs-md); color: #1F2937; background: #fff; font-family: inherit; }
+  #new-card .n-date:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 3px #EFF6FF; }
+  /* 지난 날짜를 골랐을 때만 한 줄 — 평소엔 빈 칸이라 아무 자리도 차지하지 않는다. */
+  #new-card .n-date-note { font-size: var(--fs-sm); color: #9CA3AF; }
+  #new-card .field { gap: 8px; margin: 0 0 9px; }
+  #new-card .field > label { width: 64px; font-size: var(--fs-md); }
+  #new-card .field input[type=text], #new-card .field select { height: 36px; box-sizing: border-box; }
+  #new-card .kw-box { min-height: 36px; box-sizing: border-box; padding: 3px 8px; }
+  #new-card .kw-note { font-size: var(--fs-sm); color: #9CA3AF; margin: -4px 0 9px 72px; }
+  #new-card .kw-box input[type=text] { height: auto; }
+  #new-card select.hm-sel { width: 70px; }
+  #new-card .n-quick { display: inline-flex; gap: 5px; margin-left: 6px; flex-wrap: wrap; }
+  #new-card .n-last { margin: 12px 0 0; padding-top: 12px; border-top: 1px dashed #E5E7EB; }
+  #new-card .n-opts { display: flex; gap: 16px; flex-wrap: wrap; flex: 1; font-size: var(--fs-md); }
+  #new-card .n-opts label { display: flex; gap: 6px; align-items: center; cursor: pointer; color: #1F2937; }
+  #new-card .n-opts label input { width: var(--chk-sm); height: var(--chk-sm); margin: 0;
+    flex: none; accent-color: #2563EB; cursor: pointer; }
+  #new-card .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  @media (max-width: 640px) {
+    #new-card .field > label { width: 100%; }
+    #new-card .kw-note { margin-left: 0; }
+    #new-card .n-quick { margin-left: 0; }
+    #new-card .n-last .btn { width: 100%; justify-content: center; }
+  }
+  .chip .must-kw { color: #146B5E; font-weight: 600; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 11px 0; border-top: 1px solid #E5E7EB; border-bottom: 1px solid #E5E7EB; margin: 16px 0; }
+  /* [수정: 2026-09-15] 체크박스 일괄이동 바 — 툴바 밑(목록 맨 위)에서 화면 맨 아래 흰 띠로
+     옮겼다(시안 ADHOC_BULK_BAR_MOCKUP.html A안). 스크롤을 내려 기사를 체크하면 바가 화면 밖에
+     있어 다시 맨 위까지 올라가야 했다. 모양은 정기 확정본·초안의 .bottombar(app/renderer.py)와
+     같은 값이다 — 같은 일을 하는 바가 두 흐름에서 같은 자리에 있어야 한다. 정기는 🖍 때문에
+     띠가 늘 떠 있지만 여기엔 올릴 게 이것뿐이라 체크했을 때만 아래에서 올라온다(.on).
+     .container의 아래 여백(80px)이 띠 높이보다 커서 마지막 기사가 가려지지 않는다. */
+  .bulk-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    background: #FFFFFF; border-top: 1px solid #E5E7EB; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+    transform: translateY(100%); visibility: hidden; transition: transform .16s ease-out, visibility .16s; }
+  .bulk-bar.on { transform: none; visibility: visible; }
+  .bulk-bar-inner { max-width: 800px; margin: 0 auto; padding: 10px 24px;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--fs-md); }
+  .bulk-bar .bulk-count { font-weight: 600; color: #1E3A5F; white-space: nowrap; margin-right: 4px; }
+  .bulk-bar .bulk-div { width: 1px; height: 20px; background: #E5E7EB; margin: 0 4px; }
+  .bulk-bar .clear-btn { margin-left: auto; background: transparent; border-color: transparent; color: #6B7280; }
+  .bulk-bar .clear-btn:hover { background: #EFF6FF; }
+  h2.sub { color: #1E3A5F; font-size: var(--fs-base); margin: 20px 0 6px; display: flex; align-items: center; gap: 6px; }
+  h2.sub .cnt { font-size: var(--fs-sm); color: #6B7280; font-weight: 400; }
+  h2.sub .sub-acts { margin-left: auto; display: flex; align-items: center; gap: 2px; }
+  /* 「AI가 읽은 소제목별 주요 요약」 — 정기 확정본·초안(app/renderer.py
+     `.bottom-summary-item`)과 같은 값. 소제목 이름을 굵게·제목색으로 본문과 가르고,
+     요약 문단은 줄 간격을 띄운다. 한쪽만 고치지 않는다. */
+  .adhoc-summary .sum-item { padding: 12px 0; border-bottom: 1px solid #E5E7EB; }
+  .adhoc-summary .sum-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .adhoc-summary .sum-item strong { display: block; color: #1E3A5F; font-weight: 700; margin-bottom: 5px; }
+  .adhoc-summary .sum-item p { margin: 0; white-space: pre-line; line-height: 1.75; }
+  .order-btn { background: transparent; border: none; color: #6B7280; font-size: 0.78rem; cursor: pointer;
+    padding: 2px 4px; display: inline-flex; }
+  .order-btn:disabled { opacity: 0.35; cursor: default; }
+  .group-block.sub-custom { border-left: 3px dashed #7DD3FC; padding-left: 10px; margin-left: -13px; }
+  .custom-tag { font-size: var(--fs-xs); color: #0369A1; background: #E0F2FE; border-radius: var(--r-pill); padding: 1px 8px; font-weight: 400; }
+  /* [수정: 2026-09-02] 기사 행 규격을 정기 확정본(app/renderer.py .article)과 같은
+     값으로 맞췄다 — 담당자가 두 화면을 오갈 때 글자 크기·여백·들여쓰기가 미묘하게
+     달라 "다른 앱 같다"는 지적(사용자, 2026-09-02). 카드 여백 8/9px·위아래 2px +
+     아래 실선 → 정기와 같은 6/8px·위아래 10px·실선 없음. 행 사이를 실선으로 가르던
+     걸 없애도 목록이 안 뭉개지는 건, 늘어난 위아래 여백이 그 역할을 대신하기 때문이다. */
+  /* [수정: 2026-09-16] 행 여백 한 단계씩 축소 — padding 6→4px, 제목·메타 줄 사이(.a-bot 위 여백) 4→2px,
+     행 사이 10→6px. 글자·버튼 크기는 그대로다(한 건 74 → 64px). 확정본·초안·정기 보관함·
+     수시 네 파일에 같은 값이 복제돼 있으니 한쪽만 고치지 않는다. 시안 파일은 정리하며 없앴다(당시 B안). */
+  .article { padding: 4px 8px; border-radius: var(--r-md); margin: 6px 0; line-height: 1.5; }
+  .article.art-scoop { background: #FEF2F2; border-left: 3px solid #DC2626; padding-left: 9px; }
+  .article:hover { background: #F3F4F6; }
+  .article.out { background: #FFFBEB; border: 1px dashed #FDE68A; }
+  /* [추가: 2026-09-15] 마지막 불러오기로 새로 들어온 기사 — 정기 초안·확정본의 「새로
+     들어온 기사」와 같은 노랑(row_new). hover보다 뒤에 둬 마우스를 올려도 노랑이 남는다
+     (정기와 같은 규칙 — 상태 색이 hover 회색을 이긴다). */
+  .article.is-new-arrival { background: #FFF9C4; }
+  /* [추가: 2026-09-15] 헤더 오른쪽 「지금까지 다시 수집」 — 편집 칩과 같은 알약 모양의
+     채운 파랑(이 화면의 주 동작). margin-left:auto로 헤더 줄 오른쪽 끝에 붙고, 창이
+     좁아 줄이 넘치면 아랫줄 오른쪽으로 내려간다. */
+  .reload-now-form { margin: 0 0 0 auto; display: inline-flex; }
+  .now-btn { font: inherit; font-size: var(--fs-sm); height: var(--h-md); padding: 0 12px; box-sizing: border-box; border-radius: var(--r-md); cursor: pointer;
+    border: 1px solid #2563EB; background: #2563EB; color: #FFFFFF; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 5px; }
+  .now-btn:hover { background: #1D4ED8; border-color: #1D4ED8; }
+  .now-btn:disabled { opacity: 0.6; cursor: progress; }
+  .now-btn:disabled .ic { animation: now-spin 0.9s linear infinite; }
+  @keyframes now-spin { to { transform: rotate(360deg); } }
+  /* [추가: 2026-09-02] [단독] 카드 강조·사진 추정 흐림 — 정기와 같은 규칙·같은 색.
+     .art-scoop을 hover/out보다 **먼저** 선언해 가장 낮은 우선순위를 준다(정기의 같은
+     주석 참고 — "지금 이 순간의 정보"가 "원래 중요하다"를 항상 이긴다). */
+  .article.is-photo { opacity: 0.55; }
+  .article.is-photo:hover, .article.is-photo:has(.bulk-chk:checked),
+  /* ⋯ 메뉴를 연 행도 또렷하게 — 정기(app/renderer.py)와 같은 값이다. */
+  .article.is-photo:has(.more-wrap.is-open) { opacity: 1; }
+  /* ADHOC_DESIGN.md §6.13 「보낸 기사 표시」 — 내용 흐리기 + 「✓ 보냄」.
+     ① 왼쪽 청록 띠는 없앴다 — 「✓ 보냄」 자리와 흐림이 이미 같은 말을 한다
+        (ADHOC_RAW_CLEANUP_MOCKUP.html).
+     ② 흐리기는 행이 아니라 「내용」(.a-title/.a-bot)에만 건다 — 행에 걸면 띠와 ✓칩까지
+        같이 흐려져 정작 눈에 걸려야 할 신호가 약해진다. 신호는 100%, 내용만 55%.
+     ③ 배경색은 안 건드린다 — 이 행엔 이미 hover 회색·체크 파랑·.out 점선이 붙어서,
+        네 번째 배경색을 넣으면 겹칠 때 무엇이 이기는지 알 수 없게 된다. */
+  /* .is-sent = 이미 확정본에 들어간 기사. 내가 보낸 것과 옆 원본이 보낸 것이 같다 —
+     흐리기·툴바 필터·전체 선택 건너뛰기·Shift 범위 건너뛰기가 모두 이 한 클래스를 본다.
+     둘을 가르는 건 행 컨트롤의 색이다. (CSS 주석은 화면으로 나가므로 화면 글자를 안 적는다.) */
+  .article.is-sent .a-title, .article.is-sent .a-bot { opacity: 0.55; transition: opacity 0.12s; }
+  .article.is-sent:hover .a-title, .article.is-sent:hover .a-bot { opacity: 1; }
+  .article.is-sent .a-top { align-items: center; }
+  .sent-tag { font-size: var(--fs-xs); color: #146B5E; background: #E3F1EE;
+    border: 1px solid rgba(20, 107, 94, 0.24); border-radius: var(--r-pill); padding: 1px 8px; margin-left: 6px;
+    display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; flex: none; }
+  /* [추가: 2026-09-15] 로데이터 원본의 보내기 — [확정본으로 | ▾] 한 몸 버튼. 기본은 이 원본의
+     확정본으로 한 번에, 다른 확정본은 ▾ 뒤로. 보낸 기사는 이 자리가 흐린 「✓ 보냄」이 된다
+     (실시간 현황의 「📌 담아두기 ↔ ✔️ 스크랩됨」과 같은 모양 — 칩을 따로 달지 않는다). */
+  .send-split { display: inline-flex; align-items: stretch; border: 1px solid rgba(20, 107, 94, 0.24);
+    border-radius: var(--r-md); flex-shrink: 0; }
+  .send-split .send-go, .send-split .send-more { border: none; background: #E3F1EE; color: #146B5E;
+    font: inherit; font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
+  .send-split .send-go { padding: 3px 9px; border-radius: var(--r-md) 0 0 var(--r-md); min-width: 74px; }
+  .send-split .send-more { padding: 3px 6px; border-left: 1px solid rgba(20, 107, 94, 0.24);
+    border-radius: 0 var(--r-md) var(--r-md) 0; font-size: var(--fs-xs); }
+  .send-split .send-go:hover, .send-split .send-more:hover { filter: brightness(0.96); }
+  /* 옆 원본이 이미 확정본으로 보낸 기사 — 같은 자리·같은 split 모양이고 색만 회색이다.
+     색이 「누가 한 일인가」를 말하는 규칙 그대로다(청록 = 내가 한 일, 회색 = 남이 한 일).
+     그래서 이 줄엔 취소를 안 단다 — 내가 한 적 없는 일이라 무를 것이 없다. ▾는 열어 둔다:
+     일부러 다른 확정본으로 보내는 길이 막히면 안 된다. */
+  .send-split.sent-split { border-color: #E5E7EB; background: #FFFFFF; }
+  .sent-split .se-label { color: #9CA3AF; font-size: var(--fs-sm); font-weight: 600;
+    padding: 3px 9px; min-width: 74px; display: inline-flex; align-items: center;
+    justify-content: center; gap: 3px; cursor: default; }
+  .sent-split .se-label .ic { width: 0.95em; height: 0.95em; }
+  .sent-split .send-more { background: #FFFFFF; color: #9CA3AF; border-left-color: #E5E7EB; }
+  .sent-split .send-more:hover { background: #E3F1EE; color: #146B5E; filter: none; }
+  /* 「확정본으로 ▾」 목록 (시안 ADHOC_SEND_MENU_MOCKUP.html A안) — 칸 머리(.mh)로 「이 원본의
+     확정본」과 「오늘 다른 확정본」을 가르고, 이름(.nm)은 한 줄 말줄임, 시각은 오른쪽 끝
+     작은 회색. 「옮기기 ▾」(.move-menu)와 같은 문법이라 값도 같이 맞춘다. 이름을 줄바꿈시키면
+     아이콘·시각만 윗줄에 남아 어긋난다(옛 flex-wrap). */
+  .send-split .more-menu { min-width: 214px; max-width: 300px; }  /* max-width가 있어야 .nm의 말줄임이 실제로 걸린다 — 없으면 긴 사안명이 메뉴를 늘린다 */
+  .send-split .more-menu .mh { display: block; padding: 6px 10px 3px; font-size: var(--fs-xs);
+    color: #9CA3AF; font-weight: 600; }
+  .send-split .more-menu button { display: flex; align-items: center; gap: 6px; }
+  .send-split .more-menu button .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .send-split .more-menu button small { margin-left: auto; padding-left: 12px; color: #9CA3AF;
+    font-size: var(--fs-xs); font-weight: 400; }
+  /* [추가: 2026-09-17] 「옮기기 ▾」 메뉴 — 칸 이름(.move-h), 다른 사안 확정본의 건수(small).
+     .flip-up은 행 메뉴가 화면 아래에서 열릴 자리가 모자랄 때 JS가 붙인다(toggleArticleMenu). */
+  .move-btn { cursor: pointer; display: inline-flex; align-items: center; gap: 3px; }
+  .move-btn:hover { color: #1F2937; border-color: #6B7280; }
+  .move-wrap.is-open .move-btn { color: #2563EB; border-color: #2563EB; }
+  .move-wrap .caret { font-size: 0.7em; }
+  .move-menu { min-width: 190px; }
+  .move-menu .move-h { display: block; padding: 6px 10px 3px; font-size: var(--fs-xs); color: #9CA3AF; font-weight: 600; }
+  .move-menu button { display: flex; align-items: center; gap: 6px; }
+  .move-menu button small { margin-left: auto; padding-left: 10px; color: #9CA3AF; font-size: var(--fs-xs); }
+  .bulk-bar .move-menu.up { left: 0; right: auto; }
+  .more-menu.flip-up { top: auto; bottom: 100%; margin: 0 0 4px; }
+  .ok-note .ok-link { color: inherit; font-weight: 600; margin-left: 6px; }
+  .more-menu .menu-sep { display: block; height: 1px; background: #E5E7EB; margin: 4px 0; }
+  .more-menu.up { top: auto; bottom: 100%; left: 0; right: auto; margin: 0 0 6px; }
+  .send-done { border: 1px solid #E5E7EB; background: #FFFFFF; color: #9CA3AF; font: inherit;
+    font-size: var(--fs-sm); font-weight: 600; border-radius: var(--r-md); padding: 3px 9px; min-width: 74px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 3px; flex-shrink: 0; }
+  .bulk-bar .send-split .send-go { font-size: var(--fs-sm); padding: 5px 12px; }
+  .bulk-bar .send-split .send-more { font-size: var(--fs-xs); padding: 5px 8px; }
+  /* 원본 툴바 오른쪽 — 이 원본의 확정본으로 가는 길(복사·텍스트·엑셀 앞). 확정본이 없으면 안 그린다. */
+  .pair-link { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-sm); font-weight: 700;
+    color: #146B5E; background: #E3F1EE; border: 1px solid rgba(20, 107, 94, 0.24);
+    border-radius: var(--r-pill); padding: 5px 12px; text-decoration: none; white-space: nowrap; }
+  a.pair-link:hover { filter: brightness(0.96); }
+  /* [추가: 2026-09-15] 새 수집의 「지난 수집」 — 날짜 · 사안명 · 검색어를 단어로만 한 줄씩.
+     1년치가 쌓여도 카드가 길어지지 않게 목록만 스크롤한다. */
+  .hist-h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .hist-h h2 { font-size: var(--fs-base); color: #1E3A5F; margin: 0; }
+  .hist-sub { font-size: var(--fs-sm); color: #9CA3AF; }
+  .hist-h input[type=search] { margin-left: auto; font: inherit; font-size: var(--fs-sm); width: 220px; max-width: 100%;
+    border: 1px solid #E5E7EB; border-radius: var(--r-md); padding: 6px 10px; background: #FFFFFF; color: #1F2937; }
+  .hist { max-height: 330px; overflow-y: auto; margin-top: 10px; border-top: 1px solid #F1F5F9; }
+  .hist .hm { font-size: var(--fs-xs); font-weight: 700; color: #9CA3AF; padding: 10px 6px 3px; }
+  .hist .hr { display: flex; align-items: baseline; gap: 12px; padding: 7px 8px; border-radius: var(--r-md);
+    cursor: pointer; font-size: var(--fs-md); }
+  .hist .hr:hover { background: #F3F4F6; }
+  .hist .hr.picked { background: #E3F1EE; }
+  .hist .h-d { width: 64px; flex-shrink: 0; color: #9CA3AF; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+  .hist .h-is { font-weight: 700; color: #1F2937; flex-shrink: 0; max-width: 40%; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .hist .h-kw { color: #6B7280; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist .h-x { font-size: var(--fs-xs); color: #9CA3AF; flex-shrink: 0; }
+  .hist .h-open { margin-left: auto; font-size: var(--fs-xs); color: #2563EB; text-decoration: none; flex-shrink: 0;
+    opacity: 0; }
+  .hist .hr:hover .h-open, .hist .h-open:focus { opacity: 1; }
+  .hist-none { padding: 14px 8px; color: #9CA3AF; font-size: var(--fs-sm); }
+  #new-card.flash { animation: new-card-flash 0.9s ease; }
+  @keyframes new-card-flash { 0% { box-shadow: 0 0 0 3px rgba(20, 107, 94, 0.24); } 100% { box-shadow: none; } }
+  /* 원본 목록 머리 — 소제목이 없어 건수와 「최신순」만 */
+  h2.sub.raw-head { gap: 8px; }
+  h2.sub.raw-head .cnt { font-size: var(--fs-md); color: #1E3A5F; font-weight: 700; }
+  h2.sub.raw-head .raw-order { font-size: var(--fs-sm); color: #6B7280; font-weight: 500; }
+  .sel-sm.to-bundle { border-color: rgba(20, 107, 94, 0.24); color: #146B5E; }
+  .sel-sm.to-bundle:disabled { color: #9CA3AF; border-color: #E5E7EB; }
+  /* 칩 색은 **그 칩이 가리키는 화면의 색**이다 — 원본은 회색(.raw-tag), 확정본은 청록
+     (.bundle-tag). 원본으로 가는 이 칩까지 청록이면 바로 왼쪽 「확정본」 이름 칩과 배색이
+     똑같아 어느 쪽이 이 화면인지 구별이 안 된다(원본 화면의 .pair-link가 청록인 것과 짝). */
+  .chip.src { background: #F1F5F9; border-color: #E5E7EB;
+    color: #6B7280; font-weight: 600; text-decoration: none; }
+  .chip.src:hover { filter: brightness(0.97); }
+  /* 화면 이름 칩 — 머리줄 맨 앞(정기 초안·확정본과 같은 자리·모양, app.renderer.screen_tag_style).
+     원본은 다듬기 전 화면이라 중립 회색, 확정본은 수시 청록. 화면 전용(복사·txt엔 없다). */
+  .chip.bundle-tag, .chip.raw-tag { font-weight: 700; font-size: var(--fs-sm); margin-right: 10px; }
+  .chip.bundle-tag { background: #E3F1EE; border-color: rgba(20, 107, 94, 0.24); color: #146B5E; }
+  .chip.raw-tag { background: #F1F5F9; border-color: #E5E7EB;
+    color: #6B7280; }
+  .sent-filter { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm);
+    color: #6B7280; cursor: pointer; }
+  /* ☑ 아직 안 보낸 기사만 — 순서는 한 톨도 안 건드리고 감추기만 한다(§6.13 C안 기각). */
+  body.unsent-only .article.is-sent { display: none; }
+  /* [추가: 2026-09-15] 원본의 「🗑 숨김」 — 실시간 현황 .live-row.is-hidden과 같은 값(흐리게 +
+     취소선)이고 목록에서 빼지 않는다. 보내기 자리의 「🗑 숨김」 버튼(되돌리는 곳)은 또렷하게
+     둔다 — 보낸 기사처럼 「신호는 또렷하게, 내용만 흐리게」. */
+  body.unsent-only .article.is-raw-hid { display: none; }
+  .article.is-raw-hid .a-title { opacity: 0.5; text-decoration: line-through; }
+  .article.is-raw-hid .a-bot > :not(.a-acts) { opacity: 0.5; }
+  /* 「✓ 보냄」 다시 누르기 = 보냄 취소 — 전체 기사의 「숨김 → 되살리기」와 같은 문법:
+     마우스를 올리면 글자가 누르면 일어날 일로 바뀐다. 취소는 빼는 동작이라 빨강 계열. */
+  .send-done.raw-unsend { color: #146B5E; border-color: rgba(20, 107, 94, 0.24); cursor: pointer; }
+  .send-done.raw-unsend:hover { color: #DC2626; border-color: #FECACA; background: #FEF2F2; }
+  .send-done .when-rest { display: inline-flex; align-items: center; gap: 3px; }
+  .send-done .when-hover { display: none; align-items: center; gap: 3px; }
+  .send-done .when-rest .ic, .send-done .when-hover .ic { width: 0.95em; height: 0.95em; }
+  .send-done.raw-unsend:hover .when-rest, .send-done.raw-unhide:not(:disabled):hover .when-rest { display: none; }
+  .send-done.raw-unsend:hover .when-hover, .send-done.raw-unhide:not(:disabled):hover .when-hover { display: inline-flex; }
+  /* 원본 목록 머리의 「☐ 전체 선택」 — 행 체크박스(.bulk-chk)와 같은 --chk-md·같은 세로줄. */
+  .sel-all { display: inline-flex; align-items: center; gap: 6px; margin: 0 4px 0 12px;
+    font-size: var(--fs-sm); color: #6B7280; font-weight: 500; cursor: pointer; }
+  .sel-all input { width: var(--chk-md); height: var(--chk-md); margin: 0; accent-color: #2563EB; cursor: pointer; }
+  /* 원본 툴바 오른쪽 「복사 · 텍스트 · 엑셀」 — 정기 초안·확정본의 글자 버튼(app.renderer
+     EXPORT_LINKS_STYLE)과 같은 값. 박스는 내용을 바꾸는 버튼, 글자는 가져가는 것. */
+  .toolbar .export-links { display: inline-flex; align-items: center; }
+  .toolbar .export-links button { font: inherit; font-size: var(--fs-md); background: transparent; border: none;
+    color: #4B5563; font-weight: 500; height: var(--h-tb); padding: 0 8px; box-sizing: border-box;
+    border-radius: var(--r-md); cursor: pointer; }
+  .toolbar .export-links button:hover { color: #2563EB; text-decoration: underline; text-underline-offset: 3px; }
+  /* 「보기 순서」 — 정기 확정본(app.renderer .view-mode-select)과 같은 값·같은 자리(가져가기
+     글자 오른쪽). 화면에 나열하는 순서만 바꾸는 보기라 오른쪽 묶음에 선다. */
+  .view-mode-select {
+    border: 1px solid #2563EB; border-radius: var(--r-md); font-size: var(--fs-md);
+    height: var(--h-tb); padding: 0 9px; box-sizing: border-box;
+    color: #1F2937; background: #FFFFFF;
+  }
+  .send-done.raw-unhide { color: #6B7280; }
+  .send-done.raw-unhide:not(:disabled) { cursor: pointer; }
+  .send-done.raw-unhide:not(:disabled):hover { border-color: #9CA3AF; color: #1F2937; }
+  .sent-filter small { color: #9CA3AF; font-size: var(--fs-sm); }
+  .sent-filter input { width: var(--chk-sm); height: var(--chk-sm); margin: 0; flex: none;
+    accent-color: #2563EB; cursor: pointer; }
+  /* 「처리 안 한 N건 전부 확정본으로」 — 원본의 보내기 버튼과 같은 청록, 테두리만. */
+  .btn.send-all { background: #FFFFFF; color: #146B5E; border-color: rgba(20, 107, 94, 0.24); }
+  .btn.send-all:hover { background: #E3F1EE; }
+  /* 📷 사진 추정 (N) — 정기 확정본·초안과 같은 이름·같은 동작·같은 모양
+     (app.renderer.PHOTO_GATHER_STYLE). 화면만 바꾸는 보기라 카드·복사·txt·엑셀은 그대로다.
+     툴바엔 자리가 없어(넣으면 xlsx가 홀로 아랫줄로 떨어진다) 목록 바로 위 한 줄에 둔다. */
+  .photo-row { display: flex; gap: 8px; align-items: center; margin: -6px 0 10px; }
+  /* 모양 규칙: 알약 = 상태를 알려 주고 누르면 켜고 끄기만. 「무언가를 한다」는 네모 버튼과
+     섞이지 않게 .btn의 네모 모서리를 알약으로 덮는다(정기 툴바와 같은 규칙).
+     시안 mockups/TOOLBAR_DEPTH_MOCKUP.html C안. */
+  .btn.photo-gather-btn {
+    border-radius: var(--r-pill); background: #FFFFFF; color: #4B5563;
+    border-color: #E5E7EB; font-weight: 500;
+  }
+  .btn.photo-gather-btn:hover { background: #EFF6FF; color: #2563EB; border-color: #BFDBFE; }
+  /* 켜진 동안 채운 파랑 — 지금 화면이 평소 화면이 아니라는 표시. */
+  .btn.photo-gather-btn.is-on, .btn.photo-gather-btn.is-on:hover {
+    background: #2563EB; color: #FFFFFF; border-color: #2563EB;
+  }
+  .photo-gather-strip {
+    position: sticky; top: 60px; z-index: 15; display: flex; align-items: center; gap: 10px;
+    flex-wrap: wrap; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: var(--r-lg);
+    padding: 9px 12px; margin: 4px 0 6px;
+  }
+  .photo-gather-strip label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); cursor: pointer; }
+  /* 「전체 선택」은 자기가 거느리는 기사 행의 체크와 같은 크기다 — 띠 글자가 한 단계
+     작아도 상위 체크가 하위보다 작아 보이면 안 된다(수시 원본 .sel-all과 같은 규칙). */
+  .photo-gather-strip label input { width: var(--chk-md); height: var(--chk-md); margin: 0;
+    accent-color: #2563EB; cursor: pointer; }
+  .photo-gather-strip .pg-msg { font-size: var(--fs-md); color: #1E3A5F; }
+  .photo-gather-strip .pg-sp { flex: 1; }
+  .pg-done { text-align: center; color: #6B7280; padding: 28px 0 16px; font-size: var(--fs-md); }
+  .pg-from {
+    flex-shrink: 0; max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: var(--fs-xs); color: #4B5563; background: #F8FAFC; border: 1px solid #E5E7EB;
+    border-radius: var(--r-md); padding: 0 6px;
+  }
+  body.photo-gather .article.is-photo { opacity: 1; }
+  body.photo-gather .photo-badge { display: none; }
+  body.photo-gather .group-block:not(.photo-gather-view), body.photo-gather .adhoc-summary,
+  body.photo-gather .art-order-btn { display: none !important; }
+  .t-scoop { color: #B91C1C; font-weight: 800; }
+  .t-flash { color: #B91C1C; font-weight: 600; }
+  .photo-badge {
+    flex-shrink: 0; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
+    color: #6B7280; background: #F3F4F6; border: 1px solid #E5E7EB;
+    white-space: nowrap; position: relative; top: -0.15em;
+  }
+  .article details { display: block; }
+  .article summary { list-style: none; cursor: pointer; }
+  .article summary::-webkit-details-marker { display: none; }
+  /* [추가: 2026-08-19] 요약 펼침 — app/renderer.py의 "이미 확인한 기사" 규칙과 동일:
+     details가 열려있는 동안만 :has()로 제목 색을 바꾼다(자바스크립트 불필요, 닫으면
+     자동으로 원래 색으로 돌아온다). */
+  .article:has(details[open]) .a-title { opacity: 0.62; }  /* [수정: 2026-08-21] 색 대신 opacity */
+  .a-top { display: flex; align-items: flex-start; gap: 8px; }
+  /* [수정: 2026-09-18] 정기 확정본과 같은 16px 체크박스(시안 mockups/CHECKBOX_SIZE_MOCKUP.html B안).
+     들여쓰기 28 → 31px(.a-bot·.edit-box)도 같이 — 왼쪽 여백 4 + 16 + 오른쪽 여백 3 + gap 8. */
+  .bulk-chk { width: var(--chk-md); height: var(--chk-md); margin: 3px 3px 0 4px; flex: none;
+    accent-color: #2563EB; cursor: pointer; }
+  /* [수정: 2026-09-02] 제목 0.93 → 1rem, 메타 줄 0.78 → 0.8rem, 들여쓰기 25 → 28px.
+     셋 다 정기 확정본의 실측값 그대로다(.title-line은 body 기본 크기를 그대로 쓰고,
+     28px은 체크박스 자체 여백까지 포함해 브라우저에서 잰 값이다 — app/renderer.py의
+     ".article:has(.article-select) .action-row" 주석 참고). */
+  .a-title { font-size: var(--fs-base); }
+  /* [수정: 2026-09-11] 정기 확정본 .title-outlet과 같은 값 — 괄호 없이 회색·조금 작은 글자. */
+  .a-title .outlet { color: #6B7280; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  .a-bot { display: flex; align-items: center; gap: 8px; margin: 2px 0 0 31px;
+    flex-wrap: wrap; row-gap: 4px; }
+  .a-time { font-size: var(--fs-sm); color: #6B7280; white-space: nowrap;
+    user-select: none; -webkit-user-select: none; }
+  .a-time-sep { color: #6B7280; font-size: var(--fs-sm); margin: 0 2px;
+    user-select: none; -webkit-user-select: none; }
+  /* [추가: 2026-09-02] 🔍 이 기사가 걸린 검색어 — 정기 확정본의 .kw-inline과 같은
+     자리(게시시각 뒤)·같은 크기·같은 두 톤(돋보기는 한 톤 흐리게, 값이 먼저 읽히도록).
+     값은 카드에 저장된 matched_keywords로, 수집할 때마다 현재 검색어 기준으로 다시
+     쓰인다(app/adhoc/collector.py) — 검색어를 고치면 이 표시도 따라 바뀐다. */
+  .kw-inline { font-size: var(--fs-sm); color: #6B7280;
+    display: inline-flex; align-items: center; gap: 4px; }
+  .kw-inline .kw-ic { width: 0.75em; height: 0.75em; color: #9CA3AF; flex-shrink: 0; }
+  .kw-inline .kw-v { color: #4B5563; }
+  /* [추가: 2026-08-19] URL 통짜 텍스트 줄(.a-url) 대신 원문보기 링크 — 정기 확정본의
+     .origin-link-text와 같은 자리·같은 색(app/renderer.py 참고). 액션 줄에 있던 ↗
+     원문 열기 아이콘은 여기로 통합해 없앤다(같은 일을 하는 입구를 두 개 두지 않음). */
+  .origin-link { color: #2563EB; text-decoration: none; font-size: var(--fs-sm); display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; flex-shrink: 0; }
+  .origin-link:hover { text-decoration: underline; }
+  .origin-link .ic { width: 0.75em; height: 0.75em; }
+  .a-acts { display: flex; gap: 4px; align-items: center; margin-left: auto;
+    justify-content: flex-end; flex-shrink: 0; flex-wrap: wrap; row-gap: 4px; }
+  .icon-btn { border: none; background: none; color: #6B7280; border-radius: var(--r-md); padding: 4px 6px; cursor: pointer; display: inline-flex; align-items: center; }
+  .icon-btn:hover { background: #E5E7EB; color: #1F2937; }
+  /* [추가: 2026-09-02] 기사 행 안의 아이콘만 정기 규격으로 따로 잡는다 — 소제목 헤더의
+     📋🗑▲▼(같은 .icon-btn)는 예전 그대로 둔다. 정기에서 복사·🗑·↑↓는 hover 배경이
+     없고(.move-btn/.hide-btn/.copy-btn), ⋯·🏷만 옅은 파랑 배경이 깔린다(.more-btn/
+     .lab-btn) — 그 구분을 그대로 옮겼다. */
+  .a-acts .icon-btn { padding: 2px 6px; font-size: 1rem; border-radius: var(--r-sm); }
+  .a-acts .icon-btn:hover { background: none; color: #1F2937; }
+  .a-acts .hide-btn:hover { color: #DC2626; }
+  .a-acts .more-btn, .a-acts .lab-btn { padding: 3px 7px; }
+  .a-acts .more-btn:hover, .a-acts .lab-btn:hover { background: #EFF6FF; color: #2563EB; }
+  /* ⋯ 버튼 — 메뉴의 「복사하기」를 누르면 1초간 ✓로 바뀐다(copyArticleIcon). */
+  .a-acts .more-btn .icon-default { display: inline-flex; }
+  .a-acts .more-btn .icon-done { display: none; }
+  .a-acts .more-btn.is-copied .icon-default { display: none; }
+  .a-acts .more-btn.is-copied .icon-done { display: inline-flex; }
+  /* [추가: 2026-09-02] ⋯ 더보기 — 정기와 같은 마크업·같은 치수. 담기는 건 원문 다시
+     불러오기·기사 정보 직접 수정 둘이고, 저장은 정기와 같은 전역 저장소를 쓴다
+     (app.summary_overrides — 같은 URL이면 어느 화면에서 봐도 같은 제목이어야 한다). */
+  .more-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+  .more-menu {
+    display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 60;
+    min-width: 172px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+    padding: 4px; box-shadow: var(--sh-pop);
+  }
+  .more-wrap.is-open .more-menu { display: block; }
+  .more-menu button {
+    display: block; width: 100%; text-align: left; background: transparent; border: none;
+    padding: 8px 10px; border-radius: var(--r-sm); font-size: var(--fs-md); color: #1F2937;
+    cursor: pointer; white-space: nowrap;
+  }
+  .more-menu button:hover { background: #EFF6FF; }
+  /* ✏️ 직접 수정 — 요약 아래에 펼쳐지는 입력칸. 이 화면 관례대로 실제 <form> 제출이라
+     저장하면 페이지가 통째로 다시 그려진다(정기의 fetch+204와 다른 점). */
+  .edit-box { margin: 6px 0 4px 31px; padding: 10px 12px; background: #F8FAFC;
+    border: 1px solid #E5E7EB; border-radius: var(--r-lg); }
+  .edit-box.hidden { display: none; }
+  .edit-box label { display: block; font-size: var(--fs-xs); color: #6B7280; margin: 0 0 3px; }
+  .edit-box input, .edit-box textarea { width: 100%; box-sizing: border-box; font: inherit;
+    font-size: var(--fs-md); padding: 6px 8px; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    margin-bottom: 8px; background: #FFFFFF; color: #1F2937; }
+  .edit-box textarea { min-height: 60px; resize: vertical; }
+  /* [추가] 언론사 칸 — 제목과 한 줄에. 정기 .edit-summary-form .esf-row와 같은 값이다. */
+  .edit-box .eb-row { display: flex; gap: 8px; }
+  .edit-box .eb-f { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+  .edit-box .eb-f.eb-outlet { flex: 0 0 132px; }
+  @media (max-width: 560px) {
+    .edit-box .eb-row { flex-wrap: wrap; }
+    .edit-box .eb-f.eb-outlet { flex: 1 1 100%; }
+  }
+  .edit-box .acts { display: flex; gap: 6px; justify-content: flex-end; }
+  /* [추가: 2026-09-02] 소제목 헤더의 🗑(통째 숨기기·빈 소제목 삭제)만 hover 빨강 —
+     같은 묶음의 📋·▲▼는 무채색 그대로다(정기 .rename-btn.group-hide-btn과 같은 규칙). */
+  .icon-btn.group-hide-btn:hover { color: #DC2626; }
+  /* [추가: 2026-09-01] 소제목 헤더의 📋 — 정기 화면(.group-copy-btn)과 같은 전환:
+     누르면 1초간 ✓로 바뀐다. 색·크기는 옆 ▲▼·🗑과 같은 .icon-btn에서 물려받는다. */
+  .group-copy-btn .icon-default { display: inline-flex; }
+  .group-copy-btn .icon-done { display: none; }
+  .group-copy-btn.is-copied .icon-default { display: none; }
+  .group-copy-btn.is-copied .icon-done { display: inline-flex; }
+  .sel-sm { font: inherit; font-size: var(--fs-sm); padding: 3px 8px; border: 1px solid #E5E7EB; border-radius: var(--r-md); background: #FFFFFF; color: #6B7280; }
+  .out-tag { font-size: var(--fs-xs); color: #92400E; background: #FEF3C7; border: 1px solid #FDE68A; border-radius: var(--r-pill); padding: 1px 8px; margin-left: 6px; }
+  /* [추가: 2026-08-19] 펼쳐지는 요약 — app/renderer.py .article-summary와 같은 목적,
+     이 화면 카드 톤(옅은 배경+왼쪽 테두리)에 맞춰 살짝 감쌌다. */
+  /* [수정: 2026-09-02] 정기 .article-summary와 같은 값(여백만, 배경 상자 없음)으로
+     맞췄다 — 수시 쪽 상자가 더 예뻤지만, 두 화면이 같아 보이는 게 먼저다. */
+  .a-summary { margin: 6px 0 4px 20px; color: #1F2937; font-size: var(--fs-md); }
+  .a-summary.none { color: #9CA3AF; font-style: italic; }
+  .empty { color: #6B7280; font-size: var(--fs-lg); padding: 12px 0; }
+  /* [추가: 2026-10-21] 오늘 카드가 없을 때의 빈 화면 — 상단바 「원본」·「확정본」이 여기로 온다.
+     지난 카드로 데려가는 대신 "오늘 것이 없다"는 사실과 다음 할 일을 그 자리에 둔다. */
+  .empty-zone { text-align: center; padding: 30px 12px 26px; }
+  .empty-zone .zz { font-size: 1.9rem; line-height: 1; }
+  .empty-zone .sub { margin: 12px 0 0; color: #6B7280; font-size: var(--fs-md); line-height: 1.7; }
+  .empty-zone .acts { margin-top: 18px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  /* 단추는 한 줄을 지킨다 — .btn 높이가 var(--h-md) 고정이라 글자가 접히면 상자 밖으로 샌다.
+     원본 이름은 길 수 있으므로 거기서 잘린다(수시 탭 .tab .nm과 같은 처방). */
+  .empty-zone .acts .btn { max-width: 100%; white-space: nowrap; }
+  .empty-zone .acts .btn .nm { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  /* 지난 카드로 가는 길 — 상단바가 더는 거기로 데려가지 않으므로 그 대신 눈앞에 두는 한 줄이다. */
+  .past-line { margin-top: 22px; padding-top: 14px; border-top: 1px solid #E5E7EB; color: #6B7280;
+    font-size: var(--fs-sm); display: flex; gap: 6px; align-items: baseline; justify-content: center;
+    line-height: 1.7; }
+  .past-line > .ic { flex: none; align-self: center; }
+  .past-line a { color: #4B5563; text-decoration: none; font-weight: 600; }
+  .past-line a:hover { color: #2563EB; text-decoration: underline; text-underline-offset: 3px; }
+  .past-line .when { font-variant-numeric: tabular-nums; }
+  /* [수정: 2026-09-02] 좌하단 휴지통 스택은 정기 확정본·초안(app.renderer의
+     .trash-fab/.undo-fab/.trash-pop)과 같은 자리·같은 규격이어야 한다 — 문서에는
+     그렇게 적혀 있었지만 실제 값이 4px씩 어긋나 있었다(16↔20, 52↔56, 46↔50,
+     78↔88, 320↔336). 두 흐름을 오갈 때 같은 버튼이 조금씩 움직이면 안 되므로
+     정기 값으로 통일한다. */
+  .fab { position: fixed; z-index: 25; box-sizing: border-box; width: var(--fab-sm); height: var(--fab-sm); padding: 0; border-radius: var(--r-circle); background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; box-shadow: var(--sh-float); display: flex; align-items: center; justify-content: center; cursor: pointer; font: inherit; font-size: 1.3rem; }
+  .fab.left { left: 20px; bottom: 20px; width: var(--fab-lg); height: var(--fab-lg); }
+  .fab.left.upper { bottom: 88px; width: var(--fab-sm); height: var(--fab-sm); }
+  .fab.left.upper:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .fab .badge { position: absolute; top: -3px; right: -3px; background: #DC2626; color: #FFFFFF; font-size: var(--fs-xs); font-weight: 700; border-radius: var(--r-pill); padding: 0 5px; line-height: 1.55; }
+  .fab-pop { display: none; position: fixed; left: 20px; bottom: 88px; width: 336px; max-height: 60vh; overflow-y: auto; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg); box-shadow: var(--sh-pop); padding: 12px 14px; z-index: 30; }
+  .fab-pop.is-open { display: block; }
+  .fab-pop h5 { margin: 0 0 8px; font-size: var(--fs-md); color: #1E3A5F; }
+  /* [추가: 2026-09-17] 수시 확정본 (발송) — 정기 확정본 .confirm-send-fab과 같은 자리·규격. */
+  .send-fab { position: fixed; right: 20px; bottom: 80px; width: var(--fab-lg); height: var(--fab-lg); border-radius: var(--r-circle);
+    background: #15803D; color: #FFFFFF; border: none; font: inherit; font-size: var(--fs-md); font-weight: 700;
+    cursor: pointer; box-shadow: var(--sh-float); z-index: 200;
+    display: flex; align-items: center; justify-content: center; }
+  .ok-note { background: #F0FDF4; border: 1px solid #BBF7D0; color: #166534; border-radius: var(--r-lg); padding: 11px 14px; margin: 12px 0; font-size: var(--fs-md); }
+  .ok-note .ok-link { color: inherit; font-weight: 600; margin-left: 6px; }
+  .sent-done { margin-left: 8px; font-size: var(--fs-sm); font-weight: 500; color: #6B7280; white-space: nowrap; }
+  a.sent-done { text-decoration: none; }
+  a.sent-done:hover { color: #2563EB; text-decoration: underline; }
+  .send-modal-back { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.32); z-index: 300;
+    align-items: center; justify-content: center; padding: 16px; }
+  .send-modal-back.is-open { display: flex; }
+  .send-modal { background: #FFFFFF; border-radius: var(--r-lg); box-shadow: var(--sh-modal);
+    width: 100%; max-width: 420px; max-height: 80vh; overflow-y: auto; padding: 18px 20px 16px; }
+  .send-modal h3 { margin: 0 0 4px; font-size: var(--fs-base); color: #1E3A5F; }
+  .send-modal .sm-sub { margin: 0 0 12px; font-size: var(--fs-sm); color: #6B7280; line-height: 1.6; }
+  .send-modal .sm-row { display: flex; align-items: center; gap: 9px; padding: 8px 4px; border-top: 1px solid #F1F5F9; font-size: var(--fs-md); cursor: pointer; }
+  .send-modal .sm-row input { width: var(--chk-md); height: var(--chk-md); margin: 0; accent-color: #15803D; }
+  .send-modal .sm-row .nm { font-weight: 600; color: #1F2937; }
+  .send-modal .sm-row .what { margin-left: auto; font-size: var(--fs-sm); color: #6B7280; white-space: nowrap; }
+  .send-modal .sm-row:has(input:not(:checked)) .nm, .send-modal .sm-row:has(input:not(:checked)) .what { color: #9CA3AF; text-decoration: line-through; }
+  .send-modal .sm-note { margin: 10px 0 0; font-size: var(--fs-sm); color: #6B7280; line-height: 1.6; }
+  .send-modal .sm-warn { margin: 10px 0 0; font-size: var(--fs-sm); color: #92400E; background: #FFFBEB; border-radius: var(--r-md); padding: 8px 10px; line-height: 1.6; }
+  .send-modal .sm-btns { display: flex; justify-content: flex-end; gap: 8px; margin: 14px 0 0; }
+  .send-modal .sm-go { background: #15803D; color: #FFFFFF; border: none; border-radius: var(--r-md); padding: 8px 16px; font: inherit; font-size: var(--fs-md); font-weight: 700; cursor: pointer; }
+  .send-modal .sm-go:disabled { opacity: 0.45; cursor: not-allowed; }
+  .fab-pop .row { display: flex; gap: 8px; align-items: flex-start; padding: 7px 0; border-top: 1px solid #F1F5F9; font-size: var(--fs-sm); }
+  .fab-pop .row .tx { flex: 1; color: #6B7280; }
+  /* [수정: 2026-09-11] 회차 줄이 <a> 하나에서 「체크박스 · 링크 · 🗑」 세 칸(.run-line)이
+     됐다 — 여백·밑줄·hover는 바깥 줄이 맡고, 링크(.run-row)는 남은 폭을 채운다. */
+  .run-line { display: flex; align-items: center; gap: 10px; padding: 0 4px 0 26px; font-size: var(--fs-base);
+    min-height: 34px; border-radius: var(--r-md); }
+  .run-line:hover { background: #F3F4F6; }
+  .run-row { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 7px 0;
+    text-decoration: none; color: #1F2937; }
+  .st { font-size: var(--fs-xs); border-radius: var(--r-pill); padding: 1px 9px; border: 1px solid; flex: none; }
+  .st.done { background: #EFF6FF; color: #2563EB; border-color: #BFDBFE; }  /* [수정: 2026-08-21] 초록→파랑 */
+  .st.wip { background: #FFFBEB; color: #B45309; border-color: #FDE68A; }
+  .run-row .n { margin-left: auto; color: #9CA3AF; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+  .run-row:hover .go { text-decoration: underline; text-underline-offset: 3px; }
+  /* [추가: 2026-09-11] 수시 보관함 삭제 — 줄 끝 🗑(하나, 확인창 없음)와 [선택 삭제](여러 개,
+     확인창 한 번). 🗑는 확정본 기사 행의 🗑와 같은 무게: 평소 회색, hover만 빨강. */
+  .row-del { flex: none; border: none; background: none; color: #9CA3AF; cursor: pointer;
+    padding: 4px 6px; border-radius: var(--r-sm); line-height: 1; display: inline-flex; font-size: 0.95rem; }
+  .row-del:hover { color: #DC2626; background: #FEF2F2; }
+  /* 선택 삭제 모드 — body.arch-tidy일 때만 체크박스가 나오고, 꺼내는 동작(복사·txt·xlsx·
+     열기)과 줄 끝 🗑는 숨는다. 고른 줄은 확정본에서 체크한 기사 행과 같은 옅은 파랑. */
+  input.pick { display: none; width: var(--chk-md); height: var(--chk-md); margin: 0; flex: none;
+    accent-color: #2563EB; cursor: pointer; }
+  .pick-sp { display: none; width: var(--chk-md); flex: none; }
+  body.arch-tidy input.pick { display: inline-block; }
+  body.arch-tidy .pick-sp { display: inline-block; }
+  body.arch-tidy .row-del, body.arch-tidy .exp, body.arch-tidy .run-row .go, body.arch-tidy .normal-only { display: none; }
+  .run-line:has(input.pick:checked) { background: #EFF6FF; }
+  .tidy-only { display: none; }
+  body.arch-tidy .tidy-only { display: inline-flex; }
+  /* [추가: 2026-10-12] 「삭제 기록」으로 가는 글자 링크 — 정기 보관함과 같은 자리·같은 모양.
+     건수는 안 적는다(적으면 보관함이 다시 어수선해진다). */
+  .deleted-link { margin-left: auto; color: #4B5563; text-decoration: none; font-size: var(--fs-sm);
+    font-weight: 500; white-space: nowrap; }
+  .deleted-link:hover { color: #2563EB; text-decoration: underline; text-underline-offset: 3px; }
+  .result-bar .deleted-link + .tidy-btn { margin-left: 0; }
+  body.arch-tidy .deleted-link { display: none; }
+  /* [추가: 2026-10-12] 카드 화면 맨 아래 줄 — 「삭제 기록」 글자 링크 + (탭 줄이 없을 때)
+     「사안 목록에서 삭제」. 링크의 margin-left:auto 가 둘을 오른쪽으로 민다. */
+  .card-del-row { display: flex; gap: 12px; align-items: center; justify-content: flex-end; margin-top: 14px; }
+  /* 좁은 화면에선 오른쪽 아래 발송 ●(fixed)가 이 줄을 덮는다 — 떠 있는 것들 위로 비켜 세운다.
+     960px 이하부터 카드 오른쪽 끝과 발송 ●의 자리가 겹치기 시작한다(실측). */
+  @media (max-width: 960px) { .card-del-row { margin-bottom: 72px; } }
+  .tidy-btn { margin-left: auto; border: 1px solid #E5E7EB; background: #FFFFFF; color: #6B7280; border-radius: var(--r-md);
+    padding: 6px 13px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .tidy-btn:hover { border-color: #FECACA; color: #DC2626; background: #FEF2F2; }
+  .tidy-bar { margin-left: auto; align-items: center; gap: 8px; font-size: var(--fs-sm); color: #6B7280; }
+  .pick-empty { border: 1px dashed #E5E7EB; background: #FFFFFF; color: #4B5563; border-radius: var(--r-md);
+    padding: 5px 11px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; }
+  .pick-empty:hover { border-color: #2563EB; color: #2563EB; border-style: solid; }
+  .done-btn { border: 1px solid #2563EB; background: #2563EB; color: #FFFFFF; border-radius: var(--r-md);
+    padding: 5px 13px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; font-weight: 600; }
+  /* 고른 게 있을 때만 뜨는 바 — /hidden 일괄 복구 바·확정본 일괄이동 바와 같은 규칙과 색. */
+  .sel-bar { display: none; position: sticky; top: 62px; z-index: 5; align-items: center; gap: 10px;
+    background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: var(--r-lg); padding: 8px 12px;
+    margin: 0 0 8px; font-size: var(--fs-md); color: #1E3A5F; box-shadow: var(--sh-float); }
+  .sel-bar.on { display: flex; }
+  .sel-bar .sp { flex: 1; }
+  .sel-bar .clr { background: transparent; color: #6B7280; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    padding: 5px 10px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; }
+  /* [추가: 2026-08-18] 🏷 라벨(PRD.md 기능10) — app.renderer/app.preview_renderer의
+     라벨 CSS와 같은 앰버 값(당시 시안의 --label-bg/--label-text). 이 화면은
+     실제 <form> 제출 방식(app/adhoc/renderer.py 상단 라우팅 계약 주석)이라 팝오버
+     자체는 열고닫기만 JS로 하고, 붙이기/떼기는 페이지 전체를 새로고침한다. */
+  .lab-pop-wrap { position: relative; display: inline-flex; }
+  .lab-btn.on { color: #8A5A14; background: #FBF0DA; }
+  .lab-btn .lab-count { font-size: var(--fs-xs); font-weight: 700; margin-left: 2px; }
+  .lab-pop {
+    position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 60; width: 250px;
+    text-align: left; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+    padding: 11px 12px; box-shadow: var(--sh-pop);
+  }
+  .lab-pop.hidden { display: none; }
+  .lab-pop h4 { margin: 0 0 6px; font-size: var(--fs-xs); color: #6B7280; font-weight: 700; }
+  .lab-pop .known { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+  .lab-pop .known .none { font-size: var(--fs-xs); color: #6B7280; }
+  .known-chip {
+    font-size: var(--fs-xs); font-weight: 600; color: #6B7280; cursor: pointer;
+    background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 2px 8px;
+  }
+  .known-chip:hover { background: #FBF0DA; color: #8A5A14; border-color: rgba(138, 90, 20, 0.28); }
+  .known-chip.used { background: #FBF0DA; color: #8A5A14; border-color: rgba(138, 90, 20, 0.28); font-weight: 700; }
+  .known-chip .n { opacity: 0.6; font-weight: 500; margin-left: 3px; }
+  .lab-pop .addbox { display: flex; gap: 5px; }
+  .lab-pop .addbox input {
+    flex: 1; font-size: var(--fs-sm); padding: 5px 7px; border: 1px solid #E5E7EB; border-radius: var(--r-sm);
+  }
+  .lab-pop .addbox button {
+    font-size: var(--fs-xs); font-weight: 700; padding: 5px 10px; border-radius: var(--r-sm); cursor: pointer;
+    background: #FBF0DA; color: #8A5A14; border: 1px solid rgba(138, 90, 20, 0.28);
+  }
+  /* 확정본 이름 짓는 창 — 뼈대·크기·줄 구성은 정기 「소제목 이름 고르기 창」
+     (app.renderer NAME_PICKER_STYLE)과 같은 값이고 **색만 수시 청록**이다. 초록은 이 앱에서
+     발송 ●(COLOR_SEND)과 「잘 됐다」 안내(COLOR_OK_*)가 이미 쓰고 있어 새로 만들지 않는다. */
+  /* 이 앱엔 공용 `.hidden`이 없다 — 숨기는 요소마다 제 규칙을 적는다(.edit-box.hidden,
+     .lab-pop.hidden과 같은 줄). 이걸 빠뜨리면 창과 **화면 전체를 덮는 막**이 늘 떠 있어
+     모든 클릭이 막에 먹히고, 화면이 통째로 먹통이 된다(글자는 멀쩡해 눈치채기 어렵다). */
+  #bundle-namer.hidden, #namer-back.hidden { display: none; }
+  #namer-back { position: fixed; inset: 0; z-index: 39; background: rgba(15,23,42,0.12); }
+  #bundle-namer { position: fixed; top: 13vh; left: 50%; transform: translateX(-50%); z-index: 40;
+    width: 372px; max-width: calc(100vw - 32px); background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: var(--r-lg); box-shadow: var(--sh-modal); padding: 11px 12px 9px; }
+  #bundle-namer .np-title { font-size: var(--fs-sm); font-weight: 700; color: #1E3A5F;
+    margin: 0 0 7px; display: flex; align-items: center; gap: 7px; }
+  #bundle-namer .np-title .chip { margin: 0; }
+  .np-input { width: 100%; font: inherit; font-size: var(--fs-md); padding: 6px 9px; box-sizing: border-box;
+    border: 1px solid #E5E7EB; border-radius: var(--r-md); color: #1F2937; background: #FFFFFF; }
+  .np-input:focus { outline: none; border-color: #146B5E; box-shadow: 0 0 0 3px #E3F1EE; }
+  .np-lead { font-size: var(--fs-xs); color: #6B7280; margin: 8px 6px 1px; }
+  .np-list { max-height: 100px; overflow-y: auto; margin: 0 -4px; }
+  .np-row { display: flex; align-items: baseline; gap: 8px; width: calc(100% - 8px);
+    margin: 0 4px; padding: 3px 8px; border: none; background: none; border-radius: var(--r-sm);
+    font: inherit; text-align: left; cursor: pointer; color: #1F2937; }
+  .np-row:hover { background: #E3F1EE; }
+  .np-row .np-nm { flex: 1; font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 볼드 = 오늘 담당자가 이미 지은 이름(정기 창의 .np-mine과 같은 뜻). */
+  .np-row.np-mine .np-nm { font-weight: 700; }
+  .np-row .np-when { font-size: var(--fs-xs); color: #6B7280; white-space: nowrap; }
+  .np-sep { font-size: var(--fs-xs); color: #6B7280; margin: 6px 8px 1px; padding-top: 5px;
+    border-top: 1px dashed #E5E7EB; }
+  .np-sep:first-child { border-top: none; padding-top: 0; margin-top: 1px; }
+  .np-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    margin-top: 8px; padding-top: 7px; border-top: 1px solid #E5E7EB; }
+  .np-msg { font-size: var(--fs-xs); color: #6B7280; flex: 1; }
+  .np-msg.new { color: #146B5E; }
+  /* 빈 칸으로 「만들어 보내기」를 눌렀을 때 — 새 색을 만들지 않고 주의 세트를 쓴다.
+     말없이 아무 일도 안 하면 창이 먹통으로 보인다. */
+  .np-msg.warn { color: #92400E; font-weight: 700; }
+  .np-btns { display: flex; gap: 6px; }
+  .np-btns button { font: inherit; font-size: var(--fs-sm); padding: 5px 12px; border-radius: var(--r-md); cursor: pointer; }
+  .np-cancel { background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; }
+  /* 이 창의 대표 동작 하나라 채운 색 — 수시 청록이다(발송 초록이면 「누르면 나간다」로 읽힌다). */
+  .np-ok { background: #146B5E; color: #FFFFFF; border: none; font-weight: 700; }
+  .lab-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin: 4px 0 0 25px; }
+  .lab-row .tagmark { color: #8A5A14; opacity: 0.75; }
+  .lab-chip {
+    display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs); font-weight: 700;
+    color: #8A5A14; background: #FBF0DA; border: 1px solid rgba(138, 90, 20, 0.28);
+    border-radius: var(--r-pill); padding: 2px 8px; white-space: nowrap;
+  }
+  .lab-chip form { display: inline; }
+  .lab-chip .x-btn {
+    background: none; border: none; padding: 0; margin: 0; color: #8A5A14; opacity: 0.55;
+    cursor: pointer; font-weight: 700; font-size: 0.85rem; line-height: 1;
+  }
+  .lab-chip .x-btn:hover { opacity: 1; }
+
+
+/* ===== 제안 — 「켜진 칩」 한 규칙 =====================================
+   앱에 이미 켜고 끄는 알약 언어가 있다: 수집 시간 설정의 요일 칩(.day-chip).
+   꺼짐은 점선 테두리 + 흐린 글자, 켜짐은 실선 accent 테두리 + 옅은 파랑 바탕 +
+   accent 글자. 날짜 칩도 같은 말을 쓴다 — 새 모양을 만들지 않는다.           */
+.qchip.on {
+  border: 1px solid #2563EB; border-style: solid;
+  background: #EFF6FF; color: #2563EB; font-weight: 600;
+}
+.qchip.on:hover { background: #E0ECFF; }
+/* 칩 안 날짜(C안) — 이름보다 한 단계 작고 흐리게. */
+.qchip .d { font-size: var(--fs-xs); opacity: .75; margin-left: 4px; font-weight: 400; }
+.qchip.on .d { opacity: .85; }
+
+/* 목업 전용 — 실제 화면에는 없는 설명 장치 */
+.mk-wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px 60px; }
+.mk-h1 { font-size: 1.3rem; color: #1E3A5F; margin: 0 0 6px; }
+.mk-lead { font-size: .88rem; color: #4B5563; line-height: 1.7; margin: 0 0 26px; }
+.mk-sec { margin: 0 0 30px; }
+.mk-t { font-size: 1.1rem; color: #1E3A5F; margin: 0 0 4px; }
+.mk-t .pick { font-size: .72rem; color: #fff; background: #2563EB; border-radius: 999px;
+  padding: 2px 9px; margin-left: 8px; vertical-align: 2px; font-weight: 600; }
+.mk-why { font-size: .8rem; color: #6B7280; line-height: 1.65; margin: 0 0 10px; }
+.mk-why b { color: #1F2937; }
+.mk-box { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 14px 18px; }
+.mk-state { font-size: .72rem; color: #9CA3AF; margin: 12px 0 6px; letter-spacing: .02em; }
+.mk-con { font-size: .8rem; color: #B45309; background: #FFFBEB; border: 1px solid #FDE68A;
+  border-radius: 6px; padding: 8px 11px; margin-top: 10px; line-height: 1.6; }
+</style></head>
+<body style="background:#F8FAFC">
+<div class="mk-wrap">
+  <h1 class="mk-h1">새 수집 — 날짜 칩이 「지금 고른 날짜」를 말하게</h1>
+  <p class="mk-lead">
+    지금은 <b>「어제」를 눌러도 칩이 그대로</b>라, 날짜가 바뀌었는지 날짜 칸 숫자를 읽어야 압니다.
+    칩이 상태를 말해야 눌렀다는 것이 보입니다.<br>
+    쓰는 언어는 <b>이미 앱에 있습니다</b> — 수집 시간 설정의 요일 칩(<code>.day-chip</code>)이
+    꺼짐 점선 / 켜짐 실선+옅은 파랑입니다. 새 모양을 만들지 않고 그대로 가져옵니다.
+  </p>
+
+  <div class="mk-sec">
+    <h2 class="mk-t">A안 — 지금 칩 둘에 켜짐 상태만 더한다<span class="pick">권장</span></h2>
+    <p class="mk-why">
+      고르는 날짜가 그 칩과 같으면 켜지고, <b>직접 고른 날짜면 둘 다 꺼진다</b>.
+      칩은 어디까지나 지름길이고 <b>날짜의 주인은 날짜 칸</b>이라는 관계가 그대로 보인다.
+    </p>
+    <div class="mk-box">
+      <div class="mk-state">오늘 (화면을 열었을 때)</div>
+      <div class="field">
+  <label>날짜</label>
+  <span class="n-date" style="display:inline-flex;align-items:center;padding:0 8px;">2026. 10. 21. <span style="margin-left:6px;opacity:.5">▦</span></span>
+  <span class="n-quick"><button type="button" class="qchip on">오늘</button><button type="button" class="qchip">어제</button></span>
+  <span class="n-date-note"></span>
+</div>
+      <div class="mk-state">「어제」를 눌렀을 때</div>
+      <div class="field">
+  <label>날짜</label>
+  <span class="n-date" style="display:inline-flex;align-items:center;padding:0 8px;">2026. 10. 20. <span style="margin-left:6px;opacity:.5">▦</span></span>
+  <span class="n-quick"><button type="button" class="qchip">오늘</button><button type="button" class="qchip on">어제</button></span>
+  <span class="n-date-note is-past">어제 하루 전체 · 기사가 많은 검색어는 못 닿을 수 있어요</span>
+</div>
+      <div class="mk-state">날짜 칸에서 10/18을 직접 골랐을 때 — 둘 다 꺼짐</div>
+      <div class="field">
+  <label>날짜</label>
+  <span class="n-date" style="display:inline-flex;align-items:center;padding:0 8px;">2026. 10. 18. <span style="margin-left:6px;opacity:.5">▦</span></span>
+  <span class="n-quick"><button type="button" class="qchip">오늘</button><button type="button" class="qchip">어제</button></span>
+  <span class="n-date-note is-past">3일 전 하루 전체 · 기사가 많은 검색어는 못 닿을 수 있어요</span>
+</div>
+    </div>
+  </div>
+
+  <div class="mk-sec">
+    <h2 class="mk-t">B안 — 칩을 셋으로 (오늘 · 어제 · 그저께)</h2>
+    <p class="mk-why">
+      그저께를 자주 쓰면 한 번에 간다. 다만 <b>칩을 늘리기 시작하면 어디서 멈출지가 애매하다</b>
+      (3일 전? 일주일 전?) — 그 일은 날짜 칸이 이미 한다.
+    </p>
+    <div class="mk-box"><div class="field">
+  <label>날짜</label>
+  <span class="n-date" style="display:inline-flex;align-items:center;padding:0 8px;">2026. 10. 20. <span style="margin-left:6px;opacity:.5">▦</span></span>
+  <span class="n-quick"><button type="button" class="qchip">오늘</button><button type="button" class="qchip on">어제</button><button type="button" class="qchip">그저께</button></span>
+  <span class="n-date-note is-past">어제 하루 전체 · 기사가 많은 검색어는 못 닿을 수 있어요</span>
+</div></div>
+    <div class="mk-con">A안에 칩 하나만 더한 것이라, 쓰다가 필요해지면 그때 늘려도 늦지 않습니다.</div>
+  </div>
+
+  <div class="mk-sec">
+    <h2 class="mk-t">C안 — 칩 안에 날짜까지 적는다</h2>
+    <p class="mk-why">
+      「어제가 며칠이지」를 세지 않아도 된다. 다만 <b>바로 왼쪽 날짜 칸이 같은 숫자를 이미 말하고 있어</b>
+      한 줄에 같은 날짜가 두 번 선다.
+    </p>
+    <div class="mk-box"><div class="field">
+  <label>날짜</label>
+  <span class="n-date" style="display:inline-flex;align-items:center;padding:0 8px;">2026. 10. 20. <span style="margin-left:6px;opacity:.5">▦</span></span>
+  <span class="n-quick"><button type="button" class="qchip">오늘<span class="d">10/21</span></button><button type="button" class="qchip on">어제<span class="d">10/20</span></button></span>
+  <span class="n-date-note is-past">어제 하루 전체 · 기사가 많은 검색어는 못 닿을 수 있어요</span>
+</div></div>
+    <div class="mk-con">칩이 길어져 수집시간 줄과 가로 길이가 어긋납니다.</div>
+  </div>
+</div>
+</body></html>
