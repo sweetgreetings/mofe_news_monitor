@@ -104,13 +104,20 @@ def handle_get(handler, path: str) -> bool:
         return True
 
     if base == "/adhoc/card":
-        card_id = _query(path).get("id", [""])[0]
+        query = _query(path)
+        card_id = query.get("id", [""])[0]
+        # [추가: 2026-10-21] id 없이 kind만 오면 「오늘 그 종류 카드가 없다」는 빈 화면이다 —
+        # 상단바 「원본」·「확정본」이 오늘 카드가 없을 때 여기로 온다(renderer._latest_href).
+        if not card_id:
+            kind = query.get("kind", [""])[0]
+            if kind in (card.KIND_COLLECT, card.KIND_BUNDLE):
+                handler._respond(renderer.render_empty_kind_page(kind))
+                return True
         c = card.load_card(card_id)
         if c is None:
             handler.send_response(404)
             handler.end_headers()
             return True
-        query = _query(path)
         error = query.get("error", [""])[0]
         notice = query.get("notice", [""])[0]
         notice_card = query.get("notice_card", [""])[0]

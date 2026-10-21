@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>시안 · 수시 확정본 — 오늘 것이 없을 때</title>
+<style>
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+    --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --h-tb: 28px; --h-md: 30px; }
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 28px 24px 80px; }
+
+  /* 시안 설명 — 화면에는 없는 글이다 */
+  .mk-head { margin: 0 0 6px; color: #1E3A5F; font-size: 1.45rem; }
+  .mk-lead { color: #4B5563; font-size: var(--fs-md); line-height: 1.75; margin: 0 0 26px; }
+  .mk-lead b { color: #1E3A5F; }
+  .mk-sec { margin: 34px 0 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .mk-sec h2 { margin: 0; font-size: var(--fs-lg); color: #1E3A5F; }
+  .mk-tag { font-size: var(--fs-xs); font-weight: 700; border-radius: var(--r-pill); padding: 3px 10px; }
+  .mk-tag.now { background: #F1F5F9; border: 1px solid #E5E7EB; color: #6B7280; }
+  .mk-tag.pick { background: #E3F1EE; border: 1px solid rgba(20,107,94,.24); color: #146B5E; }
+  .mk-note { color: #6B7280; font-size: var(--fs-sm); line-height: 1.7; margin: 0 0 12px; }
+  .mk-note b { color: #1E3A5F; }
+  .frame { border: 1px solid #E5E7EB; border-radius: var(--r-lg); overflow: hidden; background: #F8FAFC;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06); }
+  .frame .inner { padding: 18px 20px 22px; }
+
+  /* ── 실제 화면 CSS(돌고 있는 앱에서 그대로 옮김) ───────────────── */
+  .topbar { background: #FFFFFF; border-bottom: 1px solid #E5E7EB; }
+  .topbar-inner { padding: 10px 20px; display: flex; justify-content: flex-start; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .topbar-inner > .tn { color: #2563EB; text-decoration: none; font-size: var(--fs-md); font-weight: 600;
+    padding: 5px 14px; border: 1px solid transparent; border-radius: var(--r-pill); white-space: nowrap; }
+  .topbar-inner > a.tn:hover { background: #EFF6FF; }
+  .topbar-inner > .tn-sep { width: 1px; height: 18px; background: #E5E7EB; margin: 0 16px; }
+  .topbar.adhoc .topbar-inner > .tn.is-current { cursor: default; background: #E3F1EE;
+    border-color: rgba(20, 107, 94, 0.45); color: #146B5E; }
+  .topbar-inner > .tn.is-empty { color: #6B7280; opacity: 0.55; cursor: not-allowed; }
+
+  .card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 22px 24px; margin-bottom: 14px; }
+  .report-head { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; font-size: var(--fs-xl); font-weight: 700; color: #1E3A5F; }
+  .meta-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-size: var(--fs-sm); }
+  .chip { background: #F1F5F9; border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 3px 11px; color: #6B7280; }
+  .chip.bundle-tag, .chip.raw-tag { font-weight: 700; font-size: var(--fs-sm); margin-right: 10px; }
+  .chip.bundle-tag { background: #E3F1EE; border-color: rgba(20, 107, 94, 0.24); color: #146B5E; }
+  .chip.raw-tag { background: #F1F5F9; border-color: #E5E7EB; color: #6B7280; }
+  .chip.src { background: #F1F5F9; border-color: #E5E7EB; color: #6B7280; font-weight: 600; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 5px; }
+  .total-count-badge { background: #F1F5F9; border: 1px solid #E5E7EB; border-radius: var(--r-pill);
+    padding: 2px 9px; color: #6B7280; font-size: var(--fs-sm); font-weight: 600; margin-left: 8px; }
+  .name-field { display: inline-flex; align-items: center; gap: 4px; border-bottom: 1.5px dashed #94A3B8; padding: 0 2px; }
+  .name-field .nm { color: #146B5E; }
+  .name-field .pen { color: #94A3B8; font-size: 0.72em; }
+  .warn { background: #FEF2F2; border: 1px solid #FCA5A5; color: #DC2626; border-radius: var(--r-lg);
+    padding: 11px 14px; margin: 12px 0; font-size: var(--fs-md); line-height: 1.65; }
+  .warn a { color: inherit; font-weight: 700; }
+  .warn-amber { background: #FFFBEB; border-color: #FDE68A; color: #92400E; }
+  .btn { font: inherit; font-size: var(--fs-md); height: var(--h-md); padding: 0 14px; box-sizing: border-box;
+    border-radius: var(--r-md); cursor: pointer; border: 1px solid #2563EB; background: #2563EB; color: #FFFFFF;
+    font-weight: 600; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+  .btn.mute { background: #FFFFFF; color: #6B7280; border-color: #E5E7EB; }
+  .btn.teal { background: #146B5E; border-color: #146B5E; color: #FFFFFF; }
+  .plus-glyph { font-size: 1.2em; font-weight: 600; line-height: 0; margin-right: 4px; }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; border: 1px solid #E5E7EB;
+    border-radius: var(--r-lg); background: #F8FAFC; padding: 9px 11px; margin: 14px 0; }
+  .export-links button { border: none; background: transparent; color: #4B5563; font-weight: 500;
+    border-radius: var(--r-md); padding: 4px 8px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; }
+  .btn.ai { background: #F0EAFB; color: #4A3F8F; border-color: #DCD0F2; height: var(--h-tb); }
+  .btn.sm { height: var(--h-tb); }
+  .art { display: flex; gap: 10px; padding: 4px 8px; margin: 6px 0; align-items: flex-start; }
+  .art .t { font-size: var(--fs-base); }
+  .art .t .outlet { color: #6B7280; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  .art .m { color: #6B7280; font-size: var(--fs-sm); margin-top: 3px; }
+  h2.sub { font-size: var(--fs-lg); color: #6B7280; font-style: italic; font-weight: 600; margin: 18px 0 2px; }
+
+  /* ── 빈 화면 ───────────────────────────────────────────────── */
+  .empty-zone { text-align: center; padding: 30px 12px 26px; }
+  .empty-zone .zz { font-size: 1.9rem; line-height: 1; }
+  .empty-zone .ttl { margin: 12px 0 0; font-size: var(--fs-lg); color: #1E3A5F; font-weight: 700; }
+  .empty-zone .sub { margin: 7px 0 0; color: #6B7280; font-size: var(--fs-md); line-height: 1.7; }
+  .empty-zone .acts { margin-top: 18px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .past-line { margin-top: 22px; padding-top: 14px; border-top: 1px solid #E5E7EB;
+    color: #6B7280; font-size: var(--fs-sm); display: flex; gap: 8px; align-items: center;
+    justify-content: center; flex-wrap: wrap; }
+  .past-line a { color: #4B5563; text-decoration: none; font-weight: 600; }
+  .past-line a:hover { color: #2563EB; text-decoration: underline; text-underline-offset: 3px; }
+  .past-line .when { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1 class="mk-head">수시 확정본 — 오늘 것이 없을 때</h1>
+<p class="mk-lead">
+  상단바 <b>확정본</b>은 지금 <b>종류만 맞으면 가장 최근 카드</b>로 간다(<code>latest_card_id("bundle")</code>).
+  그래서 오늘 확정본이 없으면 <b>이틀 전 확정본</b>이 열리고, 열자마자 「여기엔 더 못 보낸다」는 빨간 배너가 뜬다 —
+  갈 수 없는 곳으로 데려다 놓고 왜 못 하는지 설명하는 모양이다.<br>
+  <b>홈 흐름도는 이미 오늘 카드만 본다</b>(<code>_todays_adhoc_state</code>) — 같은 칸이 두 자리에서 다르게 동작하고 있다.
+</p>
+
+<!-- ───────────────────── 지금 ───────────────────── -->
+<div class="mk-sec">
+  <span class="mk-tag now">지금</span>
+  <h2>상단바 「확정본」 → 10/19 확정본이 열린다</h2>
+</div>
+<p class="mk-note">오늘은 2026-10-21. 오늘 원본은 둘 있고 확정본은 없다.</p>
+<div class="frame">
+  <div class="topbar adhoc"><div class="topbar-inner">
+    <a class="tn" href="#">홈</a>
+    <span class="tn-sep"></span>
+    <a class="tn" href="#">새 수집</a>
+    <a class="tn" href="#">원본</a>
+    <span class="tn is-current">확정본</span>
+    <a class="tn" href="#">보관함</a>
+  </div></div>
+  <div class="inner">
+    <div class="card" style="margin:0">
+      <div class="report-head"><span class="chip bundle-tag">확정본</span>수시 모니터링 17시 54분 기준(<span class="name-field"><span class="nm">증안펀드</span><span class="pen">✎</span></span>)<span class="total-count-badge">3건</span></div>
+      <div class="meta-row"><a class="chip src" href="#"><svg class="ic" viewBox="0 0 24 24"><path d="M10 8V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-2"/><path d="M15 12H3l3-3"/><path d="m6 15-3-3"/></svg> 증안펀드 3건</a></div>
+      <div class="warn"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.3l3.2 1.9"/></svg>
+        <b>2026-10-19에 만든 확정본</b>입니다 (오늘은 2026-10-21). 지난 날짜의 확정본에는 기사를 더 보낼 수 없어요 —
+        오늘 <a href="#">새 수집</a>의 원본에서 보내면 오늘 확정본이 새로 생겨요.</div>
+      <div class="toolbar">
+        <button class="btn ai sm"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="5.4" r="1.4"/><path d="M12 6.8v2.3"/><rect x="4.5" y="9.1" width="15" height="10.9" rx="4"/><path d="M9 17.3h6"/></svg> 소제목 배정 (3)</button>
+        <span style="flex:1"></span>
+        <span class="export-links"><button>복사</button><button>텍스트</button><button>엑셀</button></span>
+      </div>
+      <h2 class="sub">소제목 미분류 <span style="font-size:var(--fs-md)">3건</span></h2>
+      <div class="art"><div><div class="t"><span class="outlet">머니투데이</span>“사라”더니 목표가 내려 ‘찬물’…급락장 속 증안펀드 등판론 솔솔</div><div class="m">16:42 · 2일 전 · 원문보기 ↗</div></div></div>
+      <div class="art"><div><div class="t"><span class="outlet">이데일리</span>李 “지배경영권 남용 교정해야”…증시 정상화 추가 조치 검토</div><div class="m">17:32 · 2일 전 · 원문보기 ↗</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────────── A안 ───────────────────── -->
+<div class="mk-sec">
+  <span class="mk-tag pick">A안</span>
+  <h2>상단바 「확정본」은 <b>오늘</b> 확정본만 가리킨다 — 없으면 빈 화면</h2>
+</div>
+<p class="mk-note">
+  확정본은 <b>원본에서 처음 보낼 때 저절로 생긴다</b> — 그래서 빈 화면이 가리키는 다음 할 일은 「오늘 원본」이다.
+  지난 확정본은 <b>수시 보관함</b>이 맡는다(보관함엔 원래 확정본만 쌓인다) — 그 길을 아래 한 줄이 들고 있어, 가장 최근 것은 여기서 바로 연다.
+</p>
+<div class="frame">
+  <div class="topbar adhoc"><div class="topbar-inner">
+    <a class="tn" href="#">홈</a>
+    <span class="tn-sep"></span>
+    <a class="tn" href="#">새 수집</a>
+    <a class="tn" href="#">원본</a>
+    <span class="tn is-current">확정본</span>
+    <a class="tn" href="#">보관함</a>
+  </div></div>
+  <div class="inner">
+    <div class="card" style="margin:0">
+      <div class="report-head"><span class="chip bundle-tag">확정본</span>오늘 만든 확정본이 없어요</div>
+      <div class="empty-zone">
+        <div class="zz">💤</div>
+        <p class="ttl">아직 확정본으로 보낸 기사가 없어요</p>
+        <p class="sub">확정본은 원본에서 기사를 처음 보낼 때 만들어져요.</p>
+        <div class="acts">
+          <a class="btn teal" href="#"><svg class="ic" viewBox="0 0 24 24"><path d="M14 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-2"/><path d="M9 12h12l-3-3"/><path d="m18 15 3-3"/></svg> 오늘 원본 열기 · 재정경제부+자제</a>
+          <a class="btn mute" href="#"><span class="plus-glyph">+</span>새 수집</a>
+        </div>
+        <div class="past-line">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M3 7h18v4H3z"/><path d="M5 11v8h14v-8"/><path d="M10 15h4"/></svg>
+          지난 확정본은 <a href="#">수시 보관함</a>에 있어요 —
+          가장 최근 <a href="#"><span class="when">10/19</span> 증안펀드 (2) →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────────── 원본 칸 ───────────────────── -->
+<div class="mk-sec">
+  <span class="mk-tag pick">A안 · 같은 규칙</span>
+  <h2>「원본」도 같다 — 오늘 원본이 없을 때</h2>
+</div>
+<p class="mk-note">
+  두 칸을 가르면 같은 상단바에서 하나는 오늘 것, 하나는 이틀 전 것이 열린다. 한 규칙으로 둔다.
+  원본이 없을 때의 다음 할 일은 <b>새 수집</b>이고, 지난 원본은 새 수집의 <b>「지난 수집」</b> 목록이 맡는다(보관함엔 원본이 안 쌓인다).
+</p>
+<div class="frame">
+  <div class="topbar adhoc"><div class="topbar-inner">
+    <a class="tn" href="#">홈</a>
+    <span class="tn-sep"></span>
+    <a class="tn" href="#">새 수집</a>
+    <span class="tn is-current">원본</span>
+    <a class="tn" href="#">확정본</a>
+    <a class="tn" href="#">보관함</a>
+  </div></div>
+  <div class="inner">
+    <div class="card" style="margin:0">
+      <div class="report-head"><span class="chip raw-tag">원본</span>오늘 모은 원본이 없어요</div>
+      <div class="empty-zone">
+        <div class="zz">💤</div>
+        <p class="ttl">오늘은 아직 아무것도 안 모았어요</p>
+        <p class="sub">검색어와 시간대를 정하면 그 조건으로 모은 기사가 원본에 쌓여요.</p>
+        <div class="acts">
+          <a class="btn teal" href="#"><span class="plus-glyph">+</span>새 수집 시작</a>
+        </div>
+        <div class="past-line">
+          <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.3l3.2 1.9"/></svg>
+          지난 원본은 <a href="#">새 수집</a>의 「지난 수집」에서 찾아요 —
+          가장 최근 <a href="#"><span class="when">10/19</span> 증안펀드 · 증시안전펀드 →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────────── 곁다리 ───────────────────── -->
+<div class="mk-sec">
+  <span class="mk-tag now">곁다리</span>
+  <h2>보관함에서 연 지난 확정본 — 배너 색을 빨강에서 앰버로</h2>
+</div>
+<p class="mk-note">
+  A안을 넣으면 이 배너는 <b>담당자가 보관함에서 일부러 열었을 때만</b> 뜬다 — 사고가 아니라 사실 알림이다.
+  규칙서에선 <b>빨강은 오류와 [단독]·[속보]</b>이고 이런 건 <b>주의(앰버)</b>다.
+  오늘 확정본이 있으면 그리로 가는 길도 함께 적는다.
+</p>
+<div class="frame"><div class="inner">
+  <div class="card" style="margin:0">
+    <div class="report-head"><span class="chip bundle-tag">확정본</span>수시 모니터링 17시 54분 기준(<span class="name-field"><span class="nm">증안펀드</span><span class="pen">✎</span></span>)<span class="total-count-badge">3건</span></div>
+    <div class="warn warn-amber"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.3l3.2 1.9"/></svg>
+      <b>2026-10-19에 만든 확정본</b>입니다 (오늘은 2026-10-21). 지난 날짜의 확정본에는 기사를 더 보낼 수 없어요 —
+      오늘 <a href="#">새 수집</a>의 원본에서 보내면 오늘 확정본이 새로 생겨요.</div>
+  </div>
+</div></div>
+
+<p class="mk-note" style="margin-top:30px">
+  <b>안 바뀌는 것</b> — 지난 확정본 카드는 그대로 있고 보관함·주소로 언제든 열린다. 지우거나 숨기지 않는다.
+  바뀌는 건 <b>상단바 두 칸이 어디로 가느냐</b> 하나다.
+</p>
+
+</div>
+</body>
+</html>

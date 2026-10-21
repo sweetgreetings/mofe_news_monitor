@@ -54,6 +54,8 @@ from app.summarizer import ETC_GROUP_NAME, etc_titles_summary
 from app.topnav import adhoc_nav, topnav_style
 from app.adhoc import undo
 from app.adhoc.card import (
+    KIND_BUNDLE,
+    KIND_COLLECT,
     MAX_ADHOC_KEYWORDS,
     keywords_label,
     keywords_text,
@@ -71,7 +73,8 @@ from app.adhoc.card import (
     is_raw,
     normalize_condition,
     last_collect_new_urls,
-    latest_card_id,
+    latest_card_id_on,
+    latest_card_summary_before,
     list_card_summaries,
     load_issues,
     move_targets,
@@ -663,6 +666,14 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .adv-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: var(--fs-md); }}
   .adv-grid label {{ display: flex; gap: 8px; align-items: center; cursor: pointer; }}
   .warn {{ background: {error_bg}; border: 1px solid {error_border_mid}; color: {error}; border-radius: var(--r-lg); padding: 11px 14px; margin: 12px 0; font-size: var(--fs-md); }}
+  /* [추가: 2026-10-21] 「지난 날짜 카드입니다」는 오류가 아니라 **사실 알림**이라 주의(앰버)다 —
+     빨강은 오류와 [단독]·[속보]의 색이다(CLAUDE.md 디자인 절). 상단바가 더는 지난 카드로
+     데려가지 않게 된 뒤로 이 배너는 담당자가 보관함·「지난 수집」에서 **일부러 열었을 때만**
+     뜬다 — 사고가 아니다. 새 색 세트를 만들지 않고 이미 있는 주의 세트를 쓴다. */
+  .warn.stale {{ background: {warn_bg}; border-color: {warn_border}; color: {warn_text}; }}
+  /* 이 배너 안의 링크는 배너 색을 따른다 — 기본 파랑이면 배너에서 혼자 튄다.
+     빨간 .warn(오류·상한 안내)엔 링크가 없어 거기까지 넓히지 않는다. */
+  .warn.stale a {{ color: inherit; font-weight: 700; }}
   /* 오늘의 수집 결과 — 사안명 탭. 오늘 만든 카드가 2개 이상일 때만 그려진다. */
   .tabwrap {{ background: {adhoc_bg}; margin: -22px -24px 18px; padding: 12px 18px 0; border-radius: var(--r-lg) var(--r-lg) 0 0; }}
   .tabwrap-h {{ font-size: var(--fs-xs); font-weight: 700; color: {adhoc_text}; margin-bottom: 9px; }}
@@ -1150,6 +1161,24 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .a-summary {{ margin: 6px 0 4px 20px; color: {text}; font-size: var(--fs-md); }}
   .a-summary.none {{ color: {text_faint}; font-style: italic; }}
   .empty {{ color: {muted}; font-size: var(--fs-lg); padding: 12px 0; }}
+  /* [추가: 2026-10-21] 오늘 카드가 없을 때의 빈 화면 — 상단바 「원본」·「확정본」이 여기로 온다.
+     지난 카드로 데려가는 대신 "오늘 것이 없다"는 사실과 다음 할 일을 그 자리에 둔다. */
+  .empty-zone {{ text-align: center; padding: 30px 12px 26px; }}
+  .empty-zone .zz {{ font-size: 1.9rem; line-height: 1; }}
+  .empty-zone .sub {{ margin: 12px 0 0; color: {muted}; font-size: var(--fs-md); line-height: 1.7; }}
+  .empty-zone .acts {{ margin-top: 18px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }}
+  /* 단추는 한 줄을 지킨다 — .btn 높이가 var(--h-md) 고정이라 글자가 접히면 상자 밖으로 샌다.
+     원본 이름은 길 수 있으므로 거기서 잘린다(수시 탭 .tab .nm과 같은 처방). */
+  .empty-zone .acts .btn {{ max-width: 100%; white-space: nowrap; }}
+  .empty-zone .acts .btn .nm {{ overflow: hidden; text-overflow: ellipsis; min-width: 0; }}
+  /* 지난 카드로 가는 길 — 상단바가 더는 거기로 데려가지 않으므로 그 대신 눈앞에 두는 한 줄이다. */
+  .past-line {{ margin-top: 22px; padding-top: 14px; border-top: 1px solid {border}; color: {muted};
+    font-size: var(--fs-sm); display: flex; gap: 6px; align-items: baseline; justify-content: center;
+    line-height: 1.7; }}
+  .past-line > .ic {{ flex: none; align-self: center; }}
+  .past-line a {{ color: {text_soft}; text-decoration: none; font-weight: 600; }}
+  .past-line a:hover {{ color: {accent}; text-decoration: underline; text-underline-offset: 3px; }}
+  .past-line .when {{ font-variant-numeric: tabular-nums; }}
   /* [수정: 2026-09-02] 좌하단 휴지통 스택은 정기 확정본·초안(app.renderer의
      .trash-fab/.undo-fab/.trash-pop)과 같은 자리·같은 규격이어야 한다 — 문서에는
      그렇게 적혀 있었지만 실제 값이 4px씩 어긋나 있었다(16↔20, 52↔56, 46↔50,
@@ -1350,11 +1379,14 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 
 
 # 상단바 — app/topnav.py의 수시 묶음(홈 │ 새 수집 · 원본 · 확정본 · 보관함)을 모든 수시
-# 화면이 같이 쓰고, 지금 화면만 켜진 칩으로 표시한다. 원본·확정본은 그 종류의 가장 최근
-# 카드로 가고, 없으면 흐리게 자리를 지킨다(시안 mockups/TOPBAR_NAV_MOCKUP.html).
-def _latest_href(kind: str) -> Optional[str]:
-    card_id = latest_card_id(kind)
-    return f"/adhoc/card?id={quote(card_id)}" if card_id else None
+# 화면이 같이 쓰고, 지금 화면만 켜진 칩으로 표시한다(시안 mockups/TOPBAR_NAV_MOCKUP.html).
+#
+# [수정: 2026-10-21] 원본·확정본은 **오늘 만든 카드**만 가리킨다. 오늘 것이 없으면 지난
+# 카드로 데려가지 않고 그 종류의 빈 화면(`/adhoc/card?kind=…`)으로 보낸다 — 그래서 이 두
+# 칸은 이제 **언제나 갈 곳이 있고**, 흐린 자리(is-empty)로 남는 경우가 없다.
+def _latest_href(kind: str) -> str:
+    card_id = latest_card_id_on(datetime.now().strftime("%Y-%m-%d"), kind)
+    return f"/adhoc/card?id={quote(card_id)}" if card_id else f"/adhoc/card?kind={kind}"
 
 
 def page_nav(current: Optional[str] = None) -> str:
@@ -2684,6 +2716,91 @@ def gone_note_html(gone: str) -> str:
     )
 
 
+# [추가: 2026-10-21] 오늘 카드가 없을 때의 빈 화면 — 상단바 「원본」·「확정본」의 목적지다.
+#
+# 예전엔 그 두 칸이 날짜를 안 보고 가장 최근 카드로 가서, 오늘 확정본이 없으면 **지난 날짜
+# 확정본**이 열리고 그 화면은 열리자마자 "여기엔 기사를 더 보낼 수 없다"는 배너부터 띄웠다.
+# 갈 수 없는 곳으로 데려다 놓고 왜 못 하는지 설명하는 모양이라, 이제 그 자리에 **없다는 사실과
+# 다음 할 일**을 둔다. 지난 카드 자체는 하나도 안 건드린다(보관함·주소로 그대로 열린다) —
+# 바뀌는 건 상단바가 어디로 가느냐 하나다.
+#
+# 흐린 자리(is-empty)로 두지 않는 이유: 그건 "영영 없다"는 뜻인데 이건 "오늘 것만 없다"라
+# 할 일이 있다. 흐린 칩은 왜 흐린지 스스로 말하지 못한다.
+def _md_label(date_str: str) -> str:
+    """`2026-10-19` → `10/19`. 날짜 모양이 아니면 빈 문자열(없는 날짜를 지어내지 않는다)."""
+    parts = (date_str or "").split("-")
+    if len(parts) != 3 or not all(x.isdigit() for x in parts):
+        return ""
+    return f"{int(parts[1])}/{int(parts[2])}"
+
+
+def render_empty_kind_page(kind: str) -> str:
+    """kind ∈ {"collect", "bundle"} — 오늘 그 종류 카드가 없을 때의 화면."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    bundle_mode = kind == KIND_BUNDLE
+    name = "확정본" if bundle_mode else "원본"
+    chip_cls = "bundle-tag" if bundle_mode else "raw-tag"
+
+    # 지난 카드 한 줄 — 그 날짜 카드만 열어 **화면에 찍히던 이름 그대로** 짓는다
+    # (확정본은 같은 날 같은 이름의 (2)까지, 원본은 검색어). 요약의 report_title을
+    # 그냥 쓰면 탭·보관함에 보이던 이름과 달라진다.
+    past_html = ""
+    past = latest_card_summary_before(today, kind)
+    if past is not None:
+        day = cards_for_date(past["collect_date"])
+        pc = next((c for c in day if c["id"] == past["id"]), None)
+        when = _md_label(past["collect_date"])
+        if pc is not None and when:
+            label = bundle_label(pc, day) if bundle_mode else screen_name(pc, day)
+            href = f"/adhoc/card?id={quote(pc['id'])}"
+            where = (
+                '지난 확정본은 <a href="/adhoc">수시 보관함</a>에 있어요 —'
+                if bundle_mode
+                else '지난 원본은 <a href="/adhoc/new">새 수집</a>의 「지난 수집」에서 찾아요 —'
+            )
+            past_html = (
+                f'<div class="past-line">{icon("clock")}<span>{where} 가장 최근 '
+                f'<a href="{href}"><span class="when">{when}</span> {html.escape(label)} →</a>'
+                f'</span></div>'
+            )
+
+    if bundle_mode:
+        # 확정본은 원본에서 처음 보낼 때 저절로 생긴다 — 그래서 다음 할 일이 「오늘 원본」이다.
+        head = "오늘 만든 확정본이 없어요"
+        sub = "확정본은 원본에서 기사를 처음 보낼 때 만들어져요."
+        raw_id = latest_card_id_on(today, KIND_COLLECT)
+        if raw_id:
+            raw_card = load_card(raw_id)
+            raw_name = screen_name(raw_card, cards_for_date(today)) if raw_card else ""
+            open_raw = (
+                f' · <span class="nm">{html.escape(raw_name)}</span>' if raw_name else ""
+            )
+            acts = (
+                f'<a class="btn" href="/adhoc/card?id={quote(raw_id)}">'
+                f'{icon("to_raw")} 오늘 원본 열기{open_raw}</a>'
+                f'<a class="btn mute" href="/adhoc/new"><span class="plus-glyph">+</span>새 수집</a>'
+            )
+        else:
+            acts = '<a class="btn" href="/adhoc/new"><span class="plus-glyph">+</span>새 수집 시작</a>'
+    else:
+        head = "오늘 모은 원본이 없어요"
+        sub = "검색어와 시간대를 정하면 그 조건으로 모은 기사가 원본에 쌓여요."
+        acts = '<a class="btn" href="/adhoc/new"><span class="plus-glyph">+</span>새 수집 시작</a>'
+
+    body = f"""
+<div class="card">
+  <div class="report-head"><span class="chip {chip_cls}">{name}</span>{head}</div>
+  <div class="empty-zone">
+    <div class="zz">💤</div>
+    <p class="sub">{sub}</p>
+    <div class="acts">{acts}</div>
+    {past_html}
+  </div>
+</div>
+"""
+    return base_page(f"{name} · 오늘 것이 없어요", body, nav=page_nav(kind))
+
+
 def render_card_page(
     card: dict, error: Optional[str] = None, notice: Optional[str] = None,
     notice_card: Optional[str] = None, gone: str = ""
@@ -3133,7 +3250,7 @@ def render_card_page(
         # [수정: 2026-09-15] 확정본은 이제 원본에서 처음 보낼 때 저절로 생긴다 — 「새로
         # 만들어주세요」 대신 그 길을 가리킨다.
         warn_html = (
-            f'<div class="warn">{icon("clock")} <b>{card["collect_date"]}에 만든 확정본</b>입니다 '
+            f'<div class="warn stale">{icon("clock")} <b>{card["collect_date"]}에 만든 확정본</b>입니다 '
             f"(오늘은 {today_str}). 지난 날짜의 확정본에는 기사를 더 보낼 수 없어요 — "
             f'오늘 <a href="/adhoc/new">새 수집</a>의 원본에서 보내면 오늘 확정본이 새로 생겨요.</div>'
         )
@@ -3141,7 +3258,7 @@ def render_card_page(
         # [수정: 2026-09-15] 같은 조건으로 오늘 새로 모으는 길을 바로 건다 — 새 수집이 이
         # 카드의 사안·검색어를 채운 채로 열린다(render_new_card_page의 pick).
         warn_html = (
-            f'<div class="warn">{icon("clock")} <b>{card["collect_date"]} 기준</b>으로 수집한 카드입니다 '
+            f'<div class="warn stale">{icon("clock")} <b>{card["collect_date"]} 기준</b>으로 수집한 카드입니다 '
             f'(오늘은 {today_str}). 시간대를 그대로 다시 수집하면 <b>{today_str}</b> 날짜로 검색됩니다 — '
             f'<a href="/adhoc/new?from={quote(card["id"])}">이 조건으로 오늘 새로 모으기 →</a></div>'
         )

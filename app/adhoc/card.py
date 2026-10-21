@@ -444,6 +444,38 @@ def latest_card_id(kind: Optional[str] = None) -> Optional[str]:
     return None
 
 
+# [추가: 2026-10-21] 상단바 「원본」·「확정본」이 가리키는 곳 — **오늘 만든 카드만**이다.
+# latest_card_id는 날짜를 안 봐서 오늘 확정본이 없으면 이틀 전 확정본을 열었고, 그 화면은
+# 열리자마자 "여기엔 더 못 보낸다"는 배너부터 띄웠다(갈 수 없는 곳으로 데려다 놓고 왜 못
+# 하는지 설명하는 모양). 홈 흐름도는 처음부터 오늘 카드만 봤다(landing_renderer의
+# _todays_adhoc_state) — 같은 칸이 두 자리에서 다르게 동작하던 것을 한 규칙으로 모은다.
+# 지난 확정본은 수시 보관함이, 지난 원본은 새 수집의 「지난 수집」이 맡는다.
+def latest_card_id_on(date_str: str, kind: str) -> Optional[str]:
+    """그 날짜에 만든 그 종류 카드 중 가장 최근 것의 id — 없으면 None.
+
+    요약 캐시만 읽어 **파일을 새로 열지 않는다**(_SUMMARY_FIELDS에 collect_date·kind가
+    들어 있다) — 모든 수시 화면의 상단바가 요청마다 부르는 자리라서다.
+    """
+    rows = [
+        s for s in list_card_summaries()
+        if s.get("collect_date") == date_str and s.get("kind") == kind
+    ]
+    return max(rows, key=lambda s: s["created_at"])["id"] if rows else None
+
+
+def latest_card_summary_before(date_str: str, kind: str) -> Optional[dict]:
+    """그 날짜보다 **앞에** 만든 그 종류 카드 중 가장 최근 요약 — 빈 화면의 「가장 최근」 한 줄.
+
+    상단바가 더는 지난 카드로 데려가지 않으므로, 그 대신 눈앞에 두는 길이다.
+    collect_date가 없는 옛 카드는 날짜를 댈 수 없어 빼고 센다(없는 날짜를 지어내지 않는다).
+    """
+    rows = [
+        s for s in list_card_summaries()
+        if s.get("kind") == kind and s.get("collect_date") and s["collect_date"] < date_str
+    ]
+    return max(rows, key=lambda s: s["created_at"]) if rows else None
+
+
 def list_cards(issue_id: Optional[str] = None) -> list[dict]:
     """저장된 카드를 최신순(collect_date·시작시각 내림차순)으로 돌려준다.
 

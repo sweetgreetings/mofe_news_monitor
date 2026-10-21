@@ -1372,6 +1372,109 @@ def test_draft_keeps_what_it_showed():
     print("19) 초안에 보인 기사 붙잡기: 통과 (재검색에 안 잡혀도 유지, 먼저 보인 쪽이 대표, 설정·숨김은 우선, 확정본까지 반영, 빠진 이유 로그)")
 
 
+def test_adhoc_nav_today_only():
+    """수시 상단바 「원본」·「확정본」은 **오늘 만든 카드**만 가리킨다.
+
+    예전엔 날짜를 안 보고 가장 최근 카드로 가서, 오늘 확정본이 없으면 **이틀 전 확정본**이
+    열리고 그 화면은 열리자마자 "여기엔 기사를 더 보낼 수 없다"는 배너부터 띄웠다 — 갈 수
+    없는 곳으로 데려다 놓고 왜 못 하는지 설명하는 모양이다. 홈 흐름도는 처음부터 오늘
+    카드만 봤으므로(landing_renderer._todays_adhoc_state) 같은 칸이 두 자리에서 다르게
+    동작하고 있었다.
+
+    지난 카드는 **지우지도 숨기지도 않는다** — 바뀌는 건 상단바가 어디로 가느냐 하나이고,
+    그래서 빈 화면이 지난 카드로 가는 길을 눈앞에 들고 있어야 한다.
+    """
+    _require_isolation()
+
+    from app.adhoc import card, renderer, routes
+
+    class _H:
+        def __init__(self):
+            self.body = ""
+            self.code = None
+
+        def _respond(self, body):
+            self.body = body
+
+        def send_response(self, code):
+            self.code = code
+
+        def end_headers(self):
+            pass
+
+    with tempfile.TemporaryDirectory() as tmp:
+        adhoc_dir = Path(tmp)
+        (adhoc_dir / "cards").mkdir()
+        (adhoc_dir / "trash").mkdir()
+        with patch.object(card, "CARDS_DIR", adhoc_dir / "cards"), \
+             patch.object(card, "TRASH_DIR", adhoc_dir / "trash"), \
+             patch.object(card, "ISSUES_FILE", adhoc_dir / "issues.json"):
+            now = datetime.now()
+            two_days_ago = now - timedelta(days=2)
+            issue = card.get_or_create_issue("증안펀드", now=two_days_ago)
+            old_raw = card.new_card(
+                issue["id"], "증안펀드", "00:00", "17:41", ["증권시장안정펀드"], now=two_days_ago,
+            )
+            old_bundle = card.new_bundle_card(
+                "증안펀드", now=two_days_ago, issue_id=issue["id"],
+                basis_time="17:41", source_card_id=old_raw["id"],
+            )
+
+            # 1) 오늘 카드가 하나도 없다 — 상단바는 지난 카드가 아니라 빈 화면을 가리킨다.
+            assert renderer._latest_href("bundle") == "/adhoc/card?kind=bundle", \
+                "오늘 확정본이 없는데 상단바가 지난 확정본으로 간다"
+            assert renderer._latest_href("collect") == "/adhoc/card?kind=collect", \
+                "오늘 원본이 없는데 상단바가 지난 원본으로 간다"
+            nav = renderer.page_nav("bundle")
+            assert old_bundle["id"] not in nav and old_raw["id"] not in nav, \
+                "상단바에 지난 카드 id가 남아 있다"
+            # 흐린 자리(is-empty)로 두지 않는다 — 갈 곳이 언제나 있다.
+            assert "is-empty" not in nav, "수시 상단바에 흐린 칸이 남아 있다"
+
+            # 2) 빈 화면이 지난 카드로 가는 길을 들고 있다 — 화면에 찍히던 이름 그대로.
+            page = renderer.render_empty_kind_page("bundle")
+            assert "오늘 만든 확정본이 없어요" in page
+            assert f'/adhoc/card?id={old_bundle["id"]}' in page, \
+                "빈 화면에 지난 확정본으로 가는 길이 없다"
+            assert "수시 보관함" in page, "지난 확정본이 어디 있는지 안 적혀 있다"
+            raw_page = renderer.render_empty_kind_page("collect")
+            assert "오늘 모은 원본이 없어요" in raw_page
+            assert f'/adhoc/card?id={old_raw["id"]}' in raw_page, \
+                "빈 화면에 지난 원본으로 가는 길이 없다"
+            assert "지난 수집" in raw_page, "지난 원본이 어디 있는지 안 적혀 있다"
+
+            # 3) 라우트 — id 없이 kind만 오면 빈 화면이고 404가 아니다.
+            h = _H()
+            assert routes.handle_get(h, "/adhoc/card?kind=bundle") is True
+            assert h.code is None and "오늘 만든 확정본이 없어요" in h.body
+            # 모르는 kind는 예전처럼 404 — 빈 화면이 아무 주소나 받아주면 안 된다.
+            h = _H()
+            assert routes.handle_get(h, "/adhoc/card?kind=zzz") is True
+            assert h.code == 404
+
+            # 4) 오늘 원본이 생기면 상단바가 그리로 가고, 확정본 빈 화면의 첫 단추도 그 원본이다
+            #    (확정본은 원본에서 처음 보낼 때 저절로 생긴다 — 그게 다음 할 일이다).
+            today_raw = card.new_card(
+                issue["id"], "증안펀드", "00:00", "16:05", ["증안펀드"], now=now,
+            )
+            assert renderer._latest_href("collect") == f'/adhoc/card?id={today_raw["id"]}'
+            assert renderer._latest_href("bundle") == "/adhoc/card?kind=bundle", \
+                "오늘 원본이 생겼다고 확정본 칸이 따라가면 안 된다"
+            page = renderer.render_empty_kind_page("bundle")
+            assert f'오늘 원본 열기' in page and today_raw["id"] in page, \
+                "확정본 빈 화면이 오늘 원본을 안 가리킨다"
+
+            # 5) 오늘 확정본이 생기면 그리로 간다.
+            today_bundle = card.new_bundle_card(
+                "증안펀드", now=now, issue_id=issue["id"],
+                basis_time="16:05", source_card_id=today_raw["id"],
+            )
+            assert renderer._latest_href("bundle") == f'/adhoc/card?id={today_bundle["id"]}'
+
+    print("55) 수시 상단바 오늘 카드만: 통과 (지난 카드로 안 감, 빈 화면이 지난 카드 길을 들고 있음, "
+          "kind 라우트, 확정본 빈 화면은 오늘 원본을 가리킴)")
+
+
 def test_photo_caption_name_list_title():
     """요약이 잘려 날짜 도장·이메일 신호가 사라진 사진기사를 "~하는 + 이름-이름" 제목
     모양으로 잡는지, 그리고 가운뎃점·따옴표·서술형 제목은 안 잡는지 확인한다
@@ -6358,6 +6461,7 @@ if __name__ == "__main__":
         test_regular_run_delete_and_restore,
         test_adhoc_card_delete_and_restore,
         test_adhoc_tab_delete_stays_put,
+        test_adhoc_nav_today_only,
         test_photo_caption_name_list_title,
         test_photo_caption_candidate_title_and_cut_stamp,
         test_outlet_photo_tag,

@@ -46,11 +46,6 @@ REGULAR_ITEMS = (
     ("archive", "보관함", "/history.html"),
 )
 
-ADHOC_EMPTY_TIPS = {
-    "collect": "아직 오늘 원본이 없어요",
-    "bundle": "아직 확정본이 없어요",
-}
-
 
 def topnav_style() -> str:
     """상단바 CSS(값이 채워진 문자열). 템플릿에 그대로 끼워 넣는다.
@@ -120,11 +115,13 @@ def regular_nav(current: Optional[str] = None) -> str:
     return _bar(items, "reg")
 
 
-def adhoc_nav(current: Optional[str], collect_href: Optional[str], bundle_href: Optional[str]) -> str:
+def adhoc_nav(current: Optional[str], collect_href: str, bundle_href: str) -> str:
     """수시 화면 상단바. current ∈ {"new", "collect", "bundle", "archive"}.
 
-    원본·확정본은 그 종류의 가장 최근 카드로 간다 — 카드가 없으면 href가 None이고,
-    자리를 지키도록 흐리게 남긴다.
+    [수정: 2026-10-21] 원본·확정본은 **오늘 만든 카드**로 가고, 오늘 것이 없으면 그 종류의
+    빈 화면으로 간다(app.adhoc.renderer._latest_href) — 그래서 이 두 칸은 언제나 갈 곳이
+    있고 흐린 자리(is-empty)로 남지 않는다. 흐린 칩은 "영영 없다"는 뜻인데 이건 "오늘 것만
+    없다"라 할 일이 있고, 흐린 칩은 왜 흐린지 스스로 말하지 못한다.
     """
     entries = (
         ("new", "새 수집", f"{_BASE}/adhoc/new"),
@@ -137,7 +134,7 @@ def adhoc_nav(current: Optional[str], collect_href: Optional[str], bundle_href: 
         if key == current:
             items.append(_link(label, href, "is-current"))
         else:
-            items.append(_link(label, href, tip=ADHOC_EMPTY_TIPS.get(key, "")))
+            items.append(_link(label, href))
     return _bar(items, "adhoc")
 
 
