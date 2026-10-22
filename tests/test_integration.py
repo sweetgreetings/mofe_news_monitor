@@ -2463,16 +2463,26 @@ def test_adhoc_screen_name():
             assert adhoc_renderer.download_filename(card.load_card(many["id"])).startswith(
                 f"{today}_수시모니터링_가 외3_원본"), "파일명이 첫 검색어 + 외N이 아님"
 
-            # 3b) 이름 창과 그 뒤를 덮는 막은 **닫혀 있을 때 진짜로 사라져야 한다.**
-            # 이 앱엔 공용 `.hidden`이 없어 규칙을 빠뜨리면 막(inset:0)이 늘 떠 있고,
+            # 3b) 보낼 확정본 고르는 창과 그 뒤를 덮는 막은 **닫혀 있을 때 진짜로 사라져야
+            # 한다.** 이 앱엔 공용 `.hidden`이 없어 규칙을 빠뜨리면 막(inset:0)이 늘 떠 있고,
             # 화면의 모든 클릭이 거기 먹혀 **카드 화면이 통째로 먹통**이 된다.
-            assert "#bundle-namer.hidden" in page and "#namer-back.hidden" in page, \
-                "이름 창·막을 숨기는 CSS가 없음 — 막이 화면을 덮어 모든 클릭을 먹는다"
+            assert "#send-picker.hidden" in page and "#picker-back.hidden" in page, \
+                "창·막을 숨기는 CSS가 없음 — 막이 화면을 덮어 모든 클릭을 먹는다"
 
-            # 3c) 기본 「확정본으로」 단추는 메뉴와 같은 곳을 가리킨다 — 보낸 적이 없으면
-            # __auto__는 서버가 거부하므로 단추만 그걸 들고 있으면 먹통으로 보인다.
+            # 3c) 기본 「확정본으로」 단추는 창이 미리 고를 곳과 같은 곳을 가리킨다 — 보낸 적이
+            # 없으면 __auto__는 서버가 거부하므로 단추만 그걸 들고 있으면 먹통으로 보인다.
             assert 'class="send-go" data-bundle="__new__"' in page, \
                 "보낸 적 없는 원본인데 단추가 __auto__를 가리킴"
+            # 3d) 오늘 확정본이 하나도 없으면 「기존 확정본으로」 갈래를 **안 그린다** —
+            # 고를 게 없는데 흐린 칸을 두면 왜 못 고르는지 화면이 스스로 말하지 못한다.
+            assert 'id="sp-opt-exist"' not in page and 'data-has-exist=""' in page, \
+                "고를 확정본이 없는데 갈래를 그림"
+            assert 'id="sp-name"' in page, "이름칸이 없음"
+            # 보내기 길엔 브라우저 확인창이 없다 — 창이 확인창을 겸한다.
+            assert "건을 확정본으로 보낼까요?" not in page and "으로 보낼까요?" not in page, \
+                "옛 confirm 확인창이 남아 있음"
+            # ▾ 메뉴는 뗐다 — 창이 고를 곳을 다 보여주므로 행엔 단추 하나만 선다.
+            assert '">확정본으로</button></span>' in page, "행 보내기 단추 옆에 ▾가 남아 있음"
 
             calls = []
 
@@ -2521,8 +2531,16 @@ def test_adhoc_screen_name():
             assert "「청문회 13:05」 원본이 「청문회 종합」 확정본으로 이미 보낸" in _second_page, \
                 "말풍선이 보낸 원본의 검색어 이름을 안 적음"
             assert "rawUnsend(this)" not in _second_page, "내가 한 적 없는 보냄에 취소 버튼이 달림"
-            # 그래도 **일부러** 다른 확정본으로 보내는 길은 ▾로 열려 있어야 한다
+            # 그래도 **일부러** 다른 확정본으로 보내는 길은 열려 있어야 한다(작은 단추 → 창)
             assert "그래도 다른 확정본으로 보내기" in _second_page, "보낼 길이 통째로 막힘"
+            # 오늘 확정본이 생겼으니 이제 창에 「기존 확정본으로」 갈래가 선다. 이 원본은
+            # 아직 아무 데도 안 보냈으므로 __auto__ 줄은 없고 남의 확정본만 골라진다.
+            assert 'id="sp-opt-exist"' in _second_page and 'data-has-exist="1"' in _second_page, \
+                "고를 확정본이 생겼는데 갈래를 안 그림"
+            assert f'name="sp-bundle" value="{bundles[0]["id"]}"' in _second_page, \
+                "오늘 다른 확정본이 창 목록에 없음"
+            assert 'value="__auto__"' not in _second_page, \
+                "보낸 적 없는 원본인데 창이 __auto__ 줄을 그림"
             # 「모든 기사 확정본으로」가 보낼 목록에서도 빠진다 — 확인창 건수와 실제가 같아야 한다
             assert "https://v.x/1" not in card.open_raw_urls(_second, day)
             assert "https://v.x/3" in card.open_raw_urls(_second, day)
@@ -2686,8 +2704,11 @@ def test_adhoc_raw_trash_and_rounds():
 
             p = page()
             assert "rawHide(this)" in p and "모든 기사 확정본으로" in p and 'data-count="4"' in p
-            # f-string 안의 JS라 줄바꿈은 역슬래시를 두 번 적어야 한다 — 한 번이면 스크립트 전체가 죽는다
-            assert "'') + '\\n\\n'" in p, "전부 보내기 확인창의 줄바꿈이 JS 문자열을 끊음"
+            # 「모든 기사 확정본으로」도 창을 연다 — 건수·가려 둔 기사·빼는 건수를 창이 받는다
+            # (옛 confirm 확인창은 없앴다: 받을 곳을 고치려면 창을 닫고 ▾를 다시 열어야 했다).
+            assert "{n: n, skip: skip, hiding: hiding}" in p, \
+                "전부 보내기가 창에 보낼 범위를 안 넘김"
+            assert "으로 보낼까요?" not in p, "옛 confirm 확인창이 남아 있음"
             assert "남은 기사만 보기" not in p, "처리한 게 없는데 필터가 그려짐"
             assert 'id="raw-select-all"' in p, "원본 목록 머리에 전체 선택이 없음"
             assert 'onclick="copyWholeCard()"' in p and "/adhoc/card/download?id=" in p, "원본에 copy·txt가 없음"

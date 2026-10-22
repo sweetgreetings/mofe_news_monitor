@@ -1,0 +1,331 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>수시 보내기 — 받을 확정본 고르는 창 (시안)</title>
+<style>
+  :root{
+    --bg:#F8FAFC; --card:#FFFFFF; --header:#1E3A5F; --text:#1F2937;
+    --muted:#6B7280; --faint:#9CA3AF; --border:#E5E7EB;
+    --adhoc-bg:#E3F1EE; --adhoc-text:#146B5E; --adhoc-soft:rgba(20,107,94,0.24);
+    --warn-text:#92400E; --on-fill:#fff;
+    --r-sm:4px; --r-md:6px; --r-lg:10px; --r-pill:999px;
+    --fs-xs:0.72rem; --fs-sm:0.8rem; --fs-md:0.88rem; --fs-base:1rem; --fs-lg:1.1rem; --fs-xl:1.3rem;
+    --sh-modal:0 16px 40px rgba(15,23,42,0.22);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:28px 20px 60px;background:var(--bg);color:var(--text);
+    font-family:'Pretendard','Noto Sans KR',-apple-system,sans-serif;}
+  .wrap{max-width:1000px;margin:0 auto;}
+  h1{font-size:var(--fs-xl);color:var(--header);margin:0 0 4px;}
+  .sub{font-size:var(--fs-md);color:var(--muted);margin:0 0 26px;}
+  h2{font-size:var(--fs-lg);color:var(--header);margin:30px 0 4px;}
+  h2 .tag{font-size:var(--fs-xs);font-weight:700;border-radius:var(--r-pill);padding:2px 8px;
+    margin-left:8px;vertical-align:2px;background:var(--adhoc-bg);color:var(--adhoc-text);
+    border:1px solid var(--adhoc-soft);}
+  .note{font-size:var(--fs-sm);color:var(--muted);margin:0 0 14px;line-height:1.7;}
+  .note b{color:var(--text);}
+  .row{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;}
+  .stage{background:#EEF2F6;border:1px solid var(--border);border-radius:var(--r-lg);
+    padding:22px 18px;display:flex;justify-content:center;}
+  .cap{font-size:var(--fs-xs);color:var(--faint);margin:7px 2px 0;text-align:center;}
+  .col{display:flex;flex-direction:column;}
+
+  /* ── 지금: 브라우저 confirm 재현 ───────────────────────────── */
+  .confirm{width:404px;background:#fff;border-radius:12px;box-shadow:var(--sh-modal);
+    padding:16px 18px 8px;font-size:0.82rem;color:#202124;line-height:1.7;}
+  .confirm p{margin:0 0 12px;}
+  .confirm .btns{display:flex;justify-content:flex-end;gap:22px;padding:6px 0 8px;}
+  .confirm .btns span{color:#1a73e8;font-weight:600;font-size:0.82rem;}
+
+  /* ── 창 (bundle-namer 값 그대로) ──────────────────────────── */
+  .dlg{width:380px;background:var(--card);border:1px solid var(--border);
+    border-radius:var(--r-lg);box-shadow:var(--sh-modal);padding:11px 12px 9px;}
+  .dlg .t{font-size:var(--fs-sm);font-weight:700;color:var(--header);
+    margin:0 0 3px;display:flex;align-items:center;gap:7px;}
+  .chip{display:inline-flex;align-items:center;font-size:var(--fs-sm);font-weight:700;
+    border-radius:var(--r-pill);padding:1px 9px;background:var(--adhoc-bg);
+    color:var(--adhoc-text);border:1px solid var(--adhoc-soft);}
+  .lead{font-size:var(--fs-xs);color:var(--muted);margin:0 0 9px 1px;line-height:1.6;}
+
+  /* 갈래 머리 — 라디오 줄 */
+  .opt{border:1px solid var(--border);border-radius:var(--r-md);padding:7px 9px 8px;margin-bottom:7px;}
+  .opt.on{border-color:var(--adhoc-text);box-shadow:0 0 0 3px var(--adhoc-bg);}
+  .opt.off .body{opacity:.45;}
+  .opt > label{display:flex;align-items:center;gap:7px;cursor:pointer;
+    font-size:var(--fs-md);font-weight:700;color:var(--text);}
+  .opt > label input{accent-color:var(--adhoc-text);width:14px;height:14px;flex:none;margin:0;}
+  .opt > label .n{margin-left:auto;font-size:var(--fs-xs);font-weight:500;color:var(--faint);}
+  .body{margin-top:7px;}
+
+  .np-input{width:100%;font:inherit;font-size:var(--fs-md);padding:6px 9px;
+    border:1px solid var(--border);border-radius:var(--r-md);color:var(--text);background:#fff;}
+  .np-input:focus{outline:none;border-color:var(--adhoc-text);box-shadow:0 0 0 3px var(--adhoc-bg);}
+  .np-lead{font-size:var(--fs-xs);color:var(--muted);margin:7px 4px 1px;}
+  .np-list{max-height:96px;overflow-y:auto;margin:0 -3px;}
+  .np-row{display:flex;align-items:baseline;gap:8px;width:calc(100% - 6px);margin:0 3px;
+    padding:3px 7px;border:none;background:none;border-radius:var(--r-sm);font:inherit;
+    text-align:left;cursor:pointer;color:var(--text);}
+  .np-row:hover{background:var(--adhoc-bg);}
+  .np-row .nm{flex:1;font-size:var(--fs-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .np-row.mine .nm{font-weight:700;}
+  .np-row .when{font-size:var(--fs-xs);color:var(--muted);white-space:nowrap;}
+  .np-sep{font-size:var(--fs-xs);color:var(--muted);margin:5px 7px 1px;padding-top:4px;
+    border-top:1px dashed var(--border);}
+  .np-sep:first-child{border-top:none;padding-top:0;margin-top:1px;}
+
+  /* 기존 확정본 목록 */
+  .blist{max-height:108px;overflow-y:auto;margin:0 -3px;}
+  .brow{display:flex;align-items:center;gap:8px;width:calc(100% - 6px);margin:1px 3px;
+    padding:5px 7px;border:1px solid transparent;background:none;border-radius:var(--r-sm);
+    font:inherit;text-align:left;cursor:pointer;color:var(--text);}
+  .brow:hover{background:var(--adhoc-bg);}
+  .brow.sel{background:var(--adhoc-bg);border-color:var(--adhoc-soft);}
+  .brow input{accent-color:var(--adhoc-text);width:14px;height:14px;flex:none;margin:0;}
+  .brow .nm{flex:1;font-size:var(--fs-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .brow .meta{font-size:var(--fs-xs);color:var(--faint);white-space:nowrap;}
+  .mh{display:block;padding:5px 8px 2px;font-size:var(--fs-xs);color:var(--faint);font-weight:700;}
+
+  .foot{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    margin-top:9px;padding-top:7px;border-top:1px solid var(--border);}
+  .msg{font-size:var(--fs-xs);color:var(--muted);flex:1;}
+  .msg.new{color:var(--adhoc-text);}
+  .msg.warn{color:var(--warn-text);font-weight:700;}
+  .btns{display:flex;gap:6px;}
+  .btns button{font:inherit;font-size:var(--fs-sm);padding:5px 12px;border-radius:var(--r-md);cursor:pointer;}
+  .cancel{background:#fff;color:var(--muted);border:1px solid var(--border);}
+  .ok{background:var(--adhoc-text);color:var(--on-fill);border:none;font-weight:700;}
+
+  /* B안 — 한 목록 */
+  .newrow{display:flex;align-items:center;gap:8px;margin:2px 3px;padding:5px 7px;
+    border:1px solid transparent;border-radius:var(--r-sm);}
+  .newrow.sel{background:var(--adhoc-bg);border-color:var(--adhoc-soft);}
+  .newrow input[type=radio]{accent-color:var(--adhoc-text);width:14px;height:14px;flex:none;margin:0;}
+  .newrow .np-input{font-size:var(--fs-sm);padding:4px 8px;}
+  .plus{font-size:1.2em;font-weight:600;margin-right:2px;}
+
+  .pro{font-size:var(--fs-sm);color:var(--muted);line-height:1.8;margin:10px 0 0;}
+  .pro b{color:var(--text);}
+  hr{border:none;border-top:1px solid var(--border);margin:34px 0 0;}
+</style>
+
+<div class="wrap">
+<h1>수시 — 보낼 확정본을 창에서 고르기</h1>
+<p class="sub">지금은 <b>확인창</b>과 <b>이름 창</b>이 두 단계로 갈라져 있고, 「기존 확정본으로」는 <code>▾</code> 메뉴에만 있습니다. 한 창에서 고르게 하는 안.</p>
+
+<h2>지금</h2>
+<p class="note">기본 단추를 누르면 받을 곳이 이미 정해진 채로 「보낼까요?」만 묻습니다 — <b>다른 확정본으로 보내려면 창을 닫고 <code>▾</code>를 다시 눌러야</b> 합니다. 새 확정본이면 이 창을 넘긴 뒤에 이름 창이 한 번 더 뜹니다.</p>
+<div class="stage">
+  <div class="col">
+    <div class="confirm">
+      <p>5건을 새 확정본으로 보낼까요?</p>
+      <p>원본에는 그대로 남아요. 빼려면 「✓ 보냄」을 다시 누르면 돼요.</p>
+      <div class="btns"><span>취소</span><span>확인</span></div>
+    </div>
+    <p class="cap">확인창 → (새 확정본이면) 이름 창. 두 번 묻는다.</p>
+  </div>
+</div>
+
+<hr>
+
+<h2>A안 — 두 갈래를 나란히<span class="tag">추천</span></h2>
+<p class="note">말씀하신 모양 그대로입니다. <b>두 칸이 늘 다 보이고</b>, 고른 칸만 또렷해집니다. 이름칸을 누르면 「새 확정본으로」가, 목록 줄을 누르면 「기존 확정본으로」가 저절로 켜집니다(라디오를 따로 누르지 않아도 됩니다). 받을 곳이 이미 있으면 <b>그 확정본이 미리 골라진 채로</b> 열려 Enter 한 번이면 끝입니다.</p>
+<div class="row">
+
+  <div class="col">
+    <div class="stage">
+      <div class="dlg" data-dlg>
+        <div class="t"><span class="chip">확정본</span>5건을 어디로 보낼까요?</div>
+        <p class="lead">원본에는 그대로 남아요 · 이미 보냈거나 숨긴 2건은 빼요</p>
+
+        <div class="opt on" data-opt="exist">
+          <label><input type="radio" name="a1" checked>기존 확정본으로<span class="n">오늘 2개</span></label>
+          <div class="body">
+            <div class="blist">
+              <span class="mh">이 원본이 보낸 확정본</span>
+              <button class="brow sel" type="button"><input type="radio" name="a1b" checked><span class="nm">증안펀드</span><span class="meta">15:05 · 4건</span></button>
+              <span class="mh">오늘 다른 확정본</span>
+              <button class="brow" type="button"><input type="radio" name="a1b"><span class="nm">재산세 인하 검토</span><span class="meta">14:20 · 7건</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="opt off" data-opt="new">
+          <label><input type="radio" name="a1">새 확정본으로</label>
+          <div class="body">
+            <input class="np-input" placeholder="보고서 첫 줄에 나갈 이름">
+          </div>
+        </div>
+
+        <div class="foot">
+          <span class="msg">Enter 보내기 · Esc 닫기</span>
+          <span class="btns"><button class="cancel">취소</button><button class="ok">보내기</button></span>
+        </div>
+      </div>
+    </div>
+    <p class="cap">① 받을 곳이 있을 때 — 보낸 적 있는 확정본이 미리 골라져 있다</p>
+  </div>
+
+  <div class="col">
+    <div class="stage">
+      <div class="dlg">
+        <div class="t"><span class="chip">확정본</span>5건을 어디로 보낼까요?</div>
+        <p class="lead">원본에는 그대로 남아요 · 이미 보냈거나 숨긴 2건은 빼요</p>
+
+        <div class="opt off">
+          <label><input type="radio" name="a2">기존 확정본으로<span class="n">오늘 2개</span></label>
+          <div class="body">
+            <div class="blist">
+              <button class="brow" type="button"><input type="radio" name="a2b"><span class="nm">증안펀드</span><span class="meta">15:05 · 4건</span></button>
+              <button class="brow" type="button"><input type="radio" name="a2b"><span class="nm">재산세 인하 검토</span><span class="meta">14:20 · 7건</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="opt on">
+          <label><input type="radio" name="a2" checked>새 확정본으로</label>
+          <div class="body">
+            <input class="np-input" value="인사청문회" autofocus>
+            <div class="np-lead">최근 사안 · 치면 걸러져요</div>
+            <div class="np-list">
+              <div class="np-sep">오늘</div>
+              <button class="np-row mine" type="button"><span class="nm">증안펀드</span><span class="when">15:05 확정본</span></button>
+              <div class="np-sep">최근</div>
+              <button class="np-row" type="button"><span class="nm">인사청문회</span><span class="when">10/20</span></button>
+              <button class="np-row" type="button"><span class="nm">국정감사 대응</span><span class="when">10/17</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="foot">
+          <span class="msg new">새 사안으로 만들어요</span>
+          <span class="btns"><button class="cancel">취소</button><button class="ok">만들어 보내기</button></span>
+        </div>
+      </div>
+    </div>
+    <p class="cap">② 「새 확정본으로」를 고른 모습 — 이름칸이 열리고 목록이 따라 붙는다</p>
+  </div>
+
+  <div class="col">
+    <div class="stage">
+      <div class="dlg">
+        <div class="t"><span class="chip">확정본</span>5건을 새 확정본으로</div>
+        <p class="lead">오늘 만든 확정본이 아직 없어요 · 원본에는 그대로 남아요</p>
+        <input class="np-input" value="" placeholder="보고서 첫 줄에 나갈 이름 (예: 증안펀드)">
+        <div class="np-lead">최근 사안 · 치면 걸러져요</div>
+        <div class="np-list" style="max-height:100px">
+          <div class="np-sep">최근</div>
+          <button class="np-row" type="button"><span class="nm">인사청문회</span><span class="when">10/20</span></button>
+          <button class="np-row" type="button"><span class="nm">국정감사 대응</span><span class="when">10/17</span></button>
+          <button class="np-row" type="button"><span class="nm">증안펀드</span><span class="when">10/15</span></button>
+        </div>
+        <div class="foot">
+          <span class="msg">Enter 만들기 · Esc 닫기</span>
+          <span class="btns"><button class="cancel">취소</button><button class="ok">만들어 보내기</button></span>
+        </div>
+      </div>
+    </div>
+    <p class="cap">③ 오늘 확정본이 0개 — 고를 게 없으니 갈래를 안 그린다(지금 이름 창 그대로)</p>
+  </div>
+</div>
+
+<p class="pro"><b>좋은 점</b> — 보낼 곳이 한 화면에 다 보이고, 확인창·이름 창 두 단계가 하나로 준다. <code>▾</code> 메뉴가 하던 일을 창이 받으므로 단추는 하나만 남는다.<br>
+<b>값</b> — 창이 ①에서 약 300px, ②에서 약 360px. 확정본이 4개를 넘으면 목록만 스크롤한다(최대 108px).</p>
+
+<hr>
+
+<h2>B안 — 한 목록, 맨 아래가 「새 확정본」</h2>
+<p class="note">지금 <code>▾</code> 메뉴 구조를 그대로 창으로 올린 안. 칸 머리로 가르고 맨 아래 줄이 이름칸을 품습니다. <b>더 작고</b>, 보낼 곳이 많아져도 한 줄씩만 늘어납니다. 대신 「새로 만들기」가 목록의 한 줄로 보여 두 갈래라는 느낌은 A안보다 약합니다.</p>
+<div class="row">
+  <div class="col">
+    <div class="stage">
+      <div class="dlg">
+        <div class="t"><span class="chip">확정본</span>5건을 어디로 보낼까요?</div>
+        <p class="lead">원본에는 그대로 남아요 · 이미 보냈거나 숨긴 2건은 빼요</p>
+        <div class="blist" style="max-height:150px">
+          <span class="mh">이 원본이 보낸 확정본</span>
+          <button class="brow sel" type="button"><input type="radio" name="b1" checked><span class="nm">증안펀드</span><span class="meta">15:05 · 4건</span></button>
+          <span class="mh">오늘 다른 확정본</span>
+          <button class="brow" type="button"><input type="radio" name="b1"><span class="nm">재산세 인하 검토</span><span class="meta">14:20 · 7건</span></button>
+          <span class="mh">새로 만들기</span>
+          <div class="newrow"><input type="radio" name="b1"><input class="np-input" placeholder="새 확정본 이름"></div>
+        </div>
+        <div class="foot">
+          <span class="msg">Enter 보내기 · Esc 닫기</span>
+          <span class="btns"><button class="cancel">취소</button><button class="ok">보내기</button></span>
+        </div>
+      </div>
+    </div>
+    <p class="cap">① 기본 — 보낸 적 있는 확정본이 미리 골라져 있다</p>
+  </div>
+
+  <div class="col">
+    <div class="stage">
+      <div class="dlg">
+        <div class="t"><span class="chip">확정본</span>5건을 어디로 보낼까요?</div>
+        <p class="lead">원본에는 그대로 남아요 · 이미 보냈거나 숨긴 2건은 빼요</p>
+        <div class="blist" style="max-height:150px">
+          <span class="mh">이 원본이 보낸 확정본</span>
+          <button class="brow" type="button"><input type="radio" name="b2"><span class="nm">증안펀드</span><span class="meta">15:05 · 4건</span></button>
+          <span class="mh">오늘 다른 확정본</span>
+          <button class="brow" type="button"><input type="radio" name="b2"><span class="nm">재산세 인하 검토</span><span class="meta">14:20 · 7건</span></button>
+          <span class="mh">새로 만들기</span>
+          <div class="newrow sel"><input type="radio" name="b2" checked><input class="np-input" value="인사청문회"></div>
+        </div>
+        <div class="np-lead">최근 사안 · 치면 걸러져요</div>
+        <div class="np-list">
+          <button class="np-row" type="button"><span class="nm">인사청문회</span><span class="when">10/20</span></button>
+          <button class="np-row" type="button"><span class="nm">국정감사 대응</span><span class="when">10/17</span></button>
+        </div>
+        <div class="foot">
+          <span class="msg new">새 사안으로 만들어요</span>
+          <span class="btns"><button class="cancel">취소</button><button class="ok">만들어 보내기</button></span>
+        </div>
+      </div>
+    </div>
+    <p class="cap">② 이름칸을 치면 그 줄이 켜지고 최근 사안 목록이 아래에 붙는다</p>
+  </div>
+</div>
+
+<hr>
+<h2>두 안에 공통으로 드는 규칙</h2>
+<p class="note">
+① <b>창은 확인창을 겸한다</b> — 「원본에는 그대로 남아요 / 이미 보냈거나 숨긴 N건은 빼요 / 지금 화면에 보이는 기사만 보내요」는 제목 아래 한 줄로 내려오고, 브라우저 <code>confirm()</code>은 사라진다.<br>
+② <b>「기존 확정본으로」와 「새 확정본으로」는 정말 다른 일이다</b> — 지금 이름 창에서 오늘 쓴 이름을 고르면 <b>같은 이름의 새 확정본 「(2)」</b>가 생긴다. 이 창은 그 둘을 처음으로 눈에 보이게 가른다.<br>
+③ <b>들어오는 문은 넷이고 전부 이 창을 쓴다</b> — 행 「확정본으로」 · 선택 바 · 「모든 기사 확정본으로」 · 소제목 통째(📥). 소제목 통째는 지금처럼 이름칸에 소제목 이름을 채워 연다.<br>
+④ <b><code>▾</code> 단추는 뗀다</b> — 단추 하나를 누르면 이 창이 뜨고 창이 고를 곳을 다 보여주므로, 단추 옆 ▾는 같은 일을 두 번 하는 자리가 된다.
+</p>
+</div>
+
+<script>
+// 목업용 — 갈래를 눌러 보는 느낌만.
+document.querySelectorAll('.dlg').forEach(function (dlg) {
+  function paint() {
+    dlg.querySelectorAll('.opt').forEach(function (o) {
+      var on = o.querySelector('label input[type=radio]').checked;
+      o.classList.toggle('on', on); o.classList.toggle('off', !on);
+    });
+    dlg.querySelectorAll('.brow, .newrow').forEach(function (r) {
+      var rd = r.querySelector('input[type=radio]');
+      r.classList.toggle('sel', !!(rd && rd.checked));
+    });
+  }
+  dlg.addEventListener('click', function (e) {
+    var row = e.target.closest('.brow');
+    if (row) {
+      var rd = row.querySelector('input[type=radio]'); rd.checked = true;
+      var opt = row.closest('.opt');
+      if (opt) opt.querySelector('label input[type=radio]').checked = true;
+    }
+    setTimeout(paint, 0);
+  });
+  dlg.querySelectorAll('.np-input').forEach(function (inp) {
+    inp.addEventListener('focus', function () {
+      var opt = inp.closest('.opt');
+      if (opt) opt.querySelector('label input[type=radio]').checked = true;
+      var nr = inp.closest('.newrow');
+      if (nr) nr.querySelector('input[type=radio]').checked = true;
+      paint();
+    });
+  });
+  paint();
+});
+</script>

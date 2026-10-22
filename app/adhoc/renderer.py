@@ -922,39 +922,32 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .sent-tag {{ font-size: var(--fs-xs); color: {adhoc_text}; background: {adhoc_bg};
     border: 1px solid {adhoc_border_soft}; border-radius: var(--r-pill); padding: 1px 8px; margin-left: 6px;
     display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; flex: none; }}
-  /* [추가: 2026-09-15] 로데이터 원본의 보내기 — [확정본으로 | ▾] 한 몸 버튼. 기본은 이 원본의
-     확정본으로 한 번에, 다른 확정본은 ▾ 뒤로. 보낸 기사는 이 자리가 흐린 「✓ 보냄」이 된다
-     (실시간 현황의 「📌 담아두기 ↔ ✔️ 스크랩됨」과 같은 모양 — 칩을 따로 달지 않는다). */
+  /* [수정: 2026-10-22] 로데이터 원본의 보내기 — **단추 하나**다. 누르면 「보낼 확정본 고르는
+     창」(#send-picker)이 뜨고 받을 곳·새 이름·확인이 거기서 한 번에 끝난다. 옛 [확정본으로 | ▾]
+     한 몸 버튼은 뗐다 — 창이 고를 곳을 다 보여주므로 ▾는 같은 일을 두 번 하는 자리였다.
+     보낸 기사는 이 자리가 흐린 「✓ 보냄」이 된다(실시간 현황의 「📌 담아두기 ↔ ✔️ 스크랩됨」과
+     같은 모양 — 칩을 따로 달지 않는다). */
   .send-split {{ display: inline-flex; align-items: stretch; border: 1px solid {adhoc_border_soft};
     border-radius: var(--r-md); flex-shrink: 0; }}
   .send-split .send-go, .send-split .send-more {{ border: none; background: {adhoc_bg}; color: {adhoc_text};
     font: inherit; font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }}
-  .send-split .send-go {{ padding: 3px 9px; border-radius: var(--r-md) 0 0 var(--r-md); min-width: 74px; }}
+  .send-split .send-go {{ padding: 3px 9px; border-radius: var(--r-md); min-width: 74px; }}
   .send-split .send-more {{ padding: 3px 6px; border-left: 1px solid {adhoc_border_soft};
     border-radius: 0 var(--r-md) var(--r-md) 0; font-size: var(--fs-xs); }}
   .send-split .send-go:hover, .send-split .send-more:hover {{ filter: brightness(0.96); }}
   /* 옆 원본이 이미 확정본으로 보낸 기사 — 같은 자리·같은 split 모양이고 색만 회색이다.
      색이 「누가 한 일인가」를 말하는 규칙 그대로다(청록 = 내가 한 일, 회색 = 남이 한 일).
-     그래서 이 줄엔 취소를 안 단다 — 내가 한 적 없는 일이라 무를 것이 없다. ▾는 열어 둔다:
-     일부러 다른 확정본으로 보내는 길이 막히면 안 된다. */
+     그래서 이 줄엔 취소를 안 단다 — 내가 한 적 없는 일이라 무를 것이 없다. 오른쪽 작은 단추는
+     열어 둔다: 일부러 다른 확정본으로 보내는 길이 막히면 안 된다(누르면 같은 창이 뜬다). */
   .send-split.sent-split {{ border-color: {border}; background: {card}; }}
   .sent-split .se-label {{ color: {text_faint}; font-size: var(--fs-sm); font-weight: 600;
     padding: 3px 9px; min-width: 74px; display: inline-flex; align-items: center;
     justify-content: center; gap: 3px; cursor: default; }}
   .sent-split .se-label .ic {{ width: 0.95em; height: 0.95em; }}
-  .sent-split .send-more {{ background: {card}; color: {text_faint}; border-left-color: {border}; }}
+  .sent-split .send-more {{ background: {card}; color: {text_faint}; border-left-color: {border};
+    font-size: var(--fs-sm); }}
+  .sent-split .send-more .ic {{ width: 0.95em; height: 0.95em; }}
   .sent-split .send-more:hover {{ background: {adhoc_bg}; color: {adhoc_text}; filter: none; }}
-  /* 「확정본으로 ▾」 목록 (시안 ADHOC_SEND_MENU_MOCKUP.html A안) — 칸 머리(.mh)로 「이 원본의
-     확정본」과 「오늘 다른 확정본」을 가르고, 이름(.nm)은 한 줄 말줄임, 시각은 오른쪽 끝
-     작은 회색. 「옮기기 ▾」(.move-menu)와 같은 문법이라 값도 같이 맞춘다. 이름을 줄바꿈시키면
-     아이콘·시각만 윗줄에 남아 어긋난다(옛 flex-wrap). */
-  .send-split .more-menu {{ min-width: 214px; max-width: 300px; }}  /* max-width가 있어야 .nm의 말줄임이 실제로 걸린다 — 없으면 긴 사안명이 메뉴를 늘린다 */
-  .send-split .more-menu .mh {{ display: block; padding: 6px 10px 3px; font-size: var(--fs-xs);
-    color: {text_faint}; font-weight: 600; }}
-  .send-split .more-menu button {{ display: flex; align-items: center; gap: 6px; }}
-  .send-split .more-menu button .nm {{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-  .send-split .more-menu button small {{ margin-left: auto; padding-left: 12px; color: {text_faint};
-    font-size: var(--fs-xs); font-weight: 400; }}
   /* [추가: 2026-09-17] 「옮기기 ▾」 메뉴 — 칸 이름(.move-h), 다른 사안 확정본의 건수(small).
      .flip-up은 행 메뉴가 화면 아래에서 열릴 자리가 모자랄 때 JS가 붙인다(toggleArticleMenu). */
   .move-btn {{ cursor: pointer; display: inline-flex; align-items: center; gap: 3px; }}
@@ -974,7 +967,6 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     font-size: var(--fs-sm); font-weight: 600; border-radius: var(--r-md); padding: 3px 9px; min-width: 74px;
     display: inline-flex; align-items: center; justify-content: center; gap: 3px; flex-shrink: 0; }}
   .bulk-bar .send-split .send-go {{ font-size: var(--fs-sm); padding: 5px 12px; }}
-  .bulk-bar .send-split .send-more {{ font-size: var(--fs-xs); padding: 5px 8px; }}
   /* 원본 툴바 오른쪽 — 이 원본의 확정본으로 가는 길(복사·텍스트·엑셀 앞). 확정본이 없으면 안 그린다. */
   .pair-link {{ display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-sm); font-weight: 700;
     color: {adhoc_text}; background: {adhoc_bg}; border: 1px solid {adhoc_border_soft};
@@ -1391,25 +1383,55 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     font-size: var(--fs-xs); font-weight: 700; padding: 5px 10px; border-radius: var(--r-sm); cursor: pointer;
     background: {label_bg}; color: {label_text}; border: 1px solid {label_border};
   }}
-  /* 확정본 이름 짓는 창 — 뼈대·크기·줄 구성은 정기 「소제목 이름 고르기 창」
-     (app.renderer NAME_PICKER_STYLE)과 같은 값이고 **색만 수시 청록**이다. 초록은 이 앱에서
-     발송 ●(COLOR_SEND)과 「잘 됐다」 안내(COLOR_OK_*)가 이미 쓰고 있어 새로 만들지 않는다. */
+  /* 보낼 확정본을 고르는 창 (시안 ADHOC_SEND_TARGET_MOCKUP.html A안) — **두 갈래가 늘 다
+     보이고 고른 칸만 또렷해진다.** 옛 모양은 확인창(confirm)과 이름 창 둘로 갈려 있어, 받을
+     곳을 고치려면 창을 닫고 ▾를 다시 눌러야 했다. 이 창이 확인창을 겸하므로 보내기 길에
+     브라우저 confirm()은 쓰지 않는다.
+     뼈대·크기·줄 구성은 정기 「소제목 이름 고르기 창」(app.renderer NAME_PICKER_STYLE)과 같은
+     값이고 **색만 수시 청록**이다. 초록은 이 앱에서 발송 ●(COLOR_SEND)과 「잘 됐다」
+     안내(COLOR_OK_*)가 이미 쓰고 있어 새로 만들지 않는다. */
   /* 이 앱엔 공용 `.hidden`이 없다 — 숨기는 요소마다 제 규칙을 적는다(.edit-box.hidden,
      .lab-pop.hidden과 같은 줄). 이걸 빠뜨리면 창과 **화면 전체를 덮는 막**이 늘 떠 있어
      모든 클릭이 막에 먹히고, 화면이 통째로 먹통이 된다(글자는 멀쩡해 눈치채기 어렵다). */
-  #bundle-namer.hidden, #namer-back.hidden {{ display: none; }}
-  #namer-back {{ position: fixed; inset: 0; z-index: 39; background: rgba(15,23,42,0.12); }}
-  #bundle-namer {{ position: fixed; top: 13vh; left: 50%; transform: translateX(-50%); z-index: 40;
-    width: 372px; max-width: calc(100vw - 32px); background: {card}; border: 1px solid {border};
+  #send-picker.hidden, #picker-back.hidden {{ display: none; }}
+  #picker-back {{ position: fixed; inset: 0; z-index: 39; background: rgba(15,23,42,0.12); }}
+  #send-picker {{ position: fixed; top: 13vh; left: 50%; transform: translateX(-50%); z-index: 40;
+    width: 380px; max-width: calc(100vw - 32px); background: {card}; border: 1px solid {border};
     border-radius: var(--r-lg); box-shadow: var(--sh-modal); padding: 11px 12px 9px; }}
-  #bundle-namer .np-title {{ font-size: var(--fs-sm); font-weight: 700; color: {header};
-    margin: 0 0 7px; display: flex; align-items: center; gap: 7px; }}
-  #bundle-namer .np-title .chip {{ margin: 0; }}
+  #send-picker .np-title {{ font-size: var(--fs-sm); font-weight: 700; color: {header};
+    margin: 0 0 3px; display: flex; align-items: center; gap: 7px; }}
+  #send-picker .np-title .chip {{ margin: 0; }}
+  /* 제목 아래 한 줄이 옛 확인창의 본문을 받는다 — 보낼 범위(가려 둔 기사·빼는 건수)와
+     「원본에는 그대로 남아요」. 화면이 부를 때마다 다시 적는다(openSendPicker). */
+  .np-sub {{ font-size: var(--fs-xs); color: {muted}; margin: 0 0 9px 1px; line-height: 1.6; }}
+  /* 갈래 — 라디오를 따로 누르지 않아도 이름칸을 누르면 「새 확정본으로」가, 목록 줄을 누르면
+     「기존 확정본으로」가 저절로 켜진다(syncSendPicker). 안 고른 칸은 흐려지기만 하고
+     사라지지 않는다: 두 길이 다 보여야 고르는 것이다. */
+  .sp-opt {{ border: 1px solid {border}; border-radius: var(--r-md); padding: 7px 9px 8px; margin-bottom: 7px; }}
+  .sp-opt.on {{ border-color: {adhoc_text}; box-shadow: 0 0 0 3px {adhoc_bg}; }}
+  .sp-opt.off .sp-body {{ opacity: 0.45; }}
+  .sp-opt .sp-head {{ display: flex; align-items: center; gap: 7px; cursor: pointer;
+    font-size: var(--fs-md); font-weight: 700; color: {text}; }}
+  .sp-opt .sp-head input {{ accent-color: {adhoc_text}; width: var(--chk-sm); height: var(--chk-sm);
+    flex: none; margin: 0; }}
+  .sp-opt .sp-head .n {{ margin-left: auto; font-size: var(--fs-xs); font-weight: 500; color: {text_faint}; }}
+  .sp-body {{ margin-top: 7px; }}
+  .sp-list {{ max-height: 108px; overflow-y: auto; margin: 0 -3px; }}
+  /* 줄 이름(.nm)은 한 줄 말줄임, 시각·건수는 오른쪽 끝 작은 회색 — 옛 「확정본으로 ▾」 메뉴와
+     같은 문법이다(그 메뉴가 하던 일을 이 칸이 그대로 받았다). */
+  .sp-row {{ display: flex; align-items: center; gap: 8px; margin: 1px 3px; padding: 5px 7px;
+    border: 1px solid transparent; border-radius: var(--r-sm); cursor: pointer; }}
+  .sp-row:hover {{ background: {adhoc_bg}; }}
+  .sp-row.sel {{ background: {adhoc_bg}; border-color: {adhoc_border_soft}; }}
+  .sp-row input {{ accent-color: {adhoc_text}; width: var(--chk-sm); height: var(--chk-sm); flex: none; margin: 0; }}
+  .sp-row .nm {{ flex: 1; font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+  .sp-row .meta {{ font-size: var(--fs-xs); color: {text_faint}; white-space: nowrap; }}
+  .sp-mh {{ display: block; padding: 5px 8px 2px; font-size: var(--fs-xs); color: {text_faint}; font-weight: 700; }}
   .np-input {{ width: 100%; font: inherit; font-size: var(--fs-md); padding: 6px 9px; box-sizing: border-box;
     border: 1px solid {border}; border-radius: var(--r-md); color: {text}; background: {card}; }}
   .np-input:focus {{ outline: none; border-color: {adhoc_text}; box-shadow: 0 0 0 3px {adhoc_bg}; }}
   .np-lead {{ font-size: var(--fs-xs); color: {muted}; margin: 8px 6px 1px; }}
-  .np-list {{ max-height: 100px; overflow-y: auto; margin: 0 -4px; }}
+  .np-list {{ max-height: 96px; overflow-y: auto; margin: 0 -4px; }}
   .np-row {{ display: flex; align-items: baseline; gap: 8px; width: calc(100% - 8px);
     margin: 0 4px; padding: 3px 8px; border: none; background: none; border-radius: var(--r-sm);
     font: inherit; text-align: left; cursor: pointer; color: {text}; }}
@@ -2125,18 +2147,62 @@ def _render_bundle_meta_chips(card: dict) -> str:
 _NAMER_RECENT_ROWS = 8  # 「최근」 줄 수 — 목록 상한 100px 안에서 훑히는 만큼
 
 
-def _bundle_namer_html(card: dict, day_bundles: list[dict], hint: str) -> str:
-    """확정본 이름을 짓는 창 — **사안이 태어나는 자리**다(새 수집이 아니라 여기).
+def _send_picker_html(
+    card: dict, day_bundles: list[dict], today_bundles: list[dict],
+    raw_default: Optional[dict], hint: str,
+) -> str:
+    """보낼 확정본을 고르는 창 — **사안이 태어나는 자리이자 확인창**이다.
 
-    뼈대·크기·줄 구성은 정기의 「소제목 이름 고르기 창」(app.renderer NAME_PICKER_STYLE)
-    그대로이고 **색만 수시 청록**이다 — 하는 일이 다른 두 창이 생김새까지 같으면 어느
-    쪽인지 매번 다시 읽어야 한다(사용자 지적). 초록을 새로 만들지 않는 이유는 이 앱에서
-    초록에 이미 임자가 둘 있어서다: 발송 ● 버튼과 「잘 됐다」 안내. 청록은 이미 확정본의
-    색이라(머리줄 「확정본」 칩) 창이 그 집안 물건으로 선다.
+    [수정: 2026-10-22] 옛 모양은 둘로 갈려 있었다: 브라우저 confirm()이 「새 확정본으로
+    보낼까요?」만 묻고, 받을 곳을 바꾸려면 창을 닫고 「확정본으로 ▾」 메뉴를 다시 열어야
+    했다. 고르는 자리와 묻는 자리를 한 창에 모은다(시안 ADHOC_SEND_TARGET_MOCKUP.html A안).
 
-    목록에서 고르면 그 사안(issue_id)을 물려받아 수시 보관함 「사안별 보기」가 그대로
-    돈다 — 그래서 사안을 없애는 게 아니라 **태어나는 자리를 옮기는** 것이다.
+    갈래는 둘이고 **둘 다 늘 보인다** — 「기존 확정본으로」(오늘 확정본 목록, 옛 ▾ 메뉴가
+    하던 일)와 「새 확정본으로」(이름칸 + 오늘·최근 사안 목록, 옛 이름 창이 하던 일).
+    **그 둘이 정말 다른 일이라는 것을 처음으로 눈에 보이게 가른다** — 이름 목록에서 오늘 쓴
+    이름을 고르면 같은 이름의 **새** 확정본 「(2)」가 생긴다(아래 왼쪽 글이 그 말을 한다).
+
+    오늘 확정본이 하나도 없으면 「기존」 칸을 **아예 안 그린다** — 고를 게 없는데 흐린 칸을
+    두면 왜 못 고르는지 화면이 스스로 말하지 못한다(상단바 흐린 칩을 뗀 것과 같은 판단).
+
+    목록에서 고르면 그 사안(issue_id)을 물려받아 수시 보관함 「사안별 보기」가 그대로 돈다.
     """
+    def _visible(bundle: dict) -> int:
+        return sum(1 for a in bundle["articles"] if not a.get("hidden"))
+
+    def bundle_row(value: str, name: str, when: str, count: int) -> str:
+        meta = " · ".join(x for x in (when, f"{count}건") if x)
+        return (
+            f'<label class="sp-row"><input type="radio" name="sp-bundle" '
+            f'value="{html.escape(value)}" onchange="pickExistMode()">'
+            f'<span class="nm">{html.escape(name)}</span>'
+            f'<span class="meta">{html.escape(meta)}</span></label>'
+        )
+
+    # 칸 머리가 「이 원본이 보낸 확정본」이다 — 사안으로 묶던 것을 「내가 보냈나」로 묶기
+    # 때문이고, 그게 default_bundle_for가 하는 일이다. 값은 그 id가 아니라 __auto__로 둔다:
+    # 서버가 보낼 때 다시 풀어야 「지금까지 다시 수집」 뒤의 경계가 한 곳에서 정해진다.
+    own = (
+        '<span class="sp-mh">이 원본이 보낸 확정본</span>'
+        + bundle_row(
+            "__auto__", bundle_label(raw_default, day_bundles),
+            bundle_time(raw_default), _visible(raw_default),
+        )
+    ) if raw_default else ""
+    other_rows = "".join(
+        bundle_row(b["id"], bundle_label(b, day_bundles), bundle_time(b), _visible(b))
+        for b in today_bundles
+        if not raw_default or b["id"] != raw_default["id"]
+    )
+    others = f'<span class="sp-mh">오늘 다른 확정본</span>{other_rows}' if other_rows else ""
+    exist_html = (
+        '<div class="sp-opt" id="sp-opt-exist">'
+        '<label class="sp-head"><input type="radio" name="sp-mode" value="exist" '
+        'onchange="syncSendPicker()">기존 확정본으로'
+        f'<span class="n">오늘 {len(today_bundles)}개</span></label>'
+        f'<div class="sp-body"><div class="sp-list">{own}{others}</div></div></div>'
+    ) if today_bundles else ""
+
     rows: list[str] = []
     seen: set = set()
     # 이름마다 오늘 몇 개나 있나 — 고르면 붙을 번호(data-next)가 그 다음 수다.
@@ -2184,20 +2250,37 @@ def _bundle_namer_html(card: dict, day_bundles: list[dict], hint: str) -> str:
             break
     recent_rows = f'<div class="np-sep">최근</div>{"".join(rec_rows)}' if rec_rows else ""
 
-    return f"""<div id="namer-back" class="hidden" onclick="closeBundleNamer()"></div>
-<div id="bundle-namer" class="hidden" role="dialog" aria-label="확정본 이름">
-  <div class="np-title"><span class="chip bundle-tag">확정본</span>이름</div>
-  <input id="namer-input" class="np-input" autocomplete="off"
-         placeholder="보고서 첫 줄에 나갈 이름 (예: {html.escape(card["report_title"])})"
-         value="{html.escape(hint)}" oninput="filterNamerRows()"
-         onkeydown="namerKeydown(event)">
-  <div class="np-lead" id="namer-lead">최근 사안 · 치면 걸러져요</div>
-  <div class="np-list" id="namer-list">{today_rows}{recent_rows}</div>
+    name_body = (
+        f'<input id="sp-name" class="np-input" autocomplete="off" '
+        f'placeholder="보고서 첫 줄에 나갈 이름 (예: {html.escape(card["report_title"])})" '
+        f'value="{html.escape(hint)}" oninput="filterPickerRows()" onfocus="pickNewMode()">'
+        f'<div class="np-lead" id="sp-hint">최근 사안 · 치면 걸러져요</div>'
+        f'<div class="np-list" id="sp-list">{today_rows}{recent_rows}</div>'
+    )
+    # 고를 게 없으면 갈래 머리를 안 그린다 — 줄 하나로 끝나는 칸에 라디오를 달면
+    # 「고를 수 있다」는 거짓말이 된다(지금 이름 창과 같은 모습으로 남는다).
+    new_html = (
+        '<div class="sp-opt" id="sp-opt-new">'
+        '<label class="sp-head"><input type="radio" name="sp-mode" value="new" '
+        'onchange="syncSendPicker()">새 확정본으로</label>'
+        f'<div class="sp-body">{name_body}</div></div>'
+        if today_bundles
+        else f'<div id="sp-opt-new">{name_body}</div>'
+    )
+
+    return f"""<div id="picker-back" class="hidden" onclick="closeSendPicker()"></div>
+<div id="send-picker" class="hidden" role="dialog" aria-label="보낼 확정본"
+     data-has-exist="{"1" if today_bundles else ""}">
+  <div class="np-title"><span class="chip bundle-tag">확정본</span>
+    <span id="sp-head">어디로 보낼까요?</span></div>
+  <p class="np-sub" id="sp-lead">원본에는 그대로 남아요</p>
+  {exist_html}
+  {new_html}
   <div class="np-foot">
-    <span class="np-msg" id="namer-msg">Enter 만들기 · Esc 닫기</span>
+    <span class="np-msg" id="sp-msg">Enter 보내기 · Esc 닫기</span>
     <span class="np-btns">
-      <button type="button" class="np-cancel" onclick="closeBundleNamer()">취소</button>
-      <button type="button" class="np-ok" onclick="confirmBundleNamer()">만들어 보내기</button>
+      <button type="button" class="np-cancel" onclick="closeSendPicker()">취소</button>
+      <button type="button" class="np-ok" id="sp-ok" onclick="confirmSendPicker()">보내기</button>
     </span>
   </div>
 </div>"""
@@ -2345,11 +2428,11 @@ def _raw_filter_row_html(raw_articles: list, unsent_filter_html: str) -> str:
 def _render_article_row(
     card: dict, article: dict, group_names: list[str], is_first: bool, is_last: bool,
     known_labels_html: str = "", sent_to: str = "", bundle_options_html: str = "",
-    is_new: bool = False, raw_menu_html: str = "", raw_hidden_tip: str = "",
+    is_new: bool = False, raw_can_send: bool = False, raw_hidden_tip: str = "",
     raw_sent_other: tuple = (),
     move_bundles_html: str = "", outlet_rank: int = 0,
     raw_send_target: str = "__auto__",
-    raw_send_tip: str = "확정본으로 보냅니다 (원본에는 그대로 남아요)",
+    raw_send_tip: str = "확정본으로 보냅니다 (원본에는 그대로 남아요)",  # 창에서 받을 곳을 고른다
 ) -> str:
     """sent_to: 이 기사를 이미 받아간 모음 이름(없으면 빈 문자열). 저장된 값이 아니라
     card.sent_index가 매번 다시 계산한 값이다 — 모음에서 숨기면 그 즉시 풀려야 하므로
@@ -2361,9 +2444,10 @@ def _render_article_row(
     is_new: 마지막 불러오기로 새로 들어온 기사면 True — 노랑(.is-new-arrival)으로 칠한다
     (card.last_collect_new_urls).
 
-    raw_menu_html: [추가: 2026-09-15] 로데이터 원본(card.is_raw)의 「확정본으로 ▾」 메뉴에
-    들어갈 버튼들. 원본 행엔 「다른 소제목」·숨기기·🏷 라벨이 없고, 보내기 한 가지만 남는다
-    (판단은 전부 확정본에서 — 수시 4단 흐름). 빈 문자열이면(잠긴 카드) 보내기 버튼도 없다.
+    raw_can_send: [수정: 2026-10-22] 로데이터 원본(card.is_raw)에서 지금 보낼 수 있나.
+    원본 행엔 「다른 소제목」·숨기기·🏷 라벨이 없고, 보내기 한 가지만 남는다(판단은 전부
+    확정본에서 — 수시 4단 흐름). 거짓이면(잠긴 카드) 보내기 버튼도 없다. 받을 확정본은
+    단추가 아니라 **창**(#send-picker)에서 고른다 — 옛 「확정본으로 ▾」 메뉴는 뗐다.
 
     raw_hidden_tip: [추가: 2026-09-15] 로데이터 원본에서 「숨김」 표시가 붙은 기사면 그 툴팁
     (원본에서 🗑 / 확정본에서 뺌 — card.raw_row_states). 실시간 현황의 🗑와 같은 모양이다:
@@ -2607,7 +2691,7 @@ def _render_article_row(
         # [추가: 2026-09-15] 원본의 보내기 — 한 번 누르면 「이 원본의 확정본」(없으면 그 순간
         # 새로)으로 간다. 다른 확정본을 고르는 길은 ▾ 뒤로. 보낸 기사는 칩 대신 이 자리가
         # 「✓ 보냄」이 된다 — 실시간 현황의 「📌 담아두기 ↔ ✔️ 스크랩됨」과 같은 모양이다.
-        if sent_to and raw_menu_html:
+        if sent_to and raw_can_send:
             # [수정: 2026-09-22] 「✓ 보냄」을 다시 누르면 보냄 취소 — 확정본까지 가서 🗑를 누르지
             # 않아도 된다. 전체 기사의 「🗑 숨김 → ↩ 되살리기」처럼 마우스를 올리면 글자가 바뀐다.
             bundle_select_html = (
@@ -2628,15 +2712,15 @@ def _render_article_row(
             bundle_select_html = (
                 f'<button type="button" class="send-done raw-unhide" data-id="{card_id}" data-url="{url}" '
                 f'title="{html.escape(raw_hidden_tip)}" '
-                + ('onclick="event.stopPropagation(); rawUnhide(this)"' if raw_menu_html else "disabled")
+                + ('onclick="event.stopPropagation(); rawUnhide(this)"' if raw_can_send else "disabled")
                 + f'><span class="when-rest">{icon("trash")} 숨김</span>'
                 f'<span class="when-hover">{icon("undo")} 되살리기</span></button>'
             )
         elif raw_sent_other:
             # [추가: 2026-10-19] 옆 원본이 이미 보낸 기사 — 회색 「이미 보냄」. 취소는 안 단다
             # (내가 한 적 없는 일이라 무를 게 없고, unsend_raw가 내 사본만 다룬다). 그래도
-            # 보내려면 ▾로 다른 확정본을 고른다. 컨테이너가 .send-split이라야 sendRaw의
-            # closest('.send-split')가 data-id/url을 찾는다 — 색만 .sent-split로 덮는다.
+            # 그래도 보내려면 오른쪽 작은 단추로 같은 창을 연다. 컨테이너가 .send-split이라야
+            # sendRaw의 closest('.send-split')가 data-id/url을 찾는다 — 색만 .sent-split로 덮는다.
             _other_bundle, _other_src = (list(raw_sent_other) + ["", ""])[:2]
             _other_tip = (
                 f"「{_other_src}」 원본이 「{_other_bundle}」 확정본으로 이미 보낸 기사예요"
@@ -2644,12 +2728,11 @@ def _render_article_row(
                 else f"다른 원본이 「{_other_bundle}」 확정본으로 이미 보낸 기사예요"
             )
             _other_more = (
-                '<span class="more-wrap">'
-                '<button type="button" class="send-more" onclick="event.stopPropagation(); toggleArticleMenu(this)" '
-                'title="그래도 다른 확정본으로 보내기" aria-label="그래도 다른 확정본으로 보내기">▾</button>'
-                f'<span class="more-menu" onclick="event.stopPropagation();">{raw_menu_html}</span>'
-                "</span>"
-                if raw_menu_html
+                f'<button type="button" class="send-more" data-bundle="{raw_send_target}" '
+                'onclick="event.stopPropagation(); sendRaw(this)" '
+                'title="그래도 다른 확정본으로 보내기" aria-label="그래도 다른 확정본으로 보내기">'
+                f'{icon("to_bundle")}</button>'
+                if raw_can_send
                 else ""
             )
             bundle_select_html = (
@@ -2657,17 +2740,12 @@ def _render_article_row(
                 f'<span class="se-label" title="{html.escape(_other_tip)}">'
                 f'{icon("to_bundle")} 이미 보냄</span>{_other_more}</span>'
             )
-        elif raw_menu_html:
+        elif raw_can_send:
             bundle_select_html = (
                 f'<span class="send-split" data-id="{card_id}" data-url="{url}">'
                 f'<button type="button" class="send-go" data-bundle="{raw_send_target}" '
                 'onclick="event.stopPropagation(); sendRaw(this)" '
-                f'title="{html.escape(raw_send_tip)}">확정본으로</button>'
-                '<span class="more-wrap">'
-                '<button type="button" class="send-more" onclick="event.stopPropagation(); toggleArticleMenu(this)" '
-                'title="다른 확정본으로 보내기" aria-label="다른 확정본으로 보내기">▾</button>'
-                f'<span class="more-menu" onclick="event.stopPropagation();">{raw_menu_html}</span>'
-                "</span></span>"
+                f'title="{html.escape(raw_send_tip)}">확정본으로</button></span>'
             )
         else:
             bundle_select_html = ""
@@ -2725,7 +2803,7 @@ def _render_article_row(
             f'<button type="button" class="icon-btn hide-btn" data-id="{card_id}" data-url="{url}" '
             f'onclick="event.stopPropagation(); rawHide(this)" '
             f'title="숨기기 — 목록에 남기고 흐리게만 해요 (되돌리기 가능)">{icon("trash")}</button>'
-            if raw_menu_html and not sent_to and not raw_hidden_tip
+            if raw_can_send and not sent_to and not raw_hidden_tip
             else ""
         )
         if raw
@@ -3257,16 +3335,16 @@ def render_card_page(
     sent_map = sent_index(source_ids, day_bundles) if not bundle_mode else {}
     # [추가: 2026-09-15] 마지막 불러오기로 새로 들어온 기사 — 노랑으로 칠한다.
     new_urls = last_collect_new_urls(card)
-    # [추가: 2026-09-15] 로데이터 원본 — 이 원본의 확정본(같은 날·같은 사안, 없으면 None)과
-    # 「확정본으로 ▾」 메뉴. 확정본은 처음 보내는 순간 서버가 만든다(__auto__).
+    # [추가: 2026-09-15] 로데이터 원본 — 이 원본의 확정본(같은 날·같은 사안, 없으면 None).
+    # 확정본은 처음 보내는 순간 서버가 만든다(__auto__).
     raw_mode = is_raw(card)
     raw_default = default_bundle_for(card, day_bundles) if raw_mode else None
     # 이 원본이 이미 보낸 확정본(없으면 None — 그때는 이름을 묻는 창이 뜬다).
     raw_default_when = bundle_time(raw_default) if raw_default else ""
     raw_default_label = bundle_label(raw_default, day_bundles) if raw_default else ""
-    # 기본 「확정본으로」 단추 셋(행·선택 바·「모든 기사 확정본으로」)이 가리킬 곳 —
-    # **메뉴가 `__auto__` 줄을 그리는 조건과 같은 판정이다**(_raw_menu의 own). 아직 아무 데도
-    # 안 보낸 원본에서 단추만 `__auto__`를 들고 있으면 서버가 거부해 먹통으로 보인다.
+    # 단추 셋(행·선택 바·「모든 기사 확정본으로」)이 창을 열 때 **미리 골라 둘 곳** —
+    # **창이 `__auto__` 줄을 그리는 조건과 같은 판정이다**(_send_picker_html의 own). 아직 아무
+    # 데도 안 보낸 원본에서 단추만 `__auto__`를 들고 있으면 서버가 거부해 먹통으로 보인다.
     raw_send_target = "__auto__" if raw_default else "__new__"
     raw_send_where = f"「{raw_default_label}」 확정본" if raw_default else "새 확정본"
     # 「지금까지 다시 수집」 뒤 새 확정본을 만들 때 창에 채워 둘 이름(엔터 한 번이면 끝).
@@ -3297,48 +3375,9 @@ def render_card_page(
         source_id = state[2] if len(state) > 2 else ""
         return (state[1], raw_source_names.get(source_id, ""))
 
-    def _raw_menu(onclick: str) -> str:
-        """원본 행·선택 바의 「확정본으로 ▾」 목록 (시안 ADHOC_SEND_MENU_MOCKUP.html A안).
-
-        이 원본이 기본으로 보낼 확정본과 「오늘 다른 확정본」을 **칸 머리(.mh)로 가른다** —
-        목록엔 오늘 만든 확정본이 전부 들어와(다른 사안·다른 판 포함) 이름만으로는 어느
-        쪽인지 안 보인다. 확정본 화면의 「옮기기 ▾」(.move-h)와 같은 문법이다.
-
-        폴더 아이콘은 달지 않는다 — 줄이 전부 확정본이라 아이콘이 가르는 게 없고,
-        「+ 새 확정본」 줄만 아이콘이 없어 들여쓰기가 어긋난다. 시각은 이름 뒤에 붙이지
-        않고 오른쪽 끝 작은 회색(small)으로 뺀다(「옮기기 ▾」의 건수와 같은 자리).
-        """
-        if not (raw_mode and can_send):
-            return ""
-
-        def row(value: str, name: str, when: str) -> str:
-            return (
-                f'<button type="button" data-bundle="{html.escape(value)}" onclick="{onclick}">'
-                f'<span class="nm">{html.escape(name)}</span>'
-                + (f"<small>{html.escape(when)}</small>" if when else "")
-                + "</button>"
-            )
-
-        # 칸 머리가 「이 원본이 보낸 확정본」이다 — 사안으로 묶던 것을 「내가 보냈나」로
-        # 묶기 때문이고, 그게 default_bundle_for가 하는 일이다. 아직 아무 데도 안 보냈으면
-        # 이 칸을 아예 안 그린다: 그때 할 일은 「+ 새 확정본 만들어 보내기」 하나다.
-        own = (
-            '<span class="mh">이 원본이 보낸 확정본</span>'
-            + row("__auto__", raw_default_label, raw_default_when)
-        ) if raw_default else ""
-        other_rows = "".join(
-            row(b["id"], bundle_label(b, day_bundles), bundle_time(b))
-            for b in today_bundles
-            if not raw_default or b["id"] != raw_default["id"]
-        )
-        others = f'<span class="mh">오늘 다른 확정본</span>{other_rows}' if other_rows else ""
-        return (
-            own + others
-            + f'<span class="menu-sep"></span><button type="button" data-bundle="__new__" onclick="{onclick}">'
-            '<span class="nm">+ 새 확정본 만들어 보내기</span></button>'
-        )
-
-    raw_menu_html = _raw_menu("sendRaw(this)")
+    # [수정: 2026-10-22] 받을 확정본은 단추 옆 ▾ 메뉴가 아니라 창에서 고른다
+    # (_send_picker_html) — 창이 고를 곳을 다 보여주므로 ▾는 같은 일을 두 번 하는 자리였다.
+    raw_can_send = raw_mode and can_send
     # [추가: 2026-09-17] 확정본의 「옮기기 ▾」 아랫칸 — 오늘 만든 **다른 사안의** 확정본
     # (card.move_targets, 서버도 같은 함수로 다시 확인한다). 어제 확정본엔 없다(자정 잠금).
     move_bundles = (
@@ -3395,11 +3434,11 @@ def render_card_page(
                         and not _raw_hidden_tip(a["url"])
                         and not _raw_sent_other(a["url"])
                     ),
-                    raw_menu_html=raw_menu_html,
+                    raw_can_send=raw_can_send,
                     raw_hidden_tip=_raw_hidden_tip(a["url"]),
                     raw_sent_other=_raw_sent_other(a["url"]),
                     raw_send_target=raw_send_target,
-                    raw_send_tip=f"{raw_send_where}으로 보냅니다 (원본에는 그대로 남아요)",
+                    raw_send_tip=f"{raw_send_where}으로 보내요 — 받을 곳은 창에서 고를 수 있어요",
                 )
                 for a in raw_articles
             )
@@ -3822,10 +3861,10 @@ def render_card_page(
             send_all_html = (
                 f'<button type="button" class="btn sm send-all" data-id="{card_id_esc}" '
                 f'data-count="{raw_open_n}" data-skip="{raw_sent_n + raw_other_n + raw_hidden_n}" '
-                f'data-bundle="{raw_send_target}" data-target="{html.escape(raw_default_label)}" '
+                f'data-bundle="{raw_send_target}" '
                 f'onclick="sendAllOpen(this)" '
                 f'title="숨김·보냄 표시가 없는 기사를 모두 {html.escape(raw_send_where)}으로 보내요 '
-                f'(원본에는 그대로 남아요)">{icon("to_bundle")} 모든 기사 확정본으로</button>'
+                f'— 받을 곳은 창에서 고를 수 있어요">{icon("to_bundle")} 모든 기사 확정본으로</button>'
             )
     bulk_bundle_html = (
         # 세로선 — 「소제목 옮기기」와 「확정본으로 보내기」는 다른 동작이라 한 줄 안에서 가른다.
@@ -3908,17 +3947,12 @@ def render_card_page(
     {pair_html}
     {export_links_html}
   </div>"""
-        bulk_menu_html = _raw_menu("bulkSendRaw(this)")
         bulk_actions_html = (
             f'<span class="send-split" data-id="{card_id_attr}">'
             f'<button type="button" class="send-go" data-bundle="{raw_send_target}" onclick="bulkSendRaw(this)" '
-            f'title="고른 기사를 {html.escape(raw_send_where)}으로 보냅니다 (원본에는 그대로 남아요)">'
-            '확정본으로 보내기</button>'
-            '<span class="more-wrap">'
-            '<button type="button" class="send-more" onclick="toggleArticleMenu(this)" '
-            'title="다른 확정본으로 보내기" aria-label="다른 확정본으로 보내기">▾</button>'
-            f'<span class="more-menu up">{bulk_menu_html}</span></span></span>'
-            if bulk_menu_html
+            f'title="고른 기사를 {html.escape(raw_send_where)}으로 보내요 — 받을 곳은 창에서 고를 수 있어요">'
+            '확정본으로 보내기</button></span>'
+            if raw_can_send
             else ""
         )
     else:
@@ -4004,7 +4038,7 @@ def render_card_page(
   <button type="button" class="btn sm clear-btn" onclick="clearBulkSelection()">선택 해제</button>
 </div></div>
 
-{_bundle_namer_html(card, day_bundles, name_hint) if raw_mode and can_send else ""}
+{_send_picker_html(card, day_bundles, today_bundles, raw_default, name_hint) if can_send else ""}
 """
 
     copy_full_text = build_adhoc_plain_text(card)
@@ -4366,60 +4400,124 @@ function bulkMoveTo(btn) {{
 // 창이 뜨는 동안 보내기를 멈춰야 하므로 값을 돌려주지 않고 이어서 할 일(run)을 받는다
 // (브라우저 prompt()는 동기라 그냥 돌려줄 수 있었지만, 창에는 「이미 쓴 이름」 목록이
 // 있어야 해서 그 길을 쓸 수 없다 — 정기 이름 고르기 창과 같은 이유다).
-var _namerRun = null;
-function withBundle(bundleId, extra, run) {{
+var _pickerRun = null;
+function withBundle(bundleId, extra, run, meta) {{
   var fields = extra || {{}};
-  fields.bundle = bundleId;
   var hint = fields.bundle_name_hint || '';
   delete fields.bundle_name_hint;
-  if (bundleId !== '__new__') {{ run(fields); return; }}
-  openBundleNamer(hint, function (name) {{ fields.bundle_name = name; run(fields); }});
+  function go(target, name) {{
+    fields.bundle = target;
+    if (name) fields.bundle_name = name;
+    run(fields);
+  }}
+  // 옛 원본의 <select>는 담당자가 보낼 곳을 이미 골랐다 — 그때만 창을 건너뛴다.
+  if (!meta && bundleId !== '__new__') {{ go(bundleId, ''); return; }}
+  meta = meta || {{}};
+  meta.preset = bundleId;
+  meta.hint = hint;
+  openSendPicker(meta, go);
 }}
-function openBundleNamer(hint, done) {{
-  var box = document.getElementById('bundle-namer');
-  var back = document.getElementById('namer-back');
+function openSendPicker(meta, run) {{
+  var box = document.getElementById('send-picker');
   if (!box) return;
-  _namerRun = done;
-  var input = document.getElementById('namer-input');
-  // 「지금까지 다시 수집」 뒤에는 직전 확정본 이름을 채워 **전체 선택**해 둔다 —
-  // 엔터 한 번이면 끝이고, 고치려면 그대로 치면 덮인다(정기 「이름 바꾸기」와 같은 처방).
-  if (hint) {{ input.value = hint; }}
+  _pickerRun = run;
+  var name = document.getElementById('sp-name');
+  if (meta.hint) {{ name.value = meta.hint; }}
+  var hasExist = !!box.dataset.hasExist;
+  // 제목·안내줄이 옛 확인창의 본문을 받는다 — 몇 건을 보내는지, 무엇이 빠지는지.
+  document.getElementById('sp-head').textContent =
+    (meta.n ? meta.n + '건을 ' : '') + (hasExist ? '어디로 보낼까요?' : '새 확정본으로');
+  var bits = ['원본에는 그대로 남아요'];
+  if (meta.hiding) bits.push('지금 화면에 보이는 기사만 보내요');
+  if (meta.skip) bits.push('이미 보냈거나 숨긴 ' + meta.skip + '건은 빼요');
+  if (meta.group) bits.push('소제목 이름도 함께 가요');
+  document.getElementById('sp-lead').textContent = bits.join(' · ');
+  // 받을 곳을 미리 골라 둔다 — 보낸 적이 있으면 그 확정본, 없으면 이름칸이다.
+  var picked = null;
+  if (meta.preset && meta.preset !== '__new__') {{
+    picked = box.querySelector('.sp-row input[value="' + meta.preset + '"]');
+  }}
+  if (picked) picked.checked = true;
+  setPickerMode(picked ? 'exist' : 'new');
   box.classList.remove('hidden');
-  back.classList.remove('hidden');
-  input.focus();
-  if (input.value) input.select();
-  filterNamerRows();
+  document.getElementById('picker-back').classList.remove('hidden');
+  // 「지금까지 다시 수집」 뒤에는 직전 확정본 이름이 채워져 있다 — 전체 선택해 두면
+  // 엔터 한 번이면 끝이고, 고치려면 그대로 치면 덮인다(정기 「이름 바꾸기」와 같은 처방).
+  if (!picked) {{ name.focus(); if (name.value) name.select(); }}
 }}
-function closeBundleNamer() {{
-  _namerRun = null;
-  document.getElementById('bundle-namer').classList.add('hidden');
-  document.getElementById('namer-back').classList.add('hidden');
+function closeSendPicker() {{
+  _pickerRun = null;
+  document.getElementById('send-picker').classList.add('hidden');
+  document.getElementById('picker-back').classList.add('hidden');
 }}
-function confirmBundleNamer() {{
-  var name = (document.getElementById('namer-input').value || '').trim();
-  // 빈 칸이면 **말을 한다** — 조용히 돌아서면 창이 먹통으로 보인다(아래 왼쪽 자리가
-  // 평소 비어 있는 건 할 말이 생기면 내주기 위해서다).
-  if (!name) {{
-    var m = document.getElementById('namer-msg');
-    m.textContent = '이름을 적어야 만들 수 있어요';
-    m.classList.add('warn');
-    document.getElementById('namer-input').focus();
+function setPickerMode(mode) {{
+  var r = document.querySelector('#send-picker .sp-head input[value="' + mode + '"]');
+  if (r) r.checked = true;
+  syncSendPicker();
+}}
+function pickNewMode() {{ setPickerMode('new'); }}
+function pickExistMode() {{ setPickerMode('exist'); }}
+function pickerMode() {{
+  var m = document.querySelector('#send-picker .sp-head input:checked');
+  return m ? m.value : 'new';
+}}
+// 고른 칸만 또렷하게 + 고른 줄만 칠한다. 대표 단추 글자도 하는 일에 맞춘다
+// (「보내기」 / 「만들어 보내기」) — 누르기 전에 무엇이 일어날지 단추가 말한다.
+function syncSendPicker() {{
+  var box = document.getElementById('send-picker');
+  if (!box) return;
+  box.querySelectorAll('.sp-opt').forEach(function (o) {{
+    var head = o.querySelector('.sp-head input');
+    var on = head ? head.checked : true;
+    o.classList.toggle('on', on);
+    o.classList.toggle('off', !on);
+  }});
+  box.querySelectorAll('.sp-row').forEach(function (r) {{
+    r.classList.toggle('sel', r.querySelector('input').checked);
+  }});
+  var mode = pickerMode();
+  document.getElementById('sp-ok').textContent = mode === 'new' ? '만들어 보내기' : '보내기';
+  if (mode === 'new') {{ filterPickerRows(); return; }}
+  var msg = document.getElementById('sp-msg');
+  msg.textContent = 'Enter 보내기 · Esc 닫기';
+  msg.className = 'np-msg';
+}}
+function confirmSendPicker() {{
+  var box = document.getElementById('send-picker');
+  var msg = document.getElementById('sp-msg');
+  var run = _pickerRun;
+  if (pickerMode() === 'exist') {{
+    var b = box.querySelector('.sp-row input:checked');
+    // 조용히 돌아서면 창이 먹통으로 보인다 — 빈 이름과 같은 자리에서 말을 한다.
+    if (!b) {{ msg.textContent = '보낼 확정본을 골라 주세요'; msg.className = 'np-msg warn'; return; }}
+    closeSendPicker();
+    if (run) run(b.value, '');
     return;
   }}
-  var run = _namerRun;
-  closeBundleNamer();
-  if (run) run(name);
+  var name = (document.getElementById('sp-name').value || '').trim();
+  if (!name) {{
+    msg.textContent = '이름을 적어야 만들 수 있어요';
+    msg.className = 'np-msg warn';
+    document.getElementById('sp-name').focus();
+    return;
+  }}
+  closeSendPicker();
+  if (run) run('__new__', name);
 }}
-function namerKeydown(e) {{
-  if (e.key === 'Enter') {{ e.preventDefault(); confirmBundleNamer(); }}
-  else if (e.key === 'Escape') {{ e.preventDefault(); closeBundleNamer(); }}
-}}
-// 치면 같은 목록에서 평평하게 거른다(정기 창과 같은 규칙) — 0건이면 기본 목록으로
-// 되돌리고 안내줄만 바꾼다. 「없다」를 산문으로 설명하지 않는다.
-function filterNamerRows() {{
-  var q = (document.getElementById('namer-input').value || '').trim();
-  var rows = document.querySelectorAll('#namer-list .np-row');
-  var seps = document.querySelectorAll('#namer-list .np-sep');
+// 창이 떠 있는 동안에만 듣는다 — Enter 보내기 · Esc 닫기(이름칸 안에서도 같다).
+document.addEventListener('keydown', function (e) {{
+  if (!_pickerRun) return;
+  if (e.key === 'Enter') {{ e.preventDefault(); confirmSendPicker(); }}
+  else if (e.key === 'Escape') {{ e.preventDefault(); closeSendPicker(); }}
+}});
+// 치면 같은 목록에서 평평하게 거른다(정기 이름 고르기 창과 같은 규칙) — 0건이면 기본
+// 목록으로 되돌리고 안내줄만 바꾼다. 「없다」를 산문으로 설명하지 않는다.
+function filterPickerRows() {{
+  var input = document.getElementById('sp-name');
+  if (!input) return;
+  var q = (input.value || '').trim();
+  var rows = document.querySelectorAll('#sp-list .np-row');
+  var seps = document.querySelectorAll('#sp-list .np-sep');
   var hit = 0, exact = false, nextNo = '';
   rows.forEach(function (r) {{
     var name = r.dataset.name || '';
@@ -4431,23 +4529,23 @@ function filterNamerRows() {{
   }});
   if (q && hit === 0) {{ rows.forEach(function (r) {{ r.style.display = ''; }}); }}
   seps.forEach(function (sp) {{ sp.style.display = (q && hit > 0) ? 'none' : ''; }});
-  var msg = document.getElementById('namer-msg');
-  msg.classList.remove('warn');
-  if (q && !exact) {{ msg.textContent = '새 사안으로 만들어요'; msg.classList.add('new'); }}
+  var msg = document.getElementById('sp-msg');
+  msg.className = 'np-msg';
+  if (q && !exact) {{ msg.textContent = '새 사안으로 만들어요'; msg.className = 'np-msg new'; }}
   else if (q && nextNo) {{
     // 보고서 첫 줄은 이름 그대로고, 번호는 탭·목록에만 붙는다 — 그 말을 여기서 한 번 한다.
     msg.textContent = '오늘 쓴 이름이라 화면에 「(' + nextNo + ')」가 붙어요';
-    msg.classList.add('new');
+    msg.className = 'np-msg new';
   }}
-  else {{ msg.textContent = 'Enter 만들기 · Esc 닫기'; msg.classList.remove('new'); }}
+  else {{ msg.textContent = 'Enter 만들기 · Esc 닫기'; }}
 }}
 document.addEventListener('click', function (e) {{
-  var row = e.target.closest('#namer-list .np-row');
+  var row = e.target.closest('#sp-list .np-row');
   if (!row) return;
-  var input = document.getElementById('namer-input');
+  var input = document.getElementById('sp-name');
   input.value = row.dataset.name || '';
   input.focus();
-  filterNamerRows();
+  pickNewMode();
 }});
 function sendToBundle(sel) {{
   if (!sel.value) return;
@@ -4468,17 +4566,13 @@ function bulkSendToBundle(id) {{
   }});
 }}
 function sendGroupToBundle(btn) {{
-  var name = btn.dataset.name, n = btn.dataset.count;
-  // 확인창이 **이름 창보다 먼저** 뜬다 — 거꾸로면 이름을 다 짓고 나서 물린다.
-  // 이 블록은 파이썬 f-string이라 JS 줄바꿈 이스케이프는 역슬래시를 두 번 적는다 —
-  // 한 번만 적으면 출력에 진짜 줄바꿈이 박혀 JS 문자열이 끊기고, 스크립트 전체가
-  // SyntaxError로 죽어 이 화면의 버튼(편집·복사·↑↓ …)이 전부 먹통이 된다.
-  if (!confirm('「' + name + '」의 ' + n + '건을 확정본으로 보낼까요?\\n\\n'
-      + '원본에는 그대로 남습니다 (복사예요).\\n소제목 이름도 함께 갑니다.')) return;
+  var name = btn.dataset.name, n = Number(btn.dataset.count || 0);
+  // 옛 확인창은 창이 겸한다 — 건수·「소제목 이름도 함께 가요」는 창의 안내줄에 선다.
   // 소제목 이름을 새 확정본 이름의 기본값으로 미리 채운다 — 소제목을 통째로 보내면
   // 그 이름이 확정본으로 따라가므로(§6.13), 대개 그대로 쓰면 맞다.
   withBundle(btn.dataset.bundle, {{id: btn.dataset.id, group: name, bundle_name_hint: name}},
-    function (fields) {{ post('/adhoc/card/send-to-bundle', fields); }});
+    function (fields) {{ post('/adhoc/card/send-to-bundle', fields); }},
+    {{n: n, group: name}});
 }}
 // [추가: 2026-09-15] 로데이터 원본의 「확정본으로」 — 기본 버튼·▾ 메뉴 항목이 같은 함수를
 // 쓴다. 보낼 확정본은 누른 버튼의 data-bundle(__auto__ = 이 원본의 확정본, 없으면 새로),
@@ -4488,7 +4582,7 @@ function sendRaw(btn) {{
   closeArticleMenus();
   withBundle(btn.dataset.bundle, {{id: split.dataset.id, urls: split.dataset.url}}, function (fields) {{
     post('/adhoc/card/send-to-bundle', fields);
-  }});
+  }}, {{n: 1}});
 }}
 // [추가: 2026-09-15] 원본의 🗑 / 「🗑 숨김」 다시 누르기 — 실시간 현황처럼 목록에서 빼지 않고
 // 표시만 붙이고 뗀다. 확인창은 없다: 기사가 제자리에 남아 바로 되돌릴 수 있어서다.
@@ -4536,18 +4630,12 @@ function sendAllOpen(btn) {{
     }}).filter(function (u) {{ return u; }});
   var n = hiding ? urls.length : Number(btn.dataset.count);
   if (!n) return;
-  // 아직 아무 데도 안 보낸 원본이면 가리킬 이름이 없다 — 「」 빈 괄호를 적지 않고
-  // 「새 확정본」이라 쓰고, 확인창을 지난 뒤에 이름 창이 뜬다(확인창이 늘 먼저다).
-  var where = btn.dataset.target ? '「' + btn.dataset.target + '」 확정본' : '새 확정본';
-  if (!confirm(n + '건을 ' + where + '으로 보낼까요?'
-      + (hiding ? '\\n지금 화면에 보이는 기사만 보내요.' : '')
-      + (skip ? '\\n이미 보냈거나 숨긴 ' + skip + '건은 빼요.' : '') + '\\n\\n'
-      + '원본에는 그대로 남아요. 빼려면 「✓ 보냄」을 다시 누르면 돼요.')) return;
+  // 옛 확인창은 창이 겸한다 — 건수·가려 둔 기사·빼는 건수가 창의 안내줄에 선다.
   withBundle(btn.dataset.bundle || '__auto__', {{id: btn.dataset.id}}, function (fields) {{
     if (hiding) {{ postWithUrls('/adhoc/card/send-to-bundle', fields, urls); return; }}
     fields.all_open = '1';
     post('/adhoc/card/send-to-bundle', fields);
-  }});
+  }}, {{n: n, skip: skip, hiding: hiding}});
 }}
 function bulkSendRaw(btn) {{
   var split = btn.closest('.send-split');
@@ -4556,7 +4644,7 @@ function bulkSendRaw(btn) {{
   closeArticleMenus();
   withBundle(btn.dataset.bundle, {{id: split.dataset.id}}, function (fields) {{
     postWithUrls('/adhoc/card/send-to-bundle', fields, urls);
-  }});
+  }}, {{n: urls.length}});
 }}
 // ☑ 아직 안 보낸 기사만 — 감추기만 하고 순서는 안 건드린다. 소제목 건수는 화면에
 // 보이는 것과 어긋나면 안 되므로 여기서 같이 다시 센다(원래 값은 data-total에 보관).
