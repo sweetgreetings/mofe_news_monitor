@@ -5608,6 +5608,63 @@ def test_custom_group_alias_outlives_the_day_and_the_delete():
     print("✓ 직접 만든 소제목 속이름: 자정·삭제를 넘겨 화면 이름이 남고, 오늘 배정만 피해 간다")
 
 
+def test_etc_order_follows_the_user():
+    """「기타」를 맨 뒤로 미는 건 **AI가 막 분류한 상태**까지다 — 담당자가 ▲▼로 옮기면 그 자리.
+
+    예전엔 화면 이름이 「기타」면 무조건 맨 뒤로 눌러 두고 ▲▼도 안 그렸다. 그래서 담당자가
+    직접 만든 「기타」(속이름 `기타 (2)`)까지 같이 잠겨, 한 화면에 선 두 칸 중 어느 것도 못
+    옮겼다(2026-10-21 제보). 이제 ▲▼가 없는 칸은 📂 미분류 하나다.
+
+    「담당자가 옮겼나」는 **그 회차 저장 순서에 그 이름이 있나** 하나로 읽는다 — 화면이
+    보내는 목록이 곧 그것이라 판정과 저장이 같은 값을 본다.
+    """
+    from app import group_order
+    from app.group_order import apply_group_order, is_order_locked, save_group_order
+    from app.llm_classifier import UNCLASSIFIED_GROUP_NAME
+
+    tmp = Path(tempfile.mkdtemp())
+    rid = ("2026-10-21", "14:00")
+
+    def names(groups):
+        return [g["name"] for g in apply_group_order(groups, rid)]
+
+    with patch.object(custom_groups, "CUSTOM_GROUPS_FILE", tmp / "custom_groups.json"), \
+         patch.object(curation, "GROUP_LABELS_FILE", tmp / "group_labels.json"), \
+         patch.object(group_order, "GROUP_ORDER_FILE", tmp / "group_order.json"):
+        key = custom_groups.unique_key("기타", {"기타"})
+        custom_groups.add_custom_group("기타", key=key)          # 화면엔 「기타」로 보이는 둘째 칸
+        groups = [
+            {"name": "기타", "articles": []},
+            {"name": "우리부 관련", "articles": []},
+            {"name": key, "articles": []},
+            {"name": UNCLASSIFIED_GROUP_NAME, "articles": []},
+        ]
+
+        # 1) 저장된 순서가 없으면 예전 그대로 — 두 「기타」가 뒤로, 미분류는 그 뒤.
+        assert names(groups) == ["우리부 관련", "기타", key, UNCLASSIFIED_GROUP_NAME], names(groups)
+
+        # 2) ▲▼를 그릴지 묻는 자리는 📂 미분류만 막는다.
+        labels = curation.load_group_labels(rid)
+        assert not is_order_locked("기타", labels), "AI 기타의 ▲▼가 안 그려진다"
+        assert not is_order_locked(key, labels), "직접 만든 「기타」의 ▲▼가 안 그려진다"
+        assert is_order_locked(UNCLASSIFIED_GROUP_NAME, labels), "미분류에 ▲▼가 생겼다"
+
+        # 3) 담당자가 옮긴 자리는 그대로 지킨다(화면이 보내는 목록 = 미분류만 뺀 지금 순서).
+        save_group_order([key, "기타", "우리부 관련"], rid)
+        assert names(groups) == [key, "기타", "우리부 관련", UNCLASSIFIED_GROUP_NAME], names(groups)
+
+        # 4) 미분류는 저장 순서에 섞여 들어와도 늘 맨 뒤다(다음 회차의 다른 기사가 끼어든다).
+        save_group_order([UNCLASSIFIED_GROUP_NAME, "기타", "우리부 관련"], rid)
+        assert names(groups)[-1] == UNCLASSIFIED_GROUP_NAME, names(groups)
+
+        # 5) 저장 순서에 없는 새 소제목은 자연 순서 그대로 뒤에 붙고, 「기타」는 제자리를 지킨다.
+        save_group_order(["기타", "우리부 관련"], rid)
+        grown = groups[:2] + [{"name": "국정감사", "articles": []}] + groups[2:]
+        assert names(grown) == ["기타", "우리부 관련", "국정감사", key, UNCLASSIFIED_GROUP_NAME], names(grown)
+
+    print("✓ 「기타」 순서: AI가 분류한 상태만 맨 뒤, 담당자가 옮긴 자리는 그대로")
+
+
 def test_home_issue_card_uses_display_names():
     """홈 「오늘의 주요 주제」는 화면에 보이는 이름으로 묶고 「기타」를 가린다.
 
@@ -6852,6 +6909,7 @@ if __name__ == "__main__":
         test_empty_custom_group_appears_once_in_group_list,
         test_custom_group_with_taken_name_gets_its_own_box,
         test_custom_group_alias_outlives_the_day_and_the_delete,
+        test_etc_order_follows_the_user,
         test_home_issue_card_uses_display_names,
         test_no_ai_key_is_not_a_failure,
         test_env_key_transplant,

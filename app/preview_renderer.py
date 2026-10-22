@@ -288,6 +288,11 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
   .undo-fab:hover {{ background: {hover}; color: {accent}; border-color: {accent}; }}
   .undo-fab:disabled {{ opacity: 0.5; cursor: progress; }}
+  /* [추가] 되돌릴 게 없으면 **숨겨만** 둔다 — 아예 안 그리면 기사 한 건을 🗑로 숨겼을 때
+     (hideArticle은 그 줄만 지우고 화면을 다시 그리지 않는다) 방금 생긴 되돌릴 걸음을
+     누를 자리가 새로고침 전까지 없다. `hidden` 속성만으로는 위 display:flex가 이겨서
+     안 숨으므로 규칙을 하나 더 둔다. 확정본·초안 두 파일에 같은 값이 있다. */
+  .undo-fab[hidden] {{ display: none; }}
 {hidden_trash_style}
 {scroll_top_style}
 {refresh_link_style}
@@ -1322,7 +1327,7 @@ function _tocReadSections() {{
       raw: renameBtn ? renameBtn.dataset.name : "",
       label: sec.dataset.tocName,
       id: sec.id,
-      // [추가: 2026-09-10] 순서가 고정된 칸(기타) — 목차엔 보이되 ▲▼ 대상이 아니다.
+      // 순서를 바꿀 수 없는 칸(📂 미분류) — 목차엔 보이되 ▲▼ 대상이 아니다.
       locked: sec.hasAttribute("data-order-locked"),
       // [추가: 2026-08-05] app.renderer와 동일 — 사용자가 직접 만든 소제목은 목차에서도 볼드로.
       custom: sec.classList.contains("subheading-custom")
@@ -1340,7 +1345,7 @@ function _tocDirtyCount() {{
 // 아니다 — 예전 moveTocOrder도 .rename-btn[data-current] 목록만 보고 순서를 계산해서
 // 이 칸을 건너뛰었다. 목차에는 그대로 보여주되 ▲▼만 잠그고, 이웃도 건너뛴다.
 // (초안은 미분류 칸이 실제로 자주 뜨는 화면이라 확정본보다 더 자주 걸리는 경로다.)
-// [추가: 2026-09-10] 순서 대상인가 — 미분류(raw 없음)와 순서 고정 칸(기타, locked) 둘 다 아니다.
+// 순서 대상인가 — 📂 미분류는 둘 다로 걸러진다(raw 없음 · locked). 기타는 대상이다.
 function _tocOrderable(item) {{ return !!(item && item.raw && !item.locked); }}
 function _tocReorderNeighbor(idx, step) {{
   if (!_tocOrderable(_tocItems[idx])) {{ return -1; }}
@@ -1632,7 +1637,9 @@ function hideArticle(btn) {{
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: hideArticleBody(btn)
   }}).then(function(res) {{
-    if (res.ok) {{ article.remove(); }}
+    // [수정] 이 길은 그 줄만 지우고 화면을 다시 그리지 않는다(보던 자리를 지키려고 일부러
+    // 그렇다). 그래서 방금 생긴 되돌릴 걸음을 누를 ↩를 여기서 직접 켠다 — 확정본과 같다.
+    if (res.ok) {{ article.remove(); revealUndoFab("기사 숨기기"); }}
     else {{ alert("숨기기에 실패했습니다. 다시 시도해주세요."); }}
   }}).catch(function() {{
     alert("숨기기에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
@@ -2103,7 +2110,9 @@ function undoLastAction(btn) {{
           location.reload();
         }});
       }}
-      else if (res.status === 409) {{ btn.disabled = false; alert("되돌릴 작업이 없습니다."); }}
+      // [수정] 되돌릴 게 정말 없으면(다른 탭에서 이미 썼거나 자정이 지난 경우) 거짓말을
+      // 하고 있는 단추이므로 알린 뒤 숨긴다 — 눌러도 아무 일 없는 단추를 남겨 두지 않는다.
+      else if (res.status === 409) {{ alert("되돌릴 작업이 없습니다."); btn.hidden = true; btn.disabled = false; }}
       else {{ btn.disabled = false; alert("되돌리기에 실패했습니다. 다시 시도해주세요."); }}
     }}).catch(function() {{
       btn.disabled = false;
@@ -2934,7 +2943,7 @@ def _render_preview_groups(
     sections = []
     unclassified_html = ""
     # [수정: 2026-09-10] app.renderer._render_groups와 같은 이유 — ▼는 "옮길 수 있는 마지막
-    # 소제목"에서 잠근다(그 아래엔 고정 칸인 기타·📂 미분류만 온다).
+    # 소제목"에서 잠근다(그 아래엔 순서를 바꿀 수 없는 📂 미분류만 온다).
     orderable_indexes = [i for i, g in enumerate(groups) if not is_order_locked(g["name"], labels)]
     first_orderable_index = orderable_indexes[0] if orderable_indexes else -1
     last_orderable_index = orderable_indexes[-1] if orderable_indexes else -1
@@ -2992,7 +3001,7 @@ def _render_preview_groups(
             )
         # [추가: 2026-08-03] app.renderer._render_groups와 동일한 이유 — 소제목 자체의
         # 화면 순서를 ↑/↓로 바꾼다.
-        # [수정: 2026-09-10] 기타는 맨 뒤 고정이라 ▲▼를 안 그린다(app.renderer와 동일).
+        # ▲▼가 없는 칸은 📂 미분류 하나다(app.renderer와 동일 — 기타는 담당자가 옮길 수 있다).
         order_locked = is_order_locked(group["name"], labels)
         order_up_disabled = " disabled" if group_index <= first_orderable_index else ""
         order_down_disabled = " disabled" if group_index >= last_orderable_index else ""
@@ -3325,18 +3334,13 @@ def _round_deadline_ms(slot_end: Optional[str]) -> int:
 
 
 def _undo_fab_html() -> str:
-    """↩ 되돌리기 버튼 — 되돌릴 게 있을 때만 그린다(app/undo.py, 확정본과 동일).
+    """↩ 되돌리기 버튼 — 마크업은 확정본과 **같은 한 곳**(app.renderer.undo_fab_html).
 
-    항상 떠 있으면 "지금 이걸 누르면 뭐가 되돌아가는지" 알 수 없어 오히려 누르기
-    불안하다는 판단으로, 스택이 비어 있으면 아무것도 렌더링하지 않는다.
+    보이는 조건은 그대로다(되돌릴 게 있을 때만 보인다). 스택이 비어 있으면 안 그리는 게
+    아니라 숨긴 채 그린다 — 화면을 다시 그리지 않는 단건 숨기기(hideArticle)가 그 자리에서
+    켤 수 있어야 한다(revealUndoFab).
     """
-    label = undo_peek_label()
-    if not label:
-        return ""
-    return (
-        f'<button type="button" class="undo-fab" onclick="undoLastAction(this)" '
-        f'title="{html.escape(label)} 되돌리기">{icon("undo")}</button>'
-    )
+    return undo_fab_html(undo_peek_label())
 
 
 def _reclassify_btn_ref_html() -> str:

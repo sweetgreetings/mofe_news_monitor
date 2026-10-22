@@ -183,6 +183,11 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
   .undo-fab:hover {{ background: {hover}; color: {accent}; border-color: {accent}; }}
   .undo-fab:disabled {{ opacity: 0.5; cursor: progress; }}
+  /* [추가] 되돌릴 게 없으면 **숨겨만** 둔다 — 아예 안 그리면 기사 한 건을 🗑로 숨겼을 때
+     (hideArticle은 그 줄만 지우고 화면을 다시 그리지 않는다) 방금 생긴 되돌릴 걸음을
+     누를 자리가 새로고침 전까지 없다. `hidden` 속성만으로는 위 display:flex가 이겨서
+     안 숨으므로 규칙을 하나 더 둔다. 확정본·초안 두 파일에 같은 값이 있다. */
+  .undo-fab[hidden] {{ display: none; }}
 {hidden_trash_style}
 {scroll_top_style}
 {refresh_link_style}
@@ -1181,7 +1186,7 @@ function _tocReadSections() {{
       raw: renameBtn ? renameBtn.dataset.name : "",
       label: sec.dataset.tocName,
       id: sec.id,
-      // [추가: 2026-09-10] 순서가 고정된 칸(기타) — 목차엔 보이되 ▲▼ 대상이 아니다.
+      // 순서를 바꿀 수 없는 칸(📂 미분류) — 목차엔 보이되 ▲▼ 대상이 아니다.
       locked: sec.hasAttribute("data-order-locked"),
       // [추가: 2026-08-05] 사용자가 직접 만든 소제목(.subheading-custom, 화면에서 하늘색
       // 점선 테두리로 표시되는 것과 같은 기준)은 목차에서도 볼드로 표시한다.
@@ -1200,7 +1205,7 @@ function _tocDirtyCount() {{
 // 아니다 — 예전 moveTocOrder도 .rename-btn[data-current] 목록만 보고 순서를 계산해서
 // 이 칸을 건너뛰었다(그 결과 이 칸의 ▲▼는 눌러도 아무 일이 없었다). 목차에는 그대로
 // 보여주되(그 위치로 이동하는 링크는 필요하다) ▲▼만 잠그고, 이웃을 찾을 때도 건너뛴다.
-// [추가: 2026-09-10] 순서 대상인가 — 미분류(raw 없음)와 순서 고정 칸(기타, locked) 둘 다 아니다.
+// 순서 대상인가 — 📂 미분류는 둘 다로 걸러진다(raw 없음 · locked). 기타는 대상이다.
 function _tocOrderable(item) {{ return !!(item && item.raw && !item.locked); }}
 function _tocReorderNeighbor(idx, step) {{
   if (!_tocOrderable(_tocItems[idx])) {{ return -1; }}
@@ -1494,7 +1499,10 @@ function hideArticle(btn) {{
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: hideArticleBody(btn)
   }}).then(function(res) {{
-    if (res.ok) {{ article.remove(); }}
+    // [수정] 이 길은 그 줄만 지우고 화면을 다시 그리지 않는다(보던 자리를 지키려고 일부러
+    // 그렇다). 그래서 방금 생긴 되돌릴 걸음을 누를 ↩를 여기서 직접 켠다 — 안 켜면
+    // 새로고침 전까지 되돌릴 자리가 없다(서버 라벨과 같은 말을 쓴다).
+    if (res.ok) {{ article.remove(); revealUndoFab("기사 숨기기"); }}
     else {{ alert("숨기기에 실패했습니다. 다시 시도해주세요."); }}
   }}).catch(function() {{
     alert("숨기기에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
@@ -1895,7 +1903,9 @@ function undoLastAction(btn) {{
           location.reload();
         }});
       }}
-      else if (res.status === 409) {{ btn.disabled = false; alert("되돌릴 작업이 없습니다."); }}
+      // [수정] 되돌릴 게 정말 없으면(다른 탭에서 이미 썼거나 자정이 지난 경우) 거짓말을
+      // 하고 있는 단추이므로 알린 뒤 숨긴다 — 눌러도 아무 일 없는 단추를 남겨 두지 않는다.
+      else if (res.status === 409) {{ alert("되돌릴 작업이 없습니다."); btn.hidden = true; btn.disabled = false; }}
       else {{ btn.disabled = false; alert("되돌리기에 실패했습니다. 다시 시도해주세요."); }}
     }}).catch(function() {{
       btn.disabled = false;
@@ -2966,8 +2976,8 @@ def _render_groups(
     sections = []
     unclassified_html = ""
     # [수정: 2026-09-10] ▼를 잠그는 기준은 "화면의 마지막 소제목"이 아니라 "옮길 수 있는
-    # 마지막 소제목"이다 — 그 아래엔 순서가 고정된 기타·📂 미분류만 오므로(apply_group_order),
-    # 예전처럼 전체 끝을 기준으로 삼으면 기타 바로 위 소제목의 ▼가 눌려도 아무 일이 없었다.
+    # 마지막 소제목"이다 — 그 아래엔 순서를 바꿀 수 없는 📂 미분류만 오므로(apply_group_order),
+    # 예전처럼 전체 끝을 기준으로 삼으면 그 위 소제목의 ▼가 눌려도 아무 일이 없었다.
     orderable_indexes = [i for i, g in enumerate(groups) if not is_order_locked(g["name"], labels)]
     first_orderable_index = orderable_indexes[0] if orderable_indexes else -1
     last_orderable_index = orderable_indexes[-1] if orderable_indexes else -1
@@ -3029,8 +3039,8 @@ def _render_groups(
         # [추가: 2026-08-03] 소제목 자체의 화면 순서를 ↑/↓로 바꾼다(기사 순서와는 별개) —
         # app.group_order.save_group_order가 저장을 맡고, 여기서는 맨 처음/마지막
         # 소제목일 때만 버튼을 비활성화한다(기사 ↑/↓와 동일한 관례).
-        # [수정: 2026-09-10] 기타는 맨 뒤 고정이라(app.group_order._lock_rank — 화면 이름 기준)
-        # ▲▼를 아예 안 그린다 — 📂 미분류에서 ▲▼를 뺀 것과 같은 이유.
+        # ▲▼가 없는 칸은 📂 미분류 하나다(app.group_order.is_order_locked) — 기타도 담당자는
+        # 옮길 수 있고, 옮긴 자리는 apply_group_order가 그대로 지킨다.
         order_locked = is_order_locked(group["name"], labels)
         order_up_disabled = " disabled" if group_index <= first_orderable_index else ""
         order_down_disabled = " disabled" if group_index >= last_orderable_index else ""
@@ -3929,15 +3939,11 @@ def render_page(
     # (photo_gather_script). 0건이면 버튼 자체를 안 그리는 규칙은 그대로다.
     photo_suspect_count = sum(1 for a in articles if looks_like_photo_caption(a))
     photo_gather_btn_html = photo_gather_button_html(photo_suspect_count)
-    # [추가: 2026-08-11] 되돌릴 게 있을 때만 ↩ 버튼을 그린다 — 항상 떠 있으면 무엇이
+    # [추가: 2026-08-11] 되돌릴 게 있을 때만 ↩ 버튼이 보인다 — 항상 떠 있으면 무엇이
     # 되돌아가는지 알 수 없어 오히려 누르기 불안하다는 판단(사용자와 합의).
-    undo_label = undo_peek_label()
-    undo_fab_html = (
-        f'<button type="button" class="undo-fab" onclick="undoLastAction(this)" '
-        f'title="{html.escape(undo_label)} 되돌리기">{icon("undo")}</button>'
-        if undo_label
-        else ""
-    )
+    # [수정] 되돌릴 게 없으면 안 그리는 게 아니라 숨겨 둔다(undo_fab_html) — 화면을 다시
+    # 그리지 않는 단건 숨기기가 그 자리에서 켤 수 있어야 한다.
+    undo_fab_markup = undo_fab_html(undo_peek_label())
     # [되돌림: 2026-08-10] 전송 횟수 원문자 배지(①②…)는 굳이 필요 없다는 피드백으로
     # 뺐다 — send_count는 그대로 저장/추적되고 "(수정)" 제목 접두어 판단에도 계속
     # 쓰이지만, 화면에 숫자로 노출하진 않는다.
@@ -4057,7 +4063,7 @@ def render_page(
         action_fab_html=action_fab_html,
         regen_btn_html=regen_btn_html,
         photo_gather_btn_html=photo_gather_btn_html,
-        undo_fab_html=undo_fab_html,
+        undo_fab_html=undo_fab_markup,
         grace_deadline_ms=grace_deadline_ms,
         # [추가: 2026-08-13] "새로 들어온 기사"(노랑) 비교 기준선을 담는 localStorage 키 —
         # (날짜, 회차)마다 달라야 회차가 바뀔 때 화면 전체가 노래지지 않는다. run_at이
@@ -6205,6 +6211,50 @@ def hide_batch_style() -> str:
 def hide_batch_script() -> str:
     """여러 기사 한 번에 숨기기 JS — 중괄호 홑겹 완성 문자열."""
     return HIDE_BATCH_SCRIPT % {"host": SETTINGS_SERVER_HOST, "port": SETTINGS_SERVER_PORT}
+
+
+# ↩ 되돌리기 단추 — 확정본·초안 공용(마크업·JS 모두 여기 한 곳). 두 화면이 각자 만들던
+# 마크업을 합쳤다.
+#
+# **보이는 조건은 그대로다 — 되돌릴 게 있을 때만 보인다.** 바뀐 건 "없으면 아예 안 그린다"가
+# "없으면 숨겨 둔다"로 된 것뿐이고, 그래야 화면이 스스로 켤 수 있다. 기사 한 건을 🗑로 숨기는
+# 길(hideArticle)은 그 줄만 지우고 화면을 다시 그리지 않아서, 안 그려 두면 방금 생긴 되돌릴
+# 걸음을 누를 자리가 **새로고침 전까지 없었다** — 📂 소제목 미분류처럼 한 건씩 골라 지우는
+# 칸에서 "숨기기는 되는데 되돌리기가 안 된다"로 나타났다(소제목 통째 🗑·선택 바 🗑은
+# location.reload()를 해서 멀쩡했다).
+UNDO_FAB_SCRIPT = """
+// 숨어 있던 ↩를 그 자리에서 켠다 — 화면을 다시 그리지 않는 동작이 성공한 직후에 부른다.
+// label은 서버가 쌓은 되돌리기 걸음 이름과 같은 말이어야 한다(단추 툴팁에 그대로 쓰인다).
+function revealUndoFab(label) {
+  var fab = document.querySelector(".undo-fab");
+  if (!fab) { return; }
+  fab.title = label + " 되돌리기";
+  fab.disabled = false;
+  fab.hidden = false;
+}
+"""
+
+
+def undo_fab_script() -> str:
+    """↩ 단추를 켜는 JS — 중괄호 홑겹 완성 문자열."""
+    return UNDO_FAB_SCRIPT
+
+
+def undo_fab_html(label: Optional[str]) -> str:
+    """↩ 되돌리기 단추 — 되돌릴 게 없으면 `hidden`으로 숨긴 채 그린다(위 주석 참고).
+
+    항상 **보이게** 두지는 않는다 — 무엇이 되돌아가는지 모르는 단추는 누르기 불안하다는
+    판단(사용자와 합의)은 그대로다.
+    """
+    if not label:
+        return (
+            '<button type="button" class="undo-fab" onclick="undoLastAction(this)" '
+            f'title="" hidden>{icon("undo")}</button>'
+        )
+    return (
+        '<button type="button" class="undo-fab" onclick="undoLastAction(this)" '
+        f'title="{html.escape(label)} 되돌리기">{icon("undo")}</button>'
+    )
 
 
 # ⋯ 더보기 > 「사진 추정 해제」·「사진 추정 되돌리기」 — 확정본·초안·정기 보관함 공용이다.
