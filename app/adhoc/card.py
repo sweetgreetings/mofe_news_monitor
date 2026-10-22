@@ -81,6 +81,28 @@ def is_raw(card: dict) -> bool:
     return card_kind(card) == KIND_COLLECT and bool(card.get("raw"))
 
 
+def collect_range(card: dict) -> tuple[str, str]:
+    """이 카드가 모으는 구간 — `(시작 날짜, 끝 날짜)`. 하루면 둘이 같다.
+
+    **카드의 날짜(`collect_date`)는 언제나 「끝 날짜」다.** 기간 수집을 넣으면서도 탭 줄·
+    수시 보관함·확정본이 날짜를 읽는 자리를 하나도 안 고친 이유가 이것이다 — 10/18~10/21
+    카드는 「10/21까지 모은 것」으로 10/21 아래 선다. 시작 날짜만 `collect_from`에 따로
+    적고, **하루짜리 카드엔 그 키를 아예 안 적는다**(옛 카드와 같은 모양으로 남는다).
+
+    시작이 끝보다 뒤인 깨진 값은 하루로 읽는다 — 거꾸로 된 구간으로 검색하면 0건이
+    나오는데 그게 "그날 기사가 없었다"와 구별되지 않는다.
+    """
+    end = card.get("collect_date") or ""
+    start = card.get("collect_from") or end
+    return (start, end) if start <= end else (end, end)
+
+
+def is_multi_day(card: dict) -> bool:
+    """여러 날을 모으는 카드인가 — 화면이 날짜를 더 적어야 하는지 가르는 한 곳."""
+    start, end = collect_range(card)
+    return bool(start and end and start != end)
+
+
 def window_of(card: dict) -> dict:
     """카드의 수집 시간창 — 모음 카드는 None이므로 빈 값을 돌려준다.
 
@@ -210,6 +232,28 @@ def _validate_window(start: str, end: str) -> None:
         raise AdhocCardError(f"끝나는 시각이 시작 시각보다 빠릅니다 ({start} ~ {end}).")
 
 
+def _validate_collect_from(
+    collect_from: Optional[str], collect_date: str, now: datetime
+) -> str:
+    """기간 수집의 시작 날짜. 없으면 끝 날짜와 같다(= 하루).
+
+    여기서 보는 건 **형식과 앞뒤 순서**뿐이다 — "얼마나 지난 날짜까지 허용하나"는
+    _validate_collect_date와 같은 이유로 수집 쪽(app.adhoc.collector)이 본다.
+    """
+    if not collect_from:
+        return collect_date
+    collect_from = collect_from.strip()
+    try:
+        date.fromisoformat(collect_from)
+    except ValueError:
+        raise AdhocCardError(f"시작 날짜는 YYYY-MM-DD 형식으로 골라주세요 ({collect_from}).")
+    if collect_from > collect_date:
+        raise AdhocCardError(
+            f"시작 날짜가 끝 날짜보다 뒤예요 ({collect_from} ~ {collect_date})."
+        )
+    return collect_from
+
+
 def _validate_collect_date(collect_date: Optional[str], now: datetime) -> str:
     """"어느 날 기사를 모으나"를 확인해 "YYYY-MM-DD"로 돌려준다. 없으면 오늘이다.
 
@@ -304,6 +348,7 @@ def new_card(
     must_keywords: Optional[list[str]] = None,
     raw: bool = True,
     collect_date: Optional[str] = None,
+    collect_from: Optional[str] = None,
 ) -> dict:
     """카드를 새로 만들어 저장하고, 만든 카드를 돌려준다.
 
@@ -324,12 +369,15 @@ def new_card(
     # 모을 수 있게 되면서 둘이 갈라졌다. now로 날짜를 대신하면 카드 id(파일명 사전순 =
     # 만든 순서)와 created_at까지 과거로 끌려가 목록 정렬이 뒤집힌다.
     collect_date = _validate_collect_date(collect_date, now)
+    collect_from = _validate_collect_from(collect_from, collect_date, now)
 
     card = {
         "id": _generate_card_id(now),
         "issue_id": issue_id,
         "report_title": report_title,
         "collect_date": collect_date,
+        # 하루면 키를 안 적는다 — 옛 카드·하루 카드가 똑같은 모양으로 남는다.
+        **({"collect_from": collect_from} if collect_from != collect_date else {}),
         "window": {"start": window_start, "end": window_end},
         "keywords": [k.strip() for k in keywords if k.strip()],
         # [수정: 2026-09-01] 수집 원본 화면에서 "검색어가 모두 있는 기사만"을 고르면

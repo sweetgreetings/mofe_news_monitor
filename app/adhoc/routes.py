@@ -354,6 +354,8 @@ def _handle_collect(handler, form: dict) -> None:
     # 비어 오면 오늘이다(card._validate_collect_date) — 날짜 칸이 없던 때 만든 북마크·
     # 외부 폼이 그대로 돌게 한다.
     collect_date = _field(form, "collect_date")
+    # 비어 오면 끝 날짜와 같다(= 하루) — 날짜 칸이 하나뿐이던 때의 폼도 그대로 돈다.
+    collect_from = _field(form, "collect_from")
     options = {
         "use_outlet_whitelist": "use_outlet_whitelist" in form,
         "exclude_photo": "exclude_photo" in form,
@@ -371,6 +373,7 @@ def _handle_collect(handler, form: dict) -> None:
             options=options,
             must_keywords=must_keywords,
             collect_date=collect_date,
+            collect_from=collect_from,
         )
     except AdhocCardError as error:
         # 아직 카드가 안 만들어진 단계의 실패라 되돌아갈 카드가 없다 — 수집 원본 폼

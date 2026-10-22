@@ -908,9 +908,15 @@ def kst_at(date_str: str, hhmm: str) -> datetime:
     return datetime(year, month, day, hour, minute, tzinfo=_KST)
 
 
-def _compare_collect_day(pub_date: datetime, day: Optional[str] = None) -> int:
-    """이 기사가 수집 대상 날짜(KST)보다 **새것인지(+1) 같은 날인지(0) 오래된 것인지(-1)**.
-    day가 없으면 대상 날짜는 "오늘"이다(기존 동작).
+def _compare_collect_day(
+    pub_date: datetime, day: Optional[str] = None, day_from: Optional[str] = None
+) -> int:
+    """이 기사가 수집 대상 구간(KST)보다 **새것인지(+1) 안에 드는지(0) 오래된 것인지(-1)**.
+    day가 없으면 대상은 "오늘"이고(기존 동작), day_from을 주면 **그 날부터 day까지**다.
+
+    **기간이어도 판정은 똑같이 세 갈래다** — 끝 날짜보다 새것이면 건너뛰고, 시작 날짜보다
+    오래된 것을 만났을 때에만 멈춘다. 그래서 하루 수집은 "시작=끝"인 기간일 뿐이고,
+    기간 수집이 따로 분기를 만들지 않는다.
 
     **세 갈래여야 한다 — 참/거짓이면 안 된다.** 네이버는 늘 최신순으로 주므로, 지난
     날짜를 모을 때는 목록 맨 앞이 그 날보다 **새 기사**(오늘·그 뒤 날짜)로 시작한다.
@@ -930,9 +936,14 @@ def _compare_collect_day(pub_date: datetime, day: Optional[str] = None) -> int:
     실측(2026-10-21): 하루 0.7건인 '증안펀드'는 1,442일 전까지, 하루 25건인 '세법개정'은
     40일 전까지, 하루 500건인 '재정경제부'는 2일 전까지 닿았다.
     """
-    target = day or datetime.now(_KST).strftime("%Y-%m-%d")
+    end = day or datetime.now(_KST).strftime("%Y-%m-%d")
+    start = day_from or end
     stamp = pub_date.astimezone(_KST).strftime("%Y-%m-%d")
-    return (stamp > target) - (stamp < target)
+    if stamp > end:
+        return 1
+    if stamp < start:
+        return -1
+    return 0
 
 
 def incremental_search_after(last_seen: datetime, earliest: datetime, now: Optional[datetime] = None) -> datetime:
@@ -1062,6 +1073,7 @@ def _search_one_keyword(
     before: Optional[datetime] = None,
     include_unparsed_dates: bool = False,
     day: Optional[str] = None,
+    day_from: Optional[str] = None,
 ) -> tuple[list[dict], bool]:
     """
     한 키워드로 검색해 당일(KST) 게시된 기사만 모은다 (PRD.md 기능1 규칙 2).
@@ -1157,7 +1169,7 @@ def _search_one_keyword(
                     pending.append((item, None))
                 continue  # 날짜를 못 읽으면 이 기사만 건너뛴다 (페이지네이션 중단 신호로는 안 씀)
             deepest_pub_date = pub_date
-            day_cmp = _compare_collect_day(pub_date, day)
+            day_cmp = _compare_collect_day(pub_date, day, day_from)
             if day_cmp < 0:
                 reached_older_article = True
                 break  # 최신순 정렬이므로 여기서부터는 전부 더 오래된 기사
@@ -1274,6 +1286,7 @@ def search_keywords(
     before: Optional[datetime] = None,
     include_unparsed_dates: bool = False,
     day: Optional[str] = None,
+    day_from: Optional[str] = None,
 ) -> tuple[dict[str, list[dict]], list[str], list[str]]:
     """
     키워드 목록 각각을 검색해 {키워드: 검색결과} 딕셔너리로 돌려준다. 그룹 OR/AND
@@ -1324,7 +1337,7 @@ def search_keywords(
             try:
                 results, capped = _search_one_keyword(
                     keyword, after=keyword_after, before=before,
-                    include_unparsed_dates=include_unparsed_dates, day=day,
+                    include_unparsed_dates=include_unparsed_dates, day=day, day_from=day_from,
                 )
                 return results, False, capped
             except requests.exceptions.RequestException as error:

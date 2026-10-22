@@ -54,6 +54,8 @@ from app.summarizer import ETC_GROUP_NAME, etc_titles_summary
 from app.topnav import adhoc_nav, topnav_style
 from app.adhoc import undo
 from app.adhoc.card import (
+    collect_range,
+    is_multi_day,
     KIND_BUNDLE,
     KIND_COLLECT,
     MAX_ADHOC_KEYWORDS,
@@ -277,6 +279,23 @@ def _format_hhmm_kr(hhmm: str) -> str:
     return f"{int(hour_str)}시 {int(minute_str) if minute_str else 0:02d}분"
 
 
+def _pub_day_prefix(article: dict, card: dict) -> str:
+    """기간 카드의 기사 줄 앞에 붙는 날짜(`10/19 `). 하루 카드면 빈 문자열이다.
+
+    며칠 치가 한 목록에 섞이는데 시각만 적으면 **어느 날 기사인지 알 수 없다** — 그
+    목록을 그대로 보고서로 옮기는 자리라 날짜가 빠지면 안 된다. 하루 카드는 머리줄이
+    이미 날짜를 말하므로 한 글자도 더 붙이지 않는다.
+    """
+    if not is_multi_day(card):
+        return ""
+    return f'<span class="a-day">{_md((article.get("pub_date") or "")[:10])}</span> '
+
+
+def _md(date_str: str) -> str:
+    """"2026-10-18" -> "10/18". 머리줄·기사 줄이 같은 모양을 쓰게 한 곳에 둔다."""
+    return f"{int(date_str[5:7])}/{int(date_str[8:10])}" if len(date_str) >= 10 else date_str
+
+
 def _basis_time(card: dict) -> str:
     """머리줄 「N시 N분 기준」의 시각("HH:MM") — 원본은 수집 시간창의 끝, 확정본은 담긴 기사를
     보낸 순간의 원본 시각 중 가장 늦은 것(기사가 다 빠졌으면 이 확정본이 받던 원본 시각 —
@@ -295,6 +314,10 @@ def report_header_text(card: dict) -> str:
     # 원본은 로데이터라 「무슨 조건으로 모았나」가 그 텍스트의 값이다. 검색어가 없는
     # 옛 카드는 사안명으로 물러선다.
     name = keywords_label(card) if is_raw(card) and card.get("keywords") else card["report_title"]
+    if is_multi_day(card):
+        # 「N시 N분 기준」으로는 며칠 치인지 말할 수 없다 — 구간을 그대로 적는다.
+        start, end = collect_range(card)
+        return f"수시 모니터링 {_md(start)}~{_md(end)} 수집({name})"
     basis = _basis_time(card)
     if not basis:
         return f"수시 모니터링 ({name})"
@@ -790,6 +813,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     padding: 0 8px; font-size: var(--fs-md); color: {text}; background: #fff; font-family: inherit; }}
   #new-card .n-date:focus {{ outline: none; border-color: {accent}; box-shadow: 0 0 0 3px {hover}; }}
   /* 지난 날짜를 골랐을 때만 한 줄 — 평소엔 빈 칸이라 아무 자리도 차지하지 않는다. */
+  #new-card .n-dash {{ color: {text_faint}; margin: 0 1px; }}
   #new-card .n-date-note {{ font-size: var(--fs-sm); color: {text_faint}; }}
   #new-card .field {{ gap: 8px; margin: 0 0 9px; }}
   #new-card .field > label {{ width: 64px; font-size: var(--fs-md); }}
@@ -1128,6 +1152,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .a-title .outlet {{ color: {muted}; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }}
   .a-bot {{ display: flex; align-items: center; gap: 8px; margin: 2px 0 0 31px;
     flex-wrap: wrap; row-gap: 4px; }}
+  .a-day {{ color: {text}; font-weight: 600; }}
   .a-time {{ font-size: var(--fs-sm); color: {muted}; white-space: nowrap;
     user-select: none; -webkit-user-select: none; }}
   .a-time-sep {{ color: {muted}; font-size: var(--fs-sm); margin: 0 2px;
@@ -1673,15 +1698,20 @@ def render_new_card_page(error: Optional[str] = None, kind: str = "", pick: str 
     <div class="kw-note">검색어는 하나씩 따로 걸립니다. 띄어 쓴 말은 붙어 있는 그대로 찾고, 두 낱말이 다 든 기사는 「가상자산+과세」처럼 +로 묶으세요.</div>
     <div class="field">
       <label>날짜</label>
+      <input type="date" class="n-date" id="collect-from" name="collect_from"
+             value="{today}" min="{oldest_date}" max="{today}" onchange="onDateChange()">
+      <span class="n-dash">~</span>
       <input type="date" class="n-date" id="collect-date" name="collect_date"
              value="{today}" min="{oldest_date}" max="{today}" onchange="onDateChange()">
       <span class="n-quick">
-        <button type="button" class="qchip" data-days="0" aria-pressed="false" onclick="setCollectDate(0)">오늘</button>
-        <button type="button" class="qchip" data-days="1" aria-pressed="false" onclick="setCollectDate(1)">어제</button>
+        <button type="button" class="qchip" data-span="0" aria-pressed="false" onclick="setCollectSpan(0)">오늘</button>
+        <button type="button" class="qchip" data-span="1,1" aria-pressed="false" onclick="setCollectSpan(1,1)">어제</button>
+        <button type="button" class="qchip" data-span="2" aria-pressed="false" onclick="setCollectSpan(2)">최근 3일</button>
+        <button type="button" class="qchip" data-span="6" aria-pressed="false" onclick="setCollectSpan(6)">최근 7일</button>
       </span>
       <span class="n-date-note" id="date-note"></span>
     </div>
-    <div class="field">
+    <div class="field" id="time-row">
       <label>수집시간</label>
       {_hm_select_html("win-start", "window_start", "00:00", now_hhmm)}
       <span class="tilde">~</span>
@@ -1722,10 +1752,10 @@ var MAX_KEYWORDS = {MAX_ADHOC_KEYWORDS};   // 검색어 상한 — 「하나라�
 var keywords = [];
 
 // ---- 날짜 칸 ----------------------------------------------------------------
-// 시 드롭다운은 평소 "오늘 지난 시각까지"만 담는다(_hm_select_html). 지난 날짜를 고르면
-// 그 하루가 이미 끝났으므로 24시간을 전부 열고, 오늘로 돌아오면 다시 지난 시각까지로
-// 줄인다 — 열어 둔 채 오늘로 돌아오면 아직 오지 않은 시각을 고를 수 있고, 그건 서버가
-// 거부한다(앱이 고르게 해놓고 서버가 물리는 모양을 만들지 않는다).
+// 시 드롭다운은 평소 "오늘 지난 시각까지"만 담는다(_hm_select_html). 지난 날짜·기간을
+// 고르면 그 날들이 이미 끝났으므로 24시간을 전부 열고, 오늘 하루로 돌아오면 다시 지난
+// 시각까지로 줄인다 — 열어 둔 채 돌아오면 아직 오지 않은 시각을 고를 수 있고, 그건
+// 서버가 거부한다(앱이 고르게 해놓고 서버가 물리는 모양을 만들지 않는다).
 function hmAllHours(id) {{
   var s = hmSelects(id);
   if (!s[0]) return;
@@ -1738,15 +1768,62 @@ function hmLimitHours(id, lastHour) {{
     if (parseInt(s[0].options[i].value, 10) > lastHour) s[0].remove(i);
   }}
 }}
+// 날짜 셈은 한 곳에서만 한다 — 칩을 누를 때와 칩에 불을 켤 때가 같은 값을 봐야
+// "눌렀는데 안 켜지는" 어긋남이 안 생긴다. 기준은 늘 끝 칸의 max(서버가 박아 보낸 오늘)다.
+function dateMinusDays(days) {{
+  var d = new Date(document.getElementById('collect-date').max);
+  d.setDate(d.getDate() - days);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+         '-' + String(d.getDate()).padStart(2, '0');
+}}
+// 칩 하나가 **두 칸을 한꺼번에** 채운다 — 하루만 쓸 때도 번거롭지 않게(「어제」는 두 칸 다 어제).
+// data-span은 "시작까지 며칠 전[,끝까지 며칠 전]"이고 끝을 생략하면 오늘이다.
+function spanOf(btn) {{
+  var p = (btn.dataset.span || '0').split(',');
+  return [parseInt(p[0], 10), parseInt(p.length > 1 ? p[1] : '0', 10)];
+}}
+// 고른 구간과 같은 칩에만 불이 켜진다. **날짜 칸에서 직접 고르면 전부 꺼진다** —
+// 칩은 지름길이고 날짜의 주인은 날짜 칸이라는 관계가 그대로 보여야 한다.
+function syncDateChips() {{
+  var f = document.getElementById('collect-from'), t = document.getElementById('collect-date');
+  if (!f || !t) return;
+  document.querySelectorAll('.qchip[data-span]').forEach(function (b) {{
+    var sp = spanOf(b);
+    var on = f.value === dateMinusDays(sp[0]) && t.value === dateMinusDays(sp[1]);
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }});
+}}
+function setCollectSpan(fromDays, toDays) {{
+  document.getElementById('collect-from').value = dateMinusDays(fromDays);
+  document.getElementById('collect-date').value = dateMinusDays(toDays === undefined ? 0 : toDays);
+  onDateChange();
+}}
 function onDateChange() {{
-  var el = document.getElementById('collect-date');
+  var f = document.getElementById('collect-from'), t = document.getElementById('collect-date');
   var note = document.getElementById('date-note');
   var todayOnly = document.getElementById('today-only-time');
+  var timeRow = document.getElementById('time-row');
+  // 시작이 끝보다 뒤면 조용히 맞춰 준다 — 거꾸로 된 구간은 0건이 나오는데 그게
+  // "그 기간에 기사가 없었다"와 구별되지 않는다(서버도 막지만 여기서 먼저 막는다).
+  if (f.value > t.value) f.value = t.value;
   syncDateChips();
-  // max가 곧 오늘이다(서버가 박아 보낸다) — 화면에서 날짜를 따로 계산하지 않는다.
-  var isToday = !el.value || el.value === el.max;
-  // 「지금」·「최근 1·3시간」은 지금을 기준으로 삼는 버튼이라 지난 날짜에선 뜻이 없다.
-  todayOnly.style.display = isToday ? '' : 'none';
+  var isToday = !t.value || t.value === t.max;
+  var isRange = f.value !== t.value;
+  // 기간이면 하루 안 시간창은 뜻이 없다 — 줄을 통째로 숨기고 첫날 00:00 ~ 끝날로 고정한다.
+  timeRow.style.display = isRange ? 'none' : '';
+  // 「지금」·「최근 1·3시간」은 지금을 기준으로 삼는 버튼이라 오늘 하루일 때만 뜻이 있다.
+  todayOnly.style.display = (isToday && !isRange) ? '' : 'none';
+  if (isRange) {{
+    hmAllHours('win-start'); hmAllHours('win-end');
+    setHM('win-start', '00:00');
+    // 끝이 오늘이면 23:59는 아직 오지 않은 시각이다(서버가 거부한다).
+    setHM('win-end', isToday ? nowHM() : '23:59');
+    var days = Math.round((new Date(t.value) - new Date(f.value)) / 86400000) + 1;
+    note.textContent = days + '일치를 한 번에 · 기사가 많은 검색어는 못 닿을 수 있어요';
+    note.classList.add('is-past');
+    return;
+  }}
   if (isToday) {{
     hmLimitHours('win-start', new Date().getHours());
     hmLimitHours('win-end', new Date().getHours());
@@ -1760,38 +1837,11 @@ function onDateChange() {{
   hmAllHours('win-end');
   setHM('win-start', '00:00');
   setHM('win-end', '23:59');
-  // 지난 날짜를 골랐을 때만 한 줄. 네이버는 검색어당 최신 1000건까지만 주므로 기사가
-  // 많은 검색어는 그 날까지 닿지 못한다 — 여기선 "그럴 수 있다"까지만 말하고, 실제로
-  // 못 닿았는지는 수집한 뒤 카드 화면의 빨간 경고가 사실대로 말한다.
-  var days = Math.round((new Date(el.max) - new Date(el.value)) / 86400000);
+  var ago = Math.round((new Date(t.max) - new Date(t.value)) / 86400000);
   // 어제는 "1일 전"이라 하지 않는다 — 사람이 쓰는 말이 따로 있는데 숫자로 적으면 한 번 센다.
-  note.textContent = (days === 1 ? '어제' : days + '일 전') +
+  note.textContent = (ago === 1 ? '어제' : ago + '일 전') +
     ' 하루 전체 · 기사가 많은 검색어는 못 닿을 수 있어요';
   note.classList.add('is-past');
-}}
-// 날짜 셈은 한 곳에서만 한다 — 칩을 누를 때와 칩에 불을 켤 때가 같은 값을 봐야
-// "눌렀는데 안 켜지는" 어긋남이 안 생긴다. 기준은 늘 el.max(서버가 박아 보낸 오늘)다.
-function dateMinusDays(days) {{
-  var el = document.getElementById('collect-date');
-  var d = new Date(el.max);
-  d.setDate(d.getDate() - days);
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
-         '-' + String(d.getDate()).padStart(2, '0');
-}}
-// 고른 날짜와 같은 칩에만 불이 켜진다. **날짜 칸에서 직접 고르면 둘 다 꺼진다** —
-// 칩은 지름길이고 날짜의 주인은 날짜 칸이라는 관계가 그대로 보여야 한다.
-function syncDateChips() {{
-  var el = document.getElementById('collect-date');
-  if (!el) return;
-  document.querySelectorAll('.qchip[data-days]').forEach(function (b) {{
-    var on = el.value === dateMinusDays(parseInt(b.dataset.days, 10));
-    b.classList.toggle('on', on);
-    b.setAttribute('aria-pressed', on ? 'true' : 'false');
-  }});
-}}
-function setCollectDate(daysAgo) {{
-  document.getElementById('collect-date').value = dateMinusDays(daysAgo);
-  onDateChange();
 }}
 
 function renderKeywords() {{
@@ -1858,7 +1908,10 @@ document.getElementById('new-card-form').addEventListener('submit', function (e)
     return;
   }}
   var dateEl = document.getElementById('collect-date');
-  if (!validWindow('win-start', 'win-end', !dateEl || !dateEl.value || dateEl.value === dateEl.max)) {{
+  var fromEl = document.getElementById('collect-from');
+  var sameDay = !fromEl || fromEl.value === dateEl.value;
+  var endIsToday = !dateEl || !dateEl.value || dateEl.value === dateEl.max;
+  if (!validWindow('win-start', 'win-end', sameDay && endIsToday)) {{
     e.preventDefault();
   }}
 }});
@@ -2368,7 +2421,7 @@ def _render_article_row(
         if is_sched
         else ""
     )
-    out_of_window = article_out_of_window(article, window_of(card))
+    out_of_window = article_out_of_window(article, card)
     out_tag = f'<span class="out-tag">구간 밖 · {article["pub_date"][11:16]}</span>' if out_of_window else ""
     other_group_names = [g for g in group_names if g != article.get("group")]
 
@@ -2475,7 +2528,7 @@ def _render_article_row(
     # 정기 _format_pub_time과 같은 방식이다.
     pub_iso = html.escape(article.get("pub_date") or "")
     time_html = (
-        f'<span class="a-time">{article["pub_date"][11:16]} · '
+        f'<span class="a-time">{_pub_day_prefix(article, card)}{article["pub_date"][11:16]} · '
         f'<span class="a-time-rel" data-pub-date="{pub_iso}"></span></span>'
         if pub_iso
         else ""

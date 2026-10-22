@@ -41,7 +41,9 @@ _FIXTURE_BY_KEYWORD = {
 }
 
 
-def _fake_search_one_keyword(keyword, after=None, before=None, include_unparsed_dates=False, day=None):
+def _fake_search_one_keyword(
+    keyword, after=None, before=None, include_unparsed_dates=False, day=None, day_from=None
+):
     # day: 어느 날짜를 모으나(지난 날짜 수집). 픽스처는 늘 "오늘" 기사를 돌려주므로
     # 값을 쓰지 않지만, 실제 함수와 시그니처가 어긋나면 호출 자체가 터진다.
     # [수정: 2026-08-24] _search_one_keyword의 반환값이 (기사 목록, 조회 상한에 걸렸는지)
@@ -1213,6 +1215,7 @@ def test_adhoc_past_date_collect():
     now = datetime.now().replace(second=0, microsecond=0)
     today = now.strftime("%Y-%m-%d")
     yday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    two_days_ago = (now - timedelta(days=2)).strftime("%Y-%m-%d")
 
     # 1) 세 갈래 판정 — 오늘 기사는 "새것"(건너뜀)이고 그제 기사는 "오래됨"(중단)이다.
     assert naver_api._compare_collect_day(naver_api.kst_at(today, "09:00"), yday) > 0, \
@@ -1246,8 +1249,10 @@ def test_adhoc_past_date_collect():
             # 3) 지난 날짜 카드도 수집된다 — 그 날짜로 검색이 걸리는지 day 인자로 확인한다.
             seen = {}
 
-            def _fake(keywords, after=None, before=None, include_unparsed_dates=False, day=None):
+            def _fake(keywords, after=None, before=None, include_unparsed_dates=False,
+                      day=None, day_from=None):
                 seen["day"] = day
+                seen["day_from"] = day_from
                 seen["window"] = (after, before)
                 return ({keywords[0]: [{
                     "outlet": "한국일보", "title": "세법개정안 국회 제출", "url": "https://n.news.naver.com/a/1",
@@ -1289,10 +1294,15 @@ def test_adhoc_past_date_collect():
             # 5) 새 수집 폼의 날짜 칸 + 지난 날짜 배너 문구
             form = adhoc_renderer.render_new_card_page()
             assert 'name="collect_date"' in form and f'max="{today}"' in form
-            assert "setCollectDate(1)" in form, "「어제」 칩이 없다"
-            # 칩이 "지금 고른 날짜"를 말한다(시안 A안) — 누르는 쪽과 불 켜는 쪽이 **같은
+            assert "setCollectSpan(1,1)" in form, "「어제」 칩이 없다"
+            # 칩이 "지금 고른 구간"을 말한다(시안 A안) — 누르는 쪽과 불 켜는 쪽이 **같은
             # 날짜 셈**(dateMinusDays)을 봐야 "눌렀는데 안 켜지는" 어긋남이 안 생긴다.
-            assert form.count('data-days="0"') == 1 and form.count('data-days="1"') == 1
+            assert form.count('data-span="0"') == 1 and form.count('data-span="1,1"') == 1
+            # 날짜 칸은 둘이고 기간 칩이 함께 선다(A안).
+            assert 'name="collect_from"' in form and form.count('type="date"') == 2
+            for span in ('data-span="2"', 'data-span="6"'):
+                assert span in form, f"기간 칩이 없다: {span}"
+            assert 'id="time-row"' in form, "기간일 때 숨길 수집시간 줄에 id가 없다"
             assert ".qchip.on" in form, "켜진 칩 CSS가 없다 — 눌러도 모양이 안 변한다"
             assert "syncDateChips();" in form, "화면을 열 때 「오늘」이 안 켜진다"
             # 시간 줄의 빠른 칩(0시부터·최근 N시간)은 켜짐이 없는 동작 버튼이다.
@@ -1331,7 +1341,50 @@ def test_adhoc_past_date_collect():
             page = adhoc_renderer.render_card_page(card.load_card(day_bundles[0]["id"]))
             assert "기사를 더 보낼 수 없어요" not in page, "거짓이 된 옛 확정본 배너가 남아 있다"
 
-    print("55) 수시 지난 날짜 수집: 통과 (세 갈래 날짜 판정, 날짜만 과거, 못 닿음 빨간 경고, 폼 날짜 칸, 같은 날짜 확정본으로 보내기)")
+            # 7) **기간 수집** — 카드 날짜는 끝 날짜이고, 검색은 시작~끝을 본다.
+            rng = card.new_card("", "", "00:00", "23:59", ["세법개정"], now=now,
+                                collect_date=yday, collect_from=two_days_ago)
+            assert card.collect_range(rng) == (two_days_ago, yday)
+            assert card.is_multi_day(rng) and rng["collect_date"] == yday, \
+                "기간 카드의 날짜가 끝 날짜가 아니다 — 탭·보관함·확정본이 전부 이 값을 본다"
+            assert "collect_from" not in card.load_card(c["id"]), \
+                "하루 카드에 collect_from이 적혔다(옛 카드와 모양이 달라진다)"
+            seen.clear()
+            with patch.object(adhoc_collector, "search_keywords", _fake):
+                adhoc_collector.run_collect(rng["id"], now=now, log=False)
+            assert (seen["day"], seen["day_from"]) == (yday, two_days_ago), \
+                f"기간이 검색으로 안 내려갔다: {seen}"
+            assert seen["window"][0] == naver_api.kst_at(two_days_ago, "00:00"), \
+                "창의 시작이 시작 날짜 위에 서지 않았다"
+
+            # 기간에서는 시간창을 **날짜까지** 봐야 한다 — 시:분만 대조하면 가운데 날
+            #  기사가 끝날 시각창에 걸려 조건 밖으로 떨어진다.
+            # 구간 = "시작날 00:00 ~ 끝날 09:00". 가운데(시작) 날 오후 기사는 그 안이다 —
+            # 옛 판정은 시:분만 봐서 15:00을 09:00 창 밖으로 떨어뜨렸다.
+            mid = {"pub_date": f"{two_days_ago}T15:00:00+09:00", "matched_keywords": ["세법개정"]}
+            narrow = dict(rng, window={"start": "00:00", "end": "09:00"})
+            assert not adhoc_collector.article_out_of_window(mid, narrow), \
+                "기간 카드가 가운데 날 기사를 구간 밖으로 떨어뜨렸다"
+            assert adhoc_collector.article_out_of_window(
+                mid, dict(narrow, collect_from=None)), "하루 카드 판정이 느슨해졌다"
+
+            # 화면: 머리줄은 구간, 기사 줄엔 날짜가 붙는다(하루 카드엔 안 붙는다).
+            assert adhoc_renderer.report_header_text(rng).startswith(
+                f"수시 모니터링 {int(two_days_ago[5:7])}/{int(two_days_ago[8:10])}~"), \
+                "기간 머리줄이 구간을 안 적는다"
+            assert adhoc_renderer._pub_day_prefix(mid, rng), "기간인데 기사 줄에 날짜가 없다"
+            assert not adhoc_renderer._pub_day_prefix(mid, saved), "하루인데 날짜가 붙었다"
+
+            # 한도는 **시작 날짜**로 본다 — 끝 날짜로 재면 긴 구간이 그냥 통과한다.
+            far = dict(rng, collect_from=(now - timedelta(days=9999)).strftime("%Y-%m-%d"))
+            try:
+                adhoc_collector._validate_collectable(far, now)
+            except adhoc_collector.AdhocCollectError:
+                pass
+            else:
+                raise AssertionError("한도 밖 시작 날짜를 막지 않음")
+
+    print("55) 수시 지난 날짜 수집: 통과 (세 갈래 날짜 판정, 날짜만 과거, 못 닿음 빨간 경고, 폼 날짜 칸, 같은 날짜 확정본으로 보내기, 기간 수집)")
 
 
 def test_adhoc_reload_to_now():

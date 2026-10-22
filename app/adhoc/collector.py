@@ -9,7 +9,10 @@ import threading
 from datetime import date, datetime
 from typing import Optional
 
-from app.adhoc.card import AdhocCardError, append_collect_log, card_lock, load_card, save_card
+from app.adhoc.card import (
+    AdhocCardError, append_collect_log, card_lock, collect_range, is_multi_day,
+    load_card, save_card,
+)
 from app.filters import (deduplicate_by_title, exclude_personnel_articles, exclude_photo_articles,
                          filter_by_outlet_whitelist, is_schedule_listing)
 from app.config import ADHOC_PAST_COLLECT_DAYS
@@ -45,12 +48,14 @@ _search_cache_lock = threading.Lock()
 _SEARCH_CACHE_MAX = 40  # 키워드 5 × 카드 8개 정도. 넘으면 오래된 것부터 버린다.
 
 
-def _cache_key(collect_date: str, keyword: str, window: dict) -> tuple:
-    return (collect_date, keyword, window["start"], window["end"])
+def _cache_key(collect_date: str, keyword: str, window: dict, day_from: str = "") -> tuple:
+    # 시작 날짜도 키에 든다 — 같은 끝 날짜라도 기간이 다르면 다른 결과다.
+    return (collect_date, keyword, window["start"], window["end"], day_from)
 
 
 def _search_with_cache(
-    collect_date: str, keywords: list[str], window: dict, after, before
+    collect_date: str, keywords: list[str], window: dict, after, before,
+    day_from: Optional[str] = None,
 ) -> tuple[dict[str, list[dict]], list[str], set[str]]:
     """키워드별 검색 결과를 돌려준다 — 캐시에 있는 키워드는 네이버를 부르지 않는다.
 
@@ -70,7 +75,7 @@ def _search_with_cache(
     missing: list[str] = []
     with _search_cache_lock:
         for keyword in keywords:
-            hit = _search_cache.get(_cache_key(collect_date, keyword, window))
+            hit = _search_cache.get(_cache_key(collect_date, keyword, window, day_from or ""))
             if hit is None:
                 missing.append(keyword)
             else:
@@ -84,12 +89,14 @@ def _search_with_cache(
 
     # day=collect_date — 이 한 줄이 "어느 날을 모으나"를 정한다(app.naver_api._is_on_collect_day).
     # 캐시 키에 이미 collect_date가 들어 있어(_cache_key) 날짜가 다른 수집끼리 섞이지 않는다.
-    fresh, failed, fresh_capped = search_keywords(missing, after=after, before=before, day=collect_date)
+    fresh, failed, fresh_capped = search_keywords(
+        missing, after=after, before=before, day=collect_date, day_from=day_from,
+    )
     with _search_cache_lock:
         for keyword, results in fresh.items():
             if keyword in failed:
                 continue  # 실패한 키워드는 캐시하지 않는다 — 다음에 다시 시도해야 한다
-            _search_cache[_cache_key(collect_date, keyword, window)] = (results, keyword in fresh_capped)
+            _search_cache[_cache_key(collect_date, keyword, window, day_from or "")] = (results, keyword in fresh_capped)
         while len(_search_cache) > _SEARCH_CACHE_MAX:
             _search_cache.pop(next(iter(_search_cache)))
     cached.update(fresh)
@@ -115,9 +122,17 @@ def _validate_collectable(card: dict, now: datetime) -> None:
     구조 검증과는 성격이 달라 여기(collector)에 둔다.
     """
     today = now.strftime("%Y-%m-%d")
-    collect_date = card["collect_date"]
+    start_day, collect_date = collect_range(card)
     if collect_date > today:
         raise AdhocCollectError(f"{collect_date}은 아직 오지 않은 날짜예요.")
+    # 한도는 **시작 날짜**로 본다 — 구간에서 가장 오래된 쪽이라, 끝 날짜로 재면
+    # 「오늘까지 400일」 같은 구간이 그냥 통과한다.
+    age = (date.fromisoformat(today) - date.fromisoformat(start_day)).days
+    if age > ADHOC_PAST_COLLECT_DAYS:
+        raise AdhocCollectError(
+            f"{start_day}은 {ADHOC_PAST_COLLECT_DAYS}일보다 더 지난 날짜예요 "
+            f"({age}일 전). 더 가까운 날짜로 모아주세요."
+        )
     if collect_date < today:
         # [수정: 2026-10-21] 예전엔 지난 날짜 카드의 수집을 통째로 막았다(ADHOC_DESIGN.md
         # §6.3 자정 잠금). 막은 이유는 하나였다 — 검색이 언제나 "오늘"로 고정돼 있어서
@@ -125,12 +140,6 @@ def _validate_collectable(card: dict, now: datetime) -> None:
         # 기사가 담겼다. 이제 검색이 카드의 collect_date를 그대로 쓰므로 그 이유가
         # 사라졌고, 거꾸로 **막는 것이 틀린 동작**이 됐다(어제 날짜로 모으려면 수집을
         # 해야 한다). 날짜 자체의 한도만 본다.
-        age = (date.fromisoformat(today) - date.fromisoformat(collect_date)).days
-        if age > ADHOC_PAST_COLLECT_DAYS:
-            raise AdhocCollectError(
-                f"{collect_date}은 {ADHOC_PAST_COLLECT_DAYS}일보다 더 지난 날짜예요 "
-                f"({age}일 전). 더 가까운 날짜로 모아주세요."
-            )
         return  # 지난 날짜는 하루가 이미 끝났으므로 아래 "아직 그 시각이 안 됐다" 검사가 없다
     window_end = card["window"]["end"]
     now_hhmm = now.strftime("%H:%M")
@@ -140,7 +149,7 @@ def _validate_collectable(card: dict, now: datetime) -> None:
         )
 
 
-def article_out_of_window(article: dict, window: dict) -> bool:
+def article_out_of_window(article: dict, card: dict) -> bool:
     """이 기사가 카드의 현재 시간창 밖인지 계산한다(저장하지 않고 매번 다시 계산 —
     시간창이 재수집으로 바뀌면 그 즉시 다시 맞아떨어져야 하므로, live_renderer의
     matched_keywords와 같은 이유로 값을 고정 저장하지 않는다).
@@ -152,8 +161,16 @@ def article_out_of_window(article: dict, window: dict) -> bool:
         return False
     # 모음 카드는 시간창 자체가 없다(§6.13, window=None) — 위 manual 면제로 이미 다
     # 걸러지지만, 판정 함수가 인자만 보고도 안전하도록 한 겹 더 둔다.
-    if not window or not window.get("start") or not window.get("end"):
+    window = card.get("window") or {}
+    if not window.get("start") or not window.get("end"):
         return False
+    start_day, end_day = collect_range(card)
+    if start_day != end_day:
+        # [추가: 2026-10-22] 기간 카드는 **날짜까지** 봐야 한다 — 시:분만 대조하면
+        # 「10/19 15:00 기사」가 끝날 창(예: 00:00~09:30)에 걸려 조건 밖으로 떨어진다.
+        # 구간은 "시작날 window.start 초과 ~ 끝날 window.end 이하"다(하루와 같은 경계).
+        stamp = article["pub_date"][:16].replace("T", " ")
+        return not (f"{start_day} {window['start']}" < stamp <= f"{end_day} {window['end']}")
     pub_hhmm = article["pub_date"][11:16]  # ISO 8601 "...THH:MM:SS+09:00"에서 시:분만
     return not (window["start"] < pub_hhmm <= window["end"])
 
@@ -261,14 +278,15 @@ def _search_card(card: dict, now: datetime) -> tuple[dict[str, list[dict]], list
     반영으로 생기는 애매한 상태("어디까지 반영됐는지 모르겠다")를 만들지 않는다.
     """
     window = card["window"]
-    collect_date = card["collect_date"]
+    start_day, collect_date = collect_range(card)
     keywords = list(dict.fromkeys(card["keywords"] + card.get("must_keywords", [])))
     results, failed, capped = _search_with_cache(
         collect_date,
         keywords,
         window,
-        after=kst_at(collect_date, window["start"]),
+        after=kst_at(start_day, window["start"]),
         before=kst_at(collect_date, window["end"]),
+        day_from=start_day,
     )
     if failed:
         names = ", ".join(f"'{k}'" for k in failed)
@@ -286,7 +304,7 @@ def _search_card(card: dict, now: datetime) -> tuple[dict[str, list[dict]], list
     for keyword in card.get("must_keywords", []):
         if keyword in capped:
             raise AdhocKeywordCapError(
-                f"'{keyword}'{josa_eun(keyword)} 지금부터 {collect_date} 사이 기사가 "
+                f"'{keyword}'{josa_eun(keyword)} 지금부터 {start_day} 사이 기사가 "
                 f"{_MAX_START:,}건을 넘어 정확히 거를 수 없어요. "
                 "수집 시간대를 좁히거나 더 구체적인 말을 써주세요."
             )
