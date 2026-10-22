@@ -5632,6 +5632,9 @@ def bulk_move_bar_html(split_html: str) -> str:
     버튼의 뜻이 모양으로 갈린다: 「옮기기」만 채운 파랑(이 띠의 대표 동작), ↑↓는 흰 바탕
     테두리(보조), 🗑은 흰 바탕 + 빨강(지우기) — 수시 선택 바(.btn.sm / .btn.sm.danger)와
     같은 규칙이다. 아이콘은 app.icons 하나에서 온다(예전엔 두 파일에 SVG가 복붙돼 있었다).
+
+    🗑에는 수시와 똑같이 「숨기기」 글자가 붙는다 — ↑↓는 글리프만으로 뜻이 서지만 🗑은
+    「숨기기」와 「삭제」가 같은 그림이라, 글자가 없으면 지워 없애는 것으로 읽힌다.
     """
     return (
         '<div class="bulk-move-bar" id="bulk-move-bar">\n'
@@ -5646,7 +5649,7 @@ def bulk_move_bar_html(split_html: str) -> str:
         f'{icon("down")}</button>\n'
         '    <button type="button" class="bulk-hide" onclick="bulkHideSelected(this)" '
         'title="선택한 기사 전부 숨기기 (되돌리기 가능)">'
-        f'{icon("trash")}</button>\n'
+        f'{icon("trash")} 숨기기</button>\n'
         f'    {split_html}\n'
         '    <button class="clear-btn" type="button" onclick="clearSelection()">선택 해제</button>\n'
         '  </div>'
