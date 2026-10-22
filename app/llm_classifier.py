@@ -1116,7 +1116,7 @@ _ASSIGN_SCHEMA = {
 
 def classify_isolated(articles: list, max_subheadings: int) -> Optional[list]:
     """정기 회차의 전역 `_last_names`(직전 소제목 이름 이어쓰기 힌트)를 건드리지 않고
-    classify_with_llm을 부른다 — 회차가 없는 호출부(수시 카드·「엑셀로 목록 만들기」)가 쓴다.
+    classify_with_llm을 부른다 — 회차가 없는 호출부(수시 카드·「엑셀파일로 보고용 텍스트 생성」)가 쓴다.
 
     안 그러면 양방향으로 오염된다(ADHOC_DESIGN.md §6.5):
       (1) 호출 전 — 정기 회차의 소제목 이름이 이 호출의 프롬프트에 "직전에 쓰던 이름"으로

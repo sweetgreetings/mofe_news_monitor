@@ -1,4 +1,4 @@
-# 「📋 엑셀로 목록 만들기」(`GET /excel-merge`)의 로직 — 화면은 app/excel_merge_renderer.py.
+# 「📋 엑셀파일로 보고용 텍스트 생성」(`GET /excel-merge`)의 로직 — 화면은 app/excel_merge_renderer.py.
 #
 # 담당자가 들고 있는 표(언론사·제목·링크)를 보고서 한 줄 형식으로 바꿔 주는 **흐름 밖 화면**이다.
 # 그래서 지키는 선이 셋이다:

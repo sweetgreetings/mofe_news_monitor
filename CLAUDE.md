@@ -471,7 +471,7 @@ URL
 
 ```
 - `/format`에서 `{outlet}`/`{title}` 템플릿. URL 줄과 발행일 미표시는 바꿀 수 없다.
-- **흐름 밖 화면은 정기 텍스트 표출 형식을 쓴다 — 정기 값이 곧 앱의 기본 모양이고, 수시만 따로 가질 수 있는 예외다**(`adhoc_article_line_template`/`adhoc_subheading_format_template`, 키가 없으면 `load_settings`가 그때의 정기 값을 복사해 시작한다). 기사 줄 형식을 쓰는 흐름 밖 자리는 여섯 — 오늘 전체 기사 복사(`live_renderer`) · 홈 부정 추정·[단독]/[속보] 목록 복사(`landing_renderer`) · [단독]·[속보] 텔레그램 알림(`breaking_alert_sender`) · 기관 기사 찾기 복사(`agency_archive_renderer`) · 라벨 보관함 복사·txt(`settings_server`) · 엑셀로 목록 만들기(`excel_merge_renderer`, 화면에 구워 보낸다). 소제목 형식을 쓰는 흐름 밖 자리는 **둘**(라벨 보관함의 라벨 이름 머리줄 · 엑셀로 목록 만들기의 소제목 줄). **흐름 밖 화면마다 형식 설정을 따로 만들지 않는다** — 라벨만 떼어내면 나머지를 설명할 수 없고, 다 떼어내면 기사 한 줄 모양을 고치려고 담당자가 여섯 군데를 돌아다닌다. **그래서 라벨 보관함에 수시 기사가 섞여도 정기 형식으로 나간다** — 기사마다 출처 흐름의 형식을 입히면 한 목록 안에 두 모양이 선다. **설정 화면 두 곳이 적용 범위를 한 줄로 적는다**(`_FORMAT_FLOWS`의 `line_also`/`sub_also`) — 그 항목이 설정 메뉴의 「정기」 묶음 안에 있어 적어 두지 않으면 정기 보고서 전용으로 읽힌다. → H: 텍스트 표출 형식 — 흐름 밖 화면
+- **흐름 밖 화면은 정기 텍스트 표출 형식을 쓴다 — 정기 값이 곧 앱의 기본 모양이고, 수시만 따로 가질 수 있는 예외다**(`adhoc_article_line_template`/`adhoc_subheading_format_template`, 키가 없으면 `load_settings`가 그때의 정기 값을 복사해 시작한다). 기사 줄 형식을 쓰는 흐름 밖 자리는 여섯 — 오늘 전체 기사 복사(`live_renderer`) · 홈 부정 추정·[단독]/[속보] 목록 복사(`landing_renderer`) · [단독]·[속보] 텔레그램 알림(`breaking_alert_sender`) · 기관 기사 찾기 복사(`agency_archive_renderer`) · 라벨 보관함 복사·txt(`settings_server`) · 엑셀파일로 보고용 텍스트 생성(`excel_merge_renderer`, 화면에 구워 보낸다). 소제목 형식을 쓰는 흐름 밖 자리는 **둘**(라벨 보관함의 라벨 이름 머리줄 · 엑셀파일로 보고용 텍스트 생성의 소제목 줄). **흐름 밖 화면마다 형식 설정을 따로 만들지 않는다** — 라벨만 떼어내면 나머지를 설명할 수 없고, 다 떼어내면 기사 한 줄 모양을 고치려고 담당자가 여섯 군데를 돌아다닌다. **그래서 라벨 보관함에 수시 기사가 섞여도 정기 형식으로 나간다** — 기사마다 출처 흐름의 형식을 입히면 한 목록 안에 두 모양이 선다. **설정 화면 두 곳이 적용 범위를 한 줄로 적는다**(`_FORMAT_FLOWS`의 `line_also`/`sub_also`) — 그 항목이 설정 메뉴의 「정기」 묶음 안에 있어 적어 두지 않으면 정기 보고서 전용으로 읽힌다. → H: 텍스트 표출 형식 — 흐름 밖 화면
 - **기사마다 URL 다음에 빈 줄 하나.** 소제목 끝에 따로 넣지 않는다. 텍스트를 만드는 곳 넷이 전부 따른다: `app/renderer.py` `_build_plain_text` · `app/preview_renderer.py` `_build_preview_plain_text` · `app/history_renderer.py` `_build_slot_plain_text` · `app/adhoc/renderer.py` `build_adhoc_plain_text`.
 - **화면의 기사 제목 줄은 이 템플릿을 따르지 않는다** — `언론사 제목`, 언론사만 회색·`0.86em`·굵기 500·오른쪽 여백 `0.5em`. 같은 값이 다섯 곳: `.title-outlet`(renderer·preview_renderer·history_renderer, 마크업은 `render_article`) / `/hidden`의 `.hidden-row .title-outlet` / 수시 `.a-title .outlet`. 예외: 오늘 전체 기사(언론사 칩), 좁은 팝오버(괄호 유지). 시안 [mockups/OUTLET_TITLE_MOCKUP.html](mockups/OUTLET_TITLE_MOCKUP.html).
 - 전문 크롤링 안 함 — 네이버 `description`만. 형광펜 단어(최대 20, `HIGHLIGHT_COLORS` 5색 순환, 칩을 누르면 다음 색, 색은 단어별 전역). **편집은 확정본·초안·오늘 전체 기사 좌측 하단 🖍️ 한 곳뿐이다** — 설정 화면(`/highlight`)은 없앴고 옛 주소는 설정 메뉴로 보낸다. **형광펜은 정기 화면에만 칠한다** — 수시 원본·확정본은 칠하지 않는다.
@@ -842,9 +842,9 @@ URL
 - **범위 선택 UI 없음 — 지금 화면에 보이는 것.** 확정본·초안·라벨·수시 보관함은 렌더링 때 구운 rows를 hidden input JSON으로 `POST /download-excel`에 보낸다. 정기 보관함만 지연 로딩이라 펼친 날짜(`data-date`)를 모아 `POST /download-excel-history`로 보내 서버가 다시 만든다.
 - **파일명 `날짜_종류_구분.xlsx`.** 회차 자리는 머리줄처럼 `14-00기준`, 초안은 확정본 파일과 구별되게 끝에 `_초안`(확정본 `2026-09-17_언론모니터링_14-00기준.xlsx`, 초안 `…_14-00기준_초안.xlsx` — txt도 같은 이름). 여러 날짜는 범위(`date_range_label`), 라벨은 뽑은 날. 자유 입력은 `sanitize_filename_part`.
 
-## 엑셀로 목록 만들기 (`app/excel_merge.py` · `app/excel_merge_renderer.py`, `GET /excel-merge`)
+## 엑셀파일로 보고용 텍스트 생성 (`app/excel_merge.py` · `app/excel_merge_renderer.py`, `GET /excel-merge`)
 
-담당자가 **밖에서 들고 온 표**(언론사·제목·링크)를 보고서 한 줄 형식으로 바꿔 주는 **흐름 밖 화면**. 설정 메뉴 「정기, 수시 공통」에 있고 화면 이름은 `EXCEL_MERGE_TITLE` 한 곳에 둔다. 단계는 셋 — ① 표 붙여넣기 → ② 열 맞추기 → ③ 결과. 시안 [mockups/EXCEL_MERGE_MOCKUP.html](mockups/EXCEL_MERGE_MOCKUP.html).
+담당자가 **밖에서 들고 온 표**(언론사·제목·링크)를 보고서 한 줄 형식으로 바꿔 주는 **흐름 밖 화면**. 설정 메뉴 「기타」에 있고 화면 이름은 `EXCEL_MERGE_TITLE` 한 곳에 둔다. 단계는 셋 — ① 표 붙여넣기 → ② 열 맞추기 → ③ 결과. 시안 [mockups/EXCEL_MERGE_MOCKUP.html](mockups/EXCEL_MERGE_MOCKUP.html). → H: 엑셀파일로 보고용 텍스트 생성 — 이름·자리·전용 보관함 기각
 
 - **아무것도 저장하지 않는다.** 회차 파일·수시 카드·라벨·숨김·배정(`group_overrides`)·소제목 순서(`group_order`)·커스텀 소제목 — 하나도 건드리지 않는다. 담당자가 들고 온 표는 이 앱이 모은 기사가 아니라서, 저장하는 순간 「앱이 관측한 것」과 섞여 어느 쪽이 기록인지 알 수 없게 된다(기관 기사 원장이 「책」인 것과 같은 이유로 **이쪽은 책에 안 적는다**). 받아서 바꿔 주고 끝낸다.
 - **텍스트 모양은 정기 값 그대로다**(위 「텍스트 형식」의 흐름 밖 규칙) — 기사 줄 `article_line_template`, 소제목 `subheading_format_template`. **이 화면 전용 형식 설정을 만들지 않는다.**
@@ -956,7 +956,7 @@ URL
 
 ## 설정 메뉴 (`/`, `_MENU_TEMPLATE`)
 
-- 묶음 순서: **정기**(검색어 · 수집시간대 │ 텍스트 표출 형식: 기사 제목 · 소제목 │ 발송 · 알림: 자동발송 대기시간 및 ON/OFF · [단독]·[속보] 기사 알림) → **수시**(텍스트 표출 형식: 기사 제목 · 소제목) → **정기, 수시 공통**(언론사 선택 및 순서 지정 · 엑셀로 목록 만들기 `표를 보고서 형식으로` · 삭제 기록 `지운 회차 되살리기`) → **받는 사람 지정**(텔레그램 · 이메일 `정기 확정본만` · 발송 기록 `누가 받았는지`) → **연동**(키 보관 상태 `어디에 저장돼 있나` · 네이버 뉴스 API 설정 · LLM(AI) 연동 · 텔레그램 발송 계정 · 이메일 발송 계정, 맨 아래 고정). 시안 [mockups/SETTINGS_MENU_REORG_MOCKUP.html](mockups/SETTINGS_MENU_REORG_MOCKUP.html).
+- 묶음 순서: **정기**(검색어 · 수집시간대 │ 텍스트 표출 형식: 기사 제목 · 소제목 │ 발송 · 알림: 자동발송 대기시간 및 ON/OFF · [단독]·[속보] 기사 알림) → **수시**(텍스트 표출 형식: 기사 제목 · 소제목) → **정기, 수시 공통**(언론사 선택 및 순서 지정 · 삭제 기록 `지운 회차 되살리기`) → **받는 사람 지정**(텔레그램 · 이메일 `정기 확정본만` · 발송 기록 `누가 받았는지`) → **기타**(엑셀파일로 보고용 텍스트 생성) → **연동**(키 보관 상태 `어디에 저장돼 있나` · 네이버 뉴스 API 설정 · LLM(AI) 연동 · 텔레그램 발송 계정 · 이메일 발송 계정, 맨 아래 고정). 시안 [mockups/SETTINGS_MENU_REORG_MOCKUP.html](mockups/SETTINGS_MENU_REORG_MOCKUP.html).
 - 메뉴 항목 이름과 그 화면 제목(`<title>`·`<h1>`)은 같다. 예외: 묶음 이름이 뜻을 채워 주는 항목(받는 사람 지정의 `텔레그램`·`이메일` → 화면 `텔레그램 받는 사람`·`이메일 받는 사람`, 텍스트 표출 형식의 `기사 제목`·`소제목` → 화면 `정기 · 기사 제목 형식` 등).
 - 정기·수시 묶음 이름엔 홈 흐름도 줄 이름표와 같은 왼쪽 3px 띠(`flow_row_reg_bar`/`flow_row_adhoc_bar`). 묶음 안 작은 제목은 `.menu-sub`.
 - 두 흐름이 같은 이름의 화면(기사 제목 형식·소제목 형식)을 가지므로 그 화면 제목은 `정기 · …`/`수시 · …`로 가른다(`_FORMAT_FLOWS` 한 표).

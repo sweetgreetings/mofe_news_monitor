@@ -462,7 +462,6 @@ _MENU_TEMPLATE = (
     <div class="category-name">정기, 수시 공통</div>
     <div class="menu">
       <a href="/outlets">언론사 선택 및 순서 지정<span class="menu-chev">›</span></a>
-      <a href="/excel-merge">엑셀로 목록 만들기<span class="menu-note">표를 보고서 형식으로</span><span class="menu-chev">›</span></a>
       <a href="/deleted">삭제 기록<span class="menu-note">지운 회차 되살리기</span><span class="menu-chev">›</span></a>
     </div>
   </div>
@@ -472,6 +471,12 @@ _MENU_TEMPLATE = (
       <a href="/telegram">텔레그램<span class="menu-chev">›</span></a>
       <a href="/email">이메일<span class="menu-note">정기 확정본만</span><span class="menu-chev">›</span></a>
       <a href="/send-log">발송 기록<span class="menu-note">누가 받았는지</span><span class="menu-chev">›</span></a>
+    </div>
+  </div>
+  <div class="category">
+    <div class="category-name">기타</div>
+    <div class="menu">
+      <a href="/excel-merge">엑셀파일로 보고용 텍스트 생성<span class="menu-chev">›</span></a>
     </div>
   </div>
   <!-- [추가: 2026-08-20] "연동"은 일부러 맨 아래에 둔다(사용자 지정 위치) — 검색어
@@ -6713,7 +6718,7 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         self._respond_download(text, filename)
 
     def _handle_excel_merge_read(self, form: dict) -> None:
-        """「엑셀로 목록 만들기」의 .xlsx 읽기 — 표를 2차원 글자 배열로 돌려준다.
+        """「엑셀파일로 보고용 텍스트 생성」의 .xlsx 읽기 — 표를 2차원 글자 배열로 돌려준다.
 
         화면이 파일 원본을 **base64 한 덩어리**로 실어 보낸다(`data=`). multipart를 쓰지
         않는 이유는 do_POST가 본문을 urlencoded 하나로만 읽기 때문이다 — 여기만 바이너리
@@ -6734,11 +6739,11 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             # 이유를 그대로 화면에 적는다 — 「읽지 못했어요」만 띄우면 할 일을 알 수 없다.
             self._respond_json({"error": str(exc)})
             return
-        logger.info("엑셀로 목록 만들기 — 표 %d줄 읽음", len(rows))
+        logger.info("엑셀파일로 보고용 텍스트 생성 — 표 %d줄 읽음", len(rows))
         self._respond_json({"rows": rows})
 
     def _handle_excel_merge_classify(self, form: dict) -> None:
-        """「엑셀로 목록 만들기」의 AI 소제목 배정 — 담당자가 버튼을 눌렀을 때만 들어온다.
+        """「엑셀파일로 보고용 텍스트 생성」의 AI 소제목 배정 — 담당자가 버튼을 눌렀을 때만 들어온다.
 
         아무것도 저장하지 않는다(회차·카드·배정·캐시 어디에도) — 받은 목록에 소제목 이름만
         붙여 돌려주고, 화면이 그걸 얹어 다시 그린다. 실패하면 이유 한 줄을 돌려준다
@@ -6754,10 +6759,10 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             return
         result = assign_subheadings([a for a in items if isinstance(a, dict)])
         if "reason" in result:
-            logger.info("엑셀로 목록 만들기 — AI 배정 못함(%s)", result["reason"])
+            logger.info("엑셀파일로 보고용 텍스트 생성 — AI 배정 못함(%s)", result["reason"])
             self._respond_json({"reason": ASSIGN_REASONS.get(result["reason"], ASSIGN_REASONS["failed"])})
             return
-        logger.info("엑셀로 목록 만들기 — AI가 소제목 %d건 배정", len(result["assigned"]))
+        logger.info("엑셀파일로 보고용 텍스트 생성 — AI가 소제목 %d건 배정", len(result["assigned"]))
         self._respond_json({"assigned": result["assigned"]})
 
     def _handle_download_excel(self, form: dict) -> None:

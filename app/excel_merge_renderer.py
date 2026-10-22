@@ -1,4 +1,4 @@
-# 「📋 엑셀로 목록 만들기」 화면 (`GET /excel-merge`) — 로직·규칙은 app/excel_merge.py.
+# 「📋 엑셀파일로 보고용 텍스트 생성」 화면 (`GET /excel-merge`) — 로직·규칙은 app/excel_merge.py.
 #
 # 담당자가 들고 온 표(언론사·제목·링크)를 보고서 한 줄 형식으로 바꾼다. 하는 일이 셋이라
 # 화면도 세 단계다: ① 표 붙여넣기 → ② 열 맞추기 → ③ 결과.
@@ -28,7 +28,7 @@ from app.llm_classifier import is_configured as llm_is_configured
 from app.settings import load_settings
 from app.topnav import plain_nav, topnav_style
 
-EXCEL_MERGE_TITLE = "엑셀로 목록 만들기"
+EXCEL_MERGE_TITLE = "엑셀파일로 보고용 텍스트 생성"
 
 _BASE = f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}"
 
@@ -542,7 +542,7 @@ def _ai_controls_html(ai_ready: bool) -> str:
 
 
 def render_excel_merge_page() -> str:
-    """「엑셀로 목록 만들기」 화면 한 장."""
+    """「엑셀파일로 보고용 텍스트 생성」 화면 한 장."""
     settings = load_settings()
     ai_ready = llm_is_configured()
     baked = {
