@@ -10,7 +10,8 @@ from datetime import date, datetime
 from typing import Optional
 
 from app.adhoc.card import AdhocCardError, append_collect_log, card_lock, load_card, save_card
-from app.filters import deduplicate_by_title, exclude_personnel_articles, exclude_photo_articles, filter_by_outlet_whitelist
+from app.filters import (deduplicate_by_title, exclude_personnel_articles, exclude_photo_articles,
+                         filter_by_outlet_whitelist, is_schedule_listing)
 from app.config import ADHOC_PAST_COLLECT_DAYS
 from app.naver_api import _MAX_START, kst_at, search_keywords
 from app.settings import load_settings
@@ -172,6 +173,11 @@ def _apply_options(articles: list[dict], options: dict) -> list[dict]:
         articles = exclude_photo_articles(articles)
     if options.get("exclude_personnel"):
         articles = exclude_personnel_articles(articles)
+    # 📅 일정 기사 제외 — 사진·인사와 같은 자리·같은 방식이다. 판정은 공용
+    # is_schedule_listing 하나라 담당자가 ⋯ 메뉴에서 끈 기사는 여기서도 안 걸린다.
+    if options.get("exclude_schedule"):
+        articles = [a for a in articles
+                    if not is_schedule_listing(a.get("title") or "", a.get("url") or "")]
     return deduplicate_by_title(articles)
 
 

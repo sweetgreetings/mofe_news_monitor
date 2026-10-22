@@ -113,6 +113,7 @@ from app.filters import (
     is_schedule_listing,
     looks_like_photo_caption,
     photo_badge_tip,
+    schedule_badge_tip,
 )
 from app.sorter import outlet_sort_key, sort_by_pub_desc
 # 1000건 상한 숫자는 네이버가 정한 값이라 화면이 따로 적지 않고 그 자리에서 가져온다 —
@@ -120,7 +121,7 @@ from app.sorter import outlet_sort_key, sort_by_pub_desc
 from app.naver_api import _MAX_START
 from app.icons import icon
 from app.labels import labels_for_url
-from app import photo_overrides
+from app import photo_overrides, schedule_overrides
 from app.llm_classifier import MAX_ARTICLES_FOR_CLASSIFY
 from app.renderer import (
     AI_SUMMARY_HEADING,
@@ -877,6 +878,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .article.is-photo:hover, .article.is-photo:has(.bulk-chk:checked),
   /* ⋯ 메뉴를 연 행도 또렷하게 — 정기(app/renderer.py)와 같은 값이다. */
   .article.is-photo:has(.more-wrap.is-open) {{ opacity: 1; }}
+  /* 📅 일정 기사 — 정기(app/renderer.py)와 같은 값이다. */
+  .article.is-sched {{ opacity: 0.55; }}
+  .article.is-sched:hover, .article.is-sched:has(.bulk-chk:checked),
+  .article.is-sched:has(.more-wrap.is-open) {{ opacity: 1; }}
   /* ADHOC_DESIGN.md §6.13 「보낸 기사 표시」 — 내용 흐리기 + 「✓ 보냄」.
      ① 왼쪽 청록 띠는 없앴다 — 「✓ 보냄」 자리와 흐림이 이미 같은 말을 한다
         (ADHOC_RAW_CLEANUP_MOCKUP.html).
@@ -1096,11 +1101,12 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   body.photo-gather .art-order-btn {{ display: none !important; }}
   .t-scoop {{ color: {scoop_text}; font-weight: 800; }}
   .t-flash {{ color: {flash_text}; font-weight: 600; }}
-  .photo-badge {{
-    flex-shrink: 0; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
+  .photo-badge, .sched-badge {{
+    flex-shrink: 0; padding: 1px 6px; border-radius: var(--r-pill); font-size: var(--fs-2xs);
     color: {photo_badge_text}; background: {photo_badge_bg}; border: 1px solid {photo_badge_border};
-    white-space: nowrap; position: relative; top: -0.15em;
+    white-space: nowrap; position: relative; top: -0.12em;
   }}
+  .photo-badge .ic, .sched-badge .ic {{ width: 0.95em; height: 0.95em; vertical-align: -0.1em; }}
   .article details {{ display: block; }}
   .article summary {{ list-style: none; cursor: pointer; }}
   .article summary::-webkit-details-marker {{ display: none; }}
@@ -1694,6 +1700,7 @@ def render_new_card_page(error: Optional[str] = None, kind: str = "", pick: str 
       <span class="n-opts">
         <label><input type="checkbox" name="use_outlet_whitelist" value="1"> 등록 언론사만</label>
         <label><input type="checkbox" name="exclude_photo" value="1"> 사진 추정 제외</label>
+        <label><input type="checkbox" name="exclude_schedule" value="1"> 일정 추정 제외</label>
         <label><input type="checkbox" name="exclude_personnel" value="1"> 인사기사 제외</label>
       </span>
       <button type="submit" class="btn">{icon("search")} 수집</button>
@@ -2225,7 +2232,7 @@ def _raw_kinds_of(article: dict) -> set:
     marks = set()
     if looks_like_photo_caption(article):
         marks.add("photo")
-    if is_schedule_listing(article.get("title") or ""):
+    if is_schedule_listing(article.get("title") or "", article.get("url") or ""):
         marks.add("sched")
     if PERSONNEL_NOTICE_MARK in (article.get("title") or ""):
         marks.add("hr")
@@ -2353,6 +2360,14 @@ def _render_article_row(
         if is_photo
         else ""
     )
+    # 📅 일정 — 정기와 같은 함수·같은 칩(app.filters.is_schedule_listing).
+    is_sched = is_schedule_listing(article["title"], article.get("url", ""))
+    sched_badge_html = (
+        f'<span class="sched-badge" title="{html.escape(schedule_badge_tip(article["title"]))}">'
+        f'{icon("calendar")} 일정 추정</span>'
+        if is_sched
+        else ""
+    )
     out_of_window = article_out_of_window(article, window_of(card))
     out_tag = f'<span class="out-tag">구간 밖 · {article["pub_date"][11:16]}</span>' if out_of_window else ""
     other_group_names = [g for g in group_names if g != article.get("group")]
@@ -2364,6 +2379,19 @@ def _render_article_row(
     # 자리가 원본이라, 여기서 못 끄면 확정본으로 보낸 뒤에야 끌 수 있다). 저장은 정기와
     # 같은 전역 저장소(app.photo_overrides)이고, 사진으로 잡힌 행과 끈 행에만 그린다.
     photo_cleared = photo_overrides.is_photo_cleared(article["url"])
+    # 「일정 추정 해제」도 같은 자리·같은 방식(form 제출)이다 — 저장은 정기와 같은 전역
+    # 저장소(app.schedule_overrides).
+    sched_cleared = schedule_overrides.is_schedule_cleared(article["url"])
+    sched_menu_html = ""
+    if is_sched or sched_cleared:
+        sched_menu_html = (
+            '<form method="POST" action="/adhoc/card/schedule-override">'
+            f'<input type="hidden" name="id" value="{card_id}">'
+            f'<input type="hidden" name="url" value="{html.escape(article["url"])}">'
+            f'<input type="hidden" name="action" value="{"restore" if sched_cleared else "clear"}">'
+            f'<button type="submit">{"일정 추정 되돌리기" if sched_cleared else "일정 추정 해제"}</button>'
+            "</form>"
+        )
     photo_menu_html = ""
     if is_photo or photo_cleared:
         photo_menu_html = (
@@ -2488,7 +2516,7 @@ def _render_article_row(
         "</form>"
         f'<button type="button" data-target="{edit_id}" '
         'onclick="event.stopPropagation(); openEditSummary(this)">기사 정보 직접 수정</button>'
-        f"{photo_menu_html}"
+        f"{sched_menu_html}{photo_menu_html}"
         "</span>"
         "</span>"
     )
@@ -2669,6 +2697,8 @@ def _render_article_row(
         article_class += " out"
     if is_photo:
         article_class += " is-photo"
+    if is_sched:
+        article_class += " is-sched"
     if raw:
         # 원본 거르기 줄이 보는 표식 — 종류 칩(일정 추정·인사)과 「등록 언론사만」 체크가
         # 이 클래스들만 본다. 판정은 칩 건수를 세는 자리와 **같은 함수**(_raw_kinds_of)라
@@ -2676,7 +2706,7 @@ def _render_article_row(
         # 엑셀·발송엔 하나도 안 나간다.
         _marks = _raw_kinds_of(article)
         for _key, _cls, _ic, _nm, _tip in _RAW_KINDS:
-            if _key != "photo" and _key in _marks:
+            if _key not in ("photo", "sched") and _key in _marks:
                 article_class += f" {_cls}"
         # 「등록 언론사만」 — 설정 「언론사 선택 및 순서 지정」의 체크 그대로다. 아무도
         # 안 골랐으면 거르지 않는다(filter_by_outlet_whitelist와 같은 규칙, 그때 칸은 잠긴다).
@@ -2691,7 +2721,7 @@ def _render_article_row(
     <summary>
       <div class="a-top">
         <input type="checkbox" class="bulk-chk" data-url="{url}" onclick="event.stopPropagation();" onchange="updateBulkBar()">
-        <div class="a-title"><span class="outlet">{html.escape(article["outlet"])}</span>{title_html}{out_tag}{photo_badge_html}</div>
+        <div class="a-title"><span class="outlet">{html.escape(article["outlet"])}</span>{title_html}{out_tag}{sched_badge_html}{photo_badge_html}</div>
         {sent_tag_html}
       </div>
       <div class="a-bot">

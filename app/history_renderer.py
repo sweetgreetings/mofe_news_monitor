@@ -48,6 +48,7 @@ from app.renderer import (
     label_popover_script,
     label_popover_style,
     photo_override_script,
+    schedule_override_script,
     render_article,
 )
 from app.today_cuts import cut_origin
@@ -316,6 +317,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      행은 또렷하게 한다 — 그 메뉴 안에 「사진 추정 해제」가 있다. */
   .article.is-photo {{ opacity: 0.55; }}
   .article.is-photo:hover, .article.is-photo:has(.more-wrap.is-open) {{ opacity: 1; }}
+  /* 📅 일정 기사 — 확정본과 같은 값(체크박스가 없는 화면이라 :checked는 뺀다). */
+  .article.is-sched {{ opacity: 0.55; }}
+  .article.is-sched:hover, .article.is-sched:has(.more-wrap.is-open) {{ opacity: 1; }}
   /* [수정: 2026-08-27] 초안 마감 시점에 자동 배정된 기사(render_article이
      article["finalize_auto_assigned"]를 보고 항상 붙이는 마크업, 이 화면도
      render_article을 그대로 재사용한다)의 **연보라 음영·왼쪽 선을 이 화면에서만 뺐다**
@@ -350,11 +354,12 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      규칙이 빠져 있어, 배지가 .title-row(flex) 안에서 블록으로 부풀어 알약도 아닌 맨
      글자(16px)로 떴다. 위 .finalize-added-badge·.late-badge와 같은 이유로 **남긴다** —
      보관함에서 이건 할 일 알림이 아니라 "이 기사는 사진기사로 봤다"는 기록이다. */
-  .photo-badge {{
-    flex-shrink: 0; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
+  .photo-badge, .sched-badge {{
+    flex-shrink: 0; padding: 1px 6px; border-radius: var(--r-pill); font-size: var(--fs-2xs);
     color: {photo_badge_text}; background: {photo_badge_bg}; border: 1px solid {photo_badge_border}; white-space: nowrap;
-    position: relative; top: -0.15em;  /* 제목보다 글자가 작은 알약이라 반 칸(0.15em) 올려 제목 글자 높이 한가운데에 맞춘다. */
+    position: relative; top: -0.12em;  /* 제목보다 글자가 작은 알약이라 baseline 정렬만으론 아래로 보인다 — 조금(0.12em) 올려 제목 글자 높이 한가운데에 맞춘다(칩 글자를 --fs-2xs로 내리며 0.15 → 0.12em). */
   }}
+  .photo-badge .ic, .sched-badge .ic {{ width: 0.95em; height: 0.95em; vertical-align: -0.1em; }}
   /* 기사 한 줄 — **이 화면만** 메타 줄(시각·원문보기·아이콘)을 제목 줄 오른쪽 끝에
      올린다. 확정본·초안·수시는 2행 그대로다. 보관함은 손대지 않고 훑기만 하는 화면이고
      (체크박스도 ↑↓도 없다), 그 세 화면은 누를 표적이 커야 하는 작업 화면이라 여기서만
@@ -554,6 +559,7 @@ function copySlotText(btn) {{
 // [추가: 2026-09-16] 🏷 라벨 — 확정본·초안과 같은 코드(app.renderer.label_popover_script).
 {label_popover_script}
 {photo_override_script}
+{schedule_override_script}
 function hideArticle(btn) {{
   var url = btn.dataset.url;
   var article = btn.closest(".article");
@@ -1426,6 +1432,7 @@ def _theme() -> dict:
         "label_popover_style": label_popover_style(),
         "label_popover_script": label_popover_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
         "photo_override_script": photo_override_script(),
+        "schedule_override_script": schedule_override_script(),
         "topnav_style": topnav_style(),
         "topnav_html": regular_nav("archive"),
     }

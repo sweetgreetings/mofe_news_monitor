@@ -241,6 +241,18 @@ FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN
 - **표시**: `render_article`을 쓰는 화면(확정본·초안·정기 보관함)과 수시·기관 기사 찾기 모두 행을 흐리게(`opacity:0.55`, `.article.is-photo`, 기관 기사 찾기만 `.art.is-photo`) + `📷 사진 추정` 칩. hover·체크·⋯ 메뉴를 연 행은 또렷. **읽기 전용 화면이라고 흐림을 빼지 않는다** — 그 뜻이 「훑을 때 건너뛰고 확인하려면 마우스를 올린다」라 훑기만 하는 화면에서 더 맞는다(연보라 「마감 후 자동 배정」 음영을 보관함에서만 뺀 것과 다른 판단이다 — 그건 끌 수 없는 할 일 알림이었다). **이 CSS(`.photo-badge`·`.article.is-photo`)는 다섯 파일에 복제돼 있다** — `app/renderer.py`·`app/preview_renderer.py`·`app/history_renderer.py`·`app/adhoc/renderer.py`·`app/agency_archive_renderer.py`. 한쪽만 고치지 않는다(규칙이 빠진 화면에선 알약이 `.title-row` flex 안에서 서식 없는 맨 글자로 뜬다). `tests/test_integration.py` `test_photo_badge_css_is_in_every_screen`이 이 상태를 지킨다 — 네 벌의 선언이 같은 값인지와, 그린 확정본·정기 보관함 HTML에 마크업과 규칙이 **함께** 들어 있는지를 본다. **라벨은 표식이든 추정이든 「📷 사진 추정」 하나**이고 차이는 툴팁만(`photo_badge_tip(title)` 한 곳, 실제 붙은 말머리를 적는다). 두 번째 라벨을 만들지 않는다.
 - **「📷 사진 추정 (N)」** — **알약이다**(모양 규칙: 알약 = 상태를 알려 주고 누르면 켜고 끄기만). 화면만 바꾸는 보기라 **「보고서 내용을 바꾸는」 왼쪽 네모 버튼과 섞지 않는다** — 확정본·초안은 툴바 **오른쪽 묶음(`.actions-right`) 맨 앞**, 수시 확정본은 목록 바로 위 줄(`.photo-row`, 툴바엔 자리가 없다), 수시 원본은 그 자리의 「거르기」 줄 안 칩 셋 중 하나다(아래 수시 절). 꺼짐은 흰 알약 + 회색 테두리, **켜지면 채운 파랑**(모아 보는 동안 소제목·📌·요약이 다 숨으므로 되돌아갈 스위치가 약해지면 안 된다 — 그래서 글자 버튼으로 내리지 않았다). 0건이면 안 그린다. 사진 추정 행만 한 목록으로 모으고 행마다 원래 소제목 이름표(`.pg-from`, 미분류는 없음). 흐림·칩은 뗀다. sticky 띠 「☐ 전체 선택 · … · [원래 화면으로]」, 숨기기는 선택 바의 🗑(아래 일괄 숨김 규칙). **화면만 바꾸는 보기**라 저장·복사·발송은 안 변한다. 모아 보는 동안 다른 소제목·📌·AI 요약·메모·배너·목차·↑↓는 숨고 「보기 순서」는 소제목별로 잠근다. 끄면 행이 정확히 제자리로 돌아간다. 상태는 탭 단위 `sessionStorage`(`photoGather:{날짜}:{회차}` / `photoGather:preview:{ROUND_DEADLINE_MS}` / `adhocPhotoGather:{카드 id}`); 수시는 스크롤 복원보다 먼저 되살린다. 코드는 정기 `app/renderer.py` `photo_gather_style/script/button_html`, 수시 `app/adhoc/renderer.py` `_PHOTO_GATHER_JS` — **동작을 바꾸면 둘 다 바꾼다.** 소제목에서 사진을 늘 빼두는 안은 기각(화면과 보고서가 어긋난다). 시안 [mockups/PHOTO_GROUP_MOCKUP.html](mockups/PHOTO_GROUP_MOCKUP.html)·[mockups/TOOLBAR_DEPTH_MOCKUP.html](mockups/TOOLBAR_DEPTH_MOCKUP.html) C안.
 
+### 📅 일정 추정 기사
+
+매일 같은 틀로 나오는 **정형 일정 기사**(`[오늘의 국회일정] (22일, 목)`·`[오늘의 주요일정]경제(10월22일목요일)`·`[오늘의 국감](22일)`)를 사진 추정과 **같은 문법**으로 표시한다 — 수집에서 빼지 않고 행을 흐리게 + 칩 하나, 틀렸으면 ⋯ 메뉴에서 한 건씩 끈다. 실측(회차·원장·수시 카드 전수 21,565건): 적중 230건, 회차 평균 0.8건, 회차의 66%는 0건인데 **아침 06시 회차는 45건 중 19건(42%)**이다. 시안 [mockups/SCHEDULE_BADGE_MOCKUP.html](mockups/SCHEDULE_BADGE_MOCKUP.html).
+
+- **판정은 `app/filters.py` `is_schedule_listing(title, url)` 하나다.** 제목 **맨 앞 말머리**에 「일정」이 들었거나, 말머리가 `오늘의 국감`·`내일의 국감`일 때(`_SCHEDULE_EXTRA_HEADS`). **말머리 목록은 실측으로만 채운다**(사진 표식 층 `PHOTO_TAG_RE`와 같은 방식) — 맨 `[국감]`·`[2026 국감]`은 **안 넣는다**(사진·일반 기사가 섞인 329건이라 「국감」만으로는 못 가른다).
+- **표식 판정 하나뿐이라 추정 층이 없다.** 말머리 없이 같은 틀로 나오는 기사(`머니투데이 오프라인 헤드라인-22일`)와 일정이 아닌 모음 기사(`[연합뉴스 이 시각 헤드라인]`·`[게시판]`·`[오늘의 채권ㆍ외환 메모]`·`[전국 주요 신문 사설]`·`[미리보는 이데일리 신문]`)는 **일부러 안 잡는다** — 담당자가 「일정만」으로 범위를 정했다. 여기를 넓히려면 그 결정부터 다시 받는다.
+- **화면 이름은 「📅 일정 추정」 하나다** — 행 칩·수시 원본 거르기 칩·수시 새 수집 「일정 추정 제외」·기관 기사 찾기 「일정 추정 제외」·⋯ 메뉴가 같은 글자를 쓴다. 칩 글자는 `--fs-2xs`이고 색·모양은 📷 사진 추정과 **같은 값**이다(새 색을 만들지 않는다 — 글자와 아이콘이 이미 가른다). 아이콘은 이모지가 아니라 `icon("calendar")`.
+- **표시**: 행을 흐리게(`opacity: 0.55`, `.article.is-sched`, 기관 기사 찾기만 `.art.is-sched`) + 칩. hover·체크·⋯ 메뉴를 연 행은 또렷. **두 판정에 다 걸린 기사도 흐림은 한 번**이고 칩은 둘 다 선다(📅가 앞, 📷가 뒤). CSS는 사진과 **같은 블록**이라 다섯 파일에 함께 복제돼 있다 — 한쪽만 고치지 않는다(`test_photo_badge_css_is_in_every_screen`이 지킨다).
+- **📅 일정 추정 해제** (`app/schedule_overrides.py`, `data/schedule_overrides.json`): 말머리는 정형인데 내용은 일반 기사인 경우(`[오늘의 주요 일정] 김승원 후보자 인사청문회...여야, 정면충돌 예고`)를 한 건씩 끈다. **`photo_overrides`와 같은 성격·같은 모양**이고(URL 키 전역, 나이로 안 지움), **입히는 자리는 `is_schedule_listing()` 맨 앞 한 곳**이라 화면 여섯·수시 「일정 추정 제외」·기관 기사 찾기 거르기·홈 「오늘의 주요 주제」 순위가 코드를 더 안 고쳐도 따라온다. 누르는 자리는 ⋯ 더보기 맨 아래(「사진 추정 해제」 바로 위), **일정으로 잡힌 행과 끈 행에만** 그리고 끈 행은 같은 자리가 「일정 추정 되돌리기」다. 확인창 없음, 되돌리기 ↩ 대상 아님. 코드는 JS `app/renderer.py` `schedule_override_script()` 한 곳 + 서버 `POST /set-schedule-override`, 수시는 form 제출(`/adhoc/card/schedule-override`). **방향은 해제뿐이다**(「일정으로 표시」는 만들지 않는다).
+- **빼는 자리는 둘** — 수시 새 수집 「일정 추정 제외」(`exclude_schedule`, 수집에서 뺀다)와 기관 기사 찾기 거르기 「일정 추정 제외」(`nosched`, 보는 것만 거른다). 정기 회차에는 **빼는 설정을 만들지 않는다**(사진과 같은 이유 — 판정이 틀린 기사가 화면에 안 보이고 조용히 빠진다).
+- **홈 「오늘의 주요 주제」 순위는 이 함수를 그대로 쓴다**(`app/landing_renderer.py`) — 범위가 넓어지면 그 순위도 같이 정확해진다. `tests/test_integration.py` `test_schedule_badge`가 범위·보류 갈래·오탐·해제 한 곳을 지킨다. → H: 일정 추정 기사
+
 ### 초안에 보인 기사 유지 (`app/draft_seen.py`, `data/draft_seen.json`)
 
 - **담당자가 숨기거나 조건을 바꾸지 않는 한, 초안에 한 번 보인 기사는 그 회차 초안에 남고 확정본에도 들어간다.**
@@ -992,12 +1004,13 @@ URL
 - **flex 줄에 놓는 체크박스엔 `flex: none`을 준다** — 없으면 폭이 눌린다(소제목 머리에서 16 → 13px로 눌렸던 실측).
 - 스위치·요일 칩·검색 방식 칩 속에 `opacity: 0`으로 숨긴 `input`은 이 단계 밖이다(알약 규칙 몫).
 
-### 글자 크기 (`app/config.py` `FONT_XS`~`FONT_XL`)
+### 글자 크기 (`app/config.py` `FONT_2XS`~`FONT_XL`)
 
-시안 [mockups/TYPE_SCALE_MOCKUP.html](mockups/TYPE_SCALE_MOCKUP.html). → H: 글자 크기 단계
+시안 [mockups/TYPE_SCALE_MOCKUP.html](mockups/TYPE_SCALE_MOCKUP.html)·[mockups/SCHEDULE_BADGE_MOCKUP.html](mockups/SCHEDULE_BADGE_MOCKUP.html). → H: 글자 크기 단계
 
-- **여섯 단계만 쓴다** — CSS엔 `font-size: var(--fs-md)`처럼 적고 숫자를 적지 않는다(정의는 모양 토큰과 같은 `SHAPE_TOKENS_CSS`):
-  - `--fs-xs` 0.72rem: 숫자 배지·작은 칩 안 보조 글자·캡션. **이보다 작게 쓰지 않는다.**
+- **일곱 단계만 쓴다** — CSS엔 `font-size: var(--fs-md)`처럼 적고 숫자를 적지 않는다(정의는 모양 토큰과 같은 `SHAPE_TOKENS_CSS`):
+  - `--fs-2xs` 0.66rem: **제목 줄 칩 안 글자 한 자리뿐이다** — `📷 사진 추정`·`📅 일정 추정`. 칩은 글자와 SVG가 한 줄에 서는데 `.ic`가 1em이라 아이콘이 글자를 그대로 따라가, `--fs-xs`에서는 알약이 73×21px로 제목을 밀었다(0.66rem이면 66×20px, 실측). **이 자리 말고는 쓰지 않는다** — 쓰기 시작하면 「작게 하고 싶을 때 쓰는 칸」이 되고 단계가 무너진다.
+  - `--fs-xs` 0.72rem: 숫자 배지·작은 칩 안 보조 글자·캡션. **칩 안 글자 말고는 이보다 작게 쓰지 않는다.**
   - `--fs-sm` 0.8rem: 메타 줄(시각·원문보기·검색어)·칩·행 안 컨트롤·작은 안내.
   - `--fs-md` 0.88rem: 버튼·툴바(정기·수시 같게)·입력칸·배너·안내문·**펼친 기사 요약**(제목보다 한 단계 작게).
   - `--fs-base` 1rem: 기사 제목·본문.

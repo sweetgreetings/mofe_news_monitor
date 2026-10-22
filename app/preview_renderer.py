@@ -119,7 +119,10 @@ from app.renderer import (
     refresh_link_script,
     refresh_link_style,
     hide_batch_script,
+    undo_fab_html,
+    undo_fab_script,
     photo_override_script,
+    schedule_override_script,
     hide_batch_style,
     range_select_script,
     pinned_jump_badge_html,
@@ -662,6 +665,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .article.is-photo:hover, .article.is-photo:has(.article-select:checked),
   /* ⋯ 메뉴를 연 행도 또렷하게 — 확정본(app/renderer.py)과 같은 값이다. */
   .article.is-photo:has(.more-wrap.is-open) {{ opacity: 1; }}
+  /* 📅 일정 기사 — 확정본(app/renderer.py)과 같은 값이다. */
+  .article.is-sched {{ opacity: 0.55; }}
+  .article.is-sched:hover, .article.is-sched:has(.article-select:checked),
+  .article.is-sched:has(.more-wrap.is-open) {{ opacity: 1; }}
   /* [추가: 2026-08-03] app.renderer와 동일한 이유 — 체크된 기사만 연한 배경으로
      표시한다 (디자인 시안 A). */
   .article:has(.article-select:checked) {{ background: {hover}; }}
@@ -705,11 +712,12 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     gap: 4px; flex-shrink: 0; flex-wrap: wrap; row-gap: 4px;
   }}
   /* [추가: 2026-08-21] app.renderer와 동일 — 사진 추정 배지(아이콘+문구 칩). */
-  .photo-badge {{
-    flex-shrink: 0; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
+  .photo-badge, .sched-badge {{
+    flex-shrink: 0; padding: 1px 6px; border-radius: var(--r-pill); font-size: var(--fs-2xs);
     color: {photo_badge_text}; background: {photo_badge_bg}; border: 1px solid {photo_badge_border}; white-space: nowrap;
-    position: relative; top: -0.15em;  /* [수정: 2026-08-21] 제목보다 글자가 작은 알약이라 baseline 정렬만으론 약간 아래로 보인다(실측: 위 여백 +1px, 아래 -2.3px) — 반 칸(0.15em) 올려 제목 글자 높이 한가운데에 맞춘다. */
+    position: relative; top: -0.12em;  /* 제목보다 글자가 작은 알약이라 baseline 정렬만으론 아래로 보인다 — 조금(0.12em) 올려 제목 글자 높이 한가운데에 맞춘다(칩 글자를 --fs-2xs로 내리며 0.15 → 0.12em). */
   }}
+  .photo-badge .ic, .sched-badge .ic {{ width: 0.95em; height: 0.95em; vertical-align: -0.1em; }}
 {late_badge_style}
 {export_links_style}
   .article-summary {{ margin: 6px 0 4px 20px; color: {text}; font-size: var(--fs-md); }}
@@ -1130,7 +1138,9 @@ document.addEventListener("keydown", function (e) {{ if (e.key === "Escape") clo
 {scroll_top_script}
 {refresh_link_script}
 {hide_batch_script}
+{undo_fab_script}
 {photo_override_script}
+{schedule_override_script}
 {range_select_script}
 {name_picker_script}
 {kw_inline_script}
@@ -2616,7 +2626,9 @@ def _theme() -> dict:
         "refresh_link_script": refresh_link_script(),
         "hide_batch_style": hide_batch_style(),
         "hide_batch_script": hide_batch_script(),
+        "undo_fab_script": undo_fab_script(),
         "photo_override_script": photo_override_script(),
+        "schedule_override_script": schedule_override_script(),
         "range_select_script": range_select_script(".article-select", ".article"),
         "url_add_style": url_add_style(),
         "url_add_script": url_add_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT, "preview"),

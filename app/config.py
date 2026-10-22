@@ -681,6 +681,11 @@ SHADOW_MODAL = "0 16px 40px rgba(15, 23, 42, 0.22)"  # 확인창 · 이름 고�
 # 글자 크기 여섯 단계(CLAUDE.md 디자인 「글자 크기」, 시안 mockups/TYPE_SCALE_MOCKUP.html).
 # CSS엔 `font-size: var(--fs-md)`처럼 적는다. 아이콘 크기를 font-size로 정하는 곳(↩·⋯·✏️·▲▼·×)과
 # 홈 머리 제목·손글씨 캡션은 이 단계 밖이다.
+# 아이콘이 함께 선 칩(📷 사진 추정 · 📅 일정) 안 글자 전용 — 이 한 자리 말고는 쓰지 않는다.
+# 칩은 글자와 SVG가 한 줄에 서는데 .ic가 1em이라 아이콘이 글자를 그대로 따라간다. 그래서
+# --fs-xs(0.72rem)에서는 제목 줄에 선 알약이 73×21px로 제목을 밀었다 — 0.66rem으로 내리면
+# 66×20px이다(실측, 시안 mockups/SCHEDULE_BADGE_MOCKUP.html 1번).
+FONT_2XS = "0.66rem"     # 제목 줄 칩 안 글자 — 📷 사진 추정 · 📅 일정
 FONT_XS = "0.72rem"      # 숫자 배지 · 작은 칩 안 보조 글자 · 캡션
 FONT_SM = "0.8rem"       # 메타 줄 · 칩 · 행 안 컨트롤 · 작은 안내
 FONT_MD = "0.88rem"      # 버튼 · 툴바 · 입력칸 · 배너 · 안내문 · 펼친 기사 요약
@@ -697,7 +702,7 @@ PLUS_GLYPH_CSS = (
 
 SHAPE_TOKENS_CSS = (
     ":root { "
-    f"--fs-xs: {FONT_XS}; --fs-sm: {FONT_SM}; --fs-md: {FONT_MD}; "
+    f"--fs-2xs: {FONT_2XS}; --fs-xs: {FONT_XS}; --fs-sm: {FONT_SM}; --fs-md: {FONT_MD}; "
     f"--fs-base: {FONT_BASE}; --fs-lg: {FONT_LG}; --fs-xl: {FONT_XL}; "
     f"--r-sm: {RADIUS_SM}; --r-md: {RADIUS_MD}; --r-lg: {RADIUS_LG}; "
     f"--r-pill: {RADIUS_PILL}; --r-circle: {RADIUS_CIRCLE}; "
@@ -889,6 +894,11 @@ SUMMARY_OVERRIDES_FILE = DATA_DIR / "summary_overrides.json"
 # 결정이 90일 뒤 조용히 되살아난다. 값은 {url: {"photo": false, "at": ISO}}
 # (app.photo_overrides).
 PHOTO_OVERRIDES_FILE = DATA_DIR / "photo_overrides.json"
+# [추가: 2026-10-22] 담당자가 직접 끈 「📅 일정」 표시 — photo_overrides.json과 같은 성격·
+# 같은 형식({url: {"schedule": false, "at": ISO}})이라 나란히 둔다. 일정 판정은 제목 맨 앞
+# 말머리 하나로만 보는 표식 판정이라 거의 안 틀리지만, 말머리만 같고 내용은 일반 기사인
+# 경우(YTN 「[오늘의 주요 일정] 김승원 후보자 인사청문회…여야, 정면충돌 예고」)가 있다.
+SCHEDULE_OVERRIDES_FILE = DATA_DIR / "schedule_overrides.json"
 # PRD.md 기능10(라벨) — [추가: 2026-08-18] 담당자가 기사 한 건에 직접 붙이는 자유 입력
 # 태그. URL 키 전역 저장소로, 정기(확정본·초안)·수시(수집 확정본) 어느 화면에서 붙였든
 # 같은 항목을 함께 본다 — summary_overrides.json과 같은 이유로 app/adhoc/ 밖, 이

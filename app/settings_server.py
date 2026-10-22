@@ -195,6 +195,7 @@ from app.summary_overrides import (
 from app.title_refetch import refetch_titles
 
 from app.photo_overrides import set_photo_override
+from app.schedule_overrides import set_schedule_override
 from app.scheduler import next_pending_slot
 from app.preview_renderer import (
     _compute_preview_articles,
@@ -6430,6 +6431,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_edit_summary(form)
         elif self.path == "/set-photo-override":
             self._handle_set_photo_override(form)
+        elif self.path == "/set-schedule-override":
+            self._handle_set_schedule_override(form)
         elif self.path == "/save-manual-keyword-note":
             self._handle_save_manual_keyword_note(form)
         elif self.path == "/assign-unclassified":
@@ -7889,6 +7892,26 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         set_photo_override(url, False if action == "clear" else None)
+        self._regenerate_screens()
+        self.send_response(204)
+        self.end_headers()
+
+    def _handle_set_schedule_override(self, form: dict) -> None:
+        """⋯ 더보기 > 「일정 추정 해제」·「일정 추정 되돌리기」가 fetch로 호출한다
+        (setScheduleOverride — 확정본·초안·정기 보관함 공용).
+
+        위 사진 해제와 **같은 성격·같은 길**이다: 저장은 app.schedule_overrides(URL 키
+        전역), 판정에 입히는 자리는 is_schedule_listing() 맨 앞 한 곳이라 화면 여섯·수시
+        「일정 기사 제외」·기관 기사 찾기 「일정 제외」·홈 주요 주제 순위가 저절로 따라온다.
+        되돌리기(app.undo) 대상이 아니다 — 되돌리는 자리가 같은 ⋯ 메뉴 안에 바로 생긴다.
+        """
+        url = form.get("url", [""])[0]
+        action = form.get("action", [""])[0]
+        if not url or action not in ("clear", "restore"):
+            self.send_response(400)
+            self.end_headers()
+            return
+        set_schedule_override(url, False if action == "clear" else None)
         self._regenerate_screens()
         self.send_response(204)
         self.end_headers()

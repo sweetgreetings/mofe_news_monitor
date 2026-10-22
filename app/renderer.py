@@ -69,13 +69,14 @@ from app.llm_classifier import (
 from app.llm_classifier import cached_group_names as llm_cached_group_names
 from app.undo import peek_label as undo_peek_label
 from app.group_order import apply_group_order, is_order_locked
-from app.filters import headline_kind, HEADLINE_TAG_RE, looks_like_photo_caption, photo_badge_tip
+from app.filters import (headline_kind, HEADLINE_TAG_RE, looks_like_photo_caption,
+                         photo_badge_tip, is_schedule_listing, schedule_badge_tip)
 from app.highlight import highlight_keywords
 from app.icons import icon
 from app.labels import label_stats, labels_for_url, snapshot_source
 from app.manual_articles import load_manual_articles
 from app.naver_api import outlet_display_label
-from app import photo_overrides
+from app import photo_overrides, schedule_overrides
 from app.settings import all_search_keywords, auto_send_grace_sec, is_auto_send_enabled, load_settings
 from app.storage import is_today, load_latest_confirmed_run
 from app.summarizer import summarize_groups
@@ -534,6 +535,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   /* ⋯ 메뉴를 연 행도 또렷하게 — 그 메뉴 안에 「사진 추정 해제」가 있다. 판정이 맞는지
      보면서 누르는 자리라 흐린 채로 두면 안 된다(마우스가 없는 화면엔 hover가 없다). */
   .article.is-photo:has(.more-wrap.is-open) {{ opacity: 1; }}
+  /* 📅 일정 기사도 같은 값으로 흐리게 — 두 판정에 다 걸린 행도 흐림은 한 번이다. */
+  .article.is-sched {{ opacity: 0.55; }}
+  .article.is-sched:hover, .article.is-sched:has(.article-select:checked),
+  .article.is-sched:has(.more-wrap.is-open) {{ opacity: 1; }}
   /* [추가: 2026-08-03] 일괄 이동용 체크박스를 켠 기사는 연한 배경으로 표시해 "지금
      뭘 골랐는지" 스크롤하면서도 바로 보이게 한다 (디자인 시안 A, 사용자 선택) —
      자바스크립트 변경 없이 :has()만으로 동작. */
@@ -703,11 +708,12 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      파일에 복제돼 있다 — renderer·preview_renderer·history_renderer·adhoc/renderer·
      agency_archive_renderer(마지막은 선택자가 .art.is-photo). 한쪽만 고치지 않는다.
      규칙이 빠진 화면에선 알약이 아니라 서식 없는 맨 글자로 뜬다(보관함이 그랬다). */
-  .photo-badge {{
-    flex-shrink: 0; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
+  .photo-badge, .sched-badge {{
+    flex-shrink: 0; padding: 1px 6px; border-radius: var(--r-pill); font-size: var(--fs-2xs);
     color: {photo_badge_text}; background: {photo_badge_bg}; border: 1px solid {photo_badge_border}; white-space: nowrap;
-    position: relative; top: -0.15em;  /* [수정: 2026-08-21] 제목보다 글자가 작은 알약이라 baseline 정렬만으론 약간 아래로 보인다(실측: 위 여백 +1px, 아래 -2.3px) — 반 칸(0.15em) 올려 제목 글자 높이 한가운데에 맞춘다. */
+    position: relative; top: -0.12em;  /* 제목보다 글자가 작은 알약이라 baseline 정렬만으론 아래로 보인다 — 조금(0.12em) 올려 제목 글자 높이 한가운데에 맞춘다(칩 글자를 --fs-2xs로 내리며 0.15 → 0.12em). */
   }}
+  .photo-badge .ic, .sched-badge .ic {{ width: 0.95em; height: 0.95em; vertical-align: -0.1em; }}
   .article-summary {{ margin: 6px 0 4px 20px; color: {text}; font-size: var(--fs-md); }}
   /* [수정: 2026-07-30] "이미 확인함" 표시를 브라우저에 영구 기억(localStorage)하는 대신,
      "지금 펼쳐서 보고 있는 기사"에만 실시간으로 적용한다 — 예전 방식은 클릭했던 기사가
@@ -982,7 +988,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 {scroll_top_script}
 {refresh_link_script}
 {hide_batch_script}
+{undo_fab_script}
 {photo_override_script}
+{schedule_override_script}
 {range_select_script}
 {url_add_script}
 {note_history_script}
@@ -2642,6 +2650,20 @@ def render_article(
     # ⋯ 메뉴의 「사진 추정 해제」는 **사진으로 잡힌 행과 담당자가 끈 행에만** 붙는다 —
     # 사진과 무관한 기사에까지 달면 모든 행의 메뉴가 한 줄씩 길어지고, 그 줄은 누를 일이
     # 없다. 끈 기사에서는 같은 자리가 되돌리는 자리가 된다(새 자리를 만들지 않는다).
+    # [추가: 2026-10-22] 📅 일정 — 제목 맨 앞 말머리가 「오늘의 국회일정」·「오늘의 국감」
+    # 같은 정형 일정 기사(app.filters.is_schedule_listing). 사진과 **같은 문법**이다:
+    # 수집에서 빼지 않고 행을 흐리게 + 칩 하나, 틀렸으면 ⋯ 메뉴에서 한 건씩 끈다.
+    # 「추정」을 안 붙이는 이유는 말머리 표식 하나로만 보기 때문이다(「인사기사 제외」와 같다).
+    is_sched = is_schedule_listing(article.get("title", ""), article["url"])
+    sched_cleared = schedule_overrides.is_schedule_cleared(article["url"])
+    sched_menu_html = ""
+    if is_sched or sched_cleared:
+        sched_menu_html = (
+            f'<button type="button" data-url="{url}" '
+            f'data-schedule-action="{"restore" if sched_cleared else "clear"}" '
+            'onclick="event.stopPropagation(); closeArticleMenus(); setScheduleOverride(this);">'
+            f'{"일정 추정 되돌리기" if sched_cleared else "일정 추정 해제"}</button>'
+        )
     photo_menu_html = ""
     if is_photo or photo_cleared:
         photo_menu_html = (
@@ -2672,7 +2694,7 @@ def render_article(
         f'data-outlet="{outlet}" '
         f'data-title="{title_attr}" data-summary="{html.escape(article.get("summary", ""))}" '
         'onclick="event.stopPropagation(); closeArticleMenus(); editSummary(this);">기사 정보 직접 수정</button>'
-        f"{photo_menu_html}"
+        f"{sched_menu_html}{photo_menu_html}"
         "</span>"
         "</span>"
     )
@@ -2733,6 +2755,12 @@ def render_article(
         if is_photo
         else ""
     )
+    sched_badge_html = (
+        f'<span class="sched-badge" title="{html.escape(schedule_badge_tip(article.get("title", "")))}">'
+        f'{icon("calendar")} 일정 추정</span>'
+        if is_sched
+        else ""
+    )
     # [추가: 2026-08-20] 초안 마감 시점에 방금 자동으로 소제목에 배정된 기사 — 담당자가
     # 초안에서 못 본 기사일 수 있다(app.scraper.collect_run이 article["finalize_auto_
     # assigned"]로 영구히 남긴 값, 지우는 로직 없음 — 계속 표시). 음영은 CSS
@@ -2784,6 +2812,8 @@ def render_article(
     # caption docstring), 그 원칙을 확정본·초안에도 맞춘 것이다.
     if is_photo:
         article_class += " is-photo"
+    if is_sched:
+        article_class += " is-sched"
     # [수정: 2026-08-14] 게시시각 옆에 "· 원문보기"를 붙인다 — pub_time_html이 비어있는
     # (pub_date 없는 옛 기사) 경우엔 구분점 없이 원문보기만 남긴다.
     pub_time_html = _format_pub_time(article, show_relative_time)
@@ -2863,7 +2893,7 @@ def render_article(
         f"{row_mark}>"
         "<details>"
         "<summary>"
-        f'<div class="title-row">{checkbox_html}<span class="title-line">{line_html}</span>{photo_badge_html}{finalize_badge_html}</div>'
+        f'<div class="title-row">{checkbox_html}<span class="title-line">{line_html}</span>{sched_badge_html}{photo_badge_html}{finalize_badge_html}</div>'
         f"{refetch_was_html}"
         f'<div class="action-row"{meta_mark}>'
         # [수정: 2026-09-14] 칩을 검색어 앞으로 — 검색어가 남는 자리만큼 잘리게 되면서, 뒤에
@@ -4115,7 +4145,9 @@ def render_page(
         refresh_link_script=refresh_link_script(),
         hide_batch_style=hide_batch_style(),
         hide_batch_script=hide_batch_script(),
+        undo_fab_script=undo_fab_script(),
         photo_override_script=photo_override_script(),
+        schedule_override_script=schedule_override_script(),
         range_select_script=range_select_script(".article-select", ".article"),
         url_add_style=url_add_style(),
         url_add_script=url_add_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT, "confirmed"),
@@ -6285,6 +6317,33 @@ function setPhotoOverride(btn) {
 def photo_override_script() -> str:
     """사진 추정 해제 JS — 중괄호 홑겹 완성 문자열(확정본·초안·정기 보관함 공용)."""
     return PHOTO_OVERRIDE_SCRIPT % {"host": SETTINGS_SERVER_HOST, "port": SETTINGS_SERVER_PORT}
+
+
+# ⋯ 더보기 > 「일정 추정 해제」·「일정 추정 되돌리기」 — 위 사진 해제와 같은 모양·같은 자리다
+# (확정본·초안·정기 보관함 공용). 한쪽을 바꾸면 다른 쪽도 바꾼다.
+SCHEDULE_OVERRIDE_SCRIPT = """
+function setScheduleOverride(btn) {
+  var url = btn.dataset.url;
+  var action = btn.dataset.scheduleAction;
+  btn.disabled = true;
+  fetch("http://%(host)s:%(port)s/set-schedule-override", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({url: url, action: action})
+  }).then(function (res) {
+    if (res.ok) { location.reload(); }
+    else { alert("일정 추정을 바꾸지 못했습니다. 다시 시도해주세요."); btn.disabled = false; }
+  }).catch(function () {
+    alert("일정 추정을 바꾸지 못했습니다 — 앱이 실행 중인지 확인해주세요.");
+    btn.disabled = false;
+  });
+}
+"""
+
+
+def schedule_override_script() -> str:
+    """일정 추정 해제 JS — 중괄호 홑겹 완성 문자열(확정본·초안·정기 보관함 공용)."""
+    return SCHEDULE_OVERRIDE_SCRIPT % {"host": SETTINGS_SERVER_HOST, "port": SETTINGS_SERVER_PORT}
 
 
 def generate_waiting_page() -> Path:

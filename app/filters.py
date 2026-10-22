@@ -134,11 +134,72 @@ def photo_badge_tip(title: str, url: str = "", fetch_body: bool = True) -> str:
 # 일정 정도 침해")는 안 걸린다. **수집·확정본·소제목 분류 어디에도 안 쓴다** — 오직
 # 홈의 주요 주제 순위 계산에서만 걸러 쓴다(HISTORY.md "홈 화면 재구성" 참고).
 _SCHEDULE_LISTING_RE = re.compile(r"^\s*[\[\(<《【〔][^\]\)>》】〕]{0,20}일정[^\]\)>》】〕]{0,10}[\]\)>》】〕]")
+# 제목 맨 앞 말머리 그 자체(괄호 안 글자) — 툴팁에 실제로 붙은 말머리를 적는 데 쓴다.
+_SCHEDULE_HEAD_RE = re.compile(r"^\s*[\[\(<《【〔]([^\]\)>》】〕]{1,34})[\]\)>》】〕]")
+# 「일정」이라는 낱말은 없지만 같은 틀로 매일 나오는 일정 나열 말머리 — **실측으로만 채운다**
+# (사진 표식 층 PHOTO_TAG_RE와 같은 방식). 공백을 지우고 대조하므로 「오늘의 국감」·
+# 「오늘의국감」이 같이 걸린다. 맨 「[국감]」·「[2026 국감]」은 **넣지 않는다** — 그 말머리는
+# 사진·일반 기사가 섞여 있어(실측 329건) 「국감」만으로는 못 가른다.
+_SCHEDULE_EXTRA_HEADS = {"오늘의국감", "내일의국감"}
 
 
-def is_schedule_listing(title: str) -> bool:
-    """제목 맨 앞 말머리 안에 "일정"이 있는 정형 일정 나열 기사인지 판정한다."""
-    return bool(_SCHEDULE_LISTING_RE.match(title))
+def _schedule_override(url: str) -> Optional[bool]:
+    """담당자가 직접 적어 둔 일정 판정(app.schedule_overrides). 늦게 읽어 순수 도구인 이
+    모듈이 import 시점에 저장소를 끌어오지 않게 한다 — _manual_verdict와 같은 방식이다."""
+    if not url:
+        return None
+    from app import schedule_overrides
+    return schedule_overrides.schedule_override(url)
+
+
+def schedule_tag_text(title: str) -> str:
+    """일정으로 잡힌 제목의 **실제 말머리**(괄호 안 글자). 아니면 빈 문자열."""
+    match = _SCHEDULE_HEAD_RE.match(title or "")
+    if not match:
+        return ""
+    head = match.group(1).strip()
+    if "일정" in head or head.replace(" ", "") in _SCHEDULE_EXTRA_HEADS:
+        return head
+    return ""
+
+
+def schedule_badge_tip(title: str) -> str:
+    """📅 일정 배지의 툴팁 문구 — 화면 여섯이 함께 쓴다(photo_badge_tip과 같은 자리).
+
+    배지 글자가 「일정」 한 낱말이라, **실제로 붙은 말머리**를 여기서 적는다. 반환값은
+    제목에서 온 글자를 담으므로 속성에 넣을 땐 이스케이프한다.
+    """
+    head = schedule_tag_text(title)
+    if head:
+        return f"제목 맨 앞 말머리가 「{head}」인 정형 일정 기사입니다"
+    return "정형 일정 기사입니다"
+
+
+def is_schedule_listing(title: str, url: str = "") -> bool:
+    """제목 맨 앞 말머리로 정형 일정 나열 기사인지 판정한다.
+
+    **표식 판정 하나뿐이고 추정 층이 없다** — 그래서 화면 글자도 「일정 추정」이 아니라
+    「일정」이다(「인사기사 제외」와 같은 문법. CLAUDE.md 「사진·인사 기사」 절 참고).
+    말머리 없이 같은 틀로 나오는 기사(머니투데이 「오프라인 헤드라인-22일」 등)와 일정이
+    아닌 모음 기사(「[연합뉴스 이 시각 헤드라인]」·「[게시판]」·「[전국 주요 신문 사설]」)는
+    **일부러 안 잡는다**(2026-10-22 담당자 결정 — 보류).
+
+    맨 앞에 담당자가 직접 끈 기사(app.schedule_overrides)가 있고, 없을 때만 앱이 판정한다.
+    여기 한 곳에 두면 화면 여섯·수시 「일정 기사 제외」·기관 기사 찾기 「일정 제외」·홈
+    「오늘의 주요 주제」 순위가 저절로 따라온다.
+    """
+    manual = _schedule_override(url)
+    if manual is not None:
+        return manual
+    if _SCHEDULE_LISTING_RE.match(title or ""):
+        return True
+    head = _SCHEDULE_HEAD_RE.match(title or "")
+    return bool(head and head.group(1).strip().replace(" ", "") in _SCHEDULE_EXTRA_HEADS)
+
+
+def article_is_schedule_listing(article: dict) -> bool:
+    """기사 dict로 묻는 길 — 제목과 주소를 함께 넘긴다(화면들이 쓰는 입구)."""
+    return is_schedule_listing(article.get("title", ""), article.get("url", ""))
 
 
 def sort_scoop_first(articles: list[dict]) -> list[dict]:

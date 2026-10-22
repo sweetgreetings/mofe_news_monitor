@@ -33,7 +33,8 @@ from app.config import (
     FONT_STACK,
     PALETTE,
 )
-from app.filters import HEADLINE_TAG_RE, headline_kind, looks_like_photo_caption, photo_badge_tip
+from app.filters import (HEADLINE_TAG_RE, headline_kind, is_schedule_listing,
+                         looks_like_photo_caption, photo_badge_tip, schedule_badge_tip)
 from app.excel_export import sanitize_filename_part
 from app.icons import icon
 from app.labels import load_labels
@@ -193,7 +194,7 @@ def _is_photo(article: dict) -> bool:
 
 # 필터 줄. **사진만 「빼고 보기」 방향이다** — 오늘 전체 기사의 다섯 칸은 전부 「~만 보기」인데,
 # 여기선 세로선으로 갈라 두어 다른 축으로 읽힌다(사진만 골라 볼 일이 거의 없다).
-AGENCY_ARCHIVE_FILTERS = _FILTERS = ("major", "scoop", "flash", "nophoto")
+AGENCY_ARCHIVE_FILTERS = _FILTERS = ("major", "scoop", "flash", "nophoto", "nosched")
 
 
 def _tally(article: dict, allowed: frozenset) -> dict:
@@ -204,6 +205,8 @@ def _tally(article: dict, allowed: frozenset) -> dict:
         "scoop": kind == "단독",
         "flash": kind == "속보",
         "photo": _is_photo(article),
+        # 📅 일정 추정 — 판정은 공용 is_schedule_listing 그대로다(말머리 하나라 비용이 없다).
+        "sched": is_schedule_listing(article.get("title") or "", article.get("url") or ""),
     }
 
 
@@ -216,6 +219,8 @@ def _passes(hits: dict, on: dict) -> bool:
     ):
         return False
     if on["nophoto"] and hits["photo"]:
+        return False
+    if on["nosched"] and hits["sched"]:
         return False
     return True
 
@@ -249,7 +254,7 @@ def _collect(
     `only_date`를 주면 그 하루만 읽는다(지연 로딩 조각 · 예산 없음).
     """
     days, total, spent, raw_total = [], 0, 0, 0
-    counts = {"major": 0, "scoop": 0, "flash": 0, "photo": 0}
+    counts = {"major": 0, "scoop": 0, "flash": 0, "photo": 0, "sched": 0}
     today = datetime.now().strftime("%Y-%m-%d")
     for date_str in available_dates():
         if only_date is not None:
@@ -270,7 +275,7 @@ def _collect(
             if not _passes(hits, on):
                 continue
             total += 1
-            rows.append(dict(merged, _photo=hits["photo"]))
+            rows.append(dict(merged, _photo=hits["photo"], _sched=hits["sched"]))
         if not rows:
             continue
         # 날짜는 통째로 그리거나 통째로 미룬다 — 반만 그리면 그게 곧 예전의 「잘림」이다.
@@ -429,7 +434,14 @@ def _row_html(
         if photo
         else ""
     )
-    cls = "art is-photo" if photo else "art"
+    # 📅 일정 추정 — 확정본과 같은 칩. 이 화면은 읽기 전용이라 끄는 길은 없다(결과만 따라온다).
+    sched = bool(article.get("_sched"))
+    if sched:
+        badge = (
+            f'<span class="sched-badge" title="{html.escape(schedule_badge_tip(raw_title))}">'
+            f'{icon("calendar")} 일정 추정</span>'
+        ) + badge
+    cls = "art" + (" is-photo" if photo else "") + (" is-sched" if sched else "")
     head = (
         '<div class="title-row">'
         f'<div class="a-title">{outlet_html}{title}{badge}{labs}</div>'
@@ -533,12 +545,14 @@ _FILTER_LABELS = [
     ("scoop", "[단독]", "scoop"),
     ("flash", "[속보]", "flash"),
     ("nophoto", "사진 추정 제외", "photo"),
+    ("nosched", "일정 추정 제외", "sched"),
 ]
 _FILTER_TIPS = {
     "major": "설정 「언론사 선택 및 순서 지정」에서 체크한 언론사만 남깁니다",
     "scoop": "제목 맨 앞에 [단독]이 붙은 기사만",
     "flash": "제목 맨 앞에 [속보]가 붙은 기사만",
     "nophoto": "사진과 설명 한 문장뿐인 것으로 보이는 기사를 목록에서 뺍니다",
+    "nosched": "제목 맨 앞에 [오늘의 국회일정] 같은 말머리가 붙은 기사를 목록에서 뺍니다",
 }
 _FILTER_LOCKED_TIP = "아직 스크랩 언론사가 지정되지 않았어요 (설정에서 선택하면 활성화됩니다)"
 
@@ -586,7 +600,8 @@ def render_agency_archive_page(
             f'<input type="checkbox" name="{key}" value="1"{" checked" if on[key] else ""}'
             f'{" disabled" if locked.get(key) else ""}'
             ' onchange="this.form.submit()" />'
-            f'{icon("camera") if key == "nophoto" else ""}{html.escape(label)}'
+            f'{icon("camera") if key == "nophoto" else ""}'
+            f'{icon("calendar") if key == "nosched" else ""}{html.escape(label)}'
             f'<span class="n">{counts[count_key]}</span></label>'
         )
         for key, label, count_key in _FILTER_LABELS
@@ -767,9 +782,12 @@ _TEMPLATE = """<!DOCTYPE html>
   /* 사진 추정 — 확정본과 같은 값(행 흐리게 + 알약, 마우스를 올리면 또렷). */
   .art.is-photo {{ opacity: 0.55; }}
   .art.is-photo:hover {{ opacity: 1; }}
-  .photo-badge {{ display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-pill);
-    font-size: var(--fs-xs); font-weight: 600; color: {text_soft}; background: {bg};
+  .art.is-sched {{ opacity: 0.55; }}
+  .art.is-sched:hover {{ opacity: 1; }}
+  .photo-badge, .sched-badge {{ display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 1px 6px; border-radius: var(--r-pill);
+    font-size: var(--fs-2xs); font-weight: 600; color: {text_soft}; background: {bg};
     border: 1px solid {border}; white-space: nowrap; }}
+  .photo-badge .ic, .sched-badge .ic {{ width: 0.95em; height: 0.95em; vertical-align: -0.1em; }}
   /* 말머리는 배지 없이 제목 글자색(확정본·오늘 전체 기사와 같은 값). */
   .t-scoop {{ color: {scoop_text}; font-weight: 800; }}
   .t-flash {{ color: {flash_text}; font-weight: 600; }}
@@ -921,7 +939,7 @@ function loadAgencyDay(details) {{
   var p = new URLSearchParams();
   p.set('date', details.dataset.date);
   if (q.get('q')) {{ p.set('q', q.get('q')); }}
-  ['major', 'scoop', 'flash', 'nophoto'].forEach(function (k) {{
+  ['major', 'scoop', 'flash', 'nophoto', 'nosched'].forEach(function (k) {{
     if (q.get(k)) {{ p.set(k, '1'); }}
   }});
   fetch('/agency-archive/day?' + p.toString())

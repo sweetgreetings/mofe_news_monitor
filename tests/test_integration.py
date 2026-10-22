@@ -22,7 +22,7 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app import agency_archive, alert_groups, alerted_urls, config, credentials, api_usage, breaking_alert, breaking_alert_sender, breaking_alert_state, confirm_send, curation, custom_groups, draft_articles, draft_seen, history_renderer, landing_renderer, llm_classifier, naver_api, preview_cache, preview_order, preview_renderer, renderer, scheduler, scraper, settings, storage, telegram_bot, telegram_recipients, negative_guess, today_cuts, auto_classify_turn, photo_body, breaking_burst, send_log, photo_overrides, manual_keyword_note  # noqa: E402
+from app import agency_archive, alert_groups, alerted_urls, config, credentials, api_usage, breaking_alert, breaking_alert_sender, breaking_alert_state, confirm_send, curation, custom_groups, draft_articles, draft_seen, history_renderer, landing_renderer, llm_classifier, naver_api, preview_cache, preview_order, preview_renderer, renderer, scheduler, scraper, settings, storage, telegram_bot, telegram_recipients, negative_guess, today_cuts, auto_classify_turn, photo_body, breaking_burst, send_log, photo_overrides, schedule_overrides, manual_keyword_note  # noqa: E402
 import main  # noqa: E402
 
 _FIXTURE_BY_KEYWORD = {
@@ -5066,8 +5066,9 @@ def _photo_badge_declarations(src: str, name: str = "") -> set:
 
     # 줄 맨 앞에서 시작하는 규칙만 — `body.photo-gather .photo-badge {{ display: none; }}`
     # (사진 모아 보는 동안 칩을 감추는 줄)이 파일에 따라 먼저 나온다.
-    m = re.search(r"(?m)^\s*\.photo-badge \{\{", src)
-    assert m, f"{name}: .photo-badge 규칙이 아예 없습니다 — 그 화면에선 알약이 맨 글자로 뜹니다"
+    m = re.search(r"(?m)^\s*\.photo-badge, \.sched-badge \{\{", src)
+    assert m, (f"{name}: .photo-badge, .sched-badge 규칙이 아예 없습니다 — "
+               "그 화면에선 알약이 맨 글자로 뜹니다")
     head = m.start()
     body = src[m.end():src.index("}}", m.end())]
     body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)       # 설명 주석은 값이 아니다
@@ -5098,7 +5099,7 @@ def test_photo_badge_css_is_in_every_screen():
 
     # (1) 네 벌의 선언이 같은 값인가 — 기준은 render_article이 사는 renderer.py다.
     base = _photo_badge_declarations(sources["renderer.py"], "renderer.py")
-    assert "border-radius: var(--r-pill)" in base and "font-size: var(--fs-xs)" in base, base
+    assert "border-radius: var(--r-pill)" in base and "font-size: var(--fs-2xs)" in base, base
     for name in screens[1:]:
         got = _photo_badge_declarations(sources[name], name)
         assert got == base, (
@@ -5115,13 +5116,18 @@ def test_photo_badge_css_is_in_every_screen():
         assert ".article.is-photo:hover" in src, f"{name}: 마우스를 올려도 안 또렷해집니다"
         assert ".article.is-photo:has(.more-wrap.is-open)" in src, \
             f"{name}: ⋯ 메뉴를 연 행이 흐린 채로 남습니다 — 그 안에 「사진 추정 해제」가 있습니다"
+        # 📅 일정 추정도 같은 칩·같은 흐림이다(render_article이 두 칩을 함께 내보낸다).
+        assert ".article.is-sched {{ opacity: 0.55; }}" in src, f"{name}: 일정 행 흐림 규칙이 없습니다"
+        assert ".article.is-sched:has(.more-wrap.is-open)" in src, \
+            f"{name}: ⋯ 메뉴를 연 일정 행이 흐린 채로 남습니다 — 그 안에 「일정 추정 해제」가 있습니다"
 
     # 다섯째 — 기관 기사 찾기는 선택자(.art)도 레이아웃도 달라 값까지 같지 않다.
     agency = (root / "app" / "agency_archive_renderer.py").read_text(encoding="utf-8")
     assert ".art.is-photo {{ opacity: 0.55; }}" in agency, "기관 기사 찾기: 흐림 값이 다릅니다"
     assert ".art.is-photo:hover" in agency, "기관 기사 찾기: 마우스를 올려도 안 또렷해집니다"
+    assert ".art.is-sched {{ opacity: 0.55; }}" in agency, "기관 기사 찾기: 일정 행 흐림 값이 다릅니다"
     agency_badge = _photo_badge_declarations(agency, "agency_archive_renderer.py")
-    assert "border-radius: var(--r-pill)" in agency_badge and "font-size: var(--fs-xs)" in agency_badge, \
+    assert "border-radius: var(--r-pill)" in agency_badge and "font-size: var(--fs-2xs)" in agency_badge, \
         f"기관 기사 찾기: 알약이 아닙니다 {sorted(agency_badge)}"
 
     # (2) 그린 화면에 마크업과 규칙이 **함께** 있는가.
@@ -5140,12 +5146,86 @@ def test_photo_badge_css_is_in_every_screen():
     for screen, page in (("확정본", confirmed), ("정기 보관함", archive)):
         assert 'class="photo-badge"' in page, f"{screen}: 사진 기사인데 배지 마크업이 없습니다"
         assert "article is-photo" in page, f"{screen}: 사진 행에 is-photo가 안 붙었습니다"
-        assert ".photo-badge {" in page, \
+        assert ".photo-badge, .sched-badge {" in page, \
             f"{screen}: 배지를 내보내면서 CSS는 안 냅니다 — 화면엔 서식 없는 맨 글자로 뜹니다"
         assert ".article.is-photo { opacity: 0.55; }" in page, \
             f"{screen}: 배지는 있는데 행이 안 흐려집니다"
 
-    print("61) 📷 사진 추정 알약: 통과 (네 벌 같은 값, 흐림·또렷 조건, 그린 화면에 마크업+CSS 함께)")
+    print("61) 📷 사진 추정 · 📅 일정 추정 알약: 통과 (네 벌 같은 값, 흐림·또렷 조건, 그린 화면에 마크업+CSS 함께)")
+
+
+def test_schedule_badge():
+    """📅 일정 추정 — **판정이 `is_schedule_listing()` 한 곳**인지.
+
+    사진 추정과 같은 계약이다: 한 곳에서 판정하고 한 곳에서 담당자 해제를 입히므로
+    화면 여섯·수시 새 수집 「일정 추정 제외」·기관 기사 찾기 「일정 추정 제외」·홈
+    「오늘의 주요 주제」 순위가 코드를 더 안 고쳐도 따라온다.
+
+    범위도 함께 지킨다 — **말머리에 「일정」이 든 것과 [오늘의 국감]·[내일의 국감] 둘뿐**이다.
+    2026-10-22 담당자 결정으로 모음 기사([연합뉴스 이 시각 헤드라인]·[게시판]·
+    [오늘의 채권ㆍ외환 메모]·[전국 주요 신문 사설])와 말머리 없는 기사(머니투데이
+    오프라인 헤드라인)는 **보류**다 — 여기가 조용히 넓어지면 읽을 기사가 흐려진다.
+    """
+    _require_isolation()
+    from app.filters import is_schedule_listing, schedule_badge_tip
+    from app.schedule_overrides import set_schedule_override, is_schedule_cleared
+    from app.renderer import render_article
+
+    # (1) 범위 — 걸려야 하는 것과 보류한 것(실측 제목 그대로).
+    for title in ("[오늘의 국회일정] (22일, 목)", "[오늘의 주요일정]경제(10월22일목요일)",
+                  "[오늘의 국감](22일)", "[내일의 국감](8일)",
+                  "[오늘의 국감일정] 법사위·정무위·재경위 등 10개 상임위 - 10월 22일",
+                  "[정부 주요 일정] 경제·사회부처 주간 일정 (10월 6일 ~ 10월 8일)",
+                  "[오늘 재경부 등 경제부처 일정]", "[오늘의 주요일정·22일] 헌법재판소 선고"):
+        assert is_schedule_listing(title), f"일정 기사인데 안 걸렸습니다: {title}"
+    for title in ("[연합뉴스 이 시각 헤드라인] - 07:30", "[게시판] 재경부 전략경제자문단 세미나",
+                  "[오늘의 채권ㆍ외환 메모] (10월22일)", "[전국 주요 신문 사설](14일 조간)",
+                  "머니투데이 오프라인 헤드라인-22일"):
+        assert not is_schedule_listing(title), f"보류한 갈래가 걸렸습니다: {title}"
+    for title in ("[국감] 재정경제부 국정감사", "[2026 국감] 이형일 부총리 다시 국감대에",
+                  "청와대 \"대통령 임명권 일정 정도 침해\"",
+                  "이형일 부총리, 취임 첫 일정은 대미 투자 국회 보고",
+                  "고양시의회, 제307회 임시회 의사일정 마무리"):
+        assert not is_schedule_listing(title), f"일반 기사가 일정으로 잡혔습니다: {title}"
+    assert "오늘의 국회일정" in schedule_badge_tip("[오늘의 국회일정] (22일, 목)"), \
+        "툴팁이 실제로 붙은 말머리를 안 적습니다"
+
+    sched = {"url": "https://n.news.naver.com/mnews/article/001/31", "outlet": "뉴스1",
+             "title": "[오늘의 국회일정] (22일, 목)", "summary": "국회 일정",
+             "pub_date": "2026-10-22T05:00:00+09:00"}
+    plain = {"url": "https://n.news.naver.com/mnews/article/001/32", "outlet": "조세일보",
+             "title": "국회 재경위, 오늘 국세청·관세청 등 종합 국정감사", "summary": "국정감사",
+             "pub_date": "2026-10-22T05:11:00+09:00"}
+
+    # (2) 화면 — 흐림·칩·⋯ 메뉴 줄은 일정으로 잡힌 행에만.
+    html_sched = render_article(sched, [])
+    assert 'class="sched-badge"' in html_sched and "일정 추정</span>" in html_sched, "칩이 없습니다"
+    assert "is-sched" in html_sched, "일정 행이 안 흐려집니다"
+    assert "일정 추정 해제" in html_sched, "일정 행에 끄는 자리가 없습니다"
+    html_plain = render_article(plain, [])
+    assert "sched-badge" not in html_plain and "일정 추정 해제" not in html_plain, \
+        "일정과 무관한 행에까지 칩·메뉴 줄이 붙었습니다"
+
+    # (3) 담당자가 끄면 **한 곳에서** 입혀져 모든 길이 따라온다.
+    set_schedule_override(sched["url"], False)
+    assert not is_schedule_listing(sched["title"], sched["url"]), "해제가 판정을 못 이겼습니다"
+    assert is_schedule_cleared(sched["url"]), "해제 기록이 안 남았습니다"
+    html_cleared = render_article(sched, [])
+    assert "is-sched" not in html_cleared and "일정 추정</span>" not in html_cleared, \
+        "해제했는데 화면이 아직 흐리게 그립니다"
+    assert "일정 추정 되돌리기" in html_cleared, "해제한 행에 되돌리는 자리가 없습니다"
+
+    # 수시 새 수집 「일정 추정 제외」도 같은 판정을 본다 — 끈 기사는 여기서도 안 걸린다.
+    from app.adhoc.collector import _apply_options
+    # _apply_options는 언론사 순위로 다시 정렬하므로 **무엇이 남았는가**만 본다.
+    kept = {a["url"] for a in _apply_options([sched, plain], {"exclude_schedule": True})}
+    assert kept == {sched["url"], plain["url"]}, \
+        "수집 제외가 해제를 못 봤습니다 — 판정이 두 벌로 갈렸습니다"
+    set_schedule_override(sched["url"], None)
+    kept = {a["url"] for a in _apply_options([sched, plain], {"exclude_schedule": True})}
+    assert kept == {plain["url"]}, "되돌렸는데 「일정 추정 제외」가 안 걸러냅니다"
+
+    print("62) 📅 일정 추정: 통과 (말머리 범위·보류 갈래 제외·오탐 없음, 칩·흐림·⋯ 해제, 한 곳에서 입힘)")
 
 
 def test_agency_archive_filters():
@@ -6925,6 +7005,7 @@ if __name__ == "__main__":
         test_title_watch_alert,
         test_photo_override_is_one_place,
         test_photo_badge_css_is_in_every_screen,
+        test_schedule_badge,
         test_outlet_override_is_one_place,
         test_agency_archive_filters,
         test_agency_archive_keeps_every_date,
@@ -7046,6 +7127,10 @@ if __name__ == "__main__":
                     (photo_overrides, "PHOTO_OVERRIDES_FILE", tmp_dir / "photo_overrides.json"),
                     (photo_overrides, "_cache", None),
                     (photo_overrides, "_cache_sig", None),
+                    # 담당자가 직접 끈 일정 추정 — 사진과 같은 이유로 경로와 캐시를 함께 비운다.
+                    (schedule_overrides, "SCHEDULE_OVERRIDES_FILE", tmp_dir / "schedule_overrides.json"),
+                    (schedule_overrides, "_cache", None),
+                    (schedule_overrides, "_cache_sig", None),
                 ):
                     more_patches.enter_context(patch.object(target, name, value))
                 # [추가: 2026-09-17] LLM 분류 캐시도 임시 폴더로 — 예전엔 회차를 저장하는
