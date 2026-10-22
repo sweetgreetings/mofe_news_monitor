@@ -2500,6 +2500,94 @@ def test_adhoc_screen_name():
     print("43) 수시 원본 이름: 통과 (검색어가 이름, 옆 원본이 보낸 건 「이미 보냄」, 이름은 확정본에서)")
 
 
+def test_adhoc_raw_filter_row():
+    """수시 원본의 「거르기」 줄 — 체크 하나 + 종류 칩 셋(2026-10-22).
+
+      1) 왼쪽은 체크(어디까지 볼까), 세로선 오른쪽은 칩(무엇이 섞여 있나)
+      2) 칩 건수와 행 표식은 **같은 판정**(_raw_kinds_of)에서 나오고, 0건인 칩은 안 그린다
+      3) 「등록 언론사만」은 설정의 체크 그대로고, 0곳이면 잠근 채 한 건도 안 거른다
+      4) 보기 필터일 뿐 — 복사·txt는 한 건도 안 줄어든다
+      5) 가려 둔 기사는 「모든 기사 확정본으로」로도 안 나간다
+    """
+    _require_isolation()
+    from app.adhoc import card, renderer as adhoc_renderer
+
+    with tempfile.TemporaryDirectory() as tmp:
+        adhoc_dir = Path(tmp)
+        for sub in ("cards", "trash", "undo"):
+            (adhoc_dir / sub).mkdir()
+        with patch.object(card, "CARDS_DIR", adhoc_dir / "cards"), \
+             patch.object(card, "TRASH_DIR", adhoc_dir / "trash"), \
+             patch.object(card, "ISSUES_FILE", adhoc_dir / "issues.json"):
+            now = datetime.now().replace(microsecond=0)
+            today = now.strftime("%Y-%m-%d")
+            issue = card.get_or_create_issue("예산")
+
+            def art(n, outlet, title):
+                return {"outlet": outlet, "title": title, "url": f"https://r.x/{n}", "summary": "예산 기사 본문",
+                        "pub_date": f"{today}T14:0{n}:00+09:00", "matched_keywords": ["예산"],
+                        "group": None, "order": None, "hidden": False,
+                        "added_at": f"{today}T15:05:00", "added_by": "collect"}
+
+            raw = card.new_card(issue["id"], "예산", "11:00", "15:05", ["예산"], now=now)
+            raw["articles"] = [
+                art(1, "KBS", "예산안 심사 본격화"),
+                art(2, "뉴스1", "[오늘의 일정] 10월 22일 국회"),
+                art(3, "동네신문", "[인사] 재정경제부"),
+                art(4, "동네신문", "지역 예산 토론회"),
+            ]
+            card.save_card(raw)
+            saved = card.load_card(raw["id"])
+
+            def page(outlets):
+                # 렌더러가 **이름으로** 가져다 쓰는 load_settings를 갈아끼운다 —
+                # app.settings 쪽을 갈면 이 모듈의 참조는 그대로라 아무 일도 안 일어난다.
+                with patch.object(adhoc_renderer, "load_settings",
+                                  lambda: {"outlet_order": list(outlets), "keyword_groups": []}):
+                    return adhoc_renderer.render_card_page(saved)
+
+            p = page(["KBS", "뉴스1"])
+
+            # 1) 줄이 있고, 체크와 칩이 세로선으로 갈린다
+            assert '<div class="frow">' in p and 'id="major-only"' in p, "원본에 거르기 줄이 없음"
+            assert '<span class="fsep">' in p, "체크와 칩을 가르는 세로선이 없음"
+
+            # 2) 칩 건수 = 행 표식 수. 판정이 두 군데로 갈리면 「칩엔 3건인데 모아 보니 2건」이 된다.
+            for key, cls, _ic, name, _tip in adhoc_renderer._RAW_KINDS:
+                n = sum(1 for a in saved["articles"] if key in adhoc_renderer._raw_kinds_of(a))
+                rows = len(re.findall(r'<div class="article[^"]*\b' + cls + r'\b', p))
+                assert rows == n, f"{name} 칩 건수({n})와 행 표식({rows})이 어긋남"
+                # 칩이 있는지는 마크업으로 본다 — 화면 글자는 CSS 주석에도 적혀 나간다.
+                chip = f'data-kind="{key}"'
+                if n:
+                    assert chip in p and f"{name} ({n})" in p, f"{name} 칩이 안 그려짐"
+                else:
+                    assert chip not in p, f"{name}이 0건인데 칩이 그려짐"
+            assert "일정 추정 (1)" in p and "인사 (1)" in p, "말머리 기사를 못 잡음"
+
+            # 3) 등록 언론사만 — 설정의 체크 그대로(동네신문 2건이 비등록)
+            assert '등록 언론사만 <span class="n">2</span>' in p, "등록 언론사 건수가 설정과 다름"
+            assert len(re.findall(r'<div class="article[^"]*\bis-nonmajor\b', p)) == 2, \
+                "비등록 언론사 행 표식이 어긋남"
+            locked = page([])
+            assert "disabled> 등록 언론사만" in locked, "체크한 언론사가 0곳인데 칸이 안 잠김"
+            assert not re.search(r'<div class="article[^"]*\bis-nonmajor\b', locked), \
+                "체크한 언론사가 0곳인데 기사를 거르고 있음"
+
+            # 4) 보기 필터일 뿐 — 가져가기 텍스트는 그대로다
+            text = adhoc_renderer.build_adhoc_plain_text(saved)
+            assert text.count("https://r.x/") == 4, "거르기 줄이 복사 텍스트를 줄임"
+
+            # 5) 가려 둔 기사는 「모든 기사 확정본으로」로도 안 나간다
+            assert "major-only" in p and "postWithUrls('/adhoc/card/send-to-bundle', fields, urls)" in p, \
+                "가린 기사를 빼고 보내는 길이 없음"
+
+            # 모아 보기는 종류를 갈아타는 한 벌 — 확정본의 알약도 같은 함수를 쓴다
+            assert "function toggleKindGather(" in p and "ADHOC_KINDS" in p, "종류별 모아 보기 JS가 없음"
+            assert "function togglePhotoGather() { toggleKindGather('photo'); }" in p, \
+                "확정본 알약이 쓰던 입구가 사라짐"
+
+
 def test_adhoc_raw_trash_and_rounds():
     """수집 원본의 🗑 · 「처리 안 한 N건 전부 확정본으로」 · 불러올 때마다 새 확정본(2026-09-15).
 
@@ -6824,6 +6912,7 @@ if __name__ == "__main__":
         test_adhoc_move_to_other_issue_bundle,
         test_destination_switches,
         test_adhoc_raw_trash_and_rounds,
+        test_adhoc_raw_filter_row,
         test_editorial_filter,
         test_telegram_recipients_receive_and_notify,
         test_telegram_bot_name,

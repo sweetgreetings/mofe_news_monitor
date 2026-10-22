@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>수시 원본 — 거르기 줄(체크 하나 + 칩 셋) 시안</title>
+<style>
+  /* 토큰·기사 행·툴바·알약·모아 보기 띠는 돌아가는 /adhoc/card(원본)에서 그대로.
+     새로 만든 건 「거르기」 줄(.frow)과 종류 칩(.kind-chip) — 칩은 지금 쓰고 있는
+     📷 사진 추정 알약(.photo-gather-btn)을 그대로 늘린 것이다. */
+  :root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+    --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px;
+    --h-sm: 24px; --h-tb: 28px; --h-md: 30px; --chk-md: 16px; --chk-sm: 14px; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+
+  /* ── 시안 껍데기 (화면엔 없는 것) ── */
+  .mk { max-width: 940px; margin: 0 auto; padding: 28px 20px 80px; }
+  .mk h1 { font-size: 1.45rem; color: #1E3A5F; margin: 0 0 6px; }
+  .mk .lead { color: #4B5563; font-size: var(--fs-md); line-height: 1.75; margin: 0 0 26px; }
+  .sec { margin: 34px 0 0; }
+  .sec > h2 { font-size: var(--fs-lg); color: #1E3A5F; margin: 0 0 4px; }
+  .sec > .why { color: #6B7280; font-size: var(--fs-sm); margin: 0 0 10px; line-height: 1.75; }
+  .pick { display: inline-block; font-size: var(--fs-xs); font-weight: 700; color: #146B5E;
+    background: #E3F1EE; border: 1px solid rgba(20,107,94,.24); border-radius: var(--r-pill);
+    padding: 1px 9px; margin-left: 6px; vertical-align: 2px; }
+  .alt { display: inline-block; font-size: var(--fs-xs); font-weight: 700; color: #92400E;
+    background: #FFFBEB; border: 1px solid #FDE68A; border-radius: var(--r-pill);
+    padding: 1px 9px; margin-left: 6px; vertical-align: 2px; }
+  .screen { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 20px 22px; }
+  .memo { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 16px 20px; }
+  .memo li { font-size: var(--fs-md); color: #1F2937; line-height: 1.85; margin: 0 0 6px; }
+  .memo b { color: #1E3A5F; }
+  .memo .q { color: #92400E; }
+  .cap { font-size: var(--fs-xs); color: #6B7280; margin: 0 0 8px; }
+
+  /* ── 돌아가는 화면에서 그대로 ── */
+  .report-head { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; font-size: var(--fs-xl);
+    font-weight: 700; color: #1E3A5F; }
+  .chip { background: #F1F5F9; border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 3px 11px; color: #6B7280; }
+  .chip.raw-tag { font-weight: 700; font-size: var(--fs-sm); margin-right: 10px; }
+  .meta-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-size: var(--fs-sm); }
+
+  .btn { font: inherit; font-size: var(--fs-md); height: var(--h-md); padding: 0 14px; border-radius: var(--r-md);
+    cursor: pointer; border: 1px solid #2563EB; background: #2563EB; color: #FFFFFF; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+  .btn.sm { font-size: var(--fs-md); height: var(--h-tb); padding: 0 14px; }
+  .btn.mute { background: #FFFFFF; color: #6B7280; border-color: #E5E7EB; }
+  .btn.send-all { background: #FFFFFF; color: #146B5E; border-color: rgba(20, 107, 94, 0.24); }
+  .btn.send-all:hover { background: #E3F1EE; }
+  .btn.danger { background: #FFFFFF; color: #DC2626; border-color: #DC2626; }
+
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 11px 0;
+    border-top: 1px solid #E5E7EB; border-bottom: 1px solid #E5E7EB; margin: 16px 0; }
+  .toolbar .export-links { display: inline-flex; align-items: center; margin-left: auto; }
+  .toolbar .export-links button { font: inherit; font-size: var(--fs-md); background: transparent; border: none;
+    color: #4B5563; font-weight: 500; height: var(--h-tb); padding: 0 8px; border-radius: var(--r-md); cursor: pointer; }
+  .toolbar .export-links button:hover { color: #2563EB; text-decoration: underline; text-underline-offset: 3px; }
+
+  /* ★ 거르기 줄 — 왼쪽은 체크(범위를 좁힌다), 세로선 오른쪽은 칩(이 목록에 섞인 종류). */
+  .frow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -6px 0 10px; }
+  .frow .flabel { font-size: var(--fs-sm); color: #4B5563; font-weight: 600; flex: none; margin-right: 2px; }
+  .frow label { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-sm);
+    color: #1F2937; cursor: pointer; margin-right: 4px; }
+  .frow input[type="checkbox"] { flex: none; width: var(--chk-sm); height: var(--chk-sm); margin: 0;
+    accent-color: #2563EB; cursor: pointer; }
+  .frow .n { font-size: var(--fs-xs); color: #6B7280; }
+  .frow .fsep { width: 1px; height: 14px; background: #E5E7EB; margin: 0 4px; }
+  .frow label.off { color: #9CA3AF; cursor: not-allowed; }
+  .frow label.off input { cursor: not-allowed; }
+  .frow .lock { font-size: var(--fs-xs); color: #6B7280; }
+  .frow .lock a { color: #2563EB; }
+
+  /* ★ 종류 칩 — 지금 쓰는 📷 사진 추정 알약(.photo-gather-btn)의 값 그대로.
+     꺼짐 = 흰 알약 + 회색 테두리, 켜짐 = 채운 파랑. 「무언가를 한다」는 네모 버튼과 섞이지 않는다. */
+  .kind-chip { font: inherit; font-size: var(--fs-md); height: var(--h-tb); padding: 0 12px;
+    border-radius: var(--r-pill); background: #FFFFFF; color: #4B5563; border: 1px solid #E5E7EB;
+    font-weight: 500; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+  .kind-chip:hover { background: #EFF6FF; color: #2563EB; border-color: #BFDBFE; }
+  .kind-chip.is-on, .kind-chip.is-on:hover { background: #2563EB; color: #FFFFFF; border-color: #2563EB; }
+  .kind-chip .kn { font-size: var(--fs-sm); opacity: .85; }
+  /* B안(빼기)에서 켜진 칩 — 「지금 빠져 있다」는 뜻이라 글자에 취소선을 긋는다. */
+  .kind-chip.is-cut { background: #F3F4F6; color: #6B7280; border-color: #E5E7EB; text-decoration: line-through; }
+  .kind-chip.is-cut .kn { text-decoration: none; }
+
+  /* 모아 보기 띠 — 지금 📷 사진 추정을 켰을 때 뜨는 그 띠 그대로 */
+  .photo-gather-strip { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #EFF6FF;
+    border: 1px solid #BFDBFE; border-radius: var(--r-lg); padding: 9px 12px; margin: 4px 0 6px; }
+  .photo-gather-strip label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); cursor: pointer; }
+  .photo-gather-strip label input { width: var(--chk-md); height: var(--chk-md); margin: 0; accent-color: #2563EB; cursor: pointer; }
+  .photo-gather-strip .pg-msg { font-size: var(--fs-md); color: #1E3A5F; }
+  .photo-gather-strip .pg-sp { flex: 1; }
+
+  h2.sub { color: #1E3A5F; font-size: var(--fs-base); margin: 20px 0 6px; display: flex; align-items: center; gap: 6px; }
+  h2.sub.raw-head { gap: 8px; }
+  h2.sub.raw-head .cnt { font-size: var(--fs-md); color: #1E3A5F; font-weight: 700; }
+  h2.sub.raw-head .of { font-size: var(--fs-sm); color: #6B7280; font-weight: 500; }
+  h2.sub.raw-head .raw-order { font-size: var(--fs-sm); color: #6B7280; font-weight: 500; }
+  .sel-all { display: inline-flex; align-items: center; gap: 6px; margin: 0 4px 0 0;
+    font-size: var(--fs-sm); color: #6B7280; font-weight: 500; cursor: pointer; }
+  .sel-all input { width: var(--chk-md); height: var(--chk-md); margin: 0; accent-color: #2563EB; cursor: pointer; }
+
+  .article { padding: 4px 8px; border-radius: var(--r-md); margin: 6px 0; line-height: 1.5; }
+  .article:hover { background: #F3F4F6; }
+  .article.is-photo { opacity: 0.55; }
+  .article.is-photo:hover { opacity: 1; }
+  .a-top { display: flex; align-items: flex-start; gap: 8px; }
+  .a-title { font-size: var(--fs-base); }
+  .a-title .outlet { color: #6B7280; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  .bulk-chk { width: var(--chk-md); height: var(--chk-md); margin: 3px 3px 0 4px; flex: none;
+    accent-color: #2563EB; cursor: pointer; }
+  .a-bot { display: flex; align-items: center; gap: 8px; margin: 2px 0 0 31px; flex-wrap: wrap; row-gap: 4px;
+    font-size: var(--fs-sm); color: #6B7280; }
+  .a-bot .origin-link { color: #2563EB; text-decoration: none; }
+  .a-acts { display: flex; gap: 4px; align-items: center; margin-left: auto; flex-shrink: 0; }
+  .icon-btn { border: none; background: none; color: #6B7280; cursor: pointer; padding: 2px 6px;
+    font-size: 1rem; border-radius: var(--r-sm); line-height: 1; }
+  .a-acts .more-btn { padding: 3px 7px; }
+  .a-acts .more-btn:hover { background: #EFF6FF; color: #2563EB; }
+  .a-acts .hide-btn:hover { color: #DC2626; }
+  .send-split { display: inline-flex; align-items: stretch; border: 1px solid rgba(20, 107, 94, 0.24);
+    border-radius: var(--r-md); flex-shrink: 0; }
+  .send-split .send-go, .send-split .send-more { border: none; background: #E3F1EE; color: #146B5E;
+    font: inherit; font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
+  .send-split .send-go { padding: 3px 9px; border-radius: var(--r-md) 0 0 var(--r-md); min-width: 74px; }
+  .send-split .send-more { padding: 3px 6px; border-left: 1px solid rgba(20, 107, 94, 0.24);
+    border-radius: 0 var(--r-md) var(--r-md) 0; font-size: var(--fs-xs); }
+  .photo-badge { flex-shrink: 0; padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-xs);
+    color: #6B7280; background: #F3F4F6; border: 1px solid #E5E7EB; white-space: nowrap;
+    position: relative; top: -0.15em; }
+  .kw-inline { color: #6B7280; }
+
+  /* 새 수집 폼의 거르기 줄 — 지금 화면 그대로(비교용) */
+  .nrow { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .nrow > .nlabel { font-size: var(--fs-sm); color: #4B5563; font-weight: 600; width: 58px; flex: none; }
+  .nrow label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); color: #1F2937; cursor: pointer; }
+  .nrow input[type="checkbox"] { width: var(--chk-sm); height: var(--chk-sm); margin: 0; accent-color: #2563EB; }
+  .nbox { border: 1px solid #E5E7EB; border-radius: var(--r-lg); background: #F8FAFC; padding: 14px 16px; }
+  .nbox + .nbox { margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="mk">
+
+<h1>수시 원본 — 거르기 줄: 체크 하나 + 칩 셋</h1>
+<p class="lead">
+  <b>왼쪽 체크는 「어디까지 볼까」(범위), 세로선 오른쪽 칩은 「이 목록에 무엇이 섞여 있나」(종류)</b>다.
+  칩은 새로 만든 모양이 아니라 지금 원본 목록 위에 있는 <b>📷 사진 추정 (N)</b> 알약을 셋으로 늘린 것이고,
+  그래서 사진에 관한 컨트롤이 둘로 갈리던 문제가 같이 없어진다(.photo-row 줄이 사라진다).
+  숫자는 오늘 11시 02분 「미래대응기금」 원본 실제값이다 — 64건 · 등록 언론사 26 · 사진 추정 5 · 일정 추정 1 · <b>인사 0</b>.
+</p>
+
+<!-- ───────────────── 기본 모습 ───────────────── -->
+<div class="sec">
+  <h2>기본 — 아무것도 안 켠 모습</h2>
+  <p class="why">
+    인사 기사가 0건이라 <b>인사 칩은 아예 안 그린다</b> — 아무것도 못 거르는 칸을 늘 띄워 두면 그 줄을 안 읽게 된다
+    (지금 📷 사진 추정 알약·「남은 기사만 보기」와 같은 규칙).
+  </p>
+  <div class="screen">
+    <div class="report-head"><span class="chip raw-tag">원본</span>수시 모니터링 11시 02분 기준(미래대응기금)</div>
+    <div class="meta-row"><span class="chip">08:00 ~ 11:02</span><span class="chip">✏️ 편집</span></div>
+
+    <div class="toolbar">
+      <button type="button" class="btn sm send-all">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M9 8V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-2"/><path d="M3 12h13l-3-3"/><path d="m13 15 3-3"/></svg>
+        모든 기사 확정본으로</button>
+      <span class="export-links">
+        <button type="button">복사</button><button type="button">텍스트</button><button type="button">엑셀</button>
+      </span>
+    </div>
+
+    <div class="frow">
+      <span class="flabel">거르기</span>
+      <label title="보냄·이미 보냄·숨김 — 이미 보고서에 들어갔거나 손댄 기사를 가리고 남은 기사만 보여줘요">
+        <input type="checkbox"> 남은 기사만 보기 <span class="n">보냄 3 · 숨김 2</span></label>
+      <label title="설정 「언론사 선택 및 순서 지정」에서 체크한 언론사만 보여줘요">
+        <input type="checkbox"> 등록 언론사만 <span class="n">26</span></label>
+      <span class="fsep"></span>
+      <button type="button" class="kind-chip" title="사진 추정 기사만 한곳에 모아 봐요">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="3.6"/></svg>
+        사진 추정 <span class="kn">5</span></button>
+      <button type="button" class="kind-chip" title="제목 맨 앞에 [오늘의 일정] 같은 말머리가 붙은 기사만 모아 봐요">
+        <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg>
+        일정 추정 <span class="kn">1</span></button>
+    </div>
+
+    <h2 class="sub raw-head">
+      <label class="sel-all"><input type="checkbox"> 전체 선택</label>
+      <span class="cnt">64건</span><span class="raw-order">최신순</span></h2>
+
+    <div class="article">
+      <div class="a-top"><input type="checkbox" class="bulk-chk">
+        <div class="a-title"><span class="outlet">kmaeil.com</span>인천시의회 김대영 위원장, 지방재정 영향 토론회...제도 개선 촉구</div></div>
+      <div class="a-bot">11:00 · 9분 전 · <a class="origin-link" href="#">원문보기</a> · <span class="kw-inline">🔍 미래대응기금</span>
+        <span class="a-acts"><span class="send-split"><button class="send-go">확정본으로</button><button class="send-more">▾</button></span>
+          <button class="icon-btn more-btn">⋯</button><button class="icon-btn hide-btn">🗑</button></span></div>
+    </div>
+    <div class="article is-photo">
+      <div class="a-top"><input type="checkbox" class="bulk-chk">
+        <div class="a-title"><span class="outlet">뉴스1</span>미래대응기금 정책 심포지엄 <span class="photo-badge">📷 사진 추정</span></div></div>
+      <div class="a-bot">10:58 · 11분 전 · <a class="origin-link" href="#">원문보기</a> · <span class="kw-inline">🔍 미래대응기금</span>
+        <span class="a-acts"><span class="send-split"><button class="send-go">확정본으로</button><button class="send-more">▾</button></span>
+          <button class="icon-btn more-btn">⋯</button><button class="icon-btn hide-btn">🗑</button></span></div>
+    </div>
+    <div class="article">
+      <div class="a-top"><input type="checkbox" class="bulk-chk">
+        <div class="a-title"><span class="outlet">부산일보</span>기보 권형택 이사장 취임 100일… “기관체계 개편으로 기술혁신 지원”</div></div>
+      <div class="a-bot">10:52 · 17분 전 · <a class="origin-link" href="#">원문보기</a> · <span class="kw-inline">🔍 미래대응기금</span>
+        <span class="a-acts"><span class="send-split"><button class="send-go">확정본으로</button><button class="send-more">▾</button></span>
+          <button class="icon-btn more-btn">⋯</button><button class="icon-btn hide-btn">🗑</button></span></div>
+    </div>
+    <div class="article">
+      <div class="a-top"><input type="checkbox" class="bulk-chk">
+        <div class="a-title"><span class="outlet">KBS</span>박수영 “미래대응기금, 재경부 의견 묵살하고 졸속 추진…전면 철회해야”</div></div>
+      <div class="a-bot">10:44 · 25분 전 · <a class="origin-link" href="#">원문보기</a> · <span class="kw-inline">🔍 미래대응기금</span>
+        <span class="a-acts"><span class="send-split"><button class="send-go">확정본으로</button><button class="send-more">▾</button></span>
+          <button class="icon-btn more-btn">⋯</button><button class="icon-btn hide-btn">🗑</button></span></div>
+    </div>
+    <div class="article">
+      <div class="a-top"><input type="checkbox" class="bulk-chk">
+        <div class="a-title"><span class="outlet">jeonmae.co.kr</span>[오늘의 일정] 10월 22일 목요일 국회</div></div>
+      <div class="a-bot">09:48 · 1시간 전 · <a class="origin-link" href="#">원문보기</a> · <span class="kw-inline">🔍 미래대응기금</span>
+        <span class="a-acts"><span class="send-split"><button class="send-go">확정본으로</button><button class="send-more">▾</button></span>
+          <button class="icon-btn more-btn">⋯</button><button class="icon-btn hide-btn">🗑</button></span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────── 칩을 누르면 — A안 ───────────────── -->
+<div class="sec">
+  <h2>칩을 누르면 ① 그 종류만 <b>모아 본다</b><span class="pick">결정</span></h2>
+  <p class="why">
+    칩이 채운 파랑이 되고 그 종류만 한 목록으로 모인다. 빼고 싶으면 그 자리에서 <b>전체 선택 → 🗑</b> 한 번 —
+    「확인하고 빼는」 길이라 오탐(사진 추정)이 있어도 안전하다. 끄면 목록이 정확히 제자리로 돌아온다.
+    <b>칩 하나만 켜진다</b>(두 종류를 한꺼번에 모아 보는 건 뜻이 애매하다).
+  </p>
+  <div class="screen">
+    <div class="frow">
+      <span class="flabel">거르기</span>
+      <label><input type="checkbox"> 남은 기사만 보기 <span class="n">보냄 3 · 숨김 2</span></label>
+      <label><input type="checkbox"> 등록 언론사만 <span class="n">26</span></label>
+      <span class="fsep"></span>
+      <button type="button" class="kind-chip is-on">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="3.6"/></svg>
+        사진 추정 <span class="kn">5</span></button>
+      <button type="button" class="kind-chip">
+        <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg>
+        일정 추정 <span class="kn">1</span></button>
+    </div>
+
+    <div class="photo-gather-strip">
+      <label><input type="checkbox"> 전체 선택</label>
+      <span class="pg-msg">사진 추정 5건만 보고 있어요</span>
+      <span class="pg-sp"></span>
+      <button type="button" class="btn sm danger">🗑 숨기기</button>
+      <button type="button" class="btn sm mute">원래 화면으로</button>
+    </div>
+
+    <div class="article">
+      <div class="a-top"><input type="checkbox" class="bulk-chk">
+        <div class="a-title"><span class="outlet">뉴스1</span>미래대응기금 정책 심포지엄</div></div>
+      <div class="a-bot">10:58 · 11분 전 · <a class="origin-link" href="#">원문보기</a>
+        <span class="a-acts"><span class="send-split"><button class="send-go">확정본으로</button><button class="send-more">▾</button></span>
+          <button class="icon-btn more-btn">⋯</button><button class="icon-btn hide-btn">🗑</button></span></div>
+    </div>
+    <div class="article">
+      <div class="a-top"><input type="checkbox" class="bulk-chk">
+        <div class="a-title"><span class="outlet">뉴스1</span>미래대응기금 관련 재경부 내부 공문 공개하는 박수영 의원</div></div>
+      <div class="a-bot">10:21 · 48분 전 · <a class="origin-link" href="#">원문보기</a>
+        <span class="a-acts"><span class="send-split"><button class="send-go">확정본으로</button><button class="send-more">▾</button></span>
+          <button class="icon-btn more-btn">⋯</button><button class="icon-btn hide-btn">🗑</button></span></div>
+    </div>
+    <div class="article">
+      <div class="a-top"><input type="checkbox" class="bulk-chk">
+        <div class="a-title"><span class="outlet">뉴스1</span>미래대응기금 전면 철회 촉구하는 박수영 의원</div></div>
+      <div class="a-bot">10:19 · 50분 전 · <a class="origin-link" href="#">원문보기</a>
+        <span class="a-acts"><span class="send-split"><button class="send-go">확정본으로</button><button class="send-more">▾</button></span>
+          <button class="icon-btn more-btn">⋯</button><button class="icon-btn hide-btn">🗑</button></span></div>
+    </div>
+    <p style="font-size:var(--fs-sm); color:#9CA3AF; margin:10px 0 0">… (2건 더)</p>
+  </div>
+</div>
+
+<!-- ───────────────── 칩을 누르면 — B안 ───────────────── -->
+<div class="sec">
+  <h2>칩을 누르면 ② 그 종류를 <b>뺀다</b> — 안 쓴 안<span class="alt">기각</span></h2>
+  <p class="why">
+    한 번에 빠진다(처음 말씀하신 「일정 추정 기사 제외」가 그대로 한 번 누르기가 된다).
+    켜진 칩은 <b>회색 + 취소선</b>이라 「지금 빠져 있다」로 읽히고, 머리줄 건수가 <b>58건 · 64건 중</b>으로 바뀐다.
+    <b>여럿을 동시에 켤 수 있다.</b> 대신 📷 사진 모아 보기는 이 줄에서 없어지므로,
+    사진을 확인하고 빼던 길(모아 보기 → 전체 선택 → 🗑)은 사라진다 — 그게 이 안의 값이다.
+  </p>
+  <div class="screen">
+    <div class="frow">
+      <span class="flabel">거르기</span>
+      <label><input type="checkbox"> 남은 기사만 보기 <span class="n">보냄 3 · 숨김 2</span></label>
+      <label><input type="checkbox" checked> 등록 언론사만 <span class="n">26</span></label>
+      <span class="fsep"></span>
+      <button type="button" class="kind-chip is-cut">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="3.6"/></svg>
+        사진 추정 <span class="kn">5</span></button>
+      <button type="button" class="kind-chip is-cut">
+        <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg>
+        일정 추정 <span class="kn">1</span></button>
+    </div>
+    <h2 class="sub raw-head">
+      <label class="sel-all"><input type="checkbox"> 전체 선택</label>
+      <span class="cnt">23건</span><span class="of">64건 중</span><span class="raw-order">최신순</span></h2>
+    <div class="article">
+      <div class="a-top"><input type="checkbox" class="bulk-chk">
+        <div class="a-title"><span class="outlet">KBS</span>박수영 “미래대응기금, 재경부 의견 묵살하고 졸속 추진…전면 철회해야”</div></div>
+      <div class="a-bot">10:44 · 25분 전 · <a class="origin-link" href="#">원문보기</a> · <span class="kw-inline">🔍 미래대응기금</span>
+        <span class="a-acts"><span class="send-split"><button class="send-go">확정본으로</button><button class="send-more">▾</button></span>
+          <button class="icon-btn more-btn">⋯</button><button class="icon-btn hide-btn">🗑</button></span></div>
+    </div>
+    <div class="article">
+      <div class="a-top"><input type="checkbox" class="bulk-chk">
+        <div class="a-title"><span class="outlet">노컷뉴스</span>경북 시장·군수 한자리…지역 현안·재정 부담 공동 대응 나서</div></div>
+      <div class="a-bot">10:43 · 26분 전 · <a class="origin-link" href="#">원문보기</a> · <span class="kw-inline">🔍 미래대응기금</span>
+        <span class="a-acts"><span class="send-split"><button class="send-go">확정본으로</button><button class="send-more">▾</button></span>
+          <button class="icon-btn more-btn">⋯</button><button class="icon-btn hide-btn">🗑</button></span></div>
+    </div>
+    <div class="article">
+      <div class="a-top"><input type="checkbox" class="bulk-chk">
+        <div class="a-title"><span class="outlet">이데일리</span>권형택 기보 이사장 "기술평가 역량 고도화, 기술혁신 종합지원 기반 구축"</div></div>
+      <div class="a-bot">10:34 · 35분 전 · <a class="origin-link" href="#">원문보기</a> · <span class="kw-inline">🔍 미래대응기금</span>
+        <span class="a-acts"><span class="send-split"><button class="send-go">확정본으로</button><button class="send-more">▾</button></span>
+          <button class="icon-btn more-btn">⋯</button><button class="icon-btn hide-btn">🗑</button></span></div>
+    </div>
+    <p style="font-size:var(--fs-sm); color:#9CA3AF; margin:10px 0 0">… (20건 더)</p>
+  </div>
+</div>
+
+<!-- ───────────────── 칩 셋 · 잠김 ───────────────── -->
+<div class="sec">
+  <h2>칩이 셋 다 설 때 · 잠길 때</h2>
+  <p class="why">
+    위는 인사 기사가 있는 원본(가상 수치 3건), 아래는 설정에서 체크한 언론사가 0곳이라 체크가 잠긴 모습 —
+    켜도 한 건도 안 남으니 <b>잠그고 갈 곳을 가리킨다</b>(오늘 전체 기사·기관 기사 찾기와 같은 규칙).
+    800px에서 체크 둘 + 칩 셋이 한 줄에 그대로 든다.
+  </p>
+  <div class="screen">
+    <div class="frow" style="margin:0 0 16px">
+      <span class="flabel">거르기</span>
+      <label><input type="checkbox"> 남은 기사만 보기 <span class="n">보냄 3 · 숨김 2</span></label>
+      <label><input type="checkbox"> 등록 언론사만 <span class="n">26</span></label>
+      <span class="fsep"></span>
+      <button type="button" class="kind-chip">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="3.6"/></svg>
+        사진 추정 <span class="kn">5</span></button>
+      <button type="button" class="kind-chip">
+        <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg>
+        일정 추정 <span class="kn">1</span></button>
+      <button type="button" class="kind-chip">
+        <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8.2" r="3.9"/><path d="M4 20.4a8 8 0 0 1 16 0"/></svg>
+        인사 <span class="kn">3</span></button>
+    </div>
+    <div class="frow" style="margin:0">
+      <span class="flabel">거르기</span>
+      <label><input type="checkbox"> 남은 기사만 보기 <span class="n">보냄 3 · 숨김 2</span></label>
+      <label class="off" title="설정 「언론사 선택 및 순서 지정」에서 체크한 언론사가 없어요"><input type="checkbox" disabled> 등록 언론사만</label>
+      <span class="lock">— 설정에서 <a href="#">언론사를 먼저 고르세요 →</a></span>
+      <span class="fsep"></span>
+      <button type="button" class="kind-chip">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="3.6"/></svg>
+        사진 추정 <span class="kn">5</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────── 칩 이름 ───────────────── -->
+<div class="sec">
+  <h2>칩에 「기사」를 붙일까</h2>
+  <p class="why">
+    위는 지금 규칙에 박혀 있는 이름 꼴(📷 사진 추정 (N))을 그대로 따른 것 — 정기 확정본·초안의 같은 알약과 글자가 같아진다.
+    아래는 말씀하신 대로 「기사」까지 적은 것. 둘 다 한 줄에 들어간다.
+  </p>
+  <div class="screen">
+    <div class="nbox">
+      <p class="cap">A — 종류 이름 + 건수 (정기 📷 알약과 같은 꼴)</p>
+      <div class="frow" style="margin:0">
+        <button type="button" class="kind-chip">📷 사진 추정 <span class="kn">5</span></button>
+        <button type="button" class="kind-chip">🗓 일정 추정 <span class="kn">1</span></button>
+        <button type="button" class="kind-chip">👤 인사 <span class="kn">3</span></button>
+      </div>
+    </div>
+    <div class="nbox">
+      <p class="cap">B — 「기사」까지</p>
+      <div class="frow" style="margin:0">
+        <button type="button" class="kind-chip">📷 사진 추정 기사 <span class="kn">5</span></button>
+        <button type="button" class="kind-chip">🗓 일정 추정 기사 <span class="kn">1</span></button>
+        <button type="button" class="kind-chip">👤 인사 기사 <span class="kn">3</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────── 새 수집 폼 ───────────────── -->
+<div class="sec">
+  <h2>새 수집 폼은 체크 그대로</h2>
+  <p class="why">
+    칩에는 건수가 붙는데 <b>수집하기 전에는 그 건수를 모른다</b> — 그래서 새 수집의 거르기는 지금처럼 체크다.
+    거기서 끄고 모으면 원본에 그 종류가 아예 없어 칩도 저절로 안 그려진다.
+    「일정기사 제외」 칸을 네 번째로 넣을지는 따로 정하면 된다(아래는 넣은 모습).
+  </p>
+  <div class="screen">
+    <div class="nbox">
+      <div class="nrow"><span class="nlabel">거르기</span>
+        <label><input type="checkbox"> 등록 언론사만</label>
+        <label><input type="checkbox"> 사진 추정 제외</label>
+        <label><input type="checkbox"> 인사기사 제외</label>
+        <label><input type="checkbox"> 일정기사 제외</label>
+        <button type="button" class="btn" style="margin-left:auto">🔍 수집</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────────────── 메모 ───────────────────────── -->
+<div class="sec">
+  <h2>정하고 넘어갈 것</h2>
+  <div class="memo">
+    <ul>
+      <li><b>칩을 누르면 ①모아 보기인가 ②빼기인가</b> — 하나만 고르면 됩니다. ①이면 지금 📷 알약 동작이 그대로 셋으로 늘어나고(사진 컨트롤이 둘로 갈리던 문제도 같이 해결), ②면 한 번에 빠지는 대신 모아 보기가 없어집니다.</li>
+      <li><b>보기 필터일 뿐이다</b> — 카드 파일·복사·텍스트·엑셀·발송은 한 글자도 안 바뀝니다. 끄면 64건이 그대로 돌아옵니다.</li>
+      <li><b>「모든 기사 확정본으로」는 보이는 것만 보내야 한다.</b> 지금은 서버가 다시 세어(<code>open_raw_urls</code>) 화면과 무관하게 전부 보냅니다 — 거르기를 켠 채 누르면 <span class="q">안 보이는 기사까지 보고서로 들어갑니다.</span> 건수를 확인창에 적고 보이는 것만 보내도록 같이 고쳐야 합니다.</li>
+      <li><b>기억하지 않는다</b> — 화면을 열면 늘 꺼져 있습니다(원본은 카드마다 조건이 달라, 켜 둔 걸 잊으면 다음 카드에서 「왜 몇 건밖에 없지」가 됩니다).</li>
+      <li><b>「등록 언론사만」은 설정 「언론사 선택 및 순서 지정」의 체크 그대로</b> — 화면마다 다른 목록을 두지 않습니다. 이름은 같은 수시 화면(새 수집)에 맞춰 「등록 언론사만」으로 뒀습니다(오늘 전체 기사·기관 기사 찾기는 「선택 언론사만」).</li>
+      <li><b>판정은 이미 있는 함수 셋 그대로</b> — 사진 <code>looks_like_photo_caption</code>, 일정 <code>is_schedule_listing</code>, 인사 <code>[인사]</code> 말머리. 새 규칙을 만들지 않고 쓰는 자리만 늘어납니다.</li>
+    </ul>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

@@ -106,7 +106,14 @@ from app.config import (
     FONT_STACK,
     PALETTE,
 )
-from app.filters import HEADLINE_TAG_RE, headline_kind, looks_like_photo_caption, photo_badge_tip
+from app.filters import (
+    HEADLINE_TAG_RE,
+    PERSONNEL_NOTICE_MARK,
+    headline_kind,
+    is_schedule_listing,
+    looks_like_photo_caption,
+    photo_badge_tip,
+)
 from app.sorter import outlet_sort_key, sort_by_pub_desc
 # 1000건 상한 숫자는 네이버가 정한 값이라 화면이 따로 적지 않고 그 자리에서 가져온다 —
 # 숫자를 두 군데 적으면 한쪽만 고쳤을 때 경고문이 거짓이 된다.
@@ -1036,6 +1043,23 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      (app.renderer.PHOTO_GATHER_STYLE). 화면만 바꾸는 보기라 카드·복사·txt·엑셀은 그대로다.
      툴바엔 자리가 없어(넣으면 xlsx가 홀로 아랫줄로 떨어진다) 목록 바로 위 한 줄에 둔다. */
   .photo-row {{ display: flex; gap: 8px; align-items: center; margin: -6px 0 10px; }}
+  /* [추가: 2026-10-22] 원본의 보기 필터 줄 — 왼쪽은 체크(범위), 세로선 오른쪽은 종류 칩.
+     칩은 위 .photo-gather-btn 그대로라 모양 규칙(알약 = 상태 + 켜고 끄기)이 저절로
+     지켜진다. 체크는 보조 줄이라 --chk-sm. (CSS 주석은 화면으로 나가므로 화면 글자를
+     안 적는다.) */
+  .frow {{ display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: -6px 0 10px; }}
+  .frow .flabel {{ font-size: var(--fs-sm); color: {text_soft}; font-weight: 600; flex: none; margin-right: 2px; }}
+  .frow .f-chk {{ display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-sm);
+    color: {text}; cursor: pointer; margin-right: 4px; }}
+  .frow .f-chk input {{ flex: none; width: var(--chk-sm); height: var(--chk-sm); margin: 0;
+    accent-color: {accent}; cursor: pointer; }}
+  .frow .f-chk .n {{ font-size: var(--fs-xs); color: {text_soft}; }}
+  .frow .f-chk.off {{ color: {muted}; cursor: not-allowed; }}
+  .frow .f-chk.off input {{ cursor: not-allowed; }}
+  .frow .f-lock {{ font-size: var(--fs-xs); color: {text_soft}; }}
+  .frow .fsep {{ width: 1px; height: 14px; background: {border}; margin: 0 4px; }}
+  /* 언론사 범위 체크 — 감추기만 하고 순서는 한 톨도 안 건드린다(.unsent-only와 같은 방식). */
+  body.major-only .article.is-nonmajor {{ display: none; }}
   /* 모양 규칙: 알약 = 상태를 알려 주고 누르면 켜고 끄기만. 「무언가를 한다」는 네모 버튼과
      섞이지 않게 .btn의 네모 모서리를 알약으로 덮는다(정기 툴바와 같은 규칙).
      시안 mockups/TOOLBAR_DEPTH_MOCKUP.html C안. */
@@ -2173,6 +2197,91 @@ def _move_menu_html(group_names: list[str], bundles_html: str, onclick: str, own
     return "".join(parts)
 
 
+# [추가: 2026-10-22] 원본 거르기 줄의 종류 칩 — (키, 행 클래스, 아이콘, 이름, 말풍선).
+# **판정을 새로 만들지 않는다** — 앱에 이미 있는 셋을 그대로 쓴다(사진
+# looks_like_photo_caption · 일정 is_schedule_listing · 인사 [인사] 말머리).
+# 이름은 「📷 사진 추정 (N)」 꼴 하나다 — 정기 확정본·초안의 같은 알약과 글자가 같아야 한다.
+_RAW_KINDS = (
+    ("photo", "is-photo", "camera", "사진 추정",
+     "사진 추정 기사만 한곳에 모아 봅니다 — 복사·txt·엑셀은 그대로예요"),
+    ("sched", "is-sched", "calendar", "일정 추정",
+     "제목 맨 앞에 [오늘의 일정] 같은 말머리가 붙은 기사만 모아 봅니다"),
+    ("hr", "is-hr", "user", "인사",
+     "제목에 [인사] 말머리가 붙은 기사만 모아 봅니다"),
+)
+
+
+def _raw_kinds_js() -> str:
+    """모아 보기 JS가 쓰는 종류 표(행 클래스·이름·아이콘). 화면 글자와 행 클래스가
+    같은 표에서 나와야 「칩 이름과 띠 글자가 다른」 일이 안 생긴다."""
+    return __import__("json").dumps(
+        {key: {"cls": cls, "name": name, "icon": icon(ic)} for key, cls, ic, name, _tip in _RAW_KINDS},
+        ensure_ascii=False,
+    )
+
+
+def _raw_kinds_of(article: dict) -> set:
+    """이 기사가 어느 종류 칩에 걸리는가. 칩 건수와 행 클래스가 같은 답을 본다."""
+    marks = set()
+    if looks_like_photo_caption(article):
+        marks.add("photo")
+    if is_schedule_listing(article.get("title") or ""):
+        marks.add("sched")
+    if PERSONNEL_NOTICE_MARK in (article.get("title") or ""):
+        marks.add("hr")
+    return marks
+
+
+def _raw_filter_row_html(raw_articles: list, unsent_filter_html: str) -> str:
+    """원본의 「거르기」 줄 — 왼쪽은 체크(어디까지 볼까), 세로선 오른쪽은 칩(무엇이 섞여 있나).
+
+    칩은 새 모양이 아니라 정기·확정본이 쓰는 📷 사진 추정 알약(.photo-gather-btn)을 셋으로
+    늘린 것이고, 누르면 그 종류만 모아 본다(빼지 않는다 — 확인하고 🗑로 빼는 길이라
+    오탐이 있어도 안전하다). **화면만 바꾸는 보기**라 카드·복사·txt·엑셀·발송은 그대로다.
+
+    0건인 칩은 아예 안 그린다 — 아무것도 못 거르는 칸이 늘 떠 있으면 그 줄을 안 읽게 된다
+    (📷 알약·「남은 기사만 보기」와 같은 규칙).
+    """
+    visible = [a for a in raw_articles if not a.get("hidden")]
+    if not visible:
+        return ""
+    chips = []
+    for key, _cls, ic, name, tip in _RAW_KINDS:
+        n = sum(1 for a in visible if key in _raw_kinds_of(a))
+        if not n:
+            continue
+        chips.append(
+            f'<button type="button" class="btn sm photo-gather-btn" data-kind="{key}" '
+            f'onclick="toggleKindGather(\'{key}\')" title="{html.escape(tip)}">'
+            f"{icon(ic)} {name} ({n})</button>"
+        )
+    # 「등록 언론사만」 — 설정의 체크를 그대로 본다. 0곳이면 켜도 한 건도 안 남으니
+    # 잠그고 갈 곳을 가리킨다(오늘 전체 기사·기관 기사 찾기와 같은 규칙).
+    major = load_settings().get("outlet_order") or ()
+    major_n = sum(1 for a in visible if (a.get("outlet") or "") in major)
+    if major:
+        major_html = (
+            '<label class="f-chk" title="설정 「언론사 선택 및 순서 지정」에서 체크한 언론사만 보여줍니다">'
+            '<input type="checkbox" id="major-only" onchange="applyUnsentFilter()"> '
+            f'등록 언론사만 <span class="n">{major_n}</span></label>'
+        )
+    else:
+        major_html = (
+            # 잠김 말풍선은 오늘 전체 기사·기관 기사 찾기와 글자까지 같다 — 같은 칸이
+            # 화면마다 다른 말을 하면 안 된다.
+            '<label class="f-chk off" '
+            'title="아직 스크랩 언론사가 지정되지 않았어요 (설정에서 선택하면 활성화됩니다)">'
+            '<input type="checkbox" id="major-only" disabled> 등록 언론사만</label>'
+            '<span class="f-lock">— <a href="/outlets">언론사를 먼저 고르세요 →</a></span>'
+        )
+    sep = '<span class="fsep"></span>' if chips else ""
+    return (
+        '<div class="frow">'
+        '<span class="flabel">거르기</span>'
+        f"{unsent_filter_html}{major_html}{sep}{''.join(chips)}</div>"
+    )
+
+
 def _render_article_row(
     card: dict, article: dict, group_names: list[str], is_first: bool, is_last: bool,
     known_labels_html: str = "", sent_to: str = "", bundle_options_html: str = "",
@@ -2560,6 +2669,20 @@ def _render_article_row(
         article_class += " out"
     if is_photo:
         article_class += " is-photo"
+    if raw:
+        # 원본 거르기 줄이 보는 표식 — 종류 칩(일정 추정·인사)과 「등록 언론사만」 체크가
+        # 이 클래스들만 본다. 판정은 칩 건수를 세는 자리와 **같은 함수**(_raw_kinds_of)라
+        # 「칩엔 3건인데 모아 보니 2건」이 안 생긴다. 화면 전용이라 저장값·복사·txt·
+        # 엑셀·발송엔 하나도 안 나간다.
+        _marks = _raw_kinds_of(article)
+        for _key, _cls, _ic, _nm, _tip in _RAW_KINDS:
+            if _key != "photo" and _key in _marks:
+                article_class += f" {_cls}"
+        # 「등록 언론사만」 — 설정 「언론사 선택 및 순서 지정」의 체크 그대로다. 아무도
+        # 안 골랐으면 거르지 않는다(filter_by_outlet_whitelist와 같은 규칙, 그때 칸은 잠긴다).
+        _major = settings.get("outlet_order") or ()
+        if _major and (article.get("outlet") or "") not in _major:
+            article_class += " is-nonmajor"
     if _kind == "단독":
         article_class += " art-scoop"
 
@@ -2669,25 +2792,41 @@ function applyViewMode(mode) {
 # f-string의 값으로 들어가므로 중괄호를 두 번 쓰지 않는다.
 _PHOTO_GATHER_JS = """
 var _pgHomes = null;
+// 지금 모아 보고 있는 종류(ADHOC_KINDS의 키). 원본은 필터 줄의 칩 셋이, 확정본은
+// 지금까지와 같은 알약 하나가 이 하나를 켠다 — **한 번에 한 종류만**이다
+// (두 종류를 한꺼번에 모으면 무엇을 보고 있는지가 흐려진다).
+var _pgKind = 'photo';
+function _pgInfo() { return ADHOC_KINDS[_pgKind] || ADHOC_KINDS.photo; }
 function _pgRefresh() {
   var strip = document.getElementById('photo-gather-strip');
   var view = document.getElementById('photo-gather-view');
   if (!strip || !view) return;
-  var n = view.querySelectorAll('.article.is-photo').length;
+  var kind = _pgInfo();
+  var rows = Array.prototype.slice.call(view.querySelectorAll('.article.' + kind.cls));
+  // 모아 본 뒤에도 다른 필터(언론사 범위·처리한 기사 가리기)는 그대로 걸린다 — 그래서
+  // 띠의 건수는 **지금 눈에 보이는 만큼**이다. 적힌 수와 보이는 수가 다르면 「전체 선택」이
+  // 몇 건을 고르는지 알 수 없게 된다.
+  var n = rows.filter(function (el) { return el.offsetParent !== null; }).length;
   var all = strip.querySelector('input');
   all.disabled = n === 0;
   if (n === 0) all.checked = false;
   strip.querySelector('.pg-msg').innerHTML = n
-    ? ADHOC_PHOTO_ICON + ' <b>사진 추정 ' + n + '건</b>만 모아 보고 있어요'
-    : '남은 사진 추정이 없어요';
+    ? kind.icon + ' <b>' + kind.name + ' ' + n + '건</b>만 모아 보고 있어요'
+    : (rows.length ? '위의 다른 조건에 가려 보이는 기사가 없어요'
+                   : '남은 ' + kind.name + ' 기사가 없어요');
   var done = view.querySelector('.pg-done');
-  if (!n && !done) {
+  if (!rows.length && !done) {
     view.insertAdjacentHTML('beforeend',
       '<div class="pg-done">다 치웠어요. 숨긴 기사는 왼쪽 아래 휴지통에서 되살릴 수 있어요.</div>');
-  } else if (n && done) { done.remove(); }
+  } else if (rows.length && done) { done.remove(); }
 }
-function photoGatherOn() {
-  if (document.body.classList.contains('photo-gather')) return;
+function photoGatherOn(kind) {
+  kind = ADHOC_KINDS[kind] ? kind : 'photo';
+  if (document.body.classList.contains('photo-gather')) {
+    if (_pgKind === kind) return;
+    photoGatherOff();   // 다른 종류로 갈아탈 때는 먼저 원래 자리로 돌려놓는다
+  }
+  _pgKind = kind;
   // 「보기 순서」가 시간순·언론사순이면 먼저 소제목별로 돌려놓는다 — 두 보기가 같은 행을
   // 서로 다른 자리로 옮기면 끌 때 제자리를 못 찾는다. 모아 보는 동안엔 잠근다(정기와 같다).
   var vsel = document.querySelector('.view-mode-select');
@@ -2695,7 +2834,8 @@ function photoGatherOn() {
     if (vsel.value !== 'subheading') { vsel.value = 'subheading'; applyViewMode('subheading'); }
     vsel.disabled = true;
   }
-  var rows = Array.prototype.slice.call(document.querySelectorAll('.group-block .article.is-photo'));
+  var rows = Array.prototype.slice.call(
+    document.querySelectorAll('.group-block .article.' + _pgInfo().cls));
   // 옮기기 전 자리를 적어두고 끌 때 뒤에서부터 되돌린다(앞 행의 next가 아직 모인 목록 안에
   // 있는 뒤 행을 가리킬 수 있어서다 — 정기 flat-view와 같은 방식).
   _pgHomes = rows.map(function (el) { return {el: el, parent: el.parentElement, next: el.nextElementSibling}; });
@@ -2727,8 +2867,11 @@ function photoGatherOn() {
   if (anchor) host.insertBefore(view, anchor); else host.appendChild(view);
   host.insertBefore(strip, view);
   document.body.classList.add('photo-gather');
-  document.querySelectorAll('.photo-gather-btn').forEach(function (b) { b.classList.add('is-on'); });
-  try { sessionStorage.setItem(ADHOC_PHOTO_KEY, '1'); } catch (e) {}
+  // 켠 종류의 칩만 채운 파랑 — 확정본의 알약엔 data-kind가 없어 그대로 켜진다.
+  document.querySelectorAll('.photo-gather-btn').forEach(function (b) {
+    b.classList.toggle('is-on', !b.dataset.kind || b.dataset.kind === _pgKind);
+  });
+  try { sessionStorage.setItem(ADHOC_PHOTO_KEY, _pgKind); } catch (e) {}
   _pgRefresh();
   updateBulkBar();
 }
@@ -2753,16 +2896,23 @@ function photoGatherOff() {
   updateBulkBar();
   window.scrollTo(0, 0);
 }
-function togglePhotoGather() {
-  if (document.body.classList.contains('photo-gather')) { photoGatherOff(); return; }
-  photoGatherOn();
+function togglePhotoGather() { toggleKindGather('photo'); }
+// 종류 칩 — 누르면 그 종류만 모아 보고, 같은 칩을 다시 누르면 제자리로. **빼는 게 아니라
+// 모아 보는 것**이라, 빼려면 모아 본 자리에서 전부 고른 뒤 숨기면 된다(판정이 틀릴 수
+// 있는 종류도 눈으로 확인하고 빼게 된다).
+function toggleKindGather(kind) {
+  if (document.body.classList.contains('photo-gather') && _pgKind === kind) {
+    photoGatherOff();
+    return;
+  }
+  photoGatherOn(kind);
   window.scrollTo(0, 0);
 }
 // 화면에 보이는 행만 고른다(「아직 안 보낸 기사만」으로 감춘 행은 제외).
 function photoGatherSelectAll(on) {
   var view = document.getElementById('photo-gather-view');
   if (!view) return;
-  view.querySelectorAll('.article.is-photo .bulk-chk').forEach(function (cb) {
+  view.querySelectorAll('.article.' + _pgInfo().cls + ' .bulk-chk').forEach(function (cb) {
     if (cb.closest('.article').offsetParent !== null) cb.checked = on;
   });
   updateBulkBar();
@@ -2776,7 +2926,11 @@ function bulkHide(id) {
   if (!urls.length) return;
   postWithUrls('/adhoc/card/bulk-hide', {id: id}, urls);
 }
-try { if (sessionStorage.getItem(ADHOC_PHOTO_KEY)) photoGatherOn(); } catch (e) {}
+// 옛 기록은 '1'(사진)이었다 — 값이 종류 키로 바뀌어도 그 탭이 멀쩡히 되살아나야 한다.
+try {
+  var _pgSaved = sessionStorage.getItem(ADHOC_PHOTO_KEY);
+  if (_pgSaved) photoGatherOn(_pgSaved === '1' ? 'photo' : _pgSaved);
+} catch (e) {}
 """
 
 
@@ -3317,6 +3471,9 @@ def render_card_page(
     if not sections:
         sections.append('<p class="empty">아직 수집된 기사가 없습니다.</p>')
 
+    # 원본은 📷 알약 자리를 「거르기」 줄이 대신한다(아래 raw 툴바에서 채운다).
+    filter_row_html = ""
+
     # [추가: 2026-09-15] 📷 사진 추정 모아 보기 — 정기와 같은 이름. 화면에 보이는 기사
     # (조건 안 + 숨기지 않음) 중 사진 추정이 0건이면 줄 자체를 안 그린다.
     photo_count = sum(
@@ -3659,8 +3816,10 @@ def render_card_page(
             )
         else:
             pair_html = ""
+        # [수정: 2026-10-22] 「남은 기사만 보기」는 아래 「거르기」 줄로 내려갔다 —
+        # 툴바엔 동작(모든 기사 확정본으로)과 가져가기만 남는다.
+        filter_row_html = _raw_filter_row_html(raw_articles, unsent_filter_html)
         toolbar_html = f"""<div class="toolbar">
-    {unsent_filter_html}
     {send_all_html}
     <span style="flex:1"></span>
     {pair_html}
@@ -3733,7 +3892,7 @@ def render_card_page(
 
   {toolbar_html}
 
-  {photo_row_html}
+  {filter_row_html or photo_row_html}
   {"".join(sections)}
 </div>
 
@@ -3816,7 +3975,7 @@ window.addEventListener('pageshow', function () {{
 var ADHOC_SCROLL_KEY = 'adhocScroll:' + {__import__("json").dumps(card["id"])};
 var ADHOC_HAS_ERROR = {"true" if error else "false"};
 var ADHOC_PHOTO_KEY = 'adhocPhotoGather:' + {__import__("json").dumps(card["id"])};
-var ADHOC_PHOTO_ICON = {__import__("json").dumps(icon("camera"))};
+var ADHOC_KINDS = {_raw_kinds_js()};
 {_VIEW_MODE_JS}
 {_PHOTO_GATHER_JS}
 {range_select_script('.bulk-chk', '.article', '.is-sent, .is-raw-hid')}
@@ -4276,17 +4435,36 @@ function syncRawSelectAll() {{
   sa.checked = n > 0 && n === open.length;
   sa.indeterminate = n > 0 && n < open.length;
 }}
-// 「모든 기사 확정본으로」 — 무엇을 보낼지는 서버가 다시 센다(all_open). 보냄·숨김 기사는 빠진다.
+// 「모든 기사 확정본으로」 — 평소엔 무엇을 보낼지 서버가 다시 센다(all_open, 보냄·숨김 제외).
+// [수정: 2026-10-22] **화면에서 가려 둔 기사는 안 보낸다** — 안 보이는 기사가 조용히
+// 보고서로 들어가면 담당자는 왜 그게 거기 있는지 알 길이 없다(실시간 화면에서 보이는
+// 체크만 담는 것과 같은 규칙). 그때는 화면이 주소를 직접 실어 보낸다.
 function sendAllOpen(btn) {{
   var skip = Number(btn.dataset.skip || 0);
+  var hiding = document.body.classList.contains('major-only')
+    || document.body.classList.contains('photo-gather');
+  var urls = Array.prototype.filter.call(document.querySelectorAll('.group-block .article'),
+    function (a) {{
+      return !a.classList.contains('is-sent') && !a.classList.contains('is-raw-hid')
+        && a.offsetParent !== null;
+    }}).map(function (a) {{
+      var cb = a.querySelector('.bulk-chk');
+      return cb ? cb.dataset.url : '';
+    }}).filter(function (u) {{ return u; }});
+  var n = hiding ? urls.length : Number(btn.dataset.count);
+  if (!n) return;
   // 아직 아무 데도 안 보낸 원본이면 가리킬 이름이 없다 — 「」 빈 괄호를 적지 않고
   // 「새 확정본」이라 쓰고, 확인창을 지난 뒤에 이름 창이 뜬다(확인창이 늘 먼저다).
   var where = btn.dataset.target ? '「' + btn.dataset.target + '」 확정본' : '새 확정본';
-  if (!confirm(btn.dataset.count + '건을 ' + where + '으로 보낼까요?'
+  if (!confirm(n + '건을 ' + where + '으로 보낼까요?'
+      + (hiding ? '\\n지금 화면에 보이는 기사만 보내요.' : '')
       + (skip ? '\\n이미 보냈거나 숨긴 ' + skip + '건은 빼요.' : '') + '\\n\\n'
       + '원본에는 그대로 남아요. 빼려면 「✓ 보냄」을 다시 누르면 돼요.')) return;
-  withBundle(btn.dataset.bundle || '__auto__', {{id: btn.dataset.id, all_open: '1'}},
-    function (fields) {{ post('/adhoc/card/send-to-bundle', fields); }});
+  withBundle(btn.dataset.bundle || '__auto__', {{id: btn.dataset.id}}, function (fields) {{
+    if (hiding) {{ postWithUrls('/adhoc/card/send-to-bundle', fields, urls); return; }}
+    fields.all_open = '1';
+    post('/adhoc/card/send-to-bundle', fields);
+  }});
 }}
 function bulkSendRaw(btn) {{
   var split = btn.closest('.send-split');
@@ -4300,17 +4478,23 @@ function bulkSendRaw(btn) {{
 // ☑ 아직 안 보낸 기사만 — 감추기만 하고 순서는 안 건드린다. 소제목 건수는 화면에
 // 보이는 것과 어긋나면 안 되므로 여기서 같이 다시 센다(원래 값은 data-total에 보관).
 function applyUnsentFilter() {{
-  var on = document.getElementById('unsent-only').checked;
+  var box = document.getElementById('unsent-only');
+  var on = !!(box && box.checked);
   document.body.classList.toggle('unsent-only', on);
+  // 언론사 범위 체크 — 원본에만 있는 칸이고, 같은 함수가 함께 입힌다(건수를 한 번만 센다).
+  var major = document.getElementById('major-only');
+  var majorOn = !!(major && major.checked && !major.disabled);
+  document.body.classList.toggle('major-only', majorOn);
   document.querySelectorAll('.group-block').forEach(function (block) {{
     var cnt = block.querySelector('h2.sub .cnt');
     if (!cnt) return;
     if (!cnt.dataset.total) {{
       cnt.dataset.total = String(block.querySelectorAll('.article').length);
     }}
-    if (!on) {{ cnt.textContent = cnt.dataset.total + '건'; return; }}
+    if (!on && !majorOn) {{ cnt.textContent = cnt.dataset.total + '건'; return; }}
     var left = Array.prototype.filter.call(block.querySelectorAll('.article'), function (a) {{
-      return !a.classList.contains('is-sent') && !a.classList.contains('is-raw-hid');
+      if (on && (a.classList.contains('is-sent') || a.classList.contains('is-raw-hid'))) return false;
+      return !(majorOn && a.classList.contains('is-nonmajor'));
     }}).length;
     cnt.textContent = left + '건 (전체 ' + cnt.dataset.total + ')';
   }});
