@@ -117,7 +117,6 @@ def _style() -> str:
   .frow input[type="checkbox"] {{ flex: none; width: var(--chk-sm); height: var(--chk-sm); margin: 0;
     accent-color: {p['accent']}; cursor: pointer; }}
   .frow label.off {{ color: {p['muted']}; cursor: default; }}
-  .fsep {{ width: 1px; height: 14px; background: {p['border']}; margin: 0 2px; }}
 
   /* ③ 결과 */
   pre.out {{ margin: 0; border: 1px solid {p['border']}; border-radius: var(--r-lg); background: {p['bg']};
@@ -165,6 +164,7 @@ var ROLES = [
 
 var rows = [];      // 붙여넣은/올린 표
 var mapping = [];   // 열마다 역할
+var hasHeader = true;   // 첫 줄이 열 이름인가 — 앱이 보고 정한다(아래 looksLikeHeader)
 var items = [];     // 지금 결과에 담긴 기사 (AI 배정·내보내기가 이걸 본다)
 var aiNames = {};   // AI가 붙인 소제목 {url: 이름} — 표의 소제목 열을 덮어쓰지 않고 위에 얹는다
 
@@ -198,8 +198,16 @@ function guessRole(header, sampleValue, used) {
   return pick || "skip";
 }
 
+// 첫 줄이 열 이름인가 — **담당자에게 묻지 않고 앱이 본다.** 기사 줄에는 반드시 링크가
+// 있고(링크가 없으면 어차피 건너뛴다) 열 이름 줄에는 없다. 그래서 판정이 틀릴 자리가 없다.
+// 체크 칸으로 두던 때는 끄고 켜는 뜻을 담당자가 매번 다시 읽어야 했고, 잘못 꺼 두면 첫 기사가
+// 조용히 열 이름으로 먹혔다. 대신 **어떻게 읽었는지는 ② 머리줄이 말한다**(renderMap).
+function looksLikeHeader(row) {
+  return !(row || []).some(function (c) { return /^https?:\/\//.test((c || "").trim()); });
+}
+
 function buildMapping() {
-  var hasHeader = $("hasHeader").checked;
+  hasHeader = looksLikeHeader(rows[0]);
   var header = hasHeader ? rows[0] : [];
   var first = rows[hasHeader ? 1 : 0] || rows[0] || [];
   var width = 0;
@@ -218,10 +226,10 @@ function buildMapping() {
       if (mapping[i] === "skip") { mapping[i] = need; return; }
     }
   });
-  renderMap(header, first, hasHeader);
+  renderMap(header, first);
 }
 
-function renderMap(header, first, hasHeader) {
+function renderMap(header, first) {
   var body = $("mapbody");
   body.innerHTML = "";
   var counts = {};
@@ -249,9 +257,11 @@ function renderMap(header, first, hasHeader) {
   var miss = [];
   if (mapping.indexOf("title") < 0) miss.push("제목");
   if (mapping.indexOf("url") < 0) miss.push("링크");
+  // 첫 줄을 어떻게 읽었는지 **먼저** 적는다 — 그게 틀리면 아래 표가 통째로 한 줄씩 밀린다.
   $("mapsub").textContent = miss.length
     ? miss.join("·") + " 칸을 고르면 결과가 나와요"
-    : "표의 첫 줄을 보고 짐작해 뒀어요 — 다르면 고치세요";
+    : (hasHeader ? "첫 줄은 열 이름으로 읽었어요" : "첫 줄에 링크가 있어 기사로 읽었어요")
+      + " · 짐작이 다르면 고치세요";
 }
 
 function outletRank(name) {
@@ -260,7 +270,6 @@ function outletRank(name) {
 }
 
 function render() {
-  var hasHeader = $("hasHeader").checked;
   var data = rows.slice(hasHeader ? 1 : 0);
   var ci = {};
   ROLES.forEach(function (r) { ci[r[0]] = mapping.indexOf(r[0]); });
@@ -279,7 +288,9 @@ function render() {
     var title = (r[ci.title] || "").trim();
     if (!url || !/^https?:\/\//.test(url)) { if (title || url) skipped.nourl.push(line); return; }
     if (!title) { skipped.notitle.push(line); return; }
-    if ($("dedupe").checked && seen[url]) { skipped.dup.push(line); return; }
+    // 같은 링크는 늘 한 번이다 — 한 보고서에 같은 기사를 두 번 적을 일이 없어 고를 것이
+    // 아니다(정기 수집도 같은 URL은 1건). 건너뛴 줄은 아래 안내가 번호로 적는다.
+    if (seen[url]) { skipped.dup.push(line); return; }
     seen[url] = 1;
     var cell = function (key) { return ci[key] >= 0 ? (r[ci[key]] || "").trim() : ""; };
     items.push({
@@ -409,8 +420,6 @@ function assignWithAI() {
 
 // ── 버튼 연결 ───────────────────────────────────────────────────────
 $("go").onclick = run;
-$("hasHeader").onchange = function () { aiNames = {}; buildMapping(); render(); };
-$("dedupe").onchange = render;
 $("byOutlet").onchange = render;
 $("clear").onclick = function () {
   $("paste").value = ""; rows = []; items = []; aiNames = {};
@@ -424,8 +433,7 @@ if ($("clearsec")) $("clearsec").onclick = function () {
   // 다시 누르는 것이다(원본 표는 ① 칸에 그대로 있다).
   aiNames = {};
   mapping = mapping.map(function (r) { return r === "section" ? "skip" : r; });
-  var hasHeader = $("hasHeader").checked;
-  renderMap(hasHeader ? rows[0] : [], rows[hasHeader ? 1 : 0] || rows[0] || [], hasHeader);
+  renderMap(hasHeader ? rows[0] : [], rows[hasHeader ? 1 : 0] || rows[0] || []);
   render();
 };
 $("pickfile").onclick = function () { $("file").click(); };
@@ -586,7 +594,7 @@ def render_excel_merge_page() -> str:
   <div class="step">
     <div class="shead">
       <span class="n">① 표 붙여넣기</span>
-      <span class="sub">엑셀에서 칸을 골라 복사(⌘C)한 뒤 아래에 붙여넣으세요</span>
+      <span class="sub">엑셀에서 칸을 골라 복사(⌘C)한 뒤 아래에 붙여넣으세요 — 첫 줄은 열 이름으로 읽습니다</span>
     </div>
     <div class="inbox">
       <textarea class="paste" id="paste" spellcheck="false" placeholder="언론사&#9;제목&#9;링크
@@ -616,9 +624,6 @@ def render_excel_merge_page() -> str:
       <tbody id="mapbody"></tbody>
     </table>
     <div class="frow">
-      <label><input type="checkbox" id="hasHeader" checked /> 첫 줄은 열 이름이에요</label>
-      <span class="fsep"></span>
-      <label title="같은 링크가 여러 줄에 있으면 처음 한 줄만 남깁니다"><input type="checkbox" id="dedupe" checked /> 같은 링크는 한 번만</label>
       {outlet_label}
     </div>
     <div class="warn hidden" id="skipnote"></div>
