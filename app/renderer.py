@@ -997,9 +997,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 {name_picker_script}
 {kw_inline_script}
 {photo_gather_script}
+{copy_text_script}
 const PLAIN_TEXT = {plain_text_json};
 function copyPlainText() {{
-  navigator.clipboard.writeText(PLAIN_TEXT)
+  pmCopy(PLAIN_TEXT)
     .then(() => alert("클립보드에 복사했습니다."))
     .catch(() => alert("복사에 실패했습니다."));
 }}
@@ -1034,7 +1035,7 @@ document.addEventListener("click", function(e) {{
 // flashEl: ✓로 바꿀 대상(없으면 누른 버튼). ⋯ 메뉴의 「복사하기」는 메뉴가 곧 닫히므로 ⋯ 버튼을 넘긴다.
 function copyArticleIcon(btn, flashEl) {{
   var mark = flashEl || btn;
-  navigator.clipboard.writeText(btn.dataset.copyText).then(function() {{
+  pmCopy(btn.dataset.copyText).then(function() {{
     mark.classList.add("is-copied");
     clearTimeout(mark._copyTimer);
     mark._copyTimer = setTimeout(function() {{ mark.classList.remove("is-copied"); }}, 1000);
@@ -1062,7 +1063,7 @@ function showToast(message, thenFn) {{
 // 한 번 더 확인창을 거친다.
 function copyAiSummary(btn) {{
   if (!confirm("AI 요약을 복사할까요? (위 기사 목록 복사와는 별도로 복사됩니다)")) return;
-  navigator.clipboard.writeText(btn.dataset.copyText).then(function() {{
+  pmCopy(btn.dataset.copyText).then(function() {{
     showToast("복사했습니다.");
   }}).catch(function() {{
     alert("복사에 실패했습니다.");
@@ -4124,6 +4125,7 @@ def render_page(
         **note_vars,
         # json.dumps로 JS 문자열 리터럴로 안전하게 이스케이프하고, "</script"가 섞여
         # 있어도 스크립트 태그가 조기 종료되지 않도록 "</"를 "<\/"로 한 번 더 바꾼다.
+        copy_text_script=copy_text_script(),
         plain_text_json=json.dumps(plain_text, ensure_ascii=False).replace("</", "<\\/"),
         highlight_words_json=json.dumps(
             [
@@ -4923,6 +4925,62 @@ def gather_buttons_html(counts: dict) -> str:
 def photo_gather_button_html(count: int) -> str:
     """옛 이름 — 사진 알약 하나만 그린다(부르는 자리가 남아 있으면 그대로 돈다)."""
     return gather_buttons_html({"photo": count})
+
+
+# ── 「복사」는 앱 어디서나 이 함수 하나를 거친다 ──────────────────────────
+# **navigator.clipboard는 보안 맥락(https·localhost)에만 있는 물건이다.** `.env`의
+# SERVER_HOST를 바깥 주소로 열면(`http://172.16.20.6:8765`) 브라우저가 그 출처를
+# 안 믿어 객체가 **아예 없고**, 그러면 `navigator.clipboard.writeText(...)`는
+# 부르기도 전에 **속성을 읽는 순간 TypeError로 터진다** — 뒤에 붙은 `.catch`는
+# 던져진 예외를 못 받으므로 「복사에 실패했습니다」조차 안 뜨고 버튼이 조용히
+# 죽는다(화면·수집·발송은 멀쩡해서 버튼 하나만 고장 난 것처럼 보인다).
+# 그래서 그 출처에서는 숨은 textarea + execCommand('copy')로 물러선다 — 옛
+# 방식이지만 **비보안 출처에서 쓸 수 있는 유일한 길**이다.
+#
+# **돌려주는 건 늘 Promise다** — 부르는 자리 스무 곳이 이미 `.then(...)`으로
+# 피드백(✓·토스트·글자 바뀜)을 달고 있어서, 모양이 같아야 그 사슬을 한 줄도
+# 안 고치고 갈아끼울 수 있다. **새 복사 버튼은 이 함수를 쓴다** —
+# `navigator.clipboard`를 직접 부르면 그 버튼만 바깥 주소에서 죽고,
+# `tests/test_integration.py` `test_copy_goes_through_one_place`가 거기서 깨진다.
+COPY_TEXT_SCRIPT = """
+window.pmCopy = function (text) {
+  text = text == null ? "" : String(text);
+  // 숨은 textarea + execCommand('copy') — 비보안 출처에서 쓸 수 있는 유일한 길.
+  function legacy() {
+    return new Promise(function (resolve, reject) {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      // readonly — 폰에서 키보드가 올라오지 않게. 화면 밖으로 밀되 fixed로 띄워
+      // 보던 자리가 흔들리지 않게 한다.
+      ta.setAttribute("readonly", "");
+      ta.style.cssText = "position:fixed;top:0;left:-9999px;opacity:0";
+      document.body.appendChild(ta);
+      // 담당자가 끌어서 잡아 둔 선택 영역은 복사가 끝나면 돌려준다.
+      var sel = document.getSelection();
+      var had = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
+      ta.select();
+      try { ta.setSelectionRange(0, ta.value.length); } catch (e) {}
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      ta.remove();
+      if (sel && had) { sel.removeAllRanges(); sel.addRange(had); }
+      if (ok) { resolve(); } else { reject(new Error("copy failed")); }
+    });
+  }
+  if (navigator.clipboard && window.isSecureContext) {
+    // 보안 맥락이라도 **거절될 수 있다** — 창이 포커스를 잃었거나 브라우저가 쓰기
+    // 권한을 안 준 경우다(Write permission denied). 그때도 위 길로 한 번 더 해 본다
+    // — 눌렀는데 아무 일도 안 나는 것보다 낫다.
+    return navigator.clipboard.writeText(text).catch(legacy);
+  }
+  return legacy();
+};
+"""
+
+
+def copy_text_script() -> str:
+    """복사 공용 함수 `pmCopy(text)` — 화면마다 제 <script> 블록에 한 번 끼운다."""
+    return COPY_TEXT_SCRIPT
 
 
 def hidden_trash_style() -> str:

@@ -38,6 +38,7 @@ from app.filters import is_schedule_listing
 from app.llm_classifier import ETC_GROUP_NAME, round_id_for_run
 from app.home_trend import load_trend_words
 from app.icons import icon
+from app.renderer import copy_text_script
 from app.settings import load_settings
 from app.storage import list_run_dates, list_runs_for_date, load_today_runs
 from app.trend_chart import chart_css, render_chart
@@ -615,7 +616,7 @@ def _board_card_html(settings: dict, runs_today: list, now: Optional[datetime] =
 
 # 부정 추정 기사 목록: 마우스를 올리면 열리고, 누르면 고정된다. 여는·닫는 지연과 "클릭 = 고정"은
 # 아래 [단독]/[속보] 칩(_ALERT_HOVER_JS)과 같은 값이고, 둘은 한 번에 하나만 열린다.
-_BOARD_JS = """
+_BOARD_JS = copy_text_script() + """
 (function () {
   var box = document.querySelector('details.ngbox');
   if (!box) return;
@@ -647,12 +648,8 @@ _BOARD_JS = """
         b.textContent = '복사됨'; b.classList.add('done');
         setTimeout(function () { b.textContent = '복사'; b.classList.remove('done'); }, 1200);
       }
-      function fallback() {
-        var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
-        ta.select(); document.execCommand('copy'); ta.remove(); done();
-      }
-      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, fallback);
-      else fallback();
+      // 복사는 앱 어디서나 pmCopy 하나를 거친다(app.renderer.copy_text_script).
+      pmCopy(text).then(done, function () { alert('복사에 실패했습니다.'); });
     });
   });
 })();

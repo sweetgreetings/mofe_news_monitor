@@ -45,6 +45,7 @@ from app.renderer import (
     apply_subheading_format,
     format_slot_time_kr,
     known_label_chips_html,
+    copy_text_script,
     label_popover_script,
     label_popover_style,
     photo_override_script,
@@ -537,7 +538,7 @@ document.addEventListener("click", function(e) {{
 // flashEl: ✓로 바꿀 대상(없으면 누른 버튼). ⋯ 메뉴의 「복사하기」는 메뉴가 곧 닫히므로 ⋯ 버튼을 넘긴다.
 function copyArticleIcon(btn, flashEl) {{
   var mark = flashEl || btn;
-  navigator.clipboard.writeText(btn.dataset.copyText).then(function() {{
+  pmCopy(btn.dataset.copyText).then(function() {{
     mark.classList.add("is-copied");
     clearTimeout(mark._copyTimer);
     mark._copyTimer = setTimeout(function() {{ mark.classList.remove("is-copied"); }}, 1000);
@@ -548,7 +549,7 @@ function copyArticleIcon(btn, flashEl) {{
 // [추가: 2026-08-12] 회차(시간대) 전체 복사 — ⋯ 메뉴 안이 아니라 항상 보이는
 // 버튼이라 completion 표시 후 메뉴를 닫을 필요는 없다.
 function copySlotText(btn) {{
-  navigator.clipboard.writeText(btn.dataset.copyText).then(function() {{
+  pmCopy(btn.dataset.copyText).then(function() {{
     var original = btn.textContent;
     btn.textContent = "복사했습니다";
     setTimeout(function() {{ btn.textContent = original; }}, 900);
@@ -557,6 +558,7 @@ function copySlotText(btn) {{
   }});
 }}
 // [추가: 2026-09-16] 🏷 라벨 — 확정본·초안과 같은 코드(app.renderer.label_popover_script).
+{copy_text_script}
 {label_popover_script}
 {photo_override_script}
 {schedule_override_script}
@@ -853,7 +855,7 @@ function historyDownloadText(filename, text) {{
   form.remove();
 }}
 function historyCopyText(btn, text) {{
-  navigator.clipboard.writeText(text).then(function () {{
+  pmCopy(text).then(function () {{
     var original = btn.textContent;
     btn.textContent = '복사했습니다';
     setTimeout(function () {{ btn.textContent = original; }}, 900);
@@ -1431,6 +1433,7 @@ def _theme() -> dict:
         "refetch_titles_script": refetch_titles_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
         "label_popover_style": label_popover_style(),
         "label_popover_script": label_popover_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
+        "copy_text_script": copy_text_script(),
         "photo_override_script": photo_override_script(),
         "schedule_override_script": schedule_override_script(),
         "topnav_style": topnav_style(),

@@ -17,6 +17,7 @@ import json
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
+from app.renderer import copy_text_script
 from app.topnav import plain_nav, topnav_style
 from app.config import FONT_STACK, MAX_TREND_WORDS, PALETTE
 from app.excel_export import date_range_label
@@ -311,8 +312,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   {table_html}
 </div>
 <script>
+{copy_text_script}
 function copyTrendTable(btn) {{
-  navigator.clipboard.writeText(btn.dataset.copyText).then(function () {{
+  pmCopy(btn.dataset.copyText).then(function () {{
     var orig = btn.textContent;
     btn.textContent = "복사됨";
     setTimeout(function () {{ btn.textContent = orig; }}, 1200);
@@ -380,6 +382,7 @@ def render_trend_page(query: dict) -> str:
         table_html=table_html,
         trend_chart_css=chart_css(),
         trend_hover_js=HOVER_JS,
+        copy_text_script=copy_text_script(),
         topnav_style=topnav_style(),
         topnav_html=plain_nav(),
         **PALETTE,

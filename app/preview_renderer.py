@@ -104,6 +104,7 @@ from app.renderer import (
     format_slot_time_kr,
     known_label_chips_html,
     late_badge_style,
+    copy_text_script,
     kw_inline_style,
     kw_inline_script,
     gather_buttons_html,
@@ -1163,9 +1164,10 @@ function classifyDegradedConfirmMsg(verb) {{
       + CLASSIFY_DEGRADED_NAMES.join(", ")
       + "\\n\\n그대로 " + verb + "?";
 }}
+{copy_text_script}
 function copyPlainText() {{
   if (CLASSIFY_DEGRADED && !confirm(classifyDegradedConfirmMsg("복사할까요"))) {{ return; }}
-  navigator.clipboard.writeText(PLAIN_TEXT)
+  pmCopy(PLAIN_TEXT)
     .then(() => alert("클립보드에 복사했습니다."))
     .catch(() => alert("복사에 실패했습니다."));
 }}
@@ -1191,7 +1193,7 @@ document.addEventListener("click", function(e) {{
 // flashEl: ✓로 바꿀 대상(없으면 누른 버튼). ⋯ 메뉴의 「복사하기」는 메뉴가 곧 닫히므로 ⋯ 버튼을 넘긴다.
 function copyArticleIcon(btn, flashEl) {{
   var mark = flashEl || btn;
-  navigator.clipboard.writeText(btn.dataset.copyText).then(function() {{
+  pmCopy(btn.dataset.copyText).then(function() {{
     mark.classList.add("is-copied");
     clearTimeout(mark._copyTimer);
     mark._copyTimer = setTimeout(function() {{ mark.classList.remove("is-copied"); }}, 1000);
@@ -1205,7 +1207,7 @@ function copyArticleIcon(btn, flashEl) {{
 // 별도 텍스트라 한 번 더 확인창을 거친다.
 function copyAiSummary(btn) {{
   if (!confirm("AI 요약을 복사할까요? (위 기사 목록 복사와는 별도로 복사됩니다)")) return;
-  navigator.clipboard.writeText(btn.dataset.copyText).then(function() {{
+  pmCopy(btn.dataset.copyText).then(function() {{
     alert("복사했습니다.");
   }}).catch(function() {{
     alert("복사에 실패했습니다.");
@@ -2605,6 +2607,8 @@ def _theme() -> dict:
         # 붙기 때문이고, .photo-badge처럼 복붙해 두면 한쪽만 고쳤을 때 어긋난다.
         "late_badge_style": late_badge_style(),
         "export_links_style": export_links_style(),
+        # 복사 공용 함수 — _theme()을 거치면 이 파일의 format 자리 네 곳에 따로 등록할 필요가 없다.
+        "copy_text_script": copy_text_script(),
         # [추가: 2026-09-14] 🔍 검색어 CSS·툴팁 — 확정본과 한 곳에서 만든 값(같은 이유).
         "kw_inline_style": kw_inline_style(),
         "kw_inline_script": kw_inline_script(),

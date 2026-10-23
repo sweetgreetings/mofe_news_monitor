@@ -5079,6 +5079,88 @@ def test_outlet_override_is_one_place():
     print("48) 언론사명 직접 수정: 통과 (입히는 자리 한 곳 — 화면·보고서 한 줄·엑셀, 부분 저장, 편집 창 네 벌)")
 
 
+def test_copy_goes_through_one_place():
+    """「복사」가 `pmCopy()` 한 곳을 거치는지 — 바깥 주소에서 모든 복사 버튼이 조용히 죽던 사고.
+
+    **`navigator.clipboard`는 보안 맥락(https·localhost)에만 있는 물건이다.** `.env`의
+    SERVER_HOST를 바깥 주소로 열면(`http://172.16.20.6:8765`) 브라우저가 그 출처를 안 믿어
+    객체가 **아예 없고**, `navigator.clipboard.writeText(...)`는 **속성을 읽는 순간**
+    TypeError로 터진다 — 뒤에 붙은 `.catch`는 던져진 예외를 못 받으므로 「복사에
+    실패했습니다」조차 안 뜨고 버튼이 아무 말 없이 죽는다. 화면·수집·발송이 멀쩡하고
+    서버 로그에도 아무것도 안 남아서, 담당자가 "복사가 안 돼"라고 말해 주기 전까지
+    아무도 모른다 — 화면 JS가 끊기는 사고와 같은 종류라 이 테스트가 그물이다.
+
+    두 가지를 지킨다:
+      (1) `navigator.clipboard`를 직접 부르는 자리는 **공용 함수 안 한 곳**뿐이다.
+      (2) `pmCopy(`를 쓰는 파일은 그 함수를 화면에 **끼워 넣기도** 해야 한다
+          (`copy_text_script`) — 안 끼우면 그 화면에서만 `pmCopy`가 없어 똑같이 죽는다.
+    """
+    _require_isolation()
+    from app.renderer import COPY_TEXT_SCRIPT, copy_text_script
+
+    root = Path(__file__).resolve().parent.parent
+    files = sorted(set(root.glob("app/*.py")) | set(root.glob("app/adhoc/*.py")))
+
+    def live_code(text):
+        """주석 줄은 뺀다 — 왜 이렇게 됐는지 적어 둔 설명(파이썬 #·JS //)까지 세면
+        규칙을 설명하는 글이 규칙 위반으로 잡힌다."""
+        return "\n".join(
+            ln for ln in text.splitlines()
+            if not ln.lstrip().startswith(("#", "//"))
+        )
+
+    # (1) 직접 부르는 자리는 공용 함수 안 하나뿐.
+    assert live_code(COPY_TEXT_SCRIPT).count("navigator.clipboard.writeText(") == 1, (
+        "공용 함수 안의 보안 맥락 분기가 사라졌습니다"
+    )
+    for f in files:
+        text = live_code(f.read_text(encoding="utf-8"))
+        direct = text.count("navigator.clipboard")
+        # 파일명만 보면 안 된다 — app/adhoc/renderer.py도 이름이 renderer.py다.
+        if f.relative_to(root).as_posix() == "app/renderer.py":
+            # 공용 함수 안의 두 번(존재 확인 + writeText)만 허용한다.
+            allowed = live_code(COPY_TEXT_SCRIPT).count("navigator.clipboard")
+            assert direct == allowed, (
+                f"app/renderer.py의 navigator.clipboard가 {direct}곳입니다 — "
+                f"공용 함수 안 {allowed}곳 말고는 pmCopy()를 쓰세요"
+            )
+            continue
+        rel = f.relative_to(root).as_posix()
+        assert direct == 0, (
+            f"{rel}이 navigator.clipboard를 직접 부릅니다 — 바깥 주소(http://172.16.x.x)로 "
+            f"열면 그 버튼만 조용히 죽습니다. app.renderer.copy_text_script의 pmCopy()를 쓰세요"
+        )
+
+    # (2) pmCopy를 쓰는 화면은 공용 함수를 끼워 넣기도 해야 한다.
+    users, injectors = [], []
+    for f in files:
+        text = f.read_text(encoding="utf-8")
+        if "pmCopy(" in text:
+            users.append(f)
+        if "copy_text_script" in text:
+            injectors.append(f.name)
+    assert users, "pmCopy를 쓰는 화면이 하나도 없습니다 — 교체가 안 된 것입니다"
+    for f in users:
+        text = f.read_text(encoding="utf-8")
+        assert "copy_text_script" in text, (
+            f"{f.relative_to(root).as_posix()}이 pmCopy를 쓰는데 공용 함수를 화면에 안 끼웁니다 — "
+            f"그 화면에서만 pmCopy가 없어 복사가 죽습니다"
+        )
+
+    # (3) 공용 함수가 비보안 출처에서 물러설 길(execCommand)을 들고 있는지.
+    js = copy_text_script()
+    assert "window.isSecureContext" in js, "보안 맥락 판정이 빠졌습니다"
+    assert 'document.execCommand("copy")' in js, (
+        "비보안 출처에서 물러설 길이 없습니다 — 그게 이 함수의 존재 이유입니다"
+    )
+    assert "return new Promise(" in js, (
+        "Promise를 안 돌려주면 부르는 자리의 .then(...) 피드백 사슬이 전부 깨집니다"
+    )
+
+    print(f"복사는 pmCopy 한 곳을 거침: 통과 (쓰는 화면 {len(users)}곳, "
+          f"직접 호출 0곳, 비보안 출처 폴백 있음)")
+
+
 def test_photo_override_is_one_place():
     """사진 추정 해제 — **입히는 자리가 `looks_like_photo_caption()` 맨 앞 한 곳**인지.
 
@@ -7092,6 +7174,7 @@ if __name__ == "__main__":
         test_refetch_titles_bulk,
         test_refetch_titles_widget_contract,
         test_title_watch_alert,
+        test_copy_goes_through_one_place,
         test_photo_override_is_one_place,
         test_photo_badge_css_is_in_every_screen,
         test_schedule_badge,

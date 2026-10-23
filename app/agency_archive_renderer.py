@@ -42,6 +42,7 @@ from app.naver_api import outlet_display_label
 from app.renderer import (
     build_group_copy_texts,
     known_label_chips_html,
+    copy_text_script,
     label_popover_script,
     label_popover_style,
 )
@@ -681,6 +682,7 @@ def render_agency_archive_page(
         topnav_style=topnav_style(),
         label_popover_style=label_popover_style(),
         label_popover_script=label_popover_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
+        copy_text_script=copy_text_script(),
         topnav=plain_nav(),
         title=html.escape(AGENCY_ARCHIVE_TITLE),
         scope=html.escape("·".join(AGENCY_ARCHIVE_KEYWORDS)),
@@ -909,12 +911,13 @@ _TEMPLATE = """<!DOCTYPE html>
   {body_html}
 </div>
 <script>
+{copy_text_script}
 {label_popover_script}
 /* 다른 화면의 copyArticleIcon과 하는 일은 같지만, 이 버튼은 <summary> 안에 있어
    **누르면 요약이 같이 펼쳐진다** — 그 한 가지 때문에 따로 둔다(공용 함수엔 그 처리가 없다). */
 function copyArchiveRow(e, btn) {{
   e.preventDefault(); e.stopPropagation();
-  navigator.clipboard.writeText(btn.dataset.copyText || '').then(function () {{
+  pmCopy(btn.dataset.copyText || '').then(function () {{
     btn.classList.add('is-copied');
     clearTimeout(btn._copyTimer);
     btn._copyTimer = setTimeout(function () {{ btn.classList.remove('is-copied'); }}, 1000);
@@ -984,7 +987,7 @@ function archiveNothingLoaded() {{
 function copyArchiveAll(btn) {{
   var text = archiveExportText(btn.closest('.exp'));
   if (!text) {{ archiveNothingLoaded(); return; }}
-  navigator.clipboard.writeText(text).then(function () {{
+  pmCopy(text).then(function () {{
     var before = btn.textContent;
     btn.textContent = '복사됨';
     setTimeout(function () {{ btn.textContent = before; }}, 1000);

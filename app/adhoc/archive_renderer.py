@@ -30,6 +30,7 @@ from app.adhoc.renderer import (
 from app.config import COLOR_ERROR, DELETED_LOG_TITLE
 from app.excel_export import date_range_label, sanitize_filename_part
 from app.icons import icon
+from app.renderer import copy_text_script
 
 _WEEKDAY_KR = ["월", "화", "수", "목", "금", "토", "일"]
 _PRESET_UNITS = {"day", "week", "month", "all"}
@@ -765,9 +766,9 @@ def render_archive_page(
 # 303 → GET)이다. 되돌아온 주소에 방금 지운 id(deleted)·되살린 id(restored)가 실려 오고,
 # 서버가 그 줄이 든 사안·날짜를 펼친 채로 그린다 — 여기서는 그 줄로 스크롤만 한다
 # (예전 스크롤 위치를 기억하는 것보다 확실하다: 펼침 상태가 바뀌면 위치도 달라진다).
-_ARCHIVE_SCRIPT = """<script>
+_ARCHIVE_SCRIPT = "<script>" + copy_text_script() + """
 function copyArchiveText(btn) {
-  navigator.clipboard.writeText(btn.dataset.copyText).then(function () {
+  pmCopy(btn.dataset.copyText).then(function () {
     var original = btn.textContent;
     btn.textContent = '복사했습니다';
     setTimeout(function () { btn.textContent = original; }, 900);

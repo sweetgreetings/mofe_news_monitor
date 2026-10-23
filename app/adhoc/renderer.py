@@ -127,6 +127,7 @@ from app import photo_overrides, schedule_overrides
 from app.llm_classifier import MAX_ARTICLES_FOR_CLASSIFY
 from app.renderer import (
     AI_SUMMARY_HEADING,
+    copy_text_script,
     apply_line_template,
     apply_subheading_format,
     format_slot_time_kr,
@@ -4100,6 +4101,7 @@ def render_card_page(
 
     copy_full_text = build_adhoc_plain_text(card)
     script = f"""<script>
+{copy_text_script()}
 var ADHOC_PLAIN_TEXT = {__import__("json").dumps(copy_full_text)};
 var ADHOC_CARD_ID = {__import__("json").dumps(card["id"])};
 
@@ -4211,7 +4213,7 @@ if (reloadNowForm) {{
 }}
 
 function copyWholeCard() {{
-  navigator.clipboard.writeText(ADHOC_PLAIN_TEXT).then(function () {{
+  pmCopy(ADHOC_PLAIN_TEXT).then(function () {{
     alert('복사했습니다.');
   }}).catch(function () {{ alert('복사에 실패했습니다.'); }});
 }}
@@ -4222,7 +4224,7 @@ function copyWholeCard() {{
 // flashEl: ✓로 바꿀 대상(없으면 누른 버튼). ⋯ 메뉴의 「복사하기」는 메뉴가 곧 닫히므로 ⋯ 버튼을 넘긴다.
 function copyArticleIcon(btn, flashEl) {{
   var mark = flashEl || btn;
-  navigator.clipboard.writeText(btn.dataset.copyText).then(function () {{
+  pmCopy(btn.dataset.copyText).then(function () {{
     mark.classList.add('is-copied');
     clearTimeout(mark._copyTimer);
     mark._copyTimer = setTimeout(function () {{ mark.classList.remove('is-copied'); }}, 1000);
@@ -4287,7 +4289,7 @@ renderRelativeTimes();
 // (data-copy-text를 클립보드에 넣고 아이콘을 1초간 ✓로). 카드 전체 복사(copyWholeCard)의
 // alert을 쓰지 않는 건, 소제목마다 있는 버튼이라 확인창이 번거롭기 때문이다.
 function copyGroupText(btn) {{
-  navigator.clipboard.writeText(btn.dataset.copyText).then(function () {{
+  pmCopy(btn.dataset.copyText).then(function () {{
     btn.classList.add('is-copied');
     clearTimeout(btn._copyTimer);
     btn._copyTimer = setTimeout(function () {{ btn.classList.remove('is-copied'); }}, 1000);

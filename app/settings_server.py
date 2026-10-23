@@ -205,6 +205,7 @@ from app.preview_renderer import (
     preview_move_article,
 )
 from app.renderer import (
+    copy_text_script,
     range_select_script,
     apply_line_template,
     apply_subheading_format,
@@ -4937,8 +4938,9 @@ _LABELS_TEMPLATE = (
 {undo_fab_html}
 <script>
 // [추가: 2026-09-15] 두 보관함의 copyArchiveText와 같은 피드백(글자가 잠깐 바뀜).
+{copy_text_script}
 function copyLabelText(btn) {{
-  navigator.clipboard.writeText(btn.dataset.copyText).then(function () {{
+  pmCopy(btn.dataset.copyText).then(function () {{
     var original = btn.textContent;
     btn.textContent = '복사했습니다';
     setTimeout(function () {{ btn.textContent = original; }}, 900);
@@ -5634,6 +5636,7 @@ def render_labels_page(selected: Optional[list] = None) -> str:
             )
     undo_fab_html = _label_undo_fab_html()
     return _LABELS_TEMPLATE.format(
+        copy_text_script=copy_text_script(),
         **_theme(),
         refetch_titles_style=refetch_titles_style(),
         refetch_titles_script=refetch_titles_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),

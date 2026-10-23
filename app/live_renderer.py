@@ -51,6 +51,7 @@ from app.labels import load_labels
 from app.renderer import (
     apply_line_template,
     known_label_chips_html,
+    copy_text_script,
     label_popover_script,
     label_popover_style,
     range_select_script,
@@ -840,6 +841,7 @@ function unhideFromLive(btn) {{
   }});
 }}
 {bulk_select_script}
+{copy_text_script}
 {label_popover_script}
 // [추가] 여러 건 한 번에 담아두기 — 회차 작업 중에 "이 기사들 지금 회차에 넣자"가
 // 뭉텅이로 생기는데, 행 버튼만 있으면 건수만큼 눌러야 했다. 고르는 문법(체크박스·선택 바·
@@ -1039,7 +1041,7 @@ document.addEventListener("click", function (e) {{
 // 「복사하기」는 누르는 순간 메뉴가 닫히므로 ⋯ 버튼을 넘긴다.
 function copyArticleIcon(btn, flashEl) {{
   var mark = flashEl || btn;
-  navigator.clipboard.writeText(btn.dataset.copyText).then(function () {{
+  pmCopy(btn.dataset.copyText).then(function () {{
     mark.classList.add("is-copied");
     clearTimeout(mark._copyTimer);
     mark._copyTimer = setTimeout(function () {{ mark.classList.remove("is-copied"); }}, 1000);
@@ -1515,6 +1517,7 @@ def _theme() -> dict:
         # 🏷 라벨 팝오버 — 네 화면(본문·대기·오류)이 같은 조각을 받는다.
         "label_popover_style": label_popover_style(),
         "label_popover_script": label_popover_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
+        "copy_text_script": copy_text_script(),
     }
 
 

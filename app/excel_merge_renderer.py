@@ -24,6 +24,7 @@ from app.config import (
 )
 from app.excel_merge import MAX_TABLE_ROWS, MAX_UPLOAD_BYTES
 from app.icons import icon
+from app.renderer import copy_text_script
 from app.llm_classifier import is_configured as llm_is_configured
 from app.settings import load_settings
 from app.topnav import plain_nav, topnav_style
@@ -148,7 +149,7 @@ def _style() -> str:
 # 화면의 JS. **평문 raw 문자열이다** — f-string·.format을 쓰지 않으므로 `\n`이 파이썬에
 # 먹히지 않고 JS 문자열 리터럴로 그대로 나간다(CLAUDE.md 「작업 규칙」의 `\\n` 사고 방지).
 # 서버가 넘기는 값은 전부 아래 `EM` 한 덩어리(JSON)로 받는다.
-_SCRIPT = r"""
+_SCRIPT = copy_text_script() + r"""
 var $ = function (id) { return document.getElementById(id); };
 
 // 열의 역할 — 값은 서버와 주고받는 내부 이름, 글자는 화면 이름.
@@ -479,7 +480,7 @@ $("file").onchange = function () {
 $("cp").onclick = function () {
   var t = $("out").textContent;
   if (!t) return;
-  navigator.clipboard.writeText(t).then(function () {
+  pmCopy(t).then(function () {
     $("cpnote").classList.remove("hidden");
     setTimeout(function () { $("cpnote").classList.add("hidden"); }, 1800);
   });
