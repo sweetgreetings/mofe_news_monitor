@@ -696,6 +696,14 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .kw-box {{ flex: 1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; border: 1px solid {border}; border-radius: var(--r-md); padding: 6px 8px; background: {card}; min-width: 200px; }}
   .kw-chip {{ background: {hover}; color: {accent}; border: 1px solid {border}; border-radius: var(--r-pill); padding: 3px 10px; font-size: var(--fs-sm); display: inline-flex; gap: 6px; align-items: center; }}
   .kw-chip button {{ border: none; background: none; color: {muted}; cursor: pointer; font-size: var(--fs-md); line-height: 1; padding: 0; }}
+  .kw-chip .kw-word {{ cursor: text; }}
+  /* 칩을 두 번 누르면 그 자리에 서는 입력칸. 선택자가 긴 이유 — 이 화면엔 모든 글자칸에
+     걸리는 `input[type=text]`(flex: 1 · min-width: 120px)과 `#new-card .field input[type=text]`
+     (height: 36px)가 있어, 클래스 하나로는 눌려 폭이 깎이고 칩 줄 높이도 어긋난다.
+     flex: none이라야 긴 검색어의 앞머리가 칸 밖으로 밀려나지 않는다. */
+  #new-card .field input[type=text].kw-chip-edit {{ border: 1px solid {accent}; background: {card};
+    border-radius: var(--r-pill); padding: 3px 10px; font: inherit; font-size: var(--fs-sm); color: {text};
+    outline: none; flex: none; height: auto; min-width: 0; max-width: 100%; }}
   .kw-add {{ border: none; background: none; color: {accent}; cursor: pointer; font-size: var(--fs-sm); font-weight: 600; padding: 3px 6px; flex: none; }}
   .kw-cnt {{ font-size: var(--fs-sm); color: {muted}; margin-left: auto; }}
   .tilde {{ color: {muted}; }}
@@ -1867,14 +1875,23 @@ function onDateChange() {{
 }}
 
 function renderKeywords() {{
-  document.querySelectorAll('.kw-chip').forEach(function (el) {{ el.remove(); }});
+  document.querySelectorAll('.kw-chip, .kw-chip-edit').forEach(function (el) {{ el.remove(); }});
   var box = document.getElementById('kw-box');
   var input = document.getElementById('kw-input');
   keywords.forEach(function (word, idx) {{
     var chip = document.createElement('span');
     chip.className = 'kw-chip';
-    chip.innerHTML = word.replace(/</g, '&lt;').replace(/>/g, '&gt;') +
-      ' <button type="button" onclick="removeKeyword(' + idx + ')">×</button>';
+    var w = document.createElement('span');
+    w.className = 'kw-word';
+    w.textContent = word;
+    w.title = '두 번 누르면 글자 수정';
+    w.ondblclick = function () {{ startKwEdit(idx); }};
+    var x = document.createElement('button');
+    x.type = 'button';
+    x.textContent = '×';
+    x.title = '이 검색어를 지웁니다';
+    x.onclick = function () {{ removeKeyword(idx); }};
+    chip.appendChild(w); chip.appendChild(x);
     box.insertBefore(chip, input);
   }});
   document.getElementById('kw-cnt').textContent = keywords.length + ' / ' + MAX_KEYWORDS;
@@ -1903,6 +1920,46 @@ function addKeyword() {{
 function removeKeyword(idx) {{
   keywords.splice(idx, 1);
   renderKeywords();
+}}
+
+// 칩을 두 번 누르면 그 자리가 입력칸이 된다 — 긴 검색어(「기획예산처+재정경제부+…」)를
+// 고치려고 지웠다 다시 치지 않게. 정기 검색어 화면(_KEYWORD_GROUPS_SCRIPT의 startEdit)과
+// 같은 문법이다: 엔터·칸 밖 누르기로 확정, Esc로 되돌림, 한글 조합 중 엔터는 무시.
+// 칸 폭은 글자 폭을 따라간다(수시 사안명 fitIssueWidth와 같은 방식) — 글자 수로 세면
+// 한글 한 자가 'ch' 한 칸보다 넓어 긴 검색어의 앞머리가 칸 밖으로 밀려난다.
+var _kwCanvas = document.createElement('canvas').getContext('2d');
+function startKwEdit(idx) {{
+  var chip = document.querySelectorAll('#kw-box .kw-chip')[idx];
+  if (!chip) return;
+  var edit = document.createElement('input');
+  edit.type = 'text';
+  edit.className = 'kw-chip-edit';
+  edit.value = keywords[idx];
+  chip.replaceWith(edit);
+  function fit() {{
+    var cs = getComputedStyle(edit);
+    _kwCanvas.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+    var extra = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 2;
+    edit.style.width = Math.ceil(_kwCanvas.measureText(edit.value || '검색어').width + extra + 4) + 'px';
+  }}
+  fit();
+  edit.oninput = fit;
+  edit.focus(); edit.select();
+  var done = false;   // 확정·취소 뒤 다시 그리면 blur가 한 번 더 온다
+  function commit() {{
+    if (done) return;
+    done = true;
+    var v = edit.value.trim();
+    // 빈 칸이거나 이미 있는 검색어면 되돌린다 — 지우는 길은 × 하나다(추가 때와 같은 규칙).
+    if (v && v !== keywords[idx] && keywords.indexOf(v) === -1) keywords[idx] = v;
+    renderKeywords();
+  }}
+  edit.onblur = commit;
+  edit.onkeydown = function (e) {{
+    if (e.isComposing || e.keyCode === 229) return;
+    if (e.key === 'Enter') {{ e.preventDefault(); commit(); }}
+    if (e.key === 'Escape') {{ done = true; renderKeywords(); }}
+  }};
 }}
 
 // 빈 칸에서 백스페이스 = 마지막 칩의 × 와 같은 일. 글자가 남아 있으면 평소대로 글자를
