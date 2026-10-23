@@ -504,6 +504,11 @@ _ME_STYLE = """
     font-size: var(--fs-md); font-weight: 600; font-family: inherit; cursor: pointer; }}
   .save-bar button:hover {{ background: {header}; }}
 
+  /* 「이 정보로 찾는다」는 연결만 보여 주는 줄 — 설명 문장은 두지 않는다. */
+  .card .goto {{ margin: 14px 0 0; font-size: var(--fs-sm); }}
+  .card .goto a {{ color: {accent}; text-decoration: none; }}
+  .card .goto a:hover {{ text-decoration: underline; }}
+
   .bottom-links {{ font-size: var(--fs-sm); color: {muted}; }}
   .bottom-links button.linky {{ background: none; border: none; padding: 0;
     font: inherit; color: {accent}; cursor: pointer; text-decoration: none; }}
@@ -573,6 +578,7 @@ _ME_PAGE = (
     <input type="text" id="answer" name="answer" autocomplete="off" form="profile"
            placeholder="새 답을 적으면 바뀝니다 (비워 두면 그대로)">
     <p class="fhint">띄어쓰기 없이 붙여서 적어 주세요. 질문을 바꿀 때는 새 답도 함께 적어 주세요.</p>
+    <p class="goto"><a href="/forgot">비밀번호 찾기 →</a></p>
   </div>
 
   <div class="card">
