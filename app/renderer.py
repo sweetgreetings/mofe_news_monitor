@@ -3968,7 +3968,13 @@ def render_page(
     # 사진 추정 행을 한 목록으로 모아 보여주고, 전체 선택은 모아 보는 중 띠가 맡는다
     # (photo_gather_script). 0건이면 버튼 자체를 안 그리는 규칙은 그대로다.
     photo_suspect_count = sum(1 for a in articles if looks_like_photo_caption(a))
-    photo_gather_btn_html = photo_gather_button_html(photo_suspect_count)
+    # 📅 일정 추정도 같은 알약 한 벌이다 — 판정은 행 배지와 같은 함수(app.filters).
+    sched_suspect_count = sum(
+        1 for a in articles if is_schedule_listing(a.get("title", ""), a.get("url", ""))
+    )
+    photo_gather_btn_html = gather_buttons_html(
+        {"photo": photo_suspect_count, "sched": sched_suspect_count}
+    )
     # [추가: 2026-08-11] 되돌릴 게 있을 때만 ↩ 버튼이 보인다 — 항상 떠 있으면 무엇이
     # 되돌아가는지 알 수 없어 오히려 누르기 불안하다는 판단(사용자와 합의).
     # [수정] 되돌릴 게 없으면 안 그리는 게 아니라 숨겨 둔다(undo_fab_html) — 화면을 다시
@@ -4694,9 +4700,13 @@ PHOTO_GATHER_STYLE = """
     font-size: var(--fs-xs); color: {text_soft}; background: {bg}; border: 1px solid {border};
     border-radius: var(--r-md); padding: 0 6px;
   }}
-  /* 모아 보는 중엔 전부가 사진 추정이라 흐림·📷 칩이 행마다 같은 값(=장식)이 된다. */
-  body.photo-gather .article.is-photo {{ opacity: 1; }}
-  body.photo-gather .photo-badge {{ display: none; }}
+  /* 모아 보는 중엔 전부가 그 종류라 흐림·칩이 행마다 같은 값(=장식)이 된다. 어느 종류를
+     모아 보는 중인지는 body의 gather-{{키}} 클래스가 말한다(.photo-gather는 「모아 보는
+     중」 하나만 뜻한다 — 목록 밖을 접는 아래 규칙이 종류와 무관해야 해서다). */
+  body.gather-photo .article.is-photo {{ opacity: 1; }}
+  body.gather-photo .photo-badge {{ display: none; }}
+  body.gather-sched .article.is-sched {{ opacity: 1; }}
+  body.gather-sched .sched-badge {{ display: none; }}
   /* 목록 밖의 것들은 이 동안 접는다. ↑↓는 소제목 안 순서라 한 줄로 모인 목록에선 뜻이 없다. */
   body.photo-gather .subheading:not(.photo-gather-view),
   body.photo-gather .manual-divider, body.photo-gather .manual-zone, body.photo-gather .bottom,
@@ -4712,6 +4722,10 @@ PHOTO_GATHER_SCRIPT = """
 // 되돌린다(applyViewMode의 flat-view와 같은 방식 — 앞 행의 next가 아직 모인 목록 안에 있는
 // 뒤 행을 가리킬 수 있어서다).
 var _pgHomes = null;
+// 지금 모아 보고 있는 종류(GATHER_KINDS의 키). **한 번에 한 종류만** — 다른 칩을 누르면
+// 먼저 제자리로 돌려놓고 갈아탄다(수시 원본의 거르기 줄과 같은 규칙).
+var _pgKind = "photo";
+function _pgInfo() { return GATHER_KINDS[_pgKind] || GATHER_KINDS.photo; }
 function _pgKey() { return PHOTO_GATHER_KEY_FN(); }
 function _pgOriginLabel(article) {
   var sec = article.closest(".subheading");
@@ -4722,21 +4736,27 @@ function _pgRefresh() {
   var strip = document.getElementById("photo-gather-strip");
   var view = document.getElementById("photo-gather-view");
   if (!strip || !view) { return; }
-  var n = view.querySelectorAll(".article.is-photo").length;
+  var kind = _pgInfo();
+  var n = view.querySelectorAll(".article." + kind.cls).length;
   var all = strip.querySelector("input");
   all.disabled = n === 0;
   if (n === 0) { all.checked = false; }
   strip.querySelector(".pg-msg").innerHTML = n
-    ? PHOTO_GATHER_ICON + " <b>사진 추정 " + n + "건</b>만 모아 보고 있어요"
-    : "남은 사진 추정이 없어요";
+    ? kind.icon + " <b>" + kind.name + " " + n + "건</b>만 모아 보고 있어요"
+    : "남은 " + kind.name + " 기사가 없어요";
   var done = view.querySelector(".pg-done");
   if (!n && !done) {
     view.insertAdjacentHTML("beforeend",
       '<div class="pg-done">다 치웠어요. 숨긴 기사는 왼쪽 아래 휴지통에서 되살릴 수 있어요.</div>');
   } else if (n && done) { done.remove(); }
 }
-function photoGatherOn() {
-  if (document.body.classList.contains("photo-gather")) { return; }
+function photoGatherOn(kind) {
+  kind = GATHER_KINDS[kind] ? kind : "photo";
+  if (document.body.classList.contains("photo-gather")) {
+    if (_pgKind === kind) { return; }
+    photoGatherOff();   // 종류를 갈아탈 때는 먼저 원래 자리로 돌려놓는다
+  }
+  _pgKind = kind;
   // 「보기 순서」가 시간순·언론사순이면 먼저 소제목별로 돌려놓는다 — 두 보기가 같은 행을
   // 서로 다른 자리로 옮기면 끌 때 제자리를 못 찾는다. 모아 보는 동안엔 잠근다.
   var sel = document.querySelector(".view-mode-select");
@@ -4745,7 +4765,8 @@ function photoGatherOn() {
     sel.disabled = true;
   }
   // .subheading 안의 행만 — 📌 담아둔 기사 칸(보고서 밖)은 대상이 아니다.
-  var rows = Array.prototype.slice.call(document.querySelectorAll(".subheading .article.is-photo"));
+  var rows = Array.prototype.slice.call(
+    document.querySelectorAll(".subheading .article." + _pgInfo().cls));
   _pgHomes = rows.map(function (el) { return { el: el, parent: el.parentElement, next: el.nextElementSibling }; });
   var anchor = document.querySelector(".subheading");
   var host = anchor ? anchor.parentNode : (document.getElementById("preview-body") || document.body);
@@ -4772,9 +4793,12 @@ function photoGatherOn() {
     + '<button type="button" onclick="photoGatherOff()">원래 화면으로</button>';
   if (anchor) { host.insertBefore(view, anchor); } else { host.appendChild(view); }
   host.insertBefore(strip, view);
-  document.body.classList.add("photo-gather");
-  document.querySelectorAll(".photo-gather-btn").forEach(function (b) { b.classList.add("is-on"); });
-  try { sessionStorage.setItem(_pgKey(), "1"); } catch (e) {}
+  document.body.classList.add("photo-gather", "gather-" + _pgKind);
+  // 켠 종류의 알약만 채운 파랑 — 종류를 안 적은 옛 알약은 사진으로 본다.
+  document.querySelectorAll(".photo-gather-btn").forEach(function (b) {
+    b.classList.toggle("is-on", (b.dataset.kind || "photo") === _pgKind);
+  });
+  try { sessionStorage.setItem(_pgKey(), _pgKind); } catch (e) {}
   // 🗑 한 건 숨기기는 새로고침 없이 행만 지우므로 건수를 따라 고친다.
   new MutationObserver(_pgRefresh).observe(view, { childList: true });
   _pgRefresh();
@@ -4794,6 +4818,7 @@ function photoGatherOff() {
     if (el) { el.remove(); }
   });
   document.body.classList.remove("photo-gather");
+  Object.keys(GATHER_KINDS).forEach(function (k) { document.body.classList.remove("gather-" + k); });
   document.querySelectorAll(".photo-gather-btn").forEach(function (b) { b.classList.remove("is-on"); });
   var sel = document.querySelector(".view-mode-select");
   if (sel) { sel.disabled = false; }
@@ -4801,16 +4826,22 @@ function photoGatherOff() {
   if (typeof updateBulkMoveBar === "function") { updateBulkMoveBar(); }
   window.scrollTo(0, 0);
 }
-function togglePhotoGather() {
-  if (document.body.classList.contains("photo-gather")) { photoGatherOff(); return; }
-  photoGatherOn();
+function togglePhotoGather() { toggleKindGather("photo"); }
+// 툴바의 종류 알약 — 누르면 그 종류만 모아 보고, 같은 알약을 다시 누르면 제자리로.
+// **빼는 게 아니라 모아 보는 것**이라, 빼려면 모아 본 자리에서 전부 고른 뒤 🗑 하면 된다.
+function toggleKindGather(kind) {
+  if (document.body.classList.contains("photo-gather") && _pgKind === kind) {
+    photoGatherOff();
+    return;
+  }
+  photoGatherOn(kind);
   window.scrollTo(0, 0);
 }
 // 화면에 보이는 사진 추정 행만 고른다.
 function photoGatherSelectAll(on) {
   var view = document.getElementById("photo-gather-view");
   if (!view) { return; }
-  view.querySelectorAll(".article.is-photo .article-select").forEach(function (cb) {
+  view.querySelectorAll(".article." + _pgInfo().cls + " .article-select").forEach(function (cb) {
     if (cb.closest(".article").offsetParent !== null) { cb.checked = on; }
   });
   if (typeof updateBulkMoveBar === "function") { updateBulkMoveBar(); }
@@ -4819,7 +4850,11 @@ function photoGatherSelectAll(on) {
 // 새로고침 뒤에도 그대로 이어간다. 키(회차)를 정하는 상수가 뒤쪽 스크립트에 있을 수 있어
 // 모든 스크립트가 돈 뒤(DOMContentLoaded)에 판단한다.
 document.addEventListener("DOMContentLoaded", function () {
-  try { if (sessionStorage.getItem(_pgKey())) { photoGatherOn(); } } catch (e) {}
+  // 옛 기록은 "1"(사진)이었다 — 값이 종류 키로 바뀌어도 그 탭이 멀쩡히 되살아나야 한다.
+  try {
+    var saved = sessionStorage.getItem(_pgKey());
+    if (saved) { photoGatherOn(saved === "1" ? "photo" : saved); }
+  } catch (e) {}
 });
 """
 
@@ -4827,6 +4862,27 @@ document.addEventListener("DOMContentLoaded", function () {
 def photo_gather_style() -> str:
     """📷 사진 추정 모아 보기 CSS — 확정본·초안 공용(kw_inline_style과 같은 방식)."""
     return PHOTO_GATHER_STYLE.format(**PALETTE)
+
+
+# [추가: 2026-10-22] 모아 보기의 종류 — (키, 행 클래스, 아이콘, 이름, 말풍선).
+# 판정을 새로 만들지 않는다: 사진 looks_like_photo_caption · 일정 is_schedule_listing.
+# 수시 원본의 거르기 줄(app/adhoc/renderer.py `_RAW_KINDS`)과 같은 이름·같은 동작이라
+# 한쪽만 고치지 않는다.
+GATHER_KINDS = (
+    ("photo", "is-photo", "camera", "사진 추정",
+     "사진 추정 기사만 한곳에 모아 봅니다 — 보고서(복사·txt·발송)는 그대로예요"),
+    ("sched", "is-sched", "calendar", "일정 추정",
+     "정형 일정 나열 기사만 한곳에 모아 봅니다 — 보고서(복사·txt·발송)는 그대로예요"),
+)
+
+
+def _gather_kinds_js() -> str:
+    """모아 보기 JS가 쓰는 종류 표. 화면 글자와 행 클래스가 같은 표에서 나와야
+    「알약 이름과 띠 글자가 다른」 일이 안 생긴다(f-string 안에 중괄호를 안 넣으려고 함수로 뺀다)."""
+    return json.dumps(
+        {key: {"cls": cls, "name": name, "icon": icon(ic)} for key, cls, ic, name, _tip in GATHER_KINDS},
+        ensure_ascii=False,
+    )
 
 
 def photo_gather_script(key_js: str) -> str:
@@ -4838,24 +4894,35 @@ def photo_gather_script(key_js: str) -> str:
     """
     return (
         f"var PHOTO_GATHER_ICON = {json.dumps(icon('camera'))};\n"
+        f"var GATHER_KINDS = {_gather_kinds_js()};\n"
         f"function PHOTO_GATHER_KEY_FN() {{ return {key_js}; }}\n"
         + PHOTO_GATHER_SCRIPT
     )
 
 
-def photo_gather_button_html(count: int) -> str:
-    """툴바 오른쪽 묶음의 「📷 사진 추정 (N)」 알약 — 사진 추정이 0건이면(가장 흔한 정상
-    상태) 버튼 자체를 안 그린다(예전 「사진 추정 전체 선택」과 같은 규칙).
+def gather_buttons_html(counts: dict) -> str:
+    """툴바 오른쪽 묶음의 종류 알약 — 「📷 사진 추정 (N)」·「🗓 일정 추정 (N)」.
 
-    화면만 바꾸는 보기라 왼쪽(보고서 내용을 바꾸는 네모 버튼)이 아니라 오른쪽에 서고,
-    모양도 네모가 아니라 알약이다 — 확정본·초안이 같은 함수를 쓴다."""
-    if not count:
-        return ""
-    return (
-        '<button class="photo-gather-btn" type="button" onclick="togglePhotoGather()" '
-        'title="사진 추정 기사만 한곳에 모아 봅니다 — 보고서(복사·txt·발송)는 그대로예요">'
-        f"{icon('camera')} 사진 추정 ({count})</button>"
-    )
+    **0건인 종류는 버튼 자체를 안 그린다**(가장 흔한 정상 상태라, 눌러도 아무 일 없는
+    알약이 늘 서 있으면 그 자리를 안 읽게 된다). 화면만 바꾸는 보기라 왼쪽(보고서 내용을
+    바꾸는 네모 버튼)이 아니라 오른쪽에 서고, 모양도 네모가 아니라 알약이다 —
+    확정본·초안이 같은 함수를 쓴다. 순서는 GATHER_KINDS 그대로다."""
+    out = []
+    for key, _cls, ic, name, tip in GATHER_KINDS:
+        n = counts.get(key) or 0
+        if not n:
+            continue
+        out.append(
+            f'<button class="photo-gather-btn" type="button" data-kind="{key}" '
+            f'onclick="toggleKindGather(\'{key}\')" title="{html.escape(tip)}">'
+            f"{icon(ic)} {name} ({n})</button>"
+        )
+    return "".join(out)
+
+
+def photo_gather_button_html(count: int) -> str:
+    """옛 이름 — 사진 알약 하나만 그린다(부르는 자리가 남아 있으면 그대로 돈다)."""
+    return gather_buttons_html({"photo": count})
 
 
 def hidden_trash_style() -> str:

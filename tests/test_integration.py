@@ -1991,7 +1991,22 @@ def test_photo_gather_and_adhoc_bulk_hide():
     assert "selectAllPhotoSuspects" not in with_photo, "옛 전체 선택 함수가 남아 있음"
     assert "photoGather:" in with_photo and "togglePhotoGather" in with_photo
     without = renderer.render_page("11:00", [reg("https://r.x/1", "청문회 답변")], *args)
-    assert 'onclick="togglePhotoGather()"' not in without, "사진 추정 0건인데 버튼이 그려짐"
+    assert 'data-kind="photo"' not in without, "사진 추정 0건인데 버튼이 그려짐"
+
+    # [추가: 2026-10-22] 📅 일정 추정도 같은 알약 한 벌이다 — 확정본·초안이 같은 함수를 쓰고
+    # (gather_buttons_html), 0건인 종류는 안 그린다. 한 번에 한 종류만 켜진다(toggleKindGather).
+    with_sched = renderer.render_page("11:00", [reg("https://r.x/1", "청문회 답변"),
+                                                reg("https://r.x/3", "[오늘의 국회일정](22일·목)")], *args)
+    assert "일정 추정 (1)" in with_sched and 'data-kind="sched"' in with_sched, "정기 일정 알약 없음"
+    assert 'data-kind="sched"' not in without, "일정 추정 0건인데 버튼이 그려짐"
+    assert "var GATHER_KINDS" in with_sched and "function toggleKindGather" in with_sched, \
+        "종류별 모아 보기 JS가 없음"
+    assert "body.gather-sched" in with_sched, "모아 보는 동안 일정 행의 흐림을 푸는 규칙이 없음"
+    from app.preview_renderer import _actions_html as _draft_actions_html
+    draft_tb = _draft_actions_html("본문", "15:00", photo_suspect_count=2, sched_suspect_count=3)
+    assert "사진 추정 (2)" in draft_tb and "일정 추정 (3)" in draft_tb, "초안 툴바에 종류 알약이 없음"
+    assert "photo-gather-btn" not in _draft_actions_html("본문", "15:00"), \
+        "초안: 0건인데 알약이 그려짐"
 
     with tempfile.TemporaryDirectory() as tmp:
         adhoc_dir = Path(tmp)
