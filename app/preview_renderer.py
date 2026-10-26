@@ -3564,8 +3564,8 @@ def _actions_html(
         '<select class="view-mode-select" onchange="applyViewMode(this.value)" '
         'title="소제목 구성은 그대로 두고 화면에 나열하는 순서만 바꿉니다">'
         '<option value="subheading" selected>소제목 내 언론사순</option>'
-        '<option value="group-time">소제목 내 시간순</option>'
-        '<option value="time">시간순</option>'
+        '<option value="group-time">소제목 내 최신순</option>'
+        '<option value="time">최신순</option>'
         '<option value="outlet">언론사순</option>'
         "</select>"
         f"{refresh_link_html('preview')}"

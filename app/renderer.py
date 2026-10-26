@@ -947,8 +947,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
         </span>
         <select class="view-mode-select" onchange="applyViewMode(this.value)" title="소제목 구성은 그대로 두고 화면에 나열하는 순서만 바꿉니다">
           <option value="subheading" selected>소제목 내 언론사순</option>
-          <option value="group-time">소제목 내 시간순</option>
-          <option value="time">시간순</option>
+          <option value="group-time">소제목 내 최신순</option>
+          <option value="time">최신순</option>
           <option value="outlet">언론사순</option>
         </select>
         {refresh_link_html}
@@ -1634,7 +1634,7 @@ function applyViewMode(mode) {{
       return {{ el: el, parent: el.parentElement, next: el.nextElementSibling }};
     }});
   }}
-  // [추가: 2026-08-04] "소제목 내 시간순" — 소제목 경계는 그대로 두고, 각 소제목 안
+  // [추가: 2026-08-04] "소제목 내 최신순" — 소제목 경계는 그대로 두고, 각 소제목 안
   // 카드만 시간순으로 다시 배열한다(시간순/언론사순처럼 통째로 한 줄로 펼치지 않음).
   if (mode === "group-time") {{
     document.querySelectorAll(".subheading").forEach(function(section) {{

@@ -2969,7 +2969,7 @@ function applyViewMode(mode) {
       return {el: el, parent: el.parentElement, next: el.nextElementSibling};
     });
   }
-  // 「소제목 내 시간순」 — 소제목 경계는 그대로 두고 그 안에서만 다시 세운다.
+  // 「소제목 내 최신순」 — 소제목 경계는 그대로 두고 그 안에서만 다시 세운다.
   if (mode === 'group-time') {
     document.querySelectorAll('.group-block').forEach(function (section) {
       var inGroup = Array.prototype.filter.call(section.children, function (el) {
@@ -3977,8 +3977,8 @@ def render_card_page(
         '<select class="view-mode-select" onchange="applyViewMode(this.value)" '
         'title="소제목 구성은 그대로 두고 화면에 나열하는 순서만 바꿉니다">'
         '<option value="subheading" selected>소제목 내 언론사순</option>'
-        '<option value="group-time">소제목 내 시간순</option>'
-        '<option value="time">시간순</option>'
+        '<option value="group-time">소제목 내 최신순</option>'
+        '<option value="time">최신순</option>'
         '<option value="outlet">언론사순</option></select>'
         if len(rank_by_url) >= 2
         else ""
