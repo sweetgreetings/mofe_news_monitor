@@ -72,6 +72,8 @@ from app.group_order import apply_group_order, is_order_locked
 from app.filters import (headline_kind, HEADLINE_TAG_RE, looks_like_photo_caption,
                          photo_badge_tip, is_schedule_listing, schedule_badge_tip)
 from app.highlight import highlight_keywords
+# 「낱말로 찾기」(정기 보관함·기관 기사 찾기 공용) — 찾은 낱말 노랑·스니펫 한 곳.
+from app.word_search import mark as word_mark, snippet as word_snippet
 from app.icons import icon
 from app.labels import label_stats, labels_for_url, snapshot_source
 from app.manual_articles import load_manual_articles
@@ -2476,6 +2478,11 @@ def render_article(
     # 새로고침해도 남는다. refetch_marks와 함께일 때만 쓴다 — 버튼이 없는 화면에 표식만
     # 달지 않는다는 그 규칙 그대로다. 파일은 화면마다 한 번만 읽어 넘긴다.
     refetch_history: Optional[dict] = None,
+    # [추가] 「낱말로 찾기」 — 정기 보관함이 낱말로 찾는 동안만 넘긴다. 넘어오면
+    # **형광펜을 끄고**(이 화면의 노랑은 「찾은 낱말」 하나만 뜻해야 한다) 찾은 낱말을
+    # <mark>로 칠하며, 낱말이 요약에만 있으면 제목 밑에 스니펫 한 줄을 붙인다.
+    # 규칙은 app.word_search 한 곳이고 기관 기사 찾기가 같은 함수를 쓴다.
+    found_words: str = "",
 ) -> str:
     """기사 한 건을 렌더링한다.
 
@@ -2573,21 +2580,25 @@ def render_article(
     # 서로 안 지운다. [단독]은 이 소제목 안에서 이미 맨 위로 정렬돼 있으므로(app.filters.
     # sort_scoop_first, app.scraper.collect_run/app.preview_renderer 호출부) 카드 자체도
     # 강조한다(art-scoop) — 여러 건 나올 수 있는 [속보]는 자리는 그대로 두고 글자색만.
+    def _hl(text: str) -> str:
+        """형광펜(설정값) 또는 찾은 낱말(노랑) — 둘을 겹쳐 칠하지 않는다."""
+        return word_mark(text, found_words) if found_words else highlight_keywords(text, highlight_words)
+
     _kind = headline_kind(article["title"])
     if _kind:
         _prefix_len = HEADLINE_TAG_RE.match(article["title"]).end()
         _headline_cls = "t-scoop" if _kind == "단독" else "t-flash"
         title = (
             f'<span class="{_headline_cls}">'
-            f'{highlight_keywords(article["title"][:_prefix_len], highlight_words)}</span>'
-            f'{highlight_keywords(article["title"][_prefix_len:], highlight_words)}'
+            f'{_hl(article["title"][:_prefix_len])}</span>'
+            f'{_hl(article["title"][_prefix_len:])}'
         )
     else:
-        title = highlight_keywords(article["title"], highlight_words)
+        title = _hl(article["title"])
     title_attr = html.escape(article["title"])
     pub_date_attr = html.escape(article.get("pub_date") or "")
     url = html.escape(article["url"])
-    summary_html = highlight_keywords(article.get("summary", ""), highlight_words)
+    summary_html = _hl(article.get("summary", ""))
     # [수정: 2026-08-19] 화면 제목 줄은 더 이상 line_template(복사·다운로드·발송 전용)을
     # 따르지 않는다 — "ㅇ " 글머리 기호는 화면에서 정보 없이 자리만 차지해서 뺐다.
     # 괄호는 남긴다: 저장된 기사 제목의 약 25%가 [단독]/[속보]/따옴표 등 기호로
@@ -2884,6 +2895,11 @@ def render_article(
     row_mark = f' data-refetch-row data-pub="{pub_date_attr}"' if refetch_marks else ""
     meta_mark = " data-refetch-meta" if refetch_marks else ""
     # 저장된 제목 변경 이력 — 세 조각이 가는 자리는 refetch_title_marks의 설명 그대로다.
+    snippet_html = (
+        word_snippet(article.get("summary") or "", article.get("title") or "", found_words)
+        if found_words
+        else ""
+    )
     refetch_chip_html = refetch_was_html = refetch_hist_html = ""
     if refetch_marks and refetch_history:
         refetch_chip_html, refetch_was_html, refetch_hist_html = refetch_title_marks(
@@ -2895,6 +2911,9 @@ def render_article(
         "<details>"
         "<summary>"
         f'<div class="title-row">{checkbox_html}<span class="title-line">{line_html}</span>{sched_badge_html}{photo_badge_html}{finalize_badge_html}</div>'
+        # 스니펫은 제목 바로 밑이라 옛 제목 줄(.refetch-was)보다 앞에 둔다 — 둘 다
+        # 제 줄을 쓰므로 CSS `order`가 같아도 DOM 순서가 그대로 보이는 순서가 된다.
+        f"{snippet_html}"
         f"{refetch_was_html}"
         f'<div class="action-row"{meta_mark}>'
         # [수정: 2026-09-14] 칩을 검색어 앞으로 — 검색어가 남는 자리만큼 잘리게 되면서, 뒤에

@@ -123,7 +123,9 @@ from app.history_renderer import (
     build_excel_rows_for_dates,
     excel_filename_for_dates,
     generate_history_page,
+    preset_range as history_preset_range,
     render_history_day_fragment,
+    render_history_search_page,
 )
 from app.home_trend import add_trend_word, remove_trend_word
 from app.agency_archive_renderer import (
@@ -5847,6 +5849,11 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             return
         if self.path in _STATIC_HTML_ROUTES:
             self._respond_static_html(_STATIC_HTML_ROUTES[self.path]())
+        elif self.path.startswith("/history.html?"):
+            # 낱말로 찾기 — **같은 주소**에 q가 붙어 온다(화면이 하나다). 기간 조회와
+            # 달리 서버가 찾는다: 이 화면은 최근 이틀치 기사만 미리 그려 두고 나머지는
+            # 펼칠 때 불러오므로, 화면에 없는 날짜는 화면에서 찾을 수 없다.
+            self._handle_history_search()
         elif self.path.startswith("/history/day?"):
             self._handle_history_day()
         elif LOGO_PATH.exists() and self.path == f"/{LOGO_PATH.name}":
@@ -6241,6 +6248,37 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         auth_session.set_login_required(want_on)
         logger.info("로그인 사용: %s", "켬" if want_on else "끔")
         self._redirect("/login-settings")
+
+    @staticmethod
+    def _iso_date(value: str) -> str:
+        """날짜 칸 값 — 날짜가 아니면 빈 값으로 돌린다(주소로 아무 글자나 올 수 있다)."""
+        try:
+            return datetime.fromisoformat(value).date().isoformat()
+        except (TypeError, ValueError):
+            return ""
+
+    def _handle_history_search(self) -> None:
+        """정기 보관함 `/history.html?q=…` — 낱말로 찾은 결과를 서버가 그려 준다.
+
+        빠른 설정(preset)이 날짜 칸을 이긴다 — 화면이 날짜 칸을 늘 채워 보내므로
+        직접 입력을 먼저 보면 버튼이 아무 일도 못 한다(기관 기사 찾기와 같은 규칙).
+        q가 비어 오면 평소 화면(정적 파일) 그대로다.
+        """
+        query = parse_qs(urlsplit(self.path).query)
+        word = (query.get("q", [""])[0] or "").strip()
+        if not word:
+            self._respond_static_html(HISTORY_HTML_PATH)
+            return
+        preset = query.get("preset", [""])[0]
+        if preset:
+            start, end = history_preset_range(preset)
+        else:
+            start = self._iso_date(query.get("start", [""])[0])
+            end = self._iso_date(query.get("end", [""])[0])
+        if start and end and start > end:
+            # 거꾸로 된 구간은 0건이 나오는데 그게 「그 기간엔 없었다」와 구별되지 않는다.
+            start, end = end, start
+        self._respond(render_history_search_page(word, start, end))
 
     def _handle_history_day(self) -> None:
         """지난 기사 화면의 지연 로딩 — 오래된 날짜(EAGER_HISTORY_DAYS 밖)를 실제로 펼칠

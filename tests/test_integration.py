@@ -7154,6 +7154,105 @@ def test_excel_merge():
     print("56) 엑셀파일로 보고용 텍스트 생성: 통과 (빈 줄·날짜·셀 링크, 줄 수 초과는 거절, AI는 빈 소제목만·빠진 기사는 기타, 키 없으면 안내)")
 
 
+
+def test_history_word_search():
+    """정기 보관함 「낱말로 찾기」 — **걸린 기사만** 남기고, 노랑은 찾은 낱말 하나만 뜻한다.
+
+    (1) 걸린 날짜·회차만 서고 안 걸린 날짜는 아예 안 그린다 — 「전부 그린 뒤 화면에서
+        숨기기」가 아니다. 이 화면은 최근 EAGER_HISTORY_DAYS일치만 미리 그려 두고 나머지는
+        펼칠 때 불러오므로, 화면에서 거르면 **화면에 없는 날짜는 영영 못 찾는다.**
+    (2) 찾은 낱말은 <mark>, 그동안 **형광펜은 끈다** — 한 줄에 두 노랑이 서면 서로 다른
+        말을 한다.
+    (3) 낱말이 요약에만 있으면 스니펫 한 줄, 제목에 이미 있으면 안 그린다(제목이 곧 답이다).
+    (4) 숨긴 기사는 안 걸리고, 담당자가 **고친 제목으로 찾아도 걸린다** — 저장된 원본으로만
+        찾으면 하필 그가 신경 써서 고친 기사가 안 찾힌다.
+    (5) `+`는 AND(앱 공통 규칙, app.search_terms).
+    (6) 엑셀·선택 삭제는 안 그린다 — 엑셀은 날짜만 서버로 보내 다시 만들고 날짜 줄 🗑는
+        「이 날 회차 모두」라, 걸린 회차만 선 화면에서 둘 다 거짓이 된다.
+    """
+    _require_isolation()
+    from unittest.mock import patch
+    from app import curation
+    from app import labels as labels_mod
+    from app import summary_overrides as so
+    from app.config import DEFAULT_ARTICLE_LINE_TEMPLATE, DEFAULT_SUBHEADING_FORMAT_TEMPLATE
+    from app.history_renderer import render_history_page, render_history_search_page, search_history
+
+    now = datetime.now()
+    hit_day = now.strftime("%Y-%m-%d")
+    miss_day = (now - timedelta(days=3)).strftime("%Y-%m-%d")
+    pen = [{"word": "세제", "color": 0}]
+
+    def art(key, title, summary=""):
+        return {"outlet": "테스트일보", "title": title, "url": f"https://example.com/{key}",
+                "summary": summary, "pub_date": f"{hit_day}T10:00:00+09:00", "group": "세제"}
+
+    storage.save_run("11:00", [
+        art("a", "가상자산 과세 숙고해 판단"),                        # 제목에 있다
+        art("b", "코인과세 유예에 무게", "이형일은 가상자산 과세 시기를 두고 세제 논의"),  # 요약에만
+        art("c", "공공기관 성비위 폭증", "세제와 무관한 기사"),        # 안 걸린다
+    ], run_at=f"{hit_day}T11:00:00")
+    storage.save_run("09:00", [art("z", "재산세 개편 논의", "세제")],
+                     run_at=f"{miss_day}T09:00:00")
+
+    def render(word):
+        return render_history_search_page(
+            word, highlight_words=pen, line_template=DEFAULT_ARTICLE_LINE_TEMPLATE,
+            subheading_format=DEFAULT_SUBHEADING_FORMAT_TEMPLATE,
+        )
+
+    with tempfile.TemporaryDirectory() as tmp, \
+         patch.object(curation, "HIDDEN_ARTICLES_FILE", Path(tmp) / "hidden.json"), \
+         patch.object(labels_mod, "LABELS_FILE", Path(tmp) / "labels.json"), \
+         patch.object(so, "SUMMARY_OVERRIDES_FILE", Path(tmp) / "overrides.json"):
+
+        page = render("가상자산 과세")
+        # (1) 걸린 날짜만 — 안 걸린 날짜 줄 자체가 없다
+        assert f'data-date="{hit_day}"' in page, "걸린 날짜가 안 섰다"
+        assert f'data-date="{miss_day}"' not in page, "안 걸린 날짜가 그려졌다"
+        assert "가상자산 과세 숙고해 판단" in page and "코인과세 유예에 무게" in page
+        assert "공공기관 성비위 폭증" not in page, "안 걸린 기사가 남았다"
+        assert f'data-date="{hit_day}" open>' in page, "걸린 날짜가 접힌 채로 열렸다"
+        assert 'class="slot" ' in page and " open><summary>" in page, "걸린 회차가 접혔다"
+        # (2) 노랑은 찾은 낱말만 — 형광펜(세제)은 안 칠한다
+        assert "<mark>가상자산 과세</mark>" in page, "찾은 낱말이 노랑이 아니다"
+        assert "hl-word" not in page, "찾는 동안 형광펜이 같이 칠해졌다"
+        # (3) 스니펫 — 요약에만 있는 b에만
+        assert page.count('class="snip"') == 1, "스니펫이 제목에 있는 기사에도 붙었다"
+        # (6) 엑셀·선택 삭제 없음
+        # (버튼만 본다 — 같은 이름의 JS 함수는 화면 블록 하나라 늘 들어 있다)
+        assert "downloadHistoryDayExcel(this)" not in page, "검색 결과에 날짜 엑셀이 그려졌다"
+        assert 'onclick="downloadHistoryAllExcel()"' not in page, "검색 결과에 전체 엑셀이 그려졌다"
+        assert ">선택 삭제<" not in page, "검색 결과에 선택 삭제가 그려졌다"
+        # 평소 화면엔 낱말 줄이 서고 엑셀·선택 삭제는 그대로다
+        plain = render_history_page(
+            storage.list_runs_for_date(hit_day), highlight_words=pen,
+            deleted_runs=[], latest_key=("", ""),
+        )
+        assert 'name="q"' in plain and "예: 가상자산 과세+유예" in plain, "평소 화면에 낱말 칸이 없다"
+        assert ">선택 삭제<" in plain and 'onclick="downloadHistoryAllExcel()"' in plain
+
+        # (5) `+`는 AND — 둘 다 든 기사만
+        assert search_history("가상자산+유예")[1] == 1, "+가 AND로 안 걸렸다"
+        assert search_history("가상자산+없는말")[1] == 0
+
+        # (4) 숨긴 기사는 안 걸린다
+        assert search_history("가상자산 과세")[1] == 2
+        curation.hide_articles([{"url": "https://example.com/b"}])
+        assert search_history("가상자산 과세")[1] == 1, "숨긴 기사가 그대로 걸린다"
+
+        # (4) 고친 제목으로 찾아도 걸린다 — 저장된 원본엔 없는 말이다
+        assert search_history("증권거래세")[1] == 0
+        so.set_summary_override("https://example.com/a", "증권거래세 개편 검토", None, manual=True)
+        assert search_history("증권거래세")[1] == 1, "담당자가 고친 말로 찾으니 0건이 나온다"
+
+        # 0건이면 「없다」를 산문으로 설명하지 않고 할 일 한 줄만
+        none = render("있을리없는낱말")
+        assert "찾은 기사가 없어요" in none and "기간을 넓히거나" in none
+
+    print("55) 정기 보관함 낱말로 찾기: 통과 (걸린 기사만·노랑은 찾은 낱말·스니펫·숨김·고친 제목·+ AND)")
+
+
 if __name__ == "__main__":
     tests = [
         test_unclassified_sits_below_summary,
@@ -7179,6 +7278,7 @@ if __name__ == "__main__":
         test_photo_badge_css_is_in_every_screen,
         test_schedule_badge,
         test_outlet_override_is_one_place,
+        test_history_word_search,
         test_agency_archive_filters,
         test_agency_archive_keeps_every_date,
         test_agency_archive_labels,

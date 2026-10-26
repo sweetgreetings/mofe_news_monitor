@@ -52,6 +52,7 @@ from app.renderer import (
     schedule_override_script,
     render_article,
 )
+from app.word_search import matches as word_matches
 from app.today_cuts import cut_origin
 from app.settings import active_schedule_times, load_settings
 from app.storage import (
@@ -189,6 +190,17 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .result-bar {{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 2px 8px; }}
   .result-line {{ font-size: var(--fs-sm); color: {muted}; margin: 0; }}
   .result-line b {{ color: {header}; }}
+  /* [추가] 낱말로 찾기 — 칸은 기간 칸과 같은 높이·테두리, 「지우기」는 보조 동작이라
+     테두리 글자 버튼(파란 채움은 「찾기」 하나다). */
+  .prow input[type=search] {{ font: inherit; font-size: var(--fs-md); border: 1px solid {border};
+    border-radius: var(--r-md); background: {card}; color: {text}; padding: 5px 10px;
+    flex: 1 1 240px; min-width: 180px; }}
+  .prow .clr {{ border: 1px solid {border}; background: {card}; color: {text_soft};
+    border-radius: var(--r-md); padding: 6px 12px; font-size: var(--fs-sm); cursor: pointer;
+    font-family: inherit; text-decoration: none; }}
+  .prow .jhint {{ font-size: var(--fs-sm); color: {muted}; }}
+  .clear-q {{ font-size: var(--fs-sm); color: {accent}; text-decoration: none; }}
+  .empty .how {{ display: block; margin-top: 6px; font-size: var(--fs-md); }}
   /* 복사/txt/엑셀 — 결과 전체·날짜·회차 세 층에 같은 모양(app.adhoc.archive_renderer의
      같은 클래스와 동일 규칙). 날짜·결과 전체 층은 "이미 펼쳐서(=로딩된) 화면에 있는
      내용"만 모아 클라이언트에서 이어붙인다 — 회차 층이 이미 만들어둔 data-copy-text를
@@ -416,6 +428,13 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     flex-shrink: 0; color: {muted}; font-size: var(--fs-sm); white-space: nowrap;
     user-select: none; -webkit-user-select: none;
   }}
+  /* [추가] 낱말로 찾는 동안만 쓰는 둘. 노랑은 이 화면에서 **찾은 낱말** 하나만
+     뜻한다 — 그동안 형광펜은 끈다(app.renderer.render_article의 found_words). */
+  mark {{ background: {row_new}; color: inherit; padding: 0 1px; border-radius: var(--r-sm); }}
+  /* 스니펫 — 요약이 접혀 있어 제목만 보고는 왜 걸렸는지 모른다. 제목 바로 밑에 한 줄.
+     옛 제목 줄(.refetch-was)과 같은 order라 DOM 순서가 그대로 보이는 순서가 된다. */
+  .snip {{ order: 3; flex: 1 1 100%; margin: 2px 0 0; font-size: var(--fs-md); color: {text_soft};
+    line-height: 1.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
   .article-summary {{ margin: 6px 0 4px 20px; color: {text}; font-size: var(--fs-md); }}
   .hide-btn, .copy-btn {{
     flex-shrink: 0; background: transparent; border: none; color: {muted}; font-size: var(--fs-base);
@@ -942,6 +961,10 @@ function applyHistoryPeriodFilter(start, end) {{
   line.firstChild.textContent = historyRangeLabel(start, end) + ' · ';
   document.getElementById('hist-period-start').value = start;
   document.getElementById('hist-period-end').value = end;
+  // 낱말 폼이 지금 고른 기간을 그대로 들고 가게 맞춰 둔다 — 안 맞추면 기간을 좁혀
+  // 놓고 찾았는데 서버는 전체 기간을 뒤진다.
+  var qs = document.getElementById('hist-q-start');
+  if (qs) {{ qs.value = start; document.getElementById('hist-q-end').value = end; }}
 }}
 function setHistoryPeriodPreset(unit) {{
   var range = historyPresetRange(unit);
@@ -1184,6 +1207,7 @@ def _render_slot(
     subheading_format: str = DEFAULT_SUBHEADING_FORMAT_TEMPLATE,
     open_first: bool = False,
     lock_reason: Optional[str] = None,
+    found_words: str = "",
 ) -> str:
     """회차 하나(시간대)를 토글로 렌더링한다.
 
@@ -1218,6 +1242,10 @@ def _render_slot(
     """
     labels = load_group_labels(round_id_for_run(run))
     articles = apply_summary_overrides(filter_hidden(run["articles"]))
+    if found_words:
+        # 낱말로 찾는 중 — **고친 값을 입힌 뒤** 대조한다(담당자가 고친 말로 찾았을 때
+        # 0건이 나오면 안 된다). 소제목 묶음·건수·복사 텍스트는 남은 기사로 다시 선다.
+        articles = [a for a in articles if word_matches(a, found_words)]
     # [추가: 2026-09-16] 🏷 라벨 — 이 화면에서도 붙일 수 있다. `부정기사`처럼 나중에
     # 알게 되는 라벨은 회차가 지난 뒤에 붙는데(사용자 요청: "어? 어제 부정기사였는데
     # 이것도 붙여야 되는 거 아니야?"), 지금까지는 붙일 자리가 오늘 회차에만 있었다.
@@ -1256,7 +1284,7 @@ def _render_slot(
                         known_labels_html=known_labels_html,
                         scrap_date=label_scrap_date, scrap_end=run["run_slot"],
                         labels_lookup=labels_lookup, refetch_marks=True,
-                        refetch_history=refetch_history,
+                        refetch_history=refetch_history, found_words=found_words,
                     )
                     for a in group_articles
                 )
@@ -1269,7 +1297,7 @@ def _render_slot(
                     show_label_control=True, known_labels_html=known_labels_html,
                     scrap_date=label_scrap_date, scrap_end=run["run_slot"],
                     labels_lookup=labels_lookup, refetch_marks=True,
-                    refetch_history=refetch_history,
+                    refetch_history=refetch_history, found_words=found_words,
                 )
                 for a in articles
             )
@@ -1391,6 +1419,14 @@ def _date_label(run_date, today) -> str:
     return f"{run_date.month}월 {run_date.day}일 ({_WEEKDAY_KR[run_date.weekday()]})"
 
 
+# 낱말로 찾는 동안의 날짜 줄 가져가기 — **엑셀이 없다**(_search_period_and_result_html 주석).
+_SEARCH_DAY_EXPORT_HTML = (
+    '<span class="exp">'
+    '<button type="button" onclick="event.stopPropagation(); copyHistoryDayText(this);">복사</button>'
+    '<button type="button" onclick="event.stopPropagation(); downloadHistoryDayText(this);">텍스트</button>'
+    "</span>"
+)
+
 _DAY_EXPORT_ACTIONS_HTML = (
     '<span class="exp">'
     '<button type="button" onclick="event.stopPropagation(); copyHistoryDayText(this);">복사</button>'
@@ -1445,6 +1481,7 @@ def _render_day_slots(
     day_runs: list, highlight_words: list, line_template: str, subheading_format: str,
     open_first_slot: bool = False, run_date=None,
     deleted_entries: Optional[list] = None, latest_key: Optional[tuple] = None,
+    found_words: str = "", open_all: bool = False,
 ) -> str:
     """하루치 회차들(최신 먼저)의 슬롯 HTML을 만든다 — 지연 로딩(_render_history_day_fragment)과
     즉시 렌더링(render_history_page) 양쪽이 공유한다.
@@ -1470,9 +1507,10 @@ def _render_day_slots(
         (
             r["run_slot"],
             _render_slot(r, highlight_words, line_template, subheading_format,
-                         open_first=(open_first_slot and i == 0),
+                         open_first=(open_all or (open_first_slot and i == 0)),
                          lock_reason=run_lock_reason(r["run_at"][:10], r["run_slot"], now=now,
-                                                     latest_key=latest_key or ("", ""))),
+                                                     latest_key=latest_key or ("", "")),
+                         found_words=found_words),
         )
         for i, r in enumerate(day_runs)
     ]
@@ -1507,6 +1545,112 @@ def _group_runs_by_date(runs: list) -> "OrderedDict":
     )
 
 
+# 낱말 칸 안 예시 한 줄 — 칸이 하나뿐인 화면이라 안내줄 대신 이게 규칙을 말한다
+# (덩어리와 `+`가 한 예시에 다 들어간다, 기관 기사 찾기와 같은 방식).
+_SEARCH_PLACEHOLDER = "예: 가상자산 과세+유예"
+
+_PERIOD_PRESETS = (("day", "1일"), ("week", "7일"), ("month", "1개월"), ("all", "전체"))
+
+
+def _history_href() -> str:
+    """이 화면의 주소 — 낱말 폼이 제출하는 곳이자 「조건 지우기」가 돌아가는 곳."""
+    return f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/history.html"
+
+
+def preset_range(key: str, today=None) -> tuple:
+    """빠른 설정 한 칸의 (시작, 종료) — 화면 JS(historyPresetRange)와 같은 규칙이다.
+    낱말로 찾을 때는 서버가 같은 칸을 다시 계산하므로 두 자리가 어긋나면 안 된다."""
+    today = today or datetime.now().date()
+    if key == "day":
+        return (today.isoformat(), today.isoformat())
+    if key == "week":
+        return ((today - timedelta(days=6)).isoformat(), today.isoformat())
+    if key == "month":
+        first = today.replace(day=1)
+        nxt = (first + timedelta(days=32)).replace(day=1)
+        return (first.isoformat(), (nxt - timedelta(days=1)).isoformat())
+    return ("", "")
+
+
+def _current_preset(start: str, end: str, today=None) -> str:
+    """눌러 둘 칸 — 구간을 값으로 대조한다(어느 칸과도 안 맞으면 아무것도 안 켠다)."""
+    for key, _ in _PERIOD_PRESETS:
+        if preset_range(key, today) == (start, end):
+            return key
+    return ""
+
+
+def _range_label(start: str, end: str) -> str:
+    """기간을 화면 글자로 — 화면 JS(historyRangeLabel)와 같은 규칙."""
+    if not start or not end:
+        return "전체 기간"
+    if start == end:
+        return start
+    return f"{start} ~ {end[5:]}"
+
+
+def _word_row_html(word: str, start: str, end: str) -> str:
+    """조회 바 첫 줄 「낱말」 — 수시 보관함(사안명)·기관 기사 찾기(낱말)와 같은 두 줄 모양.
+
+    **기간과 달리 서버가 찾는다** — 이 화면은 최근 EAGER_HISTORY_DAYS일치 기사만 미리
+    그려 두고 나머지는 펼칠 때 불러오므로, 화면에 없는 날짜는 화면에서 찾을 수 없다.
+    그래서 지금 고른 기간을 숨은 칸으로 같이 들려 보낸다(화면 JS가 맞춰 둔다).
+    """
+    tail = (
+        f'<a class="clr" href="{_history_href()}">지우기</a>'
+        if word
+        else '<span class="jhint">비워두면 이 기간의 모든 회차</span>'
+    )
+    return f"""  <form class="prow" method="GET" action="{_history_href()}">
+    <b class="jlab">낱말</b>
+    <input type="search" name="q" value="{html.escape(word)}" placeholder="{_SEARCH_PLACEHOLDER}">
+    <input type="hidden" name="start" id="hist-q-start" value="{html.escape(start)}">
+    <input type="hidden" name="end" id="hist-q-end" value="{html.escape(end)}">
+    <button type="submit" class="go">찾기</button>
+    {tail}
+  </form>"""
+
+
+def _search_period_and_result_html(word: str, start: str, end: str, hit_days: int, hits: int) -> str:
+    """낱말로 찾는 동안의 조회 바 + 결과 줄.
+
+    기간 줄도 **폼**이 된다 — 낱말이 걸려 있으면 날짜만 바꿔도 서버가 다시 찾아야 한다.
+    빠른 설정 버튼은 제 이름(preset)을 싣고, 「조회」는 안 실어 날짜 칸이 그대로 간다
+    (기관 기사 찾기의 「빠른 설정이 날짜 칸을 이긴다」와 같은 규칙).
+
+    **선택 삭제·엑셀은 안 그린다** — 날짜 줄 🗑는 「이 날 회차 모두」인데 지금 화면엔
+    걸린 회차만 서 있어 거짓말이 되고, 엑셀은 날짜만 서버로 보내 다시 만드는 구조라
+    낱말로 거르기 전 하루치가 통째로 나간다(「지금 화면에 보이는 것」 규칙이 깨진다).
+    """
+    on = _current_preset(start, end)
+    seg = "".join(
+        f'<button type="submit" class="seg-btn{" on" if on == key else ""}" name="preset" value="{key}">{label}</button>'
+        for key, label in _PERIOD_PRESETS
+    )
+    return f"""<div class="period-bar">
+{_word_row_html(word, start, end)}
+  <form class="prow" method="GET" action="{_history_href()}">
+    <input type="hidden" name="q" value="{html.escape(word)}">
+    <b class="jlab">기간</b>
+    <div class="seg">{seg}</div>
+    <span class="pdiv" aria-hidden="true"></span>
+    <input type="date" name="start" value="{html.escape(start)}">
+    <span class="tilde">~</span>
+    <input type="date" name="end" value="{html.escape(end)}">
+    <button type="submit" class="go">조회</button>
+  </form>
+</div>
+<div class="result-bar">
+  <p class="result-line">낱말 ‘{html.escape(word)}’ · {html.escape(_range_label(start, end))} ·
+    <b>{hit_days}</b>일 <b>{hits}</b>건</p>
+  <a class="clear-q" href="{_history_href()}">낱말 조건 지우기 →</a>
+  <span class="exp lg">
+    <button type="button" onclick="copyHistoryAllText(this)">복사</button>
+    <button type="button" onclick="downloadHistoryAllText()">텍스트</button>
+  </span>
+</div>"""
+
+
 def _period_and_result_html(total_days: int, empty_count: int = 0) -> str:
     """기간 조회 바 + 결과 요약 줄 — app.adhoc.archive_renderer의 같은 UI(.period-bar/
     .result-bar/.exp)와 같은 모양이지만 서버 왕복이 없다: 정기는 날짜 목록이 이미 전부
@@ -1523,6 +1667,7 @@ def _period_and_result_html(total_days: int, empty_count: int = 0) -> str:
         else ""
     )
     return f"""<div class="period-bar">
+{_word_row_html("", "", "")}
   <div class="prow">
     <b class="jlab">기간</b>
     <div class="seg" id="hist-period-seg">
@@ -1772,6 +1917,83 @@ def render_history_page(
         body="\n".join(sections),
         period_and_result_html=_period_and_result_html(len(ordered_dates), len(empty_keys)),
         empty_run_keys_json=json.dumps(empty_keys),
+        **_theme(),
+    )
+
+
+def search_history(word: str, start: str = "", end: str = "", metas: Optional[list] = None) -> tuple:
+    """낱말로 저장된 회차를 훑는다 — ([(날짜, [걸린 회차…])…], 걸린 기사 수). 날짜 최신 먼저.
+
+    훑는 범위는 조회 바의 기간 그대로이고, 비면 저장된 전부다. 대조는 **숨긴 기사를 뺀
+    뒤, 담당자가 고친 값을 입힌 뒤**라 화면에 보이는 글자와 찾는 글자가 같다
+    (app.word_search.matches — 기관 기사 찾기와 같은 함수).
+    """
+    metas = list_run_meta() if metas is None else metas
+    days, hits = [], 0
+    for date_str in list_run_dates(metas):
+        if (start and date_str < start) or (end and date_str > end):
+            continue
+        runs = []
+        for run in sorted(list_runs_for_date(date_str, metas), key=lambda r: r["run_slot"], reverse=True):
+            found = [
+                a
+                for a in apply_summary_overrides(filter_hidden(run["articles"]))
+                if word_matches(a, word)
+            ]
+            if found:
+                runs.append(run)
+                hits += len(found)
+        if runs:
+            days.append((date_str, runs))
+    return days, hits
+
+
+def render_history_search_page(
+    word: str,
+    start: str = "",
+    end: str = "",
+    highlight_words: Optional[list] = None,
+    line_template: Optional[str] = None,
+    subheading_format: Optional[str] = None,
+) -> str:
+    """낱말로 찾은 결과 — 걸린 날짜·회차만, **걸린 기사만**, 전부 펼친 채로.
+
+    찾은 결과가 접혀 있으면 찾은 게 아니라 건수만 본 셈이라 날짜·회차를 다 펼친다
+    (기관 기사 찾기와 같은 규칙). 「수집 기록 없음」 줄은 안 그린다 — 이 화면의 질문은
+    「그날 회차가 다 돌았나」가 아니라 「그 낱말이 어디 있나」다.
+    """
+    if highlight_words is None or line_template is None or subheading_format is None:
+        hl, lt, sf = _display_settings()
+        highlight_words = highlight_words if highlight_words is not None else hl
+        line_template = line_template if line_template is not None else lt
+        subheading_format = subheading_format if subheading_format is not None else sf
+
+    metas = list_run_meta()
+    days, hits = search_history(word, start, end, metas)
+    latest_key = latest_run_key(metas)
+    today = datetime.now().date()
+
+    sections = []
+    for date_str, runs in days:
+        run_date = datetime.fromisoformat(date_str).date()
+        today_chip = '<span class="chip chip-today">오늘</span>' if run_date == today else ""
+        slots_html = _render_day_slots(
+            runs, highlight_words, line_template, subheading_format,
+            latest_key=latest_key, found_words=word, open_all=True,
+        )
+        sections.append(
+            f'<details class="date" data-date="{date_str}" open>'
+            f'<summary><span class="d">{html.escape(_date_label(run_date, today))}</span>'
+            f"{today_chip}{_SEARCH_DAY_EXPORT_HTML}</summary>{slots_html}</details>"
+        )
+    body = "\n".join(sections) or (
+        '<p class="empty">💤 찾은 기사가 없어요'
+        '<span class="how">기간을 넓히거나 +로 묶은 낱말을 줄여 보세요.</span></p>'
+    )
+    return _PAGE_TEMPLATE.format(
+        body=body,
+        period_and_result_html=_search_period_and_result_html(word, start, end, len(days), hits),
+        empty_run_keys_json="[]",
         **_theme(),
     )
 

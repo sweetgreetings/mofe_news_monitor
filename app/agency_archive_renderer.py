@@ -47,6 +47,8 @@ from app.renderer import (
     label_popover_style,
 )
 from app.search_terms import split_terms
+# 낱말 대조·노랑·스니펫은 정기 보관함과 **같은 규칙**이라 공용 모듈 한 곳에 있다.
+from app.word_search import mark as _highlight, matches as _matches, snippet as _snippet
 from app.settings import load_settings
 from app.summary_overrides import load_summary_overrides
 from app.topnav import plain_nav, topnav_style
@@ -118,44 +120,6 @@ def _apply_override(article: dict, overrides: dict) -> dict:
         merged["summary"] = override["summary"]
     return merged
 
-
-def _matches(article: dict, word: str) -> bool:
-    """`+`로 묶은 조각이 **전부** 든 기사만. 조각 하나하나는 글자 그대로 부분일치다."""
-    terms = split_terms(word)
-    if not terms:
-        return True
-    haystack = f"{article.get('title') or ''} {article.get('summary') or ''}".lower()
-    return all(t.lower() in haystack for t in terms)
-
-
-def _highlight(text: str, word: str) -> str:
-    """찾은 낱말만 노랑. 이 화면에서 노랑은 **찾은 낱말**을 뜻한다(형광펜은 안 칠한다).
-
-    `+`로 여러 조각을 넣었으면 조각마다 칠한다. 한 자리에서 여러 조각이 걸리면 긴 쪽을
-    칠한다 — 짧은 조각이 긴 조각을 가운데서 자르면 안 된다(`가상자산+가상자산 과세`).
-    """
-    escaped = html.escape(text)
-    needles = [html.escape(t).lower() for t in split_terms(word)]
-    if not needles:
-        return escaped
-    low = escaped.lower()
-    out, i, n = [], 0, len(escaped)
-    while i < n:
-        hit = max((x for x in needles if low.startswith(x, i)), key=len, default="")
-        if hit:
-            out.append(f"<mark>{escaped[i:i + len(hit)]}</mark>")
-            i += len(hit)
-            continue
-        # 걸리는 조각이 없는 자리에서 `&amp;` 같은 실체 참조를 가운데서 쪼개지 않는다.
-        if escaped[i] == "&":
-            end = escaped.find(";", i, i + 10)
-            if end > 0:
-                out.append(escaped[i:end + 1])
-                i = end + 1
-                continue
-        out.append(escaped[i])
-        i += 1
-    return "".join(out)
 
 
 def _selected_outlets() -> frozenset:
@@ -289,38 +253,6 @@ def _collect(
         spent += len(rows)
         days.append((date_str, len(rows), rows))
     return days, total, counts, raw_total
-
-
-# 스니펫 — 낱말 앞뒤로 이만큼만 잘라 한 줄로 보여준다. 넘치면 CSS가 한 줄에서 자른다.
-_SNIPPET_BEFORE = 28
-_SNIPPET_AFTER = 52
-
-
-def _snippet(summary: str, title: str, word: str) -> str:
-    """요약에서 **찾은 낱말 주변만** 한 줄로. 없으면 빈 문자열(그 줄을 안 그린다).
-
-    접힌 행에 이 한 줄이 필요한 이유는 실측이다 — 오늘 255건에서 낱말이 **제목엔 없고
-    요약에만** 있는 비율이 낱말마다 15~100%였다(「예산」 74건은 전부). 그냥 접으면
-    담당자가 「왜 이게 나왔지」를 알 수 없고, 잘못 걸린 기사(「기획예산처」에 걸린 「예산」)도
-    펼쳐 보기 전엔 못 거른다.
-
-    **제목에 이미 있는 낱말은 스니펫을 안 그린다** — 제목이 이미 답이라 한 줄이 중복이다.
-    `+`로 여러 조각을 넣었으면 **제목에 없는 조각**을 기준으로 자른다.
-    """
-    terms = split_terms(word)
-    if not (summary and terms):
-        return ""
-    low_title, low_sum = (title or "").lower(), summary.lower()
-    missing = [t for t in terms if t.lower() not in low_title]
-    if not missing:
-        return ""  # 조각이 전부 제목에 있다 — 제목이 곧 답이다
-    at = min((low_sum.find(t.lower()) for t in missing if t.lower() in low_sum), default=-1)
-    if at < 0:
-        return ""
-    lo = max(0, at - _SNIPPET_BEFORE)
-    hi = min(len(summary), at + _SNIPPET_AFTER)
-    cut = ("…" if lo > 0 else "") + summary[lo:hi] + ("…" if hi < len(summary) else "")
-    return f'<div class="snip">{_highlight(cut, word)}</div>'
 
 
 def _label_button_html(article: dict, labels: dict, date_str: str, known_html: str) -> str:

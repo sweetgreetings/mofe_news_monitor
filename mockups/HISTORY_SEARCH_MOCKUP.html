@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>정기 보관함 — 낱말로 찾기 시안</title>
+<style>
+  :root { --fs-2xs: 0.66rem; --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+    --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%;
+    --h-sm: 24px; --h-tb: 28px; --h-md: 30px; --h-lg: 36px; --chk-md: 16px; --chk-sm: 14px; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F1F5F9; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+
+  /* ── 시안 안내(실제 화면엔 없음) ───────────────────────── */
+  .sheet { max-width: 860px; margin: 0 auto; padding: 28px 16px 80px; }
+  .lead { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 20px 22px; margin-bottom: 26px; }
+  .lead h1 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 8px; }
+  .lead p { margin: 0 0 6px; font-size: var(--fs-md); color: #4B5563; line-height: 1.75; }
+  .lead p:last-child { margin-bottom: 0; }
+  .caseh { margin: 34px 0 10px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .caseh b { font-size: var(--fs-lg); color: #1E3A5F; }
+  .caseh span { font-size: var(--fs-sm); color: #4B5563; }
+  .pick { font-size: var(--fs-xs); background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE;
+    border-radius: var(--r-pill); padding: 1px 9px; font-weight: 600; }
+  .frame { background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 14px; }
+  .screen { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 22px 24px 20px; }
+
+  /* ── 아래는 history.html에서 그대로 가져온 값 ──────────── */
+  h2.pt { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 6px; display: flex; align-items: center; gap: 8px; }
+  .page-sub { color: #6B7280; font-size: var(--fs-md); margin: 0 0 4px; }
+  .ic { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.8;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.12em; }
+
+  .period-bar { border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 10px 12px; background: #F8FAFC; margin: 14px 0; }
+  .prow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .prow + .prow { margin-top: 10px; }
+  .prow .pdiv { width: 1px; align-self: stretch; background: #E5E7EB; margin: 0 2px; }
+  .prow .jlab { color: #6B7280; font-size: var(--fs-sm); font-weight: 600; width: 44px; flex: none; }
+  .prow input[type=date] { font: inherit; font-size: var(--fs-md); border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    background: #FFFFFF; color: #1F2937; padding: 5px 8px; font-variant-numeric: tabular-nums; }
+  .prow input[type=search] { font: inherit; font-size: var(--fs-md); border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    background: #FFFFFF; color: #1F2937; padding: 5px 10px; flex: 1 1 240px; min-width: 180px; }
+  .prow .tilde { color: #6B7280; margin: 0 2px; font-weight: 600; }
+  .prow .go { border: 1px solid #2563EB; background: #2563EB; color: #FFFFFF; border-radius: var(--r-md);
+    padding: 6px 14px; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; font-family: inherit; }
+  .prow .clr { border: 1px solid #E5E7EB; background: #FFFFFF; color: #4B5563; border-radius: var(--r-md);
+    padding: 6px 12px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; }
+  .prow .jhint { font-size: var(--fs-sm); color: #6B7280; }
+  .seg { display: inline-flex; border: 1px solid #E5E7EB; border-radius: var(--r-md); overflow: hidden; background: #FFFFFF; }
+  .seg-btn { border: none; background: #FFFFFF; color: #6B7280; font: inherit; font-size: var(--fs-sm);
+    padding: 6px 15px; cursor: pointer; border-right: 1px solid #E5E7EB; }
+  .seg-btn:last-child { border-right: none; }
+  .seg-btn.on { background: #2563EB; color: #FFFFFF; font-weight: 600; }
+
+  .result-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 2px 8px; }
+  .result-line { font-size: var(--fs-sm); color: #6B7280; margin: 0; }
+  .result-line b { color: #1E3A5F; }
+  .deleted-link { font-size: var(--fs-sm); color: #6B7280; text-decoration: none; }
+  .clear-q { font-size: var(--fs-sm); color: #2563EB; text-decoration: none; }
+  .tidy-btn { border: 1px solid #E5E7EB; background: #FFFFFF; color: #6B7280; border-radius: var(--r-md);
+    padding: 4px 10px; font-size: var(--fs-sm); cursor: pointer; font-family: inherit; }
+  .exp { display: inline-flex; gap: 2px; flex: none; margin-left: auto; }
+  .exp button { border: none; background: transparent; color: #4B5563; font-weight: 500;
+    border-radius: var(--r-md); padding: 4px 8px; font-size: var(--fs-sm); cursor: pointer;
+    font-family: inherit; white-space: nowrap; }
+  .exp button:hover { color: #2563EB; text-decoration: underline; text-underline-offset: 3px; }
+  .exp.lg button { padding: 6px 8px; }
+
+  .chip { font-size: var(--fs-xs); border-radius: var(--r-pill); padding: 1px 9px; border: 1px solid; flex: none; }
+  .chip-today { background: #EFF6FF; color: #2563EB; border-color: #BFDBFE; font-weight: 600; }
+  .sent-dot { display: inline-block; width: 7px; height: 7px; border-radius: var(--r-circle); background: #15803D; flex: none; }
+  .slot-note { font-size: var(--fs-sm); color: #6B7280; flex: 1 1 auto; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  details.date { margin: 0; border-top: 1px solid #E5E7EB; }
+  details.date > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px;
+    padding: 10px 4px; font-size: var(--fs-lg); color: #1E3A5F; font-weight: 600; }
+  details.date > summary::-webkit-details-marker { display: none; }
+  details.date > summary::before { content: "▸"; color: #6B7280; font-size: 0.8rem; font-weight: 400; }
+  details.date[open] > summary::before { content: "▾"; }
+  details.slot { margin: 0 0 0 22px; border-top: 1px solid #E5E7EB; }
+  details.slot > summary { list-style: none; cursor: pointer; display: flex; align-items: center;
+    justify-content: flex-start; gap: 10px; padding: 8px 4px; font-size: var(--fs-base); }
+  details.slot > summary::-webkit-details-marker { display: none; }
+  details.slot > summary::before { content: "▸"; color: #6B7280; font-size: 0.75rem; }
+  details.slot[open] > summary::before { content: "▾"; }
+  .slot-label { flex: none; white-space: nowrap; color: #1F2937; }
+  .slot-cnt { flex: none; font-size: var(--fs-sm); color: #6B7280; }
+  .slot-export-actions { display: flex; gap: 2px; flex-shrink: 0; margin-left: auto; }
+  .slot-export-actions button { background: transparent; color: #4B5563; border: none; border-radius: var(--r-md);
+    font-weight: 500; padding: 4px 8px; font-size: var(--fs-sm); font-family: inherit; cursor: pointer; }
+  .slot-export-actions button:hover { color: #2563EB; text-decoration: underline; text-underline-offset: 3px; }
+
+  .history-group { margin-top: 14px; }
+  .history-group h3 { font-size: var(--fs-base); color: #1E3A5F; border-bottom: 1px solid #E5E7EB;
+    padding-bottom: 4px; margin: 0 0 6px 20px; }
+  .article { margin: 6px 0 6px 20px; line-height: 1.5; padding: 4px 6px; border-radius: var(--r-md); }
+  .article .sm { cursor: pointer; display: flex; flex-direction: row; flex-wrap: wrap;
+    align-items: baseline; gap: 2px 10px; }
+  .title-row { order: 1; flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline;
+    justify-content: flex-start; gap: 8px; }
+  .action-row { order: 2; flex: 0 0 auto; margin-left: auto; display: flex; align-items: center;
+    gap: 8px; flex-wrap: nowrap; }
+  .title-line { color: #1F2937; }
+  .title-outlet { color: #6B7280; font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  .pub-time { flex-shrink: 0; color: #6B7280; font-size: var(--fs-sm); white-space: nowrap; }
+  .origin-link-text { color: #6B7280; font-size: var(--fs-sm); text-decoration: none; display: inline-flex;
+    align-items: center; gap: 3px; }
+  .iconbtn { background: transparent; border: none; color: #6B7280; font-size: 1rem; line-height: 1;
+    padding: 2px 4px; cursor: pointer; }
+  .t-scoop { color: #BE185D; font-weight: 600; }
+  mark { background: #FFF9C4; color: inherit; padding: 0 1px; border-radius: 2px; }
+  .hl-word { background: #E4F1FC; color: #1F2937; }
+  /* 스니펫 — 낱말이 요약에만 있을 때, 접힌 채로도 왜 걸렸는지 보이게 한 줄.
+     기관 기사 찾기 .snip과 같은 값. */
+  .snip { margin: 2px 0 0 0; font-size: var(--fs-md); color: #6B7280; line-height: 1.6;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 걸린 건수 — 중립 회색. 파랑은 담당자의 동작이고 노랑은 찾은 낱말이라 둘 다 피한다. */
+  .hitn { flex: none; font-size: var(--fs-xs); color: #4B5563; background: #F3F4F6;
+    border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 1px 8px; }
+  .empty-note { margin: 26px 2px; color: #6B7280; font-size: var(--fs-md); line-height: 1.8; }
+  .empty-note b { display: block; color: #1F2937; font-size: var(--fs-lg); margin-bottom: 6px; font-weight: 600; }
+
+  /* 규칙 메모 */
+  .notes { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 20px 24px; margin-top: 34px; }
+  .notes h3 { font-size: var(--fs-lg); color: #1E3A5F; margin: 0 0 12px; }
+  .notes ul { margin: 0; padding-left: 18px; }
+  .notes li { font-size: var(--fs-md); color: #1F2937; line-height: 1.85; margin-bottom: 9px; }
+  .notes li b { color: #1E3A5F; }
+  .notes li.warn { color: #92400E; }
+  .notes .sub { color: #6B7280; }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+<div class="lead">
+  <h1>정기 보관함 — 낱말로 찾기</h1>
+  <p>지금 정기 보관함은 <b>기간</b>으로만 좁힐 수 있습니다. 「그때 그 기사 어디 있더라」를 찾으려면 날짜를 하나씩 펼쳐 눈으로 훑어야 합니다. 조회 바에 <b>낱말</b> 줄을 한 줄 더해, 기관 기사 찾기와 같은 방식으로 제목·요약에서 찾습니다.</p>
+  <p class="sub" style="color:#6B7280">아래는 ① 평소 모습 · ② A안(걸린 기사만) · ③ B안(회차 통째) · ④ 한 건도 없을 때 순서입니다.</p>
+</div>
+
+<!-- ───────────────────────── ① 평소 ───────────────────────── -->
+<div class="caseh"><b>① 평소 — 낱말 칸이 비어 있을 때</b><span>지금 화면에 줄 하나가 늘어난 것뿐입니다</span></div>
+<div class="frame"><div class="screen">
+  <h2 class="pt"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg> 정기 보관함</h2>
+  <p class="page-sub">날짜별로 쌓인 스크랩 · 최근 1년 보관됩니다</p>
+
+  <div class="period-bar">
+    <div class="prow">
+      <b class="jlab">낱말</b>
+      <input type="search" placeholder="예: 가상자산 과세+유예">
+      <button type="button" class="go">찾기</button>
+      <span class="jhint">비워두면 이 기간의 모든 회차</span>
+    </div>
+    <div class="prow">
+      <b class="jlab">기간</b>
+      <div class="seg">
+        <button type="button" class="seg-btn">1일</button>
+        <button type="button" class="seg-btn">7일</button>
+        <button type="button" class="seg-btn">1개월</button>
+        <button type="button" class="seg-btn on">전체</button>
+      </div>
+      <span class="pdiv"></span>
+      <input type="date" value="2026-08-11">
+      <span class="tilde">~</span>
+      <input type="date" value="2026-10-22">
+      <button type="button" class="go">조회</button>
+    </div>
+  </div>
+
+  <div class="result-bar">
+    <p class="result-line">전체 기간 · <b>73</b>일</p>
+    <a class="deleted-link" href="#">삭제 기록 →</a>
+    <button type="button" class="tidy-btn">선택 삭제</button>
+    <span class="exp lg"><button>복사</button><button>텍스트</button><button>엑셀</button></span>
+  </div>
+
+  <details class="date"><summary><span class="d">10월 22일 (목)</span><span class="chip chip-today">오늘</span></summary></details>
+  <details class="date"><summary><span class="d">10월 21일 (수)</span></summary></details>
+  <details class="date"><summary><span class="d">10월 20일 (화)</span></summary></details>
+</div></div>
+
+<!-- ───────────────────────── ② A안 ───────────────────────── -->
+<div class="caseh"><b>② A안 — 걸린 기사만 남긴다</b><span class="pick">추천</span><span>찾기니까 찾은 것만 보여준다</span></div>
+<div class="frame"><div class="screen">
+  <h2 class="pt"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10.5h18"/></svg> 정기 보관함</h2>
+  <p class="page-sub">날짜별로 쌓인 스크랩 · 최근 1년 보관됩니다</p>
+
+  <div class="period-bar">
+    <div class="prow">
+      <b class="jlab">낱말</b>
+      <input type="search" value="가상자산 과세" placeholder="예: 가상자산 과세+유예">
+      <button type="button" class="go">찾기</button>
+      <button type="button" class="clr">지우기</button>
+    </div>
+    <div class="prow">
+      <b class="jlab">기간</b>
+      <div class="seg">
+        <button type="button" class="seg-btn">1일</button>
+        <button type="button" class="seg-btn">7일</button>
+        <button type="button" class="seg-btn on">1개월</button>
+        <button type="button" class="seg-btn">전체</button>
+      </div>
+      <span class="pdiv"></span>
+      <input type="date" value="2026-09-22">
+      <span class="tilde">~</span>
+      <input type="date" value="2026-10-22">
+      <button type="button" class="go">조회</button>
+    </div>
+  </div>
+
+  <div class="result-bar">
+    <p class="result-line">낱말 ‘가상자산 과세’ · 최근 1개월 · <b>6</b>일 <b>19</b>건</p>
+    <a class="clear-q" href="#">낱말 조건 지우기 →</a>
+    <span class="exp lg"><button>복사</button><button>텍스트</button><button>엑셀</button></span>
+  </div>
+
+  <details class="date" open><summary><span class="d">10월 22일 (목)</span><span class="chip chip-today">오늘</span></summary>
+    <details class="slot" open><summary>
+      <span class="slot-label">17:00 기준</span><span class="slot-cnt">9건</span>
+      <span class="sent-dot" title="17:02 자동발송"></span>
+      <span class="slot-note">숙고해 판단, 신중론, 여러 상황 고려/미래대응기금 설치 취지 공감 등</span>
+      <span class="slot-export-actions"><button>복사</button><button>텍스트</button></span>
+    </summary>
+      <div class="history-group"><h3>&lt;종합감사-가상자산 과세(지속)&gt;</h3>
+        <div class="article"><div class="sm">
+          <div class="title-row"><span class="title-line"><span class="title-outlet">TV조선</span>이형일 “<mark>가상자산 과세</mark> 숙고해 판단”…과세 놓고 여야 공방</span></div>
+          <div class="action-row"><span class="pub-time">16:21</span><span style="color:#6B7280">·</span><a class="origin-link-text" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+            <button class="iconbtn" title="라벨"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button></div>
+        </div></div>
+        <div class="article"><div class="sm">
+          <div class="title-row"><span class="title-line"><span class="title-outlet">서울경제</span>코인과세 유예에 무게…이형일 “여러 상황 고려해야”</span></div>
+          <div class="action-row"><span class="pub-time">15:48</span><span style="color:#6B7280">·</span><a class="origin-link-text" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+            <button class="iconbtn" title="라벨"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button></div>
+          <p class="snip" style="flex:1 1 100%; order:3">…이형일 부총리는 국정감사에서 <mark>가상자산 과세</mark> 시행 시기를 두고 “여러 상황을 고려해야 한다”고 답했다…</p>
+        </div></div>
+        <div class="article"><div class="sm">
+          <div class="title-row"><span class="title-line"><span class="title-outlet">연합뉴스</span>與 “<mark>가상자산 과세</mark> 더 유예 안돼”·野 “인프라 미비”…국감 공방(종합)</span></div>
+          <div class="action-row"><span class="pub-time">15:12</span><span style="color:#6B7280">·</span><a class="origin-link-text" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+            <button class="iconbtn" title="라벨"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button></div>
+        </div></div>
+      </div>
+      <div class="history-group"><h3>&lt;기타&gt;</h3>
+        <div class="article"><div class="sm">
+          <div class="title-row"><span class="title-line"><span class="title-outlet">동아일보</span>[위클리크립토] 디지털자산 과세 정부 입장, ‘예정대로 시행’에서 ‘숙고’로 外</span></div>
+          <div class="action-row"><span class="pub-time">11:30</span><span style="color:#6B7280">·</span><a class="origin-link-text" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+            <button class="iconbtn" title="라벨"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button></div>
+          <p class="snip" style="flex:1 1 100%; order:3">…이번 주 <mark>가상자산 과세</mark> 논의는 기재위 국정감사를 거치며 ‘숙고’ 기조로 돌아섰다…</p>
+        </div></div>
+      </div>
+    </details>
+    <details class="slot" open><summary>
+      <span class="slot-label">13:00 기준</span><span class="slot-cnt">2건</span>
+      <span class="sent-dot"></span>
+      <span class="slot-note">국감 오전 질의, 코인 과세</span>
+      <span class="slot-export-actions"><button>복사</button><button>텍스트</button></span>
+    </summary>
+      <div class="history-group"><h3>&lt;국정감사 쟁점&gt;</h3>
+        <div class="article"><div class="sm">
+          <div class="title-row"><span class="title-line"><span class="title-outlet">머니투데이</span><span class="t-scoop">[단독]</span> 경제부총리·금융위원장, <mark>가상자산 과세</mark> ‘신중론’</span></div>
+          <div class="action-row"><span class="pub-time">12:41</span><span style="color:#6B7280">·</span><a class="origin-link-text" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+            <button class="iconbtn" title="라벨"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button></div>
+        </div></div>
+      </div>
+    </details>
+  </details>
+
+  <details class="date" open><summary><span class="d">10월 21일 (수)</span></summary>
+    <details class="slot" open><summary>
+      <span class="slot-label">17:00 기준</span><span class="slot-cnt">3건</span>
+      <span class="sent-dot"></span>
+      <span class="slot-note">코인 과세 유예, 세법개정안 후속</span>
+      <span class="slot-export-actions"><button>복사</button><button>텍스트</button></span>
+    </summary>
+      <div class="history-group"><h3>&lt;가상자산 과세 유예 논의&gt;</h3>
+        <div class="article"><div class="sm">
+          <div class="title-row"><span class="title-line"><span class="title-outlet">한국경제</span>여야, <mark>가상자산 과세</mark> 2년 추가 유예 놓고 평행선</span></div>
+          <div class="action-row"><span class="pub-time">16:05</span><span style="color:#6B7280">·</span><a class="origin-link-text" href="#">원문보기<svg class="ic" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+            <button class="iconbtn" title="라벨"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button></div>
+        </div></div>
+      </div>
+    </details>
+  </details>
+  <details class="date"><summary><span class="d">10월 17일 (금)</span><span class="hitn">3건</span></summary></details>
+  <details class="date"><summary><span class="d">10월 14일 (화)</span><span class="hitn">1건</span></summary></details>
+</div></div>
+
+<!-- ───────────────────────── ③ B안 ───────────────────────── -->
+<div class="caseh"><b>③ B안 — 회차는 통째로 두고 걸린 기사만 노랑</b><span>앞뒤 기사가 같이 보이지만 한 회차 30건을 다 훑어야 한다</span></div>
+<div class="frame"><div class="screen">
+  <div class="result-bar" style="margin-top:0">
+    <p class="result-line">낱말 ‘가상자산 과세’ · 최근 1개월 · <b>6</b>일 <b>19</b>건</p>
+    <a class="clear-q" href="#">낱말 조건 지우기 →</a>
+    <span class="exp lg"><button>복사</button><button>텍스트</button><button>엑셀</button></span>
+  </div>
+  <details class="date" open><summary><span class="d">10월 22일 (목)</span><span class="chip chip-today">오늘</span></summary>
+    <details class="slot" open><summary>
+      <span class="slot-label">17:00 기준</span><span class="slot-cnt">32건</span><span class="hitn">걸림 9건</span>
+      <span class="sent-dot"></span>
+      <span class="slot-export-actions"><button>복사</button><button>텍스트</button></span>
+    </summary>
+      <div class="history-group"><h3>&lt;종합감사-부동산·공적주택 시장 안정&gt;</h3>
+        <div class="article"><div class="sm">
+          <div class="title-row"><span class="title-line"><span class="title-outlet">KBS</span>이형일 “내년까지 공적주택 10만 호 수도권 입주…공급 확대 노력”</span></div>
+          <div class="action-row"><span class="pub-time">16:27</span></div>
+        </div></div>
+        <div class="article"><div class="sm">
+          <div class="title-row"><span class="title-line"><span class="title-outlet">SBS</span>이형일 “내년까지 공적 주택 10만 호 수도권 입주…시장 안정될 것”</span></div>
+          <div class="action-row"><span class="pub-time">16:19</span></div>
+        </div></div>
+      </div>
+      <div class="history-group"><h3>&lt;종합감사-가상자산 과세(지속)&gt;</h3>
+        <div class="article"><div class="sm">
+          <div class="title-row"><span class="title-line"><span class="title-outlet">TV조선</span>이형일 “<mark>가상자산 과세</mark> 숙고해 판단”…과세 놓고 여야 공방</span></div>
+          <div class="action-row"><span class="pub-time">16:21</span></div>
+        </div></div>
+        <div class="article"><div class="sm">
+          <div class="title-row"><span class="title-line"><span class="title-outlet">서울경제</span>코인과세 유예에 무게…이형일 “여러 상황 고려해야”</span></div>
+          <div class="action-row"><span class="pub-time">15:48</span></div>
+          <p class="snip" style="flex:1 1 100%; order:3">…이형일 부총리는 국정감사에서 <mark>가상자산 과세</mark> 시행 시기를 두고…</p>
+        </div></div>
+      </div>
+      <div class="history-group"><h3>&lt;공공기관 관련&gt;</h3>
+        <div class="article"><div class="sm">
+          <div class="title-row"><span class="title-line"><span class="title-outlet">한국일보</span>예방교육 이수율은 99.9%인데… 공공기관 성비위 64% 폭증</span></div>
+          <div class="action-row"><span class="pub-time">14:02</span></div>
+        </div></div>
+      </div>
+    </details>
+  </details>
+</div></div>
+
+<!-- ───────────────────────── ④ 0건 ───────────────────────── -->
+<div class="caseh"><b>④ 한 건도 없을 때</b><span>「없다」를 산문으로 설명하지 않고, 할 일만 한 줄</span></div>
+<div class="frame"><div class="screen">
+  <div class="period-bar">
+    <div class="prow">
+      <b class="jlab">낱말</b>
+      <input type="search" value="증안펀드+면세점">
+      <button type="button" class="go">찾기</button>
+      <button type="button" class="clr">지우기</button>
+    </div>
+    <div class="prow">
+      <b class="jlab">기간</b>
+      <div class="seg">
+        <button type="button" class="seg-btn">1일</button>
+        <button type="button" class="seg-btn on">7일</button>
+        <button type="button" class="seg-btn">1개월</button>
+        <button type="button" class="seg-btn">전체</button>
+      </div>
+      <span class="pdiv"></span>
+      <input type="date" value="2026-10-16">
+      <span class="tilde">~</span>
+      <input type="date" value="2026-10-22">
+      <button type="button" class="go">조회</button>
+    </div>
+  </div>
+  <div class="result-bar">
+    <p class="result-line">낱말 ‘증안펀드+면세점’ · 최근 7일 · <b>0</b>건</p>
+    <a class="clear-q" href="#">낱말 조건 지우기 →</a>
+  </div>
+  <p class="empty-note"><b>💤 찾은 기사가 없어요</b>기간을 넓히거나 +로 묶은 낱말을 줄여 보세요.</p>
+</div></div>
+
+<div class="notes">
+  <h3>이 시안이 정한 것</h3>
+  <ul>
+    <li><b>자리는 조회 바 안, 기간 줄 위.</b> 수시 보관함(사안명 + 기간)·기관 기사 찾기(낱말 + 기간)가 이미 같은 두 줄 모양이라 새 모양을 만들지 않습니다.</li>
+    <li><b>이름은 「낱말」, 버튼은 「찾기」</b> — 기관 기사 찾기와 같은 일(제목 + 요약 부분일치)이라 같은 말을 씁니다. 수시 보관함의 「사안명 · 검색」은 사안 이름만 보는 다른 일입니다.</li>
+    <li><b>낱말 규칙도 앱 공통 하나</b>(<span class="sub">app/search_terms.py</span>) — 띄어쓰기는 덩어리, <b>+</b>가 AND. 칸이 하나뿐이라 안내줄 대신 칸 안 예시 한 줄(<span class="sub">예: 가상자산 과세+유예</span>)이 말합니다.</li>
+    <li class="warn"><b>기간과 달리 서버 왕복이 필요합니다.</b> 지금 기간 조회는 날짜 블록을 화면에서 숨기기만 하는데, 보관함은 최근 2일치 기사만 미리 그려 두고 나머지는 펼칠 때 받아옵니다 — 화면에 없는 날짜는 화면에서 찾을 수 없습니다. 그래서 낱말은 <span class="sub">GET /history?q=…</span>로 서버가 찾습니다.</li>
+    <li><b>걸린 날짜·회차는 펼친 채로 엽니다.</b> 찾은 결과가 접혀 있으면 찾은 게 아니라 건수만 본 셈입니다(기관 기사 찾기와 같은 규칙). 예산을 넘는 뒤쪽 날짜는 머리줄과 걸린 건수만 그리고 펼칠 때 받아옵니다.</li>
+    <li class="warn"><b>찾는 동안 형광펜은 끕니다.</b> 이 화면의 노랑은 「찾은 낱말」 하나만 뜻해야 하는데, 형광펜(연파랑·연두 등 5색)과 섞이면 한 줄에 선 두 색이 서로 다른 말을 합니다. 낱말 조건을 지우면 형광펜이 돌아옵니다.</li>
+    <li><b>낱말이 요약에만 있으면 한 줄 스니펫</b>을 붙입니다 — 요약이 접혀 있어 제목만 보고는 왜 걸렸는지 모릅니다. 제목에 이미 있으면 안 그립니다.</li>
+    <li><b>가져가기는 그대로 「지금 화면에 보이는 것」</b>입니다. A안에서는 걸린 기사만 복사·txt·엑셀로 나갑니다 — 결과 줄의 건수가 그 말을 하므로 따로 경고를 달지 않습니다.</li>
+    <li><b>A안을 권합니다.</b> B안은 앞뒤 기사가 같이 보이는 대신 한 회차 30건을 눈으로 다시 훑어야 해서, 찾기를 붙인 이유가 사라집니다.</li>
+  </ul>
+</div>
+
+</div>
+</body>
+</html>
