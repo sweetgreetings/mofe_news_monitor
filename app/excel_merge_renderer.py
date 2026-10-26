@@ -105,19 +105,18 @@ def _style() -> str:
   .maptable td.val {{ color: {p['text']}; max-width: 330px; overflow: hidden; text-overflow: ellipsis;
     white-space: nowrap; }}
   .maptable td.val.dim {{ color: {p['placeholder']}; }}
-  select.map {{ height: var(--h-tb); border: 1px solid {p['border']}; border-radius: var(--r-md);
+  select.map, .frow select {{ height: var(--h-tb); border: 1px solid {p['border']}; border-radius: var(--r-md);
     background: {p['card']}; color: {p['text']}; font-size: var(--fs-sm); font-family: inherit;
     padding: 0 6px; cursor: pointer; }}
   select.map.unused {{ color: {p['placeholder']}; }}
   select.map.dup {{ border-color: {p['warn_border']}; background: {p['warn_bg']}; }}
 
-  /* 정리 줄 — 보조 줄이라 체크는 --chk-sm(오늘 전체 기사 특수조건 줄과 같은 모양). */
+  /* 정렬 줄 — 보조 줄이라 글자는 --fs-sm, 칸 높이는 ② 열 맞추기 select와 같은 값이다. */
   .frow {{ display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }}
   .frow label {{ display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-sm);
     color: {p['text']}; cursor: pointer; }}
-  .frow input[type="checkbox"] {{ flex: none; width: var(--chk-sm); height: var(--chk-sm); margin: 0;
-    accent-color: {p['accent']}; cursor: pointer; }}
-  .frow label.off {{ color: {p['muted']}; cursor: default; }}
+  /* 잠긴 칸이 왜 잠겼는지는 이 한 줄이 말한다 — 닫힌 드롭다운 속 흐린 줄은 안 보인다. */
+  .lockwhy {{ font-size: var(--fs-xs); color: {p['muted']}; }}
 
   /* ③ 결과 */
   pre.out {{ margin: 0; border: 1px solid {p['border']}; border-radius: var(--r-lg); background: {p['bg']};
@@ -183,12 +182,33 @@ function splitRows(text) {
   return out;
 }
 
+// 발행일 값을 견주기 좋은 숫자로 바꾼다 — 「2026.10.22. 오후 1:42」·「2026-10-22 13:42」·
+// 「2026/10/22」. **오전·오후를 읽어야 한다**(안 읽으면 최신순이 오전·오후를 섞는다).
+// 날짜가 없으면 null이고, 그 줄은 아래 정렬에서 맨 뒤로 간다.
+function dateKey(v) {
+  var s = String(v || "").trim();
+  var d = s.match(/(\d{4})[.\-\/]\s*(\d{1,2})[.\-\/]\s*(\d{1,2})/);
+  if (!d) return null;
+  var h = 0, mi = 0;
+  var t = s.match(/(오전|오후)?\s*(\d{1,2}):(\d{2})/);
+  if (t) {
+    h = parseInt(t[2], 10); mi = parseInt(t[3], 10);
+    if (t[1] === "오후" && h < 12) h += 12;
+    if (t[1] === "오전" && h === 12) h = 0;
+  }
+  var ymd = (parseInt(d[1], 10) * 100 + parseInt(d[2], 10)) * 100 + parseInt(d[3], 10);
+  return ymd * 10000 + h * 100 + mi;
+}
+
 // 열 역할 짐작 — 「소제목」이 「제목」을 품고 있어 소제목·구분을 먼저 본다(순서가 곧 규칙).
 function guessRole(header, sampleValue, used) {
   var h = (header || "").replace(/\s/g, "");
   var v = sampleValue || "";
   var pick = null;
+  // **값이 날짜 모양이면 머리글을 안 보고 발행일로 짚는다** — 머리글이 영문이거나
+  // (TASKKEY·LABEL-3) 아예 없는 표가 실제로 들어오는데, 못 짚으면 최신순 칸이 늘 잠긴다.
   if (/^https?:\/\//.test(v)) pick = "url";
+  else if (dateKey(v) !== null) pick = "pubdate";
   else if (/링크|url|주소/i.test(h)) pick = "url";
   else if (/소제목|구분|분류|주제|섹션/.test(h)) pick = "section";
   else if (/언론사|매체|신문|방송사/.test(h)) pick = "outlet";
@@ -265,12 +285,34 @@ function renderMap(header, first) {
       + " · 짐작이 다르면 고치세요";
 }
 
+// 고를 수 있는 정렬만 열어 둔다 — 언론사순은 설정에 체크한 언론사가 있어야 하고,
+// 최신·오래된순은 ②에서 발행일 칸을 골라야 선다. 잠긴 칸을 고른 채로 두면 조용히
+// 「표에 적힌 순서」로 떨어지므로, 고른 값이 잠기면 그 자리에서 기본값으로 되돌린다.
+function syncSort() {
+  var sel = $("sortBy");
+  var locked = {
+    outlet: !EM.outlets.length,
+    newest: mapping.indexOf("pubdate") < 0,
+    oldest: mapping.indexOf("pubdate") < 0
+  };
+  Array.prototype.forEach.call(sel.options, function (op) {
+    op.disabled = !!locked[op.value];
+  });
+  if (locked[sel.value]) sel.value = "table";
+  var why = [];
+  if (locked.outlet) why.push("언론사순은 설정에서 언론사를 골라야 써요");
+  if (locked.newest) why.push("최신·오래된순은 ②에서 발행일 칸을 골라야 써요");
+  $("sortwhy").textContent = why.join(" · ");
+  $("sortwhy").classList.toggle("hidden", !why.length);
+}
+
 function outletRank(name) {
   var i = EM.outlets.indexOf(name);
   return i < 0 ? EM.outlets.length : i;   // 목록에 없는 언론사는 버리지 않고 뒤로(앱 공통 규칙)
 }
 
 function render() {
+  syncSort();   // 열 역할이 바뀌면 고를 수 있는 정렬도 바뀐다 — 거르기보다 먼저 맞춘다.
   var data = rows.slice(hasHeader ? 1 : 0);
   var ci = {};
   ROLES.forEach(function (r) { ci[r[0]] = mapping.indexOf(r[0]); });
@@ -301,12 +343,21 @@ function render() {
     });
   });
 
-  if ($("byOutlet").checked && !$("byOutlet").disabled) {
-    // 손으로 맞춘 순서가 없는 목록이라 통째로 정렬해도 잃을 게 없다 — 같은 순위 안에서는
-    // 표에 나온 순서를 지킨다(안정 정렬).
-    items = items.map(function (it, i) { return [it, i]; })
+  // 손으로 맞춘 순서가 없는 목록이라 통째로 정렬해도 잃을 게 없다. **같은 값 안에서는
+  // 표에 나온 순서를 지키고**(안정 정렬), **발행일을 못 읽은 줄은 맨 뒤**다(앱 공통 규칙 —
+  // sort_by_pub_desc·sort_by_outlet_priority 둘 다 시각이 없으면 뒤로 보낸다).
+  var mode = $("sortBy").value;
+  if (mode !== "table") {
+    items = items.map(function (it, i) { return [it, i, dateKey(it.pubdate)]; })
       .sort(function (a, b) {
-        var d = outletRank(a[0].outlet) - outletRank(b[0].outlet);
+        var d;
+        if (mode === "outlet") {
+          d = outletRank(a[0].outlet) - outletRank(b[0].outlet);
+        } else if (a[2] === null || b[2] === null) {
+          d = (a[2] === null ? 1 : 0) - (b[2] === null ? 1 : 0);
+        } else {
+          d = mode === "newest" ? b[2] - a[2] : a[2] - b[2];
+        }
         return d !== 0 ? d : a[1] - b[1];
       })
       .map(function (pair) { return pair[0]; });
@@ -421,7 +472,7 @@ function assignWithAI() {
 
 // ── 버튼 연결 ───────────────────────────────────────────────────────
 $("go").onclick = run;
-$("byOutlet").onchange = render;
+$("sortBy").onchange = render;
 $("clear").onclick = function () {
   $("paste").value = ""; rows = []; items = []; aiNames = {};
   $("step2").classList.add("hidden"); $("step3").classList.add("hidden");
@@ -564,15 +615,18 @@ def render_excel_merge_page() -> str:
     }
     file_base = f"{datetime.now().strftime('%Y-%m-%d')}_언론모니터링_목록"
     line_sample = html.escape(baked["line"])
-    # 「등록 언론사 순서로 정렬」은 설정에서 체크한 언론사를 쓴다 — 0곳이면 거르지 않고
-    # 칸을 잠근다(오늘 전체 기사·기관 기사 찾기의 「선택 언론사만」과 같은 규칙).
-    no_outlets = not baked["outlets"]
-    outlet_label = (
-        '<label class="off" title="설정 「언론사 선택 및 순서 지정」에서 언론사를 먼저 골라 주세요">'
-        '<input type="checkbox" id="byOutlet" disabled /> 등록 언론사 순서로 정렬</label>'
-        if no_outlets else
-        '<label title="설정 「언론사 선택 및 순서 지정」의 순서를 씁니다 — 목록에 없는 언론사는 뒤로 갑니다">'
-        '<input type="checkbox" id="byOutlet" /> 등록 언론사 순서로 정렬</label>'
+    # 정렬은 **결과 텍스트와 엑셀 줄 순서를 실제로 바꾼다** — 그래서 이름이 확정본의
+    # 「보기 순서」(화면 전용)가 아니라 「정렬」이다. 잠그는 조건은 화면이 매번 다시 본다
+    # (syncSort) — 언론사순은 설정 체크, 최신·오래된순은 ②의 발행일 칸.
+    sort_label = (
+        '<label for="sortBy">정렬</label>'
+        '<select id="sortBy">'
+        '<option value="table" selected>표에 적힌 순서</option>'
+        '<option value="outlet">언론사순</option>'
+        '<option value="newest">최신순</option>'
+        '<option value="oldest">오래된순</option>'
+        '</select>'
+        '<span class="lockwhy hidden" id="sortwhy"></span>'
     )
 
     return f"""<!DOCTYPE html>
@@ -625,7 +679,7 @@ def render_excel_merge_page() -> str:
       <tbody id="mapbody"></tbody>
     </table>
     <div class="frow">
-      {outlet_label}
+      {sort_label}
     </div>
     <div class="warn hidden" id="skipnote"></div>
   </div>
