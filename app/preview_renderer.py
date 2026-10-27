@@ -40,6 +40,7 @@ from app.llm_classifier import is_configured as llm_is_configured
 from app.reclassify_attempts import consecutive_failures as reclassify_consecutive_failures
 from app.reclassify_attempts import recent_attempts as reclassify_recent_attempts
 from app.config import (
+    favicon_link,
     COLLECT_LOOKBACK_MIN,
     DEFAULT_ARTICLE_LINE_TEMPLATE,
     DEFAULT_SUBHEADING_FORMAT_TEMPLATE,
@@ -157,6 +158,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>{page_title}</title>
+<!--favicon-->
 <style>
   body {{ margin: 0; background: {bg}; color: {text}; font-family: {font_stack}; }}
   .container {{
@@ -913,7 +915,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 </div>
 {topnav_html}
 <div class="container">
-  <header class="preview-head">
+  <header class="preview-head head-band work">
     <h1><span class="screen-tag work">초안</span>{run_slot_html}{total_count_html}</h1>
   </header>
   <div class="actions" id="preview-actions">{actions_html}</div>
@@ -2504,6 +2506,10 @@ renderRelativeTimes();
 </body>
 </html>
 """
+
+# 탭 아이콘은 템플릿을 만들 때 한 번만 꽂는다(아래 .format() 자리가 넷이다).
+_PAGE_TEMPLATE = _PAGE_TEMPLATE.replace("<!--favicon-->", favicon_link("preview"))
+
 
 
 def _draft_heading(slot_end, now=None, slot: Optional[dict] = None) -> dict:

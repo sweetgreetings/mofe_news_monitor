@@ -2,6 +2,7 @@
 import logging
 import os
 from pathlib import Path
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 
@@ -699,6 +700,35 @@ FONT_XL = "1.3rem"       # 화면 제목(모든 화면 같은 크기)
 PLUS_GLYPH_CSS = (
     ".plus-glyph { font-size: 1.2em; font-weight: 600; line-height: 0; margin-right: 4px; }"
 )
+
+
+# 브라우저 탭 아이콘 — 홈 흐름도 칸의 이모지를 그대로 쓴다(app/landing_renderer.py의 _flow_tile).
+# 탭 제목은 화면 이름을 맨 앞에 두지만(「초안 · 언론 모니터링 …」) 탭이 좁아지면 그 앞이 잘려
+# 보이지 않고, 그때 남는 건 아이콘뿐이다. 그림 파일을 만들지 않고 SVG data URI 한 줄로 끝낸다.
+# 새 그림을 짓지 않는 게 규칙이다 — 흐름도에 이미 선 이모지 말고 다른 걸 쓰면 같은 화면이
+# 두 그림으로 불린다.
+SCREEN_FAVICONS = {
+    "preview": "⛏️",   # 초안
+    "final": "💎",     # 확정본
+    "live": "📰",      # 오늘 전체 기사
+    "history": "🪎",   # 정기 보관함
+    "adhoc_new": "🔎",  # 수시 새 수집
+    "adhoc_raw": "🍅",  # 수시 원본
+    "adhoc_bundle": "🥗",  # 수시 확정본
+    "adhoc_archive": "🧺",  # 수시 보관함
+}
+
+
+def favicon_link(key: str) -> str:
+    """<head>에 넣을 파비콘 한 줄. 모르는 키면 빈 문자열(아이콘 없이 예전 그대로)."""
+    emoji = SCREEN_FAVICONS.get(key)
+    if not emoji:
+        return ""
+    svg = (
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+        f"<text y='.9em' font-size='90'>{emoji}</text></svg>"
+    )
+    return f'<link rel="icon" href="data:image/svg+xml,{quote(svg)}" />'
 
 SHAPE_TOKENS_CSS = (
     ":root { "

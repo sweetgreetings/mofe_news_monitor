@@ -1,0 +1,336 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>초안·확정본 구별 시안</title>
+<style>
+  /* 값은 모두 지금 돌고 있는 index.html · preview.html에서 그대로 가져왔다.
+     app/config.py → PALETTE → 템플릿 순서로 사는 색이라 시안에도 같은 값을 적는다. */
+  :root {
+    --fs-2xs: 0.66rem; --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem;
+    --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+    --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px;
+    --h-tb: 28px;
+
+    /* 지금 있는 색. 새로 만든 색은 하나도 없다. */
+    --card: #FFFFFF; --bg: #F8FAFC; --text: #1F2937; --title: #1E3A5F;
+    --border: #E5E7EB; --muted: #6B7280; --soft: #4B5563;
+    --accent: #2563EB; --accent-border: #BFDBFE; --hover: #EFF6FF;
+    --work-bg: #F1F5F9; --divider-soft: #F1F5F9;
+    --ai-bg: #F0EAFB; --ai-text: #4A3F8F; --ai-border: #DCD0F2;
+    --warn-bg: #FFFBEB; --warn-border: #FCD34D; --warn-text: #92400E;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  .page { max-width: 880px; margin: 0 auto; padding: 28px 24px 80px; }
+
+  .page > h1 { font-size: var(--fs-xl); color: var(--title); margin: 0 0 6px; }
+  .lead { color: var(--soft); font-size: var(--fs-md); line-height: 1.7; margin: 0 0 8px; }
+  .lead b { color: var(--title); }
+
+  .sec { font-size: var(--fs-lg); color: var(--title); margin: 34px 0 4px;
+    padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .note { color: var(--muted); font-size: var(--fs-sm); line-height: 1.7; margin: 8px 0 14px; }
+  .note b { color: var(--soft); }
+  .tag { display: inline-block; font-size: var(--fs-xs); font-weight: 700; padding: 2px 9px;
+    border-radius: var(--r-pill); border: 1px solid; margin-right: 8px; vertical-align: 2px; }
+  .tag.now { background: var(--divider-soft); border-color: var(--border); color: var(--muted); }
+  .tag.new { background: var(--hover); border-color: var(--accent-border); color: var(--accent); }
+
+  /* ─── 브라우저 탭 줄 ─────────────────────────────────────────── */
+  .tabstrip { display: flex; gap: 2px; background: #DEE3EA; padding: 7px 7px 0;
+    border-radius: var(--r-lg) var(--r-lg) 0 0; margin-bottom: 14px; }
+  .btab { display: flex; align-items: center; gap: 7px; background: var(--card);
+    border-radius: var(--r-md) var(--r-md) 0 0; padding: 7px 12px; min-width: 0;
+    font-size: var(--fs-sm); color: var(--text); max-width: 230px; }
+  .btab.off { background: #EAEEF3; color: var(--muted); }
+  .btab .ico { width: 15px; height: 15px; flex: none; font-size: 13px; line-height: 15px;
+    text-align: center; }
+  .btab .ico.blank { background: #CBD5E1; border-radius: 3px; }
+  .btab .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .btab .x { color: #9CA3AF; flex: none; }
+
+  /* ─── 화면 조각(상단바 + 카드 머리) ─────────────────────────── */
+  .screen { margin-bottom: 18px; border: 1px solid var(--border); border-radius: var(--r-lg);
+    overflow: hidden; background: var(--bg); }
+  .topbar { background: var(--card); border-bottom: 1px solid var(--border);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .topbar-inner { padding: 12px 24px; display: flex; justify-content: flex-start;
+    align-items: center; gap: 10px; flex-wrap: wrap; }
+  .tn { color: var(--accent); text-decoration: none; font-size: var(--fs-md); font-weight: 600;
+    padding: 5px 14px; border: 1px solid transparent; border-radius: var(--r-pill);
+    white-space: nowrap; }
+  .tn-sep { width: 1px; height: 18px; background: var(--border); margin: 0 16px; }
+  /* 지금: 두 화면 모두 켜진 칩이 같은 파랑이다. */
+  .tn.is-current { cursor: default; background: var(--hover);
+    border-color: var(--accent-border); color: var(--accent); }
+  /* 시안 ②: 켜진 칩 배색 = 그 화면의 이름 칩 배색. 초안은 회색으로 켠다. */
+  .topbar.draft .tn.is-current { background: var(--work-bg);
+    border-color: var(--border); color: var(--muted); }
+
+  .container { background: var(--card); margin: 16px; padding: 20px 22px 18px;
+    border: 1px solid var(--border); border-radius: var(--r-lg); }
+  .header-top { display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 16px; }
+  .header-top h1 { font-size: var(--fs-xl); margin: 0; color: var(--title); }
+
+  .screen-tag { display: inline-flex; align-items: center; font-size: var(--fs-sm);
+    font-weight: 700; padding: 3px 11px; border-radius: var(--r-pill); border: 1px solid;
+    margin-right: 10px; vertical-align: 0.18em; line-height: 1.3; }
+  .screen-tag.work { background: var(--work-bg); border-color: var(--border); color: var(--muted); }
+  .screen-tag.final { background: var(--hover); border-color: var(--accent-border); color: var(--accent); }
+  .head-sub { font-size: 0.72em; font-weight: 500; color: var(--muted); margin-left: 6px; }
+  .total-count-badge { margin-left: 8px; font-size: var(--fs-sm); font-weight: 700;
+    color: var(--muted); background: #F3F4F6; border-radius: var(--r-pill);
+    padding: 2px 10px; vertical-align: middle; }
+  .cut { color: #9CA3AF; margin-left: 7px; font-size: 0.8em; }
+
+  /* ─── 시안 ① 머리줄 띠 ───────────────────────────────────────
+     「📂 소제목 미분류」·「📌 담아둔 기사」 칸과 **같은 문법**:
+     왼쪽 4px 띠 + 옅은 바탕 + 오른쪽만 둥근 모서리.
+     띠 색 = 그 화면 이름 칩의 글자색, 바탕 = 그 칩의 바탕색. 한 규칙으로 두 화면이 나온다. */
+  .header-top.banded { align-items: center; padding: 9px 14px; margin-bottom: 16px;
+    border-radius: 0 var(--r-lg) var(--r-lg) 0; border-left: 4px solid; }
+  .header-top.banded.draft { border-left-color: var(--muted); background: var(--work-bg); }
+  .header-top.banded.final { border-left-color: var(--accent); background: var(--hover); }
+
+  /* 툴바 — 두 화면이 글자 하나까지 같다(지금도, 시안에서도 안 건드린다) */
+  .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .actions button { font-family: inherit; font-size: var(--fs-md); cursor: default;
+    background: var(--hover); color: var(--accent); font-weight: 600;
+    border: 1px solid transparent; border-radius: var(--r-md);
+    height: var(--h-tb); padding: 0 14px; }
+  .actions .create-group-btn { background: transparent; color: var(--accent);
+    border: 1px solid var(--accent-border); font-weight: 500; }
+  .actions .note-btn { background: transparent; color: var(--accent);
+    border: 1px solid var(--accent-border); font-weight: 500; }
+  .actions .regen-btn { background: var(--ai-bg); color: var(--ai-text);
+    border: 1px solid var(--ai-border); }
+  .actions-divider { width: 1px; height: 24px; background: var(--border); margin: 0 2px; }
+  .actions-right { margin-left: auto; display: inline-flex; align-items: center; gap: 8px;
+    flex-wrap: wrap; }
+  .export-links { display: inline-flex; align-items: center; }
+  .export-links button { background: transparent; border: none; color: var(--soft);
+    font-weight: 500; height: var(--h-tb); padding: 0 8px; }
+  .view-mode-select { border: 1px solid var(--accent); border-radius: var(--r-md);
+    font-size: var(--fs-md); height: var(--h-tb); padding: 0 9px; color: var(--text);
+    background: var(--card); font-family: inherit; }
+  .refresh { color: var(--soft); font-size: var(--fs-md); font-weight: 500; padding: 0 8px; }
+
+  /* 기사 한 줄 */
+  .subheading { margin-top: 20px; }
+  .subheading h2 { display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; font-size: var(--fs-lg); color: var(--title);
+    border-bottom: 1px solid var(--border); margin: 0 0 6px; padding-bottom: 6px; }
+  .article { margin: 6px 0; line-height: 1.5; padding: 4px 8px; border-radius: var(--r-md); }
+  .title-outlet { color: var(--muted); font-size: 0.86em; font-weight: 500; margin-right: 0.5em; }
+  .a-meta { color: var(--muted); font-size: var(--fs-sm); margin-top: 2px; }
+
+  /* 고칠 자리 */
+  .where { margin-top: 34px; border: 1px solid var(--border); border-radius: var(--r-lg);
+    background: var(--card); padding: 18px 20px; }
+  .where h3 { font-size: var(--fs-lg); color: var(--title); margin: 0 0 10px; }
+  .where ol { margin: 0; padding-left: 20px; color: var(--soft);
+    font-size: var(--fs-md); line-height: 1.9; }
+  .where code { background: var(--divider-soft); border-radius: var(--r-sm);
+    padding: 1px 5px; font-size: 0.92em; }
+  .where .warn { margin-top: 14px; background: var(--warn-bg); border: 1px solid var(--warn-border);
+    color: var(--warn-text); border-radius: var(--r-md); padding: 10px 12px;
+    font-size: var(--fs-sm); line-height: 1.7; }
+</style></head>
+<body>
+<div class="page">
+
+  <h1>초안·확정본 구별 시안</h1>
+  <p class="lead">세 가지를 한 묶음으로 — <b>① 머리줄 띠</b> · <b>② 상단바 켜진 칩 색</b> ·
+  <b>③ 파비콘</b>. 셋 다 이미 있는 색·이모지만 쓰고, 화면에 설명 글자를 하나도 늘리지 않는다.
+  툴바·기사 목록·복사·txt·발송 텍스트는 한 글자도 안 바뀐다.</p>
+
+  <!-- ───────────────────────── 지금 ───────────────────────── -->
+  <h2 class="sec"><span class="tag now">지금</span>탭 줄 — 아이콘이 없다</h2>
+  <p class="note">탭 제목은 <b>초안 ·</b> / <b>확정본 ·</b>으로 이미 갈려 있는데, 탭이 좁아지면
+  그 앞이 잘려 보이지 않는다. 그때 남는 건 아이콘뿐인데 지금은 비어 있다.</p>
+  <div class="tabstrip">
+    <div class="btab"><span class="ico blank"></span><span class="nm">초안 · 언론 모니터링 9시 30분 기준</span><span class="x">×</span></div>
+    <div class="btab off"><span class="ico blank"></span><span class="nm">확정본 · 언론 모니터링 6시 기준</span><span class="x">×</span></div>
+  </div>
+  <div class="tabstrip">
+    <div class="btab"><span class="ico blank"></span><span class="nm">초안 · 언…</span><span class="x">×</span></div>
+    <div class="btab off"><span class="ico blank"></span><span class="nm">확정본 ·…</span><span class="x">×</span></div>
+    <div class="btab off"><span class="ico blank"></span><span class="nm">오늘 전체…</span><span class="x">×</span></div>
+    <div class="btab off"><span class="ico blank"></span><span class="nm">재경부 A…</span><span class="x">×</span></div>
+  </div>
+
+  <h2 class="sec"><span class="tag now">지금</span>두 화면 머리</h2>
+  <p class="note">상단바 켜진 칩이 <b>둘 다 같은 파랑</b>이라, 색이 아니라 「어느 <i>글자</i>가
+  켜졌나」를 읽어야 안다. 머리줄도 같은 문장이고 칩 하나만 다르다.</p>
+
+  <!-- 지금 · 초안 -->
+  <div class="screen">
+    <div class="topbar"><div class="topbar-inner">
+      <a class="tn" href="#">홈</a><span class="tn-sep"></span>
+      <a class="tn" href="#">오늘 전체 기사</a>
+      <span class="tn is-current" aria-current="page">초안</span>
+      <a class="tn" href="#">확정본</a>
+      <a class="tn" href="#">보관함</a>
+    </div></div>
+    <div class="container">
+      <div class="header-top">
+        <h1><span class="screen-tag work">초안</span>언론 모니터링 9시 30분 기준<span class="head-sub">(예정, 지금 9시 14분 기준)</span><span class="cut">✂</span><span class="total-count-badge">7건</span></h1>
+      </div>
+      <div class="actions">
+        <button class="create-group-btn"><span>+</span> 새 소제목</button>
+        <button class="note-btn">한 줄 메모</button>
+        <span class="actions-divider"></span>
+        <button class="regen-btn">AI 모든 기사 재분류</button>
+        <span class="actions-right">
+          <span class="export-links"><button>복사</button><button>텍스트</button><button>엑셀</button></span>
+          <select class="view-mode-select"><option>소제목 내 언론사순</option></select>
+          <span class="actions-divider"></span>
+          <span class="refresh">⟳ 새로고침</span>
+        </span>
+      </div>
+      <div class="subheading"><h2>&lt;세제 개편&gt;</h2>
+        <div class="article"><span class="title-outlet">조선일보</span>가상자산 과세 2년 유예 … 정부, 보완 입법 추진
+          <div class="a-meta">09:12 게시 · 원문보기</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 지금 · 확정본 -->
+  <div class="screen">
+    <div class="topbar"><div class="topbar-inner">
+      <a class="tn" href="#">홈</a><span class="tn-sep"></span>
+      <a class="tn" href="#">오늘 전체 기사</a>
+      <a class="tn" href="#">초안</a>
+      <span class="tn is-current" aria-current="page">확정본</span>
+      <a class="tn" href="#">보관함</a>
+    </div></div>
+    <div class="container">
+      <div class="header-top">
+        <h1><span class="screen-tag final">확정본</span>언론 모니터링 6시 기준<span class="total-count-badge">13건</span></h1>
+      </div>
+      <div class="actions">
+        <button class="create-group-btn"><span>+</span> 새 소제목</button>
+        <button class="note-btn">한 줄 메모</button>
+        <span class="actions-divider"></span>
+        <button class="regen-btn">AI 모든 기사 재분류</button>
+        <span class="actions-right">
+          <span class="export-links"><button>복사</button><button>텍스트</button><button>엑셀</button></span>
+          <select class="view-mode-select"><option>소제목 내 언론사순</option></select>
+          <span class="actions-divider"></span>
+          <span class="refresh">⟳ 새로고침</span>
+        </span>
+      </div>
+      <div class="subheading"><h2>&lt;세제 개편&gt;</h2>
+        <div class="article"><span class="title-outlet">조선일보</span>가상자산 과세 2년 유예 … 정부, 보완 입법 추진
+          <div class="a-meta">05:41 게시 · 원문보기</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────────────────────── 시안 ───────────────────────── -->
+  <h2 class="sec"><span class="tag new">시안</span>③ 파비콘 — 홈 흐름도 이모지를 그대로</h2>
+  <p class="note">정기 흐름의 <b>⛏️ 초안</b> · <b>💎 확정본</b>. 홈 흐름도가 이미 쓰는 이모지라
+  새 그림을 만들지 않는다. 좁아진 탭에서도 아이콘은 안 잘린다.</p>
+  <div class="tabstrip">
+    <div class="btab"><span class="ico">⛏️</span><span class="nm">초안 · 언론 모니터링 9시 30분 기준</span><span class="x">×</span></div>
+    <div class="btab off"><span class="ico">💎</span><span class="nm">확정본 · 언론 모니터링 6시 기준</span><span class="x">×</span></div>
+  </div>
+  <div class="tabstrip">
+    <div class="btab"><span class="ico">⛏️</span><span class="nm">초안 · 언…</span><span class="x">×</span></div>
+    <div class="btab off"><span class="ico">💎</span><span class="nm">확정본 ·…</span><span class="x">×</span></div>
+    <div class="btab off"><span class="ico">📰</span><span class="nm">오늘 전체…</span><span class="x">×</span></div>
+    <div class="btab off"><span class="ico">🏠</span><span class="nm">재경부 A…</span><span class="x">×</span></div>
+  </div>
+
+  <h2 class="sec"><span class="tag new">시안</span>① 머리줄 띠 + ② 상단바 켜진 칩 색</h2>
+  <p class="note"><b>띠 색 = 그 화면 이름 칩의 글자색, 바탕 = 그 칩의 바탕색.</b> 한 규칙에서
+  두 화면이 나오고 새 색이 하나도 안 생긴다. 모양은 「📂 소제목 미분류」·「📌 담아둔 기사」
+  칸과 <b>같은 문법</b>(왼쪽 4px 띠 + 옅은 바탕 + 오른쪽만 둥근 모서리). 상단바의 켜진 칩도
+  같은 배색을 쓰니, 상단바와 머리줄이 같은 말을 두 번 한다.<br>
+  칩 바탕과 띠 바탕이 같은 값이라 <b>칩이 띠에 녹아든다</b> — 칩이 사라지는 게 아니라
+  띠가 곧 「커진 칩」이 된다. 이름은 그대로 남고 색만 머리줄 전체로 번진다.</p>
+
+  <!-- 시안 · 초안 -->
+  <div class="screen">
+    <div class="topbar draft"><div class="topbar-inner">
+      <a class="tn" href="#">홈</a><span class="tn-sep"></span>
+      <a class="tn" href="#">오늘 전체 기사</a>
+      <span class="tn is-current" aria-current="page">초안</span>
+      <a class="tn" href="#">확정본</a>
+      <a class="tn" href="#">보관함</a>
+    </div></div>
+    <div class="container">
+      <div class="header-top banded draft">
+        <h1><span class="screen-tag work">초안</span>언론 모니터링 9시 30분 기준<span class="head-sub">(예정, 지금 9시 14분 기준)</span><span class="cut">✂</span><span class="total-count-badge">7건</span></h1>
+      </div>
+      <div class="actions">
+        <button class="create-group-btn"><span>+</span> 새 소제목</button>
+        <button class="note-btn">한 줄 메모</button>
+        <span class="actions-divider"></span>
+        <button class="regen-btn">AI 모든 기사 재분류</button>
+        <span class="actions-right">
+          <span class="export-links"><button>복사</button><button>텍스트</button><button>엑셀</button></span>
+          <select class="view-mode-select"><option>소제목 내 언론사순</option></select>
+          <span class="actions-divider"></span>
+          <span class="refresh">⟳ 새로고침</span>
+        </span>
+      </div>
+      <div class="subheading"><h2>&lt;세제 개편&gt;</h2>
+        <div class="article"><span class="title-outlet">조선일보</span>가상자산 과세 2년 유예 … 정부, 보완 입법 추진
+          <div class="a-meta">09:12 게시 · 원문보기</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 시안 · 확정본 -->
+  <div class="screen">
+    <div class="topbar"><div class="topbar-inner">
+      <a class="tn" href="#">홈</a><span class="tn-sep"></span>
+      <a class="tn" href="#">오늘 전체 기사</a>
+      <a class="tn" href="#">초안</a>
+      <span class="tn is-current" aria-current="page">확정본</span>
+      <a class="tn" href="#">보관함</a>
+    </div></div>
+    <div class="container">
+      <div class="header-top banded final">
+        <h1><span class="screen-tag final">확정본</span>언론 모니터링 6시 기준<span class="total-count-badge">13건</span></h1>
+      </div>
+      <div class="actions">
+        <button class="create-group-btn"><span>+</span> 새 소제목</button>
+        <button class="note-btn">한 줄 메모</button>
+        <span class="actions-divider"></span>
+        <button class="regen-btn">AI 모든 기사 재분류</button>
+        <span class="actions-right">
+          <span class="export-links"><button>복사</button><button>텍스트</button><button>엑셀</button></span>
+          <select class="view-mode-select"><option>소제목 내 언론사순</option></select>
+          <span class="actions-divider"></span>
+          <span class="refresh">⟳ 새로고침</span>
+        </span>
+      </div>
+      <div class="subheading"><h2>&lt;세제 개편&gt;</h2>
+        <div class="article"><span class="title-outlet">조선일보</span>가상자산 과세 2년 유예 … 정부, 보완 입법 추진
+          <div class="a-meta">05:41 게시 · 원문보기</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="where">
+    <h3>고칠 자리</h3>
+    <ol>
+      <li><b>① 머리줄 띠</b> — <code>screen_tag_style()</code>(<code>app/renderer.py</code> 한 곳,
+        확정본·초안 공용)에 <code>.header-top.banded</code> 두 줄을 더하고 두 화면의
+        <code>&lt;div class="header-top"&gt;</code>에 클래스를 붙인다. 색은 이미 있는
+        <code>COLOR_SCREEN_TAG_*</code>·<code>COLOR_ACCENT</code>·<code>COLOR_HOVER</code>.</li>
+      <li><b>② 상단바 켜진 칩</b> — <code>app/topnav.py</code> <code>topnav_style()</code>에
+        <code>.topbar.reg.draft .tn.is-current</code> 한 줄, <code>regular_nav()</code>가
+        초안 화면일 때 <code>draft</code> 클래스를 붙인다.</li>
+      <li><b>③ 파비콘</b> — 두 템플릿의 <code>&lt;head&gt;</code>에
+        <code>&lt;link rel="icon"&gt;</code> 한 줄(SVG data URI에 이모지 하나). 파일은 안 만든다.</li>
+    </ol>
+    <div class="warn">수시(원본·확정본)는 이 시안에 안 들어 있다 — 수시는 탭·칩·청록 색으로
+    이미 갈린다. 두 흐름을 같이 바꾸려면 따로 결정한다.</div>
+  </div>
+
+</div>
+</body></html>

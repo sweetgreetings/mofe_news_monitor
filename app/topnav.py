@@ -28,6 +28,9 @@ from app.config import (
     COLOR_BORDER,
     COLOR_CARD,
     COLOR_HOVER,
+    COLOR_SCREEN_TAG_WORK_BG,
+    COLOR_SCREEN_TAG_WORK_BORDER,
+    COLOR_SCREEN_TAG_WORK_TEXT,
     COLOR_TEXT_MUTED,
     COLOR_TEXT_SOFT,
     SETTINGS_SERVER_HOST,
@@ -76,6 +79,13 @@ def topnav_style() -> str:
     border-color: {COLOR_ACCENT_BORDER}; color: {COLOR_ACCENT}; }}
   .topbar.adhoc .topbar-inner > .tn.is-current {{ background: {COLOR_ADHOC_BG};
     border-color: {COLOR_ADHOC_BORDER_STRONG}; color: {COLOR_ADHOC_TEXT}; }}
+  /* 켜진 칩 배색 = 그 화면의 이름 칩 배색. 초안은 회색으로 켠다 — 초안·확정본은 상단바도
+     머리줄도 같은 글자라, 켜진 칩까지 같은 파랑이면 「어느 글자가 켜졌나」를 읽어야만 안다.
+     파란 링크 넷 사이에서 혼자 파랗지 않은 칩은 글자를 안 읽어도 걸리고, 머리줄 띠
+     (app/renderer.py head-band)와 같은 배색이라 상단바와 머리줄이 같은 말을 두 번 한다.
+     시안 mockups/DRAFT_FINAL_DISTINCT_MOCKUP.html. */
+  .topbar.work .topbar-inner > .tn.is-current {{ background: {COLOR_SCREEN_TAG_WORK_BG};
+    border-color: {COLOR_SCREEN_TAG_WORK_BORDER}; color: {COLOR_SCREEN_TAG_WORK_TEXT}; }}
   .topbar-inner > .tn.is-empty {{ color: {COLOR_TEXT_MUTED}; opacity: 0.55; cursor: not-allowed; }}
   .topbar-inner > a.tn.back {{ color: {COLOR_TEXT_SOFT}; }}
   .topbar-inner > a.tn.back:hover {{ color: {COLOR_ACCENT}; }}
@@ -112,7 +122,8 @@ def regular_nav(current: Optional[str] = None) -> str:
     items = [_link("홈", HOME_HREF), _SEP]
     for key, label, path in REGULAR_ITEMS:
         items.append(_link(label, _BASE + path, "is-current" if key == current else ""))
-    return _bar(items, "reg")
+    # 다듬기 전 화면(초안)만 켜진 칩이 회색이다 — 그 화면 이름 칩과 같은 배색(위 CSS).
+    return _bar(items, "reg work" if current == "preview" else "reg")
 
 
 def adhoc_nav(current: Optional[str], collect_href: str, bundle_href: str) -> str:

@@ -15,6 +15,7 @@ from app.classifier import (
     run_classification_failed,
 )
 from app.config import (
+    favicon_link,
     COLOR_ACCENT,
     COLOR_ACCENT_BORDER,
     COLOR_SCREEN_TAG_REG_BG,
@@ -101,6 +102,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>확정본 · 언론 모니터링 {run_slot} 기준</title>
+<!--favicon-->
 <style>
   {cute_font_face}
   body {{ margin: 0; background: {bg}; color: {text}; font-family: {font_stack}; }}
@@ -922,7 +924,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 {topnav_html}
 <div class="container">
   <header>
-    <div class="header-top">
+    <div class="header-top head-band final">
       <h1><span class="screen-tag final">확정본</span>언론 모니터링 {run_slot} 기준{total_count_html}</h1>
     </div>
     <div class="actions">
@@ -2366,6 +2368,10 @@ renderRelativeTimes();
 </body>
 </html>
 """
+
+# 탭 아이콘은 템플릿을 만들 때 한 번만 꽂는다(아래 .format() 자리가 여럿이다).
+_PAGE_TEMPLATE = _PAGE_TEMPLATE.replace("<!--favicon-->", favicon_link("final"))
+
 
 
 def apply_line_template(template: str, outlet: str, title: str) -> str:
@@ -4230,7 +4236,7 @@ def _waiting_page_html() -> str:
         )
     return f"""<!DOCTYPE html>
 <html lang="ko">
-<head><meta charset="UTF-8" /><title>확정본</title>
+<head><meta charset="UTF-8" /><title>확정본</title>{favicon_link("final")}
 <style>body{{margin:0;background:{COLOR_BG};color:{COLOR_TEXT};font-family:{FONT_STACK};
 display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;
 font-size: var(--fs-lg);text-align:center;padding:60px 24px 0;line-height:1.8;box-sizing:border-box;}}
@@ -5791,6 +5797,16 @@ def screen_tag_style() -> str:
   .screen-tag.final {{ background: {COLOR_SCREEN_TAG_REG_BG}; border-color: {COLOR_SCREEN_TAG_REG_BORDER};
     color: {COLOR_SCREEN_TAG_REG_TEXT}; }}
   .head-sub {{ font-size: 0.72em; font-weight: 500; color: {COLOR_SCREEN_TAG_WORK_TEXT}; margin-left: 6px; }}
+  /* 머리줄 띠 — 칩 하나로는 두 화면이 안 갈려서(상단바·머리줄·툴바·기사 목록이 글자 하나까지
+     같다) 머리줄 전체가 색을 갖는다. 모양은 「📂 소제목 미분류」·「📌 담아둔 기사」 칸과 **같은
+     문법**(왼쪽 4px 띠 + 옅은 바탕 + 오른쪽만 둥근 모서리)이고, **띠 색 = 그 화면 이름 칩의
+     글자색 · 바탕 = 그 칩의 바탕색**이라 새 색이 하나도 안 생기고 한 규칙에서 두 화면이 나온다.
+     칩 바탕과 띠 바탕이 같은 값이라 칩이 띠에 녹아든다 — 칩이 사라지는 게 아니라 띠가 곧
+     「커진 칩」이 되고, 이름은 그대로 남는다. 시안 mockups/DRAFT_FINAL_DISTINCT_MOCKUP.html.
+     아래 여백(margin-bottom: 16px)은 .header-top·.preview-head가 그대로 쥔다. */
+  .head-band {{ padding: 9px 14px; border-radius: 0 var(--r-lg) var(--r-lg) 0; border-left: 4px solid; }}
+  .head-band.work {{ border-left-color: {COLOR_SCREEN_TAG_WORK_TEXT}; background: {COLOR_SCREEN_TAG_WORK_BG}; }}
+  .head-band.final {{ border-left-color: {COLOR_SCREEN_TAG_REG_TEXT}; background: {COLOR_SCREEN_TAG_REG_BG}; }}
 """
 
 
