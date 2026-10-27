@@ -107,6 +107,7 @@ from app.config import (
     DELETED_LOG_TITLE,
     FONT_STACK,
     PALETTE,
+    favicon_link,
 )
 from app.filters import (
     HEADLINE_TAG_RE,
@@ -526,6 +527,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>{title}</title>
+{favicon}
 <style>
   body {{ margin: 0; background: {bg}; color: {text}; font-family: {font_stack}; }}
   .ic {{ width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
@@ -1023,6 +1025,16 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .chip.bundle-tag {{ background: {adhoc_bg}; border-color: {adhoc_border_soft}; color: {adhoc_text}; }}
   .chip.raw-tag {{ background: {screen_tag_work_bg}; border-color: {screen_tag_work_border};
     color: {screen_tag_work_text}; }}
+  /* 머리줄 띠 — 칩 하나로는 두 화면이 안 갈려서(상단바·머리줄·툴바·기사 목록이 글자 하나까지
+     같다) 머리줄 전체가 색을 갖는다. 정기(초안·확정본, app.renderer.screen_tag_style)와 **같은
+     규칙**이라 새 색이 하나도 안 생긴다 — **띠 색 = 그 화면 이름 칩의 글자색 · 바탕 = 그 칩의
+     바탕색**이고, 모양은 「📂 소제목 미분류」 칸과 같은 문법(왼쪽 4px 띠 + 옅은 바탕 + 오른쪽만
+     둥근 모서리)이다. 수시는 확정본 칩이 청록이라 원본 회색·확정본 청록이 저절로 나온다.
+     칩 바탕과 띠 바탕이 같은 값이라 칩이 띠에 녹아든다 — 칩이 사라지는 게 아니라 띠가 곧
+     「커진 칩」이 되고, 이름은 그대로 남는다. 시안 mockups/ADHOC_SCREEN_DISTINCT_MOCKUP.html. */
+  .head-band {{ padding: 9px 14px; border-radius: 0 var(--r-lg) var(--r-lg) 0; border-left: 4px solid; }}
+  .head-band.work {{ border-left-color: {screen_tag_work_text}; background: {screen_tag_work_bg}; }}
+  .head-band.adhoc {{ border-left-color: {adhoc_text}; background: {adhoc_bg}; }}
   .sent-filter {{ display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm);
     color: {muted}; cursor: pointer; }}
   /* ☑ 아직 안 보낸 기사만 — 순서는 한 톨도 안 건드리고 감추기만 한다(§6.13 C안 기각). */
@@ -1506,12 +1518,27 @@ def page_nav(current: Optional[str] = None) -> str:
     return adhoc_nav(current, _latest_href("collect"), _latest_href("bundle"))
 
 
-def base_page(title: str, body: str, script: str = "", nav: str = "") -> str:
+# 상단바 칸 이름 → 탭 아이콘 이름(app.config.SCREEN_FAVICONS). 상단바가 쓰는 말(collect·bundle)과
+# 화면 이름(원본·확정본)이 달라 한 표에 모아 둔다 — 화면마다 제 아이콘 이름을 또 적으면 상단바와
+# 탭 아이콘이 조용히 갈린다. 표에 없는 화면은 아이콘 없이 예전 그대로다.
+_FAVICON_BY_NAV = {
+    "new": "adhoc_new",
+    "collect": "adhoc_raw",
+    "bundle": "adhoc_bundle",
+    "archive": "adhoc_archive",
+}
+
+
+def base_page(
+    title: str, body: str, script: str = "", nav: str = "", screen: str = ""
+) -> str:
+    """screen은 상단바 칸 이름(page_nav와 같은 값) — 탭 아이콘을 고르는 데만 쓴다."""
     return _PAGE_TEMPLATE.format(
         title=title,
         body=body,
         script=script,
         nav=nav or page_nav(),
+        favicon=favicon_link(_FAVICON_BY_NAV.get(screen, "")),
         # [수정: 2026-08-21] 색 값은 전부 app.config.PALETTE 하나에서 온다.
         **PALETTE,
         font_stack=FONT_STACK,
@@ -2035,7 +2062,7 @@ renderKeywords();
 }})();
 </script>"""
 
-    return base_page("수시 모니터링 — 새 수집", body, script, nav=page_nav("new"))
+    return base_page("수시 모니터링 — 새 수집", body, script, nav=page_nav("new"), screen="new")
 
 
 # --- 화면 2: 카드 정리 (ADHOC_DESIGN.md §5.3) -------------------------------------
@@ -3268,6 +3295,7 @@ def render_empty_kind_page(kind: str) -> str:
     bundle_mode = kind == KIND_BUNDLE
     name = "확정본" if bundle_mode else "원본"
     chip_cls = "bundle-tag" if bundle_mode else "raw-tag"
+    band_cls = "adhoc" if bundle_mode else "work"
 
     # 지난 카드 한 줄 — 그 날짜 카드만 열어 **화면에 찍히던 이름 그대로** 짓는다
     # (확정본은 같은 날 같은 이름의 (2)까지, 원본은 검색어). 요약의 report_title을
@@ -3317,7 +3345,7 @@ def render_empty_kind_page(kind: str) -> str:
 
     body = f"""
 <div class="card">
-  <div class="report-head"><span class="chip {chip_cls}">{name}</span>{head}</div>
+  <div class="report-head head-band {band_cls}"><span class="chip {chip_cls}">{name}</span>{head}</div>
   <div class="empty-zone">
     <div class="zz">💤</div>
     <p class="sub">{sub}</p>
@@ -3326,7 +3354,7 @@ def render_empty_kind_page(kind: str) -> str:
   </div>
 </div>
 """
-    return base_page(f"{name} · 오늘 것이 없어요", body, nav=page_nav(kind))
+    return base_page(f"{name} · 오늘 것이 없어요", body, nav=page_nav(kind), screen=kind)
 
 
 def render_card_page(
@@ -3842,7 +3870,7 @@ def render_card_page(
             else ""
         )
         report_head_html = (
-            f'<div class="report-head"><span class="chip bundle-tag">확정본</span>'
+            f'<div class="report-head head-band adhoc"><span class="chip bundle-tag">확정본</span>'
             f'수시 모니터링 {_basis_html}({_title_input}){_count_html}{_sent_done_html(card)}</div>'
         )
     else:
@@ -3875,7 +3903,7 @@ def render_card_page(
             else html.escape(_kw_label)
         )
         report_head_html = (
-            f'<div class="report-head"><span class="chip raw-tag">원본</span>수시 모니터링 '
+            f'<div class="report-head head-band work"><span class="chip raw-tag">원본</span>수시 모니터링 '
             f'{_format_hhmm_kr(window_of(card)["end"])} 기준({_kw_html}){reload_now_html}</div>'
         )
 
@@ -4767,11 +4795,12 @@ document.addEventListener('click', function (e) {{
 }});
 </script>"""
 
-    nav = page_nav("bundle" if is_bundle(card) else "collect")
+    nav_key = "bundle" if is_bundle(card) else "collect"
+    nav = page_nav(nav_key)
     # 탭 제목은 화면 이름을 맨 앞에 — 같은 사안의 원본·확정본 탭이 좁아져도 갈린다.
     # 확정본은 화면 이름(bundle_label)이라 같은 이름 확정본끼리도 번호로 갈린다.
     page_title = (
         f"확정본 · {bundle_label(card, day_bundles)}" if is_bundle(card)
         else f"원본 · {screen_name(card)}"
     )
-    return base_page(page_title, body, script, nav=nav)
+    return base_page(page_title, body, script, nav=nav, screen=nav_key)

@@ -663,7 +663,8 @@ def render_archive_page(
   <a class="btn" href="/adhoc/new">{icon("search")} 새 수집 시작</a>
   {gone_html}
 </div>"""
-        return base_page("수시 모니터링 — 수시 보관함", body, script=page_script, nav=page_nav("archive"))
+        return base_page("수시 모니터링 — 수시 보관함", body, script=page_script,
+                         nav=page_nav("archive"), screen="archive")
 
     sub_label = "사안별로 묶어 본 확정본" if view == "issue" else "날짜별로 쌓인 확정본"
     filter_bar_html = _render_filter_bar(q, start, end, today, view, sort)
@@ -686,7 +687,8 @@ def render_archive_page(
   {gone_html}
 </div>"""
         return base_page(
-            "수시 모니터링 — 수시 보관함", body, script=page_script, nav=page_nav("archive")
+            "수시 모니터링 — 수시 보관함", body, script=page_script,
+            nav=page_nav("archive"), screen="archive",
         )
 
     shown_cards = filtered
@@ -759,6 +761,7 @@ def render_archive_page(
         body,
         script=page_script,
         nav=page_nav("archive"),
+        screen="archive",
     )
 
 

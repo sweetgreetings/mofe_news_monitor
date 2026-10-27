@@ -1,0 +1,305 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>수시 원본·확정본 구별 시안</title>
+<style>
+  /* 값은 지금 돌고 있는 /adhoc/card 화면(app/adhoc/renderer.py)에서 그대로 가져왔다. */
+  :root {
+    --fs-2xs:.66rem; --fs-xs:.72rem; --fs-sm:.8rem; --fs-md:.88rem;
+    --fs-base:1rem; --fs-lg:1.1rem; --fs-xl:1.3rem;
+    --r-sm:4px; --r-md:6px; --r-lg:10px; --r-pill:999px;
+    --h-tb:28px; --h-md:30px;
+
+    --card:#FFFFFF; --bg:#F8FAFC; --text:#1F2937; --header:#1E3A5F;
+    --border:#E5E7EB; --muted:#6B7280; --soft:#4B5563;
+    --accent:#2563EB; --accent-border:#BFDBFE; --hover:#EFF6FF; --on-fill:#FFFFFF;
+    --work-bg:#F1F5F9; --work-border:#E5E7EB; --work-text:#6B7280;
+    --adhoc-bg:#E3F1EE; --adhoc-text:#146B5E;
+    --adhoc-border-soft:rgba(20,107,94,.24); --adhoc-border-strong:rgba(20,107,94,.45);
+    --warn-bg:#FFFBEB; --warn-border:#FCD34D; --warn-text:#92400E;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:'Pretendard','Noto Sans KR',sans-serif}
+  .page{max-width:880px;margin:0 auto;padding:28px 24px 80px}
+  .page>h1{font-size:var(--fs-xl);color:var(--header);margin:0 0 6px}
+  .lead{color:var(--soft);font-size:var(--fs-md);line-height:1.7;margin:0 0 8px}
+  .lead b{color:var(--header)}
+  .sec{font-size:var(--fs-lg);color:var(--header);margin:34px 0 4px;
+    padding-bottom:6px;border-bottom:1px solid var(--border)}
+  .note{color:var(--muted);font-size:var(--fs-sm);line-height:1.7;margin:8px 0 14px}
+  .note b{color:var(--soft)}
+  .tag{display:inline-block;font-size:var(--fs-xs);font-weight:700;padding:2px 9px;
+    border-radius:var(--r-pill);border:1px solid;margin-right:8px;vertical-align:2px}
+  .tag.now{background:var(--work-bg);border-color:var(--border);color:var(--muted)}
+  .tag.new{background:var(--adhoc-bg);border-color:var(--adhoc-border-strong);color:var(--adhoc-text)}
+
+  /* 브라우저 탭 줄 */
+  .tabstrip{display:flex;gap:2px;background:#DEE3EA;padding:7px 7px 0;
+    border-radius:var(--r-lg) var(--r-lg) 0 0;margin-bottom:14px}
+  .btab{display:flex;align-items:center;gap:7px;background:var(--card);
+    border-radius:var(--r-md) var(--r-md) 0 0;padding:7px 12px;min-width:0;
+    font-size:var(--fs-sm);color:var(--text);max-width:230px}
+  .btab.off{background:#EAEEF3;color:var(--muted)}
+  .btab .ico{width:15px;height:15px;flex:none;font-size:13px;line-height:15px;text-align:center}
+  .btab .ico.blank{background:#CBD5E1;border-radius:3px}
+  .btab .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .btab .x{color:#9CA3AF;flex:none}
+
+  /* 화면 조각 */
+  .screen{margin-bottom:18px;border:1px solid var(--border);border-radius:var(--r-lg);
+    overflow:hidden;background:var(--bg)}
+  .topbar{background:var(--card);border-bottom:1px solid var(--border);
+    box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .topbar-inner{padding:12px 24px;display:flex;justify-content:flex-start;
+    align-items:center;gap:10px;flex-wrap:wrap}
+  .tn{color:var(--accent);text-decoration:none;font-size:var(--fs-md);font-weight:600;
+    padding:5px 14px;border:1px solid transparent;border-radius:var(--r-pill);white-space:nowrap}
+  .tn-sep{width:1px;height:18px;background:var(--border);margin:0 16px}
+  /* 지금: 원본·확정본 둘 다 청록으로 켜진다 */
+  .topbar.adhoc .tn.is-current{cursor:default;background:var(--adhoc-bg);
+    border-color:var(--adhoc-border-strong);color:var(--adhoc-text)}
+  /* 시안 ②: 다듬기 전 화면(원본)만 회색으로 켠다 — 정기 초안과 같은 규칙·같은 클래스 */
+  .topbar.adhoc.work .tn.is-current{background:var(--work-bg);
+    border-color:var(--work-border);color:var(--work-text)}
+
+  .wrap{margin:16px}
+  .tabs{display:flex;gap:4px;row-gap:5px;align-items:flex-end;flex-wrap:wrap}
+  .tab{font-size:var(--fs-sm);padding:8px 15px;border-radius:var(--r-md) var(--r-md) 0 0;
+    background:rgba(255,255,255,.5);color:var(--adhoc-text);font-weight:600;
+    border:1px solid transparent;border-bottom:none;white-space:nowrap;text-decoration:none;
+    position:relative;top:1px;display:inline-block}
+  .tab.on{background:var(--card);font-weight:700;border-color:var(--border);
+    color:var(--header);padding-bottom:9px}
+  .tab .del{margin-left:7px;color:var(--muted);font-weight:400}
+
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);
+    padding:22px 24px;margin-bottom:14px}
+  .report-head{display:flex;align-items:center;gap:2px;flex-wrap:wrap;
+    font-size:var(--fs-xl);font-weight:700;color:var(--header)}
+  .chip{display:inline-flex;align-items:center;background:var(--work-bg);
+    border:1px solid var(--border);border-radius:var(--r-pill);padding:3px 11px;
+    color:var(--muted);font-size:var(--fs-sm);font-weight:400}
+  .chip.raw-tag,.chip.bundle-tag{font-weight:700;font-size:var(--fs-sm);margin-right:10px}
+  .chip.raw-tag{background:var(--work-bg);border-color:var(--work-border);color:var(--work-text)}
+  .chip.bundle-tag{background:var(--adhoc-bg);border-color:var(--adhoc-border-soft);
+    color:var(--adhoc-text)}
+  .name-field{display:inline-flex;align-items:center;background:var(--hover);
+    border-bottom:2px dashed var(--accent);border-radius:var(--r-sm) var(--r-sm) 0 0;
+    padding:0 6px 0 2px}
+  .name-field .pen{font-size:.62em;margin-left:5px;color:var(--accent)}
+  .total-count-badge{margin-left:8px;font-size:var(--fs-sm);font-weight:700;color:var(--muted);
+    background:#F3F4F6;border-radius:var(--r-pill);padding:2px 10px}
+  .metarow{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap}
+  .chip.src{background:var(--work-bg);border-color:var(--work-border);color:var(--work-text)}
+  .chip.pair{background:var(--adhoc-bg);border-color:var(--adhoc-border-soft);color:var(--adhoc-text)}
+  .now-btn{font:inherit;font-size:var(--fs-md);height:var(--h-tb);padding:0 14px;
+    border-radius:var(--r-md);border:1px solid var(--accent);background:var(--accent);
+    color:var(--on-fill);font-weight:600;margin-left:10px}
+
+  /* ─── 시안 ① 머리줄 띠 ──────────────────────────────────────
+     정기(초안·확정본)와 **같은 규칙**: 띠 색 = 그 화면 이름 칩의 글자색,
+     바탕 = 그 칩의 바탕색. 수시는 확정본이 청록이라 modifier 이름만 .adhoc다. */
+  .head-band{padding:9px 14px;border-radius:0 var(--r-lg) var(--r-lg) 0;border-left:4px solid}
+  .head-band.work{border-left-color:var(--work-text);background:var(--work-bg)}
+  .head-band.adhoc{border-left-color:var(--adhoc-text);background:var(--adhoc-bg)}
+
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:11px 0;
+    border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin:16px 0}
+  .btn{font:inherit;font-size:var(--fs-md);height:var(--h-md);padding:0 14px;
+    border-radius:var(--r-md);border:1px solid var(--accent);background:var(--accent);
+    color:var(--on-fill);font-weight:600;display:inline-flex;align-items:center;gap:6px}
+  .btn.sm{height:var(--h-tb);padding:0 14px}
+  .btn.ghost{background:var(--card);color:var(--accent);border-color:var(--accent-border)}
+  .exp{display:inline-flex;gap:2px;margin-left:auto}
+  .exp button{background:transparent;border:none;color:var(--soft);font-weight:500;
+    height:var(--h-tb);padding:0 8px;font-size:var(--fs-md);font-family:inherit}
+  .vsel{border:1px solid var(--accent);border-radius:var(--r-md);font-size:var(--fs-md);
+    height:var(--h-tb);padding:0 9px;color:var(--text);background:var(--card);font-family:inherit}
+
+  .a-row{margin:6px 0;line-height:1.5;padding:4px 8px}
+  .a-title .outlet{color:var(--muted);font-size:.86em;font-weight:500;margin-right:.5em}
+  .a-bot{color:var(--muted);font-size:var(--fs-sm);margin-top:2px}
+  .grp{font-size:var(--fs-lg);color:var(--header);border-bottom:1px solid var(--border);
+    margin:18px 0 6px;padding-bottom:6px;font-weight:700}
+
+  .where{margin-top:34px;border:1px solid var(--border);border-radius:var(--r-lg);
+    background:var(--card);padding:18px 20px}
+  .where h3{font-size:var(--fs-lg);color:var(--header);margin:0 0 10px}
+  .where ol{margin:0;padding-left:20px;color:var(--soft);font-size:var(--fs-md);line-height:1.9}
+  .where code{background:var(--work-bg);border-radius:var(--r-sm);padding:1px 5px;font-size:.92em}
+  .where .warn{margin-top:14px;background:var(--warn-bg);border:1px solid var(--warn-border);
+    color:var(--warn-text);border-radius:var(--r-md);padding:10px 12px;
+    font-size:var(--fs-sm);line-height:1.7}
+</style></head>
+<body>
+<div class="page">
+
+  <h1>수시 원본·확정본 구별 시안</h1>
+  <p class="lead">정기(초안·확정본)에 넣은 세 가지를 <b>같은 규칙 그대로</b> 수시에도 —
+  <b>① 머리줄 띠</b> · <b>② 상단바 켜진 칩 색</b> · <b>③ 파비콘</b>.
+  수시는 확정본 색이 파랑이 아니라 청록일 뿐, 규칙은 한 글자도 안 바뀐다.</p>
+
+  <!-- 지금 -->
+  <h2 class="sec"><span class="tag now">지금</span>탭 줄 — 아이콘이 없다</h2>
+  <p class="note">수시 탭 제목은 <b>원본 · {검색어}</b> / <b>확정본 · {사안명}</b>인데,
+  검색어가 길어 탭이 좁아지면 앞이 잘린다.</p>
+  <div class="tabstrip">
+    <div class="btab"><span class="ico blank"></span><span class="nm">원본 · 기획예산처+재정경제부+미래대응기금</span><span class="x">×</span></div>
+    <div class="btab off"><span class="ico blank"></span><span class="nm">확정본 · 미래대응기금 13시</span><span class="x">×</span></div>
+    <div class="btab off"><span class="ico blank"></span><span class="nm">새 수집</span><span class="x">×</span></div>
+  </div>
+
+  <h2 class="sec"><span class="tag now">지금</span>두 화면 머리</h2>
+  <p class="note">상단바 켜진 칩이 <b>둘 다 같은 청록</b>이다. 머리줄은 칩 색(회색/청록)으로
+  갈리긴 하지만 <b>칩 하나뿐</b>이라, 정기와 같은 문제가 그대로 있다.</p>
+
+  <!-- 지금 · 원본 -->
+  <div class="screen">
+    <div class="topbar adhoc"><div class="topbar-inner">
+      <a class="tn" href="#">홈</a><span class="tn-sep"></span>
+      <a class="tn" href="#">새 수집</a>
+      <span class="tn is-current">원본</span>
+      <a class="tn" href="#">확정본</a>
+      <a class="tn" href="#">보관함</a>
+    </div></div>
+    <div class="wrap">
+      <div class="tabs"><span class="tab on">기획예산처+재정경제부+미래대응기금<span class="del">×</span></span><span class="tab">증안펀드 · 증시안전펀드<span class="del">×</span></span></div>
+      <div class="card">
+        <div class="report-head"><span class="chip raw-tag">원본</span>수시 모니터링 14시 07분 기준(기획예산처+재정경제부+미래대응기금)<button class="now-btn">⟳ 지금까지 다시 수집</button></div>
+        <div class="metarow"><span class="chip">🕐 11:00 ~ 14:07</span><span class="chip pair">[→ 14:44 확정본 26건</span></div>
+        <div class="toolbar">
+          <button class="btn sm ghost">모든 기사 확정본으로</button>
+          <span class="exp"><button>복사</button><button>텍스트</button><button>엑셀</button></span>
+        </div>
+        <div class="a-row"><div class="a-title"><span class="outlet">경향신문</span>박홍근 미래대응기금 '재경부 패싱' 의혹에 "국회 단계에서 논의하기로 합의"</div>
+          <div class="a-bot">11:30 · 4일 전 · 원문보기</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 지금 · 확정본 -->
+  <div class="screen">
+    <div class="topbar adhoc"><div class="topbar-inner">
+      <a class="tn" href="#">홈</a><span class="tn-sep"></span>
+      <a class="tn" href="#">새 수집</a>
+      <a class="tn" href="#">원본</a>
+      <span class="tn is-current">확정본</span>
+      <a class="tn" href="#">보관함</a>
+    </div></div>
+    <div class="wrap">
+      <div class="tabs"><span class="tab on">미래대응기금 13시<span class="del">×</span></span></div>
+      <div class="card">
+        <div class="report-head"><span class="chip bundle-tag">확정본</span>수시 모니터링 14시 07분 기준(<span class="name-field">미래대응기금 13시<span class="pen">✏️</span></span>)<span class="total-count-badge">26건</span></div>
+        <div class="metarow"><span class="chip src">←] 기획예산처+미래대응기금 26건</span></div>
+        <div class="toolbar">
+          <button class="btn sm ghost">소제목 배정</button>
+          <button class="btn sm ghost">+ 소제목 추가</button>
+          <span class="exp"><button>복사</button><button>텍스트</button><button>엑셀</button>
+            <select class="vsel"><option>소제목 내 언론사순</option></select></span>
+        </div>
+        <div class="grp">미래대응기금 재경부 패싱 논란</div>
+        <div class="a-row"><div class="a-title"><span class="outlet">경향신문</span>박홍근 미래대응기금 '재경부 패싱' 의혹에 "국회 단계에서 논의하기로 합의"</div>
+          <div class="a-bot">11:30 · 4일 전 · 원문보기</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 시안 -->
+  <h2 class="sec"><span class="tag new">시안</span>③ 파비콘 — 홈 흐름도 이모지를 그대로</h2>
+  <p class="note">수시 흐름의 <b>🔎 새 수집</b> · <b>🍅 원본</b> · <b>🥗 확정본</b> ·
+  <b>🧺 보관함</b>. 정기(⛏️ 초안 · 💎 확정본)와 <b>같은 표 한 곳</b>
+  (<code style="font-size:.92em">SCREEN_FAVICONS</code>)에서 나온다.</p>
+  <div class="tabstrip">
+    <div class="btab"><span class="ico">🍅</span><span class="nm">원본 · 기획예산처+재정경제부+미래대응기금</span><span class="x">×</span></div>
+    <div class="btab off"><span class="ico">🥗</span><span class="nm">확정본 · 미래대응기금 13시</span><span class="x">×</span></div>
+    <div class="btab off"><span class="ico">🔎</span><span class="nm">새 수집</span><span class="x">×</span></div>
+  </div>
+  <div class="tabstrip">
+    <div class="btab"><span class="ico">🍅</span><span class="nm">원본 ·…</span><span class="x">×</span></div>
+    <div class="btab off"><span class="ico">🥗</span><span class="nm">확정본…</span><span class="x">×</span></div>
+    <div class="btab off"><span class="ico">⛏️</span><span class="nm">초안 · …</span><span class="x">×</span></div>
+    <div class="btab off"><span class="ico">💎</span><span class="nm">확정본…</span><span class="x">×</span></div>
+    <div class="btab off"><span class="ico">🧺</span><span class="nm">수시 보…</span><span class="x">×</span></div>
+  </div>
+  <p class="note">두 흐름의 확정본은 화면 이름이 같아 탭 제목만으로는 안 갈린다 —
+  <b>💎(정기) / 🥗(수시)</b>가 그 자리에서 유일하게 가르는 표시가 된다.</p>
+
+  <h2 class="sec"><span class="tag new">시안</span>① 머리줄 띠 + ② 상단바 켜진 칩 색</h2>
+  <p class="note"><b>띠 색 = 그 화면 이름 칩의 글자색, 바탕 = 그 칩의 바탕색</b> — 정기와 같은
+  한 규칙이라 원본 회색 · 확정본 청록이 저절로 나오고 <b>새 색이 하나도 안 생긴다.</b>
+  상단바도 원본일 때만 회색으로 켠다(정기 초안과 같은 <code style="font-size:.92em">.topbar.work</code>).<br>
+  칩 바탕과 띠 바탕이 같은 값이라 <b>칩이 띠에 녹아든다</b> — 띠가 곧 「커진 칩」이 된다.</p>
+
+  <!-- 시안 · 원본 -->
+  <div class="screen">
+    <div class="topbar adhoc work"><div class="topbar-inner">
+      <a class="tn" href="#">홈</a><span class="tn-sep"></span>
+      <a class="tn" href="#">새 수집</a>
+      <span class="tn is-current">원본</span>
+      <a class="tn" href="#">확정본</a>
+      <a class="tn" href="#">보관함</a>
+    </div></div>
+    <div class="wrap">
+      <div class="tabs"><span class="tab on">기획예산처+재정경제부+미래대응기금<span class="del">×</span></span><span class="tab">증안펀드 · 증시안전펀드<span class="del">×</span></span></div>
+      <div class="card">
+        <div class="report-head head-band work"><span class="chip raw-tag">원본</span>수시 모니터링 14시 07분 기준(기획예산처+재정경제부+미래대응기금)<button class="now-btn">⟳ 지금까지 다시 수집</button></div>
+        <div class="metarow"><span class="chip">🕐 11:00 ~ 14:07</span><span class="chip pair">[→ 14:44 확정본 26건</span></div>
+        <div class="toolbar">
+          <button class="btn sm ghost">모든 기사 확정본으로</button>
+          <span class="exp"><button>복사</button><button>텍스트</button><button>엑셀</button></span>
+        </div>
+        <div class="a-row"><div class="a-title"><span class="outlet">경향신문</span>박홍근 미래대응기금 '재경부 패싱' 의혹에 "국회 단계에서 논의하기로 합의"</div>
+          <div class="a-bot">11:30 · 4일 전 · 원문보기</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 시안 · 확정본 -->
+  <div class="screen">
+    <div class="topbar adhoc"><div class="topbar-inner">
+      <a class="tn" href="#">홈</a><span class="tn-sep"></span>
+      <a class="tn" href="#">새 수집</a>
+      <a class="tn" href="#">원본</a>
+      <span class="tn is-current">확정본</span>
+      <a class="tn" href="#">보관함</a>
+    </div></div>
+    <div class="wrap">
+      <div class="tabs"><span class="tab on">미래대응기금 13시<span class="del">×</span></span></div>
+      <div class="card">
+        <div class="report-head head-band adhoc"><span class="chip bundle-tag">확정본</span>수시 모니터링 14시 07분 기준(<span class="name-field">미래대응기금 13시<span class="pen">✏️</span></span>)<span class="total-count-badge">26건</span></div>
+        <div class="metarow"><span class="chip src">←] 기획예산처+미래대응기금 26건</span></div>
+        <div class="toolbar">
+          <button class="btn sm ghost">소제목 배정</button>
+          <button class="btn sm ghost">+ 소제목 추가</button>
+          <span class="exp"><button>복사</button><button>텍스트</button><button>엑셀</button>
+            <select class="vsel"><option>소제목 내 언론사순</option></select></span>
+        </div>
+        <div class="grp">미래대응기금 재경부 패싱 논란</div>
+        <div class="a-row"><div class="a-title"><span class="outlet">경향신문</span>박홍근 미래대응기금 '재경부 패싱' 의혹에 "국회 단계에서 논의하기로 합의"</div>
+          <div class="a-bot">11:30 · 4일 전 · 원문보기</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="where">
+    <h3>고칠 자리</h3>
+    <ol>
+      <li><b>① 머리줄 띠</b> — <code>app/adhoc/renderer.py</code>의 <code>.chip.raw-tag</code>·
+        <code>.chip.bundle-tag</code> 바로 밑에 <code>.head-band</code> 세 줄. 두 군데
+        <code>report-head</code>에 클래스를 붙인다(카드 화면 + 빈 화면
+        <code>render_empty_kind_page</code>). 색은 이미 있는 <code>COLOR_SCREEN_TAG_WORK_*</code>·
+        <code>COLOR_ADHOC_*</code>.</li>
+      <li><b>② 상단바 켜진 칩</b> — <code>app/topnav.py</code>의
+        <code>.topbar.work</code> 규칙을 <b>그대로 쓴다</b>(정기에 이미 넣었다).
+        <code>adhoc_nav()</code>가 원본 화면일 때 <code>work</code>를 덧붙이기만 하면 된다.</li>
+      <li><b>③ 파비콘</b> — <code>SCREEN_FAVICONS</code>에 수시 넷은 <b>이미 들어 있다</b>.
+        <code>base_page()</code>가 화면 종류에 맞는 <code>favicon_link()</code>를 받게 한다.</li>
+    </ol>
+    <div class="warn">결정할 것 하나 — 확정본 머리줄의 <b>사안명 칸</b>(파란 바탕 + 파란 점선
+    밑줄)이 청록 띠 위에 선다. 파랑은 이 앱에서 「담당자가 고치는 칸」이라 뜻은 맞지만,
+    색이 둘 겹치는 게 거슬리면 그 칸만 흰 바탕으로 둘 수 있다. 시안은 <b>지금 그대로</b>
+    (파란 칸)를 보여준다.</div>
+  </div>
+
+</div>
+</body></html>

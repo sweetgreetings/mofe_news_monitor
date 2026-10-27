@@ -146,7 +146,10 @@ def adhoc_nav(current: Optional[str], collect_href: str, bundle_href: str) -> st
             items.append(_link(label, href, "is-current"))
         else:
             items.append(_link(label, href))
-    return _bar(items, "adhoc")
+    # 다듬기 전 화면(원본)만 켜진 칩이 회색이다 — 그 화면 이름 칩과 같은 배색(위 .topbar.work).
+    # 정기 초안과 **같은 규칙·같은 CSS**이고, 머리줄 띠(app/adhoc/renderer.py .head-band)와
+    # 배색이 같아 상단바와 머리줄이 같은 말을 두 번 한다.
+    return _bar(items, "adhoc work" if current == "collect" else "adhoc")
 
 
 def plain_nav(back_label: Optional[str] = None, back_href: Optional[str] = None) -> str:
