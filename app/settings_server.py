@@ -4732,10 +4732,22 @@ _LABEL_STYLE = """
   .snap-tag.state {{ display: inline-flex; align-items: center; gap: 3px; }}
   .snap-tag.state .ic {{ width: 0.95em; height: 0.95em; stroke-width: 2; }}
   .snap-tag.state.is-hid {{ color: {muted}; }}
-  .arc-meta a.origin-link {{ color: {accent}; text-decoration: none;
-    display: inline-flex; align-items: center; gap: 3px; }}
-  .arc-meta a.origin-link .ic {{ width: 0.9em; height: 0.9em; }}
   .arc-labels {{ display: inline-flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }}
+  /* 원문·복사 — 이 행엔 ⋯ 더보기가 없어서 기사 한 건 복사가 들어갈 자리가 메타 줄
+     오른쪽 끝뿐이다. 그 경우에 앱이 쓰는 모양은 기관 기사 찾기의 30×26 테두리 상자
+     하나이고(app/agency_archive_renderer.py의 `.acts .ib`), 값을 글자 하나까지 같이
+     쓴다 — **테두리가 핵심이다**: 맨 아이콘만 두면 ↗와 복사가 같은 실루엣으로 보인다.
+     한쪽을 고치면 다른 쪽도 고친다. */
+  .acts {{ flex: none; display: flex; align-items: center; gap: 6px; }}
+  .acts .ib {{ flex: none; display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 26px; color: {text_soft}; text-decoration: none; background: {card};
+    border: 1px solid {border}; border-radius: var(--r-md); cursor: pointer; padding: 0; }}
+  .acts .ib:hover {{ background: {hover}; color: {accent}; border-color: {accent}; }}
+  .acts .ib svg {{ width: 13px; height: 13px; fill: none; stroke: currentColor;
+    stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }}
+  .acts .ib .icon-done {{ display: none; }}
+  .acts .ib.is-copied .icon-default {{ display: none; }}
+  .acts .ib.is-copied .icon-done {{ display: inline-flex; color: {ok_text}; }}
   .lab-chip {{
     display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs); font-weight: 700;
     color: {label_text}; background: {label_bg}; border: 1px solid {label_border};
@@ -4844,12 +4856,17 @@ def _label_source_tag_html(source: dict) -> str:
 
 
 def _render_label_archive_row(
-    entry: dict, hidden_urls: set, overrides: dict, return_qs: str = ""
+    entry: dict,
+    hidden_urls: set,
+    overrides: dict,
+    return_qs: str = "",
+    line_template: str = DEFAULT_ARTICLE_LINE_TEMPLATE,
 ) -> str:
     url = entry["url"]
     escaped_url = html.escape(url)
     override_title = overrides.get(url, {}).get("title")
-    title = html.escape(override_title or entry.get("title") or url)
+    title_raw = override_title or entry.get("title") or url
+    title = html.escape(title_raw)
     outlet = entry.get("outlet", "")
     outlet_html = outlet_display_label(outlet, url) if outlet else ""
     # 소제목 대신 **「이 기사가 지금 정기 보고서에 있나」 한 칸**이다 — 숨겼으면 「숨김」,
@@ -4886,11 +4903,26 @@ def _render_label_archive_row(
     if outlet_html:
         meta_parts.append(f"<span>·</span><span>{outlet_html}</span>")
     meta_parts.append(state_html)
-    meta_parts.append(
-        f'<a class="origin-link" href="{escaped_url}" target="_blank" rel="noopener noreferrer">'
-        f'원문보기{icon("external_link")}</a>'
-    )
     meta_parts.append(f'<span class="arc-labels">{label_chips}</span>')
+    # [추가: 2026-10-28] 기사 한 건 복사 — 이 행엔 ⋯ 더보기가 없어서(그 메뉴를 가진 여섯
+    # 화면과 달리) 복사가 들어갈 자리가 줄 오른쪽 끝뿐이다. 그 경우의 모양은 앱에 하나뿐인
+    # 기관 기사 찾기의 아이콘 두 칸(↗·복사)이라 그대로 쓴다 — 「원문보기」 글자가 ↗로
+    # 바뀌는 대신 두 화면이 같은 모양이 되고, 복사 모양이 앱에서 둘로 유지된다.
+    # 복사되는 값은 **머리줄의 「복사」가 그 기사에 쓰는 한 줄과 똑같다**(보고서 한 줄 형식
+    # + URL) — 제목은 화면이 보여주는 값(원문 교정 우선), 언론사는 스냅샷 값 그대로.
+    copy_attr = html.escape(
+        line_template.format(outlet=entry.get("outlet", ""), title=title_raw) + "\n" + url
+    )
+    meta_parts.append(
+        '<span class="acts">'
+        f'<a class="ib" href="{escaped_url}" target="_blank" rel="noopener noreferrer"'
+        f' title="원문 보기">{icon("external_link")}</a>'
+        f'<button type="button" class="ib" title="복사" data-copy-text="{copy_attr}"'
+        ' onclick="copyArticleIcon(this)">'
+        f'<span class="icon-default">{icon("copy")}</span>'
+        f'<span class="icon-done">{icon("check")}</span></button>'
+        "</span>"
+    )
     # [추가: 2026-10-12] 「⟳ 제목 다시 불러오기」가 읽는 표식 넷(app.renderer의 그 절).
     # 보내는 값은 **화면이 지금 보여주는 제목**이라야 한다 — data-refetch-title이 가리키는
     # 글자가 곧 그 값이고, 위에서 override를 이미 입혔다.
@@ -4946,6 +4978,19 @@ function copyLabelText(btn) {{
     var original = btn.textContent;
     btn.textContent = '복사했습니다';
     setTimeout(function () {{ btn.textContent = original; }}, 900);
+  }}).catch(function () {{
+    alert('복사에 실패했습니다.');
+  }});
+}}
+// 행의 복사 아이콘 — 누르면 1초간 ✓. 다른 다섯 화면의 같은 이름 함수와 같은 일을
+// 하므로 이름을 새로 짓지 않는다(flashEl은 안 쓴다 — 이 행엔 ⋯ 메뉴가 없어 누른
+// 버튼 자체가 ✓로 바뀐다).
+function copyArticleIcon(btn, flashEl) {{
+  var mark = flashEl || btn;
+  pmCopy(btn.dataset.copyText).then(function () {{
+    mark.classList.add('is-copied');
+    clearTimeout(mark._copyTimer);
+    mark._copyTimer = setTimeout(function () {{ mark.classList.remove('is-copied'); }}, 1000);
   }}).catch(function () {{
     alert('복사에 실패했습니다.');
   }});
@@ -5554,6 +5599,8 @@ def render_labels_page(selected: Optional[list] = None) -> str:
         rows = articles_for_labels_and(valid_selected)
         settings = load_settings()
         subheading_format = settings.get("subheading_format_template", DEFAULT_SUBHEADING_FORMAT_TEMPLATE)
+        # 머리줄의 「복사」(목록 통째)와 행의 복사 아이콘이 **같은 값**을 봐야 한다.
+        line_template = settings.get("article_line_template", DEFAULT_ARTICLE_LINE_TEMPLATE)
         overrides = load_summary_overrides()
         hidden_urls = _label_hidden_urls()
         if not rows:
@@ -5601,7 +5648,7 @@ def render_labels_page(selected: Optional[list] = None) -> str:
                         for r, x in zip(rows, excel_rows)
                     ],
                 }],
-                settings.get("article_line_template", DEFAULT_ARTICLE_LINE_TEMPLATE),
+                line_template,
                 {},
                 subheading_format,
             )[copy_group_name]
@@ -5631,7 +5678,9 @@ def render_labels_page(selected: Optional[list] = None) -> str:
                 f'{refetch_titles_button_html(".lab-body")}{export_form_html}</div>'
                 + refetch_titles_note_html()
                 + "".join(
-                    _render_label_archive_row(r, hidden_urls, overrides, return_qs)
+                    _render_label_archive_row(
+                        r, hidden_urls, overrides, return_qs, line_template
+                    )
                     for r in rows
                 )
                 + "</div>"

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>라벨 보관함 — 기사 한 건 복사</title>
+<style>
+
+  body { margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+  /* [수정: 2026-09-11] 폭은 확정본·초안과 같은 800px 하나다 — 본문 카드·상단바·하단
+     저장 바 세 자리가 같은 값이어야 한다(하나만 넓히면 상단 링크·저장 버튼이 본문과
+     어긋난다). 예전엔 설정 폼용 480px이 기본이고 기사 목록 화면 셋만 body.wide로
+     800px을 썼는데, 목록이 길어지는 설정 화면(검색어·언론사 등)까지 좁아져 스크롤만
+     길어졌다. 폭만 넓히면 한 줄에 하나씩 쌓는 화면은 오른쪽만 비므로, 긴 화면 여섯은
+     각자 템플릿에서 여러 칸 배치를 함께 쓴다(각 템플릿의 "[추가: 2026-09-11]" 참고). */
+  .container {
+    max-width: 800px; margin: 24px auto; padding: 24px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: var(--r-lg);
+  }
+  /* [수정: 2026-07-26] 모든 설정 세부 페이지에 상단(뒤로/HOME)·하단(저장) 고정 바를
+     적용하면서, 내용이 그 바에 가리지 않도록 컨테이너 위쪽에 여백을 더했다. 하단
+     여백(저장 버튼 있는 페이지만 필요)은 페이지마다 필요할 때만 덧붙인다. */
+  /* [수정: 2026-09-16] 카드 위 여백 60→44px — 60px은 상단 고정바(54px)를 피하려는 값인데 글자 위로
+     30px이 비었다. 44px이면 16px 남는다. 확정본·초안·실시간·정기 보관함·설정·수시·정책 단어 추이
+     일곱 화면이 같은 값을 써야 화면을 오갈 때 제목이 들썩이지 않는다(수시·추이는 84→68px 형태).
+     시안 파일은 정리하며 없앴다(당시 B안). */
+  .container { padding-top: 44px; }
+  h1 { font-size: var(--fs-xl); color: #1E3A5F; }
+  .hint { color: #6B7280; font-size: var(--fs-md); margin-bottom: 16px; }
+  .caption { color: #6B7280; font-size: var(--fs-sm); margin: 0 0 12px; }
+  .error { color: #DC2626; margin: 12px 0; }
+
+  :root { --fs-2xs: 0.66rem; --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem; --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%; --h-sm: 24px; --h-tb: 28px; --h-md: 30px; --h-lg: 36px; --fab-lg: 56px; --fab-sm: 48px; --chk-md: 16px; --chk-sm: 14px; --sh-float: 0 4px 12px rgba(15, 23, 42, 0.12); --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14); --sh-modal: 0 16px 40px rgba(15, 23, 42, 0.22); }
+  .plus-glyph { font-size: 1.2em; font-weight: 600; line-height: 0; margin-right: 4px; }
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    background: #FFFFFF; border-bottom: 1px solid #E5E7EB; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .topbar-inner {
+    max-width: 800px; margin: 0 auto; padding: 12px 24px;
+    display: flex; justify-content: flex-start; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .topbar-inner > .tn { color: #2563EB; text-decoration: none; font-size: var(--fs-md); font-weight: 600;
+    padding: 5px 14px; border: 1px solid transparent; border-radius: var(--r-pill); white-space: nowrap; }
+  .topbar-inner > a.tn:hover { background: #EFF6FF; }
+  .topbar-inner > .tn-sep { width: 1px; height: 18px; background: #E5E7EB; margin: 0 16px; }
+  .topbar-inner > .tn.is-current { cursor: default; background: #EFF6FF;
+    border-color: #BFDBFE; color: #2563EB; }
+  .topbar.adhoc .topbar-inner > .tn.is-current { background: #E3F1EE;
+    border-color: rgba(20, 107, 94, 0.45); color: #146B5E; }
+  /* 켜진 칩 배색 = 그 화면의 이름 칩 배색. 초안은 회색으로 켠다 — 초안·확정본은 상단바도
+     머리줄도 같은 글자라, 켜진 칩까지 같은 파랑이면 「어느 글자가 켜졌나」를 읽어야만 안다.
+     파란 링크 넷 사이에서 혼자 파랗지 않은 칩은 글자를 안 읽어도 걸리고, 머리줄 띠
+     (app/renderer.py head-band)와 같은 배색이라 상단바와 머리줄이 같은 말을 두 번 한다.
+     시안 mockups/DRAFT_FINAL_DISTINCT_MOCKUP.html. */
+  .topbar.work .topbar-inner > .tn.is-current { background: #F1F5F9;
+    border-color: #E5E7EB; color: #6B7280; }
+  .topbar-inner > .tn.is-empty { color: #6B7280; opacity: 0.55; cursor: not-allowed; }
+  .topbar-inner > a.tn.back { color: #4B5563; }
+  .topbar-inner > a.tn.back:hover { color: #2563EB; }
+  @media (max-width: 480px) {
+    .topbar-inner { padding: 12px 12px; gap: 2px; }
+    .topbar-inner > .tn { padding: 5px 8px; }
+    .topbar-inner > .tn-sep { margin: 0 8px; }
+  }
+
+  .save-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    background: #FFFFFF; border-top: 1px solid #E5E7EB; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  }
+  .save-bar-inner { max-width: 800px; margin: 0 auto; padding: 12px 24px; }
+  .save-bar button { width: 100%; }
+  /* [수정: 2026-08-03] app.renderer와 동일한 이유 — button은 a와 달리 font-family를
+     상속받지 않고, appearance:auto(네이티브 OS 버튼 껍데기)까지 남아있어 폰트만 맞춰선
+     완전히 똑같이 안 보인다. 크롬이 button 텍스트만 내부적으로 수직 중앙 정렬해주는
+     것까지 발견해 align-items: center를 직접 지정했다. */
+  button, a.btn {
+    background: #2563EB; color: #FFFFFF; border: none; border-radius: var(--r-md);
+    padding: 8px 16px; font-size: var(--fs-base); font-family: inherit; cursor: pointer; text-decoration: none;
+    appearance: none; -webkit-appearance: none;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  button:hover, a.btn:hover { background: #1E3A5F; }
+  button:disabled { background: #E5E7EB; color: #6B7280; cursor: not-allowed; }
+  input[type=text], input[type=number] {
+    background: #F8FAFC; color: #1F2937; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    padding: 6px 10px; font-size: var(--fs-base);
+  }
+  .del-btn {
+    background: transparent; color: #6B7280; border: 1px solid #E5E7EB; border-radius: var(--r-md);
+    padding: 4px 10px; font-size: var(--fs-sm); margin-left: 6px; cursor: pointer;
+  }
+  .del-btn:hover { background: #EFF6FF; color: #DC2626; border-color: #DC2626; }
+  /* [추가: 2026-08-13] 이모지 대신 쓰는 단색 SVG 아이콘(app.icons) 공통 크기·색 —
+     currentColor라 부모의 글자색(회색/파랑 호버/헤더 남색 등)을 그대로 물려받는다. */
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+
+  /* [추가: 2026-09-02] 좌하단 ↩ 되돌리기 — `_label_undo_fab_html`이 예전부터
+     .undo-fab 클래스를 달고 나갔는데 이 파일 어디에도 그 CSS가 없어서, 좌하단 고정
+     원형 버튼이 아니라 본문 안 파란 네모 버튼으로 그려지고 있었다(라벨 보관함은 카드
+     안쪽에, 라벨 관리는 화면 왼쪽 끝에 — 삽입 위치까지 두 화면이 서로 달랐다).
+     값은 app/renderer.py의 .undo-fab을 그대로 가져온다. bottom을 20px이 아니라
+     88px(위 칸)으로 두는 건 확정본·초안·수시에서 ↩가 늘 그 자리이기 때문이다 —
+     이 두 화면엔 아래 칸을 쓰는 휴지통이 없지만, 같은 버튼이 화면마다 높이를
+     바꾸는 것보다 왼쪽 아래 모서리가 비는 편이 낫다. */
+  .undo-fab {
+    position: fixed; left: 20px; bottom: 88px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
+    background: #FFFFFF; color: #6B7280; border: 1px solid #E5E7EB; font-size: 1.3rem;
+    cursor: pointer; box-shadow: var(--sh-float); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .undo-fab:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .undo-fab:disabled { opacity: 0.5; cursor: progress; }
+  .lab-topbar {
+    display: flex; align-items: center; gap: 10px; padding-bottom: 12px;
+    border-bottom: 1px solid #E5E7EB; margin-bottom: 16px; flex-wrap: wrap;
+  }
+  .lab-topbar h1 { margin: 0; font-size: var(--fs-xl); }
+  .lab-topbar .spacer { margin-left: auto; }
+  a.btn.ghost { background: transparent; color: #6B7280; border: 1px solid #E5E7EB; }
+  a.btn.ghost:hover { background: #EFF6FF; color: #2563EB; }
+  .lab-filter-chip {
+    display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-sm); font-weight: 600;
+    background: #FFFFFF; border: 1px solid #E5E7EB; color: #1F2937; border-radius: var(--r-pill);
+    padding: 5px 12px; margin: 0 6px 6px 0; text-decoration: none;
+  }
+  .lab-filter-chip .n { color: #6B7280; font-weight: 500; font-size: var(--fs-xs); }
+  .lab-filter-chip:hover { background: #FBF0DA; }
+  .lab-filter-chip.on { background: #8A5A14; border-color: #8A5A14; color: #FFFFFF; }
+  .lab-filter-chip.on .n { color: rgba(255, 255, 255, 0.75); }
+  .lab-chipbar { margin-bottom: 6px; }
+  .lab-listhead {
+    display: flex; align-items: center; gap: 8px; margin: 12px 0 10px; font-size: var(--fs-md); color: #1E3A5F;
+    font-weight: 700;
+  }
+  /* [추가: 2026-09-15] 라벨 보관함 [복사][txt][xlsx] — 정기·수시 보관함의 .exp
+     (app/history_renderer.py)와 같은 값이다. 한쪽을 바꾸면 이쪽도 같이 바꾼다.
+     예전 xlsx 버튼은 class="btn ghost sm"이었지만 이 파일엔 a.btn.ghost(링크용)만
+     있고 .sm은 아예 없어, 공용 button 규칙대로 큰 파란 채움 버튼으로 그려지고 있었다. */
+  /* 모양은 확정본·초안 툴바의 가져가기 버튼(app.renderer.export_links_style)과 같다 —
+     테두리·배경 없는 글자 버튼, hover에서만 accent + 밑줄. 네 자리(정기 보관함 .exp/
+     .slot-export-actions, 수시 보관함 .exp, 라벨 보관함 .exp)가 같은 값이다. */
+  .exp { display: inline-flex; gap: 2px; flex: none; margin-left: auto; }
+  .exp button { border: none; background: transparent; color: #4B5563; font-weight: 500;
+    border-radius: var(--r-md); padding: 4px 8px; font-size: var(--fs-sm); cursor: pointer;
+    font-family: inherit; white-space: nowrap; }
+  .exp button:hover { background: transparent; color: #2563EB;
+    text-decoration: underline; text-underline-offset: 3px; }
+  .exp.lg button { padding: 6px 8px; }
+  .arc-row { border: 1px solid #E5E7EB; border-radius: var(--r-lg); padding: 10px 12px; margin-bottom: 8px; }
+  .arc-row:hover { background: #EFF6FF; }
+  .arc-title { font-size: var(--fs-md); color: #1F2937; }
+  .arc-meta {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 7px;
+    font-size: var(--fs-xs); color: #6B7280;
+  }
+  .snap-tag { font-size: var(--fs-xs); background: #F8FAFC; color: #1F2937; border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 1px 6px; }
+  .snap-tag.sub { background: #EFF6FF; color: #1E3A5F; }
+  .snap-tag.src-reg, .snap-tag.src-agency, .snap-tag.src-live { background: #F8FAFC; color: #6B7280; }
+  .snap-tag.src-adhoc { background: #E3F1EE; color: #146B5E; }
+  .snap-tag.gone { background: #FFFBEB; color: #92400E; border-color: #FDE68A; }
+  /* 정기 보고서에 있나 — 「스크랩됨」/「숨김」 한 칸. 오늘 전체 기사의 행 상태와 같은 말. */
+  .snap-tag.state { display: inline-flex; align-items: center; gap: 3px; }
+  .snap-tag.state .ic { width: 0.95em; height: 0.95em; stroke-width: 2; }
+  .snap-tag.state.is-hid { color: #6B7280; }
+  .arc-meta a.origin-link { color: #2563EB; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 3px; }
+  .arc-meta a.origin-link .ic { width: 0.9em; height: 0.9em; }
+  .arc-labels { display: inline-flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+  .lab-chip {
+    display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs); font-weight: 700;
+    color: #8A5A14; background: #FBF0DA; border: 1px solid rgba(138, 90, 20, 0.28);
+    border-radius: var(--r-pill); padding: 2px 8px; white-space: nowrap;
+  }
+  .lab-chip form { display: inline; }
+  .lab-chip .x-btn {
+    background: none; border: none; padding: 0; margin: 0; color: #8A5A14; opacity: 0.55;
+    cursor: pointer; font-weight: 700; font-size: 0.9rem; line-height: 1;
+  }
+  .lab-chip .x-btn:hover { opacity: 1; background: none; }
+  table.manage { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
+  table.manage th {
+    text-align: left; padding: 8px; border-bottom: 1px solid #E5E7EB; color: #6B7280;
+    font-size: var(--fs-xs); font-weight: 700;
+  }
+  table.manage td { padding: 9px 8px; border-bottom: 1px solid #E5E7EB; vertical-align: middle; }
+  table.manage tr:hover td { background: #EFF6FF; }
+  table.manage td.name { font-weight: 700; color: #8A5A14; }
+  table.manage td.cnt, table.manage td.at { color: #6B7280; font-size: var(--fs-sm); white-space: nowrap; }
+  table.manage td.act { text-align: right; white-space: nowrap; }
+  table.manage td.act form { display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; }
+  .mini {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: var(--fs-xs); padding: 4px 9px; border-radius: var(--r-sm); cursor: pointer;
+    background: #FFFFFF; border: 1px solid #E5E7EB; color: #6B7280;
+  }
+  .mini .ic { width: 0.95em; height: 0.95em; }
+  .mini:hover { background: #EFF6FF; color: #2563EB; }
+  .mini.danger:hover { background: #FEF2F2; color: #DC2626; border-color: #F5C2C2; }
+  select.merge-sel {
+    font-size: var(--fs-xs); color: #6B7280; border: 1px solid #E5E7EB; border-radius: var(--r-sm);
+    padding: 4px 5px; background: #FFFFFF;
+  }
+  input[name="new_name"] { font-size: var(--fs-sm); padding: 5px 8px; width: 120px; }
+  .reject-box {
+    margin: 8px 0 14px; font-size: var(--fs-sm); line-height: 1.8;
+    background: #FEF2F2; border: 1px solid #F5C2C2; border-radius: var(--r-md); padding: 10px 12px;
+  }
+  .reject-box .goto {
+    font-size: var(--fs-sm); font-weight: 700; padding: 4px 10px; border-radius: var(--r-sm); cursor: pointer;
+    background: #FBF0DA; color: #8A5A14; border: 1px solid rgba(138, 90, 20, 0.28); margin-left: 4px;
+  }
+
+  /* 제목을 바꾸는 동작이라 **테두리 박스**다(글자 버튼은 가져가거나 보기만 바꾸는 것).
+     높이·여백·굵기는 확정본·초안 툴바 버튼과 같은 값. */
+  .title-refetch-btn {
+    height: var(--h-tb); padding: 0 14px; font-size: var(--fs-md); font-weight: 500;
+    background: #FFFFFF; color: #4B5563; border: 1px solid #E5E7EB;
+    border-radius: var(--r-md); display: inline-flex; align-items: center; gap: 5px;
+    cursor: pointer; font-family: inherit; white-space: nowrap; flex: none;
+  }
+  .title-refetch-btn:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .title-refetch-btn:disabled { background: #FFFFFF; color: #4B5563; border-color: #E5E7EB;
+    cursor: progress; }
+  .title-refetch-btn.is-busy .ic { animation: refetch-spin 0.9s linear infinite; }
+  @keyframes refetch-spin { to { transform: rotate(360deg); } }
+  /* 결과 줄 — 「잘 됐다」 안내라 초록 세트다. 바뀐 게 0건이어도 같은 색이다
+     (확인이 끝난 것 자체가 결과다). */
+  .refetch-note {
+    margin: 0 0 10px; padding: 8px 12px; font-size: var(--fs-sm); line-height: 1.7;
+    background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: var(--r-md);
+    color: #166534;
+  }
+  .refetch-note[hidden] { display: none; }
+  .refetch-note .sub { opacity: 0.85; }
+  /* 제목이 바뀐 줄만 세이지 — 담당자가 눌러서 일어난 일이라 「방금 손댄 것」 색이다.
+     행 hover(회색·파랑)에 지지 않게 속성 선택자로 명시도를 한 칸 올린다. */
+  [data-refetch-row].refetch-row-changed,
+  [data-refetch-row].refetch-row-changed:hover { background: #E7EFE8; }
+  .chip-changed {
+    display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs);
+    font-weight: 700; color: #92400E; background: #FEF3C7;
+    border: 1px solid #FDE68A; border-radius: var(--r-pill); padding: 2px 8px;
+    white-space: nowrap;
+  }
+  /* 제목은 그대로인데 원문만 손댄 줄 — **우리 값이 하나도 안 바뀌었으므로** 세이지를
+     안 칠하고 칩도 중립 회색이다. 「고쳐졌다」는 사실만 알린다. */
+  .chip-touched {
+    display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs);
+    font-weight: 600; color: #4B5563; background: #F3F4F6;
+    border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 2px 8px;
+    white-space: nowrap;
+  }
+  .refetch-was { margin-top: 5px; font-size: var(--fs-xs); color: #4B5563; line-height: 1.6; }
+  .refetch-was .k { color: #92400E; font-weight: 700; margin-right: 4px; }
+  .refetch-was .t { text-decoration: line-through; text-decoration-color: #4B5563; }
+  .refetch-was.touched .k { color: #4B5563; }
+  /* 「✎ 제목 변경」 칩은 **누를 수 있다** — 그 기사가 지나온 제목이 펼쳐진다. 모양은 위
+     .chip-changed 그대로고(칩은 알약 규칙), 누를 수 있다는 것은 hover 색과 옆의 횟수가
+     말한다. 횟수는 2번부터 적는다 — 1번이면 바로 밑 취소선 한 줄이 이미 전부다. */
+  button.chip-changed { font-family: inherit; cursor: pointer; }
+  button.chip-changed:hover { background: #FDE68A; }
+  button.chip-changed .ca { font-weight: 500; opacity: 0.85; margin-left: 2px; }
+  /* 이력 블록 — <details> **밖**에 둔다. 안에 두면 이력을 읽으려고 누를 때마다 기사
+     요약이 같이 접혔다 펼쳐진다. */
+  .refetch-hist {
+    margin: 8px 0 2px; padding: 2px 0 2px 12px; border-left: 2px solid #FDE68A;
+  }
+  .refetch-hist[hidden] { display: none; }
+  .refetch-hist .hh { font-size: var(--fs-xs); font-weight: 700; color: #92400E; margin-bottom: 6px; }
+  .refetch-hist ol { list-style: none; margin: 0; padding: 0; }
+  .refetch-hist li { padding: 5px 0; border-bottom: 1px solid #F3F4F6; }
+  .refetch-hist li:last-child { border-bottom: none; }
+  .refetch-hist .w { display: block; font-size: var(--fs-xs); color: #4B5563; }
+  .refetch-hist .tt { display: block; font-size: var(--fs-sm); color: #1F2937; line-height: 1.6; }
+  .refetch-hist .tt.old { color: #4B5563; text-decoration: line-through; text-decoration-color: #E5E7EB; }
+  .refetch-hist .nowchip {
+    display: inline-block; margin-left: 6px; font-size: var(--fs-xs); background: #F3F4F6;
+    color: #4B5563; border: 1px solid #E5E7EB; border-radius: var(--r-pill); padding: 1px 7px;
+  }
+
+
+
+  /* ── 시안에서만 더하는 것: 기관 기사 찾기(.acts .ib)에서 값 그대로 가져왔다 ── */
+  .acts { flex: none; display: flex; align-items: center; gap: 6px; }
+  .acts .ib { flex: none; display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 26px; color: #4B5563; text-decoration: none; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: var(--r-md); cursor: pointer; padding: 0; }
+  .acts .ib:hover { background: #EFF6FF; color: #2563EB; border-color: #2563EB; }
+  .acts .ib svg { width: 13px; height: 13px; fill: none; stroke: currentColor;
+    stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .acts .ib .icon-done { display: none; }
+  .acts .ib.is-copied .icon-default { display: none; }
+  .acts .ib.is-copied .icon-done { display: inline-flex; color: #166534; }
+
+  /* 시안 설명 틀 */
+  body { background: #F8FAFC; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 28px 16px 80px; }
+  .mk-h1 { font-size: 1.3rem; color: #1E3A5F; margin: 0 0 6px; }
+  .mk-lead { font-size: .88rem; color: #6B7280; line-height: 1.7; margin: 0 0 26px; }
+  .mk-sec { margin: 0 0 30px; }
+  .mk-name { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; }
+  .mk-name b { font-size: 1.05rem; color: #1E3A5F; }
+  .mk-name .tag { font-size: .72rem; font-weight: 700; border-radius: 999px; padding: 2px 8px;
+    background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }
+  .mk-name .tag.now { background: #F3F4F6; color: #6B7280; border-color: #E5E7EB; }
+  .mk-why { font-size: .8rem; color: #6B7280; line-height: 1.7; margin: 0 0 10px; }
+  .mk-why .plus { color: #166534; }
+  .mk-why .minus { color: #B45309; }
+  .mk-card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 12px; }
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="mk-h1">라벨 보관함 — 기사 한 건 복사</h1>
+  <p class="mk-lead">
+    라벨 보관함 행에는 ⋯ 더보기가 없다. 그래서 복사가 들어갈 자리는 <b>행 오른쪽</b>뿐이고,
+    앱에 이미 선 모양은 하나다 — <b>기관 기사 찾기</b>의 30×26 아이콘 상자(누르면 1초간 ✓).
+    아래 두 안은 그 상자를 어디까지 쓰느냐만 다르다. 복사되는 값은 두 안 모두 보고서 한 줄 형식 + URL이다.
+    <br>복사 단추를 실제로 눌러 볼 수 있다(✓로 1초 바뀐다).
+  </p>
+  <section class="mk-sec"><div class="mk-name"><b>지금</b><span class="tag now">지금 화면</span></div><p class="mk-why">한 건만 복사할 길이 없다. 맨 위 「복사」는 21건을 통째로 가져간다.</p><div class="mk-card"><div class="lab-body"><div class="arc-row" data-refetch-row data-url="https://n.news.naver.com/mnews/article/009/0005755159" data-pub="2026-10-28T11:19:00+09:00"><div class="arc-title" data-refetch-title>[단독] 韓, 블룸버그채권지수 선진국 승격 추진</div><div class="arc-meta" data-refetch-meta><span class="snap-tag src-reg">회차</span><span>2026-10-28 14:00</span><span>·</span><span>2026-10-28 11:19 발행</span><span>·</span><span>매일경제</span><span class="snap-tag state is-hid"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg> 숨김</span><a class="origin-link" href="https://n.news.naver.com/mnews/article/009/0005755159" target="_blank" rel="noopener noreferrer">원문보기<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="arc-labels"><span class="lab-chip">별도 보고 <form method="POST" action="/remove-label"><input type="hidden" name="url" value="https://n.news.naver.com/mnews/article/009/0005755159"><input type="hidden" name="label" value="별도 보고"><input type="hidden" name="redirect" value="/labels?label=%EB%B3%84%EB%8F%84%20%EB%B3%B4%EA%B3%A0"><button type="submit" class="x-btn" title="라벨 떼기">×</button></form></span></span></div></div><div class="arc-row" data-refetch-row data-url="https://n.news.naver.com/mnews/article/011/0004675636" data-pub="2026-10-27T15:30:00+09:00"><div class="arc-title" data-refetch-title>재경부는 왜 코인 교육세를 언급했나 [기자의 눈]</div><div class="arc-meta" data-refetch-meta><span class="snap-tag src-reg">회차</span><span>2026-10-27 17:00</span><span>·</span><span>2026-10-27 15:30 발행</span><span>·</span><span>서울경제</span><span class="snap-tag state"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg> 스크랩됨</span><a class="origin-link" href="https://n.news.naver.com/mnews/article/011/0004675636" target="_blank" rel="noopener noreferrer">원문보기<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="arc-labels"><span class="lab-chip">별도 보고 <form method="POST" action="/remove-label"><input type="hidden" name="url" value="https://n.news.naver.com/mnews/article/011/0004675636"><input type="hidden" name="label" value="별도 보고"><input type="hidden" name="redirect" value="/labels?label=%EB%B3%84%EB%8F%84%20%EB%B3%B4%EA%B3%A0"><button type="submit" class="x-btn" title="라벨 떼기">×</button></form></span></span></div></div><div class="arc-row" data-refetch-row data-url="https://n.news.naver.com/mnews/article/008/0005432238" data-pub="2026-10-27T13:39:00+09:00"><div class="arc-title" data-refetch-title>이형일 &quot;1인당 국민소득 4만달러대 진입 전망…모두의 성장 이룰 것&quot;</div><div class="arc-meta" data-refetch-meta><span class="snap-tag src-reg">회차</span><span>2026-10-27 14:00</span><span>·</span><span>2026-10-27 13:39 발행</span><span>·</span><span>머니투데이</span><span class="snap-tag state is-hid"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg> 숨김</span><a class="origin-link" href="https://n.news.naver.com/mnews/article/008/0005432238" target="_blank" rel="noopener noreferrer">원문보기<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="arc-labels"><span class="lab-chip">별도 보고 <form method="POST" action="/remove-label"><input type="hidden" name="url" value="https://n.news.naver.com/mnews/article/008/0005432238"><input type="hidden" name="label" value="별도 보고"><input type="hidden" name="redirect" value="/labels?label=%EB%B3%84%EB%8F%84%20%EB%B3%B4%EA%B3%A0"><button type="submit" class="x-btn" title="라벨 떼기">×</button></form></span></span></div></div></div></div></section><section class="mk-sec"><div class="mk-name"><b>A안 — 아이콘 두 칸</b><span class="tag">바뀌는 곳</span></div><p class="mk-why">기관 기사 찾기와 <b>글자 하나까지 같은 모양</b>이다(30×26 상자 · ↗ 다음 복사 · 누르면 1초간 ✓). <span class='plus'>좋은 점</span> 앱에 복사 모양이 두 가지로 유지된다 — ⋯ 메뉴를 가진 여섯 화면과, ⋯가 없는 읽기 화면 둘. <span class='minus'>치르는 값</span> 「원문보기」 글자가 아이콘이 된다.</p><div class="mk-card"><div class="lab-body"><div class="arc-row" data-refetch-row data-url="https://n.news.naver.com/mnews/article/009/0005755159" data-pub="2026-10-28T11:19:00+09:00"><div class="arc-title" data-refetch-title>[단독] 韓, 블룸버그채권지수 선진국 승격 추진</div><div class="arc-meta" data-refetch-meta><span class="snap-tag src-reg">회차</span><span>2026-10-28 14:00</span><span>·</span><span>2026-10-28 11:19 발행</span><span>·</span><span>매일경제</span><span class="snap-tag state is-hid"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg> 숨김</span><span class="arc-labels"><span class="lab-chip">별도 보고 <form method="POST" action="/remove-label"><input type="hidden" name="url" value="https://n.news.naver.com/mnews/article/009/0005755159"><input type="hidden" name="label" value="별도 보고"><input type="hidden" name="redirect" value="/labels?label=%EB%B3%84%EB%8F%84%20%EB%B3%B4%EA%B3%A0"><button type="submit" class="x-btn" title="라벨 떼기">×</button></form></span></span><span class="acts"><a class="ib" href="https://n.news.naver.com/mnews/article/009/0005755159" target="_blank" rel="noopener" title="원문 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사" onclick="mockCopy(event, this)"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button></span></div></div><div class="arc-row" data-refetch-row data-url="https://n.news.naver.com/mnews/article/011/0004675636" data-pub="2026-10-27T15:30:00+09:00"><div class="arc-title" data-refetch-title>재경부는 왜 코인 교육세를 언급했나 [기자의 눈]</div><div class="arc-meta" data-refetch-meta><span class="snap-tag src-reg">회차</span><span>2026-10-27 17:00</span><span>·</span><span>2026-10-27 15:30 발행</span><span>·</span><span>서울경제</span><span class="snap-tag state"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg> 스크랩됨</span><span class="arc-labels"><span class="lab-chip">별도 보고 <form method="POST" action="/remove-label"><input type="hidden" name="url" value="https://n.news.naver.com/mnews/article/011/0004675636"><input type="hidden" name="label" value="별도 보고"><input type="hidden" name="redirect" value="/labels?label=%EB%B3%84%EB%8F%84%20%EB%B3%B4%EA%B3%A0"><button type="submit" class="x-btn" title="라벨 떼기">×</button></form></span></span><span class="acts"><a class="ib" href="https://n.news.naver.com/mnews/article/011/0004675636" target="_blank" rel="noopener" title="원문 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사" onclick="mockCopy(event, this)"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button></span></div></div><div class="arc-row" data-refetch-row data-url="https://n.news.naver.com/mnews/article/008/0005432238" data-pub="2026-10-27T13:39:00+09:00"><div class="arc-title" data-refetch-title>이형일 &quot;1인당 국민소득 4만달러대 진입 전망…모두의 성장 이룰 것&quot;</div><div class="arc-meta" data-refetch-meta><span class="snap-tag src-reg">회차</span><span>2026-10-27 14:00</span><span>·</span><span>2026-10-27 13:39 발행</span><span>·</span><span>머니투데이</span><span class="snap-tag state is-hid"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg> 숨김</span><span class="arc-labels"><span class="lab-chip">별도 보고 <form method="POST" action="/remove-label"><input type="hidden" name="url" value="https://n.news.naver.com/mnews/article/008/0005432238"><input type="hidden" name="label" value="별도 보고"><input type="hidden" name="redirect" value="/labels?label=%EB%B3%84%EB%8F%84%20%EB%B3%B4%EA%B3%A0"><button type="submit" class="x-btn" title="라벨 떼기">×</button></form></span></span><span class="acts"><a class="ib" href="https://n.news.naver.com/mnews/article/008/0005432238" target="_blank" rel="noopener" title="원문 보기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><button type="button" class="ib" title="복사" onclick="mockCopy(event, this)"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button></span></div></div></div></div></section><section class="mk-sec"><div class="mk-name"><b>B안 — 글자는 두고 한 칸만</b><span class="tag">바뀌는 곳</span></div><p class="mk-why">「원문보기」는 그대로 두고 그 옆에 복사 상자 하나를 더한다. <span class='plus'>좋은 점</span> 지금 보던 화면이 거의 안 바뀐다. <span class='minus'>치르는 값</span> 한 줄에 글자 링크와 아이콘 상자가 섞여, 복사 모양이 앱에서 세 번째가 된다.</p><div class="mk-card"><div class="lab-body"><div class="arc-row" data-refetch-row data-url="https://n.news.naver.com/mnews/article/009/0005755159" data-pub="2026-10-28T11:19:00+09:00"><div class="arc-title" data-refetch-title>[단독] 韓, 블룸버그채권지수 선진국 승격 추진</div><div class="arc-meta" data-refetch-meta><span class="snap-tag src-reg">회차</span><span>2026-10-28 14:00</span><span>·</span><span>2026-10-28 11:19 발행</span><span>·</span><span>매일경제</span><span class="snap-tag state is-hid"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg> 숨김</span><a class="origin-link" href="https://n.news.naver.com/mnews/article/009/0005755159" target="_blank" rel="noopener noreferrer">원문보기<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="acts"><button type="button" class="ib" title="복사" onclick="mockCopy(event, this)"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button></span><span class="arc-labels"><span class="lab-chip">별도 보고 <form method="POST" action="/remove-label"><input type="hidden" name="url" value="https://n.news.naver.com/mnews/article/009/0005755159"><input type="hidden" name="label" value="별도 보고"><input type="hidden" name="redirect" value="/labels?label=%EB%B3%84%EB%8F%84%20%EB%B3%B4%EA%B3%A0"><button type="submit" class="x-btn" title="라벨 떼기">×</button></form></span></span></div></div><div class="arc-row" data-refetch-row data-url="https://n.news.naver.com/mnews/article/011/0004675636" data-pub="2026-10-27T15:30:00+09:00"><div class="arc-title" data-refetch-title>재경부는 왜 코인 교육세를 언급했나 [기자의 눈]</div><div class="arc-meta" data-refetch-meta><span class="snap-tag src-reg">회차</span><span>2026-10-27 17:00</span><span>·</span><span>2026-10-27 15:30 발행</span><span>·</span><span>서울경제</span><span class="snap-tag state"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg> 스크랩됨</span><a class="origin-link" href="https://n.news.naver.com/mnews/article/011/0004675636" target="_blank" rel="noopener noreferrer">원문보기<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="acts"><button type="button" class="ib" title="복사" onclick="mockCopy(event, this)"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button></span><span class="arc-labels"><span class="lab-chip">별도 보고 <form method="POST" action="/remove-label"><input type="hidden" name="url" value="https://n.news.naver.com/mnews/article/011/0004675636"><input type="hidden" name="label" value="별도 보고"><input type="hidden" name="redirect" value="/labels?label=%EB%B3%84%EB%8F%84%20%EB%B3%B4%EA%B3%A0"><button type="submit" class="x-btn" title="라벨 떼기">×</button></form></span></span></div></div><div class="arc-row" data-refetch-row data-url="https://n.news.naver.com/mnews/article/008/0005432238" data-pub="2026-10-27T13:39:00+09:00"><div class="arc-title" data-refetch-title>이형일 &quot;1인당 국민소득 4만달러대 진입 전망…모두의 성장 이룰 것&quot;</div><div class="arc-meta" data-refetch-meta><span class="snap-tag src-reg">회차</span><span>2026-10-27 14:00</span><span>·</span><span>2026-10-27 13:39 발행</span><span>·</span><span>머니투데이</span><span class="snap-tag state is-hid"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg> 숨김</span><a class="origin-link" href="https://n.news.naver.com/mnews/article/008/0005432238" target="_blank" rel="noopener noreferrer">원문보기<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a><span class="acts"><button type="button" class="ib" title="복사" onclick="mockCopy(event, this)"><span class="icon-default"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span><span class="icon-done"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></button></span><span class="arc-labels"><span class="lab-chip">별도 보고 <form method="POST" action="/remove-label"><input type="hidden" name="url" value="https://n.news.naver.com/mnews/article/008/0005432238"><input type="hidden" name="label" value="별도 보고"><input type="hidden" name="redirect" value="/labels?label=%EB%B3%84%EB%8F%84%20%EB%B3%B4%EA%B3%A0"><button type="submit" class="x-btn" title="라벨 떼기">×</button></form></span></span></div></div></div></div></section>
+</div>
+<script>
+function mockCopy(e, btn) {
+  e.preventDefault(); e.stopPropagation();
+  btn.classList.add('is-copied');
+  clearTimeout(btn._t);
+  btn._t = setTimeout(function () { btn.classList.remove('is-copied'); }, 1000);
+}
+</script>
+</body>
+</html>
