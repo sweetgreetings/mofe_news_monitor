@@ -1109,22 +1109,26 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     border-radius: var(--r-pill); background: {card}; color: {text_soft};
     border-color: {border}; font-weight: 500;
   }}
-  .btn.photo-gather-btn:hover {{ background: {hover}; color: {accent}; border-color: {accent_border}; }}
-  /* 켜진 동안 채운 파랑 — 지금 화면이 평소 화면이 아니라는 표시. */
+  /* 수시 화면이라 파랑이 아니라 흐름 색(청록)이다 — 초록(COLOR_SEND)은 발송 ● 버튼의
+     색이라 알약에 쓰면 누르면 나가는 버튼으로 읽힌다. 새 색은 하나도 안 만든다. */
+  .btn.photo-gather-btn:hover {{ background: {adhoc_bg}; color: {adhoc_text}; border-color: {adhoc_border_soft}; }}
+  /* 켜진 동안 채운 청록 — 지금 화면이 평소 화면이 아니라는 표시. 꺼진 칩은 「아직
+     아무것도 아님」이라 중립 회색 그대로다(켜진 하나만 그 화면 색으로 선다). */
   .btn.photo-gather-btn.is-on, .btn.photo-gather-btn.is-on:hover {{
-    background: {accent}; color: {on_fill}; border-color: {accent};
+    background: {adhoc_text}; color: {on_fill}; border-color: {adhoc_text};
   }}
+  /* 띠도 칩과 같은 흐름 색 — 수시 화면의 다른 옅은 청록 칸과 같은 값이다. */
   .photo-gather-strip {{
     position: sticky; top: 60px; z-index: 15; display: flex; align-items: center; gap: 10px;
-    flex-wrap: wrap; background: {hover}; border: 1px solid {accent_border}; border-radius: var(--r-lg);
+    flex-wrap: wrap; background: {adhoc_bg}; border: 1px solid {adhoc_border_soft}; border-radius: var(--r-lg);
     padding: 9px 12px; margin: 4px 0 6px;
   }}
   .photo-gather-strip label {{ display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); cursor: pointer; }}
   /* 「전체 선택」은 자기가 거느리는 기사 행의 체크와 같은 크기다 — 띠 글자가 한 단계
      작아도 상위 체크가 하위보다 작아 보이면 안 된다(수시 원본 .sel-all과 같은 규칙). */
   .photo-gather-strip label input {{ width: var(--chk-md); height: var(--chk-md); margin: 0;
-    accent-color: {accent}; cursor: pointer; }}
-  .photo-gather-strip .pg-msg {{ font-size: var(--fs-md); color: {header}; }}
+    accent-color: {adhoc_text}; cursor: pointer; }}
+  .photo-gather-strip .pg-msg {{ font-size: var(--fs-md); color: {adhoc_text}; }}
   .photo-gather-strip .pg-sp {{ flex: 1; }}
   .pg-done {{ text-align: center; color: {muted}; padding: 28px 0 16px; font-size: var(--fs-md); }}
   .pg-from {{
@@ -1132,6 +1136,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     font-size: var(--fs-xs); color: {text_soft}; background: {bg}; border: 1px solid {border};
     border-radius: var(--r-md); padding: 0 6px;
   }}
+  /* 모아 보는 동안엔 전부가 [단독]이라 빨간 띠·바탕이 장식이 된다 — 사진 흐림·칩을
+     푸는 것과 같은 이유로 푼다. 제목 글자색(.t-scoop)은 그대로 둔다(정기와 같은 규칙). */
+  body.gather-scoop .article.art-scoop {{ background: transparent; border-left: none; padding-left: 8px; }}
   body.photo-gather .article.is-photo {{ opacity: 1; }}
   body.photo-gather .photo-badge {{ display: none; }}
   body.photo-gather .group-block:not(.photo-gather-view), body.photo-gather .adhoc-summary,
@@ -2429,13 +2436,20 @@ def _move_menu_html(group_names: list[str], bundles_html: str, onclick: str, own
 # **판정을 새로 만들지 않는다** — 앱에 이미 있는 셋을 그대로 쓴다(사진
 # looks_like_photo_caption · 일정 is_schedule_listing · 인사 [인사] 말머리).
 # 이름은 「📷 사진 추정 (N)」 꼴 하나다 — 정기 확정본·초안의 같은 알약과 글자가 같아야 한다.
+# 마지막 칸 tidy는 「치우려고 모으는 종류인가」다 — 참이면 다 숨겼을 때 띠 아래에
+# 「다 치웠어요」 줄을 그리고, 거짓이면 안 그린다(말머리는 읽으려고 모으는 자리다).
+# 정기 app/renderer.py GATHER_KINDS와 같은 이름·같은 동작이라 한쪽만 고치지 않는다.
 _RAW_KINDS = (
+    ("scoop", "art-scoop", "siren", "[단독]",
+     "[단독] 기사만 한곳에 모아 봅니다 — 복사·txt·엑셀은 그대로예요", False),
+    ("flash", "art-flash", "siren", "[속보]",
+     "[속보] 기사만 한곳에 모아 봅니다 — 복사·txt·엑셀은 그대로예요", False),
     ("photo", "is-photo", "camera", "사진 추정",
-     "사진 추정 기사만 한곳에 모아 봅니다 — 복사·txt·엑셀은 그대로예요"),
+     "사진 추정 기사만 한곳에 모아 봅니다 — 복사·txt·엑셀은 그대로예요", True),
     ("sched", "is-sched", "calendar", "일정 추정",
-     "제목 맨 앞에 [오늘의 일정] 같은 말머리가 붙은 기사만 모아 봅니다"),
+     "제목 맨 앞에 [오늘의 일정] 같은 말머리가 붙은 기사만 모아 봅니다", True),
     ("hr", "is-hr", "user", "인사",
-     "제목에 [인사] 말머리가 붙은 기사만 모아 봅니다"),
+     "제목에 [인사] 말머리가 붙은 기사만 모아 봅니다", True),
 )
 
 
@@ -2443,7 +2457,8 @@ def _raw_kinds_js() -> str:
     """모아 보기 JS가 쓰는 종류 표(행 클래스·이름·아이콘). 화면 글자와 행 클래스가
     같은 표에서 나와야 「칩 이름과 띠 글자가 다른」 일이 안 생긴다."""
     return __import__("json").dumps(
-        {key: {"cls": cls, "name": name, "icon": icon(ic)} for key, cls, ic, name, _tip in _RAW_KINDS},
+        {key: {"cls": cls, "name": name, "icon": icon(ic), "tidy": tidy}
+         for key, cls, ic, name, _tip, tidy in _RAW_KINDS},
         ensure_ascii=False,
     )
 
@@ -2451,6 +2466,11 @@ def _raw_kinds_js() -> str:
 def _raw_kinds_of(article: dict) -> set:
     """이 기사가 어느 종류 칩에 걸리는가. 칩 건수와 행 클래스가 같은 답을 본다."""
     marks = set()
+    _kind = headline_kind(article.get("title") or "")
+    if _kind == "단독":
+        marks.add("scoop")
+    elif _kind == "속보":
+        marks.add("flash")
     if looks_like_photo_caption(article):
         marks.add("photo")
     if is_schedule_listing(article.get("title") or "", article.get("url") or ""):
@@ -2458,6 +2478,31 @@ def _raw_kinds_of(article: dict) -> set:
     if PERSONNEL_NOTICE_MARK in (article.get("title") or ""):
         marks.add("hr")
     return marks
+
+
+def _kind_chips_html(visible: list) -> str:
+    """종류 칩 묶음 — 원본의 「거르기」 줄과 확정본의 목록 위 줄이 **같은 함수**를 쓴다.
+
+    0건인 종류는 아예 안 그리고(아무것도 못 거르는 칸이 늘 떠 있으면 그 줄을 안 읽게 된다),
+    말머리 묶음과 추정 묶음 사이에만 세로선을 둔다. 누르면 그 종류만 모아 본다 —
+    빼는 게 아니라 모아 보는 것이라, 빼려면 모아 본 자리에서 전부 고른 뒤 숨기면 된다.
+    """
+    chips = []
+    prev_tidy = None
+    for key, _cls, ic, name, tip, tidy in _RAW_KINDS:
+        n = sum(1 for a in visible if key in _raw_kinds_of(a))
+        if not n:
+            continue
+        # 말머리 묶음(먼저 읽을 것)과 추정 묶음(치울 것)은 뜻이 반대라 세로선으로 가른다.
+        if prev_tidy is not None and tidy != prev_tidy:
+            chips.append('<span class="fsep"></span>')
+        prev_tidy = tidy
+        chips.append(
+            f'<button type="button" class="btn sm photo-gather-btn" data-kind="{key}" '
+            f'onclick="toggleKindGather(\'{key}\')" title="{html.escape(tip)}">'
+            f"{icon(ic)} {name} ({n})</button>"
+        )
+    return "".join(chips)
 
 
 def _raw_filter_row_html(raw_articles: list, unsent_filter_html: str) -> str:
@@ -2473,16 +2518,7 @@ def _raw_filter_row_html(raw_articles: list, unsent_filter_html: str) -> str:
     visible = [a for a in raw_articles if not a.get("hidden")]
     if not visible:
         return ""
-    chips = []
-    for key, _cls, ic, name, tip in _RAW_KINDS:
-        n = sum(1 for a in visible if key in _raw_kinds_of(a))
-        if not n:
-            continue
-        chips.append(
-            f'<button type="button" class="btn sm photo-gather-btn" data-kind="{key}" '
-            f'onclick="toggleKindGather(\'{key}\')" title="{html.escape(tip)}">'
-            f"{icon(ic)} {name} ({n})</button>"
-        )
+    chips = [_kind_chips_html(visible)]
     # 「등록 언론사만」 — 설정의 체크를 그대로 본다. 0곳이면 켜도 한 건도 안 남으니
     # 잠그고 갈 곳을 가리킨다(오늘 전체 기사·기관 기사 찾기와 같은 규칙).
     major = load_settings().get("outlet_order") or ()
@@ -2921,8 +2957,9 @@ def _render_article_row(
         # 「칩엔 3건인데 모아 보니 2건」이 안 생긴다. 화면 전용이라 저장값·복사·txt·
         # 엑셀·발송엔 하나도 안 나간다.
         _marks = _raw_kinds_of(article)
-        for _key, _cls, _ic, _nm, _tip in _RAW_KINDS:
-            if _key not in ("photo", "sched") and _key in _marks:
+        for _key, _cls, _ic, _nm, _tip, _tidy in _RAW_KINDS:
+            # 사진·일정·말머리는 원본·확정본 모두에 아래에서 이미 붙는다(흐림·빨간 바탕).
+            if _key not in ("photo", "sched", "scoop", "flash") and _key in _marks:
                 article_class += f" {_cls}"
         # 「등록 언론사만」 — 설정 「언론사 선택 및 순서 지정」의 체크 그대로다. 아무도
         # 안 골랐으면 거르지 않는다(filter_by_outlet_whitelist와 같은 규칙, 그때 칸은 잠긴다).
@@ -2931,6 +2968,10 @@ def _render_article_row(
             article_class += " is-nonmajor"
     if _kind == "단독":
         article_class += " art-scoop"
+    # [속보]에는 보이는 서식이 없다(제목 글자색뿐) — 이 클래스는 모아 보기가 그 행을
+    # 찾는 고리 하나다(_RAW_KINDS의 cls). 서식을 붙이지 않는다.
+    elif _kind == "속보":
+        article_class += " art-flash"
 
     return f"""<div class="{article_class}" data-outlet-rank="{outlet_rank}">
   <details>
@@ -3060,8 +3101,9 @@ function _pgRefresh() {
     ? kind.icon + ' <b>' + kind.name + ' ' + n + '건</b>만 모아 보고 있어요'
     : (rows.length ? '위의 다른 조건에 가려 보이는 기사가 없어요'
                    : '남은 ' + kind.name + ' 기사가 없어요');
+  // 「다 치웠어요」는 치우려고 모으는 종류(tidy)에만 — 말머리는 읽으려고 모으는 자리다.
   var done = view.querySelector('.pg-done');
-  if (!rows.length && !done) {
+  if (!rows.length && !done && kind.tidy) {
     view.insertAdjacentHTML('beforeend',
       '<div class="pg-done">다 치웠어요. 숨긴 기사는 왼쪽 아래 휴지통에서 되살릴 수 있어요.</div>');
   } else if (rows.length && done) { done.remove(); }
@@ -3113,6 +3155,9 @@ function photoGatherOn(kind) {
   if (anchor) host.insertBefore(view, anchor); else host.appendChild(view);
   host.insertBefore(strip, view);
   document.body.classList.add('photo-gather');
+  // 어느 종류를 모아 보는 중인지 — [단독]의 빨간 바탕을 푸는 CSS가 이 클래스를 본다
+  // (.photo-gather는 「모아 보는 중」 하나만 뜻한다, 정기와 같은 규칙).
+  document.body.classList.add('gather-' + _pgKind);
   // 켠 종류의 칩만 채운 파랑 — 확정본의 알약엔 data-kind가 없어 그대로 켜진다.
   document.querySelectorAll('.photo-gather-btn').forEach(function (b) {
     b.classList.toggle('is-on', !b.dataset.kind || b.dataset.kind === _pgKind);
@@ -3135,6 +3180,7 @@ function photoGatherOff() {
     if (el) el.remove();
   });
   document.body.classList.remove('photo-gather');
+  Object.keys(ADHOC_KINDS).forEach(function (k) { document.body.classList.remove('gather-' + k); });
   document.querySelectorAll('.photo-gather-btn').forEach(function (b) { b.classList.remove('is-on'); });
   var vsel = document.querySelector('.view-mode-select');
   if (vsel) vsel.disabled = false;
@@ -3684,18 +3730,9 @@ def render_card_page(
 
     # [추가: 2026-09-15] 📷 사진 추정 모아 보기 — 정기와 같은 이름. 화면에 보이는 기사
     # (조건 안 + 숨기지 않음) 중 사진 추정이 0건이면 줄 자체를 안 그린다.
-    photo_count = sum(
-        1 for _, arts in groups for a in arts
-        if not a.get("hidden") and looks_like_photo_caption(a)
-    )
-    photo_row_html = (
-        '<div class="photo-row">'
-        '<button type="button" class="btn sm photo-gather-btn" onclick="togglePhotoGather()" '
-        'title="사진 추정 기사만 한곳에 모아 봅니다 — 복사·txt·엑셀은 그대로예요">'
-        f'{icon("camera")} 사진 추정 ({photo_count})</button></div>'
-        if photo_count
-        else ""
-    )
+    _bundle_visible = [a for _, arts in groups for a in arts if not a.get("hidden")]
+    _bundle_chips = _kind_chips_html(_bundle_visible)
+    photo_row_html = f'<div class="photo-row">{_bundle_chips}</div>' if _bundle_chips else ""
 
     summary_html = ""
     if card.get("group_summaries"):

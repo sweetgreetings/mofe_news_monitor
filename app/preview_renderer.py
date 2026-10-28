@@ -83,8 +83,6 @@ from app.preview_order import (
 from app.filters import (
     deduplicate_by_title,
     filter_by_outlet_whitelist,
-    is_schedule_listing,
-    looks_like_photo_caption,
     sort_scoop_first,
 )
 from app.highlight import highlight_keywords
@@ -109,6 +107,7 @@ from app.renderer import (
     kw_inline_style,
     kw_inline_script,
     gather_buttons_html,
+    gather_counts,
     photo_gather_script,
     photo_gather_style,
     render_article,
@@ -3501,7 +3500,7 @@ def _take_auto_classify_turn(slot: dict, article_count: int) -> bool:
 
 def _actions_html(
     plain_text: str, slot_end: str, pending_count: int = 0, manual_edits: int = 0,
-    degraded: bool = False, photo_suspect_count: int = 0, sched_suspect_count: int = 0,
+    degraded: bool = False, gather_count_map: Optional[dict] = None,
     export_rows: Optional[list] = None, export_date: str = "",
 ) -> str:
     # 파일명은 확정본(`날짜_언론모니터링_14-00기준`)과 같은 모양에 끝만 `_초안`을 붙여 구별한다.
@@ -3536,9 +3535,7 @@ def _actions_html(
     )
     # 「📷 사진 추정 (N)」 — app.renderer와 같은 함수(0건이면 안 그린다). 화면만 바꾸는
     # 보기라 왼쪽(내용을 바꾸는 네모)이 아니라 오른쪽 묶음에 알약으로 선다.
-    photo_select_btn_html = gather_buttons_html(
-        {"photo": photo_suspect_count, "sched": sched_suspect_count}
-    )
+    photo_select_btn_html = gather_buttons_html(gather_count_map or {})
     # 툴바 규칙: 왼쪽 = 초안을 바꾸는 박스 버튼, 오른쪽 = 가져가거나 보기만 바꾸는 것
     # (글자 복사·텍스트·엑셀 + 보기 선택). 확정본(app.renderer)과 같은 모양이고 CSS는
     # export_links_style() 공용. 시안 mockups/TOOLBAR_GROUPING_MOCKUP.html A안.
@@ -3748,18 +3745,15 @@ def _compute_preview_content(
         for url, target_name in overrides.items()
         if url in shown_urls and target_name not in protected_group_names
     )
-    photo_suspect_count = sum(1 for a in articles if looks_like_photo_caption(a))
-    # 📅 일정 추정도 같은 알약 한 벌이다 — 판정은 행 배지와 같은 함수(app.filters).
-    sched_suspect_count = sum(
-        1 for a in articles if is_schedule_listing(a.get("title", ""), a.get("url", ""))
-    )
+    # 📅 일정 추정·[단독]·[속보]도 같은 알약 한 벌 — 건수는 확정본과 같은 gather_counts.
+    gather_count_map = gather_counts(articles)
     return {
         "body": body,
         "hint": hint,
         "plain_text": plain_text,
         "actions_html": _actions_html(
             plain_text, slot["end"], pending_count, manual_edits, classify_degraded,
-            photo_suspect_count, sched_suspect_count,
+            gather_count_map,
             export_rows=build_export_rows(groups, label_scrap_date, label_scrap_end, labels),
             export_date=label_scrap_date,
         ),

@@ -2823,6 +2823,10 @@ def render_article(
     # "단독이 가장 중요"), 개수와 무관하게 항상 먼저 눈에 걸리는 형태(덩어리)로 준다.
     if headline_kind(article["title"]) == "단독":
         article_class += " art-scoop"
+    # [추가] [속보]에는 보이는 서식이 없다(제목 글자색뿐) — 이 클래스는 모아 보기가
+    # 그 행을 찾는 고리 하나다(GATHER_KINDS의 cls). 서식을 붙이지 않는다.
+    elif headline_kind(article["title"]) == "속보":
+        article_class += " art-flash"
     # [추가: 2026-08-21] 사진 추정 기사는 지우지 않고 행을 흐리게 표시한다(CSS
     # .article.is-photo) — 판정이 틀렸을 때 담당자가 그 자리에서 처리(체크 해제)할 수
     # 있어야 한다는 결정. 마우스를 올리면 다시 밝아진다(아래 CSS). 실시간 현황이 이미
@@ -3993,14 +3997,9 @@ def render_page(
     # [수정: 2026-09-15] 「📷 사진 추정 전체 선택」 → 「📷 사진 추정 모아 보기」 — 흩어진
     # 사진 추정 행을 한 목록으로 모아 보여주고, 전체 선택은 모아 보는 중 띠가 맡는다
     # (photo_gather_script). 0건이면 버튼 자체를 안 그리는 규칙은 그대로다.
-    photo_suspect_count = sum(1 for a in articles if looks_like_photo_caption(a))
-    # 📅 일정 추정도 같은 알약 한 벌이다 — 판정은 행 배지와 같은 함수(app.filters).
-    sched_suspect_count = sum(
-        1 for a in articles if is_schedule_listing(a.get("title", ""), a.get("url", ""))
-    )
-    photo_gather_btn_html = gather_buttons_html(
-        {"photo": photo_suspect_count, "sched": sched_suspect_count}
-    )
+    # 📅 일정 추정·[단독]·[속보]도 같은 알약 한 벌이다 — 건수는 gather_counts 한 곳에서
+    # 세고, 판정은 행 배지·행 클래스와 같은 함수(app.filters)를 본다.
+    photo_gather_btn_html = gather_buttons_html(gather_counts(articles))
     # [추가: 2026-08-11] 되돌릴 게 있을 때만 ↩ 버튼이 보인다 — 항상 떠 있으면 무엇이
     # 되돌아가는지 알 수 없어 오히려 누르기 불안하다는 판단(사용자와 합의).
     # [수정] 되돌릴 게 없으면 안 그리는 게 아니라 숨겨 둔다(undo_fab_html) — 화면을 다시
@@ -4730,6 +4729,9 @@ PHOTO_GATHER_STYLE = """
   /* 모아 보는 중엔 전부가 그 종류라 흐림·칩이 행마다 같은 값(=장식)이 된다. 어느 종류를
      모아 보는 중인지는 body의 gather-{{키}} 클래스가 말한다(.photo-gather는 「모아 보는
      중」 하나만 뜻한다 — 목록 밖을 접는 아래 규칙이 종류와 무관해야 해서다). */
+  /* 모아 보는 동안엔 전부가 [단독]이라 빨간 띠·바탕이 장식이 된다 — 사진 흐림·칩을
+     푸는 것과 같은 이유로 푼다. 제목 글자색(.t-scoop)은 그대로 둔다. */
+  body.gather-scoop .article.art-scoop {{ background: transparent; border-left: none; padding-left: 8px; }}
   body.gather-photo .article.is-photo {{ opacity: 1; }}
   body.gather-photo .photo-badge {{ display: none; }}
   body.gather-sched .article.is-sched {{ opacity: 1; }}
@@ -4771,8 +4773,9 @@ function _pgRefresh() {
   strip.querySelector(".pg-msg").innerHTML = n
     ? kind.icon + " <b>" + kind.name + " " + n + "건</b>만 모아 보고 있어요"
     : "남은 " + kind.name + " 기사가 없어요";
+  // 「다 치웠어요」는 치우려고 모으는 종류(tidy)에만 — 말머리는 읽으려고 모으는 자리다.
   var done = view.querySelector(".pg-done");
-  if (!n && !done) {
+  if (!n && !done && kind.tidy) {
     view.insertAdjacentHTML("beforeend",
       '<div class="pg-done">다 치웠어요. 숨긴 기사는 왼쪽 아래 휴지통에서 되살릴 수 있어요.</div>');
   } else if (n && done) { done.remove(); }
@@ -4895,11 +4898,17 @@ def photo_gather_style() -> str:
 # 판정을 새로 만들지 않는다: 사진 looks_like_photo_caption · 일정 is_schedule_listing.
 # 수시 원본의 거르기 줄(app/adhoc/renderer.py `_RAW_KINDS`)과 같은 이름·같은 동작이라
 # 한쪽만 고치지 않는다.
+# 마지막 칸 tidy는 「치우려고 모으는 종류인가」다 — 참이면 다 숨겼을 때 띠 아래에
+# 「다 치웠어요」 줄을 그리고, 거짓이면 안 그린다(말머리는 읽으려고 모으는 자리다).
 GATHER_KINDS = (
+    ("scoop", "art-scoop", "siren", "[단독]",
+     "[단독] 기사만 한곳에 모아 봅니다 — 보고서(복사·txt·발송)는 그대로예요", False),
+    ("flash", "art-flash", "siren", "[속보]",
+     "[속보] 기사만 한곳에 모아 봅니다 — 보고서(복사·txt·발송)는 그대로예요", False),
     ("photo", "is-photo", "camera", "사진 추정",
-     "사진 추정 기사만 한곳에 모아 봅니다 — 보고서(복사·txt·발송)는 그대로예요"),
+     "사진 추정 기사만 한곳에 모아 봅니다 — 보고서(복사·txt·발송)는 그대로예요", True),
     ("sched", "is-sched", "calendar", "일정 추정",
-     "정형 일정 나열 기사만 한곳에 모아 봅니다 — 보고서(복사·txt·발송)는 그대로예요"),
+     "정형 일정 나열 기사만 한곳에 모아 봅니다 — 보고서(복사·txt·발송)는 그대로예요", True),
 )
 
 
@@ -4907,7 +4916,8 @@ def _gather_kinds_js() -> str:
     """모아 보기 JS가 쓰는 종류 표. 화면 글자와 행 클래스가 같은 표에서 나와야
     「알약 이름과 띠 글자가 다른」 일이 안 생긴다(f-string 안에 중괄호를 안 넣으려고 함수로 뺀다)."""
     return json.dumps(
-        {key: {"cls": cls, "name": name, "icon": icon(ic)} for key, cls, ic, name, _tip in GATHER_KINDS},
+        {key: {"cls": cls, "name": name, "icon": icon(ic), "tidy": tidy}
+         for key, cls, ic, name, _tip, tidy in GATHER_KINDS},
         ensure_ascii=False,
     )
 
@@ -4935,16 +4945,38 @@ def gather_buttons_html(counts: dict) -> str:
     바꾸는 네모 버튼)이 아니라 오른쪽에 서고, 모양도 네모가 아니라 알약이다 —
     확정본·초안이 같은 함수를 쓴다. 순서는 GATHER_KINDS 그대로다."""
     out = []
-    for key, _cls, ic, name, tip in GATHER_KINDS:
+    prev_tidy = None
+    for key, _cls, ic, name, tip, tidy in GATHER_KINDS:
         n = counts.get(key) or 0
         if not n:
             continue
+        # 말머리 묶음(먼저 읽을 것)과 추정 묶음(치울 것)은 뜻이 반대라 세로선으로 가른다.
+        if prev_tidy is not None and tidy != prev_tidy:
+            out.append('<span class="actions-divider"></span>')
+        prev_tidy = tidy
         out.append(
             f'<button class="photo-gather-btn" type="button" data-kind="{key}" '
             f'onclick="toggleKindGather(\'{key}\')" title="{html.escape(tip)}">'
             f"{icon(ic)} {name} ({n})</button>"
         )
     return "".join(out)
+
+
+def gather_counts(articles: list) -> dict:
+    """모아 보기 알약의 건수 — 확정본·초안이 같은 함수를 쓴다. 판정은 행 배지·행
+    클래스와 **같은 함수**라 「알약엔 3건인데 모아 보니 2건」이 안 생긴다."""
+    counts = {key: 0 for key, *_ in GATHER_KINDS}
+    for a in articles:
+        kind = headline_kind(a.get("title") or "")
+        if kind == "단독":
+            counts["scoop"] += 1
+        elif kind == "속보":
+            counts["flash"] += 1
+        if looks_like_photo_caption(a):
+            counts["photo"] += 1
+        if is_schedule_listing(a.get("title") or "", a.get("url") or ""):
+            counts["sched"] += 1
+    return counts
 
 
 def photo_gather_button_html(count: int) -> str:

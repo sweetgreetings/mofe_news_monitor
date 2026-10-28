@@ -2003,10 +2003,34 @@ def test_photo_gather_and_adhoc_bulk_hide():
         "종류별 모아 보기 JS가 없음"
     assert "body.gather-sched" in with_sched, "모아 보는 동안 일정 행의 흐림을 푸는 규칙이 없음"
     from app.preview_renderer import _actions_html as _draft_actions_html
-    draft_tb = _draft_actions_html("본문", "15:00", photo_suspect_count=2, sched_suspect_count=3)
+    draft_tb = _draft_actions_html("본문", "15:00", gather_count_map={"photo": 2, "sched": 3})
     assert "사진 추정 (2)" in draft_tb and "일정 추정 (3)" in draft_tb, "초안 툴바에 종류 알약이 없음"
     assert "photo-gather-btn" not in _draft_actions_html("본문", "15:00"), \
         "초안: 0건인데 알약이 그려짐"
+
+    # [추가] [단독]·[속보]도 같은 알약 한 벌이다 — 판정은 app.filters.headline_kind 하나고,
+    # 모아 보기가 잡는 행 클래스는 단독 .art-scoop(이미 있던 빨간 바탕) · 속보 .art-flash
+    # (서식 없는 고리). 말머리 묶음과 추정 묶음 사이에만 세로선이 선다.
+    with_head = renderer.render_page(
+        "11:00",
+        [reg("https://r.x/s1", "[단독] 기재부, 내년 예산 조정"),
+         reg("https://r.x/f1", "[속보] 가상자산 과세 2년 유예"),
+         reg("https://r.x/f2", "[속보] 반도체 특별법 통과"),
+         reg("https://r.x/d1", "[오늘의 국회일정](22일·목)"),
+         reg("https://r.x/n1", "청문회 답변")],
+        *args,
+    )
+    assert "[단독] (1)" in with_head and 'data-kind="scoop"' in with_head, "정기 [단독] 알약 없음"
+    assert "[속보] (2)" in with_head and 'data-kind="flash"' in with_head, "정기 [속보] 알약 없음"
+    assert 'data-kind="scoop"' not in without, "[단독] 0건인데 버튼이 그려짐"
+    assert "art-flash" in with_head, "[속보] 행에 모아 보기가 잡을 클래스가 없음"
+    assert "body.gather-scoop" in with_head, "모아 보는 동안 [단독] 빨간 바탕을 푸는 규칙이 없음"
+    # 말머리 둘은 한 묶음이라 사이에 세로선이 없고, 추정 묶음 앞에만 선다.
+    _seg = with_head[with_head.index('data-kind="scoop"'):with_head.index('data-kind="sched"')]
+    assert _seg.count("actions-divider") == 1, f"말머리·추정 묶음 세로선이 한 줄이 아님: {_seg.count('actions-divider')}"
+    # 「다 치웠어요」는 치우려고 모으는 종류에만 — 말머리는 읽으려고 모으는 자리다.
+    assert '"tidy": false' in with_head.replace("False", "false"), "말머리 종류에 tidy 거짓이 없음"
+    assert "kind.tidy" in with_head, "「다 치웠어요」를 종류로 가르는 조건이 없음"
 
     with tempfile.TemporaryDirectory() as tmp:
         adhoc_dir = Path(tmp)
@@ -2041,6 +2065,13 @@ def test_photo_gather_and_adhoc_bulk_hide():
             page = adhoc_renderer.render_card_page(card.load_card(c["id"]))
             assert "사진 추정 (2)" in page, "수시 모아 보기 버튼 없음(숨긴 기사는 안 센다)"
             assert "bulkHide(" in page and 'data-group-name="현장"' in page
+            # [추가] 수시 확정본도 같은 칩 묶음을 쓴다(목록 바로 위 줄) — 켜진 칩·띠는
+            # 흐름 색인 청록이고(초록은 발송 ● 버튼의 색이라 쓰지 않는다) 꺼진 칩은 회색이다.
+            assert 'data-kind="photo"' in page, "수시 확정본 칩에 data-kind가 없음"
+            assert ".btn.photo-gather-btn.is-on" in page and "#146B5E" in page, \
+                "수시 켜진 칩이 흐름 색(청록)이 아님"
+            assert "#15803D" not in page.split(".photo-gather-strip")[1][:600], \
+                "수시 모아 보기 띠에 발송 초록이 섞임"
 
             # 3) bulk-hide
             calls = []
@@ -2621,6 +2652,7 @@ def test_adhoc_raw_filter_row():
                 art(2, "뉴스1", "[오늘의 일정] 10월 22일 국회"),
                 art(3, "동네신문", "[인사] 재정경제부"),
                 art(4, "동네신문", "지역 예산 토론회"),
+                art(5, "KBS", "[속보] 가상자산 과세 2년 유예"),
             ]
             card.save_card(raw)
             saved = card.load_card(raw["id"])
@@ -2639,7 +2671,7 @@ def test_adhoc_raw_filter_row():
             assert '<span class="fsep">' in p, "체크와 칩을 가르는 세로선이 없음"
 
             # 2) 칩 건수 = 행 표식 수. 판정이 두 군데로 갈리면 「칩엔 3건인데 모아 보니 2건」이 된다.
-            for key, cls, _ic, name, _tip in adhoc_renderer._RAW_KINDS:
+            for key, cls, _ic, name, _tip, _tidy in adhoc_renderer._RAW_KINDS:
                 n = sum(1 for a in saved["articles"] if key in adhoc_renderer._raw_kinds_of(a))
                 rows = len(re.findall(r'<div class="article[^"]*\b' + cls + r'\b', p))
                 assert rows == n, f"{name} 칩 건수({n})와 행 표식({rows})이 어긋남"
@@ -2650,9 +2682,15 @@ def test_adhoc_raw_filter_row():
                 else:
                     assert chip not in p, f"{name}이 0건인데 칩이 그려짐"
             assert "일정 추정 (1)" in p and "인사 (1)" in p, "말머리 기사를 못 잡음"
+            # [추가] [단독]·[속보]도 같은 칩 한 벌 — 말머리 묶음은 추정 묶음 앞에 서고
+            # 그 사이에만 세로선이 하나 더 선다(체크와 칩 사이 하나 + 묶음 사이 하나).
+            assert '[속보] (1)' in p and 'data-kind="flash"' in p, "수시 [속보] 칩이 없음"
+            assert 'data-kind="scoop"' not in p, "[단독] 0건인데 칩이 그려짐"
+            assert p.count('<span class="fsep">') == 2, \
+                f"거르기 줄 세로선이 둘이 아님: {p.count(chr(60) + chr(115) + chr(112) + chr(97) + chr(110))}"
 
             # 3) 등록 언론사만 — 설정의 체크 그대로(동네신문 2건이 비등록)
-            assert '등록 언론사만 <span class="n">2</span>' in p, "등록 언론사 건수가 설정과 다름"
+            assert '등록 언론사만 <span class="n">3</span>' in p, "등록 언론사 건수가 설정과 다름"
             assert len(re.findall(r'<div class="article[^"]*\bis-nonmajor\b', p)) == 2, \
                 "비등록 언론사 행 표식이 어긋남"
             locked = page([])
@@ -2662,7 +2700,7 @@ def test_adhoc_raw_filter_row():
 
             # 4) 보기 필터일 뿐 — 가져가기 텍스트는 그대로다
             text = adhoc_renderer.build_adhoc_plain_text(saved)
-            assert text.count("https://r.x/") == 4, "거르기 줄이 복사 텍스트를 줄임"
+            assert text.count("https://r.x/") == 5, "거르기 줄이 복사 텍스트를 줄임"
 
             # 5) 가려 둔 기사는 「모든 기사 확정본으로」로도 안 나간다
             assert "major-only" in p and "postWithUrls('/adhoc/card/send-to-bundle', fields, urls)" in p, \
