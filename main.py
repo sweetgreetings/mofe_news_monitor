@@ -17,7 +17,7 @@ from app.confirm_send import confirm_and_promote
 from app.alert_groups import transplant_alert_groups
 from app.credentials import cleanup_env_backups, transplant_env_keys
 from app.today_cuts import after_round_collected
-from app.curation import cleanup_group_overrides
+from app.curation import archive_aged_hidden, cleanup_group_overrides
 from app.history_renderer import generate_history_page
 from app.landing_renderer import generate_landing_page
 from app.logging_setup import setup_logging
@@ -197,6 +197,9 @@ def main(open_browser: bool = True) -> None:
     try:
         delete_expired_runs()
         cleanup_group_overrides()
+        # 열람 창을 벗어난 숨김 기록을 보관 파일로 — 숨김 판정은 두 파일을 함께 본다
+        # (app.curation.load_hidden_urls). 아래에서 보관함을 그리기 전에 와야 한다.
+        archive_aged_hidden()
         delete_expired_cards()
         # 지운 지 오래된 회차는 껍데기로 — 「삭제 기록」에 줄은 남고 되살리기만 빠진다.
         purge_expired_deleted_runs()

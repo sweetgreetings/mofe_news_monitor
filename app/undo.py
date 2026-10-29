@@ -48,6 +48,11 @@ _MAX_ENTRIES = 20
 # 스냅샷에 포함할 큐레이션 상태 파일들. 여기 추가하기만 하면 그 상태도 자동으로
 # 되돌리기 대상이 된다.
 _SNAPSHOT_FILES = {
+    # [주의: 2026-10-29] `hidden_articles.json`은 **최근 HIDDEN_VIEW_DAYS일치만** 담는다.
+    # 그보다 오래된 숨김 기록이 사는 `hidden_archive.json`은 **일부러 여기 없다** —
+    # 되살리기 창이 7일이라 그 파일에는 되돌릴 것이 없고, 1년치(약 13MB)를 여기 담으면
+    # 스택이 수십~수백 MB가 되어 큐레이션 클릭 한 번이 그만큼 느려진다(아래 실측 참고).
+    # 그 파일을 이 표에 더하면 숨김 기간을 1년으로 늘린 이유 자체가 사라진다.
     "hidden": HIDDEN_ARTICLES_FILE,
     "overrides": GROUP_OVERRIDES_FILE,
     "labels": GROUP_LABELS_FILE,

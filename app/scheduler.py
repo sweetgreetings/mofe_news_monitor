@@ -12,7 +12,7 @@ from app.renderer import generate_waiting_page
 from app.last_slot_topup import last_window, topup_due_at
 from app.scraper import collect_run_with_retry, top_up_last_run
 from app.settings import active_schedule_times, load_settings
-from app.curation import cleanup_group_overrides
+from app.curation import archive_aged_hidden, cleanup_group_overrides
 from app.storage import delete_expired_runs, purge_expired_deleted_runs, run_exists
 
 logger = logging.getLogger(__name__)
@@ -245,6 +245,11 @@ def run_scheduler(
     scrape: Callable[[str, str], dict] = collect_run_with_retry,
     cleanup: Callable[[], list] = delete_expired_runs,
     cleanup_overrides: Callable[[], int] = cleanup_group_overrides,
+    # [추가: 2026-10-29] 열람 창(HIDDEN_VIEW_DAYS)을 벗어난 숨김 기록을 보관 파일로
+    # 옮긴다 — 며칠째 아무것도 숨기지 않은 경우를 받는 자리다(숨기기·되살리기는
+    # 제 잠금 안에서 같은 정리를 먼저 돌린다). app.curation을 이미 쓰는 모듈이라
+    # cleanup_overrides처럼 기본값을 실제 함수로 둔다.
+    archive_hidden: Callable[[], tuple] = archive_aged_hidden,
     purge_deleted: Callable[[], int] = purge_expired_deleted_runs,
     # [추가: 2026-08-18] 기본값을 아무 일도 안 하는 람다로 둔다 — app/scheduler.py는
     # "정기" 코드라 app.adhoc를 import하지 않는다(ADHOC_DESIGN.md §4의 단방향 의존 규칙).
@@ -349,6 +354,7 @@ def run_scheduler(
             check_title_watch(now)
             cleanup()
             cleanup_overrides()
+            archive_hidden()
             purge_deleted()
             cleanup_adhoc_cards()
         except Exception:

@@ -1,5 +1,6 @@
 # Design Ref: PRD.md 기능1 규칙 19·21, 기능2 규칙 8 — 기사 숨김/되돌리기, 소제목 순서·경계 넘나들기, 소제목 이름 바꾸기
 import json
+import logging
 import threading
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
@@ -14,8 +15,11 @@ from app.config import (
     HIDDEN_ARTICLES_FILE,
     HIDDEN_BATCH_WINDOW_SEC,
     HIDDEN_VIEW_DAYS,
+    RETENTION_DAYS,
 )
 from app.llm_classifier import round_key
+
+logger = logging.getLogger(__name__)
 
 # [추가: 2026-08-05] hide_article/unhide_article는 파일을 통째로 읽어 고쳐 다시 쓰는
 # 방식이라, ThreadingHTTPServer(app.settings_server)가 동시에 여러 요청을 처리하면
@@ -68,43 +72,161 @@ def _load_records(now: Optional[datetime] = None, days: int = 1) -> list:
     옛 형식(평평한 URL 문자열 목록)은 애초에 언제 숨겼는지 알 수 없어 그냥 버려진다
     (오늘 것이라고 확신할 수 없으므로).
     """
+    allowed = _recent_days(days, now)
+    return [record for record in _read_recent_raw() if record.get("hidden_at", "")[:10] in allowed]
+
+
+def _read_recent_raw() -> list:
+    """최근 기록 파일(`hidden_articles.json`)을 **날짜로 거르지 않고** 그대로 읽는다.
+
+    [추가: 2026-10-29] 숨김 판정이 보관 파일까지 보게 되면서(load_hidden_urls 참고),
+    "이 파일에 들어 있는 것은 전부 아직 숨김이다"가 돼 날짜 필터를 거치지 않는 읽기가
+    따로 필요해졌다. 날짜로 거르는 읽기(_load_records)는 **열람용**으로 남는다.
+
+    옛 형식(평평한 URL 문자열 목록)은 애초에 언제 숨겼는지 알 수 없어 그냥 버려진다.
+    """
     if not HIDDEN_ARTICLES_FILE.exists():
         return []
     try:
         raw = json.loads(HIDDEN_ARTICLES_FILE.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError):
         return []
-    if raw and isinstance(raw[0], str):
+    if not isinstance(raw, list) or (raw and isinstance(raw[0], str)):
         return []
-    allowed = _recent_days(days, now)
-    return [record for record in raw if record.get("hidden_at", "")[:10] in allowed]
+    return [record for record in raw if isinstance(record, dict) and record.get("url")]
 
 
 def _write_records(records: list) -> None:
     atomic_write_text(HIDDEN_ARTICLES_FILE, json.dumps(records, ensure_ascii=False, indent=2))
 
 
-def load_hidden_urls(now: Optional[datetime] = None) -> set:
-    """최근 HIDDEN_VIEW_DAYS일 안에 숨긴 기사의 URL 집합(filter_hidden의 빠른 포함 여부 확인용).
+def _archive_file():
+    """오래된 숨김 기록을 옮겨 두는 파일 경로 — **호출 시점에 만든다.**
 
-    [수정: 2026-09-16] **오늘 하루에서 7일로 늘렸다**(사용자 결정 — "자정 넘으면 복구를
-    못 하게 막혀 있는 거냐"는 물음에서 시작). 예전엔 이 함수만 오늘치를 봐서 자정이 지나면
-    숨김이 저절로 풀렸고, 그래서 휴지통에 보이는 지난 날짜 기록은 **되살릴 것이 없는**
-    기록이었다(화면도 그 자리에 복구 버튼을 안 줬다). 담당자가 기대한 건 "휴지통에
-    있으면 언제든 되살린다"였고, 덤으로 하나가 더 맞아떨어진다 — 정기 보관함이
-    filter_hidden을 거치므로, 자정에 숨김이 풀리면 **어제 실제로 발송한 보고서에는 없던
-    기사가 오늘 보관함에는 다시 보였다**(2026-09-10에 소제목 순서로 고친 "보관함 텍스트가
-    발송본과 다르다"와 같은 종류의 어긋남).
-
-    **열람 기간과 판정 기간을 일부러 같은 상수로 묶어 둔다** — 두 값이 갈리면 "휴지통에는
-    보이는데 복구는 안 되는" 줄이 다시 생긴다(그때를 위해 화면은 잠긴 복구 버튼을 그릴 수
-    있게 해뒀다, app.settings_server.render_hidden_page).
-
-    **이 기간을 더 늘리지 않는다** — app.undo가 hidden_articles.json을 통째로 20단계
-    복사하므로(파일 크기 × 20), 1년치(실측 환산 약 3.6만 건·11MB)면 되돌리기 스택이
-    200MB대가 된다. 2026-08-25에 group_overrides를 1년 → 30일로 줄인 것과 같은 이유다.
+    [추가: 2026-10-29] `app.config`에 상수로 두지 않고 최근 기록 파일 이름에서 파생한다.
+    테스트가 `patch.object(curation, "HIDDEN_ARTICLES_FILE", tmp/...)` 하나로 숨김을
+    격리하고 있는데, 보관 파일을 따로 상수로 두면 **그 테스트들이 실제 `data/`를
+    건드린다** — 호출 시점에 읽으면 두 파일이 늘 같은 폴더로 함께 따라간다
+    (`app.storage.ARTICLES_DIR`를 호출 시점에 읽는 것과 같은 이유).
     """
-    return {record["url"] for record in _load_records(now, HIDDEN_VIEW_DAYS)}
+    return HIDDEN_ARTICLES_FILE.with_name("hidden_archive.json")
+
+
+# 보관 파일을 (경로, mtime_ns, size)로 메모리에 캐시한다 — `load_hidden_urls`는 화면을
+# 그릴 때마다, 그것도 보관함에서는 **회차마다** 불리므로 호출마다 파싱하면 그만큼 느려진다
+# (`app.run_index`가 회차 파일에 쓰는 것과 같은 방식).
+_archive_cache: dict = {"sig": None, "urls": frozenset()}
+
+
+def _archive_urls() -> frozenset:
+    """보관 파일에 든 URL 집합. 읽지 못하면 경고만 남기고 빈 집합을 돌려준다."""
+    path = _archive_file()
+    try:
+        stat = path.stat()
+    except OSError:
+        _archive_cache["sig"], _archive_cache["urls"] = None, frozenset()
+        return frozenset()
+    sig = (str(path), stat.st_mtime_ns, stat.st_size)
+    if _archive_cache["sig"] == sig:
+        return _archive_cache["urls"]
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        urls = frozenset(raw) if isinstance(raw, dict) else frozenset()
+    except (OSError, json.JSONDecodeError):
+        # 읽기 실패는 "숨김이 풀린다"는 틀린 방향이라 조용히 넘기지 않는다.
+        logger.warning("숨김 보관 파일을 읽지 못했습니다 — 그 기록들의 숨김이 이번 화면에서 풀립니다: %s", path)
+        urls = frozenset()
+    _archive_cache["sig"], _archive_cache["urls"] = sig, urls
+    return urls
+
+
+def _load_archive() -> dict:
+    """보관 파일 전체(`{url: "YYYY-MM-DD"}`) — 쓰기 전에 읽을 때만 쓴다."""
+    path = _archive_file()
+    if not path.exists():
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _write_archive(mapping: dict) -> None:
+    atomic_write_text(_archive_file(), json.dumps(mapping, ensure_ascii=False, indent=2))
+    _archive_cache["sig"] = None  # 다음 조회가 다시 읽게 한다
+
+
+def _sweep_locked(now: Optional[datetime] = None) -> Tuple[int, int]:
+    """열람 창을 벗어난 최근 기록을 보관 파일로 옮기고, 회차 보관 기간이 지난 보관 기록을 버린다.
+
+    **`_hidden_lock`을 쥔 채로만 부른다.** 돌려주는 값은 (옮긴 수, 버린 수).
+
+    옮길 기준은 `active_hidden_dates()`와 **같은 헬퍼**(`_recent_days(HIDDEN_VIEW_DAYS)`)다 —
+    화면이 "되살릴 수 있는 줄"을 가르는 창과 파일이 갈리는 지점이 어긋나면, 휴지통에
+    보이는데 복구가 아무 일도 안 하는 줄이 생긴다.
+
+    보관 기록은 **URL과 날짜만** 남긴다(언론사·제목·소제목은 버린다) — 그 값들은 휴지통
+    화면이 쓰는 표시용이고 휴지통은 열람 창(7일)만 보여주므로, 들고 가면 파일만 세 배로
+    커진다. 회차 파일이 사라지면(RETENTION_DAYS) 그 기사의 숨김도 가리킬 데가 없어 버린다.
+    """
+    recent = _read_recent_raw()
+    alive = _recent_days(HIDDEN_VIEW_DAYS, now)
+    keep = [r for r in recent if r.get("hidden_at", "")[:10] in alive]
+    aged = [r for r in recent if r.get("hidden_at", "")[:10] not in alive]
+    old_enough = _recent_days(RETENTION_DAYS, now)
+    archive = _load_archive()
+    before = len(archive)
+    for record in aged:
+        archive[record["url"]] = record.get("hidden_at", "")[:10]
+    pruned = {url: day for url, day in archive.items() if day in old_enough}
+    if aged:
+        _write_records(keep)
+    if aged or len(pruned) != before:
+        _write_archive(pruned)
+    return len(aged), before + len(aged) - len(pruned)
+
+
+def archive_aged_hidden(now: Optional[datetime] = None) -> Tuple[int, int]:
+    """보관 기간 정리 묶음이 부르는 바깥문 — `_sweep_locked`를 잠금 안에서 한 번 돌린다.
+
+    [추가: 2026-10-29] 숨기기·되살리기도 제 잠금 안에서 같은 정리를 먼저 돌리므로
+    (hide_articles 참고) 이 호출은 **며칠째 아무것도 숨기지 않은 경우**를 받는다 —
+    그때도 최근 기록 파일이 열람 창 밖 기록을 안고 있으면 안 된다.
+    """
+    with _hidden_lock:
+        return _sweep_locked(now)
+
+
+def load_hidden_urls(now: Optional[datetime] = None) -> set:
+    """숨김이 **지금 작동 중인** 기사의 URL 집합(filter_hidden의 빠른 포함 여부 확인용).
+
+    **숨김은 회차 파일과 같은 기간(RETENTION_DAYS, 1년) 작동한다** — 최근 기록 파일
+    전체 ∪ 보관 파일이다. 그래서 담당자가 뺀 기사는 그 회차가 보관함에 남아 있는 동안
+    계속 빠져 있고, **정기 보관함·엑셀이 그때 발송한 보고서와 어긋나지 않는다.**
+
+    [수정: 2026-10-29] 예전엔 이 함수가 HIDDEN_VIEW_DAYS(7일)만 봤다. 그래서 **8일째부터
+    숨겼던 기사가 그 회차에 다시 나타났다** — 마감 분류가 숨긴 기사를 입력에서 빼
+    (app.scraper.collect_run) 회차 파일에 기본값 "기타"가 찍혀 있으므로, 되살아난 기사는
+    대부분 「기타」 덩어리로 보였다(실측 2026-10-28: 숨김이 만료된 43일을 합쳐 보관함에
+    보이는 12,787건 중 6,884건(53%)이 「기타」, 살아 있는 날은 3~14%).
+
+    7일이라는 값은 수명 판단이 아니라 **저장 방식이 떠민 값**이었다 — app.undo가
+    hidden_articles.json을 통째로 스냅샷에 담아, 1년치(약 42,000건·13MB)면 되돌리기
+    스택이 수십~수백 MB가 되고 큐레이션 버튼을 누를 때마다 그걸 통째로 읽고 다시 쓴다
+    (실측 주석: 6MB에서 push 140ms). 그래서 **되돌릴 필요가 있는 기간(최근 7일)만 그
+    파일에 남기고, 그보다 오래된 기록은 스냅샷에 안 들어가는 보관 파일로 옮긴다**
+    (_sweep_locked) — 되돌리기 스택 크기는 예전 그대로이고 판정만 1년으로 늘어난다.
+
+    **열람·되살리기 창은 HIDDEN_VIEW_DAYS(7일) 그대로다**(load_hidden_records·
+    active_hidden_dates). 판정과 갈리지만 **방향이 안전한 쪽**이다 — 예전에 막으려던 것은
+    "휴지통에는 보이는데 복구는 안 되는 줄"이고, 지금 갈림은 그 반대(휴지통에 안 보이고
+    숨김은 유효)라 화면에 모순이 생기지 않는다.
+
+    **이미 지난 회차는 소급해서 고칠 수 없다** — 그 숨김 기록은 옛 7일 규칙대로 이미
+    지워졌다. 이 규칙은 오늘 이후 숨기는 기사부터 맞는다.
+    """
+    return {record["url"] for record in _read_recent_raw()} | set(_archive_urls())
 
 
 def active_hidden_dates(now: Optional[datetime] = None) -> set:
@@ -166,14 +288,19 @@ def hide_articles(items, now: Optional[datetime] = None) -> int:
     base = now or datetime.now()
     added = 0
     with _hidden_lock:
-        # [수정: 2026-09-04] 읽을 때 7일치를 통째로 들고 와 그대로 다시 쓴다 — 예전처럼
-        # 오늘 것만 읽어 쓰면, 오늘 첫 숨기기 한 번이 어제 이전 기록을 파일에서 통째로
-        # 지워 휴지통의 7일 열람이 성립하지 않는다(파일에 남는 기간 = 여기서 읽는 기간).
-        records = _load_records(now, HIDDEN_VIEW_DAYS)
+        # [추가: 2026-10-29] 먼저 열람 창 밖 기록을 보관 파일로 옮긴다 — 이 자리가
+        # **옛 규칙에서 기록이 사라지던 지점**이었다(날짜로 거른 목록을 그대로 다시 써서,
+        # 숨기기 한 번이 8일 넘은 기록을 파일에서 조용히 지웠다). 지금은 지우지 않고 옮기고,
+        # 숨김 판정은 두 파일을 함께 본다(load_hidden_urls).
+        _sweep_locked(now)
+        # 읽을 때 파일에 든 것을 **날짜로 거르지 않고** 통째로 들고 와 그대로 다시 쓴다 —
+        # 거르고 쓰면 거기서 빠진 기록이 파일에서 없어진다(위 사고).
+        records = _read_recent_raw()
         # [수정: 2026-09-16] 중복 검사가 읽어온 기록 **전체**를 본다. 3일 전 기록도 여전히
-        # 살아 있어(숨김 유지 기간 = 열람 기간) 오늘 날짜로 한 건 더 쌓으면 같은 기사가
-        # 휴지통에 두 줄로 보이고, 한 줄만 복구해도 안 돌아온다.
-        known = {record["url"] for record in records}
+        # 살아 있어 오늘 날짜로 한 건 더 쌓으면 같은 기사가 휴지통에 두 줄로 보이고, 한 줄만
+        # 복구해도 안 돌아온다. [수정: 2026-10-29] 보관 파일까지 함께 본다 — 거기 든 기사도
+        # 여전히 숨김이라, 안 보면 1년 안에 같은 기사가 다시 한 줄 쌓인다.
+        known = {record["url"] for record in records} | set(_archive_urls())
         for item in items:
             url = item.get("url")
             if not url or url in known:
@@ -209,11 +336,17 @@ def unhide_articles(urls, now: Optional[datetime] = None) -> int:
     if not targets:
         return 0
     with _hidden_lock:
-        records = _load_records(now, HIDDEN_VIEW_DAYS)
+        _sweep_locked(now)
+        records = _read_recent_raw()
         # [수정: 2026-09-16] 날짜를 안 가리고 그 URL의 기록을 지운다. 2026-09-04의
         # "오늘 기록만 지운다"는 자정에 숨김이 풀리던 시절의 규칙이었다 — 그때 지난 기록은
         # 이미 효력이 없어 지울 이유가 없었고(지우면 "그저께 뭘 뺐더라"만 잃었다), 지금은
         # 그 기록이 곧 그 기사를 숨기고 있는 당사자라 안 지우면 복구가 아무 일도 안 한다.
+        #
+        # **보관 파일은 건드리지 않는다** — 되살리기 창은 HIDDEN_VIEW_DAYS(7일)이고
+        # 거기 든 기록은 이미 그 창을 벗어났다. 화면도 그 줄을 잠근 채 이유를 띄운다
+        # (active_hidden_dates·app.settings_server.render_hidden_page). 여기서 같이 지우면
+        # 화면이 막아 둔 동작이 주소로는 되는 상태가 된다.
         kept = [record for record in records if record["url"] not in targets]
         removed = len(records) - len(kept)
         if removed:

@@ -480,10 +480,11 @@ def test_empty_round_keeps_previous_screen():
 def test_hidden_articles_newest_first():
     """숨긴 기사 관리 화면에서 가장 최근에 숨긴 기사가 맨 위에 오는지 확인한다.
 
-    [수정: 2026-09-16] **숨김은 자정이 아니라 HIDDEN_VIEW_DAYS(7일) 뒤에 풀린다** —
-    휴지통에 보이는 동안은 판정도 살아 있어야 "보이는데 못 되살리는 줄"이 안 생긴다
-    (그 전엔 필터만 오늘 하루였다). 옛 형식(URL 문자열 목록)은 언제 숨겼는지 알 수 없어
-    그냥 버려지는 것도 함께 확인한다(마이그레이션하지 않음).
+    [수정: 2026-10-29] **숨김은 풀리지 않는다 — 회차 파일과 같은 1년이다.** 열람·되살리기
+    창만 HIDDEN_VIEW_DAYS(7일)이고, 그 창을 벗어난 기록은 지워지지 않고 보관 파일
+    (`hidden_archive.json`)로 옮겨져 판정에 계속 쓰인다. 예전엔 판정도 7일이라 8일째부터
+    숨겼던 기사가 그 회차에 다시 나타났다. 옛 형식(URL 문자열 목록)은 언제 숨겼는지 알 수
+    없어 그냥 버려지는 것도 함께 확인한다(마이그레이션하지 않음).
     """
     _require_isolation()
     with tempfile.TemporaryDirectory() as tmp:
@@ -509,10 +510,48 @@ def test_hidden_articles_newest_first():
             assert curation.active_hidden_dates(now=tomorrow) >= {
                 tomorrow.strftime("%Y-%m-%d"), datetime.now().strftime("%Y-%m-%d")
             }, "화면이 '되살릴 수 있는 줄'을 가르는 기준은 판정과 같은 창이어야 한다"
-            # HIDDEN_VIEW_DAYS(7일)를 넘기면 판정·열람 양쪽에서 함께 빠진다(그 기사는 다시 보인다).
+            # [수정: 2026-10-29] HIDDEN_VIEW_DAYS(7일)를 넘기면 **열람·되살리기에서만**
+            # 빠지고 **숨김은 그대로 작동한다** — 예전엔 판정도 함께 빠져 8일째부터 그 기사가
+            # 보관함에 다시 나타났다(그때 「기타」로 묶여 보였다).
             next_week = datetime.now() + timedelta(days=curation.HIDDEN_VIEW_DAYS)
-            assert curation.load_hidden_records(now=next_week) == []
-            assert curation.load_hidden_urls(now=next_week) == set()
+            assert curation.load_hidden_records(now=next_week) == [], "열람 창은 7일 그대로"
+            assert curation.load_hidden_urls(now=next_week) == {"https://c.com/3", "https://a.com/1"}, \
+                "열람 창을 넘겨도 숨김은 유지돼야 한다 — 보관함이 그때 발송한 보고서와 어긋나지 않게"
+
+            # 그 상태에서 무엇이든 숨기면(또는 보관 기간 정리가 돌면) 창 밖 기록은 **지워지지
+            # 않고** 보관 파일로 옮겨진다 — 옛 규칙에서 기록이 사라지던 바로 그 자리다.
+            moved, dropped = curation.archive_aged_hidden(now=next_week)
+            assert (moved, dropped) == (2, 0), f"두 건이 보관 파일로 옮겨져야 한다 — {moved}, {dropped}"
+            assert curation._read_recent_raw() == [], "최근 파일에는 창 안 기록만 남는다"
+            assert set(curation._load_archive()) == {"https://c.com/3", "https://a.com/1"}
+            assert curation.load_hidden_urls(now=next_week) == {"https://c.com/3", "https://a.com/1"}, \
+                "옮긴 뒤에도 판정은 같아야 한다(두 파일을 함께 본다)"
+            archive_path = curation._archive_file()
+            assert archive_path.parent == hidden_file.parent and archive_path.name == "hidden_archive.json", \
+                "보관 파일은 최근 기록 파일에서 파생돼 테스트 격리가 한 번의 patch로 끝나야 한다"
+
+            # 창을 벗어난 기록은 **되살릴 수 없다** — 화면이 그 줄을 잠근 채 이유를 띄우는데
+            # (active_hidden_dates) 여기서 지워주면 주소로는 되는 상태가 된다.
+            assert curation.unhide_articles(["https://a.com/1"], now=next_week) == 0
+            assert "https://a.com/1" in curation.load_hidden_urls(now=next_week)
+            # 보관된 기사를 또 숨겨도 줄이 늘지 않는다(중복 검사가 보관 파일까지 본다).
+            curation.hide_article("https://a.com/1", now=next_week)
+            assert curation._read_recent_raw() == []
+            # 회차 보관 기간(RETENTION_DAYS)이 지나면 보관 기록도 버린다 — 그 회차 파일이
+            # 이미 사라져 가리킬 데가 없다.
+            far = datetime.now() + timedelta(days=curation.RETENTION_DAYS + 30)
+            moved, dropped = curation.archive_aged_hidden(now=far)
+            assert (moved, dropped) == (0, 2), f"1년 넘은 보관 기록은 버린다 — {moved}, {dropped}"
+            assert curation.load_hidden_urls(now=far) == set()
+
+            # 뒤 단계가 깨끗한 상태에서 이어지게 되돌려 놓는다.
+            archive_path.unlink(missing_ok=True)
+            curation._archive_cache["sig"] = None
+            hidden_file.write_text(json.dumps([]), encoding="utf-8")
+            curation.hide_article("https://a.com/1")  # 처음과 같은 순서(a가 먼저, c가 최신)
+            curation.hide_article("https://c.com/3")
+            assert [r["url"] for r in curation.load_hidden_records()] == \
+                ["https://c.com/3", "https://a.com/1"]
 
             # 이미 숨긴 기사를 다음 날 또 숨겨도 기록이 두 줄로 늘지 않는다 — 한 줄만
             # 복구해도 안 돌아오는 "유령 기록"이 생기면 안 된다.
@@ -554,7 +593,7 @@ def test_hidden_articles_newest_first():
             assert records["https://g.com/1"]["outlet"] == "한겨레" and records["https://g.com/2"]["title"] == "제목2"
             assert records["https://g.com/2"]["outlet"] == "경향신문", "빠진 값은 서버 폴백으로 채운다"
             assert records["https://g.com/1"]["hidden_at"] < records["https://g.com/2"]["hidden_at"], "보낸 순서대로 시각이 벌어져야 한다"
-    print("11) 숨긴 기사 정렬 + 7일 유지: 통과 (최근 숨긴 순, 옛 형식은 폐기, 7일 동안 숨김·복구 유지, 8일째 해제, 여러 건 한 요청)")
+    print("11) 숨긴 기사 — 열람 7일 · 숨김 1년: 통과 (최근 숨긴 순, 옛 형식은 폐기, 창 밖은 보관 파일로 옮겨 숨김 유지·되살리기만 막힘, 1년 뒤 버림, 여러 건 한 요청)")
 
 
 def test_breaking_alert_scoop_detection():
