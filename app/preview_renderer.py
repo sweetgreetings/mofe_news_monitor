@@ -62,6 +62,7 @@ from app.curation import (
     load_group_labels,
     load_group_overrides,
     move_article,
+    reorder_article,
     set_group_override,
 )
 from app.custom_groups import add_custom_group, load_custom_groups, remove_custom_group
@@ -90,6 +91,8 @@ from app.icons import icon
 from app.manual_articles import load_manual_articles
 from app.naver_api import incremental_search_after, kst_today_at, search_articles_by_groups
 from app.renderer import (
+    drag_order_script,
+    drag_order_style,
     AI_SUMMARY_HEADING,
     build_export_rows,
     export_links_style,
@@ -303,6 +306,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 {scroll_top_style}
 {refresh_link_style}
 {hide_batch_style}
+{drag_order_style}
 {name_picker_style}
   .toc-toggle-btn {{
     position: fixed; right: 20px; bottom: 20px; width: var(--fab-sm); height: var(--fab-sm); border-radius: var(--r-circle);
@@ -1141,6 +1145,7 @@ document.addEventListener("keydown", function (e) {{ if (e.key === "Escape") clo
 {scroll_top_script}
 {refresh_link_script}
 {hide_batch_script}
+{drag_order_script}
 {undo_fab_script}
 {photo_override_script}
 {schedule_override_script}
@@ -2237,6 +2242,29 @@ function removeCustomGroup(btn) {{
 // 2번(이동 계산 1번 + reload로 다시 그리기 1번) 돌았다. 이제 서버가 이동 계산에 쓴
 // 결과를 그대로 화면 조각(JSON)으로 돌려주고, 여기서 DOM만 갈아끼운다 — 검색은
 // 이동 계산 1번으로 끝난다(그마저도 app.preview_cache 덕에 증분 검색이라 가볍다).
+// 서버가 돌려준 화면 조각을 꽂는다 — ↑/↓(previewMoveArticle)와 손잡이 드래그
+// (app.renderer의 _postDragOrder)가 **같이 쓴다**. 한쪽만 고치면 ↑↓로 옮겼을 때와
+// 끌어 옮겼을 때 화면이 달라진다.
+function _applyPreviewContent(data, url) {{
+  document.getElementById("preview-body").innerHTML = data.body;
+  document.getElementById("preview-actions").innerHTML = data.actions_html;
+  document.getElementById("preview-hint").innerHTML = data.hint;
+  PLAIN_TEXT = data.plain_text;
+  // [추가: 2026-08-20] 이동 한 번마다 분류가 다시 계산되므로(app.preview_renderer.
+  // _compute_preview_content), 복사·다운로드 확인창이 이동 직후에도 최신 폴백 상태를
+  // 보도록 같이 갱신한다. actions_html도 새로 갈아끼워졌으니 재분류 버튼의
+  // data-degraded도 이미 최신이다.
+  CLASSIFY_DEGRADED = data.classify_degraded;
+  CLASSIFY_DEGRADED_NAMES = data.classify_degraded_names;
+  // [추가: 2026-08-04] #preview-body를 통째로 갈아끼웠으니 시간순/언론사순 보기가
+  // 기억해둔 기사 노드 위치(_FLAT_VIEW_HOMES)는 전부 무효 — 다시 캡처하게 비운다.
+  _FLAT_VIEW_HOMES = null;
+  renderRelativeTimes();
+  // [추가: 2026-08-05] 이 함수는 새로고침 없이 DOM만 바로 갈아끼우므로, 다른 이동
+  // 함수처럼 sessionStorage를 거칠 필요 없이 방금 옮긴 기사를 바로 표시할 수 있다.
+  var movedEl = document.querySelector('.article[data-url="' + CSS.escape(url) + '"]');
+  if (movedEl) {{ movedEl.classList.add("just-moved"); }}
+}}
 function previewMoveArticle(btn) {{
   var url = btn.dataset.url;
   var direction = btn.dataset.direction;
@@ -2250,24 +2278,7 @@ function previewMoveArticle(btn) {{
     return res.json();
   }}).then(function(data) {{
     if (!data) return;
-    document.getElementById("preview-body").innerHTML = data.body;
-    document.getElementById("preview-actions").innerHTML = data.actions_html;
-    document.getElementById("preview-hint").innerHTML = data.hint;
-    PLAIN_TEXT = data.plain_text;
-    // [추가: 2026-08-20] 이동 한 번마다 분류가 다시 계산되므로(app.preview_renderer.
-    // _compute_preview_content), 복사·다운로드 확인창이 이동 직후에도 최신 폴백 상태를
-    // 보도록 같이 갱신한다. actions_html도 새로 갈아끼워졌으니 재분류 버튼의
-    // data-degraded도 이미 최신이다.
-    CLASSIFY_DEGRADED = data.classify_degraded;
-    CLASSIFY_DEGRADED_NAMES = data.classify_degraded_names;
-    // [추가: 2026-08-04] #preview-body를 통째로 갈아끼웠으니 시간순/언론사순 보기가
-    // 기억해둔 기사 노드 위치(_FLAT_VIEW_HOMES)는 전부 무효 — 다시 캡처하게 비운다.
-    _FLAT_VIEW_HOMES = null;
-    renderRelativeTimes();
-    // [추가: 2026-08-05] 이 함수는 새로고침 없이 DOM만 바로 갈아끼우므로, 다른 이동
-    // 함수처럼 sessionStorage를 거칠 필요 없이 방금 옮긴 기사를 바로 표시할 수 있다.
-    var movedEl = document.querySelector('.article[data-url="' + CSS.escape(url) + '"]');
-    if (movedEl) {{ movedEl.classList.add("just-moved"); }}
+    _applyPreviewContent(data, url);
   }}).catch(function() {{
     alert("소제목 이동에 실패했습니다 — 앱이 실행 중인지 확인해주세요.");
   }});
@@ -2636,6 +2647,8 @@ def _theme() -> dict:
         "refresh_link_script": refresh_link_script(),
         "hide_batch_style": hide_batch_style(),
         "hide_batch_script": hide_batch_script(),
+        "drag_order_style": drag_order_style(),
+        "drag_order_script": drag_order_script("preview"),
         "undo_fab_script": undo_fab_script(),
         "photo_override_script": photo_override_script(),
         "schedule_override_script": schedule_override_script(),
@@ -3006,6 +3019,9 @@ def _render_preview_groups(
                     },
                     move_handler="previewMoveArticle",
                     checkbox=True,
+                    # 손잡이도 ↑↓와 같은 자리에서 갈린다 — 📂 미분류는 배정 전 임시 칸이라
+                    # 순서를 맞출 일이 없어 손잡이를 안 단다.
+                    drag_handle=group["name"] != UNCLASSIFIED_GROUP_NAME,
                     group_select_html=group_select,
                     outlet_rank=rank_by_url.get(a["url"], 0),
                     show_label_control=True,
@@ -3977,6 +3993,16 @@ def preview_move_article(url: str, direction: str) -> Optional[dict]:
         save_preview_order([a["url"] for a in new_articles])
         final_articles = new_articles
 
+    return _rebuild_preview(settings, slot, keywords, final_articles)
+
+
+def _rebuild_preview(settings: dict, slot: dict, keywords: list, final_articles: list) -> dict:
+    """옮기고 난 뒤 화면 조각을 만들고 preview.html도 다시 써 둔다.
+
+    preview_move_article(↑/↓)과 preview_reorder_article(드래그)이 같이 쓴다 — 둘은
+    "어떻게 옮기나"만 다르고 그 뒤는 글자 하나까지 같아야 한다(한쪽만 고치면 ↑/↓로
+    옮겼을 때와 끌어 옮겼을 때 화면이 달라진다).
+    """
     highlight_words = settings.get("highlight_keywords", [])
     line_template = settings.get("article_line_template", DEFAULT_ARTICLE_LINE_TEMPLATE)
     subheading_format = settings.get("subheading_format_template", DEFAULT_SUBHEADING_FORMAT_TEMPLATE)
@@ -4010,6 +4036,42 @@ def preview_move_article(url: str, direction: str) -> Optional[dict]:
     )
     atomic_write_text(PREVIEW_HTML_PATH, full_html)
     return content
+
+
+def preview_reorder_article(url: str, target_url: str, place: str) -> Optional[dict]:
+    """초안의 손잡이 드래그가 호출한다(app.settings_server._handle_preview_reorder_article).
+
+    preview_move_article과 같은 길이고 다른 건 "어떻게 옮기나" 하나 —
+    app.curation.reorder_article이 target_url의 앞/뒤로 바로 꽂아 준다. 소제목을
+    넘는 이동이 없으므로 set_group_override를 쓸 일도 없고, 저장할 곳은
+    preview_order.json 하나다.
+
+    더 옮길 곳이 없거나(자리가 그대로) 검색 실패로 계산 자체를 못했으면 None —
+    호출하는 쪽이 204만 응답한다.
+    """
+    settings = load_settings()
+    slot = next_pending_slot(datetime.now(), active_schedule_times(settings))
+    if slot is None:
+        return None
+    try:
+        articles = _compute_preview_articles(settings, slot)
+    except requests.exceptions.RequestException:
+        return None
+    keywords = all_search_keywords(settings)
+    new_articles = reorder_article(
+        articles,
+        keywords,
+        url,
+        target_url,
+        place,
+        load_group_overrides(),
+        round_id=round_id_for_slot(slot),
+    )
+    if new_articles is articles:
+        return None
+    undo_push("기사 순서 변경", touched=[url])
+    save_preview_order([a["url"] for a in new_articles])
+    return _rebuild_preview(settings, slot, keywords, new_articles)
 
 
 def preview_bulk_move_articles(urls: list, direction: str) -> bool:

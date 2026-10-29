@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>소제목 안에서만 기사 드래그 — 시안</title>
+<style>
+:root {--fs-2xs: 0.66rem; --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+  --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%;
+  --h-sm: 24px; --h-tb: 28px; --h-md: 30px; --h-lg: 36px; --chk-md: 16px; --chk-sm: 14px;
+  --sh-float: 0 4px 12px rgba(15, 23, 42, 0.12); --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14);}
+
+body {margin: 0; background: #F8FAFC; color: #1F2937; font-family: 'Pretendard', 'Noto Sans KR', sans-serif;}
+.container {max-width: 800px; margin: 24px auto; padding: 44px 24px 56px; background: #FFFFFF;
+  border: 1px solid #E5E7EB; border-radius: var(--r-lg);}
+h1 {font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 6px;}
+.lead {font-size: var(--fs-md); color: #6B7280; margin: 0 0 4px; line-height: 1.7;}
+.note {font-size: var(--fs-sm); color: #6B7280; background: #F8FAFC; border: 1px solid #E5E7EB;
+  border-radius: var(--r-lg); padding: 10px 12px; margin: 14px 0 0; line-height: 1.7;}
+.note b {color: #1F2937;}
+.secttl {font-size: var(--fs-lg); color: #1E3A5F; margin: 34px 0 4px; padding-top: 18px; border-top: 2px solid #E5E7EB;}
+.secsub {font-size: var(--fs-sm); color: #6B7280; margin: 0 0 10px; line-height: 1.7;}
+
+/* ───── 아래는 지금 확정본 화면(index.html)의 값 그대로 ───── */
+.ic {width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round;
+  stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0;}
+.subheading {margin-top: 20px;}
+.subheading h2 {display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  font-size: var(--fs-lg); color: #1E3A5F; border-bottom: 1px solid #E5E7EB; margin: 0 0 6px; padding-bottom: 6px;}
+.subheading-title {display: flex; align-items: center; gap: 4px; min-width: 0;}
+.subheading-count {margin-left: 6px; font-size: var(--fs-sm); font-weight: 700; color: #6B7280;
+  background: #F3F4F6; border-radius: var(--r-pill); padding: 1px 8px;}
+.subheading-icons {display: flex; align-items: center; gap: 2px; flex-shrink: 0;}
+.rename-btn {background: transparent; border: none; color: #6B7280; font-size: 0.9rem; cursor: pointer;}
+.order-btn {background: transparent; border: none; color: #6B7280; font-size: 0.9rem; cursor: pointer; padding: 2px 6px;}
+.article {margin: 6px 0; line-height: 1.5; padding: 4px 8px; border-radius: var(--r-md);}
+.article:hover {background: #F3F4F6;}
+.article summary {cursor: pointer; display: flex; flex-direction: column; gap: 2px; list-style: none;}
+.article summary::-webkit-details-marker {display: none;}
+.title-row {display: flex; align-items: baseline; justify-content: flex-start; gap: 8px;}
+.article-select {width: var(--chk-md); height: var(--chk-md); margin: 3px 3px 0 4px; accent-color: #2563EB;
+  cursor: pointer; flex-shrink: 0; position: relative; top: 2px;}
+.title-line {min-width: 0; overflow-wrap: anywhere; color: #1F2937;}
+.title-outlet {color: #6B7280; font-size: 0.86em; font-weight: 500; margin-right: 0.5em;}
+.action-row {display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 4px;}
+.article:has(.article-select) .action-row {padding-left: 31px;}
+.pub-time {flex-shrink: 0; color: #6B7280; font-size: var(--fs-sm); white-space: nowrap;}
+.time-sep {color: #6B7280; font-size: var(--fs-sm); margin: 0 2px;}
+.origin-link-text {flex-shrink: 0; color: #2563EB; font-size: var(--fs-sm); text-decoration: none;
+  display: inline-flex; align-items: center; gap: 2px; white-space: nowrap;}
+.origin-link-icon {width: 0.75em; height: 0.75em;}
+.kw-inline {font-size: var(--fs-sm); color: #6B7280; display: inline-flex; align-items: center; gap: 4px;
+  flex: 1 1 0; min-width: 5em; max-width: max-content;}
+.kw-inline > .time-sep {margin-right: 6px;}
+.kw-inline .kw-ic {width: 0.75em; height: 0.75em; color: #9CA3AF; flex-shrink: 0;}
+.kw-inline .kw-v {color: #4B5563; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
+.article-actions {margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: 4px; flex-shrink: 0;}
+.group-move-select {flex-shrink: 0; width: 100px; height: var(--h-sm); box-sizing: border-box;
+  border: 1px solid #E5E7EB; border-radius: var(--r-sm); padding: 0 4px; font-size: var(--fs-sm);
+  color: #6B7280; background: #FFFFFF;}
+.lab-btn, .more-btn {background: transparent; border: none; color: #6B7280; font-size: 1rem; line-height: 1;
+  cursor: pointer; padding: 3px 6px; border-radius: var(--r-sm); display: inline-flex; align-items: center;}
+.lab-btn:hover, .more-btn:hover {background: #EFF6FF; color: #2563EB;}
+.move-btn, .hide-btn {flex-shrink: 0; background: transparent; border: none; color: #6B7280; font-size: 1rem;
+  cursor: pointer; padding: 2px 6px;}
+.move-btn:disabled {color: #E5E7EB; cursor: not-allowed;}
+.hide-btn:hover {color: #DC2626;}
+.article-summary {margin: 6px 0 4px 20px; color: #1F2937; font-size: var(--fs-md);}
+.article:has(details[open]) .title-line {opacity: 0.62;}
+
+/* ───── 여기부터가 새로 더하는 것 ───── */
+
+/* 손잡이 — 체크박스 왼쪽. 커서는 grab(손), 끄는 동안 grabbing(주먹). */
+.drag-handle {flex-shrink: 0; width: 16px; height: 18px; padding: 0; margin: 2px 0 0; border: none;
+  background: transparent; color: #9CA3AF; cursor: grab; display: inline-flex; align-items: center;
+  justify-content: center; position: relative; top: 2px;}
+.drag-handle .ic {width: 1rem; height: 1rem;}
+.drag-handle:hover {color: #6B7280;}
+.drag-handle:active {cursor: grabbing;}
+body.is-dragging, body.is-dragging * {cursor: grabbing !important;}
+
+/* A안 — 손잡이가 늘 보인다. 아랫줄 들여쓰기가 31 → 55px로 밀린다. */
+.variant-a .article:has(.article-select) .action-row {padding-left: 55px;}
+
+/* B안 — 레이아웃을 한 칸도 안 건드린다. 손잡이는 왼쪽 여백에 떠 있고 마우스를 올린 줄에만 보인다. */
+.variant-b .article {position: relative;}
+.variant-b .drag-handle {position: absolute; left: -14px; top: 6px; margin: 0; opacity: 0; transition: opacity .12s;}
+.variant-b .article:hover .drag-handle, .variant-b .drag-handle:focus-visible {opacity: 1;}
+
+/* 끌고 있는 줄 — 들린 것처럼 보이고 원래 자리는 비워 둔다. */
+.article.is-grabbed {opacity: .45;}
+.article.drag-ghost {background: #FFFFFF; box-shadow: var(--sh-float); border: 1px solid #E5E7EB;}
+
+/* 놓일 자리 — 파랑 2px 선. 파랑은 이 앱에서 「담당자의 동작」 색이다. */
+.drop-line {height: 0; border-top: 2px solid #2563EB; margin: 2px 0; border-radius: 2px;}
+
+/* 소제목 밖은 놓을 자리가 아니다 — 다른 소제목 칸에 들어가면 그 칸이 금지 표시를 받는다. */
+.subheading.is-nodrop {background: #FEF2F2; border-radius: var(--r-md); outline: 1px dashed #FCA5A5; outline-offset: 2px;}
+body.is-dragging .subheading.is-nodrop, body.is-dragging .subheading.is-nodrop * {cursor: no-drop !important;}
+
+/* 잠긴 상태 — 「보기 순서」가 기본값이 아닐 때, 모아 보는 중일 때. */
+.locked .drag-handle {color: #E5E7EB; cursor: not-allowed;}
+.locked .drag-handle:hover {color: #E5E7EB;}
+
+.toolbar {display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 10px;}
+.toolbar select {height: var(--h-tb); box-sizing: border-box; border: 1px solid #E5E7EB;
+  border-radius: var(--r-md); padding: 0 9px; font-size: var(--fs-md); color: #6B7280; background: #FFFFFF;}
+.exp {font-size: var(--fs-md); color: #6B7280; font-weight: 500; text-decoration: none; padding: 0 8px;}
+.gather-pill {font-size: var(--fs-sm); border-radius: var(--r-pill); padding: 3px 10px; border: 1px solid #E5E7EB;
+  background: #FFFFFF; color: #6B7280; cursor: pointer;}
+.gather-pill.on {background: #2563EB; border-color: #2563EB; color: #FFFFFF;}
+.tipline {font-size: var(--fs-sm); color: #8A5A14; background: #FBF0DA; border: 1px solid #F0D9A8;
+  border-radius: var(--r-md); padding: 7px 10px; margin: 0 0 10px; line-height: 1.6;}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>소제목 안에서만 기사 드래그 — 시안</h1>
+<p class="lead">아래 목록은 <b>정말 끌립니다</b> — 손잡이를 잡아 끌어 보세요. 커서가 손(grab) → 주먹(grabbing)으로 바뀌고,
+놓을 자리에 파란 선이 섭니다. <b>소제목 밖으로는 안 넘어갑니다.</b></p>
+<div class="note">
+<b>손잡이를 따로 두는 이유</b> — 제목 줄을 누르면 기사 요약이 펼쳐지는 자리라, 줄 전체를 끌 수 있게 만들면
+펼치기와 드래그가 서로 먹습니다. 그래서 잡는 자리를 하나 만들고 커서로 그 자리를 알립니다.<br>
+<b>↑↓는 그대로 남깁니다</b> — 드래그는 터치(폰)에서 안 되고, 아래 「잠긴 상태」에서도 ↑↓는 돌아야 합니다.
+</div>
+
+<!-- ───────────── A안 ───────────── -->
+<h2 class="secttl">A안 — 손잡이가 늘 보인다</h2>
+<p class="secsub">체크박스 왼쪽에 흐린 손잡이가 상시로 섭니다. 찾기 쉽지만 <b>아랫줄 들여쓰기가 31 → 55px로 밀립니다</b>(시각·원문보기 줄이 오른쪽으로 더 들어갑니다).</p>
+
+<div class="variant-a" data-drag-root>
+  <div class="subheading" data-group>
+    <h2><span class="subheading-title">&lt;가상자산 과세 유예 논의&gt;<span class="subheading-count">3</span></span>
+      <span class="subheading-icons">
+        <button class="rename-btn" type="button" title="소제목별 복사"><svg class="ic" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg></button>
+        <button class="rename-btn" type="button" title="이름 바꾸기"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+        <button class="order-btn" type="button" title="위로">▲</button>
+        <button class="order-btn" type="button" title="아래로">▼</button>
+      </span></h2>
+
+    <div class="article" data-row>
+      <details><summary>
+        <div class="title-row">
+          <button class="drag-handle" type="button" title="끌어서 이 소제목 안 순서 바꾸기" data-handle><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg></button>
+          <input type="checkbox" class="article-select" onclick="event.stopPropagation();">
+          <span class="title-line"><span class="title-outlet">연합뉴스</span><span>가상자산 과세 2년 유예, 당정 협의 착수</span></span>
+        </div>
+        <div class="action-row">
+          <span class="pub-time">15:37 · 24분 전</span><span class="time-sep">·</span>
+          <a class="origin-link-text" href="#" onclick="return false;">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="kw-inline"><span class="time-sep">·</span><svg class="ic kw-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">가상자산 과세</span></span>
+          <span class="article-actions">
+            <select class="group-move-select" onclick="event.stopPropagation();"><option selected disabled>다른 소제목</option></select>
+            <button class="lab-btn" type="button" title="라벨" onclick="event.stopPropagation();"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button>
+            <button class="more-btn" type="button" title="더보기" onclick="event.stopPropagation();"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button class="hide-btn" type="button" title="숨기기" onclick="event.stopPropagation();"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+            <button class="move-btn" type="button" disabled title="위로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20V4"/><path d="m4 12 8-8 8 8"/></svg></button>
+            <button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="m20 12-8 8-8-8"/></svg></button>
+          </span>
+        </div>
+      </summary>
+      <p class="article-summary">당정은 가상자산 과세 시행을 2년 미루는 방안을 두고 협의에 들어갔다. 재정경제부는 과세 인프라 준비 상황을 보고했다.</p></details>
+    </div>
+
+    <div class="article" data-row>
+      <details><summary>
+        <div class="title-row">
+          <button class="drag-handle" type="button" title="끌어서 이 소제목 안 순서 바꾸기" data-handle><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg></button>
+          <input type="checkbox" class="article-select" onclick="event.stopPropagation();">
+          <span class="title-line"><span class="title-outlet">파이낸셜뉴스</span><span>이훈기 "정부안으론 주가누르기 못 막아"…재경부 "대안 검토"</span></span>
+        </div>
+        <div class="action-row">
+          <span class="pub-time">15:12 · 49분 전</span><span class="time-sep">·</span>
+          <a class="origin-link-text" href="#" onclick="return false;">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="kw-inline"><span class="time-sep">·</span><svg class="ic kw-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">재정경제부, 재경부</span></span>
+          <span class="article-actions">
+            <select class="group-move-select" onclick="event.stopPropagation();"><option selected disabled>다른 소제목</option></select>
+            <button class="lab-btn" type="button" title="라벨" onclick="event.stopPropagation();"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button>
+            <button class="more-btn" type="button" title="더보기" onclick="event.stopPropagation();"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button class="hide-btn" type="button" title="숨기기" onclick="event.stopPropagation();"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+            <button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20V4"/><path d="m4 12 8-8 8 8"/></svg></button>
+            <button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="m20 12-8 8-8-8"/></svg></button>
+          </span>
+        </div>
+      </summary>
+      <p class="article-summary">재정경제부 관계자는 "정부안과 의원안은 적정 가격으로 평가해 과세하자는 기본 취지가 동일하다"고 말했다.</p></details>
+    </div>
+
+    <div class="article" data-row>
+      <details><summary>
+        <div class="title-row">
+          <button class="drag-handle" type="button" title="끌어서 이 소제목 안 순서 바꾸기" data-handle><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg></button>
+          <input type="checkbox" class="article-select" onclick="event.stopPropagation();">
+          <span class="title-line"><span class="title-outlet">머니투데이</span><span>가상자산 과세 인프라 "내년 상반기 완비" 재경부 설명</span></span>
+        </div>
+        <div class="action-row">
+          <span class="pub-time">14:48 · 1시간 전</span><span class="time-sep">·</span>
+          <a class="origin-link-text" href="#" onclick="return false;">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="kw-inline"><span class="time-sep">·</span><svg class="ic kw-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="kw-v">가상자산 과세, 재경부</span></span>
+          <span class="article-actions">
+            <select class="group-move-select" onclick="event.stopPropagation();"><option selected disabled>다른 소제목</option></select>
+            <button class="lab-btn" type="button" title="라벨" onclick="event.stopPropagation();"><svg class="ic" viewBox="0 0 24 24"><path d="M20.6 12.7 12.7 20.6a2 2 0 0 1-2.8 0l-7.5-7.5a2 2 0 0 1-.6-1.4V4.3A2.3 2.3 0 0 1 4.1 2H11a2 2 0 0 1 1.4.6l8.2 8.2a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg></button>
+            <button class="more-btn" type="button" title="더보기" onclick="event.stopPropagation();"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
+            <button class="hide-btn" type="button" title="숨기기" onclick="event.stopPropagation();"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+            <button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20V4"/><path d="m4 12 8-8 8 8"/></svg></button>
+            <button class="move-btn" type="button" disabled title="아래로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="m20 12-8 8-8-8"/></svg></button>
+          </span>
+        </div>
+      </summary>
+      <p class="article-summary">재정경제부는 거래소 자료 제출 체계가 내년 상반기 안에 갖춰진다고 설명했다.</p></details>
+    </div>
+  </div>
+
+  <div class="subheading" data-group>
+    <h2><span class="subheading-title">&lt;공공기관 AI 혁신 성과대회&gt;<span class="subheading-count">2</span></span>
+      <span class="subheading-icons">
+        <button class="order-btn" type="button" title="위로">▲</button>
+        <button class="order-btn" type="button" title="아래로">▼</button>
+      </span></h2>
+
+    <div class="article" data-row>
+      <details><summary>
+        <div class="title-row">
+          <button class="drag-handle" type="button" title="끌어서 이 소제목 안 순서 바꾸기" data-handle><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg></button>
+          <input type="checkbox" class="article-select" onclick="event.stopPropagation();">
+          <span class="title-line"><span class="title-outlet">KBS</span><span>부총리 "공공기관 AI 도입, 올해가 분기점"</span></span>
+        </div>
+        <div class="action-row">
+          <span class="pub-time">13:20 · 2시간 전</span><span class="time-sep">·</span>
+          <a class="origin-link-text" href="#" onclick="return false;">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="article-actions">
+            <select class="group-move-select" onclick="event.stopPropagation();"><option selected disabled>다른 소제목</option></select>
+            <button class="hide-btn" type="button" title="숨기기" onclick="event.stopPropagation();"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+            <button class="move-btn" type="button" disabled title="위로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20V4"/><path d="m4 12 8-8 8 8"/></svg></button>
+            <button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="m20 12-8 8-8-8"/></svg></button>
+          </span>
+        </div>
+      </summary>
+      <p class="article-summary">부총리는 개회사에서 공공기관의 AI 도입 속도를 끌어올려야 한다고 말했다.</p></details>
+    </div>
+
+    <div class="article" data-row>
+      <details><summary>
+        <div class="title-row">
+          <button class="drag-handle" type="button" title="끌어서 이 소제목 안 순서 바꾸기" data-handle><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg></button>
+          <input type="checkbox" class="article-select" onclick="event.stopPropagation();">
+          <span class="title-line"><span class="title-outlet">서울경제</span><span>공공기관 AI 성과대회 수상 15곳 발표</span></span>
+        </div>
+        <div class="action-row">
+          <span class="pub-time">12:55 · 3시간 전</span><span class="time-sep">·</span>
+          <a class="origin-link-text" href="#" onclick="return false;">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="article-actions">
+            <select class="group-move-select" onclick="event.stopPropagation();"><option selected disabled>다른 소제목</option></select>
+            <button class="hide-btn" type="button" title="숨기기" onclick="event.stopPropagation();"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+            <button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20V4"/><path d="m4 12 8-8 8 8"/></svg></button>
+            <button class="move-btn" type="button" disabled title="아래로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="m20 12-8 8-8-8"/></svg></button>
+          </span>
+        </div>
+      </summary>
+      <p class="article-summary">성과대회에서 15개 기관이 수상했다.</p></details>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+<b>위 두 소제목 사이로 끌어 보세요</b> — 다른 소제목 칸에 들어가면 그 칸이 옅은 빨강 + 점선으로 바뀌고
+커서가 <code>no-drop</code>이 되며, 파란 선이 서지 않습니다. 놓아도 아무 일이 없습니다.
+소제목을 넘기는 일은 지금처럼 <b>「다른 소제목」 드롭다운</b>이 맡습니다.
+</div>
+
+<!-- ───────────── B안 ───────────── -->
+<h2 class="secttl">B안 — 마우스를 올린 줄에만 손잡이가 나온다</h2>
+<p class="secsub">손잡이가 왼쪽 여백에 떠 있어 <b>지금 화면 배치를 한 칸도 안 건드립니다</b>(들여쓰기 31px 그대로). 대신 처음 쓰는 사람은 손잡이가 있다는 걸 모를 수 있습니다.</p>
+
+<div class="variant-b" data-drag-root>
+  <div class="subheading" data-group>
+    <h2><span class="subheading-title">&lt;주가 조정 기준 세제 논의&gt;<span class="subheading-count">3</span></span>
+      <span class="subheading-icons">
+        <button class="order-btn" type="button" title="위로">▲</button>
+        <button class="order-btn" type="button" title="아래로">▼</button>
+      </span></h2>
+
+    <div class="article" data-row>
+      <details><summary>
+        <div class="title-row">
+          <button class="drag-handle" type="button" title="끌어서 이 소제목 안 순서 바꾸기" data-handle><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg></button>
+          <input type="checkbox" class="article-select" onclick="event.stopPropagation();">
+          <span class="title-line"><span class="title-outlet">조선일보</span><span>주가 조정 기준 두고 여야 이견…세제실 "추가 검토"</span></span>
+        </div>
+        <div class="action-row">
+          <span class="pub-time">15:40 · 21분 전</span><span class="time-sep">·</span>
+          <a class="origin-link-text" href="#" onclick="return false;">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="article-actions">
+            <select class="group-move-select" onclick="event.stopPropagation();"><option selected disabled>다른 소제목</option></select>
+            <button class="hide-btn" type="button" title="숨기기" onclick="event.stopPropagation();"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+            <button class="move-btn" type="button" disabled title="위로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20V4"/><path d="m4 12 8-8 8 8"/></svg></button>
+            <button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="m20 12-8 8-8-8"/></svg></button>
+          </span>
+        </div>
+      </summary>
+      <p class="article-summary">여야가 주가 조정 기준을 두고 이견을 보였다.</p></details>
+    </div>
+
+    <div class="article" data-row>
+      <details><summary>
+        <div class="title-row">
+          <button class="drag-handle" type="button" title="끌어서 이 소제목 안 순서 바꾸기" data-handle><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg></button>
+          <input type="checkbox" class="article-select" onclick="event.stopPropagation();">
+          <span class="title-line"><span class="title-outlet">한국경제</span><span>세제실장 "위헌 가능성까지 따져 설계했다"</span></span>
+        </div>
+        <div class="action-row">
+          <span class="pub-time">15:05 · 56분 전</span><span class="time-sep">·</span>
+          <a class="origin-link-text" href="#" onclick="return false;">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="article-actions">
+            <select class="group-move-select" onclick="event.stopPropagation();"><option selected disabled>다른 소제목</option></select>
+            <button class="hide-btn" type="button" title="숨기기" onclick="event.stopPropagation();"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+            <button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20V4"/><path d="m4 12 8-8 8 8"/></svg></button>
+            <button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="m20 12-8 8-8-8"/></svg></button>
+          </span>
+        </div>
+      </summary>
+      <p class="article-summary">세제실장은 법적 안정성과 위헌 가능성을 함께 검토했다고 밝혔다.</p></details>
+    </div>
+
+    <div class="article" data-row>
+      <details><summary>
+        <div class="title-row">
+          <button class="drag-handle" type="button" title="끌어서 이 소제목 안 순서 바꾸기" data-handle><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg></button>
+          <input type="checkbox" class="article-select" onclick="event.stopPropagation();">
+          <span class="title-line"><span class="title-outlet">이데일리</span><span>"주가누르기 못 막는다" 야당 의원 공개 반박</span></span>
+        </div>
+        <div class="action-row">
+          <span class="pub-time">14:30 · 1시간 전</span><span class="time-sep">·</span>
+          <a class="origin-link-text" href="#" onclick="return false;">원문보기<svg class="ic origin-link-icon" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a>
+          <span class="article-actions">
+            <select class="group-move-select" onclick="event.stopPropagation();"><option selected disabled>다른 소제목</option></select>
+            <button class="hide-btn" type="button" title="숨기기" onclick="event.stopPropagation();"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+            <button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20V4"/><path d="m4 12 8-8 8 8"/></svg></button>
+            <button class="move-btn" type="button" disabled title="아래로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="m20 12-8 8-8-8"/></svg></button>
+          </span>
+        </div>
+      </summary>
+      <p class="article-summary">야당 의원이 정부안으로는 주가 누르기를 막을 수 없다고 반박했다.</p></details>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────── 잠긴 상태 ───────────── -->
+<h2 class="secttl">잠기는 자리 둘</h2>
+<p class="secsub">끌어 놓은 자리를 「저장 순서의 몇 번째」로 옮겨야 할지 답이 없는 두 경우입니다. 손잡이만 흐려지고 <b>↑↓는 그대로 돕니다</b>.</p>
+
+<div class="toolbar">
+  <select><option>소제목 내 언론사순</option><option selected>최신순</option></select>
+  <a class="exp" href="#" onclick="return false;">복사</a>
+  <a class="exp" href="#" onclick="return false;">텍스트</a>
+  <a class="exp" href="#" onclick="return false;">엑셀</a>
+</div>
+<div class="tipline">⚠ 「보기 순서」가 기본값(소제목 내 언론사순)이 아닐 때는 끌 수 없습니다 — 최신순으로 보는 중에 옮기면 그 자리가 저장 순서의 어디인지 정할 수 없습니다.</div>
+
+<div class="variant-a">
+  <div class="subheading">
+    <h2><span class="subheading-title">&lt;가상자산 과세 유예 논의&gt;<span class="subheading-count">2</span></span></h2>
+    <div class="article locked">
+      <div class="title-row">
+        <button class="drag-handle" type="button" title="「보기 순서」를 「소제목 내 언론사순」으로 두면 끌 수 있어요"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg></button>
+        <input type="checkbox" class="article-select">
+        <span class="title-line"><span class="title-outlet">연합뉴스</span><span>가상자산 과세 2년 유예, 당정 협의 착수</span></span>
+      </div>
+      <div class="action-row">
+        <span class="pub-time">15:37 · 24분 전</span>
+        <span class="article-actions">
+          <button class="move-btn" type="button" disabled title="위로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20V4"/><path d="m4 12 8-8 8 8"/></svg></button>
+          <button class="move-btn" type="button" title="아래로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="m20 12-8 8-8-8"/></svg></button>
+        </span>
+      </div>
+    </div>
+    <div class="article locked">
+      <div class="title-row">
+        <button class="drag-handle" type="button" title="「보기 순서」를 「소제목 내 언론사순」으로 두면 끌 수 있어요"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg></button>
+        <input type="checkbox" class="article-select">
+        <span class="title-line"><span class="title-outlet">머니투데이</span><span>가상자산 과세 인프라 "내년 상반기 완비" 재경부 설명</span></span>
+      </div>
+      <div class="action-row">
+        <span class="pub-time">14:48 · 1시간 전</span>
+        <span class="article-actions">
+          <button class="move-btn" type="button" title="위로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20V4"/><path d="m4 12 8-8 8 8"/></svg></button>
+          <button class="move-btn" type="button" disabled title="아래로"><svg class="ic" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="m20 12-8 8-8-8"/></svg></button>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toolbar" style="margin-top:22px;">
+  <button class="gather-pill on" type="button">📷 사진 추정 (4)</button>
+  <select disabled><option>소제목 내 언론사순</option></select>
+</div>
+<div class="tipline">⚠ 사진·말머리를 모아 보는 동안에도 끌 수 없습니다 — 소제목이 다 풀린 한 목록이라 놓을 자리가 없습니다.</div>
+
+<div class="note" style="margin-top:28px;">
+<b>이 시안이 보여주지 않는 것</b> — 끌어 놓은 결과를 서버에 저장하는 일(새 입구 하나), 숨긴 기사가 목록 사이에 끼어 있을 때의 자리 계산,
+그리고 되돌리기 ↩. 셋 다 지금 <code>app/curation.py</code> <code>move_article</code>이 쓰는 방식을 그대로 씁니다.
+</div>
+
+</div>
+
+<script>
+// 시안 전용 — 소제목 안에서만 끌리는지 손으로 확인해 보는 용도.
+// 실제 구현에서는 놓는 순간 서버(POST)로 「이 기사를 N번째 자리로」를 보낸다.
+(function () {
+  var src = null, line = null;
+
+  function makeLine() {
+    var el = document.createElement('div');
+    el.className = 'drop-line';
+    return el;
+  }
+  function clearLine() {
+    if (line && line.parentNode) line.parentNode.removeChild(line);
+    line = null;
+  }
+  function clearNodrop() {
+    document.querySelectorAll('.subheading.is-nodrop').forEach(function (g) {
+      g.classList.remove('is-nodrop');
+    });
+  }
+
+  // 손잡이를 누른 순간에만 그 줄을 끌 수 있게 켠다 — 제목 줄을 누르면 요약이 펼쳐지는 자리라서.
+  document.addEventListener('mousedown', function (e) {
+    var h = e.target.closest('[data-handle]');
+    if (!h) return;
+    var row = h.closest('[data-row]');
+    if (!row || row.classList.contains('locked')) return;
+    row.setAttribute('draggable', 'true');
+  });
+  document.addEventListener('mouseup', function () {
+    document.querySelectorAll('[data-row][draggable]').forEach(function (r) {
+      r.removeAttribute('draggable');
+    });
+  });
+
+  document.addEventListener('dragstart', function (e) {
+    var row = e.target.closest('[data-row]');
+    if (!row || !row.getAttribute('draggable')) return;
+    src = row;
+    document.body.classList.add('is-dragging');
+    row.classList.add('is-grabbed');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', 'row');
+  });
+
+  document.addEventListener('dragover', function (e) {
+    if (!src) return;
+    var group = e.target.closest('[data-group]');
+    var srcGroup = src.closest('[data-group]');
+
+    // 같은 소제목 밖이면 놓을 자리를 만들지 않는다.
+    if (!group || group !== srcGroup) {
+      clearLine();
+      clearNodrop();
+      if (group) group.classList.add('is-nodrop');
+      e.dataTransfer.dropEffect = 'none';
+      return;
+    }
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    clearNodrop();
+
+    var over = e.target.closest('[data-row]');
+    if (!over || over === src) { clearLine(); return; }
+    var box = over.getBoundingClientRect();
+    var after = (e.clientY - box.top) > box.height / 2;
+    if (!line) line = makeLine();
+    if (after) over.parentNode.insertBefore(line, over.nextSibling);
+    else over.parentNode.insertBefore(line, over);
+  });
+
+  document.addEventListener('drop', function (e) {
+    if (!src) return;
+    e.preventDefault();
+    if (line && line.parentNode) line.parentNode.insertBefore(src, line);
+    clearLine();
+    clearNodrop();
+  });
+
+  document.addEventListener('dragend', function () {
+    if (src) src.classList.remove('is-grabbed');
+    src = null;
+    document.body.classList.remove('is-dragging');
+    clearLine();
+    clearNodrop();
+  });
+
+  // 손잡이를 눌렀을 때 요약이 펼쳐지지 않게.
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('[data-handle]') || e.target.closest('.drag-handle')) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+})();
+</script>
+</body>
+</html>

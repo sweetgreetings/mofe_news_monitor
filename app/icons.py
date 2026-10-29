@@ -45,6 +45,14 @@ _ICONS = {
     # [추가: 2026-09-15] 홈 흐름도 칸 사이 화살표 — 순서를 옮기는 ▲▼(tri_*)와 모양은 같은 계열이지만 뜻이 달라 이름을 따로 둔다
     "flow_next": '<path d="m9 6 6 6-6 6"/>',
     "menu": '<path d="M4 6h16M4 12h16M4 18h16"/>',
+    # [추가] 드래그 손잡이 — 점 여섯이라 ⋯(dots)과 같은 글리프 언어를 쓰되 세로로 선다.
+    # ▲▼(16×8)처럼 가로로 좁은 글리프라 폭은 10/24, 높이는 다른 아이콘과 같은 16/24다.
+    "grip": '<circle cx="9" cy="5" r="1.5" fill="currentColor" stroke="none"/>'
+    '<circle cx="15" cy="5" r="1.5" fill="currentColor" stroke="none"/>'
+    '<circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none"/>'
+    '<circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none"/>'
+    '<circle cx="9" cy="19" r="1.5" fill="currentColor" stroke="none"/>'
+    '<circle cx="15" cy="19" r="1.5" fill="currentColor" stroke="none"/>',
     "dots": '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
     "spark": '<path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9Z"/>'
              '<path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8Z"/>',

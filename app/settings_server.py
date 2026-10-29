@@ -107,6 +107,7 @@ from app.curation import (
     load_hidden_batches,
     load_hidden_urls,
     move_article,
+    reorder_article,
     set_group_label,
     set_group_override,
     unhide_articles,
@@ -205,6 +206,7 @@ from app.preview_renderer import (
     generate_preview_page,
     preview_bulk_move_articles,
     preview_move_article,
+    preview_reorder_article,
 )
 from app.renderer import (
     copy_text_script,
@@ -6486,6 +6488,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_add_schedule_slot(form)
         elif self.path == "/move-article":
             self._handle_move_article(form)
+        elif self.path == "/reorder-article":
+            self._handle_reorder_article(form)
         elif self.path == "/rename-group":
             self._handle_rename_group(form)
         elif self.path == "/hide-article":
@@ -6512,6 +6516,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_promote_all_manual_to_draft()
         elif self.path == "/preview-move-article":
             self._handle_preview_move_article(form)
+        elif self.path == "/preview-reorder-article":
+            self._handle_preview_reorder_article(form)
         elif self.path == "/bulk-move-article":
             self._handle_bulk_move_article(form)
         elif self.path == "/bulk-move-order":
@@ -7357,6 +7363,59 @@ class _SettingsHandler(BaseHTTPRequestHandler):
                     self._regenerate_screens()
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+
+    def _handle_reorder_article(self, form: dict) -> None:
+        """확정본의 손잡이 드래그가 fetch로 호출한다(dropArticleRow).
+
+        _handle_move_article(↑/↓)과 **같은 저장 패턴**이다 — 계산은 app.curation의
+        순수 함수가 하고(reorder_article), 바뀐 게 있을 때만 undo_push →
+        snapshot_group_names → update_run_articles → 화면 재생성. 다른 점은 둘:
+        한 칸이 아니라 target_url의 앞/뒤로 바로 꽂는다는 것과, 소제목을 넘는
+        이동이 아예 없어 set_group_override를 쓸 일이 없다는 것이다.
+
+        라벨을 "기사 순서 변경"으로 맞춰 ↑/↓와 드래그를 연달아 해도 되돌리기 한
+        번으로 합쳐지게 한다(3초 합치기).
+        """
+        url = form.get("url", [""])[0]
+        target = form.get("target", [""])[0]
+        place = form.get("place", [""])[0]
+        if url and target and place in ("before", "after"):
+            run = load_latest_run()
+            if run is not None:
+                round_id = round_id_for_run(run)
+                keywords = all_search_keywords(load_settings())
+                overrides = load_group_overrides()
+                new_articles = reorder_article(
+                    run["articles"], keywords, url, target, place, overrides, round_id=round_id
+                )
+                if new_articles is not run["articles"]:
+                    undo_push("기사 순서 변경", touched=[url])
+                    snapshot = snapshot_group_names(
+                        new_articles, keywords, overrides, forced_group_target_names(), round_id=round_id
+                    )
+                    if update_run_articles(run, snapshot):
+                        self._regenerate_screens()
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+
+    def _handle_preview_reorder_article(self, form: dict) -> None:
+        """초안의 손잡이 드래그가 fetch로 호출한다(dropArticleRow).
+
+        _handle_preview_move_article과 같은 모양 — 계산·저장은
+        app.preview_renderer.preview_reorder_article이 맡고, 화면 조각을 돌려주면
+        브라우저가 reload 없이 DOM만 갈아끼운다.
+        """
+        url = form.get("url", [""])[0]
+        target = form.get("target", [""])[0]
+        place = form.get("place", [""])[0]
+        if url and target and place in ("before", "after"):
+            content = preview_reorder_article(url, target, place)
+            if content is not None:
+                self._respond_json(content)
+                return
+        self.send_response(204)
         self.end_headers()
 
     def _handle_rename_group(self, form: dict) -> None:

@@ -197,6 +197,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 {scroll_top_style}
 {refresh_link_style}
 {hide_batch_style}
+{drag_order_style}
 {url_add_style}
 {note_history_style}
 {name_picker_style}
@@ -992,6 +993,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 {scroll_top_script}
 {refresh_link_script}
 {hide_batch_script}
+{drag_order_script}
 {undo_fab_script}
 {photo_override_script}
 {schedule_override_script}
@@ -2461,6 +2463,10 @@ def render_article(
     down_title: str = "소제목 안에서 아래로 이동 (다른 소제목으로 옮기려면 '다른 소제목' 드롭다운)",
     extra_buttons_html: str = "",
     checkbox: bool = False,
+    # [추가] 끌어서 순서 바꾸는 손잡이(확정본·초안). **기본은 꺼짐** — 손잡이가 없는
+    # 화면(정기 보관함·휴지통)은 읽기 전용이라 끌 것이 없다. 📂 미분류 칸에도 안 단다
+    # (↑↓를 숨기는 것과 같은 이유 — 배정 전 임시 칸이라 순서를 맞출 일이 없다).
+    drag_handle: bool = False,
     group_select_html: str = "",
     outlet_rank: int = 0,
     show_relative_time: bool = True,
@@ -2731,6 +2737,18 @@ def render_article(
         if checkbox
         else ""
     )
+    # [추가] 손잡이는 체크박스 **왼쪽 여백에 떠 있고**(position: absolute) 마우스를 올린
+    # 줄에만 보인다 — 줄 안에 자리를 차지하면 아랫줄 들여쓰기(31px)가 밀려 네 화면이
+    # 쓰던 값이 어긋난다. 제목 줄은 누르면 요약이 펼쳐지는 자리라 **줄 전체가 아니라
+    # 이 손잡이만** 잡는 자리다(그래서 클릭은 여기서 끊는다).
+    drag_handle_html = (
+        f'<button class="drag-handle" type="button" data-drag-handle tabindex="-1" '
+        'onclick="event.stopPropagation(); event.preventDefault();" '
+        'title="끌어서 이 소제목 안 순서 바꾸기" aria-hidden="true">'
+        f'{icon("grip")}</button>'
+        if drag_handle
+        else ""
+    )
     # [추가: 2026-08-21] 이 기사가 어떤 검색어로 걸렸는지 — 게시시각·원문보기와 같은
     # 줄, 같은 회색 톤이다("담당자가 누르는 것"이 아니라 참고용 메타 정보라는 뜻).
     # 칩(테두리 알약)으로 만들지 않은 이유: 확정본 한 회차가 50~100건인데 행마다 알약이
@@ -2920,7 +2938,7 @@ def render_article(
         f"{row_mark}>"
         "<details>"
         "<summary>"
-        f'<div class="title-row">{checkbox_html}<span class="title-line">{line_html}</span>{sched_badge_html}{photo_badge_html}{finalize_badge_html}</div>'
+        f'<div class="title-row">{drag_handle_html}{checkbox_html}<span class="title-line">{line_html}</span>{sched_badge_html}{photo_badge_html}{finalize_badge_html}</div>'
         # 스니펫은 제목 바로 밑이라 옛 제목 줄(.refetch-was)보다 앞에 둔다 — 둘 다
         # 제 줄을 쓰므로 CSS `order`가 같아도 DOM 순서가 그대로 보이는 순서가 된다.
         f"{snippet_html}"
@@ -3081,6 +3099,9 @@ def _render_groups(
                         "hidden": group["name"] == UNCLASSIFIED_GROUP_NAME,
                     },
                     checkbox=True,
+                    # 손잡이도 ↑↓와 같은 자리에서 갈린다 — 📂 미분류는 배정 전 임시 칸이라
+                    # 순서를 맞출 일이 없어 손잡이를 안 단다.
+                    drag_handle=group["name"] != UNCLASSIFIED_GROUP_NAME,
                     group_select_html=group_select,
                     outlet_rank=rank_by_url.get(a["url"], 0),
                     show_label_control=show_label_control,
@@ -4177,6 +4198,8 @@ def render_page(
         refresh_link_script=refresh_link_script(),
         hide_batch_style=hide_batch_style(),
         hide_batch_script=hide_batch_script(),
+        drag_order_style=drag_order_style(),
+        drag_order_script=drag_order_script("confirmed"),
         undo_fab_script=undo_fab_script(),
         photo_override_script=photo_override_script(),
         schedule_override_script=schedule_override_script(),
@@ -6435,6 +6458,205 @@ def hide_batch_style() -> str:
 def hide_batch_script() -> str:
     """여러 기사 한 번에 숨기기 JS — 중괄호 홑겹 완성 문자열."""
     return HIDE_BATCH_SCRIPT % {"host": SETTINGS_SERVER_HOST, "port": SETTINGS_SERVER_PORT}
+
+
+# 끌어서 순서 바꾸기 — 확정본·초안 공용(CSS·JS 모두 여기 한 곳). 동작을 바꾸면 두 화면이
+# 같이 바뀐다. **소제목 안에서만** 움직이고, 소제목을 넘기는 일은 지금처럼 「다른 소제목」
+# 드롭다운이 맡는다(app.curation.reorder_article이 서버에서 한 번 더 확인한다).
+DRAG_ORDER_STYLE = """
+  /* 손잡이는 줄 안에 자리를 차지하지 않고 **왼쪽 여백에 떠 있다** — 자리를 차지하면
+     아랫줄 들여쓰기(31px)가 밀려 네 화면이 같이 쓰던 값이 어긋난다. 마우스를 올린
+     줄에만 보이고, 끄는 동안에는 잡고 있던 줄의 손잡이를 계속 보여준다. */
+  .article:has(.drag-handle) {{ position: relative; }}
+  .drag-handle {{ position: absolute; left: -14px; top: 6px; width: 16px; height: 18px;
+    padding: 0; border: none; background: transparent; color: {text_faint}; cursor: grab;
+    display: inline-flex; align-items: center; justify-content: center; opacity: 0;
+    transition: opacity 0.12s; user-select: none; -webkit-user-select: none; }}
+  .drag-handle .ic {{ width: 1rem; height: 1rem; }}
+  .article:hover .drag-handle, .article.is-grabbed .drag-handle {{ opacity: 1; }}
+  .drag-handle:hover {{ color: {muted}; }}
+  .drag-handle:active {{ cursor: grabbing; }}
+  /* 끄는 동안에는 화면 어디서나 주먹이다(놓을 수 없는 칸만 아래에서 no-drop으로 덮는다). */
+  body.is-dragging, body.is-dragging * {{ cursor: grabbing !important; }}
+  .article.is-grabbed {{ opacity: 0.45; }}
+  /* 놓일 자리 — 파랑은 이 앱에서 「담당자의 동작」 색이라 새 색을 만들지 않는다. */
+  .drop-line {{ height: 0; border-top: 2px solid {accent}; margin: 2px 0; border-radius: 2px; }}
+  /* 소제목 밖은 놓을 자리가 아니다 — 그 칸이 스스로 「여긴 아니다」라고 말한다. */
+  .subheading.is-nodrop {{ background: {error_bg}; border-radius: var(--r-md);
+    outline: 1px dashed {error_border_mid}; outline-offset: 2px; }}
+  body.is-dragging .subheading.is-nodrop, body.is-dragging .subheading.is-nodrop * {{
+    cursor: no-drop !important; }}
+  /* 잠긴 상태 — 손잡이만 흐려지고 ↑↓는 그대로 돈다. 못 끄는 이유는 툴팁이 말한다
+     (화면에 설명 글자를 늘리지 않는다). 색은 ↑↓ 비활성(.move-btn:disabled)과 같은 값. */
+  body.drag-locked .drag-handle {{ color: {border}; cursor: not-allowed; }}
+  body.drag-locked .drag-handle:hover {{ color: {border}; }}
+"""
+
+# %(host)s/%(port)s 치환이라 JS 안에 %를 쓰지 않는다.
+DRAG_ORDER_SCRIPT = """
+var DRAG_SRC = null, DRAG_LINE = null;
+// 못 끄는 두 경우 — 끌어 놓은 자리를 「저장 순서의 몇 번째」로 옮겨야 할지 답이 없다.
+function dragLockReason() {
+  if (document.body.classList.contains("photo-gather")) {
+    return "모아 보는 동안에는 끌 수 없어요 \\u2014 소제목이 풀린 한 목록이라 놓을 자리가 없어요";
+  }
+  var sel = document.querySelector(".view-mode-select");
+  if (sel && sel.value !== "subheading") {
+    return "\\u300c보기 순서\\u300d를 \\u300c소제목 내 언론사순\\u300d으로 두면 끌 수 있어요";
+  }
+  return "";
+}
+function syncDragLock() {
+  var why = dragLockReason();
+  document.body.classList.toggle("drag-locked", !!why);
+  document.querySelectorAll("[data-drag-handle]").forEach(function (h) {
+    h.title = why || "끌어서 이 소제목 안 순서 바꾸기";
+  });
+}
+function _dragLine() {
+  if (!DRAG_LINE) { DRAG_LINE = document.createElement("div"); DRAG_LINE.className = "drop-line"; }
+  return DRAG_LINE;
+}
+function _clearDragLine() {
+  if (DRAG_LINE && DRAG_LINE.parentNode) { DRAG_LINE.parentNode.removeChild(DRAG_LINE); }
+}
+function _clearNoDrop() {
+  document.querySelectorAll(".subheading.is-nodrop").forEach(function (g) { g.classList.remove("is-nodrop"); });
+}
+function _dragCleanup() {
+  if (DRAG_SRC) { DRAG_SRC.classList.remove("is-grabbed"); }
+  DRAG_SRC = null;
+  document.body.classList.remove("is-dragging");
+  _clearDragLine();
+  _clearNoDrop();
+  document.querySelectorAll(".article[draggable]").forEach(function (r) { r.removeAttribute("draggable"); });
+}
+// 제목 줄을 누르면 요약이 펼쳐지는 자리라, **손잡이를 누른 순간에만** 그 줄을 끌 수 있게 켠다.
+document.addEventListener("mousedown", function (e) {
+  var h = e.target.closest ? e.target.closest("[data-drag-handle]") : null;
+  if (!h || document.body.classList.contains("drag-locked")) { return; }
+  var row = h.closest(".article");
+  if (row) { row.setAttribute("draggable", "true"); }
+});
+document.addEventListener("mouseup", function () {
+  if (!DRAG_SRC) {
+    document.querySelectorAll(".article[draggable]").forEach(function (r) { r.removeAttribute("draggable"); });
+  }
+});
+document.addEventListener("dragstart", function (e) {
+  var row = e.target.closest ? e.target.closest(".article") : null;
+  if (!row || !row.getAttribute("draggable")) { return; }
+  DRAG_SRC = row;
+  document.body.classList.add("is-dragging");
+  row.classList.add("is-grabbed");
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = "move";
+    try { e.dataTransfer.setData("text/plain", row.dataset.url || ""); } catch (err) {}
+  }
+});
+document.addEventListener("dragover", function (e) {
+  if (!DRAG_SRC) { return; }
+  var group = e.target.closest ? e.target.closest(".subheading") : null;
+  var srcGroup = DRAG_SRC.closest(".subheading");
+  if (!group || group !== srcGroup) {
+    _clearDragLine();
+    _clearNoDrop();
+    if (group) { group.classList.add("is-nodrop"); }
+    if (e.dataTransfer) { e.dataTransfer.dropEffect = "none"; }
+    return;
+  }
+  e.preventDefault();
+  if (e.dataTransfer) { e.dataTransfer.dropEffect = "move"; }
+  _clearNoDrop();
+  var over = e.target.closest(".article");
+  if (!over || over === DRAG_SRC) { _clearDragLine(); return; }
+  var box = over.getBoundingClientRect();
+  var after = (e.clientY - box.top) > box.height / 2;
+  var line = _dragLine();
+  if (after) { over.parentNode.insertBefore(line, over.nextSibling); }
+  else { over.parentNode.insertBefore(line, over); }
+});
+document.addEventListener("drop", function (e) {
+  if (!DRAG_SRC) { return; }
+  e.preventDefault();
+  var src = DRAG_SRC;
+  var line = DRAG_LINE;
+  if (!line || !line.parentNode) { _dragCleanup(); return; }
+  // 놓일 자리 바로 뒤(또는 앞)의 기사가 서버에 보낼 기준이다 — 선은 두 기사 사이에 서 있다.
+  var next = line.nextElementSibling;
+  while (next && !next.classList.contains("article")) { next = next.nextElementSibling; }
+  var prev = line.previousElementSibling;
+  while (prev && !prev.classList.contains("article")) { prev = prev.previousElementSibling; }
+  var target = next && next !== src ? next : prev;
+  var place = (next && next !== src) ? "before" : "after";
+  if (!target || target === src) { _dragCleanup(); return; }
+  var targetUrl = target.dataset.url;
+  var url = src.dataset.url;
+  line.parentNode.insertBefore(src, line);   // 먼저 눈앞에서 옮기고
+  _dragCleanup();
+  _postDragOrder(url, targetUrl, place);     // 그다음에 서버에 적는다
+});
+document.addEventListener("dragend", function () { _dragCleanup(); });
+document.addEventListener("DOMContentLoaded", syncDragLock);
+document.addEventListener("change", function (e) {
+  if (e.target.classList && e.target.classList.contains("view-mode-select")) { syncDragLock(); }
+});
+// 모아 보기는 body 클래스로 켜고 끄므로, 그쪽 코드를 건드리지 않고 여기서 따라본다.
+new MutationObserver(syncDragLock).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+"""
+
+DRAG_ORDER_POST_CONFIRMED = """
+function _postDragOrder(url, targetUrl, place) {
+  fetch("http://%(host)s:%(port)s/reorder-article", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({url: url, target: targetUrl, place: place})
+  }).then(function (res) {
+    if (res.ok) { sessionStorage.setItem("justMovedUrls", JSON.stringify([url])); location.reload(); }
+    else { alert("순서 변경에 실패했습니다. 다시 시도해주세요."); location.reload(); }
+  }).catch(function () {
+    alert("순서 변경에 실패했습니다 \\u2014 앱이 실행 중인지 확인해주세요.");
+    location.reload();
+  });
+}
+"""
+
+DRAG_ORDER_POST_PREVIEW = """
+function _postDragOrder(url, targetUrl, place) {
+  fetch("http://%(host)s:%(port)s/preview-reorder-article", {
+    method: "POST", keepalive: true,
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({url: url, target: targetUrl, place: place})
+  }).then(function (res) {
+    if (!res.ok) { alert("순서 변경에 실패했습니다. 다시 시도해주세요."); return null; }
+    if (res.status === 204) { return null; }   // 자리가 그대로 — 눈앞 화면이 이미 맞다
+    return res.json();
+  }).then(function (data) {
+    if (!data) { return; }
+    _applyPreviewContent(data, url);
+  }).catch(function () {
+    alert("순서 변경에 실패했습니다 \\u2014 앱이 실행 중인지 확인해주세요.");
+  });
+}
+"""
+
+
+def drag_order_style() -> str:
+    """끌어서 순서 바꾸기 CSS — 값이 채워진 문자열(확정본·초안 공용)."""
+    return DRAG_ORDER_STYLE.format(**PALETTE)
+
+
+def drag_order_script(screen: str = "confirmed") -> str:
+    """끌어서 순서 바꾸기 JS — 중괄호 홑겹 완성 문자열.
+
+    screen으로 갈리는 건 「서버에 어떻게 적고 무엇으로 화면을 맞추나」 한 조각뿐이고
+    (확정본은 새로고침, 초안은 서버가 준 조각을 꽂는다) 끄는 동작 자체는 같은 코드다.
+    """
+    post = DRAG_ORDER_POST_PREVIEW if screen == "preview" else DRAG_ORDER_POST_CONFIRMED
+    return (DRAG_ORDER_SCRIPT + post) % {
+        "host": SETTINGS_SERVER_HOST,
+        "port": SETTINGS_SERVER_PORT,
+    }
 
 
 # ↩ 되돌리기 단추 — 확정본·초안 공용(마크업·JS 모두 여기 한 곳). 두 화면이 각자 만들던

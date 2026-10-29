@@ -524,6 +524,68 @@ def move_article(
     return articles, None
 
 
+def reorder_article(
+    articles: list,
+    keywords: Optional[list],
+    url: str,
+    target_url: str,
+    place: str,
+    overrides: Optional[dict] = None,
+    round_id: Optional[tuple] = None,
+) -> list:
+    """기사 하나를 **같은 소제목 안에서** 다른 기사의 바로 앞/뒤로 옮긴다(손잡이 드래그).
+
+    ↑/↓(move_article)가 이웃과 한 칸 맞바꾸는 것과 달리, 여기선 뽑아서 끼운다 —
+    한 번에 여러 칸을 건너뛰므로 드래그가 ↑/↓를 여러 번 누르는 것과 같은 결과를
+    더 적은 동작으로 낸다. 자리 판정·경계 규칙은 move_article과 **같은 방식**이다:
+
+    1. 소제목 구성은 filter_hidden(articles)로 다시 계산한다 — 숨긴 기사가 "안 보이는
+       이웃"으로 끼어 경계 판정을 어긋나게 하면 안 된다(move_article과 같은 이유).
+    2. **소제목 경계를 넘지 않는다** — url과 target_url이 같은 소제목이 아니면 아무것도
+       안 바꾸고 articles를 그대로 돌려준다(화면도 막지만 서버도 한 번 더 본다).
+       소제목을 넘는 이동은 "다른 소제목" 드롭다운(bulk_reassign_group)만 한다.
+    3. 실제 자리 옮기기는 **원본 articles**(숨긴 기사 포함)에서 한다 — target_url의
+       바로 앞/뒤에 꽂으므로 사이에 낀 숨긴 기사는 제자리에 남고, 보이는 순서는
+       화면이 보여준 그대로가 된다.
+
+    allow_llm_call=False를 반드시 넘긴다 — 이건 "지금 몇 번째 자리인가"를 알아보려는
+    읽기용 호출이지 소제목을 새로 짓는 순간이 아니다(2026-08-14 09:30 회차 사고).
+
+    place: "before" | "after". url == target_url이거나 둘 중 하나를 못 찾으면 그대로.
+    """
+    if place not in ("before", "after") or not url or not target_url or url == target_url:
+        return articles
+
+    groups = classify_articles(
+        filter_hidden(articles),
+        keywords,
+        forced_groups=overrides,
+        custom_group_names=forced_group_target_names(),
+        allow_llm_call=False,
+        round_id=round_id,
+    )
+    group = next(
+        (g for g in groups if any(a["url"] == url for a in g["articles"])), None
+    )
+    if group is None:
+        return articles
+    group_urls = {a["url"] for a in group["articles"]}
+    if target_url not in group_urls:
+        return articles  # 다른 소제목 — 경계는 넘지 않는다
+
+    index_by_url = {a["url"]: i for i, a in enumerate(articles)}
+    if url not in index_by_url or target_url not in index_by_url:
+        return articles
+
+    new_articles = list(articles)
+    moving = new_articles.pop(index_by_url[url])
+    at = next(i for i, a in enumerate(new_articles) if a["url"] == target_url)
+    new_articles.insert(at if place == "before" else at + 1, moving)
+    if [a["url"] for a in new_articles] == [a["url"] for a in articles]:
+        return articles  # 자리가 그대로면 저장할 것도 없다
+    return new_articles
+
+
 def bulk_move_articles(
     articles: list,
     keywords: Optional[list],

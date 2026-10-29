@@ -4527,6 +4527,89 @@ def test_last_slot_topup_adds_late_articles():
     print("47) 마지막 회차 보충 훑기: 통과 (정시 확정본 + 마감 뒤 덧붙이기, 23:50 마감선, 표식·배너, 한 번만)")
 
 
+
+def test_drag_order_within_group():
+    """끌어서 순서 바꾸기 — **소제목 안에서만** 움직인다.
+
+    ↑↓(move_article)와 같은 규칙·같은 저장 경로를 쓰되 한 칸이 아니라 바로 그 자리로
+    꽂는다. 이 테스트가 보는 것:
+
+      1) 같은 소제목 안에서는 target_url의 앞/뒤로 실제로 옮겨진다
+      2) **소제목을 넘는 이동은 아무것도 안 바꾼다** — 화면이 막아도 서버가 한 번 더
+         본다(그 한 줄이 빠지면 「다른 소제목」 드롭다운만 하던 일이 조용히 둘이 된다)
+      3) 자리가 그대로면 **입력 객체를 그대로** 돌려준다 — 호출부가 `is`로 보고
+         undo·저장·화면 재생성을 건너뛴다
+      4) 숨긴 기사는 제자리에 남는다 — 보이는 순서만 바뀐다
+      5) 손잡이는 확정본·초안에만, 📂 미분류 칸에는 안 달린다
+      6) 두 화면이 **같은 CSS·같은 JS**를 쓰고 갈리는 건 보내는 주소 하나뿐이다
+    """
+    from app import curation
+    from app.curation import reorder_article
+    from app.renderer import drag_order_script, drag_order_style, render_article
+
+    def art(url, group):
+        return {"url": url, "title": url, "summary": url, "outlet": url, "group": group}
+
+    arts = [art("a", "G1"), art("b", "G1"), art("c", "G1"), art("x", "G2")]
+    forced = {"a": "G1", "b": "G1", "c": "G1", "x": "G2"}
+    # 배정(forced_groups)이 실제로 먹히려면 그 이름이 「담당자가 만든 소제목」 목록에
+    # 있어야 한다 — 실제 화면에선 그 파일이 채워져 있다.
+    names = patch.object(curation, "forced_group_target_names", lambda: ["G1", "G2"])
+    names.start()
+
+    # 1) 같은 소제목 안 — 앞/뒤로 꽂힌다
+    out = reorder_article(arts, None, "c", "a", "before", forced)
+    assert [a["url"] for a in out] == ["c", "a", "b", "x"], [a["url"] for a in out]
+    out = reorder_article(arts, None, "a", "c", "after", forced)
+    assert [a["url"] for a in out] == ["b", "c", "a", "x"], [a["url"] for a in out]
+
+    # 2) 소제목을 넘는 이동은 아무것도 안 바꾼다
+    assert reorder_article(arts, None, "a", "x", "before", forced) is arts
+    assert reorder_article(arts, None, "x", "a", "after", forced) is arts
+
+    # 3) 자리가 그대로거나 값이 이상하면 입력 그대로
+    assert reorder_article(arts, None, "a", "b", "before", forced) is arts
+    assert reorder_article(arts, None, "a", "a", "before", forced) is arts
+    assert reorder_article(arts, None, "a", "b", "옆으로", forced) is arts
+    assert reorder_article(arts, None, "없는url", "a", "before", forced) is arts
+
+    # 4) 숨긴 기사는 제자리 — 보이는 순서만 바뀐다
+    with_hidden = [art("a", "G1"), {**art("h", "G1"), "hidden": True}, art("b", "G1")]
+    forced_h = {"a": "G1", "h": "G1", "b": "G1"}
+    moved = reorder_article(with_hidden, None, "b", "a", "before", forced_h)
+    assert [a["url"] for a in moved] == ["b", "a", "h"], [a["url"] for a in moved]
+
+    # 5) 손잡이는 켠 화면에만, 미분류엔 안 단다
+    one = {"url": "u", "title": "제목", "summary": "요약", "outlet": "KBS"}
+    assert "data-drag-handle" not in render_article(one, [])
+    assert "data-drag-handle" in render_article(one, [], drag_handle=True)
+    import re as _re
+
+    for mod_path in ("app/renderer.py", "app/preview_renderer.py"):
+        src = Path(mod_path).read_text(encoding="utf-8")
+        assert "drag_handle=group[\"name\"] != UNCLASSIFIED_GROUP_NAME" in src, mod_path
+
+    # 6) 두 화면이 같은 장치를 쓰고 주소만 갈린다
+    css = drag_order_style()
+    for sel in (".drag-handle", ".drop-line", ".subheading.is-nodrop", "body.drag-locked"):
+        assert sel in css, sel
+    confirmed, preview = drag_order_script("confirmed"), drag_order_script("preview")
+    assert "/reorder-article" in confirmed and "/preview-reorder-article" not in confirmed
+    assert "/preview-reorder-article" in preview
+    core = "document.addEventListener(\"dragover\""
+    assert core in confirmed and core in preview
+    # 서버가 템플릿 치환을 끝냈는지 — 남아 있으면 JS가 통째로 깨진다
+    for js in (confirmed, preview):
+        assert "%(host)s" not in js and "{settings_host}" not in js
+
+    # 두 화면 HTML에 CSS·JS가 **함께** 들어간다
+    for path in ("app/renderer.py", "app/preview_renderer.py"):
+        src = Path(path).read_text(encoding="utf-8")
+        assert "{drag_order_style}" in src and "{drag_order_script}" in src, path
+
+    names.stop()
+
+
 def test_new_article_placement():
     """새로 들어온 기사는 **제 소제목 안 언론사 순위 자리**에 끼워 들어간다.
 
@@ -7404,6 +7487,7 @@ if __name__ == "__main__":
         test_undo_stack_dedupes_snapshots,
         test_last_slot_topup_adds_late_articles,
         test_new_article_placement,
+        test_drag_order_within_group,
         test_trend_end_day_follows_today_completion,
         test_trend_today_partial_column,
         test_alert_scope_follows_keyword_switch,
