@@ -3274,10 +3274,11 @@ def _build_preview_plain_text(
         lines.append(f"[초안] 언론 모니터링 {format_slot_time_kr(slot['end'])} 기준")
         # [추가: 2026-08-05] app.renderer._build_plain_text와 동일 — 직접 작성한 메모가
         # 있으면 헤더 바로 아래 한 줄로 끼워 넣는다.
+        # [수정: 2026-10-29] 앱이 "- "를 붙이지 않는다(그 쪽과 같은 규칙).
         if note is None:
             note = load_manual_keyword_note()
         if note:
-            lines.append(f"- {note}")
+            lines.append(note)
         lines.append("")
     if not groups:
         lines.append("수집된 기사 없음")

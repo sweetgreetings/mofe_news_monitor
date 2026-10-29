@@ -3664,15 +3664,17 @@ def _build_plain_text(
     lines = []
     if header:
         lines.append(f"언론 모니터링 {format_slot_time_kr(run_slot)} 기준")
-        # [추가: 2026-08-05] "+ 한 줄 메모"로 적어둔 메모가 있으면 헤더 바로 아래
-        # "- {메모}" 한 줄로 끼워 넣는다 — AI 키워드 블록(하단)과 달리 이건 화면 맨 위에 있고,
+        # [추가: 2026-08-05] "한 줄 메모"로 적어둔 메모가 있으면 헤더 바로 아래
+        # 한 줄로 끼워 넣는다 — AI 키워드 블록(하단)과 달리 이건 화면 맨 위에 있고,
         # 내보내기 텍스트에서도 항상 헤더 다음 줄에 온다.
+        # [수정: 2026-10-29] 앱이 "- "를 붙이지 않는다 — 적은 글자가 그대로 나간다.
+        # 대시든 점이든 머리에 붙일 기호는 담당자가 메모 칸에 직접 넣는다.
         # [수정: 2026-08-26] 기준 날짜는 "오늘"이 아니라 **그 회차의 날짜**다 — 자정을 넘겨
         # 어제 마지막 회차 확정본을 보면 today와 어긋나 메모가 없는 것처럼 보였다.
         if note is None:
             note = load_manual_keyword_note((run_date or datetime.now().strftime("%Y-%m-%d"), run_slot))
         if note:
-            lines.append(f"- {note}")
+            lines.append(note)
         lines.append("")
     if not groups:
         lines.append("수집된 기사 없음")
