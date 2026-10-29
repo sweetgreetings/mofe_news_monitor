@@ -254,7 +254,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      스크롤 영역(.toc-scroll)과 바깥 상자(.toc-popover)를 분리했다 — max-height와
      padding은 스크롤 영역 쪽으로 옮겼고 상자 자체의 치수는 그대로다. */
   .toc-popover {{
-    display: none; position: fixed; right: 20px; bottom: 74px; width: 200px;
+    display: none; position: fixed; right: 20px; bottom: 74px; width: 224px;
     background: {card}; border: 1px solid {border};
     border-radius: var(--r-lg); box-shadow: var(--sh-pop); z-index: 200;
   }}
@@ -278,6 +278,26 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
   .toc-order-btn:hover {{ background: {hover}; }}
   .toc-order-btn:disabled {{ opacity: 0.3; cursor: default; }}
+  /* [추가] 끌기 손잡이 ⠿ — ▲▼가 이웃과 한 칸 맞바꾸는 것과 달리 뽑아서 끼운다.
+     자리는 **줄 맨 앞**이다(목차는 좁은 칸이라 기사 행처럼 왼쪽 여백에 띄울 자리가 없다).
+     20px 칸을 늘 비워 두므로 이름 칸 폭은 그대로고, 팝오버만 200 → 224px로 넓혔다.
+     기사 끌기(.drag-handle)와 달리 **늘 보인다** — 목차는 순서를 맞추러 일부러 여는
+     칸이라 「여기는 끌 수 있다」가 열자마자 보여야 한다.
+     .drop-line·body.is-dragging은 기사 끌기(DRAG_ORDER_STYLE)에서 그대로 쓴다. */
+  .toc-grip {{
+    flex: none; width: 20px; height: 24px; padding: 0; border: none; background: transparent;
+    color: {text_faint}; cursor: grab; display: inline-flex; align-items: center;
+    justify-content: center; user-select: none; -webkit-user-select: none;
+  }}
+  .toc-grip .ic {{ width: 1rem; height: 1rem; }}   /* 기사 끌기 손잡이(.drag-handle)와 같은 값 */
+  .toc-grip:hover {{ color: {muted}; }}
+  .toc-grip:active {{ cursor: grabbing; }}
+  /* 📂 소제목 미분류 — 못 끌고 그 자리에 못 놓는다. 색은 ▲▼ 비활성과 같은 값. */
+  .toc-row.is-locked .toc-grip {{ color: {border}; cursor: not-allowed; }}
+  .toc-row.is-locked .toc-grip:hover {{ color: {border}; }}
+  .toc-row.is-grabbed {{ opacity: 0.45; }}
+  /* 목차 줄은 24px짜리 좁은 줄이라 기사 사이(2px)보다 얇게 끼운다. */
+  .toc-scroll .drop-line {{ margin: 1px 0; }}
   /* [추가: 2026-08-05] 방금 순서를 옮긴 항목을 기사의 "방금 승격" 표시와 같은 노란색으로
      한 번 표시한다 — 팝오버가 새로고침 후 자동으로 다시 열리는 동안, 여러 개를 연달아
      옮길 때 방금 뭘 옮겼는지 헷갈리지 않게.
@@ -1229,6 +1249,47 @@ function _tocReorderNeighbor(idx, step) {{
   }}
   return -1;
 }}
+// [추가] 끌어서 순서 바꾸기 — 손잡이를 잡고 뽑아서 끼운다. ▲▼가 이웃과 한 칸 맞바꾸는
+// 것과 달리 멀리까지 한 번에 가고, 뒷일(초록 한 칸 · 「N개 위치 바뀜」 · (적용))은 둘이 같다.
+// **잠기는 자리가 없다** — 모아 보는 동안에는 ☰과 팝오버가 통째로 숨고(body.photo-gather),
+// 「보기 순서」를 바꿔도 목차의 순서 바꾸기는 그대로 돈다. 기사 끌기의 dragLockReason()이
+// 여기엔 필요 없는 이유다.
+var _tocDragSrc = null;    // 지금 끌고 있는 줄 (없으면 null)
+var _tocDragLine = null;   // 놓일 자리를 가리키는 파란 선
+function _tocDragClearLine() {{
+  if (_tocDragLine && _tocDragLine.parentNode) {{ _tocDragLine.parentNode.removeChild(_tocDragLine); }}
+  _tocDragLine = null;
+}}
+function _tocDragCleanup() {{
+  _tocDragClearLine();
+  document.body.classList.remove("is-dragging");
+  Array.prototype.forEach.call(document.querySelectorAll(".toc-row"), function(r) {{
+    r.classList.remove("is-grabbed");
+    r.draggable = false;
+  }});
+  _tocDragSrc = null;
+}}
+// ▲▼와 끌기가 함께 쓰는 뒷일 — 둘이 각자 적으면 한쪽만 고쳤을 때 초록과 숫자가 어긋난다.
+function _tocAfterMove(moving, to) {{
+  _tocTouched[moving] = true;   // 개수 세기용 (초록과 무관)
+  _tocMovedIdx = to;            // 초록은 여기 하나로 옮겨온다 — 앞서 켜져 있던 초록은 자연히 꺼진다
+  // 제자리로 돌아온 소제목은 초록도 거둔다 — 만졌더라도 결과적으로 안 옮긴 것이므로,
+  // 바뀐 게 0이면 표시도 0이어야 "확정할 게 없다"가 화면에 그대로 보인다.
+  _tocItems.forEach(function(item, k) {{
+    if (item.raw === _tocBase[k]) {{ delete _tocTouched[item.raw]; }}
+  }});
+  // 마지막에 옮긴 행이 결과적으로 제자리라면 초록도 거둔다 — 위 개수 세기와 같은 기준.
+  if (_tocMovedIdx >= 0 && _tocItems[_tocMovedIdx].raw === _tocBase[_tocMovedIdx]) {{ _tocMovedIdx = -1; }}
+  _tocRender();
+}}
+// 뽑아서 끼운다 — 한 칸만 옮기면 _tocSwap과 결과가 같다.
+function _tocMove(from, to) {{
+  if (_tocBusy || from === to || from < 0 || to < 0 || to >= _tocItems.length) {{ return; }}
+  if (!_tocOrderable(_tocItems[from]) || !_tocOrderable(_tocItems[to])) {{ return; }}
+  var moving = _tocItems.splice(from, 1)[0];
+  _tocItems.splice(to, 0, moving);
+  _tocAfterMove(moving.raw, _tocItems.indexOf(moving));
+}}
 function buildTocPopover() {{
   _tocItems = _tocReadSections();
   _tocBase = _tocItems.map(function(item) {{ return item.raw; }});
@@ -1249,10 +1310,68 @@ function _tocRender() {{
   _tocItems.forEach(function(item, idx) {{
     var row = document.createElement("div");
     // 초록 = 마지막에 옮긴 행 하나. 앞서 옮긴 행도, 밀려난 이웃도 초록이 아니다.
-    row.className = "toc-row" + (idx === _tocMovedIdx ? " toc-row-moved" : "");
+    row.className = "toc-row" + (idx === _tocMovedIdx ? " toc-row-moved" : "")
+                              + (_tocOrderable(item) ? "" : " is-locked");
+    row.dataset.idx = String(idx);
+    // 손잡이 — **누른 순간에만** 그 줄을 끌 수 있게 켠다(기사 끌기와 같은 방식). 이름을
+    // 누르면 그 소제목으로 이동하는 자리라, 줄 전체를 늘 끌리게 두면 이동과 끌기가 서로 먹는다.
+    // data-drag-handle은 달지 않는다 — 그건 기사 끌기의 전역 리스너가 잡는 이름이다.
+    var grip = document.createElement("button");
+    grip.type = "button"; grip.className = "toc-grip"; grip.tabIndex = -1;
+    grip.innerHTML = '{toc_grip_icon}';
+    grip.title = _tocOrderable(item) ? "끌어서 순서 바꾸기" : "이 칸은 순서를 바꿀 수 없어요";
+    grip.onclick = function(e) {{ e.preventDefault(); }};
+    grip.onmousedown = function() {{
+      if (_tocBusy || !_tocOrderable(item)) {{ return; }}
+      row.draggable = true;
+      // 끌지 않고 손을 떼면 그 자리에서 다시 잠근다 — 줄 전체가 끌리는 상태로 남지 않게.
+      window.addEventListener("mouseup", function _once() {{
+        window.removeEventListener("mouseup", _once);
+        if (!_tocDragSrc) {{ row.draggable = false; }}
+      }});
+    }};
+    row.addEventListener("dragstart", function(e) {{
+      _tocDragSrc = row;
+      row.classList.add("is-grabbed");
+      document.body.classList.add("is-dragging");
+      if (e.dataTransfer) {{
+        e.dataTransfer.effectAllowed = "move";
+        try {{ e.dataTransfer.setData("text/plain", item.raw); }} catch (err) {{}}
+      }}
+    }});
+    row.addEventListener("dragend", _tocDragCleanup);
+    row.addEventListener("dragover", function(e) {{
+      if (!_tocDragSrc || row === _tocDragSrc) {{ return; }}
+      e.preventDefault();
+      if (!_tocOrderable(item)) {{   // 📂 미분류 자리에는 못 놓는다 — 선도 안 서고 놓아도 아무 일이 없다
+        if (e.dataTransfer) {{ e.dataTransfer.dropEffect = "none"; }}
+        _tocDragClearLine();
+        return;
+      }}
+      if (e.dataTransfer) {{ e.dataTransfer.dropEffect = "move"; }}
+      if (!_tocDragLine) {{
+        _tocDragLine = document.createElement("div");
+        _tocDragLine.className = "drop-line";
+      }}
+      var box = row.getBoundingClientRect();
+      var before = (e.clientY - box.top) < box.height / 2;
+      scroll.insertBefore(_tocDragLine, before ? row : row.nextSibling);
+    }});
+    row.addEventListener("drop", function(e) {{
+      if (!_tocDragSrc || !_tocOrderable(item)) {{ _tocDragCleanup(); return; }}
+      e.preventDefault();
+      var from = Number(_tocDragSrc.dataset.idx);
+      var box = row.getBoundingClientRect();
+      var before = (e.clientY - box.top) < box.height / 2;
+      var to = idx + (before ? 0 : 1);
+      if (from < to) {{ to -= 1; }}   // 뽑아낸 자리만큼 뒤가 한 칸 당겨진다
+      _tocDragCleanup();
+      _tocMove(from, to);
+    }});
     var a = document.createElement("a");
     a.href = "#";
     a.textContent = item.label;
+    a.draggable = false;   // <a>의 기본 끌기(주소 끌기)가 손잡이 끌기를 가로채지 않게
     if (item.custom) {{ a.style.fontWeight = "700"; }}
     a.onclick = function(e) {{ e.preventDefault(); scrollToSubheading(item.id); }};
     var btns = document.createElement("span");
@@ -1269,6 +1388,7 @@ function _tocRender() {{
     down.onclick = function() {{ _tocSwap(idx, nextIdx); }};
     btns.appendChild(up);
     btns.appendChild(down);
+    row.appendChild(grip);
     row.appendChild(a);
     row.appendChild(btns);
     scroll.appendChild(row);
@@ -1314,16 +1434,7 @@ function _tocSwap(i, j) {{
   if (!_tocOrderable(_tocItems[i]) || !_tocOrderable(_tocItems[j])) {{ return; }}  // 순서 대상이 아닌 칸은 안 건드린다
   var moving = _tocItems[i].raw;  // ▲▼를 누른 그 소제목만 초록 대상 (밀려난 이웃은 아니다)
   var tmp = _tocItems[i]; _tocItems[i] = _tocItems[j]; _tocItems[j] = tmp;
-  _tocTouched[moving] = true;   // 개수 세기용 (초록과 무관)
-  _tocMovedIdx = j;             // 초록은 여기 하나로 옮겨온다 — 앞서 켜져 있던 초록은 자연히 꺼진다
-  // 제자리로 돌아온 소제목은 초록도 거둔다 — 만졌더라도 결과적으로 안 옮긴 것이므로,
-  // 바뀐 게 0이면 표시도 0이어야 "확정할 게 없다"가 화면에 그대로 보인다.
-  _tocItems.forEach(function(item, k) {{
-    if (item.raw === _tocBase[k]) {{ delete _tocTouched[item.raw]; }}
-  }});
-  // 마지막에 옮긴 행이 결과적으로 제자리라면 초록도 거둔다 — 위 개수 세기와 같은 기준.
-  if (_tocMovedIdx >= 0 && _tocItems[_tocMovedIdx].raw === _tocBase[_tocMovedIdx]) {{ _tocMovedIdx = -1; }}
-  _tocRender();
+  _tocAfterMove(moving, j);       // 뒷일은 끌기와 같은 함수가 맡는다
 }}
 function _tocApply() {{
   if (_tocBusy || !_tocDirtyCount()) {{ return; }}
@@ -4200,6 +4311,8 @@ def render_page(
         refresh_link_script=refresh_link_script(),
         hide_batch_style=hide_batch_style(),
         hide_batch_script=hide_batch_script(),
+        # 미니 목차 끌기 손잡이 — SVG를 화면 파일에 복붙하지 않고 icon()에서 받는다.
+        toc_grip_icon=icon("grip"),
         drag_order_style=drag_order_style(),
         drag_order_script=drag_order_script("confirmed"),
         undo_fab_script=undo_fab_script(),

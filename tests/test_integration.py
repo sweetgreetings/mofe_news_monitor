@@ -4649,6 +4649,84 @@ def test_drag_order_within_group():
     names.stop()
 
 
+def test_toc_drag_reorder():
+    """미니 목차에서 소제목을 **끌어** 옮긴다 — ▲▼와 같은 뒷일, 같은 저장 경로.
+
+    기사 끌기와 달리 **소제목 끌기는 목차 안에서만** 일어난다 — 소제목 칸은 화면보다
+    높아 잡은 자리와 놓을 자리가 함께 보이는 일이 드물고, 본문에 손잡이를 또 달면 뜻이
+    다른 두 끌기가 한 화면에 선다. 이 테스트가 보는 것:
+
+      1) 손잡이·끌기 CSS와 JS가 **확정본·초안 두 파일에 같이** 들어 있다(한쪽만 고치면
+         화면 하나는 끌리고 하나는 안 끌린다 — 목차 코드는 원래 두 벌이다)
+      2) ▲▼(_tocSwap)와 끌기(_tocMove)가 **뒷일을 같은 함수(_tocAfterMove)에 넘긴다** —
+         각자 적으면 한쪽만 고쳤을 때 초록 한 칸·「N개 위치 바뀜」이 조용히 어긋난다
+      3) 순서 대상인지 묻는 자리는 **_tocOrderable 하나**다 — 📂 미분류가 못 끌리고 그
+         자리에 못 놓이는 것도, ▲▼가 잠기는 것도 전부 그 한 줄에서 나온다
+      4) **잠기는 자리가 없다** — 모아 보는 동안엔 ☰과 팝오버가 통째로 숨고 「보기 순서」는
+         목차를 안 건드린다. 기사 끌기의 dragLockReason()을 여기로 베껴 오면 안 된다
+      5) 손잡이 그림은 icon("grip")에서 온다(SVG를 화면 파일에 복붙하지 않는다)
+      6) <a>의 기본 끌기(주소 끌기)를 꺼 둔다 — 안 끄면 브라우저가 손잡이 끌기를 가로챈다
+    """
+    _require_isolation()
+    from app.icons import icon
+
+    sources = {p: Path(p).read_text(encoding="utf-8")
+               for p in ("app/renderer.py", "app/preview_renderer.py")}
+
+    # 1) 두 파일에 같은 장치가 들어 있다
+    for path, src in sources.items():
+        for needle in (
+            ".toc-grip {{",                       # 손잡이 CSS
+            ".toc-row.is-grabbed {{",             # 끌고 있는 줄
+            ".toc-row.is-locked .toc-grip {{",    # 📂 미분류 — 못 끈다
+            ".toc-scroll .drop-line {{",          # 놓일 자리(기사 끌기의 선을 그대로 쓴다)
+            "bottom: 74px; width: 224px;",        # 손잡이 칸 20px만큼 넓힌 팝오버
+            "function _tocAfterMove(",
+            "function _tocMove(",
+            "function _tocDragCleanup(",
+            'grip.className = "toc-grip"',
+            "{toc_grip_icon}",                    # 그림은 icon()에서 받는다
+            "a.draggable = false;",               # 6) 주소 끌기가 가로채지 않게
+        ):
+            assert needle in src, f"{path}: {needle} 가 없다"
+        # 5) SVG를 복붙하지 않는다
+        assert '<circle cx="9" cy="5"' not in src, f"{path}: 손잡이 SVG가 복붙돼 있다"
+
+    # 2) ▲▼도 끌기도 뒷일은 _tocAfterMove 하나가 맡는다
+    for path, src in sources.items():
+        swap = src[src.index("function _tocSwap("):src.index("function _tocApply(")]
+        assert "_tocAfterMove(moving, j);" in swap, f"{path}: ▲▼가 뒷일을 제가 적고 있다"
+        for own in ("_tocMovedIdx = j;", "_tocTouched[moving] = true;"):
+            assert own not in swap, f"{path}: ▲▼ 안에 뒷일이 되살아났다 — {own}"
+        # 초록·개수 세기를 적는 자리는 앱 전체에서 _tocAfterMove 한 곳뿐이다
+        assert src.count("_tocTouched[moving] = true;") == 1, path
+
+    # 3)~4) 목차 구역 안에서 — 순서 대상 판정은 _tocOrderable 하나, 잠금 조건은 없다
+    for path, src in sources.items():
+        region = src[src.index("var _tocItems = []"):src.index("function _tocApply(")]
+        # 주석은 뺀다 — 「왜 잠금이 없는지」를 적어 둔 줄까지 걸리면 안 된다.
+        code = "\n".join(ln for ln in region.splitlines() if not ln.lstrip().startswith("//"))
+        assert code.count(".locked") == 1, f"{path}: _tocOrderable 밖에서 또 묻고 있다"
+        assert "_tocOrderable(item)" in code, path
+        for banned in ("dragLockReason", "drag-locked", "photo-gather"):
+            assert banned not in code, f"{path}: 목차엔 잠기는 자리가 없다 — {banned}"
+
+    # 그린 확정본 화면에 CSS·JS·그림이 **함께** 들어간다
+    page = renderer.render_page(
+        "11:00",
+        [{"outlet": "KBS", "title": "세제 개편 발표", "url": "https://u.x/1",
+          "summary": "정부가 세수 대책을 내놨다.", "pub_date": "2026-09-15T10:00:00+09:00",
+          "group": "세제"}],
+        ["세제"], [], "ㅇ ({outlet}) {title}", "<{section}>",
+    )
+    assert ".toc-grip {" in page and "function _tocMove(" in page
+    assert icon("grip") in page, "손잡이 그림이 화면에 안 들어갔다"
+    assert "{toc_grip_icon}" not in page, "템플릿 치환이 안 끝났다 — JS가 통째로 깨진다"
+
+    print("49) 목차에서 소제목 끌어 옮기기: 통과 "
+          "(두 화면 같은 장치, ▲▼와 같은 뒷일, 📂 미분류 한 곳 판정, 잠기는 자리 없음)")
+
+
 def test_new_article_placement():
     """새로 들어온 기사는 **제 소제목 안 언론사 순위 자리**에 끼워 들어간다.
 
@@ -7527,6 +7605,7 @@ if __name__ == "__main__":
         test_last_slot_topup_adds_late_articles,
         test_new_article_placement,
         test_drag_order_within_group,
+        test_toc_drag_reorder,
         test_trend_end_day_follows_today_completion,
         test_trend_today_partial_column,
         test_alert_scope_follows_keyword_switch,

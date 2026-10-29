@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>미니 목차에서 소제목 끌어 옮기기 — 시안</title>
+<style>
+  /* ── 앱에서 그대로 가져온 값 ──────────────────────────────────────────────
+     색 app/config.py PALETTE · 목차 CSS app/renderer.py(.toc-popover 계열)
+     끌기 CSS app/renderer.py DRAG_ORDER_STYLE(.drop-line·.is-grabbed·grab 커서)
+     ⠿ 아이콘 icon("grip") · ▲▼ icon("up")/icon("down")                       */
+  :root {
+    --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px;
+    --sh-pop: 0 4px 14px rgba(15, 23, 42, 0.12);
+    --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px 24px 60px;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    background: #F8FAFC; color: #1F2937;
+  }
+  h1 { font-size: var(--fs-xl); color: #1E3A5F; margin: 0 0 6px; }
+  .lead { font-size: var(--fs-md); color: #4B5563; margin: 0 0 26px; line-height: 1.7; max-width: 980px; }
+  .lead b { color: #1F2937; }
+  .cols { display: flex; gap: 28px; flex-wrap: wrap; }
+  .col { flex: 1 1 340px; min-width: 320px; }
+  .col h2 {
+    font-size: var(--fs-lg); color: #1E3A5F; margin: 0 0 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .pick { font-size: var(--fs-xs); font-weight: 700; color: #2563EB;
+    background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: var(--r-pill); padding: 2px 8px; }
+  .col p.why { font-size: var(--fs-sm); color: #6B7280; margin: 0 0 14px; line-height: 1.65; min-height: 3.3em; }
+
+  /* 팝오버가 뜬 화면을 흉내 낸 칸 — 실제로는 오른쪽 아래 ☰에 붙는 fixed 팝오버다. */
+  .stage {
+    position: relative; height: 420px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: var(--r-lg); overflow: hidden;
+  }
+  .stage .fakebody { padding: 18px; opacity: 0.45; pointer-events: none; }
+  .stage .fakebody .h { height: 11px; background: #E5E7EB; border-radius: var(--r-pill); margin: 0 0 9px; }
+  .stage .fakebody .h.w1 { width: 62%; } .stage .fakebody .h.w2 { width: 84%; }
+  .stage .fakebody .h.w3 { width: 46%; } .stage .fakebody .h.w4 { width: 72%; }
+  .toc-toggle-btn {
+    position: absolute; right: 20px; bottom: 20px; width: 48px; height: 48px;
+    border-radius: 50%; background: #FFFFFF; border: 1px solid #E5E7EB; color: #4B5563;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.10); cursor: pointer; font-size: 1.3rem;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex-shrink: 0; }
+
+  /* ── 미니 목차 팝오버 (앱 값 그대로, 폭만 200 → 224px) ───────────────────── */
+  .toc-popover {
+    position: absolute; right: 20px; bottom: 74px; width: 224px;
+    background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: var(--r-lg); box-shadow: var(--sh-pop); z-index: 200;
+  }
+  .toc-scroll { max-height: 320px; overflow-y: auto; padding: 8px; }
+  .toc-row { display: flex; align-items: center; justify-content: space-between; border-radius: var(--r-sm); }
+  .toc-row a {
+    flex: 1; min-width: 0; padding: 6px 8px; font-size: var(--fs-md); color: #1F2937;
+    text-decoration: none; border-radius: var(--r-sm); white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .toc-row a:hover { background: #EFF6FF; }
+  .toc-row-btns { display: flex; gap: 1px; flex-shrink: 0; padding-right: 4px; }
+  .toc-order-btn {
+    background: transparent; border: none; color: #6B7280; font-size: 0.72rem; cursor: pointer;
+    padding: 2px 4px; border-radius: var(--r-sm);
+  }
+  .toc-order-btn:hover { background: #EFF6FF; }
+  .toc-order-btn:disabled { opacity: 0.3; cursor: default; }
+  .toc-row.toc-row-moved { background: #E7EFE8; }
+  .toc-foot {
+    display: none; flex-direction: column; gap: 6px;
+    padding: 8px; border-top: 1px solid #E5E7EB;
+    background: #FFFFFF; border-radius: 0 0 var(--r-lg) var(--r-lg);
+  }
+  .toc-foot.is-dirty { display: flex; }
+  .toc-dirty-count { font-size: var(--fs-sm); color: #6B7280; }
+  .toc-foot-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .toc-foot-actions button { font-size: var(--fs-sm); padding: 5px 12px; border-radius: var(--r-sm); cursor: pointer; }
+  .toc-cancel-btn { background: transparent; color: #6B7280; border: 1px solid #E5E7EB; }
+  .toc-apply-btn { background: #2563EB; color: #FFFFFF; border: none; font-weight: 700; }
+
+  /* ── 새로 더하는 것: 손잡이 한 칸 ───────────────────────────────────────── */
+  .toc-grip {
+    flex: none; width: 20px; height: 24px; padding: 0; margin: 0;
+    background: transparent; border: none; color: #9CA3AF; cursor: grab;
+    display: inline-flex; align-items: center; justify-content: center;
+    user-select: none; -webkit-user-select: none;
+  }
+  .toc-grip .ic { width: 0.95rem; height: 0.95rem; }
+  .toc-grip:hover { color: #6B7280; }
+  .toc-grip:active { cursor: grabbing; }
+  /* 순서를 바꿀 수 없는 칸(📂 소제목 미분류)은 ▲▼가 이미 흐린 것과 같은 모양으로 둔다. */
+  .toc-row.is-locked .toc-grip { color: #E5E7EB; cursor: not-allowed; }
+
+  /* A안 = 늘 보인다 / B안 = 줄에 마우스를 올릴 때만 보인다(칸은 늘 비워 둔다) */
+  .hover-only .toc-grip { opacity: 0; transition: opacity 0.12s; }
+  .hover-only .toc-row:hover .toc-grip,
+  .hover-only .toc-row.is-grabbed .toc-grip { opacity: 1; }
+
+  /* 끌기 중 — 기사 끌기와 같은 값(파란 2px 선 · 잡은 줄 0.45 · 화면 전체 주먹) */
+  .drop-line { height: 0; border-top: 2px solid #2563EB; margin: 1px 0; border-radius: 2px; }
+  .toc-row.is-grabbed { opacity: 0.45; }
+  body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
+
+  .notes { margin: 30px 0 0; max-width: 980px; font-size: var(--fs-sm); color: #4B5563; line-height: 1.8; }
+  .notes h3 { font-size: var(--fs-md); color: #1E3A5F; margin: 22px 0 6px; }
+  .notes ul { margin: 0; padding-left: 18px; }
+  .notes code { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: var(--r-sm); padding: 0 4px; font-size: 0.95em; }
+  .hint { font-size: var(--fs-xs); color: #9CA3AF; margin: 8px 0 0; }
+</style>
+</head>
+<body>
+
+<h1>미니 목차에서 소제목 끌어 옮기기</h1>
+<p class="lead">
+  두 안 모두 <b>끄는 자리는 미니 목차 ☰ 안</b>이고, ▲▼·초록(마지막에 옮긴 한 칸)·「N개 위치 바뀜」·(취소)/(적용)은
+  지금 그대로다. <b>갈리는 건 손잡이가 늘 보이는지 하나뿐</b>이다. 두 목차 모두 실제로 끌어 볼 수 있다.
+</p>
+
+<div class="cols">
+
+  <div class="col">
+    <h2>A안 — 손잡이가 늘 보인다 <span class="pick">추천</span></h2>
+    <p class="why">
+      목차는 순서를 맞추러 여는 칸이라, 「여기는 끌 수 있다」가 처음 열 때 보이는 게 맞다.
+      손잡이 색은 흐린 회색(<code>text_faint</code>)이고 올리면 진해진다.
+    </p>
+    <div class="stage">
+      <div class="fakebody">
+        <div class="h w2"></div><div class="h w1"></div><div class="h w3"></div>
+        <div class="h w2"></div><div class="h w4"></div><div class="h w1"></div>
+        <div class="h w3"></div><div class="h w2"></div>
+      </div>
+      <button type="button" class="toc-toggle-btn" title="소제목 목차">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div class="toc-popover" id="pop-a"></div>
+    </div>
+    <p class="hint">줄 왼쪽 ⠿를 잡아 위아래로 끌어 보세요.</p>
+  </div>
+
+  <div class="col">
+    <h2>B안 — 올린 줄에만 보인다</h2>
+    <p class="why">
+      기사 끌기와 같은 문법(마우스를 올린 줄에만 ⠿). 목록은 더 깨끗하지만 손잡이 칸은
+      어차피 비워 둬야 해서 폭은 A안과 같고, 끌 수 있다는 걸 올려 봐야 안다.
+    </p>
+    <div class="stage">
+      <div class="fakebody">
+        <div class="h w2"></div><div class="h w1"></div><div class="h w3"></div>
+        <div class="h w2"></div><div class="h w4"></div><div class="h w1"></div>
+        <div class="h w3"></div><div class="h w2"></div>
+      </div>
+      <button type="button" class="toc-toggle-btn" title="소제목 목차">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div class="toc-popover hover-only" id="pop-b"></div>
+    </div>
+    <p class="hint">줄에 마우스를 올리면 ⠿가 나타납니다.</p>
+  </div>
+
+</div>
+
+<div class="notes">
+  <h3>두 안이 함께 지키는 것</h3>
+  <ul>
+    <li><b>📂 소제목 미분류는 못 끌고, 그 자리에도 못 놓는다</b> — 지금 ▲▼가 그 줄에서 흐린 채 아무 일도 안 하는 것과 같은 판정(<code>_tocOrderable</code>)이고, 늘 맨 아래에 남는다.</li>
+    <li><b>▲▼는 그대로 돈다</b> — 한 칸만 옮길 때, 그리고 끌기가 안 먹는 터치 화면에서 쓴다.</li>
+    <li><b>끌어 놓는 동안에는 아무것도 저장되지 않는다</b> — 목록만 바뀌고, 서버로 나가는 길은 지금처럼 (적용) 하나다. 초록은 마지막에 옮긴 한 칸, 숫자는 「적용하면 저장될 소제목 수」로 지금 규칙 그대로다.</li>
+    <li><b>잠기는 자리가 없다</b> — 모아 보는 중에는 ☰ 자체가 숨고, 「보기 순서」를 바꿔도 목차의 ▲▼는 지금도 그대로 도므로 기사 끌기의 두 잠금 조건이 여기엔 없다.</li>
+    <li>팝오버 폭만 200 → 224px로 넓힌다 — 손잡이 한 칸(20px)이 들어와도 소제목 이름 칸이 지금과 같은 폭을 쓰도록.</li>
+  </ul>
+</div>
+
+<script>
+// ── 목차 한 벌을 그리는 함수 — 앱의 _tocRender/_tocSwap과 같은 구조(메모리 목록 + 다시 그리기)
+var NAMES = [
+  { label: "가상자산 과세 유예", locked: false },
+  { label: "세법개정안 후속", locked: false },
+  { label: "국고보조금 부정수급", locked: false },
+  { label: "증시안전펀드 조성", locked: false },
+  { label: "인사청문회", locked: false },
+  { label: "기타", locked: false },
+  { label: "📂 소제목 미분류", locked: true }
+];
+var UP = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16 8-8 8 8"/></svg>';
+var DOWN = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 8 8 8 8-8"/></svg>';
+var GRIP = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">'
+  + '<circle cx="9" cy="5" r="1.5" fill="currentColor" stroke="none"/>'
+  + '<circle cx="15" cy="5" r="1.5" fill="currentColor" stroke="none"/>'
+  + '<circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none"/>'
+  + '<circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none"/>'
+  + '<circle cx="9" cy="19" r="1.5" fill="currentColor" stroke="none"/>'
+  + '<circle cx="15" cy="19" r="1.5" fill="currentColor" stroke="none"/></svg>';
+
+function makeToc(host) {
+  var state = {
+    items: NAMES.map(function (n) { return { label: n.label, locked: n.locked }; }),
+    base: NAMES.map(function (n) { return n.label; }),
+    touched: {},
+    movedIdx: -1
+  };
+  var dragSrc = null, dragLine = null;
+
+  function orderable(it) { return !!(it && !it.locked); }
+  function neighbor(idx, step) {
+    if (!orderable(state.items[idx])) { return -1; }
+    for (var k = idx + step; k >= 0 && k < state.items.length; k += step) {
+      if (orderable(state.items[k])) { return k; }
+    }
+    return -1;
+  }
+  function dirtyCount() {
+    var n = 0;
+    for (var i = 0; i < state.items.length; i++) {
+      if (state.items[i].label !== state.base[i]) { n++; }
+    }
+    return n;
+  }
+  function afterMove(label, to) {
+    state.touched[label] = true;
+    state.movedIdx = to;
+    state.items.forEach(function (it, k) {
+      if (it.label === state.base[k]) { delete state.touched[it.label]; }
+    });
+    if (state.movedIdx >= 0 && state.items[state.movedIdx].label === state.base[state.movedIdx]) {
+      state.movedIdx = -1;
+    }
+    render();
+  }
+  function swap(i, j) {
+    if (i < 0 || j < 0) { return; }
+    var tmp = state.items[i]; state.items[i] = state.items[j]; state.items[j] = tmp;
+    afterMove(state.items[j].label, j);
+  }
+  function moveTo(from, to) {
+    if (from === to || from < 0 || to < 0) { return; }
+    var moving = state.items.splice(from, 1)[0];
+    state.items.splice(to, 0, moving);
+    afterMove(moving.label, state.items.indexOf(moving));
+  }
+
+  function clearLine() {
+    if (dragLine && dragLine.parentNode) { dragLine.parentNode.removeChild(dragLine); }
+    dragLine = null;
+  }
+  function cleanup() {
+    clearLine();
+    document.body.classList.remove("is-dragging");
+    host.querySelectorAll(".toc-row").forEach(function (r) {
+      r.classList.remove("is-grabbed");
+      r.draggable = false;
+    });
+    dragSrc = null;
+  }
+
+  function render() {
+    host.innerHTML = "";
+    var scroll = document.createElement("div");
+    scroll.className = "toc-scroll";
+
+    state.items.forEach(function (item, idx) {
+      var row = document.createElement("div");
+      row.className = "toc-row"
+        + (idx === state.movedIdx ? " toc-row-moved" : "")
+        + (item.locked ? " is-locked" : "");
+      row.dataset.idx = String(idx);
+
+      var grip = document.createElement("button");
+      grip.type = "button";
+      grip.className = "toc-grip";
+      grip.innerHTML = GRIP;
+      grip.title = item.locked
+        ? "이 칸은 순서를 바꿀 수 없어요"
+        : "끌어서 순서 바꾸기";
+      grip.setAttribute("tabindex", "-1");
+      // 손잡이를 누른 순간에만 그 줄이 끌 수 있게 된다(기사 끌기와 같은 방식).
+      grip.addEventListener("mousedown", function () {
+        if (!item.locked) { row.draggable = true; }
+      });
+      grip.addEventListener("click", function (e) { e.preventDefault(); });
+
+      var a = document.createElement("a");
+      a.href = "#";
+      a.textContent = item.label;
+      a.draggable = false;          // <a>의 기본 끌기(주소 끌기)를 막는다
+      a.onclick = function (e) { e.preventDefault(); };
+
+      var btns = document.createElement("span");
+      btns.className = "toc-row-btns";
+      var up = document.createElement("button");
+      up.type = "button"; up.className = "toc-order-btn"; up.innerHTML = UP; up.title = "위로";
+      var prevIdx = neighbor(idx, -1), nextIdx = neighbor(idx, 1);
+      up.disabled = prevIdx < 0;
+      up.onclick = function () { swap(idx, prevIdx); };
+      var down = document.createElement("button");
+      down.type = "button"; down.className = "toc-order-btn"; down.innerHTML = DOWN; down.title = "아래로";
+      down.disabled = nextIdx < 0;
+      down.onclick = function () { swap(idx, nextIdx); };
+      btns.appendChild(up); btns.appendChild(down);
+
+      row.appendChild(grip); row.appendChild(a); row.appendChild(btns);
+
+      row.addEventListener("dragstart", function (e) {
+        dragSrc = row;
+        row.classList.add("is-grabbed");
+        document.body.classList.add("is-dragging");
+        e.dataTransfer.effectAllowed = "move";
+        try { e.dataTransfer.setData("text/plain", item.label); } catch (err) {}
+      });
+      row.addEventListener("dragend", cleanup);
+
+      row.addEventListener("dragover", function (e) {
+        if (!dragSrc || row === dragSrc) { return; }
+        e.preventDefault();
+        if (item.locked) {           // 📂 미분류 자리에는 못 놓는다
+          e.dataTransfer.dropEffect = "none";
+          clearLine();
+          return;
+        }
+        e.dataTransfer.dropEffect = "move";
+        if (!dragLine) {
+          dragLine = document.createElement("div");
+          dragLine.className = "drop-line";
+        }
+        var r = row.getBoundingClientRect();
+        var before = (e.clientY - r.top) < r.height / 2;
+        scroll.insertBefore(dragLine, before ? row : row.nextSibling);
+      });
+
+      row.addEventListener("drop", function (e) {
+        if (!dragSrc || item.locked) { cleanup(); return; }
+        e.preventDefault();
+        var from = Number(dragSrc.dataset.idx);
+        var r = row.getBoundingClientRect();
+        var before = (e.clientY - r.top) < r.height / 2;
+        var to = idx + (before ? 0 : 1);
+        if (from < to) { to -= 1; }
+        cleanup();
+        moveTo(from, to);
+      });
+
+      scroll.appendChild(row);
+    });
+
+    host.appendChild(scroll);
+
+    // 하단 확정 바 — 지금 그대로다(바꾼 게 없으면 아예 안 뜬다).
+    var dirty = dirtyCount();
+    var shown = Object.keys(state.touched).length || dirty;
+    var foot = document.createElement("div");
+    foot.className = "toc-foot" + (dirty ? " is-dirty" : "");
+    var count = document.createElement("span");
+    count.className = "toc-dirty-count";
+    count.textContent = shown + "개 위치 바뀜";
+    var actions = document.createElement("div");
+    actions.className = "toc-foot-actions";
+    var cancel = document.createElement("button");
+    cancel.type = "button"; cancel.className = "toc-cancel-btn"; cancel.textContent = "취소";
+    cancel.onclick = function () {
+      state.items = state.base.map(function (label, i) {
+        return { label: label, locked: NAMES[i].locked };
+      });
+      state.touched = {}; state.movedIdx = -1; render();
+    };
+    var apply = document.createElement("button");
+    apply.type = "button"; apply.className = "toc-apply-btn"; apply.textContent = "적용";
+    apply.onclick = function () {
+      state.base = state.items.map(function (it) { return it.label; });
+      state.touched = {}; state.movedIdx = -1; render();
+    };
+    actions.appendChild(cancel); actions.appendChild(apply);
+    foot.appendChild(count); foot.appendChild(actions);
+    host.appendChild(foot);
+  }
+
+  render();
+}
+
+makeToc(document.getElementById("pop-a"));
+makeToc(document.getElementById("pop-b"));
+</script>
+
+</body>
+</html>
