@@ -6708,6 +6708,112 @@ def test_user_boundary():
           "소유자가 없으면 경로는 지금 그대로")
 
 
+def test_naver_key_per_person():
+    """네이버 키는 사람별이고 **공용 값을 물려받지 않는다.**
+
+    네이버 한도는 키(애플리케이션)마다 하루 25,000회인데 담당자 한 사람이 5,679회를
+    쓴다(2026-10-30 실측) — 공용 키 하나를 나눠 쓰면 **4명이 한계다.** 각자 자기 키를
+    쓰면 그 제약이 사라진다(SERVER_REQUIREMENTS.md §9).
+
+    **물려받지 않는 것이 이 테스트의 핵심이다.** 설정·검색어는 「안 고친 칸은 공용 값을
+    쓴다」가 친절하지만, 키에 그걸 적용하면 새 사람이 담당자 키로 수집해 **한도를 같이
+    쓰게 되어 가른 뜻이 없어진다.** `.env` 폴백도 바닥 주인에게만 보인다(`.env`는
+    담당자가 설치할 때 넣은 씨앗이라 그 사람 것이다).
+
+    Claude·텔레그램·이메일은 공용이라 누가 봐도 같은 값이어야 한다 — 그쪽이 사람별로
+    갈리면 비용·봇 이름·발송 계정이 사람마다 달라진다.
+    """
+    _require_isolation()
+    import stat as stat_mod
+
+    from app import credentials as cred, store
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        with patch.object(store, "DATA_DIR", tmp_dir), \
+             patch.object(cred, "CREDENTIALS_FILE", tmp_dir / "credentials.json"), \
+             patch.object(cred, "MY_CREDENTIALS_FILE", tmp_dir / "my_credentials.json"), \
+             patch.object(cred, "NAVER_CLIENT_ID", "env-id"), \
+             patch.object(cred, "NAVER_CLIENT_SECRET", "env-secret"):
+
+            # ── 바닥 주인 — 예전 그대로 공용 파일 한 벌 ─────────────────
+            assert store.current_owner() is None
+            cred.save_naver_credentials("base-id", "base-secret")
+            cred.save_llm_credentials("sk-ant-공용")
+            cred.save_telegram_token("111:AA공용")
+            assert (tmp_dir / "credentials.json").exists()
+            assert not (tmp_dir / "my_credentials.json").exists(), (
+                "바닥 주인이 사람별 키 파일을 만들었습니다 — 그러면 가르면서 옮길 파일이 생깁니다."
+            )
+            assert cred.naver_client_id() == "base-id"
+            assert cred.naver_source() == "saved"
+
+            # ── 다른 사람 — 네이버 키를 **물려받지 않는다** ─────────────
+            with store.owner("u2"):
+                assert cred.naver_client_id() is None, (
+                    "새 사람이 담당자의 네이버 키를 물려받았습니다 — 한도를 같이 쓰게 됩니다."
+                )
+                assert cred.naver_client_secret() is None
+                assert not cred.naver_is_configured()
+                assert cred.naver_source() == "none", (
+                    f".env 폴백이 새 사람에게 보입니다({cred.naver_source()}) — "
+                    ".env는 담당자가 설치할 때 넣은 씨앗이라 그 사람 것입니다."
+                )
+                # 공용 키 셋은 그대로 보인다
+                assert cred.llm_api_key() == "sk-ant-공용"
+                assert cred.telegram_bot_token() == "111:AA공용"
+
+                # 자기 키를 넣으면 자기 파일에만 간다
+                cred.save_naver_credentials("u2-id", "u2-secret")
+                assert cred.naver_client_id() == "u2-id"
+                mine = tmp_dir / "users" / "u2" / "my_credentials.json"
+                assert mine.exists(), "사람별 키 파일이 그 사람 폴더에 안 생겼습니다."
+                # 비밀 값이라 권한을 좁힌다
+                mode = stat_mod.S_IMODE(mine.stat().st_mode)
+                assert mode == 0o600, f"사람별 키 파일 권한이 {oct(mode)}입니다 — 600이어야 합니다."
+                # 공용 파일엔 그 사람 키가 안 적힌다
+                shared = json.loads((tmp_dir / "credentials.json").read_text(encoding="utf-8"))
+                assert shared["naver"]["client_id"] == "base-id", (
+                    "다른 사람이 저장했는데 공용 네이버 키가 바뀌었습니다."
+                )
+
+            # 담당자 키는 그대로다
+            assert cred.naver_client_id() == "base-id"
+
+            # ── 다른 사람이 **공용** 키를 저장하면 공용 파일로 가고,
+            #    그러면서 공용 네이버 키를 망가뜨리지 않는다 ─────────────
+            with store.owner("u2"):
+                cred.save_llm_credentials("sk-ant-바뀜")
+            assert cred.llm_api_key() == "sk-ant-바뀜", "공용 키가 그 사람 파일에만 적혔습니다."
+            assert cred.naver_client_id() == "base-id", (
+                "공용 키를 저장하면서 공용 네이버 키를 덮었습니다."
+            )
+            with store.owner("u2"):
+                assert cred.naver_client_id() == "u2-id"
+
+            # ── .env 폴백은 바닥 주인만 ─────────────────────────────────
+            cred.delete_naver_credentials()
+            assert cred.naver_client_id() == "env-id", "바닥 주인의 .env 폴백이 끊겼습니다."
+            assert cred.naver_source() == "env"
+
+    # ── 화면 권한 — 네이버는 각자 넣으니 관리자 전용이 아니다 ─────────────
+    from app import settings_server
+    for path in ("/naver", "/save-naver", "/delete-naver", "/test-naver"):
+        assert path not in settings_server._ADMIN_ONLY_PATHS, (
+            f"{path}가 관리자 전용입니다 — 네이버 키는 각자 넣습니다."
+        )
+    for path in ("/llm", "/telegram-sender", "/email-sender", "/keys"):
+        assert path in settings_server._ADMIN_ONLY_PATHS, (
+            f"{path}가 열려 있습니다 — 공용 키라 관리자만 바꿔야 합니다."
+        )
+    assert 'href="/naver"' in settings_server._menu_html(False), (
+        "일반 사용자 메뉴에 네이버 키 항목이 없습니다 — 자기 키를 넣을 길이 없습니다."
+    )
+
+    print("✓ 네이버 키 사람별: 물려받지 않고(.env도) 자기 폴더에 권한 600으로, "
+          "Claude·텔레그램·이메일은 공용")
+
+
 def test_scheduler_runs_per_person():
     """수집은 사람마다 한 바퀴, 공용 일은 한 번만 — **그리고 혼자면 지금과 똑같이 한 번.**
 
@@ -7043,6 +7149,10 @@ def test_admin_only_settings():
         "/subheading-format", "/save-subheading-format",
         "/format-adhoc", "/save-format-adhoc",
         "/subheading-format-adhoc", "/save-subheading-format-adhoc",
+        # 네이버 키도 사람별이다 — 한도가 키마다라 각자 자기 키를 쓴다
+        # (app/credentials.py _PER_USER_CREDENTIAL_KEYS). Claude·텔레그램·이메일은
+        # 공용이라 그대로 관리자 몫이다.
+        "/naver", "/save-naver", "/delete-naver", "/test-naver",
     ]
     leaked = [p for p in must_stay_open if p in admin_only]
     assert not leaked, (
@@ -7051,7 +7161,7 @@ def test_admin_only_settings():
     )
     # 반대로 설정은 빠짐없이 들어 있다
     for path in ("/schedule", "/save-schedule", "/outlets",
-                 "/telegram", "/email", "/naver", "/llm", "/keys",
+                 "/telegram", "/email", "/llm", "/keys",
                  "/login-settings", "/save-login-settings", "/accounts", "/accounts/role",
                  "/deleted/restore", "/label-manage", "/trend/add-word"):
         assert path in admin_only, f"{path}가 관리자 전용에서 빠졌습니다."
@@ -7094,7 +7204,7 @@ def test_admin_only_settings():
             # 1) 자물쇠가 꺼져 있으면 아무것도 막지 않는다 — 누구든, 어느 주소든.
             assert not auth_session.is_login_required()
             for user in (None, member, admin):
-                for path in ("/schedule", "/save-naver", "/accounts"):
+                for path in ("/schedule", "/save-llm", "/accounts"):
                     hit, _ = blocked(path, "GET", user)
                     assert not hit, (
                         f"자물쇠가 꺼져 있는데 {path}를 막았습니다 — 혼자 쓰는 앱의 "
@@ -7116,7 +7226,7 @@ def test_admin_only_settings():
             hit, stub = blocked("/schedule", "GET", member)
             assert hit and stub.sent == ("html", 403), f"일반 사용자 GET 거절이 틀립니다: {stub.sent}"
 
-            hit, stub = blocked("/save-naver", "POST", member)
+            hit, stub = blocked("/save-llm", "POST", member)
             assert hit and stub.sent[0] == "json" and stub.sent[1] == 403, (
                 f"일반 사용자 POST는 403 JSON이어야 합니다: {stub.sent}"
             )
@@ -7164,17 +7274,20 @@ def test_admin_only_settings():
     # ── 설정 메뉴 — 일반 사용자에게는 관리자 항목을 안 그린다 ─────────────
     admin_menu = settings_server._menu_html(True)
     member_menu = settings_server._menu_html(False)
-    for path in ("/schedule", "/naver", "/outlets", "/telegram"):
+    for path in ("/schedule", "/llm", "/outlets", "/telegram"):
         assert f'href="{path}"' in admin_menu, f"관리자 메뉴에 {path}가 없습니다."
         assert f'href="{path}"' not in member_menu, (
             f"일반 사용자 메뉴에 {path}가 남아 있습니다."
         )
-    for path in ("/send-log", "/excel-merge", "/keywords", "/format"):
+    for path in ("/send-log", "/excel-merge", "/keywords", "/format", "/naver"):
         assert f'href="{path}"' in member_menu, f"일반 사용자 메뉴에 {path}가 없습니다."
     # 묶음이 통째로 비면 묶음 이름도 안 그린다
     # 「연동」은 통째로 관리자 몫이라 묶음 이름도 안 그린다. 「정기」는 검색어·형식이
     # 사람별이 되어 일반 사용자에게도 남는다(그 묶음의 수집시간대·발송만 빠진다).
-    assert "연동</div>" not in member_menu, "항목이 하나도 없는 묶음 이름이 남아 있습니다."
+    # 「연동」은 네이버 키 한 줄 때문에 일반 사용자에게도 남는다(나머지 넷은 관리자 몫).
+    assert 'href="/llm"' not in member_menu and 'href="/keys"' not in member_menu, (
+        "일반 사용자 메뉴에 공용 키 항목이 남아 있습니다."
+    )
     assert "발송 · 알림" not in member_menu, (
         "그 아래 항목이 전부 관리자 몫인 소제목이 남아 있습니다."
     )
@@ -8546,6 +8659,7 @@ if __name__ == "__main__":
         test_base_owner_needs_no_migration,
         test_settings_split_per_user,
         test_scheduler_runs_per_person,
+        test_naver_key_per_person,
         test_admin_only_settings,
         test_no_undefined_names,
         test_screens_render_to_response,

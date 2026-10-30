@@ -866,6 +866,9 @@ MY_SETTINGS_FILE = DATA_DIR / "my_settings.json"
 # SMTP 등)가 이 화면 패턴을 따라오면 같은 파일에 필드만 늘리면 된다. data/ 폴더는
 # 이미 .gitignore라 커밋되지 않는다.
 CREDENTIALS_FILE = DATA_DIR / "credentials.json"
+# 사람별 키 — **네이버 키만** 여기 산다(한도가 키마다라 각자 자기 키를 쓴다).
+# 저장소 한 겹의 사람별 칸이라 사람마다 자기 폴더로 풀린다(app/store.py _PER_USER).
+MY_CREDENTIALS_FILE = DATA_DIR / "my_credentials.json"
 ARTICLES_DIR = DATA_DIR / "articles"
 # PRD.md 기능1 규칙 19 — [추가: 2026-07-24] 숨긴 기사 URL 목록 (원본 회차 데이터와 분리 보관)
 # [뜻 좁힘: 2026-10-29] 이 파일은 이제 **최근 HIDDEN_VIEW_DAYS일치만** 담는다. 그보다

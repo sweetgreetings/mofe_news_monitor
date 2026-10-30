@@ -74,6 +74,9 @@ _PER_USER = {
     # 내가 고친 설정 칸만(검색어·형광펜·보고서 모양 — app/settings.py
     # _PER_USER_SETTING_KEYS). 안 고친 칸은 공용 settings.json 값을 쓴다.
     "my_settings.json",
+    # 내 네이버 키 — 네이버 한도가 키(애플리케이션)마다라 각자 자기 키를 쓴다.
+    # **공용 값을 물려받지 않는다**(물려받으면 한도를 같이 쓰게 되어 뜻이 없다).
+    "my_credentials.json",
     # 내 회차에 딸린 캐시 — 남의 회차 분류를 내 회차에 쓰면 소제목이 섞인다
     "llm_classification_cache.json", "preview_cache.json",
     "auto_classify_turns.json", "negative_guess.json",
@@ -193,6 +196,17 @@ def _resolve(path: Path) -> Path:
     if not uid or top not in _PER_USER:
         return path
     return Path(DATA_DIR) / _USERS_SEGMENT / uid / rel
+
+
+def real_path(path) -> Path:
+    """그 자리의 **실제 파일 경로**(사람별이면 그 사람 폴더로 풀린 것).
+
+    **쓰는 자리는 하나뿐이다** — 비밀 값 파일의 권한을 600으로 좁힐 때
+    (`app/credentials.py`). 읽고 쓰는 일은 위 함수들이 이미 알아서 풀어 주므로,
+    **경로 자체가 필요한 새 자리가 생기면 먼저 「정말 파일을 직접 만져야 하나」를
+    따진다**(대개는 `read_json`·`write_json`을 부르면 된다).
+    """
+    return _resolve(Path(path))
 
 
 def key_of(path) -> str:

@@ -24,6 +24,7 @@ from app.config import (
     ANTHROPIC_API_KEY,
     BASE_DIR,
     CREDENTIALS_FILE,
+    MY_CREDENTIALS_FILE,
     EMAIL_SENDER_ADDRESS,
     EMAIL_SENDER_PASSWORD,
     EMAIL_SERVICES,
@@ -41,27 +42,85 @@ logger = logging.getLogger(__name__)
 ENV_FILE = BASE_DIR / ".env"
 
 
-def _load() -> dict:
-    if not CREDENTIALS_FILE.exists():
-        return {}
+# ──────────────── 사람별 키인가 공용 키인가 ────────────────
+# **네이버 키만 사람별이다.** 네이버가 주는 한도는 **키(애플리케이션)마다 하루
+# 25,000회**인데 담당자 한 사람이 하루 5,679회를 쓴다(2026-10-30 실측) — 공용 키
+# 하나를 나눠 쓰면 **4명이 한계다**(22,716회 = 91%). 각자 자기 키를 쓰면 그 제약이
+# 사라진다(SERVER_REQUIREMENTS.md §9).
+#
+# 나머지 셋은 공용이다 — Claude는 비용이 한 곳으로 모이는 게 관리하기 쉽고,
+# 텔레그램 봇은 봇 하나를 모두가 쓰며(이름을 바꾸면 모두에게 바뀐다), 이메일 발송
+# 계정도 기관 계정 하나다.
+#
+# **네이버 키는 공용 값을 물려받지 않는다.** 설정·검색어는 「안 고친 칸은 공용 값을
+# 쓴다」가 친절하지만(app/settings.py), 키에 그걸 적용하면 **새 사람이 담당자 키로
+# 수집해 한도를 같이 쓰게 되어 가른 뜻이 없어진다.** 자기 키가 없으면 수집이 안 되고,
+# 그 사실은 화면이 말한다(확정본 대기 화면·오늘 전체 기사가 「키가 없어 수집이
+# 시작되지 않습니다」 + 등록 링크를 띄운다 — 이미 있던 갈래다).
+_PER_USER_CREDENTIAL_KEYS = {"naver"}
+
+
+def _is_base_owner() -> bool:
+    """지금 요청이 「바닥」의 주인인가 — 그 사람의 자리가 곧 `data/`다.
+
+    혼자 쓰는 지금이 늘 이 경우라, 아래 함수들이 **예전과 똑같이** 공용 파일 한 벌을
+    읽고 쓴다(app/users.py `base_owner_id`).
+    """
+    return store.current_owner() is None
+
+
+def _read(path) -> dict:
     try:
-        data = store.read_json(CREDENTIALS_FILE)
+        data = store.read_json(path)
     except (json.JSONDecodeError, OSError):
         return {}
     return data if isinstance(data, dict) else {}
 
 
-def _save(data: dict) -> None:
-    store.write_json(CREDENTIALS_FILE, data, indent=2)
+def _load() -> dict:
+    """지금 요청이 쓸 키 묶음 — 공용 셋 + **내** 네이버 키."""
+    data = _read(CREDENTIALS_FILE) if CREDENTIALS_FILE.exists() else {}
+    if _is_base_owner():
+        return data
+    mine = _read(MY_CREDENTIALS_FILE) if store.exists(MY_CREDENTIALS_FILE) else {}
+    # **덮는 게 아니라 갈아끼운다** — 공용 네이버 키를 물려받지 않는다.
+    for key in _PER_USER_CREDENTIAL_KEYS:
+        data[key] = mine.get(key, {}) or {}
+    return data
+
+
+def _chmod_600(path) -> None:
     # [추가: 2026-08-20] 비밀 값이 담긴 파일이라 소유자만 읽고 쓸 수 있게 권한을
-    # 좁힌다 — 이 저장소가 이런 값을 다루는 첫 사례다. chmod가 안 되는 환경(윈도우
-    # 일부 파일시스템)에서는 그냥 건너뛴다: 이 앱의 타겟이 원래 단일 로컬 사용자라
-    # 권한 좁히기가 실패해도 보안 성격이 달라지지 않는다(다른 저장 파일들도 권한을
-    # 안 좁힌다).
+    # 좁힌다. chmod가 안 되는 환경(윈도우 일부 파일시스템)에서는 그냥 건너뛴다.
     try:
-        CREDENTIALS_FILE.chmod(stat.S_IRUSR | stat.S_IWUSR)
+        path.chmod(stat.S_IRUSR | stat.S_IWUSR)
     except OSError:
         pass
+
+
+def _save(data: dict) -> None:
+    """키를 저장한다 — 사람별 칸과 공용 칸을 갈라 쓴다(`app/settings.py` `_write`와 같은 모양).
+
+    바닥 주인은 예전과 똑같이 공용 파일 한 벌에 쓴다. 그래서 **가르면서 옮긴 파일이
+    0개**이고 `my_credentials.json`은 둘째 사람이 키를 넣을 때 처음 생긴다.
+    """
+    if _is_base_owner():
+        store.write_json(CREDENTIALS_FILE, data, indent=2)
+        _chmod_600(CREDENTIALS_FILE)
+        return
+
+    mine = {key: data[key] for key in _PER_USER_CREDENTIAL_KEYS if key in data}
+    store.write_json(MY_CREDENTIALS_FILE, mine, indent=2)
+    # 사람별 파일도 비밀 값이라 권한을 좁힌다(저장소 한 겹이 그 사람 폴더로 풀어 준다).
+    _chmod_600(store.real_path(MY_CREDENTIALS_FILE))
+
+    # 공용 칸은 **그 칸만** 고친다 — 통째로 덮으면 남의 네이버 키를 자기 것으로 바꾼다.
+    shared = _read(CREDENTIALS_FILE)
+    shared.update(
+        {key: value for key, value in data.items() if key not in _PER_USER_CREDENTIAL_KEYS}
+    )
+    store.write_json(CREDENTIALS_FILE, shared, indent=2)
+    _chmod_600(CREDENTIALS_FILE)
 
 
 def mask(value: str, keep_prefix: int = 0, keep_suffix: int = 4) -> str:
@@ -79,12 +138,24 @@ def _naver_saved() -> dict:
     return _load().get("naver", {}) or {}
 
 
+def _env_naver() -> tuple:
+    """`.env`에 남은 네이버 키 — **바닥 주인에게만 보인다.**
+
+    `.env`는 담당자가 설치할 때 한 번 넣어 주는 씨앗이라 그 사람 것이다. 새로 들어온
+    사람에게 폴백하면 **담당자 키로 수집해 한도를 같이 쓰게 되어** 사람별로 가른 뜻이
+    없어진다.
+    """
+    if not _is_base_owner():
+        return (None, None)
+    return (NAVER_CLIENT_ID, NAVER_CLIENT_SECRET)
+
+
 def naver_client_id() -> Optional[str]:
-    return (_naver_saved().get("client_id") or "").strip() or NAVER_CLIENT_ID or None
+    return (_naver_saved().get("client_id") or "").strip() or _env_naver()[0] or None
 
 
 def naver_client_secret() -> Optional[str]:
-    return (_naver_saved().get("client_secret") or "").strip() or NAVER_CLIENT_SECRET or None
+    return (_naver_saved().get("client_secret") or "").strip() or _env_naver()[1] or None
 
 
 def naver_is_configured() -> bool:
@@ -96,7 +167,7 @@ def naver_source() -> str:
     saved = _naver_saved()
     if saved.get("client_id") or saved.get("client_secret"):
         return "saved"
-    if NAVER_CLIENT_ID or NAVER_CLIENT_SECRET:
+    if any(_env_naver()):
         return "env"
     return "none"
 

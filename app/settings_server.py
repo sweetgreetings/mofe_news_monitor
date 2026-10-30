@@ -1745,7 +1745,8 @@ _MENU_GROUPS = [
     # 수집 시간 같은 항목들 아래, 가장 손이 안 가는 자리가 맞다.
     ("연동", "category", [
         ("link", "/keys", "키 보관 상태", "등록됐는지 한눈에", None, True),
-        ("link", "/naver", "네이버 뉴스 API 설정", "", "naver", True),
+        # 네이버 키는 사람별이라(한도가 키마다다) 모두 자기 키를 넣는다
+        ("link", "/naver", "네이버 뉴스 API 설정", "", "naver", False),
         ("link", "/llm", "LLM(AI) 연동", "", "llm", True),
         ("link", "/telegram-sender", "텔레그램 발송 계정", "", "telegram", True),
         ("link", "/email-sender", "이메일 발송 계정", "", "email", True),
@@ -1782,9 +1783,12 @@ _ADMIN_ONLY_PATHS = {
     # 받는 사람 명단
     "/telegram", "/save-telegram", "/telegram/add-recipient-slot",
     "/email", "/save-email", "/email/add-recipient-slot",
-    # 연동 키 — 공용 키라 한 사람이 바꾸면 모두의 수집·발송이 바뀐다
+    # 연동 키 — 공용 키라 한 사람이 바꾸면 모두의 수집·발송이 바뀐다.
+    # **네이버만 빠져 있다** — 한도가 키마다라 각자 자기 키를 쓴다
+    # (app/credentials.py `_PER_USER_CREDENTIAL_KEYS`).
+    # 「키 보관 상태」(/keys)는 다섯 키를 한눈에 보는 화면이라 관리자 몫으로 남긴다 —
+    # 일반 사용자에게 필요한 건 자기 네이버 키 한 줄이고 그건 /naver가 보여 준다.
     "/keys",
-    "/naver", "/save-naver", "/delete-naver", "/test-naver",
     "/llm", "/save-llm", "/delete-llm", "/test-llm",
     "/telegram-sender", "/save-telegram-sender", "/delete-telegram-sender",
     "/test-telegram-sender",
