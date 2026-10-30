@@ -11,7 +11,7 @@ import threading
 from datetime import datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import API_USAGE_FILE, API_USAGE_WARN_RATIO, NAVER_DAILY_CALL_LIMIT
 
 # [추가: 2026-08-20] 네이버 검색 요청은 최대 8개 스레드가 동시에 날린다
@@ -31,7 +31,7 @@ def _load(now: Optional[datetime] = None) -> dict:
     if not API_USAGE_FILE.exists():
         return {"date": _today_str(now), "count": 0}
     try:
-        data = json.loads(API_USAGE_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(API_USAGE_FILE)
     except (json.JSONDecodeError, TypeError):
         return {"date": _today_str(now), "count": 0}
     if data.get("date") != _today_str(now):
@@ -46,7 +46,7 @@ def record_api_call(now: Optional[datetime] = None) -> None:
     with _LOCK:
         data = _load(now)
         data["count"] += 1
-        atomic_write_text(API_USAGE_FILE, json.dumps(data, ensure_ascii=False))
+        store.write_json(API_USAGE_FILE, data)
 
 
 def today_call_count(now: Optional[datetime] = None) -> int:

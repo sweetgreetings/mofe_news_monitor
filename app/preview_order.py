@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import PREVIEW_ORDER_FILE
 
 
@@ -24,7 +24,7 @@ def load_preview_order(now: Optional[datetime] = None) -> list:
     if not PREVIEW_ORDER_FILE.exists():
         return []
     try:
-        data = json.loads(PREVIEW_ORDER_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(PREVIEW_ORDER_FILE)
     except (json.JSONDecodeError, TypeError):
         return []
     if data.get("date") != _today_str(now):
@@ -33,10 +33,7 @@ def load_preview_order(now: Optional[datetime] = None) -> list:
 
 
 def save_preview_order(order: list, now: Optional[datetime] = None) -> None:
-    atomic_write_text(
-        PREVIEW_ORDER_FILE,
-        json.dumps({"date": _today_str(now), "order": order}, ensure_ascii=False),
-    )
+    store.write_json(PREVIEW_ORDER_FILE, {"date": _today_str(now), "order": order})
 
 
 def clear_preview_order(now: Optional[datetime] = None) -> None:

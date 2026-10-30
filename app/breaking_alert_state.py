@@ -3,7 +3,7 @@
 # 설정 화면에서 "저장"을 누를 때마다 폴링 시각까지 덮어써 간격 계산이 매번 리셋된다.
 import json
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import BREAKING_ALERT_STATE_FILE
 
 
@@ -11,11 +11,11 @@ def load_state() -> dict:
     if not BREAKING_ALERT_STATE_FILE.exists():
         return {}
     try:
-        data = json.loads(BREAKING_ALERT_STATE_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(BREAKING_ALERT_STATE_FILE)
     except (json.JSONDecodeError, TypeError):
         return {}
     return data if isinstance(data, dict) else {}
 
 
 def save_state(state: dict) -> None:
-    atomic_write_text(BREAKING_ALERT_STATE_FILE, json.dumps(state, ensure_ascii=False))
+    store.write_json(BREAKING_ALERT_STATE_FILE, state)

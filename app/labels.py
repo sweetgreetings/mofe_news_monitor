@@ -15,7 +15,7 @@ import threading
 from datetime import datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import LABELS_FILE
 from app.sorter import sort_by_pub_desc
 
@@ -42,14 +42,14 @@ def load_labels() -> dict:
     if not LABELS_FILE.exists():
         return {}
     try:
-        data = json.loads(LABELS_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(LABELS_FILE)
     except (json.JSONDecodeError, TypeError):
         return {}
     return data if isinstance(data, dict) else {}
 
 
 def _write(data: dict) -> None:
-    atomic_write_text(LABELS_FILE, json.dumps(data, ensure_ascii=False, indent=2))
+    store.write_json(LABELS_FILE, data, indent=2)
 
 
 def labels_for_url(url: str) -> list:

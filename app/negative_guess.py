@@ -17,7 +17,7 @@ import threading
 from datetime import datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import (
     NEGATIVE_GUESS_FILE,
     NEGATIVE_GUESS_KEYWORDS,
@@ -65,7 +65,7 @@ def load_state(today: Optional[str] = None) -> dict:
     today = today or datetime.now().strftime("%Y-%m-%d")
     with _file_lock:
         try:
-            data = json.loads(NEGATIVE_GUESS_FILE.read_text(encoding="utf-8"))
+            data = store.read_json(NEGATIVE_GUESS_FILE)
         except (FileNotFoundError, ValueError):
             return _empty(today)
     if not isinstance(data, dict) or data.get("date") != today:
@@ -77,7 +77,7 @@ def load_state(today: Optional[str] = None) -> dict:
 
 def _save_state(state: dict) -> None:
     with _file_lock:
-        atomic_write_text(NEGATIVE_GUESS_FILE, json.dumps(state, ensure_ascii=False))
+        store.write_json(NEGATIVE_GUESS_FILE, state)
 
 
 def mentions_ministry(article: dict) -> bool:

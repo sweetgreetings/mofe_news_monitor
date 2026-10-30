@@ -6470,6 +6470,111 @@ def test_key_paths_stay_narrow():
     print("48) 키 이음매: 통과 (네이버·Claude·텔레그램·이메일 각 한 곳, .env를 읽고 고치는 곳도 한 곳)")
 
 
+def test_storage_goes_through_one_place():
+    """저장소를 만지는 자리가 `app/store.py` 한 곳인지 지킨다 — 서버·DB로 갈 때의 이음매.
+
+    여러 사람이 쓰게 되면 저장 모듈 42개가 전부 「누구의 데이터인가」와 「파일인가
+    Postgres인가」를 알아야 한다(MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 1번).
+    그 둘을 한 겹이 혼자 알게 해 두었으므로, 이 테스트는 **그 겹을 지나지 않는 새
+    자리가 생기지 않는지**만 본다 — 생기면 여기서 깨져 "이것도 같이 옮겨야 한다"가
+    그 자리에서 드러난다.
+
+    허용 파일을 늘리기 전에 **왜 새 자리가 필요한지** 먼저 따진다(`store.read_json`·
+    `store.write_json`을 부르면 되는 경우가 대부분이다).
+
+    화면 HTML을 쓰는 렌더러 다섯은 이 규칙 밖이다 — 그건 저장소가 아니라 **화면**이고,
+    2단계에서 「파일로 쓰지 않고 응답으로 돌려준다」로 바뀔 자리라 성격이 다르다.
+    """
+    _require_isolation()
+    app_dir = Path(__file__).resolve().parent.parent
+    sources = sorted(app_dir.glob("app/**/*.py")) + [app_dir / "main.py"]
+
+    # 화면 HTML을 디스크에 쓰는 자리 — 저장소가 아니다(2단계에서 응답으로 바뀐다).
+    screen_writers = {
+        "app/renderer.py", "app/preview_renderer.py", "app/live_renderer.py",
+        "app/history_renderer.py", "app/landing_renderer.py",
+    }
+
+    rules = [
+        # 원자적 쓰기 자체는 화면 파일 전용으로 남았다. 저장소 쓰기는 store를 지난다.
+        ("화면 파일을 쓰는 곳", "atomic_write_text(",
+         screen_writers | {"app/atomic_write.py"}),
+    ]
+
+    for label, needle, allowed in rules:
+        found = {
+            str(path.relative_to(app_dir))
+            for path in sources
+            if needle in path.read_text(encoding="utf-8")
+        }
+        extra = found - allowed
+        assert not extra, (
+            f"{label}가 늘었습니다 — {sorted(extra)}. 저장을 DB로 옮길 때 같이 고쳐야 할 "
+            f"자리가 하나 더 생겼다는 뜻입니다. app/store.py의 함수를 부르는 길이 없는지 "
+            f"먼저 보세요 (지금 자리: {sorted(allowed)})"
+        )
+        assert found, f"{label}를 한 곳도 못 찾았습니다 — 규칙이 옛 이름을 보고 있습니다({needle})"
+
+    # 파일을 JSON으로 읽는 곳 — `json.loads(…read_text…)` 조합만 본다. `json.loads`
+    # 자체는 LLM 응답·요청 본문을 푸는 데도 쓰여서 글자만으로는 못 가른다.
+    json_readers = {
+        str(path.relative_to(app_dir))
+        for path in sources
+        if re.search(r"json\.loads\([^)]*\.read_text", path.read_text(encoding="utf-8"))
+    }
+    # 한 곳도 없는 게 맞다 — store 안에서도 모듈 함수 `read_text(path)`를 거친다.
+    assert not json_readers, (
+        f"JSON을 파일에서 바로 읽는 자리가 생겼습니다 — {sorted(json_readers)}. "
+        "store.read_json을 부르세요."
+    )
+
+    # 파일에 바로 쓰는 곳 — store의 임시 파일 교체와 atomic_write뿐이다(`store.write_text`
+    # 호출은 한 겹을 지나는 것이라 세지 않는다).
+    direct_writers = {
+        str(path.relative_to(app_dir))
+        for path in sources
+        if re.search(r"(?<!store)\.write_text\(", path.read_text(encoding="utf-8"))
+    }
+    assert direct_writers == {"app/store.py", "app/atomic_write.py"}, (
+        f"파일에 바로 쓰는 자리가 늘었습니다 — {sorted(direct_writers)}. "
+        "store.write_text/write_json을 부르세요."
+    )
+
+    # 파일을 원문으로 읽는 자리는 store 말고 셋뿐이고, 셋 다 저장소가 아니다.
+    raw_readers = {
+        str(path.relative_to(app_dir))
+        for path in sources
+        if re.search(r"(?<!store)\.read_text\(", path.read_text(encoding="utf-8"))
+    }
+    allowed_raw = {
+        "app/store.py",
+        # AI_RULES.md — 저장소가 아니라 저장소에 함께 든 **프롬프트 원본**이다.
+        "app/llm_classifier.py",
+        # 미리 만들어 둔 화면 파일과 로고를 담당자에게 내보내는 자리.
+        "app/settings_server.py", "app/landing_renderer.py",
+    }
+    extra_raw = raw_readers - allowed_raw
+    assert not extra_raw, (
+        f"파일을 원문으로 읽는 자리가 늘었습니다 — {sorted(extra_raw)}. "
+        "저장소를 읽는 것이면 store.read_text/read_json을 부르세요."
+    )
+
+    # 한 겹이 실제로 쓰이고 있는지 — 모듈 수가 줄면 누군가 우회로를 만든 것이다.
+    users = {
+        str(path.relative_to(app_dir))
+        for path in sources
+        if "store.read_json(" in path.read_text(encoding="utf-8")
+        or "store.write_json(" in path.read_text(encoding="utf-8")
+        or "store.write_text(" in path.read_text(encoding="utf-8")
+        or "store.read_text(" in path.read_text(encoding="utf-8")
+    }
+    assert len(users) >= 42, (
+        f"저장 한 겹을 쓰는 모듈이 {len(users)}개로 줄었습니다 — 42개 이상이어야 합니다. "
+        "어느 모듈이 다시 파일을 직접 만지게 됐는지 보세요."
+    )
+
+    print(f"✓ 저장 한 겹: 모듈 {len(users)}개가 store를 지나고, 파일을 직접 만지는 자리는 화면 쪽뿐")
+
 
 def test_screen_js_strings_are_not_cut_by_newlines():
     """화면 JS의 문자열이 줄바꿈으로 끊기지 않는지 지킨다 — 한 줄이 화면을 통째로 먹통으로 만든다.
@@ -7672,6 +7777,7 @@ if __name__ == "__main__":
         test_no_ai_key_is_not_a_failure,
         test_env_key_transplant,
         test_key_paths_stay_narrow,
+        test_storage_goes_through_one_place,
         test_screen_js_strings_are_not_cut_by_newlines,
         test_login_lock,
         test_search_operator_is_one_rule,

@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import html
-import json
 import logging
 import re
 import threading
@@ -26,7 +25,7 @@ from typing import Optional
 
 import requests
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import DATA_DIR
 
 logger = logging.getLogger(__name__)
@@ -125,7 +124,7 @@ def _load_locked() -> None:
     if _verdicts is not None:
         return
     try:
-        data = json.loads(PHOTO_BODY_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(PHOTO_BODY_FILE)
         if not isinstance(data, dict):
             data = {}
     except (OSError, ValueError):
@@ -197,7 +196,7 @@ def _check_one(url: str) -> None:
 
 def _persist_locked() -> None:
     try:
-        atomic_write_text(PHOTO_BODY_FILE, json.dumps(_verdicts, ensure_ascii=False))
+        store.write_json(PHOTO_BODY_FILE, _verdicts)
     except OSError:
         logger.warning("원문 사진 판정 기록을 저장하지 못했습니다", exc_info=True)
 

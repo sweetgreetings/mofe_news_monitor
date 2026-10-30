@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import ARTICLES_DIR, DELETED_RESTORE_DAYS, RETENTION_DAYS
 from app.run_index import find_path as _index_find_path
 from app.run_index import list_run_meta, load_entries
@@ -112,7 +112,7 @@ def save_run(
         "finalize_new_subheadings": list(finalize_new_subheadings or []),
     }
     path = _run_file_path(date_str, run_slot)
-    path.write_text(json.dumps(run_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    store.write_json(path, run_data, indent=2)
     # [추가: 2026-08-26] 저장 사실을 파일 로그에 남긴다 — "그 회차가 언제 어디에 몇 건으로
     # 저장됐나"를 사후에 확인할 방법이 지금까지 없었다(app/logging_setup.py 참고).
     logger.info("회차 저장 — %s (run_slot=%s, run_at=%s, 기사 %d건, confirmed=%s)",
@@ -127,7 +127,7 @@ def load_run_file(path: Path) -> Optional[dict]:
     바뀌었을 수 있다 — 인덱스는 캐시일 뿐이므로 실제로 읽는 쪽에서 한 번 더 방어한다.
     """
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return store.read_json(path)
     except (FileNotFoundError, json.JSONDecodeError, TypeError, ValueError):
         return None
 
@@ -232,7 +232,7 @@ def _find_run_file(run_at: str, run_slot: str) -> Optional[Path]:
         return path
     for path in ARTICLES_DIR.glob("*.json"):
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = store.read_json(path)
         except (json.JSONDecodeError, TypeError):
             continue
         if data.get("run_at") == run_at and data.get("run_slot") == run_slot:
@@ -251,7 +251,7 @@ def update_run_articles(run: dict, articles: list[dict]) -> bool:
     if path is None:
         return False
     updated = {**run, "articles": articles}
-    atomic_write_text(path, json.dumps(updated, ensure_ascii=False, indent=2))
+    store.write_json(path, updated, indent=2)
     return True
 
 
@@ -262,7 +262,7 @@ def confirm_run(run: dict, confirmed_at: Optional[str] = None) -> bool:
     if path is None:
         return False
     updated = {**run, "confirmed": True, "confirmed_at": confirmed_at or datetime.now().isoformat(timespec="seconds")}
-    atomic_write_text(path, json.dumps(updated, ensure_ascii=False, indent=2))
+    store.write_json(path, updated, indent=2)
     return True
 
 
@@ -286,7 +286,7 @@ def record_send(run: dict, auto: bool = False) -> Optional[dict]:
         "sent_by": "auto" if auto else "manual",
         "sent_at": datetime.now().isoformat(timespec="seconds"),
     }
-    atomic_write_text(path, json.dumps(updated, ensure_ascii=False, indent=2))
+    store.write_json(path, updated, indent=2)
     return updated
 
 
@@ -331,7 +331,7 @@ def record_send_failure(run: dict, channels: list, auto: bool = False) -> Option
         if "send_failure" not in run:
             return run
         updated = {k: v for k, v in run.items() if k != "send_failure"}
-    atomic_write_text(path, json.dumps(updated, ensure_ascii=False, indent=2))
+    store.write_json(path, updated, indent=2)
     return updated
 
 
@@ -380,7 +380,7 @@ def delete_expired_runs(retention_days: int = RETENTION_DAYS, now: Optional[date
             continue
         path = _articles_dir_for_cleanup() / filename
         try:
-            run_at = datetime.fromisoformat(json.loads(path.read_text(encoding="utf-8"))["run_at"])
+            run_at = datetime.fromisoformat(store.read_json(path)["run_at"])
         except (FileNotFoundError, json.JSONDecodeError, KeyError, ValueError, TypeError):
             continue
         if run_at < cutoff:
@@ -562,7 +562,7 @@ def _purge_run_file(path: Path) -> bool:
     없음」을 다시 그린다(담당자가 지운 걸 앱이 못 모은 것처럼 보이게 하면 거짓말이다).
     """
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = store.read_json(path)
     except (OSError, json.JSONDecodeError):
         data = {}
     articles = data.get("articles") or []
@@ -571,7 +571,7 @@ def _purge_run_file(path: Path) -> bool:
     shell["article_count"] = len(articles)
     dest = path.with_name(path.name.replace(".deleted-", ".purged-", 1))
     try:
-        atomic_write_text(dest, json.dumps(shell, ensure_ascii=False, indent=2))
+        store.write_json(dest, shell, indent=2)
     except OSError:
         return False
     path.unlink(missing_ok=True)
@@ -634,7 +634,7 @@ def deleted_run_article_count(trash_name: str) -> Optional[int]:
         return None
     path = _runs_trash_dir() / trash_name
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = store.read_json(path)
     except (OSError, json.JSONDecodeError):
         return None
     if "articles" in data:

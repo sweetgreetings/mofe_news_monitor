@@ -24,7 +24,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import PHOTO_OVERRIDES_FILE
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ def _read_locked() -> dict:
     data: dict = {}
     if sig is not None:
         try:
-            parsed = json.loads(PHOTO_OVERRIDES_FILE.read_text(encoding="utf-8"))
+            parsed = store.read_json(PHOTO_OVERRIDES_FILE)
             if isinstance(parsed, dict):
                 data = parsed
         except (json.JSONDecodeError, TypeError, OSError) as exc:
@@ -101,7 +101,7 @@ def set_photo_override(url: str, photo: Optional[bool]) -> None:
             data.pop(url)
         else:
             data[url] = {"photo": photo, "at": datetime.now(_KST).isoformat(timespec="seconds")}
-        atomic_write_text(PHOTO_OVERRIDES_FILE, json.dumps(data, ensure_ascii=False, indent=2))
+        store.write_json(PHOTO_OVERRIDES_FILE, data, indent=2)
         _cache, _cache_sig = data, _signature()
     logger.info("사진 추정 %s: %s", "되돌림" if photo is None else "해제", url)
 

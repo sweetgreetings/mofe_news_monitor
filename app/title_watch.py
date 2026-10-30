@@ -32,7 +32,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import (
     TITLE_WATCH_FILE,
     TITLE_WATCH_INTERVAL_MIN,
@@ -190,7 +190,7 @@ def load_state() -> dict:
     if not TITLE_WATCH_FILE.exists():
         return blank
     try:
-        data = json.loads(TITLE_WATCH_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(TITLE_WATCH_FILE)
     except (json.JSONDecodeError, OSError, TypeError):
         logger.warning("제목 변경 알림 상태 파일을 읽지 못했습니다 — 처음부터 시작합니다.")
         return blank
@@ -218,10 +218,7 @@ def _save_state(state: dict, keep_urls: Optional[set] = None) -> bool:
     if keep_urls is not None:
         alerted = {u: t for u, t in alerted.items() if u in keep_urls}
     try:
-        atomic_write_text(TITLE_WATCH_FILE, json.dumps(
-            {"last_run_at": state.get("last_run_at"), "alerted": alerted},
-            ensure_ascii=False, indent=2,
-        ))
+        store.write_json(TITLE_WATCH_FILE, {"last_run_at": state.get("last_run_at"), "alerted": alerted}, indent=2)
         return True
     except OSError:
         logger.warning("제목 변경 알림 상태를 저장하지 못했습니다.")

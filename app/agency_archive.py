@@ -22,14 +22,13 @@
 # 알림 폴링(app.breaking_alert_sender.poll_and_alert_tick)이 같은 키워드를 이미 검색하고
 # 있지만 **그 결과를 얻어 쓰지 않는다** — 아끼는 건 하루 240 요청뿐인데, 얹으면 담당자가
 # [단독]·[속보] 감시를 끌 때 책이 조용히 멈춘다(CODING_CONVENTIONS §3).
-import json
 import logging
 import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import (
     AGENCY_ARCHIVE_DIR,
     AGENCY_ARCHIVE_INTERVAL_MIN,
@@ -66,7 +65,7 @@ def _empty(date_str: str) -> dict:
 def load_day(date_str: str) -> dict:
     """그 날짜의 원장. 없거나 깨졌으면 빈 하루를 돌려준다 — 읽기만 하는 곳도 쓴다."""
     try:
-        data = json.loads(_path(date_str).read_text(encoding="utf-8"))
+        data = store.read_json(_path(date_str))
     except (FileNotFoundError, ValueError, OSError):
         return _empty(date_str)
     if not isinstance(data, dict):
@@ -97,7 +96,7 @@ def available_dates() -> list:
 def _save_day(day: dict) -> None:
     directory = _archive_dir()
     directory.mkdir(parents=True, exist_ok=True)
-    atomic_write_text(_path(day["date"]), json.dumps(day, ensure_ascii=False, indent=2))
+    store.write_json(_path(day["date"]), day, indent=2)
 
 
 def _merge(existing: list, found: list) -> tuple[list, int]:

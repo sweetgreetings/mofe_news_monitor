@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import ASSIGNED_GROUPS_FILE
 
 
@@ -28,7 +28,7 @@ def load_assigned_groups(now: Optional[datetime] = None) -> list:
     if not ASSIGNED_GROUPS_FILE.exists():
         return []
     try:
-        data = json.loads(ASSIGNED_GROUPS_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(ASSIGNED_GROUPS_FILE)
     except (json.JSONDecodeError, TypeError):
         return []
     if not isinstance(data, dict) or data.get("date") != _today_str(now):
@@ -45,7 +45,4 @@ def add_assigned_group(name: str, now: Optional[datetime] = None) -> None:
     names = load_assigned_groups(now)
     if name not in names:
         names.append(name)
-        atomic_write_text(
-            ASSIGNED_GROUPS_FILE,
-            json.dumps({"date": _today_str(now), "names": names}, ensure_ascii=False),
-        )
+        store.write_json(ASSIGNED_GROUPS_FILE, {"date": _today_str(now), "names": names})

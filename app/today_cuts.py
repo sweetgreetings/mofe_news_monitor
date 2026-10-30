@@ -22,7 +22,7 @@ import threading
 from datetime import date, datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import TODAY_CUTS_FILE
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ _MAX_DATES = 400
 
 def _load() -> dict:
     try:
-        data = json.loads(TODAY_CUTS_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(TODAY_CUTS_FILE)
     except (FileNotFoundError, json.JSONDecodeError, TypeError):
         return {}
     return data if isinstance(data, dict) else {}
@@ -43,7 +43,7 @@ def _load() -> dict:
 
 def _save(data: dict) -> None:
     keep = sorted(data)[-_MAX_DATES:]
-    atomic_write_text(TODAY_CUTS_FILE, json.dumps({k: data[k] for k in keep}, ensure_ascii=False, indent=2))
+    store.write_json(TODAY_CUTS_FILE, {k: data[k] for k in keep}, indent=2)
 
 
 def cuts_for(date_str: str) -> list:
@@ -136,13 +136,13 @@ def remove_cut(date_str: str, end: str) -> bool:
 def _copy_bucket(path, src_key: str, dst_key: str) -> None:
     """{회차 키: 값} 모양 파일에서 src 칸을 dst 칸으로 복사(덮어씀). src가 없으면 그대로 둔다."""
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = store.read_json(path)
     except (FileNotFoundError, json.JSONDecodeError, TypeError):
         return
     if not isinstance(data, dict) or src_key not in data:
         return
     data[dst_key] = copy.deepcopy(data[src_key])
-    atomic_write_text(path, json.dumps(data, ensure_ascii=False, indent=2))
+    store.write_json(path, data, indent=2)
 
 
 def copy_round_records(date_str: str, src_end: str, dst_end: str, move_seen: bool = True) -> None:

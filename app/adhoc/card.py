@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import DATA_DIR
 from app.settings import load_settings
 from app.sorter import outlet_sort_key
@@ -282,14 +282,14 @@ def load_issues() -> list[dict]:
     if not ISSUES_FILE.exists():
         return []
     try:
-        data = json.loads(ISSUES_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(ISSUES_FILE)
     except (json.JSONDecodeError, TypeError):
         return []
     return data.get("issues", [])
 
 
 def _save_issues(issues: list[dict]) -> None:
-    atomic_write_text(ISSUES_FILE, json.dumps({"issues": issues}, ensure_ascii=False, indent=2))
+    store.write_json(ISSUES_FILE, {"issues": issues}, indent=2)
 
 
 def find_issue(issue_id: str) -> Optional[dict]:
@@ -479,7 +479,7 @@ def load_card(card_id: str) -> Optional[dict]:
     if not path.exists():
         return None
     try:
-        card = json.loads(path.read_text(encoding="utf-8"))
+        card = store.read_json(path)
     except (json.JSONDecodeError, TypeError):
         return None
     # must_keywords가 없는 옛 카드·두 칸이 섞인 옛 카드를 읽는 시점에 칸 하나 + 방식
@@ -490,7 +490,7 @@ def load_card(card_id: str) -> Optional[dict]:
 
 
 def save_card(card: dict) -> None:
-    atomic_write_text(_card_path(card["id"]), json.dumps(card, ensure_ascii=False, indent=2))
+    store.write_json(_card_path(card["id"]), card, indent=2)
 
 
 # 상단바 링크를 만들 때 뒤에서부터 몇 개까지 열어볼지. 종류(kind)를 가려야 할 때만
@@ -565,7 +565,7 @@ def list_cards(issue_id: Optional[str] = None) -> list[dict]:
     cards = []
     for path in CARDS_DIR.glob("*.json"):
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = store.read_json(path)
             data["id"]
             data["created_at"]
         except (json.JSONDecodeError, KeyError, TypeError):
@@ -610,7 +610,7 @@ def list_card_summaries() -> list[dict]:
                 summary = hit[1]
             else:
                 try:
-                    data = json.loads(path.read_text(encoding="utf-8"))
+                    data = store.read_json(path)
                     data["id"]
                     data["created_at"]
                 except (json.JSONDecodeError, KeyError, TypeError, OSError):
@@ -1311,7 +1311,7 @@ def list_deleted_cards() -> list[dict]:
         if _card_path(card_id).exists():
             continue
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = store.read_json(path)
             data["id"]
         except (json.JSONDecodeError, KeyError, TypeError):
             continue
@@ -1348,7 +1348,7 @@ def _purge_card_file(path: "Path") -> bool:
     app.storage._purge_run_file과 같은 규칙이다.
     """
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = store.read_json(path)
     except (OSError, json.JSONDecodeError):
         data = {}
     articles = data.get("articles") or []
@@ -1358,7 +1358,7 @@ def _purge_card_file(path: "Path") -> bool:
     shell["article_count"] = len([a for a in articles if not a.get("hidden")])
     dest = path.with_name(path.name.replace(".deleted-", ".purged-", 1))
     try:
-        atomic_write_text(dest, json.dumps(shell, ensure_ascii=False, indent=2))
+        store.write_json(dest, shell, indent=2)
     except OSError:
         return False
     path.unlink(missing_ok=True)
@@ -1435,7 +1435,7 @@ def delete_expired_cards(retention_days: Optional[int] = None, now: Optional[dat
     moved = []
     for path in CARDS_DIR.glob("*.json"):
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = store.read_json(path)
             created_at = datetime.fromisoformat(data["created_at"])
             card_id = data["id"]
         except (json.JSONDecodeError, KeyError, ValueError, TypeError):

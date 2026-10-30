@@ -24,7 +24,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import SCHEDULE_OVERRIDES_FILE
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ def _read_locked() -> dict:
     data: dict = {}
     if sig is not None:
         try:
-            parsed = json.loads(SCHEDULE_OVERRIDES_FILE.read_text(encoding="utf-8"))
+            parsed = store.read_json(SCHEDULE_OVERRIDES_FILE)
             if isinstance(parsed, dict):
                 data = parsed
         except (json.JSONDecodeError, TypeError, OSError) as exc:
@@ -104,9 +104,7 @@ def set_schedule_override(url: str, schedule: Optional[bool]) -> None:
                 "schedule": schedule,
                 "at": datetime.now(_KST).isoformat(timespec="seconds"),
             }
-        atomic_write_text(
-            SCHEDULE_OVERRIDES_FILE, json.dumps(data, ensure_ascii=False, indent=2)
-        )
+        store.write_json(SCHEDULE_OVERRIDES_FILE, data, indent=2)
         _cache, _cache_sig = data, _signature()
     logger.info("일정 추정 %s: %s", "되돌림" if schedule is None else "해제", url)
 

@@ -13,14 +13,13 @@
 다시 꺼내 볼 수 없다. 답을 평문으로 두면 파일을 열어 본 사람이 곧 그 계정이다.
 """
 import hashlib
-import json
 import secrets
 import threading
 import unicodedata
 from datetime import datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import AUTH_MIN_PASSWORD_LEN, PRIVACY_CONSENT_REQUIRED, USERS_FILE
 
 # pbkdf2-sha256 반복 횟수. OWASP 권고값(600,000)이고, 맥에서 한 번 계산에 0.2초쯤이라
@@ -98,7 +97,7 @@ def verify_secret(raw: str, stored: str) -> bool:
 
 def _load() -> dict:
     try:
-        data = json.loads(USERS_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(USERS_FILE)
     except (OSError, ValueError):
         return {"users": []}
     if not isinstance(data, dict) or not isinstance(data.get("users"), list):
@@ -107,7 +106,7 @@ def _load() -> dict:
 
 
 def _save(data: dict) -> None:
-    atomic_write_text(USERS_FILE, json.dumps(data, ensure_ascii=False, indent=2))
+    store.write_json(USERS_FILE, data, indent=2)
 
 
 def list_users() -> list[dict]:

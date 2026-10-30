@@ -7,7 +7,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import PREVIEW_CACHE_FILE
 
 
@@ -25,7 +25,7 @@ def load_preview_cache(now: Optional[datetime] = None) -> Optional[dict]:
     if not PREVIEW_CACHE_FILE.exists():
         return None
     try:
-        data = json.loads(PREVIEW_CACHE_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(PREVIEW_CACHE_FILE)
     except (json.JSONDecodeError, TypeError):
         return None
     if data.get("date") != _today_str(now):
@@ -40,15 +40,12 @@ def save_preview_cache(signature: dict, last_seen_pub_date: str, articles: list,
     다음 호출 때 지금 상태와 다르면(키워드를 고쳤거나 다음 회차로 넘어갔으면) 캐시를
     신뢰하지 않고 처음부터 다시 검색하기 위한 비교용 값이다(app.preview_renderer).
     """
-    atomic_write_text(
+    store.write_json(
         PREVIEW_CACHE_FILE,
-        json.dumps(
-            {
-                "date": _today_str(now),
-                "signature": signature,
-                "last_seen_pub_date": last_seen_pub_date,
-                "articles": articles,
-            },
-            ensure_ascii=False,
-        ),
+        {
+            "date": _today_str(now),
+            "signature": signature,
+            "last_seen_pub_date": last_seen_pub_date,
+            "articles": articles,
+        },
     )

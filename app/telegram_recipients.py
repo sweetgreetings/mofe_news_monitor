@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import TELEGRAM_CHAT_ID, TELEGRAM_RECIPIENTS_FILE
 
 # 받는 것 일곱 칸. 저장 키 = 화면 폼 필드 꼬리 이름.
@@ -85,7 +85,7 @@ def load_telegram_recipients() -> list:
             return seeded
         return []
     try:
-        data = json.loads(TELEGRAM_RECIPIENTS_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(TELEGRAM_RECIPIENTS_FILE)
     except (json.JSONDecodeError, TypeError):
         return []
     if not isinstance(data, list):
@@ -97,7 +97,7 @@ def _write(recipients: list) -> None:
     # enabled는 regular_articles를 그대로 적어 두는 파생값이다 — 옛 코드로 되돌려도 정기
     # 기사 목록을 받던 사람에게 그대로 가게 남겨 둔다.
     rows = [{**r, "enabled": bool(r.get("regular_articles"))} for r in recipients]
-    atomic_write_text(TELEGRAM_RECIPIENTS_FILE, json.dumps(rows, ensure_ascii=False, indent=2))
+    store.write_json(TELEGRAM_RECIPIENTS_FILE, rows, indent=2)
 
 
 def save_telegram_recipients(recipients: list) -> None:

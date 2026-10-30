@@ -10,7 +10,7 @@ MAX_TREND_WORDS개) 저장소.
 import json
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import HOME_TREND_WORDS_FILE, MAX_TREND_WORDS
 
 
@@ -19,7 +19,7 @@ def load_trend_words() -> list[str]:
     if not HOME_TREND_WORDS_FILE.exists():
         return []
     try:
-        data = json.loads(HOME_TREND_WORDS_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(HOME_TREND_WORDS_FILE)
     except (json.JSONDecodeError, TypeError):
         return []
     words = data.get("words") if isinstance(data, dict) else None
@@ -27,7 +27,7 @@ def load_trend_words() -> list[str]:
 
 
 def _save(words: list[str]) -> None:
-    atomic_write_text(HOME_TREND_WORDS_FILE, json.dumps({"words": words}, ensure_ascii=False))
+    store.write_json(HOME_TREND_WORDS_FILE, {"words": words})
 
 
 def add_trend_word(word: str) -> tuple[bool, Optional[str]]:

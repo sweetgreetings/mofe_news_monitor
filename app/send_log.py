@@ -18,7 +18,7 @@ import threading
 from datetime import datetime, timedelta
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import SEND_LOG_DIR, SEND_LOG_RETENTION_DAYS
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ def _read_day(date_str: str) -> list:
     if not path.exists():
         return []
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = store.read_json(path)
     except (json.JSONDecodeError, OSError):
         logger.warning("발송 기록 파일을 읽지 못했습니다: %s", path)
         return []
@@ -184,7 +184,7 @@ def record(
             else:
                 entries.append(entry)
             SEND_LOG_DIR.mkdir(parents=True, exist_ok=True)
-            atomic_write_text(_day_file(date_str), json.dumps({"entries": entries}, ensure_ascii=False, indent=1))
+            store.write_json(_day_file(date_str), {"entries": entries}, indent=1)
             _cleanup(now)
     except OSError:
         logger.exception("발송 기록을 남기지 못했습니다(%s · %s)", kind, title)

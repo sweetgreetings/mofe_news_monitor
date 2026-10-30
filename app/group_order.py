@@ -2,7 +2,7 @@
 import json
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import GROUP_ORDER_FILE
 from app.curation import display_group_name, load_group_labels
 from app.llm_classifier import ETC_GROUP_NAME, UNCLASSIFIED_GROUP_NAME, round_key
@@ -50,7 +50,7 @@ def load_group_order(round_id: Optional[tuple] = None) -> list:
     if not GROUP_ORDER_FILE.exists():
         return []
     try:
-        data = json.loads(GROUP_ORDER_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(GROUP_ORDER_FILE)
     except (json.JSONDecodeError, TypeError):
         return []
     if not isinstance(data, dict):
@@ -67,13 +67,13 @@ def save_group_order(order: list, round_id: Optional[tuple] = None) -> None:
     """
     cleaned = [str(name) for name in order if isinstance(name, str) and name]
     try:
-        data = json.loads(GROUP_ORDER_FILE.read_text(encoding="utf-8")) if GROUP_ORDER_FILE.exists() else {}
+        data = store.read_json(GROUP_ORDER_FILE) if GROUP_ORDER_FILE.exists() else {}
     except (json.JSONDecodeError, TypeError):
         data = {}
     if not isinstance(data, dict):
         data = {}
     data[round_key(round_id)] = cleaned
-    atomic_write_text(GROUP_ORDER_FILE, json.dumps(data, ensure_ascii=False, indent=2))
+    store.write_json(GROUP_ORDER_FILE, data, indent=2)
 
 
 def apply_group_order(groups: list, round_id: Optional[tuple] = None) -> list:

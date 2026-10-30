@@ -19,7 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import (
     ANTHROPIC_API_KEY,
     BASE_DIR,
@@ -45,14 +45,14 @@ def _load() -> dict:
     if not CREDENTIALS_FILE.exists():
         return {}
     try:
-        data = json.loads(CREDENTIALS_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(CREDENTIALS_FILE)
     except (json.JSONDecodeError, OSError):
         return {}
     return data if isinstance(data, dict) else {}
 
 
 def _save(data: dict) -> None:
-    atomic_write_text(CREDENTIALS_FILE, json.dumps(data, ensure_ascii=False, indent=2))
+    store.write_json(CREDENTIALS_FILE, data, indent=2)
     # [추가: 2026-08-20] 비밀 값이 담긴 파일이라 소유자만 읽고 쓸 수 있게 권한을
     # 좁힌다 — 이 저장소가 이런 값을 다루는 첫 사례다. chmod가 안 되는 환경(윈도우
     # 일부 파일시스템)에서는 그냥 건너뛴다: 이 앱의 타겟이 원래 단일 로컬 사용자라
@@ -360,7 +360,7 @@ def _unquote(raw: str) -> str:
 def _read_env_lines() -> tuple[list[str], dict[str, tuple[int, str]]]:
     """.env 원문 줄들과 {키 이름: (줄 번호, 값)}. 값이 빈 줄은 담지 않는다(옮길 게 없다)."""
     try:
-        lines = ENV_FILE.read_text(encoding="utf-8").splitlines()
+        lines = store.read_text(ENV_FILE).splitlines()
     except OSError:
         return [], {}
     found: dict[str, tuple[int, str]] = {}
@@ -557,7 +557,7 @@ def transplant_env_keys() -> dict:
     while kept_lines and not kept_lines[-1].strip():
         kept_lines.pop()
     try:
-        atomic_write_text(ENV_FILE, "\n".join(kept_lines) + ("\n" if kept_lines else ""))
+        store.write_text(ENV_FILE, "\n".join(kept_lines) + ("\n" if kept_lines else ""))
     except OSError:
         logger.exception(
             ".env에서 옛 키 줄을 지우지 못했습니다 — 설정 파일에는 이미 옮겨졌으니 앱 동작은 정상입니다 "

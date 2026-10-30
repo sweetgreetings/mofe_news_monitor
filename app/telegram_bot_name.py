@@ -6,14 +6,13 @@
 #     (새 봇을 붙여도 기본 이름으로 시작하게).
 #   - 그 뒤로는 앱이 먼저 이름을 바꾸지 않는다(BotFather에서 바꾼 이름을 덮어쓰지 않도록).
 # 텔레그램은 이름을 자주 바꾸면 한동안 막으므로(429) 바뀌었을 때만 보낸다.
-import json
 import logging
 import time
 from typing import Optional, Tuple
 
 import requests
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app import credentials
 from app.config import DEFAULT_TELEGRAM_BOT_NAME, TELEGRAM_BOT_NAME_FILE
 
@@ -37,7 +36,7 @@ def _api(method: str) -> str:
 
 def _load_record() -> dict:
     try:
-        data = json.loads(TELEGRAM_BOT_NAME_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(TELEGRAM_BOT_NAME_FILE)
         return data if isinstance(data, dict) else {}
     except (OSError, ValueError):
         return {}
@@ -50,7 +49,7 @@ def _remember(name: str) -> None:
     record = _load_record()
     record[bot_id] = {"name": name, "at": time.strftime("%Y-%m-%dT%H:%M:%S")}
     try:
-        atomic_write_text(TELEGRAM_BOT_NAME_FILE, json.dumps(record, ensure_ascii=False, indent=2))
+        store.write_json(TELEGRAM_BOT_NAME_FILE, record, indent=2)
     except OSError:
         logger.warning("봇 이름 기록을 못 썼습니다 — 다음에 앱을 켤 때 기본 이름을 다시 걸 수 있습니다")
 

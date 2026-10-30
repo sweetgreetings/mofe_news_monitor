@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import LIVE_CACHE_FILE
 
 
@@ -37,7 +37,7 @@ def load_live_cache(now: Optional[datetime] = None) -> Optional[dict]:
     if not LIVE_CACHE_FILE.exists():
         return None
     try:
-        data = json.loads(LIVE_CACHE_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(LIVE_CACHE_FILE)
     except (json.JSONDecodeError, TypeError):
         return None
     if data.get("date") != _today_str(now):
@@ -56,14 +56,11 @@ def save_live_cache(
     keyword_articles: {키워드: [기사, ...]} — 이번에 새로 찾은 것과 기존 캐시를 합친
     "그 키워드의 당일 전체 원시 결과"를 호출부가 미리 병합해 넘긴다.
     """
-    atomic_write_text(
+    store.write_json(
         LIVE_CACHE_FILE,
-        json.dumps(
-            {
-                "date": _today_str(now),
-                "keyword_last_seen": keyword_last_seen,
-                "keyword_articles": keyword_articles,
-            },
-            ensure_ascii=False,
-        ),
+        {
+            "date": _today_str(now),
+            "keyword_last_seen": keyword_last_seen,
+            "keyword_articles": keyword_articles,
+        },
     )

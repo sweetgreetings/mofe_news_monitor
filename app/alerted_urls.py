@@ -13,7 +13,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import ALERTED_URLS_FILE
 
 
@@ -29,7 +29,7 @@ def _load(now: Optional[datetime] = None) -> dict:
     if not ALERTED_URLS_FILE.exists():
         return empty
     try:
-        data = json.loads(ALERTED_URLS_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(ALERTED_URLS_FILE)
     except (json.JSONDecodeError, TypeError):
         return empty
     if data.get("date") != _today_str(now):
@@ -70,7 +70,7 @@ def mark_alerted(urls: list, now: Optional[datetime] = None, items: Optional[lis
             if it.get("url") not in known:
                 known.add(it.get("url"))
                 data["items"].append(it)
-    atomic_write_text(ALERTED_URLS_FILE, json.dumps(data, ensure_ascii=False))
+    store.write_json(ALERTED_URLS_FILE, data)
 
 
 def alerted_items(now: Optional[datetime] = None) -> list:

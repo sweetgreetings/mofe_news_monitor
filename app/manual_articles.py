@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import MANUAL_ARTICLES_FILE
 
 
@@ -20,7 +20,7 @@ def load_manual_articles(now: Optional[datetime] = None) -> list:
     if not MANUAL_ARTICLES_FILE.exists():
         return []
     try:
-        data = json.loads(MANUAL_ARTICLES_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(MANUAL_ARTICLES_FILE)
     except (json.JSONDecodeError, TypeError):
         return []
     if data.get("date") != _today_str(now):
@@ -29,10 +29,7 @@ def load_manual_articles(now: Optional[datetime] = None) -> list:
 
 
 def _write(articles: list, now: Optional[datetime] = None) -> None:
-    atomic_write_text(
-        MANUAL_ARTICLES_FILE,
-        json.dumps({"date": _today_str(now), "articles": articles}, ensure_ascii=False, indent=2),
-    )
+    store.write_json(MANUAL_ARTICLES_FILE, {"date": _today_str(now), "articles": articles}, indent=2)
 
 
 def add_manual_articles(articles: list, now: Optional[datetime] = None, at_top: bool = False) -> int:

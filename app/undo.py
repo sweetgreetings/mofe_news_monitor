@@ -26,7 +26,7 @@ import threading
 from datetime import date, datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import (
     ASSIGNED_GROUPS_FILE,
     CUSTOM_GROUPS_FILE,
@@ -155,7 +155,7 @@ def _read_raw(path) -> Optional[str]:
     (파일 없음)까지 그대로 재현한다.
     """
     try:
-        return path.read_text(encoding="utf-8")
+        return store.read_text(path)
     except FileNotFoundError:
         return None
 
@@ -164,7 +164,7 @@ def _write_raw(path, text: Optional[str]) -> None:
     if text is None:
         path.unlink(missing_ok=True)
     else:
-        atomic_write_text(path, text)
+        store.write_text(path, text)
 
 
 def _snapshot_llm_cache() -> dict:
@@ -267,7 +267,7 @@ def _load() -> dict:
     어제 회차 상태로 되돌리는 건 의미가 없고 오히려 위험하기 때문.
     """
     try:
-        data = json.loads(UNDO_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(UNDO_FILE)
     except (FileNotFoundError, json.JSONDecodeError):
         return _empty()
     if data.get("date") != date.today().isoformat():
@@ -282,7 +282,7 @@ def _empty() -> dict:
 
 
 def _save(data: dict) -> None:
-    atomic_write_text(UNDO_FILE, json.dumps(data, ensure_ascii=False, indent=2))
+    store.write_json(UNDO_FILE, data, indent=2)
 
 
 def push(

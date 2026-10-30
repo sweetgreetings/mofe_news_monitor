@@ -8,13 +8,12 @@
 그대로 쓸 수 있으면 자물쇠가 아니다. 사용자 기록(`users.json`)의 비밀번호·답과 같은 원칙이다.
 """
 import hashlib
-import json
 import secrets
 import threading
 from datetime import datetime, timedelta
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import (
     AUTH_ATTEMPTS_FILE,
     AUTH_CONFIG_FILE,
@@ -28,14 +27,14 @@ _LOCK = threading.Lock()
 
 def _read(path, empty: dict) -> dict:
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = store.read_json(path)
     except (OSError, ValueError):
         return dict(empty)
     return data if isinstance(data, dict) else dict(empty)
 
 
 def _write(path, data: dict) -> None:
-    atomic_write_text(path, json.dumps(data, ensure_ascii=False, indent=2))
+    store.write_json(path, data, indent=2)
 
 
 # ── 「로그인 사용」 스위치 ────────────────────────────────────────────────

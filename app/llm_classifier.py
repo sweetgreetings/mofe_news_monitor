@@ -16,6 +16,7 @@ import logging
 import threading
 from typing import Optional
 
+from app import store
 from app.config import AI_RULES_FILE, MAX_SUBHEADINGS
 from app.config import LLM_MODEL as LLM_MODEL_DEFAULT
 from app.credentials import llm_api_key, llm_is_configured, llm_model
@@ -280,7 +281,6 @@ def _persist_cache_locked() -> None:
     병합으로 파일이 무한정 자라지 않도록, 파일에서 온 항목은 최근 것부터 상한의 2배까지만
     남긴다(오늘 하루 회차·초안 조작을 다 담고도 남는 크기).
     """
-    from app.atomic_write import atomic_write_text
     from app.config import LLM_CLASSIFICATION_CACHE_FILE
 
     mine = {
@@ -289,7 +289,7 @@ def _persist_cache_locked() -> None:
     }
     merged = []
     try:
-        on_disk = json.loads(LLM_CLASSIFICATION_CACHE_FILE.read_text(encoding="utf-8"))
+        on_disk = store.read_json(LLM_CLASSIFICATION_CACHE_FILE)
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         on_disk = {}
     for entry in on_disk.get("entries", []):
@@ -315,7 +315,7 @@ def _persist_cache_locked() -> None:
         "last_names": list(_last_names),
         "last_round_id": list(_last_round_id) if _last_round_id else None,
     }
-    atomic_write_text(LLM_CLASSIFICATION_CACHE_FILE, json.dumps(data, ensure_ascii=False))
+    store.write_json(LLM_CLASSIFICATION_CACHE_FILE, data)
 
 
 def _ensure_cache_hydrated() -> None:
@@ -339,7 +339,7 @@ def _ensure_cache_hydrated() -> None:
         try:
             from app.config import LLM_CLASSIFICATION_CACHE_FILE
 
-            data = json.loads(LLM_CLASSIFICATION_CACHE_FILE.read_text(encoding="utf-8"))
+            data = store.read_json(LLM_CLASSIFICATION_CACHE_FILE)
         except (FileNotFoundError, json.JSONDecodeError):
             return
         for entry in data.get("entries", []):

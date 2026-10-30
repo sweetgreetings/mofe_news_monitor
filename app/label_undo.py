@@ -12,7 +12,7 @@ import threading
 from datetime import datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import LABEL_UNDO_FILE, LABELS_FILE
 
 _MAX_ENTRIES = 20
@@ -22,7 +22,7 @@ _lock = threading.Lock()
 
 def _read_raw() -> Optional[str]:
     try:
-        return LABELS_FILE.read_text(encoding="utf-8")
+        return store.read_text(LABELS_FILE)
     except FileNotFoundError:
         return None
 
@@ -31,19 +31,19 @@ def _write_raw(text: Optional[str]) -> None:
     if text is None:
         LABELS_FILE.unlink(missing_ok=True)
     else:
-        atomic_write_text(LABELS_FILE, text)
+        store.write_text(LABELS_FILE, text)
 
 
 def _load() -> list:
     try:
-        data = json.loads(LABEL_UNDO_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(LABEL_UNDO_FILE)
     except (FileNotFoundError, json.JSONDecodeError):
         return []
     return data if isinstance(data, list) else []
 
 
 def _save(entries: list) -> None:
-    atomic_write_text(LABEL_UNDO_FILE, json.dumps(entries, ensure_ascii=False, indent=2))
+    store.write_json(LABEL_UNDO_FILE, entries, indent=2)
 
 
 def push(label: str, coalesce_sec: float = 3.0) -> None:

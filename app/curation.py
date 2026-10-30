@@ -5,7 +5,7 @@ import threading
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.classifier import classify_articles, forced_group_target_names
 from app.custom_groups import load_custom_group_labels
 from app.config import (
@@ -88,7 +88,7 @@ def _read_recent_raw() -> list:
     if not HIDDEN_ARTICLES_FILE.exists():
         return []
     try:
-        raw = json.loads(HIDDEN_ARTICLES_FILE.read_text(encoding="utf-8"))
+        raw = store.read_json(HIDDEN_ARTICLES_FILE)
     except (OSError, json.JSONDecodeError):
         return []
     if not isinstance(raw, list) or (raw and isinstance(raw[0], str)):
@@ -97,7 +97,7 @@ def _read_recent_raw() -> list:
 
 
 def _write_records(records: list) -> None:
-    atomic_write_text(HIDDEN_ARTICLES_FILE, json.dumps(records, ensure_ascii=False, indent=2))
+    store.write_json(HIDDEN_ARTICLES_FILE, records, indent=2)
 
 
 def _archive_file():
@@ -130,7 +130,7 @@ def _archive_urls() -> frozenset:
     if _archive_cache["sig"] == sig:
         return _archive_cache["urls"]
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw = store.read_json(path)
         urls = frozenset(raw) if isinstance(raw, dict) else frozenset()
     except (OSError, json.JSONDecodeError):
         # 읽기 실패는 "숨김이 풀린다"는 틀린 방향이라 조용히 넘기지 않는다.
@@ -146,14 +146,14 @@ def _load_archive() -> dict:
     if not path.exists():
         return {}
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw = store.read_json(path)
     except (OSError, json.JSONDecodeError):
         return {}
     return raw if isinstance(raw, dict) else {}
 
 
 def _write_archive(mapping: dict) -> None:
-    atomic_write_text(_archive_file(), json.dumps(mapping, ensure_ascii=False, indent=2))
+    store.write_json(_archive_file(), mapping, indent=2)
     _archive_cache["sig"] = None  # 다음 조회가 다시 읽게 한다
 
 
@@ -428,7 +428,7 @@ def _read_override_records() -> dict:
     if not GROUP_OVERRIDES_FILE.exists():
         return {}
     try:
-        raw = json.loads(GROUP_OVERRIDES_FILE.read_text(encoding="utf-8"))
+        raw = store.read_json(GROUP_OVERRIDES_FILE)
     except (json.JSONDecodeError, TypeError):
         return {}
     if not isinstance(raw, dict):
@@ -480,7 +480,7 @@ def group_override_names(days: int = 1, now: Optional[datetime] = None) -> set:
 
 
 def _write_override_records(records: dict) -> None:
-    atomic_write_text(GROUP_OVERRIDES_FILE, json.dumps(records, ensure_ascii=False, indent=2))
+    store.write_json(GROUP_OVERRIDES_FILE, records, indent=2)
 
 
 def set_group_override(
@@ -840,7 +840,7 @@ def _round_labels(round_id: Optional[tuple] = None) -> dict:
     if not GROUP_LABELS_FILE.exists():
         return {}
     try:
-        data = json.loads(GROUP_LABELS_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(GROUP_LABELS_FILE)
     except (json.JSONDecodeError, TypeError):
         return {}
     if not isinstance(data, dict):
@@ -851,13 +851,13 @@ def _round_labels(round_id: Optional[tuple] = None) -> dict:
 
 def _write_labels_for_round(round_id: Optional[tuple], labels_for_round: dict) -> None:
     try:
-        data = json.loads(GROUP_LABELS_FILE.read_text(encoding="utf-8")) if GROUP_LABELS_FILE.exists() else {}
+        data = store.read_json(GROUP_LABELS_FILE) if GROUP_LABELS_FILE.exists() else {}
     except (json.JSONDecodeError, TypeError):
         data = {}
     if not isinstance(data, dict):
         data = {}
     data[round_key(round_id)] = labels_for_round
-    atomic_write_text(GROUP_LABELS_FILE, json.dumps(data, ensure_ascii=False, indent=2))
+    store.write_json(GROUP_LABELS_FILE, data, indent=2)
 
 
 def set_group_label(topic_word: str, label: str, round_id: Optional[tuple] = None) -> None:

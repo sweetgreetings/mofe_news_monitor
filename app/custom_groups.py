@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import CUSTOM_GROUPS_FILE
 
 
@@ -27,7 +27,7 @@ def load_custom_groups(now: Optional[datetime] = None) -> list:
     if not CUSTOM_GROUPS_FILE.exists():
         return []
     try:
-        data = json.loads(CUSTOM_GROUPS_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(CUSTOM_GROUPS_FILE)
     except (json.JSONDecodeError, TypeError):
         return []
     if isinstance(data, list):
@@ -68,7 +68,7 @@ def load_custom_group_labels(now: Optional[datetime] = None) -> dict:
     if not CUSTOM_GROUPS_FILE.exists():
         return {}
     try:
-        data = json.loads(CUSTOM_GROUPS_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(CUSTOM_GROUPS_FILE)
     except (json.JSONDecodeError, TypeError):
         return {}
     if not isinstance(data, dict):
@@ -115,7 +115,7 @@ def _write(names: list, labels: Optional[dict] = None, now: Optional[datetime] =
         if len(labels) > _MAX_LABELS:
             labels = dict(list(labels.items())[-_MAX_LABELS:])
         payload["labels"] = labels
-    atomic_write_text(CUSTOM_GROUPS_FILE, json.dumps(payload, ensure_ascii=False))
+    store.write_json(CUSTOM_GROUPS_FILE, payload)
 
 
 def add_custom_group(name: str, key: Optional[str] = None, now: Optional[datetime] = None) -> Optional[str]:

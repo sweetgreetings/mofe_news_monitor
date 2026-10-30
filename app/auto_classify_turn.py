@@ -18,7 +18,7 @@ import threading
 from datetime import datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import AUTO_CLASSIFY_TURNS_FILE
 
 _lock = threading.Lock()
@@ -33,7 +33,7 @@ def _load_slots(now: Optional[datetime] = None) -> list:
     if not AUTO_CLASSIFY_TURNS_FILE.exists():
         return []
     try:
-        data = json.loads(AUTO_CLASSIFY_TURNS_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(AUTO_CLASSIFY_TURNS_FILE)
     except (json.JSONDecodeError, TypeError, OSError):
         return []
     if not isinstance(data, dict) or data.get("date") != _today_str(now):
@@ -55,10 +55,7 @@ def take_turn(slot_end: str, now: Optional[datetime] = None) -> bool:
             return False
         slots = slots + [slot_end]
         try:
-            atomic_write_text(
-                AUTO_CLASSIFY_TURNS_FILE,
-                json.dumps({"date": _today_str(now), "slots": slots}, ensure_ascii=False),
-            )
+            store.write_json(AUTO_CLASSIFY_TURNS_FILE, {"date": _today_str(now), "slots": slots})
         except OSError:
             return False
         return True
@@ -72,9 +69,6 @@ def copy_turn(src_end: str, dst_end: str, now: Optional[datetime] = None) -> Non
         if src_end not in slots or dst_end in slots:
             return
         try:
-            atomic_write_text(
-                AUTO_CLASSIFY_TURNS_FILE,
-                json.dumps({"date": _today_str(now), "slots": slots + [dst_end]}, ensure_ascii=False),
-            )
+            store.write_json(AUTO_CLASSIFY_TURNS_FILE, {"date": _today_str(now), "slots": slots + [dst_end]})
         except OSError:
             pass

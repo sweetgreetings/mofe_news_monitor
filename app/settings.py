@@ -1,10 +1,9 @@
 # Design Ref: PRD.md 기능1 규칙 6·15·16·20 — 검색 키워드/언론사 선택/형광펜 단어/수집 시각, 코드 수정 없이 화면에서 변경
-import json
 import re
 from datetime import datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import (
     BASE_GROUP_KEYWORDS,
     BASE_GROUP_NAME,
@@ -110,7 +109,7 @@ def _migrate_keyword_groups(old_keywords: list, old_mode: str) -> list:
 
 
 def _write(settings: dict) -> None:
-    atomic_write_text(SETTINGS_FILE, json.dumps(settings, ensure_ascii=False, indent=2))
+    store.write_json(SETTINGS_FILE, settings, indent=2)
 
 
 def _migrate_schedule_times(raw_times: list) -> list:
@@ -142,7 +141,7 @@ def load_settings() -> dict:
         settings = _default_settings()
         _write(settings)
         return settings
-    settings = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+    settings = store.read_json(SETTINGS_FILE)
     settings.setdefault("outlet_order", [])
     settings.setdefault("highlight_keywords", [dict(item) for item in DEFAULT_HIGHLIGHT_KEYWORDS])
     settings.setdefault("article_line_template", DEFAULT_ARTICLE_LINE_TEMPLATE)

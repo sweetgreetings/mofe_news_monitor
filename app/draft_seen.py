@@ -24,7 +24,7 @@
 import json
 import threading
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import DRAFT_SEEN_FILE
 
 _lock = threading.Lock()
@@ -45,7 +45,7 @@ def _read() -> dict:
     if not DRAFT_SEEN_FILE.exists():
         return {}
     try:
-        data = json.loads(DRAFT_SEEN_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(DRAFT_SEEN_FILE)
     except (json.JSONDecodeError, TypeError, OSError):
         return {}
     return data if isinstance(data, dict) else {}
@@ -102,7 +102,7 @@ def record_draft_seen(round_id: tuple, condition: list, visible: list) -> None:
             if url not in seen_order:
                 seen_order[url] = len(seen_order) + 1
         data["last_visible"] = [a["url"] for a in visible if a.get("url")]
-        atomic_write_text(DRAFT_SEEN_FILE, json.dumps(data, ensure_ascii=False))
+        store.write_json(DRAFT_SEEN_FILE, data)
 
 
 def move_round(src_round: tuple, dst_round: tuple) -> None:
@@ -113,4 +113,4 @@ def move_round(src_round: tuple, dst_round: tuple) -> None:
         if tuple(data.get("round_id") or ()) != tuple(src_round):
             return
         data["round_id"] = list(dst_round)
-        atomic_write_text(DRAFT_SEEN_FILE, json.dumps(data, ensure_ascii=False))
+        store.write_json(DRAFT_SEEN_FILE, data)

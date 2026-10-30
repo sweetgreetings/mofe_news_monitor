@@ -1,7 +1,7 @@
 # Design Ref: 사용자 요청(2026-08-06) — 이메일 전송 받는 사람 여러 명 관리(켜고 끄기 토글)
 import json
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import EMAIL_RECIPIENTS_FILE
 
 
@@ -16,7 +16,7 @@ def load_email_recipients() -> list:
     if not EMAIL_RECIPIENTS_FILE.exists():
         return []
     try:
-        data = json.loads(EMAIL_RECIPIENTS_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(EMAIL_RECIPIENTS_FILE)
     except (json.JSONDecodeError, TypeError):
         return []
     return data if isinstance(data, list) else []
@@ -32,7 +32,7 @@ def save_email_recipients(recipients: list) -> None:
         for r in recipients
         if r.get("email", "").strip()
     ]
-    atomic_write_text(EMAIL_RECIPIENTS_FILE, json.dumps(cleaned, ensure_ascii=False, indent=2))
+    store.write_json(EMAIL_RECIPIENTS_FILE, cleaned, indent=2)
 
 
 def active_recipient_emails() -> list:

@@ -19,7 +19,7 @@
 import json
 import logging
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.breaking_alert import load_breaking_alert_settings
 from app.config import BREAKING_ALERT_FILE
 from app.settings import load_settings, save_keyword_groups
@@ -66,7 +66,7 @@ def _raw_config() -> dict:
     if not BREAKING_ALERT_FILE.exists():
         return {}
     try:
-        data = json.loads(BREAKING_ALERT_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(BREAKING_ALERT_FILE)
     except (json.JSONDecodeError, TypeError, OSError):
         return {}
     return data if isinstance(data, dict) else {}
@@ -77,4 +77,4 @@ def _drop_group_names() -> None:
     if "group_names" not in data:
         return
     del data["group_names"]
-    atomic_write_text(BREAKING_ALERT_FILE, json.dumps(data, ensure_ascii=False, indent=2))
+    store.write_json(BREAKING_ALERT_FILE, data, indent=2)

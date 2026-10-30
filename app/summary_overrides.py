@@ -5,7 +5,7 @@ import threading
 from datetime import datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import SUMMARY_OVERRIDES_FILE
 
 # [추가: 2026-10-12] 저장 항목에는 **화면에 입히는 칸**과 **앱이 적어 두는 기록 칸**이
@@ -25,14 +25,14 @@ def load_summary_overrides() -> dict:
     if not SUMMARY_OVERRIDES_FILE.exists():
         return {}
     try:
-        data = json.loads(SUMMARY_OVERRIDES_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(SUMMARY_OVERRIDES_FILE)
     except (json.JSONDecodeError, TypeError):
         return {}
     return data if isinstance(data, dict) else {}
 
 
 def _write(overrides: dict) -> None:
-    atomic_write_text(SUMMARY_OVERRIDES_FILE, json.dumps(overrides, ensure_ascii=False, indent=2))
+    store.write_json(SUMMARY_OVERRIDES_FILE, overrides, indent=2)
 
 
 def set_summary_override(

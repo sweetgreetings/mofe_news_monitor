@@ -25,7 +25,7 @@ import threading
 from datetime import datetime
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 
 from app.adhoc.card import ADHOC_DIR, card_lock, load_card, mark_hidden, save_card
 
@@ -51,13 +51,13 @@ def _path(card_id: str):
 
 def _load(card_id: str) -> dict:
     try:
-        return json.loads(_path(card_id).read_text(encoding="utf-8"))
+        return store.read_json(_path(card_id))
     except (FileNotFoundError, json.JSONDecodeError):
         return {"entries": []}
 
 
 def _save(card_id: str, data: dict) -> None:
-    atomic_write_text(_path(card_id), json.dumps(data, ensure_ascii=False))
+    store.write_json(_path(card_id), data)
 
 
 def push(card_id: str, label: str, coalesce_sec: float = 3.0) -> None:

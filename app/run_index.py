@@ -22,7 +22,7 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ _lock = threading.Lock()
 def _read_index_file() -> dict:
     """저장된 인덱스를 읽는다. 없거나 깨졌으면 빈 인덱스 — 캐시라 언제든 다시 만들 수 있다."""
     try:
-        data = json.loads(_index_path().read_text(encoding="utf-8"))
+        data = store.read_json(_index_path())
     except (FileNotFoundError, json.JSONDecodeError, TypeError, ValueError):
         return {}
     return data.get("entries", {}) if isinstance(data, dict) else {}
@@ -67,7 +67,7 @@ def _extract_meta(path: Path) -> Optional[dict]:
     화면 쪽에서 그대로 쓸 수 있다.
     """
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = store.read_json(path)
         run_at = data["run_at"]
         run_slot = data["run_slot"]
         articles = data["articles"]
@@ -128,9 +128,7 @@ def load_entries() -> dict:
         fresh, changed = _refresh_locked(entries)
         if changed:
             try:
-                atomic_write_text(
-                    _index_path(), json.dumps({"entries": fresh}, ensure_ascii=False, indent=2)
-                )
+                store.write_json(_index_path(), {"entries": fresh}, indent=2)
             except OSError:
                 # 인덱스를 못 써도 동작은 계속돼야 한다 — 다음 조회에서 다시 만들면 된다.
                 logger.warning("회차 인덱스 저장 실패 — 이번 조회는 메모리 값으로 진행합니다", exc_info=True)

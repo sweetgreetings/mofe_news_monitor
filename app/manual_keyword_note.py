@@ -29,7 +29,7 @@ import json
 from datetime import datetime
 from typing import Optional, Tuple
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import MANUAL_KEYWORD_NOTE_FILE
 from app.storage import load_latest_run
 
@@ -86,7 +86,7 @@ def _read_notes() -> dict:
     if not MANUAL_KEYWORD_NOTE_FILE.exists():
         return {}
     try:
-        data = json.loads(MANUAL_KEYWORD_NOTE_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(MANUAL_KEYWORD_NOTE_FILE)
     except (json.JSONDecodeError, TypeError, OSError):
         return {}
     if not isinstance(data, dict):
@@ -163,10 +163,7 @@ def save_manual_keyword_note(text: str, run_key: Optional[RoundKey] = None) -> N
     if len(notes) > _MAX_NOTES:
         for stale in sorted(notes)[: len(notes) - _MAX_NOTES]:
             notes.pop(stale)
-    atomic_write_text(
-        MANUAL_KEYWORD_NOTE_FILE,
-        json.dumps({"notes": notes}, ensure_ascii=False),
-    )
+    store.write_json(MANUAL_KEYWORD_NOTE_FILE, {"notes": notes})
 
 
 def copy_note(src_key: RoundKey, dst_key: RoundKey) -> None:

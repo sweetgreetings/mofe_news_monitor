@@ -6,7 +6,7 @@ import json
 import re
 from typing import Optional
 
-from app.atomic_write import atomic_write_text
+from app import store
 from app.config import (
     BREAKING_ALERT_FILE,
     BURST_MIN_OUTLETS_CHOICES,
@@ -45,7 +45,7 @@ def load_breaking_alert_settings() -> dict:
     if not BREAKING_ALERT_FILE.exists():
         return _default()
     try:
-        data = json.loads(BREAKING_ALERT_FILE.read_text(encoding="utf-8"))
+        data = store.read_json(BREAKING_ALERT_FILE)
     except (json.JSONDecodeError, TypeError):
         return _default()
     if not isinstance(data, dict):
@@ -109,7 +109,7 @@ def save_breaking_alert_settings(
         "burst_window_min": burst_window,
         "burst_min_outlets": burst_outlets,
     }
-    atomic_write_text(BREAKING_ALERT_FILE, json.dumps(data, ensure_ascii=False, indent=2))
+    store.write_json(BREAKING_ALERT_FILE, data, indent=2)
     return data
 
 
