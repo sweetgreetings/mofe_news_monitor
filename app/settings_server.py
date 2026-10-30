@@ -1496,7 +1496,7 @@ _LOGIN_SETTINGS_TEMPLATE = (
     <p class="caption">{accounts_line}</p>
     <div class="save-bar"><div class="save-bar-inner"><button type="submit">저장</button></div></div>
   </form>
-  <p class="caption links"><a href="/signup">계정 추가</a> · <a href="/me">나의 정보 관리</a></p>
+  <p class="caption links"><a href="/accounts">계정 목록</a> · <a href="/signup">계정 추가</a> · <a href="/me">나의 정보 관리</a></p>
 </div>
 </body>
 </html>
