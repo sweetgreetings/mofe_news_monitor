@@ -558,6 +558,64 @@ def _fetch_page_html(url: str, timeout: int) -> Optional[str]:
     return response.text
 
 
+# [추가: 2026-10-29] <title> 태그엔 기사 제목 뒤에 사이트 꼬리말이 붙는다
+# (`… - 아시아투데이`, `… < 채권/외환 < 기사본문 - 연합인포맥스`). 아래
+# _best_title_from_html가 "더 긴 쪽"을 고르는 규칙이라 그 꼬리말이 통째로 제목이 돼
+# 화면·복사·보고서로 나갔다. 떼는 규칙은 둘뿐이고 전부 실측으로 채웠다
+# (2026-10-29, 저장된 기사 75건 — 자체 도메인 9개 매체 55건 + 네이버 미러 20건):
+#   1) `… < 섹션 < 기사본문 - 매체명` — 국내 언론사 CMS 한 종류가 쓰는 빵부스러기.
+#      `기사본문`이라는 표식이 끝에 있을 때만, 그 앞의 ` < ` 사슬까지 통째로 뗀다.
+#   2) 끝에 "구분자 하나 + 짧은 이름"이 붙어 있고(` - 아시아투데이` · ` │ 한경매거진&북` ·
+#      ` | 뉴데일리` · `-인베스트조선` · ` - 日刊 NTN(일간NTN)`) **그걸 떼면 og:title과
+#      같은 제목이 될 때만** 뗀다. 같은 제목인지는 글자·숫자만 남겨 댄다(_word_only) —
+#      따옴표·점·괄호를 지우고 내보내는 <title>이 있다(한경비즈니스).
+# 아래 docstring의 "og:title이 잘려 있던" 경우는 꼬리를 떼도 og:title보다 글자가 많아
+# 2)의 조건이 안 맞는다 — 그래서 이 두 규칙은 그 보정을 하나도 건드리지 않는다.
+# 네이버 미러(n.news.naver.com)의 <title>엔 꼬리말이 아예 없어 둘 다 안 돈다.
+# **새 꼬리말 모양은 실측으로 확인한 것만 더한다** — 넓히면 제목의 진짜 일부가 잘린다.
+_TITLE_SECTION_CHAIN = re.compile(r"\s+<\s+(?:[^<]*\s+<\s+)*기사본문\s+-\s+[^<]*$")
+_TITLE_SITE_TAIL = re.compile(r"^(.*?\S)\s*[-|│]\s*[^-|│]{1,30}$")
+_TITLE_WORD_ONLY = re.compile(r"[^0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ\u4e00-\u9fff]+")
+
+
+def _unescape_entities(raw: str) -> str:
+    """엔티티를 더 안 풀릴 때까지 푼다 — 두 겹으로 박아 보내는 언론사가 있다.
+
+    연합인포맥스의 og:title은 `content="재경차관 &amp;quot;AI 투자…&amp;quot;"`라서
+    한 번만 풀면 `&quot;`가 글자로 남아 보고서에 그대로 나간다
+    (app.title_refetch.normalize_title이 비교용으로 쓰는 것과 같은 규칙).
+    """
+    text = raw
+    for _ in range(3):
+        unescaped = html.unescape(text)
+        if unescaped == text:
+            break
+        text = unescaped
+    return text
+
+
+def _strip_site_chrome(text: str, other: Optional[str]) -> str:
+    """제목 끝에 붙은 사이트 꼬리말을 뗀다(위 주석의 두 규칙).
+
+    `other`는 같은 페이지에서 읽은 **다른 쪽** 제목이다 — 꼬리를 뗀 결과가 그쪽과 같은
+    제목일 때만 뗀다. og:title에도 매체명이 붙는 곳이 있어(E동아) 양쪽에 같이 건다.
+    """
+    stripped = _TITLE_SECTION_CHAIN.sub("", text).strip()
+    if not other:
+        return stripped
+    match = _TITLE_SITE_TAIL.match(stripped)
+    other_core = _TITLE_SECTION_CHAIN.sub("", other).strip()
+    if match and _word_only(match.group(1)) == _word_only(other_core):
+        return match.group(1)
+    return stripped
+
+
+def _word_only(text: str) -> str:
+    """글자·숫자만 남긴다 — 따옴표·점·괄호를 지우고 내보내는 <title>이 있어서,
+    꼬리말을 뗀 제목과 og:title이 **같은 제목인지**는 이 값으로만 댈 수 있다."""
+    return _TITLE_WORD_ONLY.sub("", text)
+
+
 def _best_title_from_html(text: str) -> Optional[str]:
     """og:title과 <title> 태그를 둘 다 확인해 더 완전해 보이는 쪽을 고른다.
 
@@ -565,23 +623,25 @@ def _best_title_from_html(text: str) -> Optional[str]:
     버그로 og:title 자체가 문장 중간에서 잘려 있는 경우가 있었다(한국일보,
     n.news.naver.com/mnews/article/469/0000946328 — og:title은 "...6070에 "에서
     끊기는데 같은 페이지의 <title> 태그엔 전체 문장이 다 있었다). 그래서 og:title이
-    있어도 <title> 태그(언론사명이 붙어 있을 수 있음)와 길이를 비교해 더 긴 쪽을
-    쓴다 — 정상적인 경우 <title>은 " - 언론사명"이 붙어 og:title보다 짧을 이유가
-    없으므로, 이 비교만으로 잘린 케이스를 걸러낼 수 있다.
+    있어도 <title> 태그와 길이를 비교해 더 긴 쪽을 쓴다.
+
+    [수정: 2026-10-29] 길이를 재기 전에 <title>의 사이트 꼬리말을 먼저 뗀다
+    (_strip_site_chrome) — 안 떼면 꼬리말이 길이를 부풀려 늘 <title>이 이긴다.
     """
     og_match = _OG_TITLE_PATTERN.search(text)
     og_title = None
     if og_match:
-        og_title = (og_match.group(1) or og_match.group(2) or "").strip() or None
+        og_title = _unescape_entities((og_match.group(1) or og_match.group(2) or "").strip()) or None
     title_match = _TITLE_TAG_PATTERN.search(text)
     title_tag = None
     if title_match:
-        title_tag = title_match.group(1).strip() or None
+        title_tag = _unescape_entities(title_match.group(1).strip()) or None
+    og_core = _strip_site_chrome(og_title, title_tag) if og_title else None
+    title_core = _strip_site_chrome(title_tag, og_title) if title_tag else None
+    og_title, title_tag = og_core or None, title_core or None
     if og_title and title_tag:
-        best = og_title if len(og_title) >= len(title_tag) else title_tag
-    else:
-        best = og_title or title_tag
-    return html.unescape(best) if best else None
+        return og_title if len(og_title) >= len(title_tag) else title_tag
+    return og_title or title_tag
 
 
 def _fetch_full_title(url: str) -> Optional[str]:
@@ -632,7 +692,7 @@ def fetch_full_title_and_summary(url: str) -> Optional[dict]:
         return None
     return {
         "title": title,
-        "summary": html.unescape(summary) if summary else None,
+        "summary": _unescape_entities(summary) if summary else None,
     }
 
 
@@ -832,7 +892,7 @@ def fetch_article_by_url(url: str) -> Optional[dict]:
         "outlet": outlet,
         "title": title,
         "url": url,
-        "summary": html.unescape(summary) if summary else "",
+        "summary": _unescape_entities(summary) if summary else "",
     }
     pub_date = _pub_date_from_html(text)
     if pub_date:

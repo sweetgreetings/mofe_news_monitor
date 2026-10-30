@@ -6724,6 +6724,86 @@ def test_naver_page_stamps_do_not_cross_match():
 
     print("56) 원문 페이지 시각 두 개: 통과 (발행·수정 안 섞임, 없는 값은 안 지어냄)")
 
+
+def test_page_title_drops_site_chrome():
+    """원문 페이지에서 읽은 제목에 **사이트 꼬리말이 따라붙지 않는지** 지킨다.
+
+    <title> 태그엔 기사 제목 뒤에 매체 이름이 붙는다. 그런데 _best_title_from_html은
+    "둘 중 더 긴 쪽"을 고르는 규칙이라(og:title이 CMS 버그로 잘려 있던 사례 때문에
+    생긴 규칙이다), 그 꼬리말이 길이를 부풀려 **언제나 <title>이 이겼다** — 담당자
+    화면의 「기사 정보 직접 수정」 칸에 `… < 채권/외환 < 기사본문 - 연합인포맥스`가
+    그대로 들어앉았고, 그 상태로 복사·txt·발송 텍스트까지 나갔다.
+
+    여기서 지키는 것은 셋이다:
+    1. 꼬리말을 뗀다 — ` < … < 기사본문 - 매체` 사슬과 "구분자 하나 + 짧은 이름".
+    2. **og:title이 잘린 경우의 보정을 깨뜨리지 않는다** — 잘린 꼬리는 구분자로 시작
+       하지 않고, 떼어 봐야 og:title과 글자 수가 달라 2)의 조건이 안 맞는다.
+    3. 엔티티를 두 겹으로 박아 보내는 곳(`&amp;quot;`)이 있어 더 안 풀릴 때까지 푼다.
+
+    실측(2026-10-29, 저장된 기사 75건 — 자체 도메인 9개 매체 55건 + 네이버 미러 20건):
+    꼬리말이 남은 것 74/75건에서 0건. 남은 1건은 og:title이 잘린 **동시에** 꼬리말이
+    붙은 경우인데, 그때 꼬리를 떼려면 "og:title이 제목의 앞부분이기만 하면 뗀다"로
+    넓혀야 해서 **일부러 안 한다**(제목의 진짜 일부가 잘린다).
+    """
+    _require_isolation()
+    from app.naver_api import _best_title_from_html
+
+    def page(og, title):
+        og_tag = f'<meta property="og:title" content="{og}" />' if og else ""
+        return f"<html><head>{og_tag}<title>{title}</title></head></html>"
+
+    # 1) ` < 섹션 < 기사본문 - 매체` 사슬 — 섹션이 몇 겹이든 통째로 뗀다.
+    assert _best_title_from_html(page(
+        "[오늘 재경부 등 경제부처 일정]",
+        "[오늘 재경부 등 경제부처 일정] < 정책/금융 < 기사본문 - 연합인포맥스",
+    )) == "[오늘 재경부 등 경제부처 일정]"
+    assert _best_title_from_html(page(
+        "[노현우의 채권분석] 만장일치 동결인들 어떠하리",
+        "[노현우의 채권분석] 만장일치 동결인들 어떠하리"
+        " < 노현우의 채권분석 < 마켓뷰 < 칼럼/이슈 < 기사본문 - 연합인포맥스",
+    )) == "[노현우의 채권분석] 만장일치 동결인들 어떠하리"
+
+    # 2) 구분자 + 매체명 — 셋 다 실측으로 본 모양이다.
+    for og, title in [
+        ("이형일, 다자 경제외교 데뷔전", "이형일, 다자 경제외교 데뷔전 - 아시아투데이"),
+        ("[단독] 국제기구 고용휴직 5명 중 1명", "[단독] 국제기구 고용휴직 5명 중 1명 | 뉴데일리"),
+        ("발행 주춤해진 한국물", "발행 주춤해진 한국물-인베스트조선"),
+    ]:
+        assert _best_title_from_html(page(og, title)) == og, title
+
+    # og:title 쪽에 매체명이 붙는 곳도 있다(E동아) — 양쪽에 같이 건다.
+    assert _best_title_from_html(page(
+        "동국대 북한학연구소, 북한 재해 취약공간 연구 - E동아",
+        "동국대 북한학연구소, 북한 재해 취약공간 연구 < 대학교육 < 교육 < 기사본문 - E동아",
+    )) == "동국대 북한학연구소, 북한 재해 취약공간 연구"
+
+    # <title>이 따옴표·점을 지우고 내보내는 곳(한경비즈니스) — 꼬리는 떼고,
+    # 구두점이 살아 있는 og:title 쪽을 쓴다.
+    # (og 값의 따옴표는 실제 페이지처럼 엔티티로 적는다 — content="…" 안의 맨
+    #  따옴표는 메타 태그 정규식이 거기서 끊어 읽는다.)
+    assert _best_title_from_html(page(
+        "수협은행 차기 행장 후보 선정 &#39;불발&#39;...추후 재논의",
+        "수협은행 차기 행장 후보 선정 불발추후 재논의 │ 한경매거진&amp;북",
+    )) == "수협은행 차기 행장 후보 선정 '불발'...추후 재논의"
+
+    # 3) og:title이 잘린 경우 — <title>이 이겨야 한다(2026-08-05 보정).
+    assert _best_title_from_html(page(
+        "정부, 국부펀드",
+        "정부, 국부펀드 협력 시동…'테마섹 노하우' 공유 제안",
+    )) == "정부, 국부펀드 협력 시동…'테마섹 노하우' 공유 제안"
+
+    # 4) 엔티티 두 겹 — 한 번만 풀면 `&quot;`가 글자로 남는다.
+    assert _best_title_from_html(page(
+        "재경차관 &amp;quot;AI 투자 둔화&amp;quot;",
+        "재경차관 \"AI 투자 둔화\" < 경제정책 < 기사본문 - 연합인포맥스",
+    )) == '재경차관 "AI 투자 둔화"'
+
+    # 5) 꼬리말이 없는 네이버 미러는 한 글자도 안 바뀐다.
+    plain = "재경부, 핵심광물 공급망 등 우즈벡·카자흐와 잇따라 MOU"
+    assert _best_title_from_html(page(plain, plain)) == plain
+
+    print("57) 원문 제목 사이트 꼬리말: 통과 (꼬리말 뗌, 잘린 og 보정·미러는 그대로)")
+
 def test_summary_override_provenance():
     """저장된 제목이 **누가 쓴 값인지** 가려지는지 지킨다.
 
@@ -7597,6 +7677,7 @@ if __name__ == "__main__":
         test_search_operator_is_one_rule,
         test_title_refetch_compares_fairly,
         test_naver_page_stamps_do_not_cross_match,
+        test_page_title_drops_site_chrome,
         test_summary_override_provenance,
         test_refetch_titles_bulk,
         test_refetch_titles_widget_contract,
