@@ -6576,6 +6576,138 @@ def test_storage_goes_through_one_place():
     print(f"✓ 저장 한 겹: 모듈 {len(users)}개가 store를 지나고, 파일을 직접 만지는 자리는 화면 쪽뿐")
 
 
+def test_user_boundary():
+    """「누구의 데이터인가」 경계를 지킨다 — **그리고 혼자 쓰는 지금은 경로가 그대로인 것.**
+
+    여러 사람이 각자 로그인해 쓰려면 저장소마다 「사람별인가 공용인가」가 정해져 있어야
+    한다(MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 3번). 가르는 기준은 새로 만들지 않고
+    이미 있는 것을 쓴다 — CLAUDE.md 「기관 기사 원장」의 표: 「이 기사에 관한 사실」이면
+    공용(제목·요약·사진 판정·라벨), 「이 기사를 내 보고서에 어쩔 건가」면 사람별(숨김·
+    소제목 배정·순서).
+
+    이 테스트가 보는 것은 넷이다:
+      ① 표가 `data/` 칸과 `app/config.py` 상수를 **빠짐없이** 덮는가(새 저장 자리가
+         생기면 여기서 깨져 「이건 어느 쪽인가」를 그 자리에서 묻는다)
+      ② 표에 없는 칸은 거부하는가
+      ③ **아무도 안 걸려 있으면 경로가 지금과 똑같은가** — 혼자 쓰는 지금이 그 상태라,
+         이 줄이 새면 담당자의 1년치 기사가 빈 화면이 된다
+      ④ 사람을 걸면 사람별 칸만 그 사람 폴더로 가고, 두 사람이 서로 안 섞이는가
+    """
+    _require_isolation()
+    import threading as _threading
+
+    from app import config as app_config, store
+
+    table = store._PER_USER | store._SHARED
+
+    # ── ① 빠짐없이 덮는가 ────────────────────────────────────────────
+    overlap = store._PER_USER & store._SHARED
+    assert not overlap, f"한 칸이 사람별·공용 양쪽에 들어 있습니다 — {sorted(overlap)}"
+
+    uncovered = []
+    for name in dir(app_config):
+        if not (name.endswith("_FILE") or name.endswith("_DIR")):
+            continue
+        value = getattr(app_config, name)
+        if not isinstance(value, Path):
+            continue
+        rel = store._rel(value)
+        if rel is None or rel == ".":
+            continue  # DATA_DIR 밖(.env·AI_RULES.md)이거나 DATA_DIR 자신
+        if rel.split("/")[0] not in table:
+            uncovered.append(f"{name} → {rel}")
+    assert not uncovered, (
+        "저장소 칸이 사람별·공용 어느 쪽인지 안 정해져 있습니다 — "
+        + ", ".join(uncovered)
+        + ". app/store.py의 _PER_USER / _SHARED 표에 한 줄을 더하세요."
+    )
+
+    # 실제 data/ 안에 굴러다니는 칸도 본다 — 모듈이 제 안에서 만드는 경로
+    # (photo_body_verdicts.json·adhoc/·undo_stack.json 등)가 여기서 걸린다.
+    real = sorted(p.name for p in Path(app_config.DATA_DIR).iterdir())
+    stray = [n for n in real if n not in table]
+    assert not stray, (
+        f"data/ 안에 표가 모르는 칸이 있습니다 — {stray}. 앱이 쓰는 자리면 표에 "
+        "더하고, 쓰다 남은 것이면 trash-can/으로 옮기세요."
+    )
+
+    # ── ② 표에 없는 칸은 거부한다 ─────────────────────────────────────
+    try:
+        store._resolve(Path(app_config.DATA_DIR) / "무슨새폴더" / "x.json")
+    except KeyError as exc:
+        assert "_PER_USER" in str(exc), str(exc)
+    else:
+        raise AssertionError("표에 없는 칸을 조용히 통과시켰습니다.")
+
+    # ── ③ 아무도 안 걸려 있으면 경로가 그대로다 ───────────────────────
+    assert store.current_owner() is None, "앞 테스트가 소유자를 걸어 둔 채 끝났습니다."
+    for value in (app_config.LABELS_FILE, app_config.ARTICLES_DIR,
+                  app_config.HIDDEN_ARTICLES_FILE, app_config.SETTINGS_FILE,
+                  app_config.ARTICLES_DIR / "2026-01-01_09-00.json"):
+        assert store._resolve(value) == value, (
+            f"소유자가 없는데 {value}의 경로를 바꿨습니다 — 혼자 쓰는 앱의 데이터가 "
+            "빈 화면이 됩니다."
+        )
+
+    # ── ④ 사람을 걸면 사람별만 갈라지고, 둘이 안 섞인다 ───────────────
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        with patch.object(store, "DATA_DIR", tmp_dir):
+            per_user = tmp_dir / "hidden_articles.json"
+            shared = tmp_dir / "labels.json"
+            run_file = tmp_dir / "articles" / "2026-01-01_09-00.json"
+            store.ensure_dir(tmp_dir / "articles")
+
+            with store.owner("u1"):
+                assert store._resolve(per_user) == tmp_dir / "users" / "u1" / "hidden_articles.json"
+                assert store._resolve(shared) == shared, "공용 칸을 사람별로 보냈습니다."
+                assert store._resolve(run_file) == (
+                    tmp_dir / "users" / "u1" / "articles" / "2026-01-01_09-00.json"
+                ), "회차 파일이 사람 폴더로 안 갔습니다(첫 조각으로 갈려야 합니다)."
+                # 폴더가 없어도 써진다 — 사람별 칸은 쓰는 자리에서 폴더를 만든다
+                store.write_json(per_user, {"who": "u1"})
+                store.write_json(shared, {"공용": 1})
+            assert store.current_owner() is None, "with 블록을 나왔는데 안 풀렸습니다."
+
+            with store.owner("u2"):
+                store.write_json(per_user, {"who": "u2"})
+                assert store.read_json(per_user) == {"who": "u2"}
+                assert store.read_json(shared) == {"공용": 1}, "공용 칸이 안 보입니다."
+
+            with store.owner("u1"):
+                assert store.read_json(per_user) == {"who": "u1"}, (
+                    "u2가 쓴 값이 u1에게 보입니다 — 경계가 새고 있습니다."
+                )
+
+            # 소유자가 없으면 둘 중 어느 것도 안 보인다(예전 자리를 본다)
+            assert not store.exists(per_user), (
+                "소유자 없이 본 자리에 사람별 파일이 생겼습니다."
+            )
+            assert store.exists(shared), "공용 파일이 예전 자리에 없습니다."
+
+            # 파일이 실제로 사람별 폴더에 들어갔다
+            assert (tmp_dir / "users" / "u1" / "hidden_articles.json").exists()
+            assert (tmp_dir / "users" / "u2" / "hidden_articles.json").exists()
+
+            # ── 스레드마다 따로 쥔다 — 한 사람의 요청이 다른 스레드를 끌고 가면 안 된다
+            seen = {}
+
+            def _other():
+                seen["owner"] = store.current_owner()
+
+            with store.owner("u1"):
+                thread = _threading.Thread(target=_other)
+                thread.start()
+                thread.join()
+            assert seen["owner"] is None, (
+                f"다른 스레드가 소유자를 물려받았습니다({seen['owner']}) — "
+                "요청 하나가 스케줄러까지 끌고 갑니다."
+            )
+
+    print(f"✓ 사용자 경계: 칸 {len(table)}개가 사람별·공용으로 갈려 있고, "
+          "소유자가 없으면 경로는 지금 그대로")
+
+
 def test_admin_only_settings():
     """「모두에게 같이 걸리는 설정은 관리자만」을 지킨다 — 그리고 **자물쇠가 꺼져 있으면
     아무것도 막지 않는** 것까지.
@@ -8109,6 +8241,7 @@ if __name__ == "__main__":
         test_env_key_transplant,
         test_key_paths_stay_narrow,
         test_storage_goes_through_one_place,
+        test_user_boundary,
         test_admin_only_settings,
         test_no_undefined_names,
         test_screens_render_to_response,
