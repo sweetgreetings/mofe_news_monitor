@@ -78,7 +78,7 @@ from app import send_log
 from app.config import SEND_LOG_RETENTION_DAYS
 from app.config import DELETED_LOG_TITLE, DELETED_RESTORE_DAYS
 from app.topnav import plain_nav, regular_nav, topnav_style
-from app import auth_session, users
+from app import auth_session, store, users
 from app.auth_renderer import (
     render_forgot_answer_page,
     render_forgot_done_page,
@@ -6142,6 +6142,10 @@ class _SettingsHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self._auth_blocked() or self._admin_blocked():
             return
+        with store.owner(self._data_owner()):
+            self._route_get()
+
+    def _route_get(self):
         if self.path in _SCREEN_HTML_ROUTES:
             self._respond(_SCREEN_HTML_ROUTES[self.path]())
         elif self.path.startswith("/history.html?"):
@@ -6271,6 +6275,23 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             if name == SESSION_COOKIE_NAME:
                 return value
         return ""
+
+    def _data_owner(self) -> Optional[str]:
+        """이 요청이 다룰 사람 — `app/store.py`의 사람별 칸이 누구 폴더로 풀릴지 정한다.
+
+        **「바닥」의 주인에게는 아무것도 걸지 않는다(`None`).** 그 사람의 자리는
+        `data/users/{id}/`가 아니라 `data/` 자신이라(`users.base_owner_id`) 소유자를
+        걸지 않는 것이 곧 그 사람의 자리를 가리키는 일이다. 그래서 **옮길 파일이
+        0개이고 이관 절차가 없다.**
+
+        로그인하지 않았을 때도 `None`이다 — 자물쇠를 꺼 둔 채 혼자 쓰는 상태가
+        그것이고, 그때 보이는 것은 바닥 주인의 데이터다(지금 담당자의 그 데이터다).
+        """
+        user = self._current_user()
+        if not user:
+            return None
+        user_id = user.get("id")
+        return None if user_id == users.base_owner_id() else user_id
 
     def _is_admin_now(self) -> bool:
         """지금 요청을 보낸 사람이 관리자 몫 화면을 봐도 되는가.
@@ -6756,6 +6777,10 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         if self._auth_blocked() or self._admin_blocked():
             return
 
+        with store.owner(self._data_owner()):
+            self._route_post(form)
+
+    def _route_post(self, form: dict) -> None:
         if self.path == "/download-text":
             self._handle_download_text(form)
         elif self.path == "/excel-merge/read":

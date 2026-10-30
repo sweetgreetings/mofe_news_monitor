@@ -6708,6 +6708,72 @@ def test_user_boundary():
           "소유자가 없으면 경로는 지금 그대로")
 
 
+def test_base_owner_needs_no_migration():
+    """**이관 절차가 없다**는 것을 지킨다 — 첫 담당자의 자리가 곧 `data/`이기 때문이다.
+
+    사람별 데이터는 `data/users/{계정 id}/…`에 사는데, 거기에 **첫 담당자 것까지**
+    넣으려 하면 지금 `data/`에 쌓인 1년치(회차 376개·수시 카드 90개)를 옮기는
+    이관이 필요해진다. 그건 이 앱에서 되돌리기가 가장 어려운 작업이고, **잘못 켜면
+    담당자 화면이 통째로 비어 보인다.**
+
+    그래서 규칙을 한 줄 바꿨다 — **「바닥」의 주인에게는 소유자를 걸지 않는다.**
+    걸지 않으면 `store._resolve`가 경로를 안 바꾸므로 그것이 곧 `data/`를 가리키는
+    일이고, **옮길 파일이 0개다.** 새로 들어온 사람만 자기 폴더에서 빈 채로 시작한다.
+
+    이 테스트가 깨지면 이관이 다시 필요해진다는 뜻이다.
+    """
+    _require_isolation()
+    from app import settings_server, store, users as users_mod
+
+    class _Stub:
+        def __init__(self, user):
+            self._user = user
+
+        def _current_user(self):
+            return self._user
+
+    owner_of = settings_server._SettingsHandler._data_owner
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        with patch.object(users_mod, "USERS_FILE", tmp_dir / "users.json"):
+            # 계정이 하나도 없으면 바닥 주인도 없다
+            assert users_mod.base_owner_id() is None
+            assert owner_of(_Stub(None)) is None
+
+            first = users_mod.create_user(
+                email="first@example.com", password="1234", display_name="담당자",
+                department="", phone="01000000000", question="초등학교",
+                answer="서울초등", consent=True,
+            )
+            second = users_mod.create_user(
+                email="second@example.com", password="1234", display_name="큐레이터",
+                department="", phone="01011112222", question="초등학교",
+                answer="부산초등", consent=True,
+            )
+
+            # 첫 계정이 바닥 주인이다(만든 순서 그대로)
+            assert users_mod.base_owner_id() == first["id"]
+
+            # ① 바닥 주인에게는 소유자를 안 건다 → 경로가 지금 그대로다
+            assert owner_of(_Stub(first)) is None, (
+                "바닥 주인에게 소유자를 걸었습니다 — 그러면 담당자의 1년치를 "
+                "data/users/ 로 옮기는 이관이 필요해집니다."
+            )
+            # ② 로그인하지 않았을 때도 바닥이다(자물쇠를 꺼 둔 채 혼자 쓰는 상태)
+            assert owner_of(_Stub(None)) is None
+            # ③ 그 밖의 사람은 자기 폴더
+            assert owner_of(_Stub(second)) == second["id"]
+
+    # ④ 바닥 주인의 요청에서 경로가 정말 안 바뀐다 — store 쪽과 맞물려 확인한다
+    from app.config import ARTICLES_DIR, HIDDEN_ARTICLES_FILE
+    with store.owner(None):
+        for value in (ARTICLES_DIR, HIDDEN_ARTICLES_FILE):
+            assert store._resolve(value) == value
+
+    print("✓ 이관 없음: 바닥 주인은 소유자가 안 걸려 data/를 그대로 보고, 남은 자기 폴더에서 시작")
+
+
 def test_admin_only_settings():
     """「모두에게 같이 걸리는 설정은 관리자만」을 지킨다 — 그리고 **자물쇠가 꺼져 있으면
     아무것도 막지 않는** 것까지.
@@ -8242,6 +8308,7 @@ if __name__ == "__main__":
         test_key_paths_stay_narrow,
         test_storage_goes_through_one_place,
         test_user_boundary,
+        test_base_owner_needs_no_migration,
         test_admin_only_settings,
         test_no_undefined_names,
         test_screens_render_to_response,
