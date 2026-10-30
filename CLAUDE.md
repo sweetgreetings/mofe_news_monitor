@@ -19,6 +19,7 @@
 | [archive/](archive/) | 끝난 설계 문서(`MORNING_ISSUES_DESIGN.md`, 초기 설계 `DESIGN.md`)·요약 기획서·정리 전 CLAUDE.md |
 | [AI_RULES.md](AI_RULES.md) | LLM 시스템 프롬프트 **원본** (코드가 이 파일을 직접 읽는다 — 고치면 바로 반영) |
 | [LLM_COST_USAGE.md](LLM_COST_USAGE.md) | Claude API 호출 지점·비용 |
+| [SERVER_REQUIREMENTS.md](SERVER_REQUIREMENTS.md) | 서버 한 대에 올려 몇 명이 쓸 때 **전산·보안팀에 확인·허가받을 것**. 실행 환경·나가는 통신·용량·개인정보 전부 실측값이고, 결정이 필요한 항목은 §7에 모여 있다 |
 | [MULTIUSER_ROLLOUT_CHECKLIST.md](MULTIUSER_ROLLOUT_CHECKLIST.md) | 여러 사람이 쓰게 될 때의 준비 항목·작업 순서. 지금 들어와 있는 것은 **자물쇠까지**다(아래 「로그인」 절) |
 | [EXPERT_QUESTIONS.md](EXPERT_QUESTIONS.md) | 혼자 정하기 어려운 결정을 자문받기 위해 모아 둔 것 (상황·실측치·후보안·묻고 싶은 것). 결정되면 규칙은 CLAUDE.md로, 기각안은 HISTORY.md로 옮기고 항목은 지운다 |
 | [TEXT_AUDIT.md](TEXT_AUDIT.md) | 화면 설명 글(말풍선·툴팁·안내줄·빈 화면·배너·확인창) 점검표. **아직 고치지 않은 문구 목록**이고, 고친 줄은 지운다 |
