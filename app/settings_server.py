@@ -373,6 +373,7 @@ _AUTH_FREE_PATHS = {
     "/login", "/signup", "/forgot", "/forgot-answer", "/forgot-reset", "/whoami",
     f"/{LOGO_PATH.name}",
 }
+_ACCOUNTS_TOP_BAR_HTML = plain_nav()
 _LABELS_TOP_BAR_HTML = plain_nav()
 _LABEL_MANAGE_TOP_BAR_HTML = plain_nav("라벨 보관함", f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/labels")
 _HIDDEN_TOP_BAR_HTML = regular_nav(None)
@@ -439,66 +440,7 @@ _MENU_TEMPLATE = (
 {topnav_html}
 <div class="container">
   <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M19.1 14.4a1.5 1.5 0 0 0 .3 1.7l.1.1a1.9 1.9 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-1.7-.3 1.5 1.5 0 0 0-.9 1.4v.2a1.9 1.9 0 1 1-3.8 0v-.1a1.5 1.5 0 0 0-1-1.4 1.5 1.5 0 0 0-1.7.3l-.1.1a1.9 1.9 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0 .3-1.7 1.5 1.5 0 0 0-1.4-.9h-.2a1.9 1.9 0 1 1 0-3.8h.1a1.5 1.5 0 0 0 1.4-1 1.5 1.5 0 0 0-.3-1.7l-.1-.1a1.9 1.9 0 1 1 2.6-2.6l.1.1a1.5 1.5 0 0 0 1.7.3h.1a1.5 1.5 0 0 0 .9-1.4v-.2a1.9 1.9 0 1 1 3.8 0v.1a1.5 1.5 0 0 0 .9 1.4 1.5 1.5 0 0 0 1.7-.3l.1-.1a1.9 1.9 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0-.3 1.7v.1a1.5 1.5 0 0 0 1.4.9h.2a1.9 1.9 0 1 1 0 3.8h-.1a1.5 1.5 0 0 0-1.4.9Z"/></svg> 설정</h1>
-  <!-- [수정: 2026-09-18] 정기 / 수시 / 공통 · 수집 / 받는 사람 / 홈 / 연동으로 다시 묶었다.
-       정기·수시가 한 화면에 나란히 서므로 두 묶음엔 흐름 이름과 홈 흐름도와 같은 색 띠를 붙인다.
-       시안 mockups/SETTINGS_MENU_REORG_MOCKUP.html. -->
-  <div class="category flow reg">
-    <div class="category-name">정기</div>
-    <div class="menu">
-      <a href="/keywords">검색어<span class="menu-chev">›</span></a>
-      <a href="/schedule">수집시간대<span class="menu-chev">›</span></a>
-      <div class="menu-sub">텍스트 표출 형식</div>
-      <a href="/format">기사 제목<span class="menu-chev">›</span></a>
-      <a href="/subheading-format">소제목<span class="menu-chev">›</span></a>
-      <div class="menu-sub">발송 · 알림</div>
-      <a href="/auto-send">자동발송 대기시간 및 ON/OFF<span class="menu-chev">›</span></a>
-      <a href="/breaking-alert">[단독]·[속보] 기사 알림<span class="menu-chev">›</span></a>
-    </div>
-  </div>
-  <div class="category flow adhoc">
-    <div class="category-name">수시</div>
-    <div class="menu">
-      <div class="menu-sub first">텍스트 표출 형식</div>
-      <a href="/format-adhoc">기사 제목<span class="menu-chev">›</span></a>
-      <a href="/subheading-format-adhoc">소제목<span class="menu-chev">›</span></a>
-    </div>
-  </div>
-  <div class="category">
-    <div class="category-name">정기, 수시 공통</div>
-    <div class="menu">
-      <a href="/outlets">언론사 선택 및 순서 지정<span class="menu-chev">›</span></a>
-      <a href="/deleted">삭제 기록<span class="menu-note">지운 회차 되살리기</span><span class="menu-chev">›</span></a>
-    </div>
-  </div>
-  <div class="category">
-    <div class="category-name">받는 사람 지정</div>
-    <div class="menu">
-      <a href="/telegram">텔레그램<span class="menu-chev">›</span></a>
-      <a href="/email">이메일<span class="menu-note">정기 확정본만</span><span class="menu-chev">›</span></a>
-      <a href="/send-log">발송 기록<span class="menu-note">누가 받았는지</span><span class="menu-chev">›</span></a>
-    </div>
-  </div>
-  <div class="category">
-    <div class="category-name">기타</div>
-    <div class="menu">
-      <a href="/excel-merge">엑셀파일로 보고용 텍스트 생성<span class="menu-chev">›</span></a>
-    </div>
-  </div>
-  <!-- [추가: 2026-08-20] "연동"은 일부러 맨 아래에 둔다(사용자 지정 위치) — 검색어
-       바로 아래(맨 위)는 이 화면을 처음 여는 사람 눈에 제일 먼저 들어오는 자리라
-       배포본을 나눠 받은 사람마다 매번 마주치게 되는데, 키 등록은 설치 시 한 번
-       해두면 그 뒤로는 다시 열 일이 거의 없는 화면이다. 자주 여닫는 검색어·형광펜·
-       수집 시간 같은 항목들 아래, 가장 손이 안 가는 자리가 맞다. -->
-  <div class="category">
-    <div class="category-name">연동</div>
-    <div class="menu">
-      <a href="/keys">키 보관 상태<span class="menu-note">등록됐는지 한눈에</span><span class="menu-chev">›</span></a>
-      <a href="/naver">네이버 뉴스 API 설정{naver_badge}<span class="menu-chev">›</span></a>
-      <a href="/llm">LLM(AI) 연동{llm_badge}<span class="menu-chev">›</span></a>
-      <a href="/telegram-sender">텔레그램 발송 계정{telegram_badge}<span class="menu-chev">›</span></a>
-      <a href="/email-sender">이메일 발송 계정{email_badge}<span class="menu-chev">›</span></a>
-    </div>
-  </div>
+{menu_html}
 </div>
 </body>
 </html>
@@ -1562,6 +1504,112 @@ _LOGIN_SETTINGS_TEMPLATE = (
 )
 
 
+# ── 계정 목록 (관리자만) ────────────────────────────────────────────────
+# **왜 있나**: 첫 계정이 관리자이고 그 뒤 계정은 일반이라, 역할을 바꾸는 길이 없으면
+# 첫 사람만 영원히 설정을 바꿀 수 있다 — 대직·인사이동 때 아무도 못 바꾸게 된다.
+# **자리는 홈 머리의 계정 메뉴다** — 계정은 「지금 쓰는 사람이 누구인가」라 설정이
+# 아니고, 같은 것을 설정 메뉴에도 두지 않는다(CLAUDE.md 「로그인」).
+_ACCOUNTS_TEMPLATE = (
+    """<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>계정 목록</title>
+<style>"""
+    + _BASE_STYLE
+    + """
+  .acc {{ display: grid; grid-template-columns: 1fr 1fr 96px 92px; gap: 6px;
+    align-items: center; padding: 10px 2px; border-bottom: 1px solid {border}; }}
+  .acc:last-of-type {{ border-bottom: 0; }}
+  .acc-head {{ color: {muted}; font-size: var(--fs-sm); padding-bottom: 2px;
+    border-bottom: 1px solid {border}; }}
+  .acc .who {{ font-size: var(--fs-base); color: {text}; }}
+  .acc .dept {{ color: {muted}; font-size: var(--fs-sm); margin-left: 6px; }}
+  .acc .mail {{ color: {muted}; font-size: var(--fs-sm); overflow-wrap: anywhere; }}
+  .acc .role {{ display: inline-block; padding: 2px 8px; border-radius: var(--r-pill);
+    font-size: var(--fs-sm); border: 1px solid {border}; color: {muted}; }}
+  .acc .role.admin {{ border-color: {accent_border}; background: {hover};
+    color: {accent}; font-weight: 500; }}
+  .acc .me {{ color: {muted}; font-size: var(--fs-sm); }}
+  .acc button, .acc .off {{ display: inline-block; height: var(--h-tb);
+    line-height: calc(var(--h-tb) - 2px); padding: 0 10px; font-size: var(--fs-sm);
+    background: {card}; color: {text_soft}; border: 1px solid {border};
+    border-radius: var(--r-md); cursor: pointer; }}
+  .acc button:hover {{ border-color: {accent_border}; color: {accent}; }}
+  /* 마지막 관리자 — 흐리게 두고 이유는 툴팁이 말한다(↑↓ 비활성과 같은 값) */
+  .acc .off {{ opacity: 0.45; cursor: default; }}
+  @media (max-width: 640px) {{
+    .acc {{ grid-template-columns: 1fr 96px 92px; }}
+    .acc .mail {{ display: none; }}
+  }}
+</style>
+</head>
+<body>
+"""
+    + _ACCOUNTS_TOP_BAR_HTML
+    + """
+<div class="container">
+  <h1>계정 목록</h1>
+  <p class="hint">
+    관리자는 모두에게 같이 걸리는 설정(검색어·수집 시간·언론사·받는 사람·키)을 바꿀 수 있습니다.
+    일반 사용자는 기사를 다듬고 보내는 일을 합니다.
+  </p>
+  {error_html}
+  {notice_html}
+  <div class="acc acc-head"><div>이름</div><div>이메일</div><div>역할</div><div></div></div>
+  {rows_html}
+</div>
+</body>
+</html>
+"""
+)
+
+
+def render_accounts_page(me_id: str = "", error: str = "", notice: str = "") -> str:
+    """계정 목록 — 이름·부서·이메일·역할, 그리고 역할을 바꾸는 단추 하나.
+
+    **자기 자신을 내리는 것도 막지 않는다**(관리자가 둘 이상이면). 막아야 하는 것은
+    「마지막 관리자가 사라지는 것」 하나이고 그 판정은 `users.set_role`이 한다.
+    """
+    rows = []
+    only_admin = users.admin_count() <= 1
+    for user in users.list_users():
+        admin = users.is_admin(user)
+        name = html.escape(user.get("display_name", "") or "이름 없음")
+        dept = user.get("department", "")
+        dept_html = f'<span class="dept">{html.escape(dept)}</span>' if dept else ""
+        mine_html = '<span class="me">(나)</span>' if user.get("id") == me_id else ""
+        if admin and only_admin:
+            # 마지막 관리자 — 단추를 **흐리게 두고 이유는 툴팁이 말한다**(휴지통의
+            # 기간 지난 되살리기와 같은 문법. 자리를 비우면 왜 못 하는지 화면이
+            # 스스로 말하지 못하고, 글자를 더 붙이면 줄마다 설명이 늘어난다).
+            action = ('<span class="off" aria-disabled="true" title="관리자가 한 명뿐입니다'
+                      ' — 다른 사람을 관리자로 올린 뒤에 내릴 수 있습니다.">일반으로</span>')
+        else:
+            label = "일반으로" if admin else "관리자로"
+            action = (
+                f'<form method="POST" action="/accounts/role">'
+                f'<input type="hidden" name="user_id" value="{html.escape(user.get("id", ""))}">'
+                f'<input type="hidden" name="role" value="{"member" if admin else "admin"}">'
+                f'<button type="submit">{label}</button></form>'
+            )
+        rows.append(
+            f'  <div class="acc"><div class="who">{name}{dept_html}'
+            f'{mine_html}</div>'
+            f'<div class="mail">{html.escape(user.get("email", ""))}</div>'
+            f'<div><span class="role{" admin" if admin else ""}">'
+            f'{"관리자" if admin else "일반"}</span></div>'
+            f"<div>{action}</div></div>"
+        )
+    return _ACCOUNTS_TEMPLATE.format(
+        **_theme(),
+        error_html=f'<div class="nb nb-error">{html.escape(error)}</div>' if error else "",
+        notice_html=f'<div class="nb nb-ok">{html.escape(notice)}</div>' if notice else "",
+        rows_html="\n".join(rows),
+    )
+
+
 def render_login_settings_page(error: str = "") -> str:
     count = users.user_count()
     if count == 0:
@@ -1648,15 +1696,200 @@ def _credential_badge(source: str) -> str:
     return ""
 
 
-def render_menu_page() -> str:
-    """설정 메뉴 화면을 렌더링한다 (PRD.md 기능1 규칙 17)."""
+# ── 설정 메뉴 항목 표 ──────────────────────────────────────────────────
+# **항목을 표로 두는 이유는 역할이다** — 「모두에게 같이 걸리는 설정은 관리자만」이라
+# 일반 사용자에게는 그 항목을 **안 그린다**(CLAUDE.md 「관리자 권한」). 묶음이 통째로
+# 비면 묶음 이름도 안 그린다 — 고를 게 없는데 비어 있는 묶음을 두면 왜 비었는지
+# 화면이 스스로 말하지 못한다.
+#
+# 묶음은 `(묶음 이름, 묶음 클래스, 줄들)`, 줄은 둘 중 하나다:
+#   ("sub", 작은 제목, 첫 줄인가)            — menu-sub 소제목
+#   ("link", 주소, 이름, 꼬리말, 배지 키, 관리자만)
+# 메뉴 순서·글자는 예전 템플릿 그대로다(시안 mockups/SETTINGS_MENU_REORG_MOCKUP.html).
+_MENU_GROUPS = [
+    ("정기", "category flow reg", [
+        ("link", "/keywords", "검색어", "", None, True),
+        ("link", "/schedule", "수집시간대", "", None, True),
+        ("sub", "텍스트 표출 형식", False),
+        ("link", "/format", "기사 제목", "", None, True),
+        ("link", "/subheading-format", "소제목", "", None, True),
+        ("sub", "발송 · 알림", False),
+        ("link", "/auto-send", "자동발송 대기시간 및 ON/OFF", "", None, True),
+        ("link", "/breaking-alert", "[단독]·[속보] 기사 알림", "", None, True),
+    ]),
+    ("수시", "category flow adhoc", [
+        ("sub", "텍스트 표출 형식", True),
+        ("link", "/format-adhoc", "기사 제목", "", None, True),
+        ("link", "/subheading-format-adhoc", "소제목", "", None, True),
+    ]),
+    ("정기, 수시 공통", "category", [
+        ("link", "/outlets", "언론사 선택 및 순서 지정", "", None, True),
+        ("link", "/deleted", "삭제 기록", "지운 회차 되살리기", None, True),
+    ]),
+    ("받는 사람 지정", "category", [
+        ("link", "/telegram", "텔레그램", "", None, True),
+        ("link", "/email", "이메일", "정기 확정본만", None, True),
+        # 발송 기록은 읽기만 하는 자리라 모두 본다 — 누구에게 갔는지는 보고서를
+        # 보내는 사람이 알아야 하는 사실이다.
+        ("link", "/send-log", "발송 기록", "누가 받았는지", None, False),
+    ]),
+    ("기타", "category", [
+        # 들고 온 표를 바꿔 주고 아무것도 저장하지 않는 도구라 모두 쓴다.
+        ("link", "/excel-merge", "엑셀파일로 보고용 텍스트 생성", "", None, False),
+    ]),
+    # [추가: 2026-08-20] "연동"은 일부러 맨 아래에 둔다(사용자 지정 위치) — 검색어
+    # 바로 아래(맨 위)는 이 화면을 처음 여는 사람 눈에 제일 먼저 들어오는 자리라
+    # 배포본을 나눠 받은 사람마다 매번 마주치게 되는데, 키 등록은 설치 시 한 번
+    # 해두면 그 뒤로는 다시 열 일이 거의 없는 화면이다. 자주 여닫는 검색어·형광펜·
+    # 수집 시간 같은 항목들 아래, 가장 손이 안 가는 자리가 맞다.
+    ("연동", "category", [
+        ("link", "/keys", "키 보관 상태", "등록됐는지 한눈에", None, True),
+        ("link", "/naver", "네이버 뉴스 API 설정", "", "naver", True),
+        ("link", "/llm", "LLM(AI) 연동", "", "llm", True),
+        ("link", "/telegram-sender", "텔레그램 발송 계정", "", "telegram", True),
+        ("link", "/email-sender", "이메일 발송 계정", "", "email", True),
+    ]),
+]
+
+
+# ── 관리자만 쓸 수 있는 자리 ────────────────────────────────────────────
+# **규칙 하나로 정해진다 — 「모두에게 같이 걸리는 설정은 관리자만」.** 지금 이 앱의
+# 설정은 전부 한 벌이라(검색어·수집 시간·언론사·받는 사람·키·형식) 한 사람이 바꾸면
+# 모두의 수집과 보고서가 바뀐다. 큐레이션·수집·발송·라벨 붙이기·보관함 읽기는
+# 자기 일이라 모두 한다.
+#
+# **주소를 정확히 대조한다 — 앞글자로 재지 않는다.** `/keywords`는 관리자만이지만
+# `/keywords/toggle-highlight`·`/keywords/cycle-highlight-color`는 확정본·초안·오늘
+# 전체 기사 화면의 🖍️ 형광펜이 부르는 자리다(큐레이션이라 모두 쓴다). 앞글자로
+# 재면 그 형광펜이 일반 사용자에게서 조용히 죽는다.
+#
+# **③ 사용자 경계가 들어오면 여기서 빠지는 항목이 생긴다** — 검색어·받는 사람·형식이
+# 사람별로 갈리는 순간 「모두에게 같이 걸리는」이 아니게 되므로 규칙이 저절로 그것들을
+# 내보낸다(MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 3번).
+_ADMIN_ONLY_PATHS = {
+    # 정기 설정
+    "/keywords", "/save",
+    "/schedule", "/save-schedule", "/schedule/add-group", "/schedule/add-slot",
+    "/format", "/save-format", "/subheading-format", "/save-subheading-format",
+    "/auto-send", "/save-auto-send",
+    "/breaking-alert", "/save-breaking-alert",
+    # 수시 설정
+    "/format-adhoc", "/save-format-adhoc",
+    "/subheading-format-adhoc", "/save-subheading-format-adhoc",
+    # 공통 설정
+    "/outlets", "/save-outlets", "/move-outlet",
+    "/deleted", "/deleted/restore", "/deleted/empty", "/history/delete-runs",
+    # 받는 사람 명단
+    "/telegram", "/save-telegram", "/telegram/add-recipient-slot",
+    "/email", "/save-email", "/email/add-recipient-slot",
+    # 연동 키 — 공용 키라 한 사람이 바꾸면 모두의 수집·발송이 바뀐다
+    "/keys",
+    "/naver", "/save-naver", "/delete-naver", "/test-naver",
+    "/llm", "/save-llm", "/delete-llm", "/test-llm",
+    "/telegram-sender", "/save-telegram-sender", "/delete-telegram-sender",
+    "/test-telegram-sender",
+    "/email-sender", "/save-email-sender", "/delete-email-sender",
+    "/test-email-sender",
+    # 자물쇠 자신 — 일반 사용자가 끌 수 있으면 자물쇠가 아니다
+    "/login-settings", "/save-login-settings",
+    # 계정을 더 만드는 일(계정이 하나도 없을 때는 첫 계정 자리라 안 막는다 — 아래 함수)
+    "/signup",
+    # 계정 목록과 역할 바꾸기
+    "/accounts", "/accounts/role",
+    # 라벨 **관리** — 이름 변경·합치기·삭제는 남이 붙인 라벨까지 바꾼다.
+    # 붙이기·떼기(/add-label·/remove-label)는 큐레이션이라 모두 한다.
+    "/label-manage", "/rename-label", "/merge-label", "/delete-label",
+    # 정책 단어 추이에 올릴 단어 — 한 벌(최대 8개)이라 모두의 그래프가 바뀐다.
+    # 그래프를 보는 것(/trend)과 받아 가는 것(/trend/download-excel)은 모두 한다.
+    "/trend/add-word", "/trend/remove-word",
+}
+
+_ADMIN_ONLY_TEMPLATE = (
+    """<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>관리자만</title>
+<style>"""
+    + _BASE_STYLE
+    + """
+</style>
+</head>
+<body>
+"""
+    + _TOP_BAR_HTML
+    + """
+<div class="container">
+  <h1>관리자만 바꿀 수 있어요</h1>
+  <p class="hint">
+    이 설정은 모두에게 같이 걸립니다 — 수집 시간·검색어·언론사·받는 사람·키를 바꾸면
+    다른 사람의 수집과 보고서까지 바뀝니다.<br>
+    바꿔야 할 것이 있으면 관리자에게 알려 주세요.
+  </p>
+</div>
+</body>
+</html>
+"""
+)
+
+
+def render_admin_only_page() -> str:
+    return _ADMIN_ONLY_TEMPLATE.format(**_theme())
+
+
+def _menu_html(admin: bool) -> str:
+    """설정 메뉴의 묶음들을 그린다. `admin`이 거짓이면 관리자 전용 항목을 뺀다."""
+    badges = {
+        "naver": lambda: _credential_badge(naver_source()),
+        "llm": lambda: _credential_badge(llm_source()),
+        "telegram": lambda: _credential_badge(telegram_source()),
+        "email": lambda: _credential_badge(email_source()),
+    }
+    out = []
+    for name, klass, rows in _MENU_GROUPS:
+        links = [r for r in rows if r[0] == "link" and (admin or not r[5])]
+        if not links:
+            continue
+        lines = []
+        for row in rows:
+            if row[0] == "sub":
+                # 소제목은 그 아래 보일 항목이 하나라도 있을 때만 그린다.
+                after = rows[rows.index(row) + 1:]
+                nxt = next((r for r in after if r[0] == "link"), None)
+                if nxt is None or (nxt[5] and not admin):
+                    continue
+                lines.append(
+                    f'      <div class="menu-sub{" first" if row[2] else ""}">{row[1]}</div>'
+                )
+                continue
+            _, href, label, note, badge, admin_only = row
+            if admin_only and not admin:
+                continue
+            note_html = f'<span class="menu-note">{note}</span>' if note else ""
+            badge_html = badges[badge]() if badge else ""
+            lines.append(
+                f'      <a href="{href}">{label}{badge_html}{note_html}'
+                f'<span class="menu-chev">›</span></a>'
+            )
+        out.append(
+            f'  <div class="{klass}">\n'
+            f'    <div class="category-name">{name}</div>\n'
+            f'    <div class="menu">\n' + "\n".join(lines) + "\n    </div>\n  </div>"
+        )
+    return "\n".join(out)
+
+
+def render_menu_page(admin: bool = True) -> str:
+    """설정 메뉴 화면을 렌더링한다 (PRD.md 기능1 규칙 17).
+
+    `admin`은 **로그인이 켜져 있고 그 사람이 관리자가 아닐 때만** 거짓이 된다 —
+    자물쇠가 꺼져 있으면 예전처럼 전부 보인다(기본값이 참인 이유).
+    """
     return _MENU_TEMPLATE.format(
         **_theme(),
         topnav_html=plain_nav(),
-        naver_badge=_credential_badge(naver_source()),
-        llm_badge=_credential_badge(llm_source()),
-        telegram_badge=_credential_badge(telegram_source()),
-        email_badge=_credential_badge(email_source()),
+        menu_html=_menu_html(admin),
     )
 
 
@@ -5907,7 +6140,7 @@ def _original_url_index() -> dict:
 
 class _SettingsHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self._auth_blocked():
+        if self._auth_blocked() or self._admin_blocked():
             return
         if self.path in _SCREEN_HTML_ROUTES:
             self._respond(_SCREEN_HTML_ROUTES[self.path]())
@@ -5921,7 +6154,7 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         elif LOGO_PATH.exists() and self.path == f"/{LOGO_PATH.name}":
             self._respond_static_binary(LOGO_PATH, "image/svg+xml")
         elif self.path == "/":
-            self._respond(render_menu_page())
+            self._respond(render_menu_page(self._is_admin_now()))
         elif self.path == "/keywords":
             self._respond(render_keywords_page(load_settings()))
         elif self.path == "/outlets":
@@ -6012,6 +6245,14 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         elif self.path == "/me" or self.path.startswith("/me?"):
             self._handle_my_info_page(
                 notice=_SIGNUP_WELCOME if "welcome" in parse_qs(urlsplit(self.path).query) else "")
+        elif self.path == "/accounts" or self.path.startswith("/accounts?"):
+            query = parse_qs(urlsplit(self.path).query)
+            user = self._current_user()
+            self._respond(render_accounts_page(
+                me_id=(user or {}).get("id", ""),
+                error=query.get("error", [""])[0],
+                notice=query.get("notice", [""])[0],
+            ))
         elif self.path == "/login-settings":
             self._respond(render_login_settings_page())
         elif self.path == "/whoami":
@@ -6031,9 +6272,46 @@ class _SettingsHandler(BaseHTTPRequestHandler):
                 return value
         return ""
 
+    def _is_admin_now(self) -> bool:
+        """지금 요청을 보낸 사람이 관리자 몫 화면을 봐도 되는가.
+
+        **자물쇠가 꺼져 있으면 참이다** — 혼자 쓰는 앱에서 설정 메뉴가 반쪽이 되면
+        안 된다. 켜져 있을 때만 그 사람의 역할을 본다.
+        """
+        if not auth_session.is_login_required():
+            return True
+        return users.is_admin(self._current_user())
+
     def _current_user(self):
         user_id = auth_session.user_id_for_token(self._cookie_token())
         return users.get_user(user_id) if user_id else None
+
+    def _admin_blocked(self) -> bool:
+        """관리자만 쓸 수 있는 자리면 응답까지 보내고 True를 돌려준다.
+
+        **로그인이 꺼져 있으면 아무것도 막지 않는다** — 자물쇠와 같은 규칙이고,
+        꺼진 동안 이 함수는 첫 줄에서 끝난다(비용 0). 혼자 쓰는 지금이 그 상태다.
+
+        거절은 GET이면 설명 화면, POST면 403 JSON이다(`_auth_blocked`가 401을 쓰는
+        것과 같은 이유 — 화면의 fetch가 받는 자리라 HTML을 성공 응답으로 돌려주면
+        화면이 그걸 결과로 읽는다).
+        """
+        if not auth_session.is_login_required():
+            return False
+        path = urlsplit(self.path).path
+        if path not in _ADMIN_ONLY_PATHS:
+            return False
+        # 계정이 하나도 없을 때의 /signup은 **첫 계정을 만드는 자리**라 막지 않는다
+        # (막으면 아무도 들어올 수 없다 — `_auth_blocked`도 같은 예외를 둔다).
+        if path == "/signup" and not users.user_count():
+            return False
+        if users.is_admin(self._current_user()):
+            return False
+        if self.command == "POST":
+            self._respond_json({"error": "admin_only"}, status=403)
+        else:
+            self._respond(render_admin_only_page(), status=403)
+        return True
 
     def _auth_blocked(self) -> bool:
         """로그인이 필요한데 안 돼 있으면 응답까지 보내고 True를 돌려준다."""
@@ -6074,6 +6352,27 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         return f"{minutes}분"
 
     # ── 로그인 ───────────────────────────────────────────────────────────
+    def _handle_set_role(self, form: dict) -> None:
+        """계정 목록의 「관리자로」·「일반으로」 단추.
+
+        막는 판정(마지막 관리자)은 `users.set_role`이 하고, 여기서는 그 이유를
+        같은 화면에 되돌려 보여주기만 한다(form 제출 + 303, 수시 화면과 같은 방식).
+        **역할을 바꾸면 그 사람의 세션은 그대로 둔다** — 비밀번호를 바꿀 때 세션을
+        끊는 것과 다르다(그건 「남이 쥔 세션을 뺏는」 일이고, 이건 권한만 바뀐다.
+        다음 요청에서 `_admin_blocked`가 새 역할로 판정한다).
+        """
+        user_id = self._one(form, "user_id")
+        role = self._one(form, "role")
+        try:
+            users.set_role(user_id, role)
+        except users.UserError as exc:
+            self._redirect("/accounts?error=" + quote(str(exc)))
+            return
+        target = users.get_user(user_id)
+        name = (target or {}).get("display_name", "") or "그 계정"
+        label = "관리자로 올렸어요" if role == "admin" else "일반으로 내렸어요"
+        self._redirect(f"/accounts?notice=" + quote(f"{name}을 {label}."))
+
     def _handle_whoami(self) -> None:
         """홈 머리의 계정 버튼이 「지금 누구인가」를 물어보는 자리.
 
@@ -6096,6 +6395,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
                 name=user.get("display_name", ""),
                 department=user.get("department", ""),
                 email=user.get("email", ""),
+                # 계정 메뉴가 관리자 몫 줄(로그인 사용·계정 목록)을 보일지 정한다.
+                is_admin=users.is_admin(user),
             )
         self._respond_json(data)
 
@@ -6452,7 +6753,7 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         # 빈 칸을 del로 지운 것처럼 잘못 판단함).
         form = parse_qs(self.rfile.read(length).decode("utf-8"), keep_blank_values=True)
 
-        if self._auth_blocked():
+        if self._auth_blocked() or self._admin_blocked():
             return
 
         if self.path == "/download-text":
@@ -6645,6 +6946,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_my_info_save(form)
         elif self.path == "/me/password":
             self._handle_my_password(form)
+        elif self.path == "/accounts/role":
+            self._handle_set_role(form)
         elif self.path == "/save-login-settings":
             self._handle_save_login_settings(form)
         else:

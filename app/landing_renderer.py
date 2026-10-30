@@ -418,7 +418,11 @@ def _account_html() -> str:
         '<span class="dept" id="acct-who-dept"></span></div>'
         '<div class="mail" id="acct-who-mail"></div></div>'
         f'<a href="{_BASE}/me">{icon("user")} 나의 정보 관리</a>'
-        f'<a href="{_BASE}/login-settings">{icon("lock")} 로그인 사용'
+        # 관리자 몫 둘은 **숨긴 채로 굽고** whoami의 is_admin이 참일 때만 켠다 —
+        # 홈은 파일 한 벌이라 여기에 역할을 박을 수 없다(이름과 같은 이유).
+        f'<a class="admin-only" hidden href="{_BASE}/accounts">'
+        f'{icon("user")} 계정 목록</a>'
+        f'<a class="admin-only" hidden href="{_BASE}/login-settings">{icon("lock")} 로그인 사용'
         '<span class="state" id="acct-lock"></span></a>'
         '<div class="sep"></div>'
         f'<form method="POST" action="{_BASE}/logout">'
@@ -473,6 +477,12 @@ _ACCOUNT_JS = """
       document.getElementById("acct-who-name").textContent = d.name || "";
       document.getElementById("acct-who-dept").textContent = d.department || "";
       document.getElementById("acct-who-mail").textContent = d.email || "";
+      // 관리자 몫 줄은 관리자일 때만 보인다 — 「모두에게 같이 걸리는 설정」이라
+      // 일반 사용자가 눌러도 서버가 거절한다(설정 메뉴도 같은 규칙으로 줄어든다).
+      // 자물쇠가 꺼져 있으면 혼자 쓰는 상태라 그냥 보인다.
+      var showAdmin = !d.login_required || !!d.is_admin;
+      var rows = document.querySelectorAll(".acct-pop .admin-only");
+      for (var i = 0; i < rows.length; i++) rows[i].hidden = !showAdmin;
       var lock = document.getElementById("acct-lock");
       lock.textContent = d.login_required ? "켜짐" : "꺼짐";
       lock.classList.toggle("on", !!d.login_required);

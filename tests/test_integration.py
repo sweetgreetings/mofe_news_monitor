@@ -6576,6 +6576,179 @@ def test_storage_goes_through_one_place():
     print(f"✓ 저장 한 겹: 모듈 {len(users)}개가 store를 지나고, 파일을 직접 만지는 자리는 화면 쪽뿐")
 
 
+def test_admin_only_settings():
+    """「모두에게 같이 걸리는 설정은 관리자만」을 지킨다 — 그리고 **자물쇠가 꺼져 있으면
+    아무것도 막지 않는** 것까지.
+
+    이 앱의 설정은 지금 전부 한 벌이라(검색어·수집 시간·언론사·받는 사람·키·형식)
+    한 사람이 바꾸면 모두의 수집과 보고서가 바뀐다. 그래서 설정은 관리자만, 큐레이션·
+    수집·발송·라벨 붙이기·보관함 읽기는 모두 한다.
+
+    **가장 중요한 줄은 「꺼져 있으면 안 막는다」다** — 지금 담당자는 혼자 쓰고 자물쇠를
+    꺼 둔 상태라, 이 규칙이 새면 그 사람의 설정 화면이 이유 없이 닫힌다.
+
+    **두 번째로 중요한 것은 주소를 앞글자로 재지 않는 것이다** — `/keywords`는
+    관리자만이지만 `/keywords/toggle-highlight`는 확정본·초안·오늘 전체 기사의 🖍️
+    형광펜이 부르는 자리다. 앞글자로 재면 그 형광펜이 일반 사용자에게서 조용히 죽는다.
+    """
+    _require_isolation()
+    from app import auth_session, settings_server, users as users_mod
+
+    # ── 관리자 전용 목록에 큐레이션·발송·읽기가 섞이지 않았다 ──────────────
+    admin_only = settings_server._ADMIN_ONLY_PATHS
+    must_stay_open = [
+        # 형광펜 — 확정본·초안·오늘 전체 기사가 부른다(앞글자로 재면 여기서 깨진다)
+        "/keywords/toggle-highlight", "/keywords/cycle-highlight-color",
+        # 큐레이션
+        "/hide-article", "/unhide-article", "/move-article", "/reorder-article",
+        "/bulk-move-article", "/rename-group", "/add-custom-group", "/remove-custom-group",
+        "/assign-unclassified", "/regenerate-subheadings-final", "/split-group",
+        "/undo", "/edit-summary", "/refetch-summary", "/refetch-titles",
+        "/set-photo-override", "/set-schedule-override", "/save-group-order",
+        "/save-manual-keyword-note", "/cut-round", "/cut-round-cancel",
+        "/add-manual-article", "/add-article-by-url", "/promote-manual-article",
+        # 라벨 붙이기·떼기·되돌리기는 큐레이션이다(관리만 관리자 몫)
+        "/add-label", "/remove-label", "/undo-label", "/labels",
+        # 발송·내보내기·읽기
+        "/send-scrap", "/telegram-send-scrap", "/email-send-scrap",
+        "/download-text", "/download-excel", "/download-excel-history",
+        "/send-log", "/excel-merge", "/trend", "/trend/download-excel",
+        "/hidden", "/agency-archive", "/me", "/me/password", "/logout", "/whoami",
+    ]
+    leaked = [p for p in must_stay_open if p in admin_only]
+    assert not leaked, (
+        f"관리자 전용에 큐레이션·발송·읽기 주소가 섞였습니다 — {leaked}. "
+        "그 화면이 일반 사용자에게서 조용히 죽습니다."
+    )
+    # 반대로 설정은 빠짐없이 들어 있다
+    for path in ("/keywords", "/save", "/schedule", "/save-schedule", "/outlets",
+                 "/telegram", "/email", "/naver", "/llm", "/keys",
+                 "/login-settings", "/save-login-settings", "/accounts", "/accounts/role",
+                 "/deleted/restore", "/label-manage", "/trend/add-word"):
+        assert path in admin_only, f"{path}가 관리자 전용에서 빠졌습니다."
+
+    # ── 문 자체 — 핸들러 메서드를 그대로 불러 본다 ────────────────────────
+    class _Stub:
+        """핸들러에서 이 문이 쓰는 것만 흉내 낸다(소켓 없이 판정만 본다)."""
+
+        def __init__(self, path, command, user):
+            self.path = path
+            self.command = command
+            self._user = user
+            self.sent = None
+
+        def _current_user(self):
+            return self._user
+
+        def _respond(self, html_text, status=200):
+            self.sent = ("html", status)
+
+        def _respond_json(self, data, status=200):
+            self.sent = ("json", status, data)
+
+        def _redirect(self, path):
+            self.sent = ("redirect", path)
+
+    gate = settings_server._SettingsHandler._admin_blocked
+
+    def blocked(path, command, user):
+        stub = _Stub(path, command, user)
+        return gate(stub), stub
+
+    admin = {"id": "a", "role": "admin"}
+    member = {"id": "b", "role": "member"}
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        with patch.object(auth_session, "AUTH_CONFIG_FILE", tmp_dir / "auth_config.json"), \
+             patch.object(users_mod, "USERS_FILE", tmp_dir / "users.json"):
+            # 1) 자물쇠가 꺼져 있으면 아무것도 막지 않는다 — 누구든, 어느 주소든.
+            assert not auth_session.is_login_required()
+            for user in (None, member, admin):
+                for path in ("/keywords", "/save-naver", "/accounts"):
+                    hit, _ = blocked(path, "GET", user)
+                    assert not hit, (
+                        f"자물쇠가 꺼져 있는데 {path}를 막았습니다 — 혼자 쓰는 앱의 "
+                        "설정 화면이 이유 없이 닫힙니다."
+                    )
+
+            # 2) 켜면 — 관리자는 통과, 일반은 거절
+            auth_session.set_login_required(True)
+            users_mod.create_user(
+                email="admin@example.com", password="1234", display_name="관리자",
+                department="", phone="01000000000", question="초등학교",
+                answer="서울초등", consent=True,
+            )
+            assert users_mod.admin_count() == 1
+
+            hit, _ = blocked("/keywords", "GET", admin)
+            assert not hit, "관리자를 막았습니다."
+
+            hit, stub = blocked("/keywords", "GET", member)
+            assert hit and stub.sent == ("html", 403), f"일반 사용자 GET 거절이 틀립니다: {stub.sent}"
+
+            hit, stub = blocked("/save-naver", "POST", member)
+            assert hit and stub.sent[0] == "json" and stub.sent[1] == 403, (
+                f"일반 사용자 POST는 403 JSON이어야 합니다: {stub.sent}"
+            )
+
+            # 로그인하지 않은 상태도 관리자가 아니다(자물쇠가 먼저 잡지만 여기서도 막는다)
+            hit, _ = blocked("/keywords", "GET", None)
+            assert hit, "로그인하지 않은 요청을 관리자로 읽었습니다."
+
+            # 3) 설정이 아닌 주소는 그대로 통과 — 형광펜이 대표다
+            for path in ("/keywords/toggle-highlight", "/hide-article", "/send-log"):
+                hit, _ = blocked(path, "POST", member)
+                assert not hit, f"{path}를 막았습니다 — 큐레이션·읽기는 모두 합니다."
+
+            # 4) 계정이 하나도 없을 때의 /signup은 첫 계정 자리라 안 막는다
+            hit, _ = blocked("/signup", "GET", member)
+            assert hit, "계정이 있는데 /signup을 열어 뒀습니다 — 아무나 계정을 만듭니다."
+            with patch.object(users_mod, "user_count", return_value=0):
+                hit, _ = blocked("/signup", "GET", None)
+                assert not hit, "계정이 하나도 없을 때 /signup을 막으면 아무도 못 들어옵니다."
+
+            # ── 역할 바꾸기 — 마지막 관리자는 못 내린다 ──────────────────
+            me = users_mod.list_users()[0]
+            try:
+                users_mod.set_role(me["id"], "member")
+            except users_mod.UserError as exc:
+                assert "한 명뿐" in str(exc), str(exc)
+            else:
+                raise AssertionError("마지막 관리자를 내릴 수 있었습니다.")
+
+            second = users_mod.create_user(
+                email="member@example.com", password="1234", display_name="큐레이터",
+                department="", phone="01011112222", question="초등학교",
+                answer="부산초등", consent=True,
+            )
+            assert second["role"] == "member", "둘째 계정이 관리자로 만들어졌습니다."
+            users_mod.set_role(second["id"], "admin")
+            assert users_mod.admin_count() == 2
+            users_mod.set_role(me["id"], "member")  # 이제는 내릴 수 있다
+            assert users_mod.admin_count() == 1
+            assert not users_mod.is_admin(users_mod.get_user(me["id"]))
+
+            auth_session.set_login_required(False)
+
+    # ── 설정 메뉴 — 일반 사용자에게는 관리자 항목을 안 그린다 ─────────────
+    admin_menu = settings_server._menu_html(True)
+    member_menu = settings_server._menu_html(False)
+    for path in ("/keywords", "/schedule", "/naver", "/outlets", "/telegram"):
+        assert f'href="{path}"' in admin_menu, f"관리자 메뉴에 {path}가 없습니다."
+        assert f'href="{path}"' not in member_menu, (
+            f"일반 사용자 메뉴에 {path}가 남아 있습니다."
+        )
+    for path in ("/send-log", "/excel-merge"):
+        assert f'href="{path}"' in member_menu, f"일반 사용자 메뉴에 {path}가 없습니다."
+    # 묶음이 통째로 비면 묶음 이름도 안 그린다
+    assert "정기</div>" not in member_menu and "연동</div>" not in member_menu, (
+        "항목이 하나도 없는 묶음 이름이 남아 있습니다."
+    )
+
+    print("✓ 관리자 권한: 설정은 관리자만(자물쇠가 꺼져 있으면 안 막음), 형광펜·큐레이션은 모두, 마지막 관리자는 못 내림")
+
+
 def test_no_undefined_names():
     """import을 빼먹었거나 이름을 잘못 적은 자리가 없는지 본다 — 린터가 없는 저장소의 그물.
 
@@ -7936,6 +8109,7 @@ if __name__ == "__main__":
         test_env_key_transplant,
         test_key_paths_stay_narrow,
         test_storage_goes_through_one_place,
+        test_admin_only_settings,
         test_no_undefined_names,
         test_screens_render_to_response,
         test_screen_js_strings_are_not_cut_by_newlines,

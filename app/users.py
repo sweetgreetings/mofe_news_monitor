@@ -117,6 +117,52 @@ def user_count() -> int:
     return len(list_users())
 
 
+def is_admin(user: Optional[dict]) -> bool:
+    """그 사람이 관리자인가 — 「모두에게 같이 걸리는 설정」을 바꿀 수 있는지의 판정.
+
+    **없는 계정(`None`)은 관리자가 아니다** — 로그인하지 않은 상태를 관리자로 읽으면
+    자물쇠를 켠 뜻이 없어진다. 자물쇠가 꺼져 있을 때 아무것도 막지 않는 일은
+    이 함수가 아니라 부르는 쪽(`app/settings_server.py` `_admin_blocked`)이 한다 —
+    「지금 켜져 있나」와 「이 사람이 관리자인가」는 다른 질문이다.
+
+    **역할 이름을 모르는 계정은 관리자가 아니다.** 첫 계정은 만들 때 `admin`으로
+    적히고(`create_user`), 그 뒤 계정은 `member`다. 키가 아예 없는 옛 기록은
+    `member`로 읽는다 — 틀려도 「못 바꾼다」 쪽이라 안전하다.
+    """
+    return bool(user) and user.get("role") == "admin"
+
+
+def admin_count() -> int:
+    """관리자가 몇 명인가 — 마지막 관리자를 일반으로 내리지 못하게 막는 자리가 쓴다."""
+    return sum(1 for user in list_users() if is_admin(user))
+
+
+def set_role(user_id: str, role: str) -> None:
+    """그 사람을 관리자로 올리거나 일반으로 내린다.
+
+    **마지막 관리자는 내릴 수 없다** — 내려 버리면 설정을 바꿀 수 있는 사람이
+    아무도 안 남고, 되돌릴 길은 `data/auth_config.json`을 지워 자물쇠를 끄는 것뿐이다
+    (CLAUDE.md 「로그인」의 탈출구). **막는 자리를 여기 두는 이유**는 화면에서만 막으면
+    막은 게 아니기 때문이다 — 폼은 누구든 직접 보낼 수 있다(개인정보 동의를
+    `create_user`에서 막는 것과 같은 규칙).
+    """
+    if role not in ("admin", "member"):
+        raise UserError("역할 값이 올바르지 않습니다.")
+    with _LOCK:
+        data = _load()
+        target = next((u for u in data["users"] if u.get("id") == user_id), None)
+        if target is None:
+            raise UserError("계정을 찾을 수 없습니다.")
+        if role == "member" and target.get("role") == "admin":
+            admins = sum(1 for u in data["users"] if u.get("role") == "admin")
+            if admins <= 1:
+                raise UserError(
+                    "관리자가 한 명뿐입니다 — 다른 사람을 관리자로 올린 뒤에 내릴 수 있습니다."
+                )
+        target["role"] = role
+        _save(data)
+
+
 def get_user(user_id: str) -> Optional[dict]:
     for user in list_users():
         if user.get("id") == user_id:
