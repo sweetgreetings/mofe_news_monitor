@@ -126,15 +126,7 @@ def _style() -> str:
   .fmt-note {{ font-size: var(--fs-sm); color: {p['muted']}; margin: 8px 0 0; line-height: 1.7; }}
   .fmt-note a {{ color: {p['accent']}; }}
 
-  .warn {{ background: {p['warn_bg']}; border: 1px solid {p['warn_border']}; color: {p['warn_text']};
-    border-radius: var(--r-lg); padding: 10px 12px; font-size: var(--fs-md); line-height: 1.6;
-    margin-top: 12px; }}
   .warn a {{ color: {p['warn_text']}; }}
-  .err {{ background: {p['error_bg']}; border: 1px solid {p['error_border']}; color: {p['error']};
-    border-radius: var(--r-lg); padding: 10px 12px; font-size: var(--fs-md); line-height: 1.6;
-    margin-top: 12px; }}
-  .ok-note {{ background: {p['ok_bg']}; border: 1px solid {p['ok_border']}; color: {p['ok_text']};
-    border-radius: var(--r-lg); padding: 8px 12px; font-size: var(--fs-md); margin-top: 12px; }}
   .hidden {{ display: none; }}
 
   @media (max-width: 640px) {{

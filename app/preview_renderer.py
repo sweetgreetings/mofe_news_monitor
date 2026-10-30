@@ -176,15 +176,14 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      무관하게 항상 보여야 놓치지 않는다는 이유. */
   .round-over-banner {{
     display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 21;
-    background: {round_over_bg}; border-bottom: 1px solid {round_over_border};
+    background: {warn_bg}; border-bottom: 1px solid {warn_border};
   }}
   .round-over-banner.is-visible {{ display: block; }}
   .round-over-banner-inner {{
     max-width: 800px; margin: 0 auto; padding: 11px 24px;
     display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   }}
-  .round-over-banner .msg {{ flex: 1; min-width: 200px; font-size: var(--fs-md); color: {round_over_text}; }}
-  .round-over-banner .msg b {{ color: {round_over_text_strong}; }}
+  .round-over-banner .msg {{ flex: 1; min-width: 200px; font-size: var(--fs-sm); color: {warn_text}; }}
   .round-over-banner .go {{
     background: {header}; color: {on_fill}; border: none; border-radius: var(--r-md);
     padding: 8px 14px; font-size: var(--fs-md); font-weight: 700; cursor: pointer; white-space: nowrap;
@@ -192,7 +191,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
   .round-over-banner .go:hover {{ background: {header_pressed}; }}
   .round-over-banner .dismiss {{
-    background: transparent; border: none; color: {round_over_dismiss}; font-size: var(--fs-sm);
+    background: transparent; border: none; color: {warn_text}; font-size: var(--fs-sm);
     cursor: pointer; text-decoration: underline; padding: 4px;
   }}
   /* [추가: 2026-08-20] AI 소제목 분류가 규칙 기반(단어 빈도)으로 떨어졌을 때의 경고.
@@ -205,25 +204,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      같은 라벨의 "전체 기사 재분류" 버튼이 있고(스크롤 없이 90~120px 위, 실측), 같은
      라벨의 버튼이 화면에 둘이면 "다른 건가?"라는 새 의문만 늘어난다. 대신 문구가
      .btn-ref로 툴바 버튼을 가리킨다. */
-  /* [수정: 2026-10-20] 바로 위 툴바와 붙어 보여서 위아래 여백을 같은 14px로 맞추고,
-     상자를 한 단계 작게 줄였다 — 글자는 --fs-sm, 상자 안 여백 10/12, 문구는 두 줄
-     (무슨 일인가 / 할 일). 배너 글자는 보통 --fs-md인데 여기만 한 단계 내린 건,
-     이 상자가 보고서 내용이 아니라 "지금 보이는 이름을 믿지 마라"는 한때의 알림이라
-     세 줄짜리 빨간 덩어리가 기사 목록 머리를 통째로 차지하면 안 되기 때문이다.
-     시안 mockups/CLASSIFY_DEGRADED_COMPACT_MOCKUP.html B안. */
-  .classify-degraded {{
-    background: {degraded_bg}; border: 1px solid {degraded_border}; border-left: 4px solid {error};
-    border-radius: var(--r-lg); padding: 10px 12px; margin: 14px 0;
-  }}
-  .classify-degraded .msg {{ font-size: var(--fs-sm); color: {degraded_text}; line-height: 1.55; }}
-  .classify-degraded .msg b {{ color: {error}; }}
-  /* AI 키가 없을 때만 같은 상자를 「주의」 세트(앰버)로 한 단계 낮춘다 — 키를 안 쓰기로
-     한 담당자에게 매 회차 빨간 경고가 뜨면 진짜 실패(크레딧 부족·분류 실패)와 구분이
-     안 되고 곧 무뎌진다. 새 색 세트는 만들지 않고 COLOR_WARN_*를 그대로 쓴다. */
-  .classify-degraded.no-key {{
-    background: {warn_bg}; border-color: {warn_border}; border-left-color: {warn_dot};
-  }}
-  .classify-degraded.no-key .msg, .classify-degraded.no-key .msg b {{ color: {warn_text}; }}
+  /* 상자 모양·톤 색·글자는 공용 한 벌(app.config BANNER_CSS)에서 온다 — 이 배너는
+     오류(빨강) 톤이고, AI 키가 없을 때만 `.no-key`가 「주의」 세트(앰버)로 한 단계
+     낮춘다(키를 안 쓰기로 한 담당자에게 매 회차 빨간 경고가 뜨면 진짜 실패와 구분이
+     안 되고 곧 무뎌진다). 그 두 톤도 BANNER_CSS가 이름으로 가른다. */
   /* [추가: 2026-08-20] 문구 안에서 툴바 버튼을 가리키는 인라인 칩 — 실제 그 버튼과
      같은 색·같은 아이콘(app/icons.py "bot")을 써서 "이게 그 버튼이다"가 바로
      읽히게 한다(app.preview_renderer._actions_html의 .reclassify-btn과 배색 통일). */
@@ -235,8 +219,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .classify-degraded .btn-ref .ic {{ width: 0.95em; height: 0.95em; }}
   /* [추가: 2026-08-20] 연속 재분류 실패 이력 — "재분류마저 실패" 문구에서만 붙는다. */
   .classify-degraded .retry-log {{
-    display: block; margin-top: 8px; padding-top: 7px; border-top: 1px dashed {degraded_rule};
-    color: {degraded_sub}; font-size: var(--fs-sm); font-variant-numeric: tabular-nums;
+    display: block; margin-top: 8px; padding-top: 7px; border-top: 1px dashed {error_border};
+    color: {muted}; font-size: var(--fs-sm); font-variant-numeric: tabular-nums;
   }}
   /* 배너가 뜨면 그만큼 topbar를 아래로 밀어 겹치지 않게 한다(높이는 JS가 실측).
      [수정: 2026-08-20] topbar만 밀고 .container는 그대로 뒀더니, .container의
@@ -3555,11 +3539,15 @@ def _classify_degraded_html(degraded: bool, article_count: int, round_id: Option
     if not degraded:
         return ""
 
-    intro = "<b>⚠️ AI가 소제목을 묶지 못했어요.</b> 지금 보이는 소제목은 AI가 지은 이름이 아니라, 단어 빈도수에 따라 기계적으로 뽑은 단어입니다."
+    # 아이콘은 icon() 하나에서 온다 — 상자 안 글자에 이모지를 섞지 않는다.
+    intro = (
+        f'{icon("alert")}<b>AI가 소제목을 묶지 못했어요.</b> 지금 보이는 소제목은 '
+        "AI가 지은 이름이 아니라, 단어 빈도수에 따라 기계적으로 뽑은 단어입니다."
+    )
 
     # AI 키가 아예 없는 상태는 "실패"가 아니라 담당자의 선택이다(설정 화면도 "안 쓰기로
     # 한 상태로도 정상"이라고 말한다) — 그래서 여기만 빨강(오류) 대신 앰버(주의) 세트를
-    # 쓰고 ⚠️도 빼고, 재분류 칩을 가리키지 않는다(키가 없으면 눌러도 같은 결과다).
+    # 쓰고 ⚠ 아이콘도 빼고, 재분류 칩을 가리키지 않는다(키가 없으면 눌러도 같은 결과다).
     # 다른 원인보다 먼저 본다 — 키가 없는데 "기사를 N건 줄이세요"는 틀린 조언이다.
     # 할 일은 키 등록과 크레딧 충전 둘 다다(키만 넣고 크레딧이 없으면 아래 크레딧 부족
     # 문구로 넘어간다).
@@ -3576,7 +3564,7 @@ def _classify_degraded_html(degraded: bool, article_count: int, round_id: Option
         over = article_count - MAX_ARTICLES_FOR_CLASSIFY
         return (
             '<div class="classify-degraded"><div class="msg">'
-            f"<b>⚠️ 지금 {article_count}건이라 AI가 소제목을 묶지 못했어요.</b> "
+            f'{icon("alert")}<b>지금 {article_count}건이라 AI가 소제목을 묶지 못했어요.</b> '
             f"(상한 {MAX_ARTICLES_FOR_CLASSIFY}건)<br>"
             "지금 소제목은 AI가 지은 이름이 아니라 단어 빈도로 뽑은 단어예요. "
             f"<b>{over}건</b> 줄이고 위의 {_reclassify_btn_ref_html()}를 누르면 다시 묶입니다."

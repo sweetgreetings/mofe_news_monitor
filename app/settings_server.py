@@ -1103,15 +1103,8 @@ _KEYWORD_GROUPS_TEMPLATE = (
      좁힌다("깜빡 + 맨 위로"가 저장이든 아니든 똑같이 보이던 문제의 해법). 안내가
      저장 버튼 바로 위에 있어 읽는 자리와 누르는 자리가 같다. 3단계: 저장할 수
      없음(빨강, 버튼 잠김) / 저장 안 함(노랑) / 저장됨(초록). */
-  .save-msg {{ display: none; align-items: flex-start; gap: 8px; font-size: var(--fs-sm); line-height: 1.5; border-radius: var(--r-md); padding: 9px 11px; margin-bottom: 10px; text-align: left; }}
+  .save-msg {{ display: none; align-items: flex-start; gap: 8px; margin: 0 0 10px; text-align: left; }}
   .save-msg.show {{ display: flex; }}
-  .save-msg .dot {{ width: 8px; height: 8px; border-radius: var(--r-circle); flex-shrink: 0; margin-top: 5px; }}
-  .save-msg.dirty {{ background: {warn_bg}; border: 1px solid {warn_border}; color: {warn_text}; }}
-  .save-msg.dirty .dot {{ background: {warn_dot}; }}
-  .save-msg.blocked {{ background: {error_bg}; border: 1px solid {error_border}; color: {error}; }}
-  .save-msg.blocked .dot {{ background: {error}; }}
-  .save-msg.saved {{ background: {saved_bg}; border: 1px solid {saved_border}; color: {saved_text}; }}
-  .save-msg.saved .dot {{ background: {saved_dot}; }}
   .save-bar button.idle {{ background: {toggle_off}; color: {toggle_off_text}; cursor: default; }}
   .save-bar button.blocked {{ background: {error_disabled}; cursor: not-allowed; }}
   .save-bar button.blocked:hover {{ background: {error_disabled}; }}
@@ -1143,7 +1136,7 @@ _KEYWORD_GROUPS_TEMPLATE = (
 
 <div class="save-bar">
   <div class="save-bar-inner">
-    <div class="save-msg" id="kwSaveMsg"><span class="dot"></span><span id="kwSaveMsgText"></span></div>
+    <div class="save-msg" id="kwSaveMsg"><span id="kwSaveMsgText"></span></div>
     <button type="button" id="kwSaveBtn">저장</button>
   </div>
 </div>
@@ -2452,11 +2445,8 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
   .npop .btns {{ display: flex; justify-content: flex-end; margin: 10px 0 0; padding: 10px 0 0; border-top: 1px solid {border}; }}
   .npop .btns button {{ width: auto; padding: 6px 16px; font-size: var(--fs-sm); }}
 
-  .save-msg {{ display: none; align-items: flex-start; gap: 8px; font-size: var(--fs-sm); line-height: 1.5; border-radius: var(--r-md); padding: 9px 11px; margin-bottom: 10px; text-align: left; }}
+  .save-msg {{ display: none; align-items: flex-start; gap: 8px; margin: 0 0 10px; text-align: left; }}
   .save-msg.show {{ display: flex; }}
-  .save-msg .dot {{ width: 8px; height: 8px; border-radius: var(--r-circle); flex-shrink: 0; margin-top: 5px; }}
-  .save-msg.dirty {{ background: {warn_bg}; border: 1px solid {warn_border}; color: {warn_text}; }}
-  .save-msg.dirty .dot {{ background: {warn_dot}; }}
 
   /* 좁은 화면 — 이름·chat id가 한 줄, 받는 것·알림이 그 아래 줄. 칩마다 이름이 적혀 있어 머리글은 숨긴다. */
   @media (max-width: 640px) {{
@@ -2524,7 +2514,7 @@ _TELEGRAM_SETTINGS_TEMPLATE = (
       <button type="submit" formaction="/telegram/add-recipient-slot"{add_disabled}><span class="plus-glyph">+</span>받는 사람 추가</button>
     </p>
     <div class="save-bar"><div class="save-bar-inner">
-      <div class="save-msg dirty{dirty_class}" id="tgSaveMsg"><span class="dot"></span><span>아직 저장하지 않았습니다.</span></div>
+      <div class="save-msg dirty{dirty_class}" id="tgSaveMsg"><span>아직 저장하지 않았습니다.</span></div>
       <button type="submit">저장</button>
     </div></div>
   </form>

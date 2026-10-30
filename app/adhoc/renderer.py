@@ -723,12 +723,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .adv-h {{ font-size: var(--fs-sm); color: {muted}; font-weight: 700; margin-bottom: 10px; }}
   .adv-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: var(--fs-md); }}
   .adv-grid label {{ display: flex; gap: 8px; align-items: center; cursor: pointer; }}
-  .warn {{ background: {error_bg}; border: 1px solid {error_border_mid}; color: {error}; border-radius: var(--r-lg); padding: 11px 14px; margin: 12px 0; font-size: var(--fs-md); }}
   /* [추가: 2026-10-21] 「지난 날짜 카드입니다」는 오류가 아니라 **사실 알림**이라 주의(앰버)다 —
      빨강은 오류와 [단독]·[속보]의 색이다(CLAUDE.md 디자인 절). 상단바가 더는 지난 카드로
      데려가지 않게 된 뒤로 이 배너는 담당자가 보관함·「지난 수집」에서 **일부러 열었을 때만**
      뜬다 — 사고가 아니다. 새 색 세트를 만들지 않고 이미 있는 주의 세트를 쓴다. */
-  .warn.stale {{ background: {warn_bg}; border-color: {warn_border}; color: {warn_text}; }}
   /* 이 배너 안의 링크는 배너 색을 따른다 — 기본 파랑이면 배너에서 혼자 튄다.
      빨간 .warn(오류·상한 안내)엔 링크가 없어 거기까지 넓히지 않는다. */
   .warn.stale a {{ color: inherit; font-weight: 700; white-space: nowrap; }}
@@ -1298,7 +1296,6 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     background: {send}; color: {on_fill}; border: none; font: inherit; font-size: var(--fs-md); font-weight: 700;
     cursor: pointer; box-shadow: var(--sh-float); z-index: 200;
     display: flex; align-items: center; justify-content: center; }}
-  .ok-note {{ background: {ok_bg}; border: 1px solid {ok_border}; color: {ok_text}; border-radius: var(--r-lg); padding: 11px 14px; margin: 12px 0; font-size: var(--fs-md); }}
   .ok-note .ok-link {{ color: inherit; font-weight: 600; margin-left: 6px; }}
   .sent-done {{ margin-left: 8px; font-size: var(--fs-sm); font-weight: 500; color: {muted}; white-space: nowrap; }}
   a.sent-done {{ text-decoration: none; }}

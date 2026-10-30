@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>경고·안내 상자 전수 + 통일안</title>
+<style>
+:root { --fs-xs: 0.72rem; --fs-sm: 0.8rem; --fs-md: 0.88rem; --fs-base: 1rem; --fs-lg: 1.1rem; --fs-xl: 1.3rem; --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px; --r-circle: 50%; --h-sm: 24px; --h-tb: 28px; --h-md: 30px; --h-lg: 36px; --fab-lg: 56px; --fab-sm: 48px; --chk-md: 16px; --chk-sm: 14px; --sh-float: 0 4px 12px rgba(15, 23, 42, 0.12); --sh-pop: 0 8px 24px rgba(15, 23, 42, 0.14); --sh-modal: 0 16px 40px rgba(15, 23, 42, 0.22); }
+* { box-sizing: border-box; }
+body { margin:0; padding:28px 16px 80px; background:#F8FAFC; color:#1F2937;
+  font-family:'Pretendard', 'Noto Sans KR', sans-serif; }
+.wrap { max-width:980px; margin:0 auto; }
+h1 { font-size:var(--fs-xl); color:#1E3A5F; margin:0 0 4px; }
+.lead { font-size:var(--fs-md); color:#6B7280; margin:0 0 10px; line-height:1.7; }
+.toc { font-size:var(--fs-sm); color:#6B7280; margin:0 0 28px; }
+.toc a { color:#2563EB; text-decoration:none; margin-right:12px; font-weight:600; }
+h2 { font-size:var(--fs-lg); color:#1E3A5F; margin:34px 0 10px;
+  border-top:1px solid #E5E7EB; padding-top:18px; }
+h3 { font-size:var(--fs-base); color:#1E3A5F; margin:22px 0 8px; }
+h3 .when { font-weight:400; color:#6B7280; font-size:var(--fs-sm); }
+table.idx { width:100%; border-collapse:collapse; font-size:var(--fs-sm); background:#FFFFFF;
+  border:1px solid #E5E7EB; border-radius:var(--r-lg); overflow:hidden; }
+table.idx th { background:#F8FAFC; color:#6B7280; font-weight:600; text-align:left;
+  padding:7px 8px; border-bottom:1px solid #E5E7EB; white-space:nowrap; }
+table.idx td { padding:6px 8px; border-bottom:1px solid #E5E7EB; vertical-align:top; }
+table.idx tr:last-child td { border-bottom:none; }
+table.idx td:nth-child(4) { font-family:ui-monospace,Menlo,monospace; font-size:var(--fs-xs); color:#6B7280; }
+table.idx td:nth-child(6), table.idx td:nth-child(7) { font-family:ui-monospace,Menlo,monospace;
+  font-size:var(--fs-xs); white-space:nowrap; }
+table.idx td:last-child { color:#92400E; }
+.case { margin:0 0 16px; }
+.case .meta { font-size:var(--fs-sm); color:#6B7280; margin:0 0 4px; }
+.case .meta b { color:#1F2937; }
+.case .meta .cls { font-family:ui-monospace,Menlo,monospace; font-size:var(--fs-xs);
+  margin-left:8px; color:#2563EB; }
+.case .meta .spec { font-family:ui-monospace,Menlo,monospace; font-size:var(--fs-xs);
+  margin-left:8px; color:#6B7280; }
+.stage { background:#FFFFFF; border:1px solid #E5E7EB; border-radius:var(--r-lg);
+  padding:14px 16px; }
+.stage > *:first-child { margin-top:0; }
+.stage > *:last-child { margin-bottom:0; }
+ol.gaps { margin:0; padding-left:20px; font-size:var(--fs-md); line-height:1.7; }
+ol.gaps li { margin-bottom:9px; }
+ol.gaps b { display:block; color:#1E3A5F; }
+ol.gaps span { color:#4B5563; font-size:var(--fs-sm); }
+.spec-card { background:#FFFFFF; border:1px solid #E5E7EB; border-radius:var(--r-lg);
+  padding:14px 18px; font-size:var(--fs-md); }
+.spec-card > b { color:#1E3A5F; }
+.spec-card ul { margin:8px 0 0; padding-left:18px; line-height:1.75; font-size:var(--fs-sm);
+  color:#4B5563; }
+.spec-card code { font-family:ui-monospace,Menlo,monospace; font-size:.92em; color:#2563EB; }
+.chip-ex { background:#F0EAFB; border:1px solid #DCD0F2; color:#4A3F8F;
+  border-radius:var(--r-sm); padding:1px 7px; font-weight:700; font-size:.92em; }
+.sizecmp { display:flex; gap:14px; flex-wrap:wrap; }
+.sizecmp .half { flex:1 1 340px; min-width:0; }
+.sizecmp .lab { font-size:var(--fs-xs); color:#6B7280; margin-bottom:6px;
+  font-family:ui-monospace,Menlo,monospace; }
+a { color:#2563EB; }
+
+/* 1 초안 폴백 경고 */
+.classify-degraded { background:#FEF2F2; border:1px solid #FECACA;
+  border-left:4px solid #DC2626; border-radius:var(--r-lg); padding:10px 12px; margin:14px 0; }
+.classify-degraded .msg { font-size:var(--fs-sm); color:#DC2626; line-height:1.55; }
+.classify-degraded .msg b { color:#DC2626; }
+.classify-degraded.no-key { background:#FFFBEB; border-color:#FDE68A;
+  border-left-color:#F59E0B; }
+.classify-degraded.no-key .msg, .classify-degraded.no-key .msg b { color:#92400E; }
+.classify-degraded .btn-ref { display:inline-flex; align-items:center; gap:4px; background:#F0EAFB;
+  border:1px solid #DCD0F2; border-radius:var(--r-sm); padding:2px 10px 2px 8px;
+  font-weight:700; color:#4A3F8F; white-space:nowrap; }
+.classify-degraded .btn-ref .ic { width:.95em; height:.95em; }
+
+/* 3 확정본 늦게 들어온 기사 */
+.late-banner { margin:0 0 14px; padding:11px 16px; border-radius:var(--r-lg); background:#FFFBEB;
+  border:1px solid #FDE68A; color:#92400E; display:flex; align-items:center;
+  gap:10px; flex-wrap:wrap; }
+.late-banner .msg { flex:1; min-width:220px; font-size:var(--fs-md); line-height:1.5; }
+.late-banner .msg .ic { width:1em; height:1em; vertical-align:-.15em; margin-right:2px; }
+.late-banner .cnt { font-family:inherit; font-weight:800; font-size:var(--fs-md); cursor:pointer;
+  border:1px solid #FDE68A; border-radius:var(--r-md); padding:2px 9px;
+  background:#FEF3C7; color:#92400E; }
+.late-banner .q { border:1px solid #FDE68A; background:#FFFFFF; color:#92400E;
+  border-radius:var(--r-md); padding:2px 7px; font-size:var(--fs-sm); cursor:help; line-height:1.4; }
+
+/* 4·5 상단 고정 띠 둘 */
+.strip { border-radius:var(--r-lg); overflow:hidden; }
+.strip .inner { padding:11px 24px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.strip .msg { flex:1; min-width:200px; font-size:var(--fs-md); }
+.strip .go { background:#1E3A5F; color:#FFFFFF; border:none; border-radius:var(--r-md);
+  padding:8px 14px; font-size:var(--fs-md); font-weight:700; cursor:pointer; white-space:nowrap; }
+.strip .dismiss { background:transparent; border:none; font-size:var(--fs-sm); cursor:pointer;
+  text-decoration:underline; padding:4px; }
+.finalize-banner { background:#F4EFFC; border:1px solid #DCD0F2; }
+.finalize-banner .msg { color:#4A3F8F; }
+.finalize-banner .msg b { color:#372C6E; }
+.finalize-banner .dismiss { color:#7C6FA8; }
+.round-over-banner { background:#FFFBEB; border:1px solid #FDE68A; }
+.round-over-banner .msg, .round-over-banner .msg b { color:#92400E; }
+.round-over-banner .dismiss { color:#92400E; }
+
+/* 6·7 오늘 전체 기사 */
+.live-warning { background:#FEF2F2; border:1px solid #DC2626; border-radius:var(--r-lg);
+  padding:10px 14px; margin:12px 0; font-size:var(--fs-md); color:#DC2626; line-height:1.5; }
+.live-heavy-kw-warning { background:#FFFBEB; border:1px solid #FDE68A;
+  border-radius:var(--r-lg); padding:10px 14px; margin:12px 0; font-size:var(--fs-md);
+  color:#92400E; line-height:1.5; }
+.live-warning .ic, .live-heavy-kw-warning .ic { width:1em; height:1em; vertical-align:-.15em; }
+
+/* 8·9·10 수시 */
+.warn { background:#FEF2F2; border:1px solid #FCA5A5; color:#DC2626;
+  border-radius:var(--r-lg); padding:11px 14px; margin:12px 0; font-size:var(--fs-md); }
+.warn.stale { background:#FFFBEB; border-color:#FDE68A; color:#92400E; }
+.warn .ic, .ok-note .ic { width:1em; height:1em; vertical-align:-.15em; }
+.warn a, .warn.stale a { color:inherit; font-weight:700; }
+.ok-note { background:#F0FDF4; border:1px solid #BBF7D0; color:#166534;
+  border-radius:var(--r-lg); padding:11px 14px; margin:12px 0; font-size:var(--fs-md); }
+.ok-note .ok-link { color:inherit; font-weight:600; margin-left:6px; }
+
+/* 11·12·14·15 작은 상자들 */
+.url-add-warn { margin-top:8px; padding:8px 11px; border-radius:var(--r-md); font-size:var(--fs-sm);
+  line-height:1.55; background:#FFFBEB; border:1px solid #FDE68A; color:#92400E; }
+.url-add-warn b { display:block; }
+.url-add-warn span { color:#A16207; }
+.refetch-note { margin:0 0 10px; padding:8px 12px; font-size:var(--fs-sm); line-height:1.7;
+  background:#F0FDF4; border:1px solid #BBF7D0; border-radius:var(--r-md); color:#166534; }
+.sm-warn { margin:10px 0 0; font-size:var(--fs-sm); color:#92400E; background:#FFFBEB;
+  border-radius:var(--r-md); padding:8px 10px; line-height:1.6; }
+.consent-missing { background:#FFFBEB; border:1px solid #FDE68A;
+  border-radius:var(--r-md); padding:8px 10px; font-size:var(--fs-md); color:#1F2937; }
+
+/* 13 설정 저장 상태 */
+.save-msg { display:flex; align-items:flex-start; gap:8px; font-size:var(--fs-sm); line-height:1.5;
+  border-radius:var(--r-md); padding:9px 11px; margin-bottom:10px; }
+.save-msg .dot { width:8px; height:8px; border-radius:var(--r-circle); flex-shrink:0; margin-top:5px; }
+.save-msg.dirty { background:#FFFBEB; border:1px solid #FDE68A; color:#92400E; }
+.save-msg.dirty .dot { background:#F59E0B; }
+.save-msg.blocked { background:#FEF2F2; border:1px solid #FECACA; color:#DC2626; }
+.save-msg.blocked .dot { background:#DC2626; }
+.save-msg.saved { background:#EFF6FF; border:1px solid #BFDBFE; color:#2563EB; }
+.save-msg.saved .dot { background:#2563EB; }
+
+/* 16 상자가 아닌 것 */
+.send-countdown { font-size:var(--fs-sm); font-weight:700; color:#DC2626; line-height:1.4;
+  width:210px; text-align:right; margin-left:auto; }
+
+
+.nb { border-radius:var(--r-lg); padding:10px 13px; margin:12px 0;
+  border:1px solid; border-left-width:4px; font-size:var(--fs-sm); line-height:1.55;
+  display:flex; align-items:flex-start; gap:8px; }
+.nb .ic { width:1.05em; height:1.05em; flex:none; margin-top:.15em; }
+.nb .body { flex:1; min-width:0; }
+.nb b { font-weight:700; }
+.nb .act { font-weight:700; color:inherit; }
+.nb-warn { background:#FFFBEB; border-color:#FDE68A;
+  border-left-color:#F59E0B; color:#92400E; }
+.nb-error { background:#FEF2F2; border-color:#FECACA;
+  border-left-color:#DC2626; color:#DC2626; }
+.nb-ai { background:#F4EFFC; border-color:#DCD0F2;
+  border-left-color:#A78BFA; color:#4A3F8F; }
+.nb-ok { background:#F0FDF4; border-color:#BBF7D0;
+  border-left-color:#166534; color:#166534; }
+.nb .chip { display:inline-flex; align-items:center; gap:4px; background:#F0EAFB;
+  border:1px solid #DCD0F2; border-radius:var(--r-sm); padding:2px 10px 2px 8px;
+  font-weight:700; color:#4A3F8F; white-space:nowrap; }
+.nb .chip .ic { width:.95em; height:.95em; margin:0; }
+.nb .cnt { font-family:inherit; font-weight:800; font-size:var(--fs-sm); cursor:pointer;
+  border:1px solid currentColor; border-radius:var(--r-md); padding:1px 8px;
+  background:#FFFFFF; color:inherit; margin-left:6px; }
+.nb-strip { border-left-width:1px; border-radius:var(--r-lg); padding:0; }
+.nb-strip .inner { padding:10px 20px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; width:100%; }
+.nb-strip .body { flex:1; min-width:200px; }
+.nb-strip .go { background:#1E3A5F; color:#FFFFFF; border:none; border-radius:var(--r-md);
+  padding:6px 13px; font-size:var(--fs-sm); font-weight:700; cursor:pointer; white-space:nowrap; }
+.nb-strip .dismiss { background:transparent; border:none; color:inherit; opacity:.8;
+  font-size:var(--fs-sm); cursor:pointer; text-decoration:underline; padding:4px; }
+.sizecmp .nb { margin:0 0 8px; }
+.sizecmp .md { font-size:var(--fs-md); }
+
+</style></head>
+<body><div class="wrap">
+<h1>경고·안내 상자 전수 + 통일안</h1>
+<p class="lead">앱이 담당자에게 말을 거는 색 상자 <b>열여섯 자리</b>입니다. CSS·문구는 돌고 있는 화면에서 그대로 떠왔습니다.</p>
+<p class="toc"><a href="#t1">1 한눈에</a><a href="#t2">2 지금 실물</a><a href="#t3">3 어긋나는 지점</a><a href="#t4">4 통일안</a></p>
+<h2 id="t1">1. 한눈에 보기 — 열여섯 자리</h2><table class="idx"><thead><tr><th>#</th><th>화면</th><th>무엇을 말하나</th><th>CSS 이름</th><th>색</th><th>여백</th><th>글자</th><th>아이콘</th><th>혼자 다른 것</th></tr></thead><tbody><tr><td>1</td><td>초안</td><td>기사 수 초과·크레딧·재분류 실패</td><td>.classify-degraded</td><td>빨강</td><td>10/12</td><td>--fs-sm</td><td>⚠️ 이모지</td><td>왼쪽 띠 4px</td></tr><tr><td>2</td><td>초안</td><td>AI 키 없음</td><td>.classify-degraded.no-key</td><td>앰버</td><td>10/12</td><td>--fs-sm</td><td>없음</td><td>왼쪽 띠 4px</td></tr><tr><td>3</td><td>확정본</td><td>늦게 들어온 기사</td><td>.late-banner</td><td>앰버</td><td>11/16</td><td>--fs-md</td><td>⤵</td><td>건수 버튼·ⓘ</td></tr><tr><td>4</td><td>확정본</td><td>마감 후 자동 배정</td><td>.finalize-banner</td><td>연보라</td><td>11/24</td><td>--fs-md</td><td>없음</td><td>상단 고정 띠</td></tr><tr><td>5</td><td>초안</td><td>회차 마감</td><td>.round-over-banner</td><td>앰버(이름만 따로)</td><td>11/24</td><td>--fs-md</td><td>없음</td><td>상단 고정 띠</td></tr><tr><td>6</td><td>오늘 전체 기사</td><td>키워드 검색 실패</td><td>.live-warning</td><td>빨강</td><td>10/14</td><td>--fs-md</td><td>⚠</td><td>테두리 진함</td></tr><tr><td>7</td><td>오늘 전체 기사</td><td>넓은 검색어</td><td>.live-heavy-kw-warning</td><td>앰버</td><td>10/14</td><td>--fs-md</td><td>⚠</td><td></td></tr><tr><td>8</td><td>수시 카드</td><td>수집 실패</td><td>.warn</td><td>빨강</td><td>11/14</td><td>--fs-md</td><td>⚠</td><td>테두리 진함</td></tr><tr><td>9</td><td>수시 카드</td><td>지난 날짜 카드</td><td>.warn.stale</td><td>앰버</td><td>11/14</td><td>--fs-md</td><td>🕑</td><td></td></tr><tr><td>10</td><td>두 보관함·수시</td><td>지운 직후</td><td>.ok-note</td><td>초록</td><td>11/14</td><td>--fs-md</td><td>✓</td><td></td></tr><tr><td>11</td><td>초안·확정본</td><td>수기 추가 거부</td><td>.url-add-warn</td><td>앰버</td><td>8/11</td><td>--fs-sm</td><td>없음</td><td></td></tr><tr><td>12</td><td>라벨·정기 보관함</td><td>제목 확인 결과</td><td>.refetch-note</td><td>초록</td><td>8/12</td><td>--fs-sm</td><td>없음</td><td></td></tr><tr><td>13</td><td>설정</td><td>저장 상태 셋</td><td>.save-msg</td><td>앰버/빨강/<b>파랑</b></td><td>9/11</td><td>--fs-sm</td><td>색 점</td><td>성공이 파랑</td></tr><tr><td>14</td><td>수시 발송 창</td><td>보낼 수 없음</td><td>.sm-warn</td><td>앰버</td><td>8/10</td><td>--fs-sm</td><td>없음</td><td>테두리 없음</td></tr><tr><td>15</td><td>회원가입</td><td>동의 안 함</td><td>.consent.is-missing</td><td>앰버</td><td>8/10</td><td>--fs-md</td><td>없음</td><td></td></tr><tr><td>16</td><td>확정본</td><td>AI 분류 실패·발송 실패</td><td>.send-countdown</td><td>빨강</td><td>—</td><td>--fs-sm</td><td>⚠️ 이모지</td><td>상자가 아님</td></tr></tbody></table><h2 id="t2">2. 지금 — 실물</h2><h3>앰버 · 주의</h3><div class="case"><div class="meta"><b>초안</b> · AI 키가 없어 소제목이 단어 빈도<span class="cls">.classify-degraded.no-key</span><span class="spec">10/12 · --fs-sm · 아이콘 없음</span></div><div class="stage"><div class="classify-degraded no-key"><div class="msg"><b>소제목은 단어 빈도로 뽑은 이름입니다.</b> AI 키를 등록하지 않아서 그렇고, 이대로 쓰셔도 됩니다.</div></div></div></div><div class="case"><div class="meta"><b>확정본</b> · 마감 뒤 들어온 기사<span class="cls">.late-banner</span><span class="spec">11/16 · --fs-md · ⤵ 아이콘</span></div><div class="stage"><div class="late-banner"><span class="msg"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg> <b>늦게 들어온 기사</b>가 뒤늦게 수집돼 함께 담겼어요.</span><button class="cnt" type="button">2건 보기</button><button class="q" type="button">&#8505;</button></div></div></div><div class="case"><div class="meta"><b>초안</b> · 회차 마감(상단 고정 띠)<span class="cls">.round-over-banner</span><span class="spec">11/24 · --fs-md · 아이콘 없음</span></div><div class="stage"><div class="strip round-over-banner"><div class="inner"><span class="msg"><b>14시 회차가 마감됐어요.</b> 지금부터 담는 기사는 확정본에는 반영되지 않아요.</span><button class="go" type="button">확정본 열기 →</button><button class="dismiss" type="button">나중에</button></div></div></div></div><div class="case"><div class="meta"><b>오늘 전체 기사</b> · 한 검색어가 결과를 덮음<span class="cls">.live-heavy-kw-warning</span><span class="spec">10/14 · --fs-md · ⚠ 아이콘</span></div><div class="stage"><div class="live-heavy-kw-warning"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5"/><path d="M12 17.2h.01"/></svg> 검색어 '예산'가 결과의 38%(142/370건)예요 — 「예산+국회」처럼 <b>+</b>로 묶거나 <a href="#">검색어</a> 화면에서 더 좁은 말로 바꿔 보세요.</div></div></div><div class="case"><div class="meta"><b>수시 카드</b> · 지난 날짜 카드<span class="cls">.warn.stale</span><span class="spec">11/14 · --fs-md · 🕑 아이콘</span></div><div class="stage"><div class="warn stale"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.3l3.2 1.9"/></svg> <b>2026-10-19에 만든 확정본</b>입니다 (오늘은 2026-10-21). 지난 날짜의 확정본에는 기사를 더 보낼 수 없어요 — 오늘 <a href="#">새 수집</a>의 원본에서 보내면 오늘 확정본이 새로 생겨요.</div></div></div><div class="case"><div class="meta"><b>초안·확정본</b> · 수기 추가 거부<span class="cls">.url-add-warn</span><span class="spec">8/11 · --fs-sm · 아이콘 없음</span></div><div class="stage"><div class="url-add-warn"><b>해당 URL로 기사를 불러올 수 없습니다.</b><span>URL을 확인해 주세요.</span></div></div></div><div class="case"><div class="meta"><b>수시 발송 확인창</b> · 보낼 수 없음<span class="cls">.sm-warn</span><span class="spec">8/10 · --fs-sm · 테두리 없음</span></div><div class="stage"><p class="sm-warn">수시 보고서를 받는 사람이 없어요. 텔레그램 받는 사람 화면에서 「수시」를 켜 주세요.</p></div></div><div class="case"><div class="meta"><b>회원가입</b> · 동의 안 함<span class="cls">.consent.is-missing</span><span class="spec">8/10 · --fs-md · 아이콘 없음</span></div><div class="stage"><div class="consent-missing">개인정보 수집·이용에 동의해야 가입할 수 있어요.</div></div></div><h3>빨강 · 오류</h3><div class="case"><div class="meta"><b>초안</b> · 기사 수 초과로 분류 실패<span class="cls">.classify-degraded</span><span class="spec">10/12 · --fs-sm · ⚠️ 이모지 · 왼쪽 띠 4px</span></div><div class="stage"><div class="classify-degraded"><div class="msg"><b>⚠️ 지금 170건이라 AI가 소제목을 묶지 못했어요.</b> (상한 150건)<br>지금 소제목은 AI가 지은 이름이 아니라 단어 빈도로 뽑은 단어예요. <b>20건</b> 줄이고 위의 <span class="btn-ref"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg> AI 모든 기사 재분류</span>를 누르면 다시 묶입니다.</div></div></div></div><div class="case"><div class="meta"><b>오늘 전체 기사</b> · 키워드 검색 실패<span class="cls">.live-warning</span><span class="spec">10/14 · --fs-md · ⚠ 아이콘 · 테두리 진함</span></div><div class="stage"><div class="live-warning"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5"/><path d="M12 17.2h.01"/></svg> 키워드 검색 실패(2개): 가상자산, 종부세 — 잠시 후 새로고침하면 다시 시도합니다.</div></div></div><div class="case"><div class="meta"><b>수시 카드</b> · 수집 실패<span class="cls">.warn</span><span class="spec">11/14 · --fs-md · ⚠ 아이콘 · 테두리 진함</span></div><div class="stage"><div class="warn"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5"/><path d="M12 17.2h.01"/></svg> 끝 시각이 지금보다 앞이어야 합니다.</div></div></div><div class="case"><div class="meta"><b>설정</b> · 저장할 수 없음<span class="cls">.save-msg.blocked</span><span class="spec">9/11 · --fs-sm · 색 점</span></div><div class="stage"><div class="save-msg blocked"><span class="dot"></span><span>"초안·확정본"을 켠 그룹이 최소 1개는 있어야 합니다.</span></div></div></div><div class="case"><div class="meta"><b>확정본</b> · AI 분류 실패(상자 아님·우하단 글자)<span class="cls">.send-countdown.classification-warning</span><span class="spec">상자 없음 · --fs-sm · ⚠️ 이모지</span></div><div class="stage"><div class="send-countdown">⚠️ AI 분류 실패<br>확인 후 직접 발송해주세요</div></div></div><h3>연보라 · AI가 한 일</h3><div class="case"><div class="meta"><b>확정본</b> · 마감 후 자동 배정(상단 고정 띠)<span class="cls">.finalize-banner</span><span class="spec">11/24 · --fs-md · 아이콘 없음</span></div><div class="stage"><div class="strip finalize-banner"><div class="inner"><span class="msg"><b>14시 회차가 마감되면서 기사 6건이 자동으로 배정됐어요.</b> 초안에서 확인하지 못한 기사예요.</span><button class="go" type="button">표시된 곳 보기 →</button><button class="dismiss" type="button">확인했어요</button></div></div></div></div><h3>초록 · 잘 됐다</h3><div class="case"><div class="meta"><b>두 보관함·수시 카드</b> · 지운 직후<span class="cls">.ok-note</span><span class="spec">11/14 · --fs-md · ✓ 아이콘</span></div><div class="stage"><div class="ok-note"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg> 「14:00 기준」 회차를 지웠어요.<a class="ok-link" href="#">삭제 기록 →</a></div></div></div><div class="case"><div class="meta"><b>라벨·정기 보관함</b> · 제목 확인 결과<span class="cls">.refetch-note</span><span class="spec">8/12 · --fs-sm · 아이콘 없음</span></div><div class="stage"><p class="refetch-note">42건 확인 · <b>제목 바뀐 기사 3건</b> · 원문만 수정 5건 <span class="sub">· 언론사 자체 도메인 2건은 확인할 수 없었어요</span></p></div></div><h3>파랑 · 저장됨(성공색이 또 하나)</h3><div class="case"><div class="meta"><b>설정</b> · 저장 완료<span class="cls">.save-msg.saved</span><span class="spec">9/11 · --fs-sm · 색 점 · 초록이 아니라 파랑</span></div><div class="stage"><div class="save-msg saved"><span class="dot"></span><span>저장했습니다.</span></div></div></div><div class="case"><div class="meta"><b>설정</b> · 저장 안 된 변경이 있음<span class="cls">.save-msg.dirty</span><span class="spec">9/11 · --fs-sm · 색 점</span></div><div class="stage"><div class="save-msg dirty"><span class="dot"></span><span>저장하지 않은 변경이 있습니다.</span></div></div></div><h2 id="t3">3. 어긋나는 지점 여덟</h2><ol class="gaps"><li><b>상자 여백이 여덟 가지다</b><span>10/12 · 10/14 · 11/14 · 11/16 · 11/24 · 9/11 · 8/12 · 8/10 — 같은 뜻의 상자가 화면마다 다른 두께로 선다.</span></li><li><b>글자 크기가 두 가지다</b><span>--fs-md 아홉 · --fs-sm 여섯. 어느 쪽이 규칙인지 코드만 봐서는 알 수 없다.</span></li><li><b>같은 값인데 색 이름이 두 벌이다</b><span>degraded_* = error_*(#FEF2F2·#FECACA·#DC2626), round_over_* = warn_*(#FFFBEB·#FDE68A·#92400E). 고칠 때 한쪽만 고치면 조용히 갈린다.</span></li><li><b>성공을 말하는 색이 두 벌이다</b><span>ok_*(초록)은 「지웠어요」·「제목 확인」, saved_*(파랑)은 설정 「저장했습니다」. 둘 다 「끝났다」인데 색이 다르다.</span></li><li><b>왼쪽 띠는 한 상자에만 있다</b><span>초안 폴백만 4px 띠 + 테두리이고 나머지 열넷은 테두리뿐이다.</span></li><li><b>아이콘이 제각각이다</b><span>⚠️ 이모지 둘 · icon(alert) 셋 · icon(clock) · icon(check) · icon(in) · 색 점 · 아예 없음 여섯.</span></li><li><b>테두리 진하기가 둘이다</b><span>수시 .warn과 오늘 전체 기사 .live-warning만 진한 테두리(#FCA5A5·#DC2626), 다른 빨강은 옅다(#FECACA).</span></li><li><b>문구 길이에 규칙이 없다</b><span>두 줄로 끝나는 것도, 한 문단으로 흐르는 것도 있다.</span></li></ol><h2 id="t4">4. 통일안</h2><div class="spec-card"><b>한 벌로 못 박는 값</b><ul><li>상자 — <code>--r-lg</code> 모서리 · 여백 <code>10px 13px</code> · 위아래 <code>12px</code> · 테두리 1px + <b>왼쪽 4px 띠</b>(톤 색). 띠가 색을 멀리서도 읽게 한다.</li><li>글자 — <code>--fs-sm</code> · 줄간격 1.55. 배너는 본문이 아니라 곁다리 알림이라 기사 제목(1rem)과 두 단계 벌린다.</li><li>아이콘 — 톤마다 하나로 고정(주의·오류 ⚠, AI 🤖, 완료 ✓). <b>이모지를 쓰지 않는다</b>(icon() 하나에서 온다).</li><li>문구 — <b>두 줄까지</b>. 첫 줄이 무슨 일인가, 둘째 줄이 할 일.</li><li>상자 안 실행 버튼은 두지 않는다 — 가리키는 칩(<span class="chip-ex">⟳ 재분류</span>)이나 글자 링크만.</li><li>색 이름 — <code>degraded_*</code>는 <code>error_*</code>로, <code>round_over_*</code>는 <code>warn_*</code>로 합친다(지금도 값이 같다). <code>saved_*</code>(파랑)는 <code>ok_*</code>로 합친다.</li></ul></div><h3>주의 — 앰버 <span class="when">— 알아 둘 것 / 담당자가 할 일이 남은 것</span></h3><div class="stage"><div class="nb nb-warn"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5"/><path d="M12 17.2h.01"/></svg><span class="body"><b>마감 뒤에 들어온 기사가 2건 있어요.</b><br>보고서를 이미 보냈다면 그 보고서엔 없는 기사예요. <button class="cnt" type="button">2건 보기</button></span></div><div class="nb nb-warn"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5"/><path d="M12 17.2h.01"/></svg><span class="body"><b>검색어 ‘예산’이 결과의 38%(142/370건)예요.</b><br>「예산+국회」처럼 +로 묶거나 <a class="act" href="#">검색어</a> 화면에서 더 좁은 말로 바꿔 보세요.</span></div><div class="nb nb-warn"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.3l3.2 1.9"/></svg><span class="body"><b>2026-10-19에 만든 확정본입니다.</b> (오늘은 2026-10-21)<br>지난 날짜 확정본엔 더 보낼 수 없어요 — 오늘 <a class="act" href="#">새 수집</a>의 원본에서 보내면 새로 생겨요.</span></div><div class="nb nb-warn"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5"/><path d="M12 17.2h.01"/></svg><span class="body"><b>소제목은 단어 빈도로 뽑은 이름입니다.</b><br>AI 키를 등록하지 않아서 그렇고, 이대로 쓰셔도 됩니다.</span></div></div><h3>오류 — 빨강 <span class="when">— 앱이 하려다 못 한 것</span></h3><div class="stage"><div class="nb nb-error"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5"/><path d="M12 17.2h.01"/></svg><span class="body"><b>지금 170건이라 AI가 소제목을 묶지 못했어요.</b> (상한 150건)<br>지금 소제목은 단어 빈도로 뽑은 단어예요. <b>20건</b> 줄이고 위의 <span class="btn-ref"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg> AI 모든 기사 재분류</span>를 누르면 다시 묶입니다.</span></div><div class="nb nb-error"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5"/><path d="M12 17.2h.01"/></svg><span class="body"><b>키워드 검색에 2개 실패했어요.</b> 가상자산, 종부세<br>잠시 후 새로고침하면 다시 시도합니다.</span></div><div class="nb nb-error"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5"/><path d="M12 17.2h.01"/></svg><span class="body"><b>끝 시각이 지금보다 앞이어야 합니다.</b></span></div></div><h3>AI — 연보라 <span class="when">— 담당자가 안 보는 사이 AI가 한 일</span></h3><div class="stage"><div class="nb nb-strip nb-ai"><div class="inner"><span class="body"><b>14시 회차가 마감되면서 기사 6건이 자동으로 배정됐어요.</b> 초안에서 확인하지 못한 기사예요. <button class="go" type="button" style="margin-left:6px">표시된 곳 보기 →</button></span></div></div></div><h3>완료 — 초록 <span class="when">— 방금 끝난 일 (설정 「저장했습니다」의 파랑도 이쪽으로 합친다)</span></h3><div class="stage"><div class="nb nb-ok"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg><span class="body"><b>「14:00 기준」 회차를 지웠어요.</b> <a class="act" href="#">삭제 기록 →</a></span></div><div class="nb nb-ok"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg><span class="body"><b>42건 확인 · 제목 바뀐 기사 3건</b> · 원문만 수정 5건<br>언론사 자체 도메인 2건은 확인할 수 없었어요.</span></div><div class="nb nb-ok"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg><span class="body"><b>저장했습니다.</b></span></div></div><h3>글자 크기는 둘 중 하나를 고른다</h3><div class="stage sizecmp"><div class="half"><div class="lab">A · --fs-sm (위 통일안)</div><div class="nb nb-warn"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5"/><path d="M12 17.2h.01"/></svg><span class="body"><b>마감 뒤에 들어온 기사가 2건 있어요.</b><br>보고서를 이미 보냈다면 그 보고서엔 없는 기사예요.</span></div></div><div class="half"><div class="lab">B · --fs-md (지금 대부분)</div><div class="nb nb-warn md"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5"/><path d="M12 17.2h.01"/></svg><span class="body"><b>마감 뒤에 들어온 기사가 2건 있어요.</b><br>보고서를 이미 보냈다면 그 보고서엔 없는 기사예요.</span></div></div></div>
+</div></body></html>

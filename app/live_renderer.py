@@ -305,16 +305,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     cursor: pointer; white-space: nowrap;
   }}
   .more-menu button:hover {{ background: {live_bg}; }}
-  .live-warning {{
-    background: {error_bg}; border: 1px solid {error}; border-radius: var(--r-lg); padding: 10px 14px;
-    margin: 12px 0; font-size: var(--fs-md); color: {error}; line-height: 1.5;
-  }}
   /* [추가: 2026-08-24] 오류가 아니라 "참고해 두면 좋을 안내"라 .live-warning(빨강)이
      아니라 앰버(주의) 계열을 쓴다 — CLAUDE.md 색 규칙: 빨강은 오류, 앰버는 주의. */
-  .live-heavy-kw-warning {{
-    background: {warn_bg}; border: 1px solid {warn_border}; border-radius: var(--r-lg); padding: 10px 14px;
-    margin: 12px 0; font-size: var(--fs-md); color: {warn_text}; line-height: 1.5;
-  }}
   /* [수정: 2026-09-16] 건수 카드(.stat-card, 59px + 여백 20px)를 없애고 그 문장을 「● 실시간」
      바로 옆에 붙였다 — 숫자 하나와 한 줄 설명에 카드 한 장을 쓰던 자리. 문장·id(stat-count·
      stat-scope)는 그대로라 applyLiveFilters가 예전처럼 건수를 고쳐 쓴다. */

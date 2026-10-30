@@ -366,13 +366,6 @@ COLOR_PHOTO_BADGE_BORDER = COLOR_BORDER
 COLOR_OK_TEXT = "#166534"
 COLOR_OK_BG = "#F0FDF4"
 COLOR_OK_BORDER = "#BBF7D0"
-# [수정: 2026-08-21] 초록에서 파랑으로 — "초록 = 발송" 하나로 좁히기로 하면서, 저장
-# 성공도 다른 "정상/완료" 신호와 같은 파랑(정보)으로 옮겼다. 값은 accent 계열을 그대로
-# 참조한다(새 색을 만들지 않는다).
-COLOR_SAVED_TEXT = COLOR_ACCENT
-COLOR_SAVED_BG = COLOR_HOVER
-COLOR_SAVED_BORDER = COLOR_ACCENT_BORDER
-COLOR_SAVED_DOT = COLOR_ACCENT
 
 # ── 상태: 주의 / 저장 안 함 ───────────────────────────────────────────────
 COLOR_WARN_TEXT = "#92400E"
@@ -391,25 +384,6 @@ COLOR_ERROR_DISABLED = "#FCA5A5"        # 저장 못 하는 상태의 저장 버
 COLOR_ERROR_BORDER_MID = "#FCA5A5"      # 경고 상자 테두리(위와 값 같음, 뜻은 다름)
 COLOR_ERROR_PLACEHOLDER = "#F87171"
 COLOR_ERROR_STRONG = "#991B1B"          # API 호출량 과다(hot) 뱃지
-
-# ── AI 분류 실패 배너 (초안 전용) ─────────────────────────────────────────
-# [수정: 2026-08-21] 이 배너만의 빨강 세트를 없애고 "오류" 세트를 그대로 쓴다 — 실패를
-# 알리는 배너라 뜻이 정확히 오류다. 시도 이력(보조 정보)은 위험 신호가 아니므로 danger가
-# 아닌 muted 글자로 낮춘다.
-COLOR_DEGRADED_BG = COLOR_ERROR_BG
-COLOR_DEGRADED_BORDER = COLOR_ERROR_BORDER
-COLOR_DEGRADED_TEXT = COLOR_ERROR
-COLOR_DEGRADED_RULE = COLOR_ERROR_BORDER
-COLOR_DEGRADED_SUB = COLOR_TEXT_MUTED
-
-# ── 회차 마감 안내 배너 (노란 상단 고정 띠) ───────────────────────────────
-# [수정: 2026-08-21] 이 배너만의 노랑 세트를 없애고 "주의" 세트를 그대로 쓴다 — 뜻이
-# "회차가 끝났으니 확인하라"는 주의 신호이지, 새 세트가 필요한 고유한 뜻이 아니었다.
-COLOR_ROUND_OVER_BG = COLOR_WARN_BG
-COLOR_ROUND_OVER_BORDER = COLOR_WARN_BORDER
-COLOR_ROUND_OVER_TEXT = COLOR_WARN_TEXT
-COLOR_ROUND_OVER_TEXT_STRONG = COLOR_WARN_TEXT
-COLOR_ROUND_OVER_DISMISS = COLOR_WARN_TEXT
 
 # ── 수시 모니터링 전용 ────────────────────────────────────────────────────
 # [수정: 2026-08-21] 이 배지만의 주황 세트를 없애고 "주의" 세트를 그대로 쓴다.
@@ -576,10 +550,6 @@ PALETTE = {
     "ok_text": COLOR_OK_TEXT,
     "ok_bg": COLOR_OK_BG,
     "ok_border": COLOR_OK_BORDER,
-    "saved_text": COLOR_SAVED_TEXT,
-    "saved_bg": COLOR_SAVED_BG,
-    "saved_border": COLOR_SAVED_BORDER,
-    "saved_dot": COLOR_SAVED_DOT,
     "warn_text": COLOR_WARN_TEXT,
     "warn_bg": COLOR_WARN_BG,
     "warn_border": COLOR_WARN_BORDER,
@@ -603,16 +573,6 @@ PALETTE = {
     "error_border_mid": COLOR_ERROR_BORDER_MID,
     "error_placeholder": COLOR_ERROR_PLACEHOLDER,
     "error_strong": COLOR_ERROR_STRONG,
-    "degraded_bg": COLOR_DEGRADED_BG,
-    "degraded_border": COLOR_DEGRADED_BORDER,
-    "degraded_text": COLOR_DEGRADED_TEXT,
-    "degraded_rule": COLOR_DEGRADED_RULE,
-    "degraded_sub": COLOR_DEGRADED_SUB,
-    "round_over_bg": COLOR_ROUND_OVER_BG,
-    "round_over_border": COLOR_ROUND_OVER_BORDER,
-    "round_over_text": COLOR_ROUND_OVER_TEXT,
-    "round_over_text_strong": COLOR_ROUND_OVER_TEXT_STRONG,
-    "round_over_dismiss": COLOR_ROUND_OVER_DISMISS,
     "out_bg": COLOR_OUT_BG,
     "out_border": COLOR_OUT_BORDER,
     "out_tag_bg": COLOR_OUT_TAG_BG,
@@ -741,6 +701,57 @@ SHAPE_TOKENS_CSS = (
     f"--chk-md: {CHECKBOX_MD}; --chk-sm: {CHECKBOX_SM}; "
     f"--sh-float: {SHADOW_FLOAT}; --sh-pop: {SHADOW_POP}; --sh-modal: {SHADOW_MODAL}; "
     "}"
+)
+
+# ── 경고·안내 상자 한 벌 ─────────────────────────────────────────────
+# 앱이 담당자에게 말을 거는 색 상자는 전부 이 한 벌에서 모양을 받는다 — 화면마다 여백
+# (10/12·10/14·11/14·11/16·8/10…)과 글자(--fs-md/--fs-sm)가 제각각이라 같은 뜻의 상자가
+# 자리마다 다른 두께로 서 있었다. 값을 여기 한 곳에 두고 topnav_style()이 모든 화면에
+# 함께 내보낸다(모양 토큰·「+」 글리프와 같은 자리).
+#
+# 뜻은 톤 넷이 말하고 **새 색 세트를 만들지 않는다** — 이미 있는 주의(warn)·오류(error)·
+# AI(ai)·완료(ok) 그대로다. 왼쪽 4px 띠가 그 톤을 멀리서도 읽게 한다(📂 미분류·📌 담아둔
+# 기사 칸이 쓰는 「왼쪽 띠」 문법과 같다).
+#
+# 글자는 --fs-sm다. 배너는 본문이 아니라 곁다리 알림이라 기사 제목(--fs-base)과 두 단계
+# 벌려야 눈이 본문으로 돌아간다 — 글자 크기 단계 절의 --fs-md 목록에서 「배너」를 뺀 이유다.
+#
+# **화면 클래스를 여기에 나열해 맞춘다**(마크업을 한 글자도 안 고치려고) — 새 경고 상자를
+# 만들면 `.nb nb-{톤}`을 쓰고 이 목록은 더 늘리지 않는다.
+_BANNER_BOX = (
+    ".nb, .classify-degraded, .late-banner, .live-warning, .live-heavy-kw-warning, "
+    ".warn, .err, .ok-note, .refetch-note, .url-add-warn, .sm-warn, .save-msg"
+)
+_BANNER_ICON = (
+    ".nb > .ic, .classify-degraded .ic, .late-banner .msg .ic, .live-warning .ic, "
+    ".live-heavy-kw-warning .ic, .warn .ic, .ok-note .ic, .refetch-note .ic"
+)
+# 톤마다 「이 톤으로 설 클래스」를 적는다. 두 칸짜리(.warn.stale)가 한 칸짜리(.warn)보다
+# 명시도가 높아, 같은 클래스의 변종이 제 톤을 가져간다.
+_BANNER_TONES = {
+    "warn": ".nb-warn, .late-banner, .live-heavy-kw-warning, .url-add-warn, .sm-warn, "
+            ".warn.stale, .classify-degraded.no-key, .save-msg.dirty",
+    "error": ".nb-error, .live-warning, .warn, .err, .classify-degraded, .save-msg.blocked",
+    "ok": ".nb-ok, .ok-note, .refetch-note, .save-msg.saved",
+    "ai": ".nb-ai",
+}
+_BANNER_TONE_COLORS = {
+    "warn": (COLOR_WARN_BG, COLOR_WARN_BORDER, COLOR_WARN_DOT, COLOR_WARN_TEXT),
+    "error": (COLOR_ERROR_BG, COLOR_ERROR_BORDER, COLOR_ERROR, COLOR_ERROR),
+    "ok": (COLOR_OK_BG, COLOR_OK_BORDER, COLOR_OK_TEXT, COLOR_OK_TEXT),
+    "ai": (COLOR_AI_BANNER_BG, COLOR_AI_BORDER, COLOR_AI_MARK, COLOR_AI_TEXT),
+}
+BANNER_CSS = (
+    f"  {_BANNER_BOX} {{ border-radius: var(--r-lg); padding: 10px 13px; margin: 12px 0;"
+    " border: 1px solid; border-left-width: 4px;"
+    " font-size: var(--fs-sm); line-height: 1.55; }\n"
+    f"  {_BANNER_ICON} {{ width: 1.05em; height: 1.05em;"
+    " vertical-align: -0.18em; margin-right: 4px; }\n"
+    + "".join(
+        f"  {_BANNER_TONES[tone]} {{ background: {bg}; border-color: {border};"
+        f" border-left-color: {band}; color: {text}; }}\n"
+        for tone, (bg, border, band, text) in _BANNER_TONE_COLORS.items()
+    )
 )
 
 # PRD.md 기능1 규칙 6 — 기사 제목·요약 내 형광펜 단어 하이라이트 색상·기본값·최대 개수.

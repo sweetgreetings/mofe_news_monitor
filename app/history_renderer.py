@@ -114,8 +114,6 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .day-del:hover {{ color: {error}; background: {error_bg}; }}
   /* [추가: 2026-10-12] 지운 직후의 초록 안내 — 사라진 줄의 자리를 받는다(수시 카드 화면의
      .ok-note와 같은 색·같은 문법). 화면을 다시 열면 없어지고, 그 뒤는 「삭제 기록」이 받는다. */
-  .ok-note {{ background: {ok_bg}; border: 1px solid {ok_border}; color: {ok_text};
-    border-radius: var(--r-lg); padding: 11px 14px; margin: 12px 0; font-size: var(--fs-md); }}
   .ok-note .ok-link {{ color: inherit; font-weight: 600; margin-left: 6px; }}
   /* 선택 삭제 모드(body.hist-tidy) — 체크박스·회차별 건수·잠금 안내가 나오고, 꺼내는
      동작(복사·txt·xlsx)과 줄 끝 🗑는 숨는다. 건수는 이때만 보인다: 평소엔 찾는 기준이

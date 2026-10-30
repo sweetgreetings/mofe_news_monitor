@@ -622,11 +622,11 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     max-width: 800px; margin: 0 auto; padding: 11px 24px;
     display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   }}
-  .finalize-banner .msg {{ flex: 1; min-width: 200px; font-size: var(--fs-md); color: {ai_text}; }}
+  .finalize-banner .msg {{ flex: 1; min-width: 200px; font-size: var(--fs-sm); color: {ai_text}; }}
   .finalize-banner .msg b {{ color: {ai_text_strong}; }}
   .finalize-banner .go {{
     background: {header}; color: {on_fill}; border: none; border-radius: var(--r-md);
-    padding: 8px 14px; font-size: var(--fs-md); font-weight: 700; cursor: pointer; white-space: nowrap;
+    padding: 7px 13px; font-size: var(--fs-sm); font-weight: 700; cursor: pointer; white-space: nowrap;
   }}
   .finalize-banner .go:hover {{ background: {header_pressed}; }}
   .finalize-banner .dismiss {{
@@ -712,15 +712,12 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
      급한 경고라 그렇게 한 것이고, 이건 그 정도가 아니다. 회수가 0건이면 서버가 이
      배너를 아예 안 그린다(0건이면 안 그린다 — 📂 미분류 배지·📷 사진 추정 버튼과 같은
      원칙. 늘 떠 있는 안내는 곧 안 읽히는 안내가 된다). */
-  .late-banner {{
-    margin: 0 0 14px; padding: 11px 16px; border-radius: var(--r-lg);
-    background: {warn_bg}; border: 1px solid {warn_border}; color: {warn_text};
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  }}
-  .late-banner .msg {{ flex: 1; min-width: 220px; font-size: var(--fs-md); line-height: 1.5; }}
-  .late-banner .msg .ic {{ width: 1em; height: 1em; vertical-align: -0.15em; margin-right: 2px; }}
+  /* 상자 모양·톤 색·글자는 공용 한 벌(app.config BANNER_CSS)에서 온다 — 여기엔
+     이 배너만의 가로 배치와 그 안 두 버튼만 남긴다. */
+  .late-banner {{ margin: 0 0 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }}
+  .late-banner .msg {{ flex: 1; min-width: 220px; }}
   .late-banner .cnt {{
-    font-family: inherit; font-weight: 800; font-size: var(--fs-md); cursor: pointer;
+    font-family: inherit; font-weight: 800; font-size: var(--fs-sm); cursor: pointer;
     border: 1px solid {warn_border}; border-radius: var(--r-md); padding: 2px 9px;
     background: {warn_chip_bg}; color: {warn_text};
   }}
@@ -5612,11 +5609,7 @@ REFETCH_TITLES_STYLE = """
   @keyframes refetch-spin {{ to {{ transform: rotate(360deg); }} }}
   /* 결과 줄 — 「잘 됐다」 안내라 초록 세트다. 바뀐 게 0건이어도 같은 색이다
      (확인이 끝난 것 자체가 결과다). */
-  .refetch-note {{
-    margin: 0 0 10px; padding: 8px 12px; font-size: var(--fs-sm); line-height: 1.7;
-    background: {ok_bg}; border: 1px solid {ok_border}; border-radius: var(--r-md);
-    color: {ok_text};
-  }}
+  .refetch-note {{ margin: 0 0 10px; }}
   .refetch-note[hidden] {{ display: none; }}
   .refetch-note .sub {{ opacity: 0.85; }}
   /* 제목이 바뀐 줄만 세이지 — 담당자가 눌러서 일어난 일이라 「방금 손댄 것」 색이다.
@@ -6309,10 +6302,7 @@ URL_ADD_STYLE = """
   .url-add-zone .url-add-close:hover {{ color: {text}; }}
   /* 거부 사유는 지우지 않고 남긴다 — 실패가 조용히 사라지면 안 된다(CODING_CONVENTIONS §3).
      주의 세트(앰버) 재사용. 입력한 주소도 남겨 어디가 틀렸는지 보고 고치게 한다. */
-  .url-add-warn {{
-    display: none; margin-top: 8px; padding: 8px 11px; border-radius: var(--r-md); font-size: var(--fs-sm);
-    line-height: 1.55; background: {warn_bg}; border: 1px solid {warn_border}; color: {warn_text};
-  }}
+  .url-add-warn {{ display: none; margin: 8px 0 0; }}
   .url-add-warn.is-on {{ display: block; }}
   .url-add-warn b {{ display: block; }}
   .url-add-warn span {{ color: {warn_sub}; }}
