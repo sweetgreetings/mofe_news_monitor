@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 from typing import Callable, List, Optional
 
+from app import store
 from app.breaking_alert_sender import poll_and_alert_tick
 from app.negative_guess import negative_guess_tick
 from app.config import MAX_RETRIES
@@ -97,9 +98,19 @@ _MAX_SLOT_ATTEMPTS = MAX_RETRIES
 _slot_failures: dict = {}
 
 
+def _failure_key(now: datetime, run_slot: str) -> tuple:
+    """실패를 세는 열쇠 — 날짜·**사람**·회차.
+
+    사람을 넣는 것이 계약이다. 스케줄러가 사람마다 한 바퀴 도는데 열쇠에 사람이
+    없으면 **한 사람의 실패가 다른 사람의 회차까지 포기시킨다**(그 사람 쪽은 멀쩡한데
+    오늘 다시 안 모은다).
+    """
+    return (now.date().isoformat(), store.current_owner(), run_slot)
+
+
 def _give_up_on(now: datetime, run_slot: str) -> bool:
     """이 회차를 오늘 더 시도하지 않기로 했는지."""
-    return _slot_failures.get((now.date().isoformat(), run_slot), 0) >= _MAX_SLOT_ATTEMPTS
+    return _slot_failures.get(_failure_key(now, run_slot), 0) >= _MAX_SLOT_ATTEMPTS
 
 
 def _record_slot_failure(now: datetime, run_slot: str) -> int:
@@ -107,8 +118,9 @@ def _record_slot_failure(now: datetime, run_slot: str) -> int:
     today = now.date().isoformat()
     for key in [k for k in _slot_failures if k[0] != today]:
         del _slot_failures[key]
-    count = _slot_failures.get((today, run_slot), 0) + 1
-    _slot_failures[(today, run_slot)] = count
+    key = _failure_key(now, run_slot)
+    count = _slot_failures.get(key, 0) + 1
+    _slot_failures[key] = count
     return count
 
 
@@ -279,6 +291,12 @@ def run_scheduler(
     # 실제 함수를 주입한다**(collect_agency_archive와 같은 이유) — 기본값이 진짜 함수면
     # run_scheduler를 부르는 테스트가 실제 data/·네이버·텔레그램까지 탄다.
     check_title_watch: Callable[[datetime], int] = lambda _now: 0,
+    # [추가: 2026-10-30] **수집은 사람마다 한 바퀴 돈다** — 각자 자기 검색어로 자기
+    # 회차를 쌓는다(③ 사용자 경계). 기본값이 `[None]`이라 **한 번만 돌고, 그게 지금
+    # 혼자 쓰는 동작 그대로다.** 실제 목록(app.users.data_owners)은 main.py가 주입한다
+    # — 기본값이 진짜 함수면 run_scheduler를 부르는 테스트가 실제 data/users.json을 읽는다
+    # (collect_agency_archive와 같은 이유).
+    list_owners: Callable[[], list] = lambda: [None],
     should_continue: Callable[[], bool] = lambda: True,
 ) -> None:
     """앱이 켜져 있는 동안 poll_interval_sec마다 실행할 회차가 있는지 확인하고 수집한다.
@@ -342,21 +360,46 @@ def run_scheduler(
             now = now_fn()
             if current_active_slot(now, schedule_times) is None:
                 render_waiting()
-            run_due_slot(now=now, schedule_times=schedule_times, scrape=scrape)
-            # 하루 마지막 회차의 「보충 훑기」 — 보충 시각이 아니거나 이미 보충했으면 즉시
-            # 돌아온다(비용 0). 수집(run_due_slot) 뒤에 둬야 방금 저장된 회차를 본다.
-            check_topup(now, schedule_times)
+
+            # ── 사람마다 한 바퀴 ─────────────────────────────────────────
+            # 회차·초안·큐레이션·수시 카드는 사람별 저장소라(app/store.py `_PER_USER`)
+            # 사람마다 자기 폴더에서 모으고 치운다. **한 사람이 실패해도 나머지는
+            # 간다** — 회차 하나가 실패해도 나머지가 가는 것과 같은 규칙이다.
+            for who in list_owners():
+                with store.owner(who):
+                    try:
+                        run_due_slot(now=now, schedule_times=schedule_times, scrape=scrape)
+                        # 하루 마지막 회차의 「보충 훑기」 — 보충 시각이 아니거나 이미
+                        # 보충했으면 즉시 돌아온다(비용 0). 수집 뒤에 둬야 방금 저장된
+                        # 회차를 본다.
+                        check_topup(now, schedule_times)
+                        # 보관 기간 정리도 사람별이다 — 각자 폴더의 오래된 회차·배정
+                        # 기록·숨김·지운 회차·수시 카드를 치운다.
+                        cleanup()
+                        cleanup_overrides()
+                        archive_hidden()
+                        purge_deleted()
+                        cleanup_adhoc_cards()
+                    except Exception:
+                        logger.exception(
+                            "수집·정리 중 오류 (사람=%s) — 다음 tick에 다시 시도합니다",
+                            who or "바닥",
+                        )
+
+            # ── 한 번만 ──────────────────────────────────────────────────
+            # **자동발송은 바닥 주인 몫 하나다** — 받는 사람 명단이 공용이라
+            # 사람마다 보내면 같은 사람이 보고서를 사람 수만큼 받는다. 다른 사람은
+            # 확정본의 발송 단추로 직접 보낸다(자동발송 스위치도 공용 설정이다).
             check_confirm_send(now)
+            # 아래 넷은 공용 저장소·공용 설정에 딸린 일이라 사람과 무관하게 한 번이다 —
+            # [단독]·[속보] 알림(공용 명단·공용 감시 설정) · 기관 기사 원장(사람과
+            # 무관한 책) · 제목 변경 알림(공용 라벨) · 홈 부정 추정(회차마다 AI를
+            # 부르는 자리라 사람 수만큼 늘리지 않는다).
             check_breaking_alert(now)
             check_negative_guess(now)
             collect_agency_archive(now)
             # 제목 변경 알림 — 아침 시각 전이거나 오늘 이미 돌았으면 즉시 돌아온다(비용 0).
             check_title_watch(now)
-            cleanup()
-            cleanup_overrides()
-            archive_hidden()
-            purge_deleted()
-            cleanup_adhoc_cards()
         except Exception:
             logger.exception("스크랩 회차 실행 중 오류 — 다음 회차에 다시 시도합니다")
         sleep(poll_interval_sec)

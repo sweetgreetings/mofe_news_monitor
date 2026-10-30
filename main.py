@@ -7,7 +7,7 @@ import threading
 import time
 import webbrowser
 
-from app import photo_body
+from app import photo_body, users
 from app.adhoc.card import delete_expired_cards, purge_expired_deleted_cards
 from app.agency_archive import collect_tick as agency_archive_tick
 from app.title_watch import watch_tick as title_watch_tick
@@ -232,7 +232,10 @@ def main(open_browser: bool = True) -> None:
             "collect_agency_archive": agency_archive_tick,
             # 라벨 붙인 기사의 제목이 바뀌었는지 30분마다(app.title_watch) — 기본값이
             # 빈 람다라 여기서 주입하지 않으면 아무 일도 안 한다.
-            "check_title_watch": title_watch_tick,
+                        "check_title_watch": title_watch_tick,
+            # 수집은 사람마다 한 바퀴 돈다 — 첫 자리는 「바닥」의 주인(None)이다
+            # (app.users.data_owners). 계정이 하나면 [None]이라 한 번만 돈다.
+            "list_owners": users.data_owners,
         },
         daemon=True,
     ).start()

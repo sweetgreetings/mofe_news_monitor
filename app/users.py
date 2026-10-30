@@ -136,6 +136,20 @@ def base_owner_id() -> Optional[str]:
     return everyone[0].get("id") if everyone else None
 
 
+def data_owners() -> list:
+    """**수집을 돌려야 하는 사람들** — 스케줄러가 사람마다 한 바퀴 도는 목록.
+
+    첫 자리는 늘 `None`(「바닥」의 주인 — 그 사람의 자리가 `data/` 자신이다)이고,
+    그 뒤로 다른 계정의 id가 온다. 계정이 하나거나 아예 없으면 `[None]`이라
+    **루프가 한 번 돌고 끝난다 — 혼자 쓰는 지금이 동작 그대로인 이유다.**
+
+    순서가 계약이다 — 바닥 주인이 먼저다. 공용 호출량(네이버)을 쓰는 순서가 곧
+    우선순위라, 한도에 닿는 날 담당자의 보고서가 먼저 모인다.
+    """
+    everyone = list_users()
+    return [None] + [u.get("id") for u in everyone[1:] if u.get("id")]
+
+
 def is_admin(user: Optional[dict]) -> bool:
     """그 사람이 관리자인가 — 「모두에게 같이 걸리는 설정」을 바꿀 수 있는지의 판정.
 

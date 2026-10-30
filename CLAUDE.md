@@ -124,6 +124,12 @@ FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN
 ### 스케줄러 (`app/scheduler.py`)
 
 - 10초 폴링 루프. 회차는 `{start, end}` 시간창(1~10개, 분은 `:00`/`:30`만). `end`가 회차의 정체성(파일명·헤더), `start`는 수집 하한.
+- **tick 안에서 「사람마다 도는 일」과 「한 번만 도는 일」이 갈린다**(③ 사용자 경계).
+  - **사람마다**: 회차 수집(`run_due_slot`) · 마지막 회차 보충(`check_topup`) · 보관 기간 정리 다섯(`cleanup`·`cleanup_overrides`·`archive_hidden`·`purge_deleted`·`cleanup_adhoc_cards`). 회차·초안·큐레이션·수시 카드가 사람별 저장소라 각자 자기 검색어로 자기 폴더에서 모으고 치운다. **한 사람이 실패해도 나머지는 간다**(회차 하나가 실패해도 나머지가 가는 것과 같은 규칙).
+  - **한 번만**: **자동발송**(`check_confirm_send`) — 받는 사람 명단이 공용이라 사람마다 보내면 같은 사람이 보고서를 사람 수만큼 받는다. 다른 사람은 확정본의 발송 단추로 직접 보낸다(자동발송 스위치도 공용 설정이다). 그리고 공용 저장소·공용 설정에 딸린 넷 — [단독]·[속보] 알림 · 기관 기사 원장 · 제목 변경 알림 · 홈 부정 추정(회차마다 AI를 부르는 자리라 사람 수만큼 늘리지 않는다). 대기 화면(`render_waiting`)도 공용 파일이라 한 번이다.
+  - **사람 목록은 `app/users.py` `data_owners()`**이고 **첫 자리는 늘 `None`(「바닥」의 주인)**이다 — 공용 호출량(네이버)을 쓰는 순서가 곧 우선순위라 한도에 닿는 날 담당자 보고서가 먼저 모인다. `run_scheduler`의 기본값은 `[None]`이라 **루프가 한 번 돌고, 그게 혼자 쓰는 지금의 동작 그대로다**(실제 목록은 `main.py`가 주입한다 — 기본값이 진짜 함수면 `run_scheduler`를 부르는 테스트가 실제 `data/users.json`을 읽는다).
+  - **회차 재시도 횟수는 사람마다 따로 센다**(`_failure_key` — 날짜·사람·회차). 열쇠에 사람이 없으면 **한 사람의 실패가 다른 사람의 회차까지 포기시킨다.**
+  - `tests/test_integration.py` `test_scheduler_runs_per_person`이 이 상태를 지킨다. → H: 사람마다 수집
 - **회차 그룹**(최대 5, 예: 주중/주말) — 그룹마다 `enabled`와 `days`. 켜진 그룹이 1개면 요일 무관하게 그것(휴일 예외용), 2개 이상이면 오늘 요일을 포함한 그룹, 없으면 첫 켜진 그룹(`app/settings.py` `pick_active_group_index`). 켜진 그룹 ≥1, 같은 요일을 두 그룹이 가질 수 없다.
 - **수집 시간 화면**(`/schedule`): 시간대 줄은 `번호 [시 ▾ : 분 ▾] ~ [시 ▾ : 분 ▾] ×`(`_hm_pair_html`), 분은 00·30뿐(회차 사이 30분 ≥ 자동발송 유예 최대 30분). **시간대마다 켜고 끄는 칸은 없다** — 안 쓰면 ×로 지우고, 저장 시 `enabled`는 늘 참(그룹 ON/OFF는 그대로). 요일은 켜고 끄는 알약 칩(`.day-chip`). 저장된 수만큼만 줄을 그리고, 「+ 시간대 추가」는 시작을 윗줄 종료로·종료를 2시간 뒤로 채운다(`_next_schedule_window`, 자정을 넘으면 빈 칸). 시안 [mockups/SCHEDULE_DROPDOWN_MOCKUP.html](mockups/SCHEDULE_DROPDOWN_MOCKUP.html) B안.
 - **오늘 놓친 회차는 전부, 오래된 것부터 보충한다** (`find_slots_to_run`). 순서가 계약이다 — `collect_run`의 `_already_published_urls`가 앞 회차 기사를 걸러내므로 최신부터 돌리면 앞 회차가 기사를 뺏긴다.

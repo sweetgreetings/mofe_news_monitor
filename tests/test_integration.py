@@ -6708,6 +6708,136 @@ def test_user_boundary():
           "소유자가 없으면 경로는 지금 그대로")
 
 
+def test_scheduler_runs_per_person():
+    """수집은 사람마다 한 바퀴, 공용 일은 한 번만 — **그리고 혼자면 지금과 똑같이 한 번.**
+
+    회차·초안·큐레이션·수시 카드는 사람별 저장소라 각자 자기 검색어로 자기 폴더에
+    모아야 한다(③ 사용자 경계). 반대로 **자동발송은 사람마다 돌면 안 된다** — 받는
+    사람 명단이 공용이라 같은 사람이 보고서를 사람 수만큼 받는다. [단독]·[속보] 알림·
+    기관 기사 원장·제목 변경 알림·홈 부정 추정도 공용 저장소·공용 설정에 딸린 일이라
+    한 번이다(부정 추정은 회차마다 AI를 부르는 자리라 사람 수만큼 늘리지 않는다).
+
+    **가장 중요한 줄은 「혼자면 한 번」이다** — `list_owners` 기본값이 `[None]`이라
+    계정이 하나뿐인 지금은 루프가 한 번 돌고, 그게 예전 동작 그대로다.
+    """
+    _require_isolation()
+    from app import scheduler as sched, store, users as users_mod
+
+    def run_once(owners=None, scrape=None):
+        """스케줄러 한 tick을 돌리고 무엇이 몇 번 불렸는지 돌려준다."""
+        calls = {"collect": [], "topup": [], "cleanup": [], "send": 0,
+                 "alert": 0, "agency": 0, "title": 0, "negative": 0, "waiting": 0}
+
+        def _scrape(run_slot, window_start):
+            calls["collect"].append((store.current_owner(), run_slot))
+            if scrape:
+                scrape(run_slot)
+            return {}
+
+        ticks = [True, False]
+        kwargs = dict(
+            poll_interval_sec=0,
+            sleep=lambda _s: None,
+            now_fn=lambda: datetime(2026, 1, 1, 12, 0),
+            schedule_times=[{"start": "09:00", "end": "11:00"}],
+            scrape=_scrape,
+            cleanup=lambda: calls["cleanup"].append(store.current_owner()) or [],
+            cleanup_overrides=lambda: 0,
+            archive_hidden=lambda: (0, 0),
+            purge_deleted=lambda: 0,
+            cleanup_adhoc_cards=lambda: [],
+            render_waiting=lambda: calls.__setitem__("waiting", calls["waiting"] + 1),
+            check_confirm_send=lambda _n: calls.__setitem__("send", calls["send"] + 1),
+            check_topup=lambda _n, _s=None: calls["topup"].append(store.current_owner()),
+            check_breaking_alert=lambda _n: calls.__setitem__("alert", calls["alert"] + 1),
+            check_negative_guess=lambda _n: calls.__setitem__("negative", calls["negative"] + 1),
+            collect_agency_archive=lambda _n: calls.__setitem__("agency", calls["agency"] + 1),
+            check_title_watch=lambda _n: calls.__setitem__("title", calls["title"] + 1),
+            should_continue=lambda: ticks.pop(0) if ticks else False,
+        )
+        if owners is not None:
+            kwargs["list_owners"] = lambda: owners
+        # 저장된 회차를 보지 않게 — 「이미 돌았나」는 항상 거짓으로 둔다
+        with patch.object(sched, "run_exists", lambda *a, **k: False):
+            sched.run_scheduler(**kwargs)
+        return calls
+
+    sched._slot_failures.clear()
+
+    # ① 기본값 — 혼자면 한 번만 돈다(지금 동작 그대로)
+    calls = run_once()
+    assert calls["collect"] == [(None, "11:00")], (
+        f"기본값으로 돌렸는데 한 번이 아닙니다: {calls['collect']}"
+    )
+    assert calls["topup"] == [None] and calls["cleanup"] == [None]
+    assert calls["send"] == 1 and calls["alert"] == 1
+
+    # ② 두 사람 — 수집·보충·정리는 사람마다, 공용 일은 한 번만
+    sched._slot_failures.clear()
+    calls = run_once(owners=[None, "u2"])
+    assert calls["collect"] == [(None, "11:00"), ("u2", "11:00")], (
+        f"사람마다 그 사람 맥락에서 모아야 합니다: {calls['collect']}"
+    )
+    assert calls["topup"] == [None, "u2"], calls["topup"]
+    assert calls["cleanup"] == [None, "u2"], calls["cleanup"]
+    for key, label in (("send", "자동발송"), ("alert", "[단독]·[속보] 알림"),
+                       ("agency", "기관 기사 원장"), ("title", "제목 변경 알림"),
+                       ("negative", "홈 부정 추정")):
+        assert calls[key] == 1, (
+            f"{label}이 {calls[key]}번 돌았습니다 — 공용이라 한 번이어야 합니다"
+            "(사람마다 돌면 받는 사람이 사람 수만큼 받습니다)."
+        )
+
+    # ③ 한 사람이 실패해도 나머지는 간다
+    sched._slot_failures.clear()
+
+    def _boom(run_slot):
+        if store.current_owner() is None:
+            raise RuntimeError("바닥 주인 수집 실패")
+
+    calls = run_once(owners=[None, "u2"], scrape=_boom)
+    assert ("u2", "11:00") in calls["collect"], (
+        "한 사람이 실패하자 다음 사람이 안 돌았습니다."
+    )
+    assert calls["send"] == 1, "한 사람의 실패가 공용 일까지 막았습니다."
+
+    # ④ 실패 횟수를 사람마다 따로 센다 — 안 그러면 한 사람의 실패가 남의 회차를 포기시킨다
+    sched._slot_failures.clear()
+    now = datetime(2026, 1, 1, 12, 0)
+    with store.owner(None):
+        for _ in range(sched._MAX_SLOT_ATTEMPTS):
+            sched._record_slot_failure(now, "11:00")
+        assert sched._give_up_on(now, "11:00")
+    with store.owner("u2"):
+        assert not sched._give_up_on(now, "11:00"), (
+            "한 사람의 실패가 다른 사람의 회차까지 포기시켰습니다."
+        )
+    sched._slot_failures.clear()
+
+    # ⑤ 소유자 목록 — 첫 자리는 늘 「바닥」이고, 계정이 하나면 [None]
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        with patch.object(users_mod, "USERS_FILE", tmp_dir / "users.json"):
+            assert users_mod.data_owners() == [None], "계정이 없으면 [None]이어야 합니다."
+            users_mod.create_user(
+                email="a@example.com", password="1234", display_name="담당자",
+                department="", phone="01000000000", question="초등학교",
+                answer="서울초등", consent=True,
+            )
+            assert users_mod.data_owners() == [None], (
+                "계정이 하나면 [None] — 바닥 주인이 그 사람이라 루프가 한 번 돈다."
+            )
+            second = users_mod.create_user(
+                email="b@example.com", password="1234", display_name="큐레이터",
+                department="", phone="01011112222", question="초등학교",
+                answer="부산초등", consent=True,
+            )
+            assert users_mod.data_owners() == [None, second["id"]]
+
+    print("✓ 사람마다 수집: 회차·보충·정리는 사람별, 자동발송·알림·원장·제목 감시·부정 추정은 한 번 "
+          "(혼자면 한 번 돌고 예전 동작 그대로)")
+
+
 def test_settings_split_per_user():
     """`settings.json`의 칸을 사람별·공용으로 가른 것을 지킨다.
 
@@ -8415,6 +8545,7 @@ if __name__ == "__main__":
         test_user_boundary,
         test_base_owner_needs_no_migration,
         test_settings_split_per_user,
+        test_scheduler_runs_per_person,
         test_admin_only_settings,
         test_no_undefined_names,
         test_screens_render_to_response,
