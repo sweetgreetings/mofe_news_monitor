@@ -6708,6 +6708,100 @@ def test_user_boundary():
           "소유자가 없으면 경로는 지금 그대로")
 
 
+def test_settings_split_per_user():
+    """`settings.json`의 칸을 사람별·공용으로 가른 것을 지킨다.
+
+    한 칸에 **각자 자기 것이어야 하는 설정**(검색어·형광펜·보고서 모양)과 **모두에게
+    같이 걸리는 설정**(수집 시간·언론사·자동발송)이 섞여 있어 파일 단위로는 못 갈랐다.
+    그래서 칸 단위로 가르고, 사람별 칸만 `my_settings.json`(저장소 한 겹의 사람별 칸)에
+    적는다.
+
+    이 테스트가 보는 것은 넷이다:
+      ① 새 설정 칸이 생기면 「사람별인가 공용인가」를 정하게 한다(목록이 `_default_settings`를
+         빠짐없이 덮는가)
+      ② **바닥 주인은 예전과 똑같이 공용 파일 한 벌에만 쓴다** — `my_settings.json`을
+         아예 만들지 않는다(그래서 쪼개도 옮길 파일이 0개다)
+      ③ 다른 사람이 검색어를 고치면 자기 파일에만 가고 공용 파일은 안 바뀐다
+      ④ 안 고친 칸은 공용 값을 그대로 쓴다(새 사람이 빈 검색어로 시작하지 않는다)
+    """
+    _require_isolation()
+    from app import settings as settings_mod, store
+
+    # ── ① 칸이 빠짐없이 갈려 있는가 ───────────────────────────────────
+    per_user = settings_mod._PER_USER_SETTING_KEYS
+    shared_known = {
+        "outlet_order", "schedule_groups", "auto_send_enabled", "auto_send_grace_min",
+    }
+    default_keys = set(settings_mod._default_settings())
+    undecided = default_keys - per_user - shared_known
+    assert not undecided, (
+        f"설정 칸이 사람별·공용 어느 쪽인지 안 정해져 있습니다 — {sorted(undecided)}. "
+        "app/settings.py의 _PER_USER_SETTING_KEYS에 넣거나, 공용이면 이 테스트의 "
+        "shared_known에 넣으세요(「내 보고서를 내가 어떻게 만드나」면 사람별, "
+        "「앱이 어떻게 일하나」면 공용)."
+    )
+    assert not (per_user & shared_known), "한 칸이 양쪽에 들어 있습니다."
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        with patch.object(store, "DATA_DIR", tmp_dir), \
+             patch.object(settings_mod, "SETTINGS_FILE", tmp_dir / "settings.json"), \
+             patch.object(settings_mod, "MY_SETTINGS_FILE", tmp_dir / "my_settings.json"):
+            # ── ② 바닥 주인(소유자 없음) — 예전 그대로 ──────────────────
+            assert store.current_owner() is None
+            settings_mod.save_keyword_groups([
+                {"name": "담당자", "keywords": ["재경부"], "mode": "OR",
+                 "include_in_live": True, "include_in_scrap": True},
+            ])
+            settings_mod.save_article_line_template("ㅇ ({outlet}) {title}")
+            assert (tmp_dir / "settings.json").exists()
+            assert not (tmp_dir / "my_settings.json").exists(), (
+                "바닥 주인이 사람별 파일을 만들었습니다 — 그러면 쪼개는 일에 이관이 딸립니다."
+            )
+            base = settings_mod.load_settings()
+            assert [g["name"] for g in base["keyword_groups"]] == ["담당자"]
+
+            # 공용 칸도 바닥 주인이 정한다
+            settings_mod.save_outlet_selection(["KBS", "MBC"])
+            assert settings_mod.load_settings()["outlet_order"] == ["KBS", "MBC"]
+
+            # ── ④ 새 사람은 안 고친 칸을 공용 값으로 물려받는다 ─────────
+            with store.owner("u2"):
+                mine = settings_mod.load_settings()
+                assert [g["name"] for g in mine["keyword_groups"]] == ["담당자"], (
+                    "새 사람이 빈 검색어로 시작했습니다 — 공용 값을 기본값으로 써야 합니다."
+                )
+                assert mine["outlet_order"] == ["KBS", "MBC"]
+
+                # ── ③ 고치면 자기 파일에만 간다 ────────────────────────
+                settings_mod.save_keyword_groups([
+                    {"name": "큐레이터", "keywords": ["설탕세"], "mode": "OR",
+                     "include_in_live": True, "include_in_scrap": True},
+                ])
+                assert (tmp_dir / "users" / "u2" / "my_settings.json").exists()
+                assert [g["name"] for g in settings_mod.load_settings()["keyword_groups"]] == ["큐레이터"]
+
+            # 바닥 주인 것은 그대로다
+            assert [g["name"] for g in settings_mod.load_settings()["keyword_groups"]] == ["담당자"], (
+                "다른 사람이 저장했는데 담당자의 검색어가 바뀌었습니다."
+            )
+
+            # ── 공용 칸은 누가 저장해도 공용 파일로 가고, 사람별 칸을 안 망가뜨린다
+            with store.owner("u2"):
+                settings_mod.save_outlet_selection(["KBS"])
+            assert settings_mod.load_settings()["outlet_order"] == ["KBS"], (
+                "공용 칸이 그 사람 파일에만 적혔습니다."
+            )
+            assert [g["name"] for g in settings_mod.load_settings()["keyword_groups"]] == ["담당자"], (
+                "공용 칸을 저장하면서 공용 파일의 사람별 칸을 덮었습니다."
+            )
+            with store.owner("u2"):
+                assert [g["name"] for g in settings_mod.load_settings()["keyword_groups"]] == ["큐레이터"]
+
+    print("✓ 설정 쪼개기: 검색어·형광펜·보고서 모양은 사람별, 수집 시간·언론사·자동발송은 공용 "
+          "(바닥 주인은 공용 파일 한 벌 그대로)")
+
+
 def test_base_owner_needs_no_migration():
     """**이관 절차가 없다**는 것을 지킨다 — 첫 담당자의 자리가 곧 `data/`이기 때문이다.
 
@@ -6812,6 +6906,13 @@ def test_admin_only_settings():
         "/download-text", "/download-excel", "/download-excel-history",
         "/send-log", "/excel-merge", "/trend", "/trend/download-excel",
         "/hidden", "/agency-archive", "/me", "/me/password", "/logout", "/whoami",
+        # ③ 사용자 경계로 **사람별 설정이 된 것들** — 각자 자기 검색어·자기 보고서
+        # 모양이라 「모두에게 같이 걸리는」이 아니다(app/settings.py
+        # _PER_USER_SETTING_KEYS). 규칙이 바뀐 게 아니라 항목이 규칙 밖으로 나갔다.
+        "/keywords", "/save", "/format", "/save-format",
+        "/subheading-format", "/save-subheading-format",
+        "/format-adhoc", "/save-format-adhoc",
+        "/subheading-format-adhoc", "/save-subheading-format-adhoc",
     ]
     leaked = [p for p in must_stay_open if p in admin_only]
     assert not leaked, (
@@ -6819,7 +6920,7 @@ def test_admin_only_settings():
         "그 화면이 일반 사용자에게서 조용히 죽습니다."
     )
     # 반대로 설정은 빠짐없이 들어 있다
-    for path in ("/keywords", "/save", "/schedule", "/save-schedule", "/outlets",
+    for path in ("/schedule", "/save-schedule", "/outlets",
                  "/telegram", "/email", "/naver", "/llm", "/keys",
                  "/login-settings", "/save-login-settings", "/accounts", "/accounts/role",
                  "/deleted/restore", "/label-manage", "/trend/add-word"):
@@ -6863,7 +6964,7 @@ def test_admin_only_settings():
             # 1) 자물쇠가 꺼져 있으면 아무것도 막지 않는다 — 누구든, 어느 주소든.
             assert not auth_session.is_login_required()
             for user in (None, member, admin):
-                for path in ("/keywords", "/save-naver", "/accounts"):
+                for path in ("/schedule", "/save-naver", "/accounts"):
                     hit, _ = blocked(path, "GET", user)
                     assert not hit, (
                         f"자물쇠가 꺼져 있는데 {path}를 막았습니다 — 혼자 쓰는 앱의 "
@@ -6879,10 +6980,10 @@ def test_admin_only_settings():
             )
             assert users_mod.admin_count() == 1
 
-            hit, _ = blocked("/keywords", "GET", admin)
+            hit, _ = blocked("/schedule", "GET", admin)
             assert not hit, "관리자를 막았습니다."
 
-            hit, stub = blocked("/keywords", "GET", member)
+            hit, stub = blocked("/schedule", "GET", member)
             assert hit and stub.sent == ("html", 403), f"일반 사용자 GET 거절이 틀립니다: {stub.sent}"
 
             hit, stub = blocked("/save-naver", "POST", member)
@@ -6891,11 +6992,12 @@ def test_admin_only_settings():
             )
 
             # 로그인하지 않은 상태도 관리자가 아니다(자물쇠가 먼저 잡지만 여기서도 막는다)
-            hit, _ = blocked("/keywords", "GET", None)
+            hit, _ = blocked("/schedule", "GET", None)
             assert hit, "로그인하지 않은 요청을 관리자로 읽었습니다."
 
             # 3) 설정이 아닌 주소는 그대로 통과 — 형광펜이 대표다
-            for path in ("/keywords/toggle-highlight", "/hide-article", "/send-log"):
+            for path in ("/keywords", "/keywords/toggle-highlight", "/hide-article",
+                         "/send-log", "/format"):
                 hit, _ = blocked(path, "POST", member)
                 assert not hit, f"{path}를 막았습니다 — 큐레이션·읽기는 모두 합니다."
 
@@ -6932,16 +7034,19 @@ def test_admin_only_settings():
     # ── 설정 메뉴 — 일반 사용자에게는 관리자 항목을 안 그린다 ─────────────
     admin_menu = settings_server._menu_html(True)
     member_menu = settings_server._menu_html(False)
-    for path in ("/keywords", "/schedule", "/naver", "/outlets", "/telegram"):
+    for path in ("/schedule", "/naver", "/outlets", "/telegram"):
         assert f'href="{path}"' in admin_menu, f"관리자 메뉴에 {path}가 없습니다."
         assert f'href="{path}"' not in member_menu, (
             f"일반 사용자 메뉴에 {path}가 남아 있습니다."
         )
-    for path in ("/send-log", "/excel-merge"):
+    for path in ("/send-log", "/excel-merge", "/keywords", "/format"):
         assert f'href="{path}"' in member_menu, f"일반 사용자 메뉴에 {path}가 없습니다."
     # 묶음이 통째로 비면 묶음 이름도 안 그린다
-    assert "정기</div>" not in member_menu and "연동</div>" not in member_menu, (
-        "항목이 하나도 없는 묶음 이름이 남아 있습니다."
+    # 「연동」은 통째로 관리자 몫이라 묶음 이름도 안 그린다. 「정기」는 검색어·형식이
+    # 사람별이 되어 일반 사용자에게도 남는다(그 묶음의 수집시간대·발송만 빠진다).
+    assert "연동</div>" not in member_menu, "항목이 하나도 없는 묶음 이름이 남아 있습니다."
+    assert "발송 · 알림" not in member_menu, (
+        "그 아래 항목이 전부 관리자 몫인 소제목이 남아 있습니다."
     )
 
     print("✓ 관리자 권한: 설정은 관리자만(자물쇠가 꺼져 있으면 안 막음), 형광펜·큐레이션은 모두, 마지막 관리자는 못 내림")
@@ -8309,6 +8414,7 @@ if __name__ == "__main__":
         test_storage_goes_through_one_place,
         test_user_boundary,
         test_base_owner_needs_no_migration,
+        test_settings_split_per_user,
         test_admin_only_settings,
         test_no_undefined_names,
         test_screens_render_to_response,

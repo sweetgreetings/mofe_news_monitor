@@ -71,6 +71,9 @@ _PER_USER = {
     "manual_articles.json",
     # 내가 쓴 한 줄 메모 · 내가 끊은 회차 · 내 되돌리기
     "manual_keyword_note.json", "today_cuts.json", "undo_stack.json",
+    # 내가 고친 설정 칸만(검색어·형광펜·보고서 모양 — app/settings.py
+    # _PER_USER_SETTING_KEYS). 안 고친 칸은 공용 settings.json 값을 쓴다.
+    "my_settings.json",
     # 내 회차에 딸린 캐시 — 남의 회차 분류를 내 회차에 쓰면 소제목이 섞인다
     "llm_classification_cache.json", "preview_cache.json",
     "auto_classify_turns.json", "negative_guess.json",

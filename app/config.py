@@ -857,6 +857,9 @@ SUMMARY_MAX_CHARS = 250
 # archive/DESIGN.md §3 — SQLite 대신 로컬 JSON 파일로 기사 데이터 저장
 DATA_DIR = BASE_DIR / "data"
 SETTINGS_FILE = DATA_DIR / "settings.json"
+# 사람별 설정 — 그 사람이 고친 칸만 든다(안 고친 칸은 settings.json 값을 쓴다).
+# 저장소 한 겹의 **사람별 칸**이라 사람마다 자기 폴더로 풀린다(app/store.py _PER_USER).
+MY_SETTINGS_FILE = DATA_DIR / "my_settings.json"
 # [추가: 2026-08-20] 설정 화면(/naver, /llm)에서 등록한 네이버·Claude 키 저장소 —
 # app.credentials 참고. 하나로 합친 이유: 두 화면의 저장·마스킹·연결 테스트·삭제
 # 로직이 완전히 동일해 모듈도 하나로 충분하고, 앞으로 다른 연동 키(텔레그램 토큰,

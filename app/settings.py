@@ -24,6 +24,7 @@ from app.config import (
     OUTLET_ORDER_JUMP_STEP,
     MIN_SCHEDULE_TIMES,
     SCHEDULE_TIMES,
+    MY_SETTINGS_FILE,
     SETTINGS_FILE,
     WEEKDAY_KEYS,
     WEEKDAY_LABELS_KO,
@@ -108,8 +109,88 @@ def _migrate_keyword_groups(old_keywords: list, old_mode: str) -> list:
     return groups
 
 
-def _write(settings: dict) -> None:
+# ──────────────── 사람별 설정인가 공용 설정인가 ────────────────
+# `settings.json` 한 칸에 **각자 자기 것이어야 하는 설정**(검색어·형광펜·보고서 모양)과
+# **모두에게 같이 걸리는 설정**(수집 시간·언론사·자동발송)이 섞여 있었다. 파일 단위로는
+# 못 가르므로 **칸 단위로** 가른다 — 아래 목록이 그 결정이다.
+#
+# **가르는 기준은 저장소 경계와 같다**(CLAUDE.md 「구조」): 「내 보고서를 내가 어떻게
+# 만드나」는 사람별, 「앱이 어떻게 일하나」는 공용.
+#
+# **사람별 칸이 사는 자리는 `my_settings.json`**이고, 그 파일은 저장소 한 겹의 사람별
+# 칸이라(`app/store.py` `_PER_USER`) 사람마다 자기 폴더로 풀린다.
+#
+# **공용 파일이 곧 새로 들어온 사람의 기본값이다** — 자기 파일에 없는 칸은 공용 값을
+# 그대로 쓴다. 그래서 새 사람이 빈 검색어로 시작하지 않고, 담당자가 1년 동안 다듬어 온
+# 그 검색어를 받아 시작한 뒤 고치면 자기 것이 된다(고치기 전까지는 담당자가 바꾸면
+# 따라 바뀐다 — 「아직 내 것으로 만들지 않은 칸」이라 그게 맞다).
+_PER_USER_SETTING_KEYS = {
+    # 내 검색어 — 각자 자기 검색어로 자기 회차를 쌓는다(회차도 사람별이다)
+    "keyword_groups",
+    # 그 검색어에 기관 그룹을 한 번 심었는지 — 검색어와 한 몸이다
+    "base_group_seeded",
+    # 내 형광펜 — 긋는 자리가 확정본·초안·오늘 전체 기사 좌하단 🖍️라 큐레이션이다
+    "highlight_keywords",
+    # 내 보고서 모양 — 정기·수시 기사 줄과 소제목 형식
+    "article_line_template", "subheading_format_template",
+    "adhoc_article_line_template", "adhoc_subheading_format_template",
+}
+
+
+def _write_shared(settings: dict) -> None:
+    """공용 파일에 **통째로** 쓴다 — 옛 형식을 옮길 때만 쓴다(`load_settings`).
+
+    사람별 값을 덮어씌우는 경로가 아니다. 설정을 저장하는 길은 `_write`다.
+    """
     store.write_json(SETTINGS_FILE, settings, indent=2)
+
+
+def _write(settings: dict) -> None:
+    """설정을 저장한다 — 사람별 칸과 공용 칸을 갈라 쓴다.
+
+    **「바닥」의 주인(소유자가 안 걸린 상태)은 예전과 똑같이 공용 파일 한 벌에 쓴다** —
+    그 사람의 자리가 곧 `data/`이고(`app/users.py` `base_owner_id`), 그래서 **쪼개도
+    옮길 파일이 0개다.** 혼자 쓰는 지금이 이 경우다.
+
+    소유자가 걸린 요청(= 바닥 주인이 아닌 사람)은 사람별 칸만 자기 파일에 적고, 공용
+    칸은 공용 파일의 **그 칸만** 고친다 — 통째로 덮으면 남의 사람별 값까지 자기 값으로
+    바꿔 버린다.
+    """
+    if store.current_owner() is None:
+        _write_shared(settings)
+        return
+
+    mine = {key: settings[key] for key in _PER_USER_SETTING_KEYS if key in settings}
+    store.write_json(MY_SETTINGS_FILE, mine, indent=2)
+
+    try:
+        shared = store.read_json(SETTINGS_FILE)
+    except (OSError, ValueError):
+        shared = {}
+    if not isinstance(shared, dict):
+        shared = {}
+    shared.update(
+        {key: value for key, value in settings.items() if key not in _PER_USER_SETTING_KEYS}
+    )
+    store.write_json(SETTINGS_FILE, shared, indent=2)
+
+
+def _apply_my_settings(settings: dict) -> dict:
+    """내가 고친 사람별 칸을 공용 값 위에 덮는다. 안 고친 칸은 공용 값 그대로."""
+    if store.current_owner() is None:
+        return settings  # 바닥 주인 — 공용 파일이 곧 자기 것이다
+    if not store.exists(MY_SETTINGS_FILE):
+        return settings
+    try:
+        mine = store.read_json(MY_SETTINGS_FILE)
+    except (OSError, ValueError):
+        return settings
+    if not isinstance(mine, dict):
+        return settings
+    for key, value in mine.items():
+        if key in _PER_USER_SETTING_KEYS:
+            settings[key] = value
+    return settings
 
 
 def _migrate_schedule_times(raw_times: list) -> list:
@@ -139,8 +220,8 @@ def load_settings() -> dict:
     """
     if not SETTINGS_FILE.exists():
         settings = _default_settings()
-        _write(settings)
-        return settings
+        _write_shared(settings)
+        return _apply_my_settings(settings)
     settings = store.read_json(SETTINGS_FILE)
     settings.setdefault("outlet_order", [])
     settings.setdefault("highlight_keywords", [dict(item) for item in DEFAULT_HIGHLIGHT_KEYWORDS])
@@ -176,14 +257,14 @@ def load_settings() -> dict:
         settings["highlight_keywords"] = [
             {"word": word, "color": i % len(HIGHLIGHT_COLORS)} for i, word in enumerate(raw_highlight)
         ]
-        _write(settings)
+        _write_shared(settings)
 
     if "keywords" in settings:
         settings["keyword_groups"] = _migrate_keyword_groups(
             settings.pop("keywords"), settings.pop("mode", "OR")
         )
         settings["base_group_seeded"] = True
-        _write(settings)
+        _write_shared(settings)
     settings.setdefault("keyword_groups", [])
 
     # [추가: 2026-07-25] 기관 정보 그룹을 고정 주입에서 "최초 1회만 심어주는 기본값"으로
@@ -193,7 +274,7 @@ def load_settings() -> dict:
     if not settings.get("base_group_seeded"):
         settings["keyword_groups"] = [_base_group()] + settings["keyword_groups"]
         settings["base_group_seeded"] = True
-        _write(settings)
+        _write_shared(settings)
 
     # [추가: 2026-07-25] "정기 스크랩 포함" 플래그 도입 이전에 저장된 그룹에는 이 필드가
     # 없다 — 없으면 켬으로 간주한다(하위 호환: 이 필드가 생겼다고 기존에 스크랩되던
@@ -239,7 +320,7 @@ def load_settings() -> dict:
             group["enabled"] = in_use
             changed = True
     if changed:
-        _write(settings)
+        _write_shared(settings)
 
     # [수정: 2026-07-29] 스크랩 시간대 "그룹"(주중/주말처럼 세트를 여러 개 두고 그 중
     # 1개만 활성) 도입 — 이전 저장분(schedule_groups가 아예 없음)은 그때까지의
@@ -257,7 +338,7 @@ def load_settings() -> dict:
             {"name": DEFAULT_SCHEDULE_GROUP_NAME, "times": raw_schedule, "enabled": True, "days": []}
         ]
         settings.pop("schedule_times", None)
-        _write(settings)
+        _write_shared(settings)
 
     # [수정: 2026-08-10] 그룹당 라디오 "active"(정확히 1개만 켜짐) 대신, 그룹마다 독립적인
     # "enabled" on/off + "days"(요일) 체크로 바뀌었다 — 이전 저장분("active" 필드가 있고
@@ -277,8 +358,8 @@ def load_settings() -> dict:
             group["days"] = []
             schedule_groups_changed = True
     if schedule_groups_changed:
-        _write(settings)
-    return settings
+        _write_shared(settings)
+    return _apply_my_settings(settings)
 
 
 def validate_article_line_template(template: str) -> str:

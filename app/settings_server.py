@@ -1708,19 +1708,20 @@ def _credential_badge(source: str) -> str:
 # 메뉴 순서·글자는 예전 템플릿 그대로다(시안 mockups/SETTINGS_MENU_REORG_MOCKUP.html).
 _MENU_GROUPS = [
     ("정기", "category flow reg", [
-        ("link", "/keywords", "검색어", "", None, True),
+        # 검색어·보고서 모양은 사람별 설정이라 모두 자기 것을 고친다(③ 사용자 경계)
+        ("link", "/keywords", "검색어", "", None, False),
         ("link", "/schedule", "수집시간대", "", None, True),
         ("sub", "텍스트 표출 형식", False),
-        ("link", "/format", "기사 제목", "", None, True),
-        ("link", "/subheading-format", "소제목", "", None, True),
+        ("link", "/format", "기사 제목", "", None, False),
+        ("link", "/subheading-format", "소제목", "", None, False),
         ("sub", "발송 · 알림", False),
         ("link", "/auto-send", "자동발송 대기시간 및 ON/OFF", "", None, True),
         ("link", "/breaking-alert", "[단독]·[속보] 기사 알림", "", None, True),
     ]),
     ("수시", "category flow adhoc", [
         ("sub", "텍스트 표출 형식", True),
-        ("link", "/format-adhoc", "기사 제목", "", None, True),
-        ("link", "/subheading-format-adhoc", "소제목", "", None, True),
+        ("link", "/format-adhoc", "기사 제목", "", None, False),
+        ("link", "/subheading-format-adhoc", "소제목", "", None, False),
     ]),
     ("정기, 수시 공통", "category", [
         ("link", "/outlets", "언론사 선택 및 순서 지정", "", None, True),
@@ -1766,16 +1767,15 @@ _MENU_GROUPS = [
 # **③ 사용자 경계가 들어오면 여기서 빠지는 항목이 생긴다** — 검색어·받는 사람·형식이
 # 사람별로 갈리는 순간 「모두에게 같이 걸리는」이 아니게 되므로 규칙이 저절로 그것들을
 # 내보낸다(MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 3번).
+# **③ 사용자 경계가 들어오면서 여기서 빠진 것들이 있다** — 검색어(`/keywords`·`/save`)와
+# 보고서 모양(`/format`·`/subheading-format`과 수시 둘)은 이제 사람별 설정이라
+# (`app/settings.py` `_PER_USER_SETTING_KEYS`) 「모두에게 같이 걸리는」이 아니다.
+# 규칙이 바뀐 게 아니라 **그 항목이 규칙 밖으로 나간 것**이다.
 _ADMIN_ONLY_PATHS = {
-    # 정기 설정
-    "/keywords", "/save",
+    # 정기 설정 — 모두에게 같이 걸리는 것만 남았다
     "/schedule", "/save-schedule", "/schedule/add-group", "/schedule/add-slot",
-    "/format", "/save-format", "/subheading-format", "/save-subheading-format",
     "/auto-send", "/save-auto-send",
     "/breaking-alert", "/save-breaking-alert",
-    # 수시 설정
-    "/format-adhoc", "/save-format-adhoc",
-    "/subheading-format-adhoc", "/save-subheading-format-adhoc",
     # 공통 설정
     "/outlets", "/save-outlets", "/move-outlet",
     "/deleted", "/deleted/restore", "/deleted/empty", "/history/delete-runs",
