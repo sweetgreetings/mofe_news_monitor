@@ -3018,7 +3018,7 @@ def test_telegram_recipients_receive_and_notify():
             mock_post.reset_mock()
 
             # 4) 메시지 짓기
-            text = "언론 모니터링 14시 기준\n- 메모\n\n<소제목>\nㅇ (KBS) 제목\nhttps://a.x\n"
+            text = "언론 모니터링 14시 기준\n메모\n\n<소제목>\nㅇ (KBS) 제목\nhttps://a.x\n"
             summary = "🤖 AI가 읽은 소제목별 주요 요약\n\n<소제목>\n요약 문장."
             people = [
                 {"chat_id": "a", "regular_articles": True, "regular_summary": False},
@@ -3027,7 +3027,7 @@ def test_telegram_recipients_receive_and_notify():
             ]
             plan = {tuple(ids): msg for msg, ids in report_message.plan_messages(people, "regular", text, summary)}
             assert plan[("a",)] == text
-            assert plan[("s",)] == "언론 모니터링 14시 기준\n- 메모\n\n" + summary + "\n", plan[("s",)]
+            assert plan[("s",)] == "언론 모니터링 14시 기준\n메모\n\n" + summary + "\n", plan[("s",)]
             assert plan[("b",)].startswith(text.rstrip()) and plan[("b",)].rstrip().endswith("요약 문장."), "둘 다면 한 통"
             for label, kwargs in (("요약 없음", {"summary": ""}), ("AI 분류 실패", {"degraded": True})):
                 args = {"summary": summary, "degraded": False, **kwargs}
@@ -3487,6 +3487,70 @@ def test_keyword_note_history_and_time_select():
     assert '<option value="15"' not in sel, "지나지 않은 시각이 목록에 있다"
     assert sel.index('value="50"') < sel.index('value="56"'), "목록에 없는 분이 제자리에 안 들어갔다"
     print("41) 지난 회차 메모 · 수시 시간 드롭다운: 통과 (오늘 앞 회차만·어제 안 가져옴·최신 5줄·같은 문구 합침·시각만 적음, 숨은 입력·분 끼우기)")
+
+
+def test_keyword_note_goes_out_as_typed():
+    """한 줄 메모는 **적은 글자 그대로** 머리줄 다음 줄에 나간다 — 앱이 글머리 기호를 안 붙인다.
+
+      1) 확정본·초안이 같은 자리·같은 글자(메모 줄을 한쪽만 고치면 여기서 깨진다)
+      2) 담당자가 「- 」를 직접 넣으면 그 글자가 그대로 한 번만 나간다(앱이 겹쳐 붙이지 않는다)
+      3) 소제목별 복사(header=False)엔 메모가 없다
+      4) 메모가 비면 메모 줄 자체가 없다(빈 줄이 하나 더 생기지 않는다)
+      5) 정기 보관함 로데이터엔 메모가 아예 안 나간다(사용자 결정 — "이건 로데이터 개념이니까")
+    """
+    from app import manual_keyword_note as mkn
+    from app.renderer import _build_plain_text
+    from app.preview_renderer import _build_preview_plain_text
+    from app.history_renderer import _build_slot_plain_text
+    from app.config import (
+        DEFAULT_ARTICLE_LINE_TEMPLATE as LINE,
+        DEFAULT_SUBHEADING_FORMAT_TEMPLATE as SUB,
+    )
+
+    groups = [{"name": "세제", "articles": [{"outlet": "KBS", "title": "제목", "url": "https://a.x"}]}]
+    note = "물가 동향, 공공기관 이전"
+    day, slot = "2026-09-22", "14:00"
+
+    # 1) 머리줄 바로 다음 줄이 적은 글자 그대로 — 앞에 아무것도 안 붙는다
+    conf = _build_plain_text(slot, groups, LINE, {}, SUB, run_date=day, note=note).split("\n")
+    assert conf[0] == "언론 모니터링 14시 기준", conf[0]
+    assert conf[1] == note, f"메모 줄에 앱이 기호를 붙였다: {conf[1]!r}"
+    assert conf[2] == "" and conf[3] == "<세제>", conf[:4]
+    draft = _build_preview_plain_text({"end": slot}, groups, LINE, {}, SUB, note=note).split("\n")
+    assert draft[0] == "[초안] 언론 모니터링 14시 기준", draft[0]
+    # 머리줄만 다르고 그 아래는 글자까지 같다 — 두 자리 중 한쪽만 고치면 여기서 깨진다
+    assert draft[1:] == conf[1:], f"초안과 확정본의 메모 아래가 다르다\n{draft[1:]}\n{conf[1:]}"
+
+    # 2) 담당자가 직접 넣은 기호는 그대로 한 번만 — 앱이 「- - 」로 겹쳐 쓰지 않는다
+    typed = "- 담당자가 직접 넣은 대시"
+    for name, text in (
+        ("확정본", _build_plain_text(slot, groups, LINE, {}, SUB, run_date=day, note=typed)),
+        ("초안", _build_preview_plain_text({"end": slot}, groups, LINE, {}, SUB, note=typed)),
+    ):
+        assert f"\n{typed}\n" in text, f"{name}: 직접 넣은 기호가 안 나갔다"
+        assert "- - " not in text, f"{name}: 앱이 기호를 겹쳐 붙였다"
+
+    # 3) 소제목별 복사엔 메모가 없다(그 복사는 소제목 이름 + 기사만 담는다)
+    assert note not in _build_plain_text(slot, groups, LINE, {}, SUB, run_date=day, note=note, header=False)
+    assert note not in _build_preview_plain_text({"end": slot}, groups, LINE, {}, SUB, note=note, header=False)
+
+    # 4) 메모가 비면 메모 줄 자체가 없다 — 빈 줄이 하나 더 생기지 않는다
+    empty = _build_plain_text(slot, groups, LINE, {}, SUB, run_date=day, note="").split("\n")
+    assert empty[:3] == ["언론 모니터링 14시 기준", "", "<세제>"], empty[:3]
+
+    # 5) 저장된 메모를 그대로 읽어 싣는다(화면과 내보내기가 같은 값을 본다)
+    mkn.save_manual_keyword_note(note, (day, slot))
+    auto = _build_plain_text(slot, groups, LINE, {}, SUB, run_date=day).split("\n")
+    assert auto[1] == note, f"저장된 메모가 안 실렸다: {auto[:3]}"
+
+    # 6) 정기 보관함 로데이터엔 메모가 아예 안 나간다 — 그 화면은 원본 그대로만 담는다
+    run = {"run_at": f"{day}T14:00:00+09:00", "run_slot": slot}
+    articles = [{"outlet": "KBS", "title": "제목", "url": "https://a.x", "group": "세제"}]
+    raw = _build_slot_plain_text(run, articles, {}, LINE, SUB)
+    assert raw.startswith(f"{day} {slot} 기준"), raw.split("\n")[0]
+    assert note not in raw, "보관함 로데이터에 메모가 샜다"
+
+    print("✓ 한 줄 메모: 적은 글자 그대로 머리줄 다음 줄(확정본·초안 같은 모양), 직접 넣은 기호 유지, 소제목별 복사·보관함 로데이터엔 없음")
 
 
 def test_telegram_bot_name():
@@ -7595,6 +7659,7 @@ if __name__ == "__main__":
         test_breaking_alert_same_article_once,
         test_add_article_by_url,
         test_keyword_note_history_and_time_select,
+        test_keyword_note_goes_out_as_typed,
         test_today_cut_round,
         test_breaking_burst_alert,
         test_breaking_alert_folds_same_event,
