@@ -2036,12 +2036,12 @@ def render_history_day_fragment(
     )
 
 
-def generate_history_page(
+def history_page_html(
     highlight_words: Optional[list] = None,
     line_template: Optional[str] = None,
     subheading_format: Optional[str] = None,
-) -> Path:
-    """저장된 모든 회차(보관 정책 RETENTION_DAYS와 연동)를 history.html로 렌더링한다."""
+) -> str:
+    """저장된 모든 회차(보관 정책 RETENTION_DAYS와 연동)로 정기 보관함 화면을 그린다."""
     if highlight_words is None or line_template is None or subheading_format is None:
         settings = load_settings()
         highlight_words = highlight_words if highlight_words is not None else settings["highlight_keywords"]
@@ -2076,5 +2076,21 @@ def generate_history_page(
         deleted_runs=list_deleted_runs(), latest_key=latest_key, empty_keys=empty_keys,
         day_delete=_day_delete_targets(metas, latest_key, now=now),
     )
-    atomic_write_text(HISTORY_HTML_PATH, html_text)
+    return html_text
+
+
+def generate_history_page(
+    highlight_words: Optional[list] = None,
+    line_template: Optional[str] = None,
+    subheading_format: Optional[str] = None,
+) -> Path:
+    """정기 보관함을 그려 `history.html`로도 남긴다(그 파일을 열어 둔 탭을 위해).
+
+    서버는 이 함수를 쓰지 않는다 — 요청마다 `history_page_html()`이 돌려주는 글을
+    그대로 응답한다(MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 2번).
+    """
+    atomic_write_text(
+        HISTORY_HTML_PATH,
+        history_page_html(highlight_words, line_template, subheading_format),
+    )
     return HISTORY_HTML_PATH

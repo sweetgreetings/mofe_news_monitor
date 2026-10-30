@@ -72,7 +72,13 @@
 
 FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN.md §3).
 
-- **웹 프레임워크 없음.** 파이썬이 정적 HTML(`index.html`, `history.html`, `home.html`, `preview.html`, `live.html`)을 다시 만든다.
+- **웹 프레임워크 없음.** 파이썬이 화면 HTML을 짓는다.
+- **화면 다섯은 요청마다 다시 그려 그 글을 그대로 응답한다** — 확정본(`/index.html`) · 정기 보관함(`/history.html`) · 홈(`/home.html`) · 초안(`/preview.html`) · 오늘 전체 기사(`/live.html`). 파일을 썼다가 그 파일을 다시 읽어 내보내던 방식은 걷었다 — **사람마다 다른 화면을 주려면 파일 한 벌로는 안 되고**(MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 2번), 한 사람의 화면을 공용 파일에 쓰는 것 자체가 다른 사람의 화면을 덮는 일이다.
+  - **렌더러마다 둘로 갈린다** — `*_html()`은 **글만 돌려주고**(`screen_page_html`·`history_page_html`·`landing_page_html`·`preview_page_html`·`live_page_or_wait_html`, 그리고 저장된 회차가 없을 때의 `waiting_page_html`), `generate_*()`은 그 글을 파일로도 남기는 얇은 껍데기다. **서버는 앞쪽만 쓴다.**
+  - **파일(`index.html` 등)은 여전히 남는다** — 스케줄러·확정(`app/confirm_send.py`)·큐레이션(`_regenerate_screens`)이 `generate_*`를 불러 갱신하므로, 그 파일을 열어 둔 탭은 예전처럼 새로고침만으로 최신 상태를 본다. **서버 요청은 그 파일을 만들지도 읽지도 않는다.**
+  - 라우트 표는 `app/settings_server.py` `_SCREEN_HTML_ROUTES` 한 곳이고, 확정본만 껍데기를 하나 더 지난다(`_confirmed_screen_html` — 저장된 회차가 없으면 `RuntimeError`를 받아 안내 화면으로 바꾼다. main.py가 파일을 만들 때와 같은 갈래다).
+  - 그리는 비용은 실측으로 작다 — **확정본 16ms · 정기 보관함 33ms · 홈 33ms**(초안·오늘 전체 기사는 네이버를 부르는 화면이라 예전에도 요청마다 다시 그렸다). 파일을 안 쓰므로 요청당 디스크 쓰기·읽기 두 번이 사라진다(보관함은 한 벌이 1.5MB다).
+  - `tests/test_integration.py` `test_screens_render_to_response`가 이 상태를 지킨다. → H: 동적 렌더링
 - **예외 하나: `app/settings_server.py`** — `http.server`만 쓰는 `127.0.0.1:8765` 서버. 설정 저장·큐레이션을 처리하고 정적 화면도 같은 출처로 서빙한다(브라우저가 `http://` → `file://` 이동을 막으므로).
   - **이 포트가 곧 중복 실행 자물쇠다.** `main.py`가 데이터를 건드리는 어떤 단계보다 먼저, main 스레드에서 동기로 bind한다. `OSError`면 이미 켜진 앱의 홈만 브라우저로 열고 바로 끝낸다. PID 파일은 쓰지 않는다(강제 종료 시 죽은 자물쇠가 남는다). **새 백그라운드 작업은 반드시 이 자물쇠 뒤에 둔다.** → H: 앱 중복 실행
 - **저장소: `data/` 아래 JSON 파일.** SQLite 없음. **읽고 쓰는 자리는 `app/store.py` 한 겹이다** — 저장 모듈 42개가 「파일인지 DB인지」를 모르게 한다(여러 사람이 쓰게 될 때 고칠 자리를 한 곳으로 모은 것, MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 1번). `read_json`/`write_json` · `read_text`/`write_text` · `exists`/`delete`/`move`/`ensure_dir`/`list_files`/`signature`, 그리고 그 자리의 논리 이름을 돌려주는 `key_of`(`DATA_DIR` 기준 상대 경로 — DB로 가면 행을 찾는 열이 될 값이다).

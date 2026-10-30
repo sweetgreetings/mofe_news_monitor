@@ -1200,7 +1200,7 @@ def _report_articles(runs: list) -> list:
     return articles
 
 
-def generate_landing_page() -> Path:
+def landing_page_html() -> str:
     """오늘 저장된 모든 회차를 합쳐 home.html을 렌더링한다.
 
     기사 스크랩(수집)과는 별개 파이프라인이다 — 이미 저장된 회차 데이터를 읽어
@@ -1224,5 +1224,14 @@ def generate_landing_page() -> Path:
         last_run=last_run,
         runs_today=runs_today,
     )
-    atomic_write_text(LANDING_HTML_PATH, html_text)
+    return html_text
+
+
+def generate_landing_page() -> Path:
+    """홈을 그려 `home.html`로도 남긴다(그 파일을 열어 둔 탭을 위해).
+
+    서버는 이 함수를 쓰지 않는다 — 요청마다 `landing_page_html()`이 돌려주는 글을
+    그대로 응답한다(MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 2번).
+    """
+    atomic_write_text(LANDING_HTML_PATH, landing_page_html())
     return LANDING_HTML_PATH

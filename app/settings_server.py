@@ -25,8 +25,6 @@ from app.config import (
     FONT_STACK,
     HIDDEN_VIEW_DAYS,
     HIGHLIGHT_COLORS,
-    HISTORY_HTML_PATH,
-    LANDING_HTML_PATH,
     LOGO_PATH,
     MAX_AUTO_SEND_GRACE_MIN,
     EMAIL_SERVICES,
@@ -40,7 +38,6 @@ from app.config import (
     MIN_SCHEDULE_TIMES,
     NAVER_DAILY_CALL_LIMIT,
     OUTLET_ORDER_JUMP_STEP,
-    OUTPUT_HTML_PATH,
     PALETTE,
     SETTINGS_SERVER_HOST,
     SETTINGS_SERVER_PORT,
@@ -124,6 +121,7 @@ from app.history_renderer import (
     build_excel_rows_for_dates,
     excel_filename_for_dates,
     generate_history_page,
+    history_page_html,
     preset_range as history_preset_range,
     render_history_day_fragment,
     render_history_search_page,
@@ -138,8 +136,8 @@ from app.excel_merge import ASSIGN_REASONS, TableReadError, assign_subheadings, 
 from app.excel_merge_renderer import render_excel_merge_page
 from app.trend_renderer import render_trend_page
 from app.trend_export import build_trend_workbook_bytes
-from app.landing_renderer import generate_landing_page
-from app.live_renderer import generate_live_page_or_wait
+from app.landing_renderer import generate_landing_page, landing_page_html
+from app.live_renderer import live_page_or_wait_html
 from app.manual_articles import (
     add_manual_article,
     add_manual_articles,
@@ -203,7 +201,7 @@ from app.scheduler import next_pending_slot
 from app.preview_renderer import (
     _compute_preview_articles,
     current_draft_urls,
-    generate_preview_page,
+    preview_page_html,
     preview_bulk_move_articles,
     preview_move_article,
     preview_reorder_article,
@@ -215,6 +213,8 @@ from app.renderer import (
     apply_subheading_format,
     build_group_copy_texts,
     generate_screen,
+    screen_page_html,
+    waiting_page_html,
     known_label_chips_html,
     refetch_title_marks,
     refetch_titles_button_html,
@@ -1576,12 +1576,33 @@ def render_login_settings_page(error: str = "") -> str:
     )
 
 
-_STATIC_HTML_ROUTES = {
-    "/index.html": lambda: OUTPUT_HTML_PATH,
-    "/history.html": lambda: HISTORY_HTML_PATH,
+def _confirmed_screen_html() -> str:
+    """확정본 — 저장된 회차가 하나도 없으면 안내 화면으로 바꿔 놓는다.
+
+    `screen_page_html`은 그때 RuntimeError를 올린다(main.py가 파일을 만들 때와 같은
+    갈래다). 여기서 받아 안내 화면을 돌려주므로 화면이 죽은 링크처럼 보이지 않는다.
+    """
+    try:
+        return screen_page_html()
+    except RuntimeError:
+        return waiting_page_html()
+
+
+# 화면 다섯은 **요청마다 다시 그려 그 글을 그대로 응답한다** — 파일을 썼다가 그 파일을
+# 다시 읽어 내보내던 방식을 걷었다. 사람마다 다른 화면을 주려면 파일 한 벌로는 안 되고
+# (MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 2번), 그리는 비용은 실측으로 작다
+# (확정본 24ms · 정기 보관함 39ms · 홈 39ms). 초안·오늘 전체 기사는 네이버를 부르는
+# 화면이라 예전에도 요청마다 다시 그렸다.
+#
+# `generate_*` 쪽(파일로도 남기는 얇은 껍데기)은 그대로 남아 있다 — 스케줄러·확정·
+# 큐레이션이 그걸 불러 `index.html` 등을 갱신하므로, 그 파일을 열어 둔 탭도 예전처럼
+# 새로고침만으로 최신 상태를 본다.
+_SCREEN_HTML_ROUTES = {
+    "/index.html": _confirmed_screen_html,
+    "/history.html": history_page_html,
     # home.html은 다른 둘과 달리, 열 때마다 당일 누적분을 새로 집계해 보여준다
     # (사용자 요청) — 접속 시점에 매번 generate_landing_page()를 다시 실행한 뒤 그 결과를 서빙.
-    "/home.html": generate_landing_page,
+    "/home.html": landing_page_html,
     # [추가: 2026-07-25] 실시간 기사 현황 — 열 때마다(새로고침 포함) 당일 0시~현재를
     # 라이브로 다시 검색한다(app.live_renderer.generate_live_page 문서 참고).
     # [수정: 2026-09-28] 화면의 「자동 새로고침」이 켜져 있으면 그 화면이 고른 주기(5·10·
@@ -1589,12 +1610,12 @@ _STATIC_HTML_ROUTES = {
     # HTML을 목록에 반영할지는 화면이 정한다(새 기사가 있을 때 띠로 알리고, 담당자가
     # 누를 때만 갈아끼운다).
     # [수정: 2026-08-13] 콜드 캐시(오늘 처음 보는 키워드가 있음)일 땐 이 요청 스레드가
-    # 수십~백여 초씩 블로킹되는 대신, generate_live_page_or_wait이 즉시 대기 화면을
+    # 수십~백여 초씩 블로킹되는 대신, live_page_or_wait_html이 즉시 대기 화면을
     # 돌려주고 실제 검색은 백그라운드 스레드에서 진행한다(app.live_renderer 참고).
-    "/live.html": generate_live_page_or_wait,
+    "/live.html": live_page_or_wait_html,
     # [추가: 2026-07-27] 다음 회차 미리보기 — 열 때마다(새로고침 포함) 진행 중인 회차의
     # 시작~현재 시각으로 다시 검색·분류한다. 저장은 하지 않는다(app.preview_renderer 참고).
-    "/preview.html": generate_preview_page,
+    "/preview.html": preview_page_html,
 }
 
 
@@ -5888,8 +5909,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self._auth_blocked():
             return
-        if self.path in _STATIC_HTML_ROUTES:
-            self._respond_static_html(_STATIC_HTML_ROUTES[self.path]())
+        if self.path in _SCREEN_HTML_ROUTES:
+            self._respond(_SCREEN_HTML_ROUTES[self.path]())
         elif self.path.startswith("/history.html?"):
             # 낱말로 찾기 — **같은 주소**에 q가 붙어 온다(화면이 하나다). 기간 조회와
             # 달리 서버가 찾는다: 이 화면은 최근 이틀치 기사만 미리 그려 두고 나머지는
@@ -6308,7 +6329,7 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         word = (query.get("q", [""])[0] or "").strip()
         if not word:
-            self._respond_static_html(HISTORY_HTML_PATH)
+            self._respond(history_page_html())
             return
         preset = query.get("preset", [""])[0]
         if preset:
@@ -8806,17 +8827,6 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
-
-    def _respond_static_html(self, path) -> None:
-        """index.html/history.html/home.html을 같은 127.0.0.1 출처로 그대로 서빙한다.
-
-        파일이 아직 없으면(예: 오늘 첫 스크랩 전) 404 대신 안내 문구를 보여준다 —
-        설정 화면에서 "메인 화면으로"를 눌렀는데 그냥 죽은 링크처럼 보이지 않도록.
-        """
-        if not path.exists():
-            self._respond('<p style="font-family:sans-serif;padding:24px;">아직 생성된 화면이 없습니다.</p>', status=404)
-            return
-        self._respond(path.read_text(encoding="utf-8"))
 
     def _respond_download(self, text: str, filename: str) -> None:
         """텍스트를 파일 다운로드로 응답한다(data: URI 대신 — _handle_download_text 참고).

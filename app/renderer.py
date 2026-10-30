@@ -6865,18 +6865,23 @@ def schedule_override_script() -> str:
     return SCHEDULE_OVERRIDE_SCRIPT % {"host": SETTINGS_SERVER_HOST, "port": SETTINGS_SERVER_PORT}
 
 
+def waiting_page_html() -> str:
+    """오늘 첫 회차가 아직 끝나지 않았을 때 확정본 대신 보여줄 안내 화면."""
+    return _waiting_page_html()
+
+
 def generate_waiting_page() -> Path:
-    """오늘 첫 회차가 아직 끝나지 않았을 때 index.html 대신 보여줄 안내 화면을 만든다."""
-    atomic_write_text(OUTPUT_HTML_PATH, _waiting_page_html())
+    """그 안내 화면을 `index.html`로도 남긴다(그 파일을 열어 둔 탭을 위해)."""
+    atomic_write_text(OUTPUT_HTML_PATH, waiting_page_html())
     return OUTPUT_HTML_PATH
 
 
-def generate_screen(
+def screen_page_html(
     keywords: Optional[list] = None,
     highlight_words: Optional[list] = None,
     line_template: Optional[str] = None,
     subheading_format: Optional[str] = None,
-) -> Path:
+) -> str:
     """저장된 최신 회차를 읽어 index.html로 렌더링한다 (PRD.md 기능2 규칙 6: 최신 회차만 표시).
 
     keywords/highlight_words/line_template/subheading_format을 생략하면 설정 화면에
@@ -6929,5 +6934,24 @@ def generate_screen(
         finalize_new_subheadings=run.get("finalize_new_subheadings", []),
         send_failure=run.get("send_failure"),
     )
-    atomic_write_text(OUTPUT_HTML_PATH, html_text)
+    return html_text
+
+
+def generate_screen(
+    keywords: Optional[list] = None,
+    highlight_words: Optional[list] = None,
+    line_template: Optional[str] = None,
+    subheading_format: Optional[str] = None,
+) -> Path:
+    """확정본을 그려 `index.html`로도 남긴다(그 파일을 열어 둔 탭을 위해).
+
+    서버는 이 함수를 쓰지 않는다 — 요청마다 `screen_page_html()`이 돌려주는 글을
+    그대로 응답한다(MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 2번). 저장된 회차가
+    하나도 없으면 `screen_page_html`이 그러듯 `RuntimeError`를 그대로 올린다 —
+    부르는 쪽이 안내 화면으로 바꿔 놓는다.
+    """
+    atomic_write_text(
+        OUTPUT_HTML_PATH,
+        screen_page_html(keywords, highlight_words, line_template, subheading_format),
+    )
     return OUTPUT_HTML_PATH

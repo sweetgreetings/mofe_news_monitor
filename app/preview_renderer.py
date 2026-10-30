@@ -4004,7 +4004,7 @@ def render_preview_error_page(slot: dict) -> str:
     )
 
 
-def generate_preview_page() -> Path:
+def preview_page_html() -> str:
     """요청이 올 때마다(새로고침 포함) 다시 계산해 preview.html을 새로 만든다 — live.html과
     같은 "매번 새로 생성, 저장 없음" 패턴. 오늘 남은 회차가 없으면 안내 화면으로 대체한다.
 
@@ -4019,16 +4019,12 @@ def generate_preview_page() -> Path:
     now = datetime.now()
     slot = next_pending_slot(now, active_schedule_times(settings))
     if slot is None:
-        html_text = render_preview_done_page()
-        atomic_write_text(PREVIEW_HTML_PATH, html_text)
-        return PREVIEW_HTML_PATH
+        return render_preview_done_page()
 
     try:
         articles = _compute_preview_articles(settings, slot)
     except requests.exceptions.RequestException:
-        html_text = render_preview_error_page(slot)
-        atomic_write_text(PREVIEW_HTML_PATH, html_text)
-        return PREVIEW_HTML_PATH
+        return render_preview_error_page(slot)
 
     keywords = all_search_keywords(settings)
     html_text = render_preview_page(
@@ -4040,7 +4036,16 @@ def generate_preview_page() -> Path:
         now.strftime("%H:%M"),
         settings.get("subheading_format_template", DEFAULT_SUBHEADING_FORMAT_TEMPLATE),
     )
-    atomic_write_text(PREVIEW_HTML_PATH, html_text)
+    return html_text
+
+
+def generate_preview_page() -> Path:
+    """초안을 그려 `preview.html`로도 남긴다(그 파일을 열어 둔 탭을 위해).
+
+    서버는 이 함수를 쓰지 않는다 — 요청마다 `preview_page_html()`이 돌려주는 글을
+    그대로 응답한다(MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 2번).
+    """
+    atomic_write_text(PREVIEW_HTML_PATH, preview_page_html())
     return PREVIEW_HTML_PATH
 
 

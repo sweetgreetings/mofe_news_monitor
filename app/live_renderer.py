@@ -2482,7 +2482,7 @@ def _live_search_plan(unique_keywords: list) -> tuple:
     return after_map, known_results_by_keyword, stored_last_seen
 
 
-def generate_live_page() -> Path:
+def live_page_html() -> str:
     """요청이 올 때마다 등록된 키워드 그룹으로 라이브 재검색해 live.html을 새로 만든다.
     예정된 회차 수집(app.scraper.collect_run)과는 완전히 별개 파이프라인 — 화면
     렌더링 결과 외엔 저장하지 않는다(다만 검색 결과 자체는 app.live_cache가 증분
@@ -2542,9 +2542,7 @@ def generate_live_page() -> Path:
         )
     except requests.exceptions.RequestException:
         if not any(known_results_by_keyword.values()):
-            html_text = render_live_error_page()
-            atomic_write_text(LIVE_HTML_PATH, html_text)
-            return LIVE_HTML_PATH
+            return render_live_error_page()
         results_by_keyword = known_results_by_keyword
     else:
         results_by_keyword = {}
@@ -2603,8 +2601,7 @@ def generate_live_page() -> Path:
         settings.get("article_line_template", DEFAULT_ARTICLE_LINE_TEMPLATE),
         failed_keywords,
     )
-    atomic_write_text(LIVE_HTML_PATH, html_text)
-    return LIVE_HTML_PATH
+    return html_text
 
 
 _live_generation_lock = threading.Lock()
@@ -2636,7 +2633,7 @@ def _ensure_live_generation_running() -> None:
         _live_generation_thread.start()
 
 
-def generate_live_page_or_wait() -> Path:
+def live_page_or_wait_html() -> str:
     """실시간 현황 라우트(/live.html)가 실제로 호출하는 진입점.
 
     [추가: 2026-08-13] 오늘 처음 보는(캐시에 last_seen이 없는) 키워드가 하나라도
@@ -2657,9 +2654,7 @@ def generate_live_page_or_wait() -> Path:
     # 없으면 새로고침(3초 자동)마다 실패할 게 뻔한 백그라운드 스레드를 계속 새로 띄우는
     # 무한 "불러오는 중" 상태에 빠진다.
     if not naver_is_configured():
-        html_text = render_live_not_configured_page()
-        atomic_write_text(LIVE_HTML_PATH, html_text)
-        return LIVE_HTML_PATH
+        return render_live_not_configured_page()
 
     settings = load_settings()
     groups = active_search_groups(settings)
@@ -2669,9 +2664,18 @@ def generate_live_page_or_wait() -> Path:
     is_cold = any(keyword not in keyword_last_seen for keyword in unique_keywords)
 
     if not is_cold:
-        return generate_live_page()
+        return live_page_html()
 
     _ensure_live_generation_running()
-    html_text = render_live_loading_page(len(unique_keywords))
-    atomic_write_text(LIVE_HTML_PATH, html_text)
+    return render_live_loading_page(len(unique_keywords))
+
+
+def generate_live_page() -> Path:
+    """오늘 전체 기사를 그려 `live.html`로도 남긴다(그 파일을 열어 둔 탭을 위해).
+
+    서버는 이 함수를 쓰지 않는다 — 요청마다 `live_page_or_wait_html()`이 돌려주는
+    글을 그대로 응답한다(사람마다 다른 화면을 주려면 파일 한 벌로는 안 된다,
+    MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 2번).
+    """
+    atomic_write_text(LIVE_HTML_PATH, live_page_html())
     return LIVE_HTML_PATH

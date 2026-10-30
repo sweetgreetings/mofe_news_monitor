@@ -6576,6 +6576,164 @@ def test_storage_goes_through_one_place():
     print(f"✓ 저장 한 겹: 모듈 {len(users)}개가 store를 지나고, 파일을 직접 만지는 자리는 화면 쪽뿐")
 
 
+def test_no_undefined_names():
+    """import을 빼먹었거나 이름을 잘못 적은 자리가 없는지 본다 — 린터가 없는 저장소의 그물.
+
+    **이 종류는 그 버튼을 누를 때까지 조용하다.** 2026-10-30에 실제로 겪었다 —
+    동적 렌더링으로 바꾸면서 `settings_server`의 `generate_history_page` import를
+    같이 걷었는데, `_regenerate_screens()`가 아직 그걸 부르고 있었다. 문법은 통과,
+    import도 통과, 화면 열기도 멀쩡했고, **기사를 숨기는 순간에만** 서버가 응답 없이
+    끊겼다(`NameError`, app.log엔 한 글자도 안 남고 launchd 쪽 stderr에만 남는다).
+    화면 JS가 줄바꿈으로 끊기던 사고와 같은 성격이라 그물도 같은 모양으로 둔다.
+
+    파이썬을 돌리지 않고 AST만 훑는다 — 모듈 하나의 모든 `Load` 이름이 그 모듈 안에서
+    import되거나 정의된 이름인지 본다. 함수 안에서 정의된 이름도 모듈 전체에서
+    「정의됐다」로 치므로 **덜 잡는 쪽으로 틀린다**(없는 것을 있다고 하지 않는다).
+    """
+    _require_isolation()
+    import builtins
+
+    root = Path(__file__).resolve().parent.parent
+    dunders = {"__file__", "__name__", "__doc__", "__package__", "__spec__", "__loader__"}
+
+    def scan(path):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        defined = set(dir(builtins)) | dunders
+        star = False
+        for node in ast.walk(tree):
+            if isinstance(node, ast.alias):
+                if node.name == "*":
+                    star = True
+                defined.add((node.asname or node.name).split(".")[0])
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                defined.add(node.name)
+            elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+                defined.add(node.id)
+            elif isinstance(node, ast.arg):
+                defined.add(node.arg)
+            elif isinstance(node, ast.ExceptHandler) and node.name:
+                defined.add(node.name)
+            elif isinstance(node, ast.Global):
+                defined.update(node.names)
+        used = {
+            n.id for n in ast.walk(tree)
+            if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)
+        }
+        return sorted(used - defined), star
+
+    sources = sorted(root.glob("app/**/*.py")) + [root / "main.py"]
+    broken = []
+    for path in sources:
+        missing, star = scan(path)
+        if star:
+            # `from x import *`가 있으면 무엇이 들어왔는지 AST로는 알 수 없다.
+            continue
+        if missing:
+            broken.append(f"{path.relative_to(root)} — {missing}")
+    assert not broken, (
+        "정의되지 않은 이름을 쓰는 자리가 있습니다:\n  " + "\n  ".join(broken)
+        + "\nimport을 빼먹었거나 이름을 잘못 적은 자리입니다 — 그 코드가 실제로 "
+        "불릴 때만 NameError로 터지므로 여기서 잡습니다."
+    )
+    print(f"✓ 이름 확인: 모듈 {len(sources)}개에 정의 없이 쓰는 이름 없음")
+
+
+def test_screens_render_to_response():
+    """화면 다섯이 **파일을 거치지 않고** 요청마다 그려 나가는지 지킨다.
+
+    여러 사람이 각자 로그인해 쓰는 판으로 가려면 사람마다 다른 화면을 줘야 하는데,
+    화면 한 벌을 디스크에 써 두고 그 파일을 내보내는 구조로는 그게 안 된다
+    (MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 2번). 그래서 렌더러마다 둘로 갈라
+    뒀다 — `*_html()`은 **글만 돌려주고**(서버가 쓰는 길), `generate_*()`은 그 글을
+    파일로도 남긴다(스케줄러·확정·큐레이션이 쓰는 길. 그 파일을 열어 둔 탭이 새로고침
+    만으로 최신 상태를 보려면 이쪽이 남아 있어야 한다).
+
+    이 테스트가 보는 것은 셋이다 — ① 라우트 다섯이 글(str)을 돌려주는 그 함수들인가
+    ② `*_html()`이 화면 파일을 안 건드리는가 ③ `generate_*()`은 여전히 쓰는가.
+    한쪽만 고치면 사람마다 다른 화면을 줄 수 없게 되거나(①②), 파일로 열어 둔 탭이
+    옛 내용에 멈춘다(③).
+    """
+    _require_isolation()
+    import inspect
+
+    from app import settings_server
+    from app.history_renderer import history_page_html
+    from app.landing_renderer import landing_page_html
+    from app.live_renderer import live_page_or_wait_html
+    from app.preview_renderer import preview_page_html
+    from app.renderer import screen_page_html, waiting_page_html
+
+    # ① 라우트 다섯이 가리키는 함수 — 확정본만 「저장된 회차 없음」을 받아 주는 껍데기다.
+    routes = settings_server._SCREEN_HTML_ROUTES
+    assert set(routes) == {"/index.html", "/history.html", "/home.html",
+                           "/live.html", "/preview.html"}, (
+        f"화면 라우트가 바뀌었습니다 — {sorted(routes)}"
+    )
+    assert routes["/history.html"] is history_page_html
+    assert routes["/home.html"] is landing_page_html
+    assert routes["/live.html"] is live_page_or_wait_html
+    assert routes["/preview.html"] is preview_page_html
+    assert routes["/index.html"] is settings_server._confirmed_screen_html
+
+    # ② 글만 돌려주는 함수들은 화면 파일을 쓰지 않는다 — 글자 대조로 본다(네이버를
+    #    부르는 두 화면은 실제로 돌려 볼 수 없다).
+    for fn in (screen_page_html, waiting_page_html, history_page_html,
+               landing_page_html, preview_page_html, live_page_or_wait_html):
+        src = inspect.getsource(fn)
+        assert "atomic_write_text" not in src, (
+            f"{fn.__name__}이 화면 파일을 쓰고 있습니다 — 그 일은 generate_* 쪽 몫입니다."
+        )
+        assert inspect.signature(fn).return_annotation is str, (
+            f"{fn.__name__}은 글(str)을 돌려줘야 합니다."
+        )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        index_path = tmp_dir / "index.html"
+        history_path = tmp_dir / "history.html"
+        home_path = tmp_dir / "home.html"
+        with patch.object(renderer, "OUTPUT_HTML_PATH", index_path), \
+             patch.object(history_renderer, "HISTORY_HTML_PATH", history_path), \
+             patch.object(landing_renderer, "LANDING_HTML_PATH", home_path):
+            # 저장된 회차가 하나도 없는 상태 — 확정본 라우트는 안내 화면으로 바뀐다.
+            waiting = settings_server._confirmed_screen_html()
+            assert "💤" in waiting or "스크랩 시간" in waiting, (
+                "저장된 회차가 없을 때 확정본 라우트가 안내 화면을 안 돌려줍니다."
+            )
+            assert not index_path.exists(), "라우트가 화면 파일을 만들었습니다(글만 돌려줘야 합니다)."
+
+            # 회차를 하나 저장하고 다시 — 이번엔 확정본이 그려지고, 그래도 파일은 안 생긴다.
+            # 확정본은 **오늘** 회차만 그린다(app.storage.is_today) — 날짜를 박으면
+            # 자정이 지난 뒤 이 테스트가 안내 화면을 받고 실패한다.
+            today = datetime.now().replace(hour=9, minute=0, second=0, microsecond=0)
+            articles = [{
+                "outlet": "KBS", "title": "저장 한 겹 시험", "url": "https://example.com/a",
+                "summary": "요약", "pub_date": today.isoformat(timespec="seconds"), "group": "시험",
+            }]
+            run = storage.save_run("09:00", articles, run_at=today.isoformat(timespec="seconds"))
+            storage.confirm_run(storage.load_latest_run())
+            assert run is not None
+
+            html_text = settings_server._confirmed_screen_html()
+            assert "저장 한 겹 시험" in html_text, "확정본이 그 회차를 안 그렸습니다."
+            assert not index_path.exists(), "라우트가 화면 파일을 만들었습니다."
+
+            for fn, path in ((history_page_html, history_path), (landing_page_html, home_path)):
+                text = fn()
+                assert text.lstrip().startswith("<!DOCTYPE") or "<html" in text, (
+                    f"{fn.__name__}이 HTML을 안 돌려줍니다."
+                )
+                assert not path.exists(), f"{fn.__name__}이 화면 파일을 만들었습니다."
+
+            # ③ generate_* 쪽은 여전히 파일로 남긴다 — 그 파일을 열어 둔 탭 몫이다.
+            assert renderer.generate_screen() == index_path and index_path.exists()
+            assert history_renderer.generate_history_page() == history_path and history_path.exists()
+            assert landing_renderer.generate_landing_page() == home_path and home_path.exists()
+            assert "저장 한 겹 시험" in index_path.read_text(encoding="utf-8")
+
+    print("✓ 동적 렌더링: 화면 다섯이 파일을 거치지 않고 요청마다 그려 나가고, generate_*는 파일로도 남긴다")
+
+
 def test_screen_js_strings_are_not_cut_by_newlines():
     """화면 JS의 문자열이 줄바꿈으로 끊기지 않는지 지킨다 — 한 줄이 화면을 통째로 먹통으로 만든다.
 
@@ -7778,6 +7936,8 @@ if __name__ == "__main__":
         test_env_key_transplant,
         test_key_paths_stay_narrow,
         test_storage_goes_through_one_place,
+        test_no_undefined_names,
+        test_screens_render_to_response,
         test_screen_js_strings_are_not_cut_by_newlines,
         test_login_lock,
         test_search_operator_is_one_rule,
