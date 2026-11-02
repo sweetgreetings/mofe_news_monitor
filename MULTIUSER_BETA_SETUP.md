@@ -96,11 +96,46 @@ A·B·C 중에서 고른다면 **B(Tailscale)** 다 — 어디서든 같은 주�
 데이터를 Supabase(Postgres)에 두면 **각자 자기 컴퓨터에서 앱을 돌려도 같은 데이터를
 본다.** 「다른 컴퓨터에서 이 화면을 열기」 문제가 아예 없어진다.
 
-**담당자 노트북에서 (한 번만):**
+#### D-1. Supabase 프로젝트 만들기 (한 번만, 10분)
 
-1. `supabase.com`에서 프로젝트를 하나 만든다(무료). 데이터베이스 비밀번호를 적어 둔다.
-2. **Settings › Database › Connection string › URI**를 복사한다
-   (`[YOUR-PASSWORD]` 자리를 실제 비밀번호로 바꾼다).
+1. **`supabase.com`** → 오른쪽 위 **Start your project**
+2. 로그인 — GitHub 계정이 있으면 그게 가장 빠르고, 없으면 이메일로 가입한다.
+   **개인 계정으로 한다**(회사 계정 금지).
+3. **New project**를 누른다. 조직(Organization)이 없으면 먼저 하나 만들라고 한다 —
+   이름은 아무거나(예: `마리`), 종류는 **Personal**, 요금제는 **Free**.
+4. 프로젝트 칸을 채운다:
+   - **Name**: `press-monitor`
+   - **Database Password**: **「Generate a password」를 누르고 그 값을 어딘가에 적어 둔다.**
+     - ⚠️ **이 비밀번호는 다시 보여주지 않는다.** 잊으면 재설정해야 한다.
+     - ⚠️ 직접 지으려면 **영문·숫자만** 쓴다 — `@ : / ? #`가 들어가면 연결 주소의
+       문법이 깨진다(주소 안에 비밀번호가 들어가기 때문이다).
+   - **Region**: **Northeast Asia (Seoul)** — 가까울수록 화면이 빠르다.
+   - **Plan**: Free
+5. **Create new project**. 1~2분 기다리면 준비된다.
+
+> **무료 요금제는 1주일 동안 아무도 안 쓰면 프로젝트가 잠시 멈춘다**(들어가서 깨우면
+> 된다). 매일 쓰는 베타에서는 걸릴 일이 없다.
+
+#### D-2. 연결 주소 복사 — **고르는 칸을 조심한다**
+
+프로젝트가 열리면 위쪽 **Connect** 버튼을 누른다. 연결 방식이 여러 개 보이는데
+**반드시 「Session pooler」를 고른다.**
+
+| 보이는 것 | 쓸까 | 왜 |
+|---|---|---|
+| **Session pooler** (`...pooler.supabase.com`, 포트 **5432**) | **이것** | 모든 요금제에서 **IPv4로 붙는다.** 오래 켜 두는 앱(이 앱)에 맞는 방식이다 |
+| Direct connection (`db.xxxx.supabase.co`, 5432) | ✗ | **기본이 IPv6**라 IPv4만 되는 망에서는 안 붙는다(유료 추가 기능이 있어야 IPv4) |
+| Transaction pooler (포트 **6543**) | ✗ | 서버리스용이다. 이 앱이 쓰는 방식(prepared statement)을 못 받는다 |
+
+복사한 주소에서 **`[YOUR-PASSWORD]` 자리를 D-1의 4번에서 적어 둔 비밀번호로 바꾼다.**
+모양은 이렇다:
+
+```
+postgresql://postgres.abcdefghijkl:적어둔비밀번호@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres
+```
+
+#### D-3. 앱에 붙이기
+
 3. 드라이버를 깐다:
    ```bash
    cd ~/press-monitor && pip3 install -r requirements-postgres.txt
