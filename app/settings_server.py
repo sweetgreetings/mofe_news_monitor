@@ -1488,9 +1488,10 @@ _LOGIN_SETTINGS_TEMPLATE = (
     <strong>아직 데이터는 사람별로 갈리지 않습니다</strong> — 누가 로그인해도 같은 기사·같은 설정을 봅니다.
   </p>
   {error_html}
+  {open_note_html}
   <form method="POST" action="/save-login-settings">
     <div class="sw-row">
-      <input type="checkbox" id="login_required" name="login_required" value="1" {checked}>
+      <input type="checkbox" id="login_required" name="login_required" value="1" {checked}{disabled}>
       <label for="login_required">앱을 열 때 로그인을 받습니다</label>
     </div>
     <p class="caption">{accounts_line}</p>
@@ -1616,10 +1617,26 @@ def render_login_settings_page(error: str = "") -> str:
         accounts_line = "등록된 계정이 없습니다 — 먼저 계정을 만들어야 켤 수 있습니다."
     else:
         accounts_line = f"등록된 계정 {count}개."
+    # **바깥에 열려 있으면 칸을 잠근다** — 끌 수 있는 선택이 아니라서다
+    # (`app/auth_session.py` `is_login_required`). 못 누르는 이유는 상자가 말한다.
+    open_now = auth_session.is_open_to_network()
+    open_note_html = (
+        '<div class="nb nb-warn">'
+        "이 앱이 <strong>다른 컴퓨터에서도 열리는 상태</strong>입니다"
+        f"(<code>SERVER_HOST</code>가 <code>{html.escape(SETTINGS_SERVER_HOST)}</code>).<br>"
+        "그래서 로그인은 <strong>늘 켜져 있고 끌 수 없습니다</strong> — 끄면 그 주소에 "
+        "닿는 사람 누구나 기사·설정·키 화면을 그대로 보게 됩니다.<br>"
+        "다시 끄려면 <code>.env</code>의 <code>SERVER_HOST</code>를 지워 이 컴퓨터에서만 "
+        "열도록 되돌린 뒤 앱을 다시 켜세요."
+        "</div>"
+        if open_now else ""
+    )
     return _LOGIN_SETTINGS_TEMPLATE.format(
         **_theme(),
         error_html=f'<p class="error">{html.escape(error)}</p>' if error else "",
         checked="checked" if auth_session.is_login_required() else "",
+        disabled=" disabled" if open_now else "",
+        open_note_html=open_note_html,
         accounts_line=accounts_line,
     )
 
@@ -6311,6 +6328,23 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         user_id = auth_session.user_id_for_token(self._cookie_token())
         return users.get_user(user_id) if user_id else None
 
+    def _is_local_request(self) -> bool:
+        """이 요청이 **이 컴퓨터 자신**에서 왔는가."""
+        try:
+            return (self.client_address[0] or "") in auth_session._LOOPBACK
+        except (AttributeError, IndexError, TypeError):
+            return False
+
+    def _first_signup_open(self) -> bool:
+        """첫 계정을 만드는 문이 열려 있는가 — **계정이 0개이고 이 컴퓨터에서 온 요청일 때만.**
+
+        계정이 하나도 없으면 아무도 못 들어오므로 `/signup`을 열어 둬야 한다. 그런데
+        바깥에 열린 상태에서 그 문까지 열려 있으면 **아무나 첫 계정을 만들어 들어온다** —
+        그래서 **첫 계정은 이 컴퓨터에서만** 만들 수 있다(바깥에서는 그냥 막힌다).
+        계정이 하나라도 생기면 그 뒤 계정은 로그인한 관리자가 만든다.
+        """
+        return users.user_count() == 0 and self._is_local_request()
+
     def _admin_blocked(self) -> bool:
         """관리자만 쓸 수 있는 자리면 응답까지 보내고 True를 돌려준다.
 
@@ -6328,7 +6362,8 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             return False
         # 계정이 하나도 없을 때의 /signup은 **첫 계정을 만드는 자리**라 막지 않는다
         # (막으면 아무도 들어올 수 없다 — `_auth_blocked`도 같은 예외를 둔다).
-        if path == "/signup" and not users.user_count():
+        # 단 **이 컴퓨터에서 온 요청일 때만**이다(`_first_signup_open`).
+        if path == "/signup" and self._first_signup_open():
             return False
         if users.is_admin(self._current_user()):
             return False
@@ -6346,7 +6381,7 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         # **가입은 계정이 하나도 없을 때만 열려 있다.** 자물쇠를 켜 둔 앱에서 아무나
         # 계정을 만들어 들어올 수 있으면 그건 자물쇠가 아니다. 계정을 더 만드는 것은
         # 로그인한 사람의 일이다(설정 → 계정 → 계정 추가).
-        if path in _AUTH_FREE_PATHS and not (path == "/signup" and users.user_count()):
+        if path in _AUTH_FREE_PATHS and (path != "/signup" or self._first_signup_open()):
             return False
         if self._current_user():
             return False
@@ -6628,6 +6663,13 @@ class _SettingsHandler(BaseHTTPRequestHandler):
     # ── 설정: 로그인 사용 ────────────────────────────────────────────────
     def _handle_save_login_settings(self, form: dict) -> None:
         want_on = bool(form.get("login_required"))
+        if not want_on and auth_session.is_open_to_network():
+            # **바깥에 열려 있으면 끌 수 없다.** 화면에서도 칸을 잠그지만, 폼은 누구든
+            # 직접 보낼 수 있으므로 여기서 한 번 더 막는다(개인정보 동의·마지막 관리자와
+            # 같은 규칙 — 막는 판정은 저장하는 자리에 둔다).
+            self._respond(render_login_settings_page(
+                error="이 앱이 다른 컴퓨터에서도 열리는 상태라 로그인을 끌 수 없습니다."))
+            return
         if want_on and users.user_count() == 0:
             # 계정이 하나도 없는데 켜면 아무도 못 들어온다.
             self._respond(render_login_settings_page(

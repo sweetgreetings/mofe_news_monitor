@@ -10,6 +10,7 @@
 #
 # 실행: python3 tests/test_integration.py
 import ast
+import inspect
 import json
 import os
 import re
@@ -7104,6 +7105,81 @@ def test_base_owner_needs_no_migration():
     print("✓ 이관 없음: 바닥 주인은 소유자가 안 걸려 data/를 그대로 보고, 남은 자기 폴더에서 시작")
 
 
+def test_network_open_forces_login():
+    """**바깥에 열려 있으면 자물쇠를 끌 수 없다** — 이게 이 앱에서 가장 큰 구멍이었다.
+
+    `.env`의 `SERVER_HOST`를 기본값이 아닌 주소로 두면 서버가 `0.0.0.0`으로 열린다
+    (`create_settings_server`). 그런데 로그인 자물쇠는 **별개 스위치이고 기본이 꺼짐**이라,
+    주소만 바꾸면 **그 주소에 닿는 사람 누구나** 1년치 기사·설정·받는 사람 명단·키
+    화면을 그대로 보게 된다. 스위치로 고를 수 있는 선택이 아니라 사고다.
+
+    그래서 `is_login_required()`가 **바깥에 열려 있으면 늘 참**을 돌려준다. 그 함수
+    하나가 자물쇠·관리자 문·사람별 데이터 경계·계정 메뉴의 판정을 전부 정하므로
+    여기서 참이 되면 그 전부가 함께 켜진다.
+
+    **첫 가입도 같은 이유로 좁혔다** — 계정이 0개면 `/signup`을 열어 둬야 아무나 못
+    들어오는 상태를 벗어나는데, 바깥에 열린 채 그 문까지 열려 있으면 **아무나 첫 계정을
+    만들어 들어온다.** 그래서 첫 계정은 **이 컴퓨터에서만** 만들 수 있다.
+    """
+    _require_isolation()
+    from app import auth_session, settings_server
+
+    # ① 이 컴퓨터에서만 열려 있는 지금 — 스위치가 그대로 뜻을 갖는다
+    assert not auth_session.is_open_to_network(), (
+        "이 테스트는 SERVER_HOST가 기본값(이 컴퓨터만)인 상태를 전제로 합니다."
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        with patch.object(auth_session, "AUTH_CONFIG_FILE", tmp_dir / "auth_config.json"):
+            assert not auth_session.is_login_required(), "기본값은 꺼짐이어야 합니다."
+            auth_session.set_login_required(True)
+            assert auth_session.is_login_required()
+            auth_session.set_login_required(False)
+            assert not auth_session.is_login_required(), "이 컴퓨터에서는 끌 수 있어야 합니다."
+
+            # ② 바깥 주소로 열린 상태 — 저장 스위치가 꺼져 있어도 **늘 켜진다**
+            for host in ("192.168.0.9", "100.84.1.2", "0.0.0.0", "mac.local"):
+                with patch.object(auth_session, "SETTINGS_SERVER_HOST", host):
+                    assert auth_session.is_open_to_network(), f"{host}를 로컬로 읽었습니다."
+                    assert auth_session.is_login_required(), (
+                        f"{host}로 열려 있는데 로그인이 꺼졌습니다 — 그 주소에 닿는 사람 "
+                        "누구나 기사·설정·키 화면을 봅니다."
+                    )
+
+            # ③ 「이 컴퓨터 자신」을 뜻하는 주소들은 바깥이 아니다
+            for host in ("127.0.0.1", "localhost", "::1"):
+                with patch.object(auth_session, "SETTINGS_SERVER_HOST", host):
+                    assert not auth_session.is_open_to_network(), f"{host}를 바깥으로 읽었습니다."
+
+    # ④ 화면이 칸을 잠그고 이유를 말한다
+    import re
+    local_html = settings_server.render_login_settings_page()
+    box = re.search(r'<input type="checkbox" id="login_required"[^>]*>', local_html)
+    assert box and "disabled" not in box.group(0), "이 컴퓨터에서는 칸이 열려 있어야 합니다."
+    assert '<div class="nb nb-warn">이 앱이' not in local_html
+
+    with patch.object(auth_session, "SETTINGS_SERVER_HOST", "192.168.0.9"):
+        open_html = settings_server.render_login_settings_page()
+    box = re.search(r'<input type="checkbox" id="login_required"[^>]*>', open_html)
+    assert box and "disabled" in box.group(0) and "checked" in box.group(0), (
+        f"바깥에 열렸는데 칸이 잠기지 않았습니다: {box.group(0) if box else '(없음)'}"
+    )
+    assert '<div class="nb nb-warn">이 앱이' in open_html, (
+        "못 끄는 이유를 화면이 말하지 않습니다."
+    )
+
+    # ⑤ 폼을 직접 보내도 끌 수 없다 — 막는 판정이 저장하는 자리에 있다
+    handler = settings_server._SettingsHandler
+    source = inspect.getsource(handler._handle_save_login_settings)
+    assert "is_open_to_network" in source, (
+        "끄기를 막는 판정이 저장 핸들러에 없습니다 — 화면에서만 막으면 막은 게 아닙니다"
+        "(폼은 누구든 직접 보낼 수 있습니다)."
+    )
+
+    print("✓ 바깥에 열리면 자물쇠 강제: 끌 수 없고(화면도 서버도), 첫 가입은 이 컴퓨터에서만")
+
+
 def test_admin_only_settings():
     """「모두에게 같이 걸리는 설정은 관리자만」을 지킨다 — 그리고 **자물쇠가 꺼져 있으면
     아무것도 막지 않는** 것까지.
@@ -7170,14 +7246,19 @@ def test_admin_only_settings():
     class _Stub:
         """핸들러에서 이 문이 쓰는 것만 흉내 낸다(소켓 없이 판정만 본다)."""
 
-        def __init__(self, path, command, user):
+        def __init__(self, path, command, user, first_signup=False):
             self.path = path
             self.command = command
             self._user = user
+            self._first_signup = first_signup
             self.sent = None
 
         def _current_user(self):
             return self._user
+
+        def _first_signup_open(self):
+            # 계정이 0개이고 이 컴퓨터에서 온 요청일 때만 참 — 여기선 값으로 넣는다
+            return self._first_signup
 
         def _respond(self, html_text, status=200):
             self.sent = ("html", status)
@@ -7190,8 +7271,8 @@ def test_admin_only_settings():
 
     gate = settings_server._SettingsHandler._admin_blocked
 
-    def blocked(path, command, user):
-        stub = _Stub(path, command, user)
+    def blocked(path, command, user, first_signup=False):
+        stub = _Stub(path, command, user, first_signup)
         return gate(stub), stub
 
     admin = {"id": "a", "role": "admin"}
@@ -7244,9 +7325,14 @@ def test_admin_only_settings():
             # 4) 계정이 하나도 없을 때의 /signup은 첫 계정 자리라 안 막는다
             hit, _ = blocked("/signup", "GET", member)
             assert hit, "계정이 있는데 /signup을 열어 뒀습니다 — 아무나 계정을 만듭니다."
-            with patch.object(users_mod, "user_count", return_value=0):
-                hit, _ = blocked("/signup", "GET", None)
-                assert not hit, "계정이 하나도 없을 때 /signup을 막으면 아무도 못 들어옵니다."
+            # 계정이 0개 + 이 컴퓨터에서 온 요청일 때만 첫 가입이 열린다
+            hit, _ = blocked("/signup", "GET", None, first_signup=True)
+            assert not hit, "첫 계정을 만들 길을 막으면 아무도 못 들어옵니다."
+            hit, _ = blocked("/signup", "GET", None, first_signup=False)
+            assert hit, (
+                "계정이 0개여도 **바깥에서 온** 가입은 막아야 합니다 — 아무나 첫 계정을 "
+                "만들어 들어옵니다."
+            )
 
             # ── 역할 바꾸기 — 마지막 관리자는 못 내린다 ──────────────────
             me = users_mod.list_users()[0]
@@ -8660,6 +8746,7 @@ if __name__ == "__main__":
         test_settings_split_per_user,
         test_scheduler_runs_per_person,
         test_naver_key_per_person,
+        test_network_open_forces_login,
         test_admin_only_settings,
         test_no_undefined_names,
         test_screens_render_to_response,

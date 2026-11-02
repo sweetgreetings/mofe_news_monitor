@@ -19,6 +19,7 @@
 | [archive/](archive/) | 끝난 설계 문서(`MORNING_ISSUES_DESIGN.md`, 초기 설계 `DESIGN.md`)·요약 기획서·정리 전 CLAUDE.md |
 | [AI_RULES.md](AI_RULES.md) | LLM 시스템 프롬프트 **원본** (코드가 이 파일을 직접 읽는다 — 고치면 바로 반영) |
 | [LLM_COST_USAGE.md](LLM_COST_USAGE.md) | Claude API 호출 지점·비용 |
+| [MULTIUSER_BETA_SETUP.md](MULTIUSER_BETA_SETUP.md) | **개인 기기끼리** 여러 명이 쓰는 베타 설치 안내(담당자 노트북이 서버). 연결하는 길 셋·계정 만들기·네이버 키·되돌리기. **회사망은 범위 밖**이다 |
 | [SERVER_REQUIREMENTS.md](SERVER_REQUIREMENTS.md) | 서버 한 대에 올려 몇 명이 쓸 때 **전산·보안팀에 확인·허가받을 것**. 실행 환경·나가는 통신·용량·개인정보 전부 실측값이고, 결정이 필요한 항목은 §7에 모여 있다 |
 | [MULTIUSER_ROLLOUT_CHECKLIST.md](MULTIUSER_ROLLOUT_CHECKLIST.md) | 여러 사람이 쓰게 될 때의 준비 항목·작업 순서. 지금 들어와 있는 것은 **자물쇠까지**다(아래 「로그인」 절) |
 | [EXPERT_QUESTIONS.md](EXPERT_QUESTIONS.md) | 혼자 정하기 어려운 결정을 자문받기 위해 모아 둔 것 (상황·실측치·후보안·묻고 싶은 것). 결정되면 규칙은 CLAUDE.md로, 기각안은 HISTORY.md로 옮기고 항목은 지운다 |
@@ -1033,6 +1034,11 @@ URL
 데이터를 사람별로 가르는 일은 저장 한 겹을 넣은 뒤다(MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서).
 
 - **기본은 꺼짐이고, 꺼져 있으면 앱은 예전과 한 글자도 다르지 않게 돈다.** 켜는 자리는 설정 `/login-settings` 하나. `_auth_blocked()`가 맨 앞에서 끝나므로 꺼진 동안 비용이 없다.
+- **바깥에 열려 있으면 자물쇠는 늘 켜지고 끌 수 없다** (`auth_session.is_open_to_network()` → `is_login_required()`). `.env`의 `SERVER_HOST`를 기본값(127.0.0.1·localhost·::1)이 아닌 주소로 두면 서버가 `0.0.0.0`으로 열리는데(`create_settings_server`), **그 상태로 자물쇠가 꺼져 있으면 그 주소에 닿는 사람 누구나 1년치 기사·설정·받는 사람 명단·키 화면을 그대로 본다.** 스위치로 고를 수 있는 선택이 아니라 사고다.
+  - **판정이 `is_login_required()` 한 곳이라 그 하나로 전부 켜진다** — 자물쇠(`_auth_blocked`)·관리자 문(`_admin_blocked`)·사람별 데이터 경계(`_data_owner`)·계정 메뉴(`/whoami`)가 모두 그 함수를 본다.
+  - **끄기는 화면과 서버 둘 다 막는다** — `/login-settings`의 칸을 잠그고(`disabled`, 못 끄는 이유는 앰버 상자가 말한다) `_handle_save_login_settings`가 한 번 더 거부한다(폼은 누구든 직접 보낼 수 있다 — 개인정보 동의·마지막 관리자와 같은 규칙). 되돌리는 길은 `.env`에서 `SERVER_HOST`를 지우고 다시 켜는 것 하나다.
+  - **첫 가입은 이 컴퓨터에서만 열린다**(`_first_signup_open` — 계정이 0개 **그리고** 요청이 루프백에서 왔을 때). 계정이 없으면 `/signup`을 열어 둬야 아무도 못 들어오는 상태를 벗어나는데, 바깥에 열린 채 그 문까지 열려 있으면 **아무나 첫 계정을 만들어 들어온다.**
+  - `tests/test_integration.py` `test_network_open_forces_login`이 이 상태를 지킨다. 개인 기기끼리 베타로 쓰는 절차는 [MULTIUSER_BETA_SETUP.md](MULTIUSER_BETA_SETUP.md). → H: 바깥에 열면 자물쇠 강제
 - **스케줄러·발송은 이 모듈을 아예 거치지 않는다** — 로그인을 켜도 회차는 정시에 모이고 자동발송은 나간다. 자물쇠가 본업을 멈추면 안 된다.
 - **계정이 하나도 없으면 켤 수 없다**(서버가 거부) — 켜는 순간 아무도 못 들어온다. 계정이 없을 때 `/login`은 `/signup`으로 보낸다. **첫 계정이 관리자**다(승인해 줄 사람이 없다).
 - **가입은 계정이 하나도 없을 때만 열려 있다** — 자물쇠를 켜 둔 앱에서 아무나 `/signup`으로 계정을 만들어 들어올 수 있으면 그건 자물쇠가 아니다. 계정을 더 만드는 것은 로그인한 사람의 일이다(설정 → 계정 → 계정 추가). **비밀번호 찾기는 언제나 열려 있다** — 막으면 잊은 사람이 들어올 길이 없다.

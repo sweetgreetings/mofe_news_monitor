@@ -15,6 +15,7 @@ from typing import Optional
 
 from app import store
 from app.config import (
+    SETTINGS_SERVER_HOST,
     AUTH_ATTEMPTS_FILE,
     AUTH_CONFIG_FILE,
     AUTH_SESSION_DAYS_KEEP,
@@ -39,7 +40,34 @@ def _write(path, data: dict) -> None:
 
 # ── 「로그인 사용」 스위치 ────────────────────────────────────────────────
 
+# 「이 컴퓨터 자신」을 뜻하는 주소들 — 이 중 하나로 열려 있으면 바깥에서 닿을 수 없다.
+_LOOPBACK = {"127.0.0.1", "localhost", "::1", "0:0:0:0:0:0:0:1"}
+
+
+def is_open_to_network() -> bool:
+    """이 앱이 **이 컴퓨터 밖에서도** 열리는 상태인가.
+
+    `.env`의 `SERVER_HOST`를 기본값(127.0.0.1)이 아닌 주소로 두면 서버가 `0.0.0.0`으로
+    열린다(`app/settings_server.py` `create_settings_server`). 그 순간부터 그 주소에
+    닿을 수 있는 사람은 누구든 화면을 열 수 있다.
+    """
+    return SETTINGS_SERVER_HOST not in _LOOPBACK
+
+
 def is_login_required() -> bool:
+    """로그인을 받아야 하는가.
+
+    **바깥에 열려 있으면 늘 참이다 — 끌 수 없다.** 설정 스위치는 「이 컴퓨터에서 혼자
+    쓰는 동안」에만 뜻이 있다. 바깥 주소로 열어 두고 자물쇠를 끄면 그 주소에 닿는
+    사람 누구나 1년치 기사·설정·키 화면을 그대로 보게 되는데, 그건 스위치로 고를 수
+    있는 선택이 아니라 사고다.
+
+    이 함수 하나가 자물쇠·관리자 문·사람별 데이터 경계·계정 메뉴의 판정을 모두 정하므로
+    (`app/settings_server.py` `_auth_blocked`·`_admin_blocked`·`_data_owner`·
+    `_is_admin_now`, `/whoami`), 여기서 참이 되면 그 전부가 함께 켜진다.
+    """
+    if is_open_to_network():
+        return True
     return bool(_read(AUTH_CONFIG_FILE, {}).get("login_required", False))
 
 
