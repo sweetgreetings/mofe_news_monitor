@@ -82,15 +82,22 @@ _PER_USER = {
     "auto_classify_turns.json", "negative_guess.json",
     # 내 수시 카드(원본·확정본·사안·되돌리기·휴지통이 모두 이 칸 아래다)
     "adhoc",
+    # 내가 붙인 라벨 — 담당자가 고른 경계다(2026-11-02). 「이 기사가 무엇인가」라
+    # 공용으로 뒀었는데, 여러 사람이 쓰면 **남이 붙인 태그가 내 라벨 보관함에
+    # 섞인다.** 라벨은 각자의 업무 분류라 자기 것이어야 한다.
+    "labels.json", "label_undo.json",
+    # 제목 변경 감시 — **라벨 붙인 기사만** 돌아보므로 라벨이 사람별이면 이것도
+    # 사람별이다(그 사람 라벨을 그 사람 명단에 알린다).
+    "title_watch.json",
+    # 내 보고서를 받을 사람 — 각자 자기 보고서를 자기 사람에게 보낸다.
+    # 봇 이름(telegram_bot_name.json)은 **봇에 붙은 값**이라 공용으로 남는다.
+    "telegram_recipients.json", "email_recipients.json",
 }
 
 _SHARED = {
     # ── 이 기사에 관한 사실 — 누가 보든 같아야 한다 ──
     "summary_overrides.json", "photo_overrides.json", "schedule_overrides.json",
     "photo_body_verdicts.json",
-    # 라벨은 「이 기사가 무엇인가」라 두 흐름을 가로지르는 URL 키 전역 저장소다
-    # (CLAUDE.md 「라벨」). 제목 변경 감시도 그 라벨을 보고 돈다.
-    "labels.json", "label_undo.json", "title_watch.json",
     # 기관 기사 원장 — 「그날 무엇이 있었나」는 사람과 무관한 책이고,
     # 범위도 app/config.py 상수 고정이라 사람마다 다를 수 없다
     "agency_archive",
@@ -103,8 +110,8 @@ _SHARED = {
     "credentials.json", "api_usage.json",
     # [단독]·[속보] 알림 — 감시 범위가 공용 검색어 설정에 달려 있다
     "alerted_urls.json", "breaking_alert.json", "breaking_alert_state.json",
-    # 받는 사람 명단·봇 이름 — 봇 이름은 봇에 붙은 값이라 바꾸면 모두에게 바뀐다
-    "telegram_recipients.json", "email_recipients.json", "telegram_bot_name.json",
+    # 봇 이름 — **봇에 붙은 값**이라 바꾸면 모든 받는 사람에게 바뀐다(공용)
+    "telegram_bot_name.json",
     # 발송 기록 — 「앱이 보낸 모든 메시지」라 보고서와 알림이 한 줄씩 섞여 있다
     # (사람별로 가르려면 줄마다 누가 보냈는지를 먼저 적어야 한다)
     "send_log",

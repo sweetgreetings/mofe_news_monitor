@@ -1727,12 +1727,12 @@ _MENU_GROUPS = [
     ("정기", "category flow reg", [
         # 검색어·보고서 모양은 사람별 설정이라 모두 자기 것을 고친다(③ 사용자 경계)
         ("link", "/keywords", "검색어", "", None, False),
-        ("link", "/schedule", "수집시간대", "", None, True),
+        ("link", "/schedule", "수집시간대", "", None, False),
         ("sub", "텍스트 표출 형식", False),
         ("link", "/format", "기사 제목", "", None, False),
         ("link", "/subheading-format", "소제목", "", None, False),
         ("sub", "발송 · 알림", False),
-        ("link", "/auto-send", "자동발송 대기시간 및 ON/OFF", "", None, True),
+        ("link", "/auto-send", "자동발송 대기시간 및 ON/OFF", "", None, False),
         ("link", "/breaking-alert", "[단독]·[속보] 기사 알림", "", None, True),
     ]),
     ("수시", "category flow adhoc", [
@@ -1745,8 +1745,8 @@ _MENU_GROUPS = [
         ("link", "/deleted", "삭제 기록", "지운 회차 되살리기", None, True),
     ]),
     ("받는 사람 지정", "category", [
-        ("link", "/telegram", "텔레그램", "", None, True),
-        ("link", "/email", "이메일", "정기 확정본만", None, True),
+        ("link", "/telegram", "텔레그램", "", None, False),
+        ("link", "/email", "이메일", "정기 확정본만", None, False),
         # 발송 기록은 읽기만 하는 자리라 모두 본다 — 누구에게 갔는지는 보고서를
         # 보내는 사람이 알아야 하는 사실이다.
         ("link", "/send-log", "발송 기록", "누가 받았는지", None, False),
@@ -1782,24 +1782,22 @@ _MENU_GROUPS = [
 # 전체 기사 화면의 🖍️ 형광펜이 부르는 자리다(큐레이션이라 모두 쓴다). 앞글자로
 # 재면 그 형광펜이 일반 사용자에게서 조용히 죽는다.
 #
-# **③ 사용자 경계가 들어오면 여기서 빠지는 항목이 생긴다** — 검색어·받는 사람·형식이
-# 사람별로 갈리는 순간 「모두에게 같이 걸리는」이 아니게 되므로 규칙이 저절로 그것들을
-# 내보낸다(MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 3번).
+# **③ 사용자 경계가 들어오면서 실제로 그렇게 줄었다** — 사람별이 되는 순간 「모두에게
+# 같이 걸리는」이 아니게 되므로 규칙이 저절로 내보낸다. 57 → 29개가 됐고, 남은 것은
+# 언론사·알림 감시·삭제 기록·공용 키·추이 단어·계정뿐이다.
 # **③ 사용자 경계가 들어오면서 여기서 빠진 것들이 있다** — 검색어(`/keywords`·`/save`)와
 # 보고서 모양(`/format`·`/subheading-format`과 수시 둘)은 이제 사람별 설정이라
 # (`app/settings.py` `_PER_USER_SETTING_KEYS`) 「모두에게 같이 걸리는」이 아니다.
 # 규칙이 바뀐 게 아니라 **그 항목이 규칙 밖으로 나간 것**이다.
 _ADMIN_ONLY_PATHS = {
-    # 정기 설정 — 모두에게 같이 걸리는 것만 남았다
-    "/schedule", "/save-schedule", "/schedule/add-group", "/schedule/add-slot",
-    "/auto-send", "/save-auto-send",
+    # 정기 설정 — 모두에게 같이 걸리는 것만 남았다.
+    # **수집 시간·자동발송·받는 사람·라벨 관리는 빠졌다**(2026-11-02) — 사람별이
+    # 되었으므로 그 규칙 밖이다. 남은 것은 [단독]·[속보] 알림 하나다(감시 주기·
+    # API 호출량이 공용이라 한 벌이다).
     "/breaking-alert", "/save-breaking-alert",
     # 공통 설정
     "/outlets", "/save-outlets", "/move-outlet",
     "/deleted", "/deleted/restore", "/deleted/empty", "/history/delete-runs",
-    # 받는 사람 명단
-    "/telegram", "/save-telegram", "/telegram/add-recipient-slot",
-    "/email", "/save-email", "/email/add-recipient-slot",
     # 연동 키 — 공용 키라 한 사람이 바꾸면 모두의 수집·발송이 바뀐다.
     # **네이버만 빠져 있다** — 한도가 키마다라 각자 자기 키를 쓴다
     # (app/credentials.py `_PER_USER_CREDENTIAL_KEYS`).
@@ -1817,9 +1815,6 @@ _ADMIN_ONLY_PATHS = {
     "/signup",
     # 계정 목록과 역할 바꾸기
     "/accounts", "/accounts/role",
-    # 라벨 **관리** — 이름 변경·합치기·삭제는 남이 붙인 라벨까지 바꾼다.
-    # 붙이기·떼기(/add-label·/remove-label)는 큐레이션이라 모두 한다.
-    "/label-manage", "/rename-label", "/merge-label", "/delete-label",
     # 정책 단어 추이에 올릴 단어 — 한 벌(최대 8개)이라 모두의 그래프가 바뀐다.
     # 그래프를 보는 것(/trend)과 받아 가는 것(/trend/download-excel)은 모두 한다.
     "/trend/add-word", "/trend/remove-word",

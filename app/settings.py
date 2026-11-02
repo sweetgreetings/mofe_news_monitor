@@ -134,6 +134,12 @@ _PER_USER_SETTING_KEYS = {
     # 내 보고서 모양 — 정기·수시 기사 줄과 소제목 형식
     "article_line_template", "subheading_format_template",
     "adhoc_article_line_template", "adhoc_subheading_format_template",
+    # 내 수집 시간표 — 담당자가 고른 경계다(2026-11-02). 사람마다 보는 시각이
+    # 달라서다. 스케줄러가 사람별 루프 안에서 그 사람 설정을 읽으므로 저절로 따라온다.
+    "schedule_groups",
+    # 내 자동발송 — **받는 사람이 사람별이 되면서 딸려온 것**이다. 공용으로 두면
+    # 한 사람이 켠 순간 모두의 보고서가 자동으로 나간다(그건 사고다).
+    "auto_send_enabled", "auto_send_grace_min",
 }
 
 

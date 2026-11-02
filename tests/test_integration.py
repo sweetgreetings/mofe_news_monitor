@@ -6733,7 +6733,9 @@ def test_user_boundary():
         tmp_dir = Path(tmp)
         with patch.object(store, "DATA_DIR", tmp_dir):
             per_user = tmp_dir / "hidden_articles.json"
-            shared = tmp_dir / "labels.json"
+            # 공용 예시는 「이 기사에 관한 사실」 쪽을 쓴다 — 라벨은 2026-11-02에
+            # 사람별로 옮겼다(담당자 결정).
+            shared = tmp_dir / "summary_overrides.json"
             run_file = tmp_dir / "articles" / "2026-01-01_09-00.json"
             store.ensure_dir(tmp_dir / "articles")
 
@@ -6955,7 +6957,7 @@ def test_scheduler_runs_per_person():
         f"기본값으로 돌렸는데 한 번이 아닙니다: {calls['collect']}"
     )
     assert calls["topup"] == [None] and calls["cleanup"] == [None]
-    assert calls["send"] == 1 and calls["alert"] == 1
+    assert calls["send"] == 1 and calls["alert"] == 1 and calls["title"] == 1
 
     # ② 두 사람 — 수집·보충·정리는 사람마다, 공용 일은 한 번만
     sched._slot_failures.clear()
@@ -6965,12 +6967,18 @@ def test_scheduler_runs_per_person():
     )
     assert calls["topup"] == [None, "u2"], calls["topup"]
     assert calls["cleanup"] == [None, "u2"], calls["cleanup"]
-    for key, label in (("send", "자동발송"), ("alert", "[단독]·[속보] 알림"),
-                       ("agency", "기관 기사 원장"), ("title", "제목 변경 알림"),
+    # **자동발송·제목 변경 알림은 사람마다 돈다**(2026-11-02) — 받는 사람 명단과
+    # 라벨이 사람별이 되었으므로, 각자 자기 보고서를 자기 사람에게 보낸다.
+    for key, label in (("send", "자동발송"), ("title", "제목 변경 알림")):
+        assert calls[key] == 2, (
+            f"{label}이 {calls[key]}번 돌았습니다 — 사람마다 한 번씩이어야 합니다"
+            "(명단·라벨이 사람별입니다)."
+        )
+    # 공용 저장소·공용 설정에 딸린 셋은 사람과 무관하게 한 번이다.
+    for key, label in (("alert", "[단독]·[속보] 알림"), ("agency", "기관 기사 원장"),
                        ("negative", "홈 부정 추정")):
         assert calls[key] == 1, (
-            f"{label}이 {calls[key]}번 돌았습니다 — 공용이라 한 번이어야 합니다"
-            "(사람마다 돌면 받는 사람이 사람 수만큼 받습니다)."
+            f"{label}이 {calls[key]}번 돌았습니다 — 공용이라 한 번이어야 합니다."
         )
 
     # ③ 한 사람이 실패해도 나머지는 간다
@@ -6984,7 +6992,7 @@ def test_scheduler_runs_per_person():
     assert ("u2", "11:00") in calls["collect"], (
         "한 사람이 실패하자 다음 사람이 안 돌았습니다."
     )
-    assert calls["send"] == 1, "한 사람의 실패가 공용 일까지 막았습니다."
+    assert calls["alert"] == 1, "한 사람의 실패가 공용 일까지 막았습니다."
 
     # ④ 실패 횟수를 사람마다 따로 센다 — 안 그러면 한 사람의 실패가 남의 회차를 포기시킨다
     sched._slot_failures.clear()
@@ -7044,9 +7052,9 @@ def test_settings_split_per_user():
 
     # ── ① 칸이 빠짐없이 갈려 있는가 ───────────────────────────────────
     per_user = settings_mod._PER_USER_SETTING_KEYS
-    shared_known = {
-        "outlet_order", "schedule_groups", "auto_send_enabled", "auto_send_grace_min",
-    }
+    # 수집 시간·자동발송은 2026-11-02에 사람별로 옮겼다(담당자 결정 — 받는 사람이
+    # 사람별이 되면서 자동발송이 딸려왔다). 공용으로 남은 설정 칸은 언론사 하나다.
+    shared_known = {"outlet_order"}
     default_keys = set(settings_mod._default_settings())
     undecided = default_keys - per_user - shared_known
     assert not undecided, (
@@ -7307,6 +7315,11 @@ def test_admin_only_settings():
         # (app/credentials.py _PER_USER_CREDENTIAL_KEYS). Claude·텔레그램·이메일은
         # 공용이라 그대로 관리자 몫이다.
         "/naver", "/save-naver", "/delete-naver", "/test-naver",
+        # 2026-11-02에 사람별이 된 것들 — 수집 시간·자동발송·받는 사람·라벨 관리.
+        # 각자 자기 시간표로 자기 보고서를 자기 사람에게 보낸다.
+        "/schedule", "/save-schedule", "/auto-send", "/save-auto-send",
+        "/telegram", "/save-telegram", "/email", "/save-email",
+        "/label-manage", "/rename-label", "/merge-label", "/delete-label",
     ]
     leaked = [p for p in must_stay_open if p in admin_only]
     assert not leaked, (
@@ -7314,10 +7327,9 @@ def test_admin_only_settings():
         "그 화면이 일반 사용자에게서 조용히 죽습니다."
     )
     # 반대로 설정은 빠짐없이 들어 있다
-    for path in ("/schedule", "/save-schedule", "/outlets",
-                 "/telegram", "/email", "/llm", "/keys",
+    for path in ("/outlets", "/save-outlets", "/llm", "/keys", "/breaking-alert",
                  "/login-settings", "/save-login-settings", "/accounts", "/accounts/role",
-                 "/deleted/restore", "/label-manage", "/trend/add-word"):
+                 "/deleted/restore", "/trend/add-word"):
         assert path in admin_only, f"{path}가 관리자 전용에서 빠졌습니다."
 
     # ── 문 자체 — 핸들러 메서드를 그대로 불러 본다 ────────────────────────
@@ -7363,7 +7375,7 @@ def test_admin_only_settings():
             # 1) 자물쇠가 꺼져 있으면 아무것도 막지 않는다 — 누구든, 어느 주소든.
             assert not auth_session.is_login_required()
             for user in (None, member, admin):
-                for path in ("/schedule", "/save-llm", "/accounts"):
+                for path in ("/outlets", "/save-llm", "/accounts"):
                     hit, _ = blocked(path, "GET", user)
                     assert not hit, (
                         f"자물쇠가 꺼져 있는데 {path}를 막았습니다 — 혼자 쓰는 앱의 "
@@ -7379,10 +7391,10 @@ def test_admin_only_settings():
             )
             assert users_mod.admin_count() == 1
 
-            hit, _ = blocked("/schedule", "GET", admin)
+            hit, _ = blocked("/outlets", "GET", admin)
             assert not hit, "관리자를 막았습니다."
 
-            hit, stub = blocked("/schedule", "GET", member)
+            hit, stub = blocked("/outlets", "GET", member)
             assert hit and stub.sent == ("html", 403), f"일반 사용자 GET 거절이 틀립니다: {stub.sent}"
 
             hit, stub = blocked("/save-llm", "POST", member)
@@ -7391,7 +7403,7 @@ def test_admin_only_settings():
             )
 
             # 로그인하지 않은 상태도 관리자가 아니다(자물쇠가 먼저 잡지만 여기서도 막는다)
-            hit, _ = blocked("/schedule", "GET", None)
+            hit, _ = blocked("/outlets", "GET", None)
             assert hit, "로그인하지 않은 요청을 관리자로 읽었습니다."
 
             # 3) 설정이 아닌 주소는 그대로 통과 — 형광펜이 대표다
@@ -7438,12 +7450,13 @@ def test_admin_only_settings():
     # ── 설정 메뉴 — 일반 사용자에게는 관리자 항목을 안 그린다 ─────────────
     admin_menu = settings_server._menu_html(True)
     member_menu = settings_server._menu_html(False)
-    for path in ("/schedule", "/llm", "/outlets", "/telegram"):
+    for path in ("/outlets", "/llm", "/keys", "/breaking-alert"):
         assert f'href="{path}"' in admin_menu, f"관리자 메뉴에 {path}가 없습니다."
         assert f'href="{path}"' not in member_menu, (
             f"일반 사용자 메뉴에 {path}가 남아 있습니다."
         )
-    for path in ("/send-log", "/excel-merge", "/keywords", "/format", "/naver"):
+    for path in ("/send-log", "/excel-merge", "/keywords", "/format", "/naver",
+                 "/schedule", "/auto-send", "/telegram", "/email"):
         assert f'href="{path}"' in member_menu, f"일반 사용자 메뉴에 {path}가 없습니다."
     # 묶음이 통째로 비면 묶음 이름도 안 그린다
     # 「연동」은 통째로 관리자 몫이라 묶음 이름도 안 그린다. 「정기」는 검색어·형식이
@@ -7452,9 +7465,12 @@ def test_admin_only_settings():
     assert 'href="/llm"' not in member_menu and 'href="/keys"' not in member_menu, (
         "일반 사용자 메뉴에 공용 키 항목이 남아 있습니다."
     )
-    assert "발송 · 알림" not in member_menu, (
-        "그 아래 항목이 전부 관리자 몫인 소제목이 남아 있습니다."
-    )
+    # 관리자 몫으로 남은 것들은 일반 사용자 메뉴에 없다 — 2026-11-02 기준으로
+    # 「정말로 모두에게 같이 걸리는 것」만 남았다(언론사·알림 감시·삭제 기록·공용 키).
+    for path in ("/outlets", "/deleted", "/breaking-alert"):
+        assert f'href="{path}"' not in member_menu, (
+            f"일반 사용자 메뉴에 {path}가 남아 있습니다 — 공용 설정입니다."
+        )
 
     print("✓ 관리자 권한: 설정은 관리자만(자물쇠가 꺼져 있으면 안 막음), 형광펜·큐레이션은 모두, 마지막 관리자는 못 내림")
 
@@ -8237,7 +8253,7 @@ def test_title_watch_alert():
          patch("app.naver_api.fetch_for_title_check", fake_fetch), \
          patch("app.telegram_bot.send_text", fake_send):
         labels_mod.LABELS_FILE.write_text(json.dumps(label_rows, ensure_ascii=False), encoding="utf-8")
-        tw._memo_last_run_at = None
+        tw._memo_last_run_at = {}
         tick = lambda when: tw.watch_tick(when, background=False)
 
         # (1) 주기가 안 됐으면 아무것도 하지 않는다 — 네이버를 한 건도 부르지 않는다.

@@ -26,6 +26,7 @@ from app.email_recipients import active_recipient_emails, load_email_recipients
 from app.email_sender import send_text as send_email_text
 from app.history_renderer import generate_history_page
 from app.landing_renderer import generate_landing_page
+from app import store
 from app.renderer import generate_screen, latest_confirmed_report
 from app import send_log
 from app.report_message import content_labels, email_message, plan_messages, send_planned
@@ -152,8 +153,18 @@ def _delivered_any(result) -> bool:
 
 
 def _run_key(run: dict) -> str:
-    """발송 기록이 회차를 가리키는 키 — 「YYYY-MM-DD|HH:MM」(app.manual_keyword_note와 같은 모양)."""
-    return f"{str(run.get('run_at', ''))[:10]}|{run.get('run_slot', '')}"
+    """자동발송 재시도를 세는 키 — 「YYYY-MM-DD|HH:MM|사람」.
+
+    **사람을 넣는 것이 계약이다.** 받는 사람이 사람별이 되면서 자동발송도 사람마다
+    돌므로(`app/scheduler.py`), 열쇠에 사람이 없으면 **한 사람의 발송 실패 5회가 다른
+    사람의 같은 회차까지 포기시킨다** — 그 사람 쪽은 멀쩡한데 보고서가 안 나간다
+    (회차 재시도 `_failure_key`와 같은 함정·같은 처방).
+
+    날짜가 맨 앞인 모양은 그대로다 — 지난 날짜를 버리는 코드가 `split("|", 1)[0]`로
+    날짜를 읽는다.
+    """
+    who = store.current_owner() or ""
+    return f"{str(run.get('run_at', ''))[:10]}|{run.get('run_slot', '')}|{who}"
 
 
 def _auto_retry_ready(run: dict, now: datetime) -> bool:

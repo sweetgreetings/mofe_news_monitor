@@ -49,7 +49,10 @@ _lock = threading.Lock()
 # 마지막으로 확인한 시각을 메모리에도 들고 있는다 — 디스크에 못 쓰는 상태(꽉 참·권한)에서
 # 파일값만 보면 주기 판정이 매 tick 참이 되어 **같은 알림을 10초마다 다시 보낸다**.
 # 앱을 다시 켜면 잊지만, 그때는 한 주기 일찍 한 번 더 도는 것뿐이다.
-_memo_last_run_at: Optional[str] = None
+# **사람마다 따로 센다** — 라벨이 사람별이 되면서 이 감시도 사람마다 돈다
+# (`app/scheduler.py`). 하나로 두면 **첫 사람이 돌고 나면 나머지는 30분 동안
+# 건너뛰어진다**(그 사람 라벨은 영영 안 보게 된다).
+_memo_last_run_at: dict = {}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -313,6 +316,7 @@ def watch_tick(now: Optional[datetime] = None, *, background: bool = True) -> in
     회차 수집·자동발송 유예 확인이 그만큼 밀린다(app.negative_guess가 스레드를 쓰는
     것과 같은 이유). 테스트는 `background=False`로 끝까지 기다린다.
     """
+    from app import store
     from app.telegram_recipients import active_alert_chat_ids
 
     now = now or datetime.now(_KST)
@@ -335,22 +339,28 @@ def watch_tick(now: Optional[datetime] = None, *, background: bool = True) -> in
         # 저장이 실패한 동안에도 주기를 지키려고 마지막 확인 시각을 메모리에도 들고 있다
         # — 디스크에 못 쓰는 상태에서 파일값만 보면 `is_due`가 매 tick 참이 되어 같은
         # 알림을 10초마다 다시 보낸다.
-        last = max(filter(None, [state.get("last_run_at"), _memo_last_run_at]), default=None)
+        who = store.current_owner()
+        last = max(
+            filter(None, [state.get("last_run_at"), _memo_last_run_at.get(who)]), default=None
+        )
         if not is_due(now, last):
             return 0
 
         def _go() -> int:
-            global _memo_last_run_at
-            try:
-                _memo_last_run_at = now.isoformat(timespec="seconds")
-                return _run_once(state, chat_ids, now)
-            except Exception:
-                # 여기서 막지 않으면 스케줄러까지 올라가 그 tick의 보관 기간 정리가
-                # 통째로 건너뛰어진다(app.labels가 읽기 권한 오류를 안 잡는다).
-                logger.exception("제목 변경 확인 중 오류 — 다음 주기에 다시 시도합니다")
-                return 0
-            finally:
-                _lock.release()
+            # **스레드는 소유자 맥락을 물려받지 않는다**(스레드마다 따로 쥔다) — 뒤에서
+            # 돌 때 `who`를 다시 걸지 않으면 그 스레드가 **바닥 주인의 라벨**을 보고
+            # 남의 명단에 알린다.
+            with store.owner(who):
+                try:
+                    _memo_last_run_at[who] = now.isoformat(timespec="seconds")
+                    return _run_once(state, chat_ids, now)
+                except Exception:
+                    # 여기서 막지 않으면 스케줄러까지 올라가 그 tick의 보관 기간 정리가
+                    # 통째로 건너뛰어진다(app.labels가 읽기 권한 오류를 안 잡는다).
+                    logger.exception("제목 변경 확인 중 오류 — 다음 주기에 다시 시도합니다")
+                    return 0
+                finally:
+                    _lock.release()
 
         released = True   # _go가 책임지고 푼다
         if background:
