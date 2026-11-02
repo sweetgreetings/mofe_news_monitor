@@ -1,0 +1,8 @@
+# Supabase(Postgres)에 데이터를 둘 때만 필요하다 — `.env`에 DATABASE_URL을 넣은 경우.
+# 파일로 쓰는 기본 상태에서는 **설치하지 않아도 앱이 그대로 돈다**(requirements.txt의
+# 네 개뿐이다 — SERVER_REQUIREMENTS.md §1의 그 약속을 지킨다).
+#
+#   pip install -r requirements-postgres.txt
+#
+# [binary]는 미리 빌드된 바퀴를 받아 컴파일러가 필요 없게 한다.
+psycopg[binary]>=3.1,<4

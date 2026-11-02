@@ -33,7 +33,7 @@
 
 - 실행: `python3 main.py` (스케줄러 + 설정·큐레이션 서버 + 브라우저 열기). `--no-browser`는 자동 실행용.
 - 테스트: `python3 tests/test_integration.py`. 린터·타입체커 없음.
-- 의존성: `requirements.txt` — `requests`, `python-dotenv`, `anthropic`, `openpyxl`.
+- 의존성: `requirements.txt` — `requests`, `python-dotenv`, `anthropic`, `openpyxl`. **Supabase(Postgres)에 데이터를 둘 때만** `requirements-postgres.txt`(`psycopg`)를 더 깐다 — 파일로 쓰는 기본 상태는 넷뿐이다.
 - 운영 환경: macOS(자동 실행은 macOS LaunchAgent). 파일명은 Windows에서도 쓸 수 있게 `:`를 쓰지 않는다(`09:00` → `09-00`). 사용자 1명, 로그인 없음.
 - 범위 밖: 다른 뉴스 소스, 계정·로그인, 원격·모바일 접속.
 
@@ -87,7 +87,15 @@ FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN
   - **예외를 삼키지 않는다** — 없으면 `OSError`, 깨졌으면 `ValueError`를 그대로 올린다. 모듈마다 「없으면 빈 것 / 깨졌으면 다시 만들기 / 경고 로그」가 다른데 이 겹이 기본값을 정해 주면 그 판단이 조용히 하나로 뭉개진다. **지금 각 모듈이 들고 있는 try/except가 그대로 계약이다.**
   - **`ensure_ascii=False`는 이 겹의 기본값이고 `indent`는 부르는 쪽이 적는다** — 42곳이 전부 전자를 쓰고, 들여쓰기는 자리마다 다르다(`undo_stack.json`은 하루 6.9MB라 들여쓰기가 곧 용량이다).
   - **화면 HTML을 쓰는 렌더러 다섯은 이 규칙 밖이고 `app/atomic_write.py`를 그대로 쓴다** — 저장소가 아니라 화면이고, 2단계에서 「파일로 쓰지 않고 응답으로 돌려준다」로 바뀔 자리라 성격이 다르다. `AI_RULES.md`를 읽는 자리(프롬프트 원본)와 미리 만들어 둔 화면 파일·로고를 내보내는 자리도 밖이다.
-  - **DB로 갈 때 갈아끼우는 자리는 `store.py` 안 `_fs_*` 함수들뿐이다.** 부르는 쪽은 Path를 그대로 넘기므로, 테스트가 임시 폴더로 갈아끼우는 방식(`patch.object(labels, "LABELS_FILE", …)`)도 그대로 돈다.
+  - **백엔드가 둘이다** — 파일(`_fs_*`)과 **Postgres**(`app/store_pg.py`). 고르는 자리는 `_route()` 하나이고 기준은 `.env`의 `DATABASE_URL`이다: **없으면 파일**(지금 혼자 쓰는 상태가 한 글자도 안 바뀐다), 있으면 Postgres(Supabase).
+    - **`DATA_DIR` 밖은 언제나 파일이다** — `.env`·`AI_RULES.md`·테스트의 임시 폴더는 옮길 대상이 아니고, 그 덕에 테스트 격리가 그대로 돈다.
+    - **키가 곧 행이다** — `labels.json` · `users/{계정}/articles/…json`처럼 `DATA_DIR` 기준 상대 경로가 기본키다. 사람별 칸은 키 안에 이미 누구인지 적혀 있어 경계가 그대로 따라온다.
+    - **없는 자리를 읽으면 `FileNotFoundError`를 올린다** — 도메인 모듈 42개의 try/except가 그 예외를 잡고 있어, 다른 예외를 내면 그 판단이 전부 어긋난다. 두 백엔드가 같은 약속을 지켜야 하는 이유다.
+    - `list_keys`는 **아래 칸으로 안 내려간다**(`Path.glob`과 같아야 한다). 이름 대조는 `fnmatch`로 한다 — `*.deleted-*.json` 같은 모양을 SQL `like`로 옮기면 틈이 생긴다.
+    - **`psycopg`는 `requirements-postgres.txt`에 따로 둔다** — 파일로 쓰는 기본 상태는 패키지 넷뿐이라는 약속을 지킨다(SERVER_REQUIREMENTS.md §1).
+    - 붙이고 지금 `data/`를 올리는 명령은 `supabase_setup.py`(`확인`·`미리보기`·`올리기`·`대조`). **순서가 계약이다 — 먼저 올리고 그다음에 앱을 재시작한다**(거꾸로면 빈 DB를 보고 화면이 비어 보인다). 이미 있는 키는 건드리지 않아 두 번 돌려도 안전하다.
+    - `tests/test_integration.py` `test_postgres_backend_contract`가 이 상태를 지킨다(DB 없이 볼 수 있는 것만 — 연결이 필요한 것은 붙인 뒤 확인한다). → H: Supabase 백엔드
+  - **그 밖에 DB로 갈 때 갈아끼우는 자리는 없다.** 부르는 쪽은 Path를 그대로 넘기므로, 테스트가 임시 폴더로 갈아끼우는 방식(`patch.object(labels, "LABELS_FILE", …)`)도 그대로 돈다.
   - **「누구의 데이터인가」도 이 겹이 안다** — 저장소 칸마다 사람별인지 공용인지 표(`_PER_USER`/`_SHARED`)가 있고, 사람별 칸은 `data/users/{계정 id}/…`로 풀린다(`_resolve`). **가르는 기준은 새로 만들지 않았다** — 「기관 기사 원장」 절의 그 표 그대로다: 「이 기사에 관한 사실」이면 공용(제목·요약·사진 판정·라벨·기관 원장), 「이 기사를 내 보고서에 어쩔 건가」면 사람별(숨김·소제목 배정·이름표·순서·담아둠·메모·회차 끊기·되돌리기·수시 카드·내 회차).
     - **칸 이름은 `DATA_DIR` 바로 아래 첫 조각이다** — `articles/…`도 `adhoc/cards/…`도 첫 조각으로 갈려 표가 한 줄이면 된다.
     - **표에 없는 칸은 거부한다**(`KeyError`) — 새 저장 자리를 만들면서 「사람별인가 공용인가」를 정하지 않고 지나가는 일을 막는다. 빠뜨리면 남의 보고서가 내 화면에 섞인다.

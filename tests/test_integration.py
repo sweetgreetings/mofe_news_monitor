@@ -6549,6 +6549,9 @@ def test_storage_goes_through_one_place():
     }
     allowed_raw = {
         "app/store.py",
+        # 한 번 하는 이사 — 디스크의 data/를 읽어 DB에 올린다(`upload_from_files`).
+        # 저장소를 **읽는** 것이 아니라 파일에서 DB로 옮기는 자리라 여기 있어야 한다.
+        "app/store_pg.py",
         # AI_RULES.md — 저장소가 아니라 저장소에 함께 든 **프롬프트 원본**이다.
         "app/llm_classifier.py",
         # 미리 만들어 둔 화면 파일과 로고를 담당자에게 내보내는 자리.
@@ -6575,6 +6578,81 @@ def test_storage_goes_through_one_place():
     )
 
     print(f"✓ 저장 한 겹: 모듈 {len(users)}개가 store를 지나고, 파일을 직접 만지는 자리는 화면 쪽뿐")
+
+
+def test_postgres_backend_contract():
+    """저장 한 겹의 **Postgres 백엔드**가 파일 백엔드와 같은 약속을 지키는지 본다.
+
+    「각자 자기 컴퓨터에 앱을 깔고 데이터는 Supabase 한 곳을 공유」하는 구도를 쓰면
+    **다른 컴퓨터에서 화면을 열 문제가 통째로 사라진다**(각자 자기 `localhost`를 본다).
+    그걸 쓰려면 저장소가 공용 DB여야 하고, 갈아끼우는 자리는 `app/store.py`의 백엔드
+    함수 여덟 하나다.
+
+    **DB 없이 볼 수 있는 것만 본다** — 연결이 필요한 것은 실제 Supabase를 붙인 뒤
+    확인한다(이 테스트는 어떤 네트워크도 쓰지 않는다):
+      ① `DATABASE_URL`이 없으면 **파일 백엔드**다(지금 혼자 쓰는 상태가 안 바뀐다)
+      ② 두 백엔드가 **같은 이름 여덟**을 갖는다(한쪽만 고치면 여기서 깨진다)
+      ③ `DATA_DIR` 밖(`.env`·테스트 임시 폴더)은 **Postgres가 켜져 있어도 파일**이다
+      ④ 키 고르기(`list_keys`)가 아래 칸으로 안 내려간다
+    """
+    _require_isolation()
+    from app import store, store_pg
+
+    # ① 기본은 파일이다
+    assert not store_pg.is_enabled(), (
+        "DATABASE_URL이 설정된 채로 테스트를 돌렸습니다 — 파일 백엔드를 전제합니다."
+    )
+    assert store._pg() is None
+
+    # ② 두 백엔드가 같은 이름 여덟을 갖는다
+    pairs = [
+        ("_fs_read_text", "read_text"), ("_fs_write_text", "write_text"),
+        ("_fs_exists", "exists"), ("_fs_delete", "delete"),
+        ("_fs_move", "move"), ("_fs_ensure_dir", "ensure_dir"),
+        ("_fs_list", "list_keys"), ("_fs_signature", "signature"),
+    ]
+    for fs_name, pg_name in pairs:
+        assert hasattr(store, fs_name), f"파일 백엔드에 {fs_name}이 없습니다."
+        assert hasattr(store_pg, pg_name), (
+            f"Postgres 백엔드에 {pg_name}이 없습니다 — 한쪽만 고치면 켜는 순간 터집니다."
+        )
+
+    # ③ Postgres가 켜져 있어도 DATA_DIR 밖은 파일이다
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        with patch.object(store_pg, "database_url", lambda: "postgresql://x/y"):
+            assert store_pg.is_enabled()
+            # 임시 폴더(= DATA_DIR 밖)는 파일 백엔드로 간다
+            backend, at = store._route(tmp_dir / "밖에있는것.json")
+            assert backend is None and isinstance(at, Path), (
+                "DATA_DIR 밖의 자리를 DB로 보냈습니다 — 테스트 격리와 .env가 깨집니다."
+            )
+            # DATA_DIR 안은 DB로 가고, 그 자리는 **키 문자열**이다
+            with patch.object(store, "DATA_DIR", tmp_dir):
+                backend, at = store._route(tmp_dir / "labels.json")
+                assert backend is store_pg and at == "labels.json", (backend, at)
+                # 사람별 칸은 키 안에 누구인지 적힌다
+                with store.owner("u2"):
+                    _, at = store._route(tmp_dir / "hidden_articles.json")
+                    assert at == "users/u2/hidden_articles.json", at
+
+    # ④ 키 고르기가 아래 칸으로 안 내려간다 — 쿼리는 흉내 내고 거르기만 본다
+    rows = [
+        ("articles/2026-01-01_09-00.json",),
+        ("articles/2026-01-02_09-00.json",),
+        ("articles/깊은칸/안쪽.json",),      # 아래 칸 — 빠져야 한다
+        ("articles/메모.txt",),               # 모양이 안 맞음 — 빠져야 한다
+    ]
+    with patch.object(store_pg, "ensure_schema", lambda: None), \
+         patch.object(store_pg, "_run", lambda *a, **k: rows):
+        got = store_pg.list_keys("articles", "*.json")
+    assert got == [
+        "articles/2026-01-01_09-00.json",
+        "articles/2026-01-02_09-00.json",
+    ], f"키 고르기가 Path.glob과 다르게 돕니다: {got}"
+
+    print("✓ Postgres 백엔드 계약: 기본은 파일, 두 백엔드가 같은 이름 여덟, "
+          "DATA_DIR 밖은 늘 파일, 키 고르기는 아래 칸으로 안 내려감")
 
 
 def test_user_boundary():
@@ -8741,6 +8819,7 @@ if __name__ == "__main__":
         test_env_key_transplant,
         test_key_paths_stay_narrow,
         test_storage_goes_through_one_place,
+        test_postgres_backend_contract,
         test_user_boundary,
         test_base_owner_needs_no_migration,
         test_settings_split_per_user,

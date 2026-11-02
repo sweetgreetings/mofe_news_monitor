@@ -36,14 +36,22 @@ sudo pmset -b sleep 0 displaysleep 10
 
 ## 1. 연결하는 길 — 셋 중 하나
 
+> **길이 넷이고, 성격이 둘로 갈린다.**
+> - **A·B·C**는 「노트북 한 대가 서버, 나머지는 브라우저로 접속」이다 → 주소·포트·터널을 풀어야 한다.
+> - **D**는 「각자 자기 컴퓨터에 앱을 깔고 **데이터만 Supabase 한 곳을 공유**」다
+>   → **접속 문제가 통째로 사라진다**(각자 자기 `localhost`를 본다). 대신 컴퓨터마다 설치가 있다.
+
 | | 어떻게 | 좋은 점 | 걸리는 점 |
 |---|---|---|---|
+| **D. 각자 설치 + Supabase** | 데이터를 공용 DB에 두고 각자 앱을 돌린다 | **터널·포트·고정 주소가 필요 없다.** 회사망·방화벽과 무관. 각자 자기 컴퓨터만 켜면 됨 | 컴퓨터마다 **파이썬·앱 설치**. 데이터가 외부 클라우드(Supabase)에 있다 |
 | **A. 같은 와이파이** | 노트북의 랜 IP로 접속 | 설치가 없다. 가장 단순 | **같은 와이파이에 있어야** 한다. IP가 바뀔 수 있다 |
 | **B. Tailscale**(권장) | 기기끼리 사설 VPN, 주소가 고정 | **어느 네트워크에 있든** 된다. 주소가 안 바뀐다. 무료 | 기기마다 앱을 한 번 설치·로그인 |
 | **C. Cloudflare 터널** | 공개 https 주소를 임시로 만든다 | 받는 쪽에 설치가 없다. **https라 복사 기능이 더 매끄럽다** | 무료는 주소가 **켤 때마다 바뀐다**. 주소를 아는 사람은 누구나 로그인 화면까지 닿는다 |
 
-**B(Tailscale)를 권한다** — 집·카페·모바일 데이터 어디서든 같은 주소로 붙고, 주소가 안
-바뀌어서 참가자에게 한 번만 알려 주면 된다.
+**지금 고른 길은 D(각자 설치 + Supabase)다**(2026-11-02) — 접속 문제가 통째로 사라지는
+것이 가장 크고, 회사망·방화벽과 무관해서 협의를 기다리지 않아도 된다.
+
+A·B·C 중에서 고른다면 **B(Tailscale)** 다 — 어디서든 같은 주소로 붙고 주소가 안 바뀐다.
 
 ### A. 같은 와이파이로 할 때
 
@@ -82,6 +90,50 @@ sudo pmset -b sleep 0 displaysleep 10
    launchctl kickstart -k gui/$(id -u)/local.press-monitor
    ```
 4. 다른 기기에서 `http://100.x.x.x:8765/home.html`
+
+### D. 각자 설치 + Supabase로 할 때
+
+데이터를 Supabase(Postgres)에 두면 **각자 자기 컴퓨터에서 앱을 돌려도 같은 데이터를
+본다.** 「다른 컴퓨터에서 이 화면을 열기」 문제가 아예 없어진다.
+
+**담당자 노트북에서 (한 번만):**
+
+1. `supabase.com`에서 프로젝트를 하나 만든다(무료). 데이터베이스 비밀번호를 적어 둔다.
+2. **Settings › Database › Connection string › URI**를 복사한다
+   (`[YOUR-PASSWORD]` 자리를 실제 비밀번호로 바꾼다).
+3. 드라이버를 깐다:
+   ```bash
+   cd ~/press-monitor && pip3 install -r requirements-postgres.txt
+   ```
+4. 붙는지 본다(아무것도 안 바꾼다):
+   ```bash
+   # 먼저 .env에 DATABASE_URL=... 한 줄을 넣고
+   python3 supabase_setup.py 확인
+   python3 supabase_setup.py 미리보기
+   ```
+5. **앱을 멈추고** 지금 데이터를 올린다:
+   ```bash
+   launchctl bootout gui/$(id -u)/local.press-monitor
+   python3 supabase_setup.py 올리기
+   python3 supabase_setup.py 대조
+   launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.press-monitor.plist
+   ```
+
+> **순서가 계약이다 — 먼저 올리고 그다음에 앱을 켠다.** `DATABASE_URL`을 넣은 뒤
+> 올리기 전에 앱을 켜면 **빈 DB를 보고 화면이 비어 보인다.** 이미 있는 키는 건드리지
+> 않으므로 `올리기`는 두 번 돌려도 안전하다.
+
+**참가자 컴퓨터에서:**
+
+1. 파이썬 3.9 이상
+2. 앱 폴더를 복사(또는 GitHub에서 clone) → `pip3 install -r requirements.txt -r requirements-postgres.txt`
+3. `.env`에 **같은 `DATABASE_URL`** 한 줄
+4. `python3 main.py` → 브라우저가 열리고, 담당자가 만들어 준 계정으로 로그인
+5. 자기 네이버 키를 넣는다(아래 §2)
+
+> **`SERVER_HOST`는 넣지 않는다** — 각자 자기 컴퓨터에서 보므로 바깥에 열 필요가 없다.
+> 그래서 이 길에서는 자물쇠가 강제되지 않는다. **대신 켜 두는 것을 권한다**
+> (같은 DB를 여러 사람이 보므로 「내가 누구인지」가 데이터 경계의 근거다).
 
 ### C. Cloudflare 터널로 할 때
 

@@ -198,6 +198,30 @@ def _resolve(path: Path) -> Path:
     return Path(DATA_DIR) / _USERS_SEGMENT / uid / rel
 
 
+# ──────────────── 어느 백엔드로 갈까 ────────────────
+# **`DATABASE_URL`이 있으면 Postgres(Supabase), 없으면 파일이다.** 없는 게 기본이라
+# 혼자 쓰는 지금은 한 글자도 안 바뀐다(`app/store_pg.py`).
+#
+# **`DATA_DIR` 밖의 것은 언제나 파일이다** — `.env`·`AI_RULES.md`·테스트의 임시 폴더는
+# 옮길 대상이 아니고, 그 덕에 테스트 격리도 그대로 돈다.
+
+def _pg():
+    """Postgres 백엔드가 켜져 있으면 그 모듈, 아니면 `None`."""
+    from app import store_pg
+
+    return store_pg if store_pg.is_enabled() else None
+
+
+def _route(path):
+    """`(백엔드, 그 백엔드가 쓰는 자리)` — Postgres면 키 문자열, 파일이면 `Path`."""
+    target = _resolve(Path(path))
+    rel = _rel(target)
+    backend = _pg()
+    if backend is not None and rel is not None:
+        return backend, rel
+    return None, target
+
+
 def real_path(path) -> Path:
     """그 자리의 **실제 파일 경로**(사람별이면 그 사람 폴더로 풀린 것).
 
@@ -226,7 +250,8 @@ def key_of(path) -> str:
 
 def read_text(path) -> str:
     """원문 그대로. 없거나 못 읽으면 `OSError`(지금과 같다)."""
-    return _fs_read_text(_resolve(Path(path)))
+    backend, at = _route(path)
+    return backend.read_text(at) if backend else _fs_read_text(at)
 
 
 def read_json(path):
@@ -238,12 +263,15 @@ def read_json(path):
 
 def write_text(path, text: str) -> None:
     """원자적으로 쓴다 — 임시 파일에 쓴 뒤 교체해, 겹쳐 써도 반쪽 파일이 안 남는다."""
-    target = _resolve(Path(path))
+    backend, at = _route(path)
+    if backend:
+        backend.write_text(at, text)
+        return
     # 사람별 칸으로 옮겨 쓰는 경우에만 그 사람 폴더를 만든다 — 공용 칸은 예전처럼
     # 폴더가 있다고 보고 바로 쓴다(없으면 `OSError`를 올리던 그 동작 그대로).
-    if target != Path(path):
-        _fs_ensure_dir(target.parent)
-    _fs_write_text(target, text)
+    if at != Path(path):
+        _fs_ensure_dir(at.parent)
+    _fs_write_text(at, text)
 
 
 def write_json(path, data, *, indent: Optional[int] = None) -> None:
@@ -254,27 +282,47 @@ def write_json(path, data, *, indent: Optional[int] = None) -> None:
 # ───────────────────── 있는지 · 치우기 · 옮기기 ─────────────────────
 
 def exists(path) -> bool:
-    return _fs_exists(_resolve(Path(path)))
+    backend, at = _route(path)
+    return backend.exists(at) if backend else _fs_exists(at)
 
 
 def delete(path, *, missing_ok: bool = True) -> None:
-    _fs_delete(_resolve(Path(path)), missing_ok=missing_ok)
+    backend, at = _route(path)
+    if backend:
+        backend.delete(at, missing_ok=missing_ok)
+        return
+    _fs_delete(at, missing_ok=missing_ok)
 
 
 def move(src, dst) -> None:
     """옮긴다(같은 저장소 안). 받는 자리의 폴더는 만들어 둔다."""
-    target = _resolve(Path(dst))
-    _fs_ensure_dir(target.parent)
-    _fs_move(_resolve(Path(src)), target)
+    backend, to = _route(dst)
+    if backend:
+        _, frm = _route(src)
+        backend.move(frm, to)
+        return
+    _fs_ensure_dir(to.parent)
+    _fs_move(_resolve(Path(src)), to)
 
 
 def ensure_dir(path) -> None:
-    _fs_ensure_dir(_resolve(Path(path)))
+    backend, at = _route(path)
+    if backend:
+        backend.ensure_dir(at)   # DB엔 폴더가 없다 — 할 일이 없다
+        return
+    _fs_ensure_dir(at)
 
 
 def list_files(directory, pattern: str = "*.json") -> list:
-    """그 칸에 든 것들 — 이름 사전순. 칸이 없으면 빈 목록."""
-    return _fs_list(_resolve(Path(directory)), pattern)
+    """그 칸에 든 것들 — 이름 사전순. 칸이 없으면 빈 목록.
+
+    Postgres에서도 **`Path`를 돌려준다** — 부르는 쪽이 `.name`을 읽고 그 값을 다시
+    이 모듈에 넘기기 때문이다(그 길이 다시 키로 풀린다).
+    """
+    backend, at = _route(directory)
+    if backend:
+        return [Path(DATA_DIR) / key for key in backend.list_keys(at, pattern)]
+    return _fs_list(at, pattern)
 
 
 def signature(path):
@@ -283,7 +331,8 @@ def signature(path):
     메모리 캐시가 「이 파일 다시 읽어야 하나」를 이것으로 판정한다
     (`run_index`·`curation`·`adhoc/card`). DB로 가면 갱신 시각이 그 자리를 받는다.
     """
-    return _fs_signature(_resolve(Path(path)))
+    backend, at = _route(path)
+    return backend.signature(at) if backend else _fs_signature(at)
 
 
 # ─────────────────── 아래가 파일 백엔드다 ───────────────────
