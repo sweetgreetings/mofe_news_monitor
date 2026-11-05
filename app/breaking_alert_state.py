@@ -8,7 +8,7 @@ from app.config import BREAKING_ALERT_STATE_FILE
 
 
 def load_state() -> dict:
-    if not BREAKING_ALERT_STATE_FILE.exists():
+    if not store.exists(BREAKING_ALERT_STATE_FILE):
         return {}
     try:
         data = store.read_json(BREAKING_ALERT_STATE_FILE)

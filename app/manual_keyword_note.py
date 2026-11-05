@@ -83,7 +83,7 @@ def _read_notes() -> dict:
     옛 형식({"text", "date", "run_slot"} 1건)도 그대로 읽어 같은 모양으로 바꿔준다 —
     다음 저장 때 새 형식으로 옮겨 적히고, 그때까지 화면 동작은 동일하다.
     """
-    if not MANUAL_KEYWORD_NOTE_FILE.exists():
+    if not store.exists(MANUAL_KEYWORD_NOTE_FILE):
         return {}
     try:
         data = store.read_json(MANUAL_KEYWORD_NOTE_FILE)

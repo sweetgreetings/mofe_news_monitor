@@ -30,7 +30,7 @@ def _today_str(now: Optional[datetime] = None) -> str:
 
 def _load_slots(now: Optional[datetime] = None) -> list:
     """오늘 이미 자동 분류를 쓴 회차(slot end) 목록. 읽을 수 없으면 빈 목록."""
-    if not AUTO_CLASSIFY_TURNS_FILE.exists():
+    if not store.exists(AUTO_CLASSIFY_TURNS_FILE):
         return []
     try:
         data = store.read_json(AUTO_CLASSIFY_TURNS_FILE)

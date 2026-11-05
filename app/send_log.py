@@ -42,7 +42,7 @@ def _day_file(date_str: str):
 
 def _read_day(date_str: str) -> list:
     path = _day_file(date_str)
-    if not path.exists():
+    if not store.exists(path):
         return []
     try:
         data = store.read_json(path)
@@ -56,12 +56,10 @@ def _read_day(date_str: str) -> list:
 def _cleanup(now: datetime) -> None:
     """보관 기간이 지난 날짜 파일을 지운다 — 기록을 쓸 때마다 한 번(파일이 90개 남짓이라 가볍다)."""
     cutoff = (now - timedelta(days=SEND_LOG_RETENTION_DAYS)).strftime("%Y-%m-%d")
-    if not SEND_LOG_DIR.exists():
-        return
-    for path in SEND_LOG_DIR.glob("*.json"):
+    for path in store.list_files(SEND_LOG_DIR):
         if path.stem < cutoff:
             try:
-                path.unlink()
+                store.delete(path)
             except OSError:
                 logger.warning("지난 발송 기록을 지우지 못했습니다: %s", path)
 
@@ -183,7 +181,7 @@ def record(
                     entries.append(entry)
             else:
                 entries.append(entry)
-            SEND_LOG_DIR.mkdir(parents=True, exist_ok=True)
+            store.ensure_dir(SEND_LOG_DIR)
             store.write_json(_day_file(date_str), {"entries": entries}, indent=1)
             _cleanup(now)
     except OSError:
@@ -196,10 +194,8 @@ def load_days(now: Optional[datetime] = None) -> list:
     """[(날짜, [기록… 최신순]), …] 날짜도 최신순. 보관 기간 안의 기록이 있는 날만."""
     now = now or datetime.now()
     cutoff = (now - timedelta(days=SEND_LOG_RETENTION_DAYS)).strftime("%Y-%m-%d")
-    if not SEND_LOG_DIR.exists():
-        return []
     days = []
-    for path in sorted(SEND_LOG_DIR.glob("*.json"), reverse=True):
+    for path in sorted(store.list_files(SEND_LOG_DIR), reverse=True):
         if path.stem < cutoff:
             continue
         entries = _read_day(path.stem)

@@ -90,12 +90,13 @@ def _refresh_locked(entries: dict) -> tuple[dict, bool]:
     fresh: dict = {}
     changed = False
 
-    for path in _articles_dir().glob("*.json"):
-        try:
-            stat = path.stat()
-        except OSError:
+    # **목록과 서명은 app.store를 거친다** — 여기서 glob·stat을 직접 쓰면 저장 자리가
+    # Postgres일 때 목록이 영원히 비어, 방금 저장한 회차가 어느 화면에도 안 보인다.
+    for path in store.list_files(_articles_dir()):
+        sig = store.signature(path)
+        if sig is None:
             continue
-        signature = {"mtime_ns": stat.st_mtime_ns, "size": stat.st_size}
+        signature = {"mtime_ns": sig[0], "size": sig[1]}
         cached = entries.get(path.name)
         if (
             cached

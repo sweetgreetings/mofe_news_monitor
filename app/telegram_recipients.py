@@ -78,7 +78,7 @@ def load_telegram_recipients() -> list:
     파일이 아직 없고 .env에 TELEGRAM_CHAT_ID가 남아 있으면 예전 "챗 아이디 1개" 방식으로
     쓰던 사람을 잃지 않도록 "나"로 한 번만 등록해준다.
     """
-    if not TELEGRAM_RECIPIENTS_FILE.exists():
+    if not store.exists(TELEGRAM_RECIPIENTS_FILE):
         if TELEGRAM_CHAT_ID:
             seeded = [_normalize_recipient({"name": "나", "chat_id": TELEGRAM_CHAT_ID, "enabled": True})]
             _write(seeded)

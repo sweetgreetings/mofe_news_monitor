@@ -34,7 +34,7 @@ def load_live_cache(now: Optional[datetime] = None) -> Optional[dict]:
       keyword_last_seen: {키워드: ISO 시각} — 그 키워드를 마지막으로 어디까지 검색했는지.
       keyword_articles: {키워드: [기사, ...]} — 그 키워드의 원시 검색 결과 누적(당일 전체).
     """
-    if not LIVE_CACHE_FILE.exists():
+    if not store.exists(LIVE_CACHE_FILE):
         return None
     try:
         data = store.read_json(LIVE_CACHE_FILE)

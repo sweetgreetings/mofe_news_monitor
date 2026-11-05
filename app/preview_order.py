@@ -21,7 +21,7 @@ def load_preview_order(now: Optional[datetime] = None) -> list:
     같은 패턴으로, 파일을 그 자리에서 지우진 않고 다음 save_preview_order 호출 때 오늘
     날짜로 덮어써진다.
     """
-    if not PREVIEW_ORDER_FILE.exists():
+    if not store.exists(PREVIEW_ORDER_FILE):
         return []
     try:
         data = store.read_json(PREVIEW_ORDER_FILE)

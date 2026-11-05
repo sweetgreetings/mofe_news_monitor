@@ -30,6 +30,7 @@ from app.config import (
     SETTINGS_SERVER_HOST,
     SETTINGS_SERVER_PORT,
 )
+from app import store
 from app.atomic_write import atomic_write_text
 from app.alerted_urls import alerted_items, already_alerted_urls
 from app.credentials import llm_is_configured, naver_is_configured
@@ -512,9 +513,9 @@ def _todays_adhoc_state() -> dict:
     today = datetime.now().strftime("%Y-%m-%d")
     compact = today.replace("-", "")
     cards = []
-    for stem in sorted((p.stem for p in adhoc_card.CARDS_DIR.glob(f"{compact}-*.json")), reverse=True):
+    for stem in sorted((p.stem for p in store.list_files(adhoc_card.CARDS_DIR, f"{compact}-*.json")), reverse=True):
         try:
-            data = json.loads((adhoc_card.CARDS_DIR / f"{stem}.json").read_text(encoding="utf-8"))
+            data = store.read_json(adhoc_card.CARDS_DIR / f"{stem}.json")
         except (json.JSONDecodeError, OSError):
             continue
         if data.get("collect_date") == today and data.get("status") != "archived":

@@ -22,7 +22,7 @@ def load_preview_cache(now: Optional[datetime] = None) -> Optional[dict]:
     app.live_cache와 같은 패턴으로, 별도의 자정 정리 없이 다음 호출이 자연히
     "캐시 없음 = 이 회차 시작부터 새로 검색"으로 처리하게 한다.
     """
-    if not PREVIEW_CACHE_FILE.exists():
+    if not store.exists(PREVIEW_CACHE_FILE):
         return None
     try:
         data = store.read_json(PREVIEW_CACHE_FILE)

@@ -25,7 +25,7 @@ def load_assigned_groups(now: Optional[datetime] = None) -> list:
     (add_assigned_group 참고) — "미분류 배정"은 기존 분류를 건드리지 않는다는
     원칙이라, 새로 생긴 소제목도 순서를 흔들지 않고 자연스러운 자리(맨 뒤)에 둔다.
     """
-    if not ASSIGNED_GROUPS_FILE.exists():
+    if not store.exists(ASSIGNED_GROUPS_FILE):
         return []
     try:
         data = store.read_json(ASSIGNED_GROUPS_FILE)

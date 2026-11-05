@@ -40,11 +40,9 @@ _cache_sig: Optional[tuple] = None
 
 
 def _signature() -> Optional[tuple]:
-    try:
-        st = PHOTO_OVERRIDES_FILE.stat()
-    except OSError:
-        return None
-    return (st.st_mtime_ns, st.st_size)
+    # **store.signature를 거친다** — `.stat()`을 직접 보면 저장 자리가 Postgres일 때
+    # 늘 None이고, 그러면 캐시가 매번 "바뀌었다"로 읽혀 호출마다 다시 읽는다.
+    return store.signature(PHOTO_OVERRIDES_FILE)
 
 
 def _read_locked() -> dict:

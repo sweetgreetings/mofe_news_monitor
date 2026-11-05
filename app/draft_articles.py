@@ -20,7 +20,7 @@ def load_draft_pending_articles(now: Optional[datetime] = None) -> list:
     app.manual_articles.load_manual_articles와 같은 패턴 — 저장된 날짜가 오늘이
     아니면(자정이 지났으면) 자동으로 빈 목록 취급한다.
     """
-    if not DRAFT_PENDING_ARTICLES_FILE.exists():
+    if not store.exists(DRAFT_PENDING_ARTICLES_FILE):
         return []
     try:
         data = store.read_json(DRAFT_PENDING_ARTICLES_FILE)

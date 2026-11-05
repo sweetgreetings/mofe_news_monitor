@@ -29,7 +29,7 @@ def _read_raw() -> Optional[str]:
 
 def _write_raw(text: Optional[str]) -> None:
     if text is None:
-        LABELS_FILE.unlink(missing_ok=True)
+        store.delete(LABELS_FILE)
     else:
         store.write_text(LABELS_FILE, text)
 

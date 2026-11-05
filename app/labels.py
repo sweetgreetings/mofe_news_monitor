@@ -39,7 +39,7 @@ class LabelCollisionError(Exception):
 def load_labels() -> dict:
     """{url: {labels, scrap_date, scrap_end, pub_date, outlet, title, group, source,
     labeled_at}} 전체를 읽는다."""
-    if not LABELS_FILE.exists():
+    if not store.exists(LABELS_FILE):
         return {}
     try:
         data = store.read_json(LABELS_FILE)

@@ -47,7 +47,7 @@ def load_group_order(round_id: Optional[tuple] = None) -> list:
     (app.curation.load_group_labels와 같은 이유·같은 방식) — "소제목은 그날그날
     다르게 쓰여도 된다"는 원칙에 따라, 순서도 이름표처럼 회차를 넘어 새지 않는다.
     """
-    if not GROUP_ORDER_FILE.exists():
+    if not store.exists(GROUP_ORDER_FILE):
         return []
     try:
         data = store.read_json(GROUP_ORDER_FILE)
@@ -67,7 +67,7 @@ def save_group_order(order: list, round_id: Optional[tuple] = None) -> None:
     """
     cleaned = [str(name) for name in order if isinstance(name, str) and name]
     try:
-        data = store.read_json(GROUP_ORDER_FILE) if GROUP_ORDER_FILE.exists() else {}
+        data = store.read_json(GROUP_ORDER_FILE) if store.exists(GROUP_ORDER_FILE) else {}
     except (json.JSONDecodeError, TypeError):
         data = {}
     if not isinstance(data, dict):

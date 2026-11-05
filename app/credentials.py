@@ -79,7 +79,7 @@ def _read(path) -> dict:
 
 def _load() -> dict:
     """지금 요청이 쓸 키 묶음 — 공용 셋 + **내** 네이버 키."""
-    data = _read(CREDENTIALS_FILE) if CREDENTIALS_FILE.exists() else {}
+    data = _read(CREDENTIALS_FILE) if store.exists(CREDENTIALS_FILE) else {}
     if _is_base_owner():
         return data
     mine = _read(MY_CREDENTIALS_FILE) if store.exists(MY_CREDENTIALS_FILE) else {}

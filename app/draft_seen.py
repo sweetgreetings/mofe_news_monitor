@@ -42,7 +42,7 @@ def search_condition(groups: list) -> list:
 
 
 def _read() -> dict:
-    if not DRAFT_SEEN_FILE.exists():
+    if not store.exists(DRAFT_SEEN_FILE):
         return {}
     try:
         data = store.read_json(DRAFT_SEEN_FILE)

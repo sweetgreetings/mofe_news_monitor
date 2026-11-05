@@ -224,7 +224,7 @@ def load_settings() -> dict:
     (키워드 그룹 도입 이전 형식)가 남아 있으면 keyword_groups로 옮겨 다시 저장한다.
     highlight_keywords가 옛 문자열 목록 형식이면 {word, color} 형식으로 옮긴다.
     """
-    if not SETTINGS_FILE.exists():
+    if not store.exists(SETTINGS_FILE):
         settings = _default_settings()
         _write_shared(settings)
         return _apply_my_settings(settings)

@@ -24,7 +24,7 @@ def load_custom_groups(now: Optional[datetime] = None) -> list:
     소제목이 자정 이후 사라지면 그 기사들은 app.classifier의 자기 치유 로직에 따라
     자동 분류(또는 "기타")로 조용히 되돌아간다 — 데이터가 없어지는 건 아니다.
     """
-    if not CUSTOM_GROUPS_FILE.exists():
+    if not store.exists(CUSTOM_GROUPS_FILE):
         return []
     try:
         data = store.read_json(CUSTOM_GROUPS_FILE)
@@ -65,7 +65,7 @@ def load_custom_group_labels(now: Optional[datetime] = None) -> dict:
     여기 적히는 건 「이름 (N)」 꼴, 즉 담당자가 친 이름이 겹쳐서 앱이 지어 준 속이름뿐이고
     AI도 담당자도 그런 이름을 직접 짓지 않는다.
     """
-    if not CUSTOM_GROUPS_FILE.exists():
+    if not store.exists(CUSTOM_GROUPS_FILE):
         return {}
     try:
         data = store.read_json(CUSTOM_GROUPS_FILE)

@@ -85,7 +85,7 @@ def _read_recent_raw() -> list:
 
     옛 형식(평평한 URL 문자열 목록)은 애초에 언제 숨겼는지 알 수 없어 그냥 버려진다.
     """
-    if not HIDDEN_ARTICLES_FILE.exists():
+    if not store.exists(HIDDEN_ARTICLES_FILE):
         return []
     try:
         raw = store.read_json(HIDDEN_ARTICLES_FILE)
@@ -121,12 +121,11 @@ _archive_cache: dict = {"sig": None, "urls": frozenset()}
 def _archive_urls() -> frozenset:
     """보관 파일에 든 URL 집합. 읽지 못하면 경고만 남기고 빈 집합을 돌려준다."""
     path = _archive_file()
-    try:
-        stat = path.stat()
-    except OSError:
+    file_sig = store.signature(path)
+    if file_sig is None:
         _archive_cache["sig"], _archive_cache["urls"] = None, frozenset()
         return frozenset()
-    sig = (str(path), stat.st_mtime_ns, stat.st_size)
+    sig = (str(path), *file_sig)
     if _archive_cache["sig"] == sig:
         return _archive_cache["urls"]
     try:
@@ -143,7 +142,7 @@ def _archive_urls() -> frozenset:
 def _load_archive() -> dict:
     """보관 파일 전체(`{url: "YYYY-MM-DD"}`) — 쓰기 전에 읽을 때만 쓴다."""
     path = _archive_file()
-    if not path.exists():
+    if not store.exists(path):
         return {}
     try:
         raw = store.read_json(path)
@@ -425,7 +424,7 @@ def _read_override_records() -> dict:
     (CODING_CONVENTIONS.md §7-2). at이 None인 기록은 다음 정리 때 "지금" 시각으로
     도장을 찍어(cleanup_group_overrides) 자연히 새 형식으로 옮겨간다.
     """
-    if not GROUP_OVERRIDES_FILE.exists():
+    if not store.exists(GROUP_OVERRIDES_FILE):
         return {}
     try:
         raw = store.read_json(GROUP_OVERRIDES_FILE)
@@ -837,7 +836,7 @@ def _round_labels(round_id: Optional[tuple] = None) -> dict:
     직접 만든 소제목의 화면 이름이 회차 이름표 파일로 복사돼, 그 소제목을 지운 뒤에도
     그 회차에만 유령처럼 남는다.
     """
-    if not GROUP_LABELS_FILE.exists():
+    if not store.exists(GROUP_LABELS_FILE):
         return {}
     try:
         data = store.read_json(GROUP_LABELS_FILE)
@@ -851,7 +850,7 @@ def _round_labels(round_id: Optional[tuple] = None) -> dict:
 
 def _write_labels_for_round(round_id: Optional[tuple], labels_for_round: dict) -> None:
     try:
-        data = store.read_json(GROUP_LABELS_FILE) if GROUP_LABELS_FILE.exists() else {}
+        data = store.read_json(GROUP_LABELS_FILE) if store.exists(GROUP_LABELS_FILE) else {}
     except (json.JSONDecodeError, TypeError):
         data = {}
     if not isinstance(data, dict):

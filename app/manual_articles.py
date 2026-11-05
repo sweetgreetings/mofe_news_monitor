@@ -17,7 +17,7 @@ def load_manual_articles(now: Optional[datetime] = None) -> list:
     저장된 날짜가 오늘이 아니면(자정이 지났으면) 자동으로 빈 목록 취급한다 — 파일을
     그 자리에서 지우진 않고, 다음에 add_manual_article이 호출될 때 오늘 날짜로 덮어써진다.
     """
-    if not MANUAL_ARTICLES_FILE.exists():
+    if not store.exists(MANUAL_ARTICLES_FILE):
         return []
     try:
         data = store.read_json(MANUAL_ARTICLES_FILE)

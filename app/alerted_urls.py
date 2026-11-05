@@ -26,7 +26,7 @@ def _load(now: Optional[datetime] = None) -> dict:
     본다. 같은 기사가 다음날 다시 검색돼도(네이버가 재노출하는 경우 등) 새 알림
     대상으로 취급한다 — 실무상 하루가 지나면 "새 소식"으로 다시 알려도 무리가 없다."""
     empty = {"date": _today_str(now), "urls": [], "items": []}
-    if not ALERTED_URLS_FILE.exists():
+    if not store.exists(ALERTED_URLS_FILE):
         return empty
     try:
         data = store.read_json(ALERTED_URLS_FILE)

@@ -16,7 +16,7 @@ from app.config import HOME_TREND_WORDS_FILE, MAX_TREND_WORDS
 
 def load_trend_words() -> list[str]:
     """저장된 단어 목록을 순서 그대로 돌려준다. 없거나 깨졌으면 빈 목록(=아직 안 고른 상태)."""
-    if not HOME_TREND_WORDS_FILE.exists():
+    if not store.exists(HOME_TREND_WORDS_FILE):
         return []
     try:
         data = store.read_json(HOME_TREND_WORDS_FILE)

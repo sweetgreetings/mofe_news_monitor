@@ -190,7 +190,7 @@ def load_state() -> dict:
     고착되지는 않는다(알린 것을 적을 자리가 다시 생긴다).
     """
     blank = {"last_run_at": None, "alerted": {}}
-    if not TITLE_WATCH_FILE.exists():
+    if not store.exists(TITLE_WATCH_FILE):
         return blank
     try:
         data = store.read_json(TITLE_WATCH_FILE)

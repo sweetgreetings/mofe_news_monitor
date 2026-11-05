@@ -6521,7 +6521,7 @@ def test_storage_goes_through_one_place():
     json_readers = {
         str(path.relative_to(app_dir))
         for path in sources
-        if re.search(r"json\.loads\([^)]*\.read_text", path.read_text(encoding="utf-8"))
+        if re.search(r"json\.loads\(.{0,160}?\.read_text", path.read_text(encoding="utf-8"))
     }
     # 한 곳도 없는 게 맞다 — store 안에서도 모듈 함수 `read_text(path)`를 거친다.
     assert not json_readers, (
@@ -6566,6 +6566,59 @@ def test_storage_goes_through_one_place():
         f"파일을 원문으로 읽는 자리가 늘었습니다 — {sorted(extra_raw)}. "
         "저장소를 읽는 것이면 store.read_text/read_json을 부르세요."
     )
+
+    # ── 「있나 없나·목록·지우기」도 한 겹을 지난다 ──────────────────────────
+    #
+    # **2026-11-05에 여기가 뚫려 17시 회차가 확정본으로 못 넘어갔다.** 쓰기는 store를
+    # 거쳐 DB로 갔는데 `storage.run_exists`가 `Path.exists()`를 직접 봐서 늘 거짓이었고,
+    # 스케줄러가 "아직 안 돈 회차"로 보아 같은 회차를 35초마다 14번 다시 모았다
+    # (`run_index`도 폴더를 glob해 그 회차가 어느 화면에도 안 보였다).
+    #
+    # **읽기·쓰기만 지키면 이 사고가 안 잡힌다** — 이미 파일이 있던 이름은 `.exists()`가
+    # 참이라 그 뒤 읽기가 DB로 가서 멀쩡히 돌아가고, **그날 처음 생기는 이름에서만**
+    # 조용히 터진다(회차 파일·날짜별 발송 기록·새 수시 카드).
+    #
+    # `store.exists(X)`는 걸리지 않는다 — 괄호가 빈 `X.exists()`만 걸린다. 주석은 뺀다
+    # (이 규칙을 설명하는 주석이 스스로 걸리면 안 된다).
+    def _code_only(path):
+        return "\n".join(
+            line for line in path.read_text(encoding="utf-8").splitlines()
+            if not line.strip().startswith("#")
+        )
+
+    path_api = [
+        ("있나 없나(.exists())", r"\.exists\(\)", {
+            "app/store.py",
+            # `.env`와 그 백업 — DATA_DIR 밖이라 저장소가 아니다
+            "app/credentials.py",
+            # 로고 파일 — 저장소가 아니라 코드 옆 그림이다
+            "app/landing_renderer.py", "app/settings_server.py",
+        }),
+        ("목록(.glob())", r"\.glob\(", {"app/store.py", "app/store_pg.py", "app/credentials.py"}),
+        ("지우기(.unlink())", r"\.unlink\(", {"app/store.py", "app/credentials.py"}),
+        ("바뀌었나(.stat())", r"\.stat\(\)", {"app/store.py", "app/credentials.py"}),
+        ("폴더 만들기(.mkdir())", r"\.mkdir\(", {
+            "app/store.py", "app/store_pg.py",
+            # 파일 백엔드로 돌 때를 위해 앱이 켜질 때 한 번 만든다. DB로 돌면 빈 폴더가
+            # 하나 생길 뿐이라 해가 없다(`store.ensure_dir`도 DB에선 할 일이 없다).
+            "app/config.py", "app/adhoc/card.py", "app/adhoc/undo.py",
+            # 로그는 저장소가 아니라 늘 파일이다
+            "app/logging_setup.py",
+        }),
+    ]
+    for label, needle, allowed in path_api:
+        found = {
+            str(path.relative_to(app_dir))
+            for path in sources
+            if re.search(needle, _code_only(path))
+        }
+        extra = found - allowed
+        assert not extra, (
+            f"저장소에 {label}를 직접 묻는 자리가 생겼습니다 — {sorted(extra)}. "
+            f"DB로 돌면 파일이 없어 **늘 거짓**이 됩니다(2026-11-05 17시 회차 사고). "
+            f"store.exists/list_files/delete/signature/ensure_dir를 부르세요 "
+            f"(지금 자리: {sorted(allowed)})"
+        )
 
     # 한 겹이 실제로 쓰이고 있는지 — 모듈 수가 줄면 누군가 우회로를 만든 것이다.
     users = {

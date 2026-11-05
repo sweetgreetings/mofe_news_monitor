@@ -63,7 +63,7 @@ def transplant_alert_groups() -> bool:
 def _raw_config() -> dict:
     """파일에 실제로 적힌 값만 — load_breaking_alert_settings는 기본값을 덮어씌워
     돌려주므로 "group_names 키가 아직 남아 있나"를 그 값으로는 판정할 수 없다."""
-    if not BREAKING_ALERT_FILE.exists():
+    if not store.exists(BREAKING_ALERT_FILE):
         return {}
     try:
         data = store.read_json(BREAKING_ALERT_FILE)

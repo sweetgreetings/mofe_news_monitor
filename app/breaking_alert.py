@@ -42,7 +42,7 @@ def _default() -> dict:
 
 
 def load_breaking_alert_settings() -> dict:
-    if not BREAKING_ALERT_FILE.exists():
+    if not store.exists(BREAKING_ALERT_FILE):
         return _default()
     try:
         data = store.read_json(BREAKING_ALERT_FILE)

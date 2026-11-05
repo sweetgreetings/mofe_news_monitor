@@ -80,10 +80,8 @@ def load_day(date_str: str) -> dict:
 def available_dates() -> list:
     """원장에 쌓인 날짜를 최신순으로. 파일을 열지 않고 이름만 본다(화면의 기간 조회용)."""
     directory = _archive_dir()
-    if not directory.exists():
-        return []
     dates = []
-    for path in directory.glob("*.json"):
+    for path in store.list_files(directory):
         name = path.stem
         try:
             datetime.strptime(name, "%Y-%m-%d")
@@ -95,7 +93,7 @@ def available_dates() -> list:
 
 def _save_day(day: dict) -> None:
     directory = _archive_dir()
-    directory.mkdir(parents=True, exist_ok=True)
+    store.ensure_dir(directory)
     store.write_json(_path(day["date"]), day, indent=2)
 
 

@@ -22,7 +22,7 @@ _lock = threading.Lock()
 
 def load_summary_overrides() -> dict:
     """URL별로 사용자가 원문에서 다시 가져온 제목·요약을 읽어온다. {url: {"title": ..., "summary": ...}}."""
-    if not SUMMARY_OVERRIDES_FILE.exists():
+    if not store.exists(SUMMARY_OVERRIDES_FILE):
         return {}
     try:
         data = store.read_json(SUMMARY_OVERRIDES_FILE)

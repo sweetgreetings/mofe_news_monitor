@@ -162,7 +162,7 @@ def _read_raw(path) -> Optional[str]:
 
 def _write_raw(path, text: Optional[str]) -> None:
     if text is None:
-        path.unlink(missing_ok=True)
+        store.delete(path)
     else:
         store.write_text(path, text)
 

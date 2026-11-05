@@ -230,7 +230,7 @@ def _find_run_file(run_at: str, run_slot: str) -> Optional[Path]:
     path = _index_find_path(run_at, run_slot)
     if path is not None:
         return path
-    for path in ARTICLES_DIR.glob("*.json"):
+    for path in store.list_files(ARTICLES_DIR):
         try:
             data = store.read_json(path)
         except (json.JSONDecodeError, TypeError):
@@ -341,7 +341,10 @@ def run_exists(run_slot: str, date_str: Optional[str] = None) -> bool:
     스케줄러가 "이 회차를 이미 실행했는가"를 판단해 중복 실행을 막는 데 쓴다.
     """
     date_str = date_str or datetime.now().strftime("%Y-%m-%d")
-    return _run_file_path(date_str, run_slot).exists()
+    # **store.exists를 거친다** — Path.exists()를 직접 보면 저장 자리가 Postgres일 때
+    # 늘 거짓이고, 스케줄러가 방금 저장한 회차를 "아직 안 돌았다"고 보아 매 tick 다시
+    # 수집한다(확정·자동발송까지 못 간다).
+    return store.exists(_run_file_path(date_str, run_slot))
 
 
 def delete_expired_runs(retention_days: int = RETENTION_DAYS, now: Optional[datetime] = None) -> list[Path]:
@@ -368,7 +371,7 @@ def delete_expired_runs(retention_days: int = RETENTION_DAYS, now: Optional[date
         except (ValueError, TypeError):
             continue
         if run_at < cutoff:
-            path.unlink()
+            store.delete(path)
             deleted.append(path)
 
     # 인덱스가 "읽을 수 없다"고 표시한 파일(bad)은 위 목록에 안 들어온다. 예전 구현은
@@ -384,7 +387,7 @@ def delete_expired_runs(retention_days: int = RETENTION_DAYS, now: Optional[date
         except (FileNotFoundError, json.JSONDecodeError, KeyError, ValueError, TypeError):
             continue
         if run_at < cutoff:
-            path.unlink()
+            store.delete(path)
             deleted.append(path)
     return deleted
 
@@ -483,12 +486,12 @@ def delete_run(date_str: str, run_slot: str, stamp: Optional[str] = None,
         meta = next(
             (m for m in metas if m["run_at"][:10] == date_str and m.get("run_slot") == run_slot), None
         )
-        if meta is None or not meta["path"].exists():
+        if meta is None or not store.exists(meta["path"]):
             return False
         trash_dir = _runs_trash_dir()
-        trash_dir.mkdir(parents=True, exist_ok=True)
+        store.ensure_dir(trash_dir)
         dest = trash_dir / f"{date_str}_{run_slot.replace(':', '-')}.deleted-{stamp}.json"
-        meta["path"].replace(dest)
+        store.move(meta["path"], dest)
     logger.info("정기 회차 삭제(trash로 이동) — %s %s → %s", date_str, run_slot, dest.name)
     return True
 
@@ -504,10 +507,8 @@ def list_deleted_runs() -> list[dict]:
     회차 자리에 아무 줄도 안 그린다**(「수집 기록 없음」이 뜨면 앱이 못 모은 날이 된다).
     """
     trash_dir = _runs_trash_dir()
-    if not trash_dir.exists():
-        return []
     entries = {}
-    for path in trash_dir.glob("*.json"):
+    for path in store.list_files(trash_dir):
         m = _DELETED_RUN_RE.match(path.name)
         restorable = m is not None
         if m is None:
@@ -541,14 +542,14 @@ def restore_run(trash_name: str) -> Optional[dict]:
     run_slot = f"{hh}:{mm}"
     with _run_trash_lock:
         src = _runs_trash_dir() / trash_name
-        if not src.exists():
+        if not store.exists(src):
             return None
         if any(meta["run_at"][:10] == date_str and meta.get("run_slot") == run_slot for meta in list_run_meta()):
             return None
         target = _run_file_path(date_str, run_slot)
-        if target.exists():
+        if store.exists(target):
             return None
-        src.replace(target)
+        store.move(src, target)
     logger.info("정기 회차 되살림 — %s → %s", trash_name, target.name)
     return {"date": date_str, "run_slot": run_slot}
 
@@ -574,7 +575,7 @@ def _purge_run_file(path: Path) -> bool:
         store.write_json(dest, shell, indent=2)
     except OSError:
         return False
-    path.unlink(missing_ok=True)
+    store.delete(path)
     return True
 
 
@@ -589,11 +590,9 @@ def purge_expired_deleted_runs(
     now = now or datetime.now()
     cutoff = now - timedelta(days=restore_days)
     trash_dir = _runs_trash_dir()
-    if not trash_dir.exists():
-        return 0
     purged = 0
     with _run_trash_lock:
-        for path in sorted(trash_dir.glob("*.deleted-*.json")):
+        for path in sorted(store.list_files(trash_dir, "*.deleted-*.json")):
             m = _DELETED_RUN_RE.match(path.name)
             if m is None or datetime.strptime(m.group(4), "%Y%m%d%H%M%S") > cutoff:
                 continue
@@ -611,13 +610,11 @@ def empty_deleted_runs() -> int:
     것(.expired-)은 담당자가 지운 적이 없어 그 화면에 안 서고, 아래 정리가 맡는다.
     """
     trash_dir = _runs_trash_dir()
-    if not trash_dir.exists():
-        return 0
     removed = 0
     with _run_trash_lock:
-        for path in list(trash_dir.glob("*.json")):
+        for path in list(store.list_files(trash_dir)):
             if _DELETED_RUN_RE.match(path.name) or _PURGED_RUN_RE.match(path.name):
-                path.unlink(missing_ok=True)
+                store.delete(path)
                 removed += 1
     if removed:
         logger.info("정기 삭제 기록 비우기 — %d개 파일 삭제", removed)

@@ -28,7 +28,7 @@ def _today_str(now: Optional[datetime] = None) -> str:
 def _load(now: Optional[datetime] = None) -> dict:
     """오늘 날짜가 아니면(자정이 지났으면) 0부터 새로 센다 — app.live_cache와 같은
     "date 필드 불일치 = 리셋" 패턴, 별도의 자정 정리 작업이 필요 없다."""
-    if not API_USAGE_FILE.exists():
+    if not store.exists(API_USAGE_FILE):
         return {"date": _today_str(now), "count": 0}
     try:
         data = store.read_json(API_USAGE_FILE)

@@ -13,7 +13,7 @@ def load_email_recipients() -> list:
     삭제 없이 "잠깐 안 보내기"를 할 수 있게 하기 위해서다(예: 휴가 기간에만 다른
     사람을 켜두고 본인은 꺼두기).
     """
-    if not EMAIL_RECIPIENTS_FILE.exists():
+    if not store.exists(EMAIL_RECIPIENTS_FILE):
         return []
     try:
         data = store.read_json(EMAIL_RECIPIENTS_FILE)

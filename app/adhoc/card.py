@@ -279,7 +279,7 @@ def _validate_collect_date(collect_date: Optional[str], now: datetime) -> str:
 
 def load_issues() -> list[dict]:
     """등록된 사안 목록을 읽어온다. 파일이 없거나 손상됐으면 빈 목록으로 취급한다."""
-    if not ISSUES_FILE.exists():
+    if not store.exists(ISSUES_FILE):
         return []
     try:
         data = store.read_json(ISSUES_FILE)
@@ -476,7 +476,7 @@ def new_bundle_card(
 
 def load_card(card_id: str) -> Optional[dict]:
     path = _card_path(card_id)
-    if not path.exists():
+    if not store.exists(path):
         return None
     try:
         card = store.read_json(path)
@@ -512,7 +512,7 @@ def latest_card_id(kind: Optional[str] = None) -> Optional[str]:
     확정본」을 오가려면 종류를 가려야 하기 때문이다. 그 안에 없으면 None(링크를 아예
     안 그린다).
     """
-    stems = sorted((p.stem for p in CARDS_DIR.glob("*.json")), reverse=True)
+    stems = sorted((p.stem for p in store.list_files(CARDS_DIR)), reverse=True)
     if not stems:
         return None
     if kind is None:
@@ -563,7 +563,7 @@ def list_cards(issue_id: Optional[str] = None) -> list[dict]:
     멈추지 않게) — 손상됐거나 필수 필드가 없는 카드 파일은 건너뛴다.
     """
     cards = []
-    for path in CARDS_DIR.glob("*.json"):
+    for path in store.list_files(CARDS_DIR):
         try:
             data = store.read_json(path)
             data["id"]
@@ -598,13 +598,13 @@ def list_card_summaries() -> list[dict]:
     rows = []
     seen = set()
     with _summary_lock:
-        for path in CARDS_DIR.glob("*.json"):
+        for path in store.list_files(CARDS_DIR):
             key = str(path)
-            try:
-                stat = path.stat()
-            except OSError:
+            # 서명도 저장소에 묻는다 — DB 백엔드에선 디스크에 파일이 없어
+            # path.stat()이 OSError로 떨어지고, 그러면 요약이 통째로 빈다.
+            sig = store.signature(path)
+            if sig is None:
                 continue
-            sig = (stat.st_mtime_ns, stat.st_size)
             hit = _summary_cache.get(key)
             if hit is not None and hit[0] == sig:
                 summary = hit[1]
@@ -1264,11 +1264,11 @@ def delete_card(card_id: str, reason: str = "deleted", stamp: Optional[str] = No
         return False
     with card_lock(card_id):
         path = _card_path(card_id)
-        if not path.exists():
+        if not store.exists(path):
             return False
         stamp = stamp or datetime.now().strftime("%Y%m%d%H%M%S")
         trashed_name = f"{card_id}.{reason}-{stamp}.json"
-        path.replace(TRASH_DIR / trashed_name)
+        store.move(path, TRASH_DIR / trashed_name)
         return True
 
 
@@ -1295,7 +1295,7 @@ def list_deleted_cards() -> list[dict]:
     `_restorable`이 거짓이고, 기사는 비어 있다(건수는 `article_count`에 적혀 있다).
     """
     latest: dict = {}
-    for path in TRASH_DIR.glob("*.json"):
+    for path in store.list_files(TRASH_DIR):
         m = _DELETED_CARD_RE.match(path.name)
         restorable = m is not None
         if m is None:
@@ -1308,7 +1308,7 @@ def list_deleted_cards() -> list[dict]:
         latest[card_id] = (path, stamp, restorable)
     cards = []
     for card_id, (path, stamp, restorable) in latest.items():
-        if _card_path(card_id).exists():
+        if store.exists(_card_path(card_id)):
             continue
         try:
             data = store.read_json(path)
@@ -1334,9 +1334,9 @@ def restore_card(trash_name: str) -> Optional[str]:
     card_id = m.group(1)
     with card_lock(card_id):
         src = TRASH_DIR / trash_name
-        if not src.exists() or _card_path(card_id).exists():
+        if not store.exists(src) or store.exists(_card_path(card_id)):
             return None
-        src.replace(_card_path(card_id))
+        store.move(src, _card_path(card_id))
         return card_id
 
 
@@ -1361,7 +1361,7 @@ def _purge_card_file(path: "Path") -> bool:
         store.write_json(dest, shell, indent=2)
     except OSError:
         return False
-    path.unlink(missing_ok=True)
+    store.delete(path)
     return True
 
 
@@ -1380,19 +1380,19 @@ def purge_expired_deleted_cards(
     now = now or datetime.now()
     purged = 0
     cutoff = now - timedelta(days=restore_days)
-    for path in sorted(TRASH_DIR.glob("*.deleted-*.json")):
+    for path in sorted(store.list_files(TRASH_DIR, "*.deleted-*.json")):
         m = _DELETED_CARD_RE.match(path.name)
         if m is None or datetime.strptime(m.group(2), "%Y%m%d%H%M%S") > cutoff:
             continue
         with card_lock(m.group(1)):
-            if path.exists() and _purge_card_file(path):
+            if store.exists(path) and _purge_card_file(path):
                 purged += 1
     expired_cutoff = now - timedelta(days=EXPIRED_TRASH_KEEP_DAYS)
-    for path in sorted(TRASH_DIR.glob("*.expired-*.json")):
+    for path in sorted(store.list_files(TRASH_DIR, "*.expired-*.json")):
         m = _EXPIRED_CARD_RE.match(path.name)
         if m is None or datetime.strptime(m.group(2), "%Y%m%d%H%M%S") > expired_cutoff:
             continue
-        path.unlink(missing_ok=True)
+        store.delete(path)
     return purged
 
 
@@ -1403,9 +1403,9 @@ def empty_deleted_cards() -> int:
     없어 그 화면에 안 서고, 위 정리가 맡는다.
     """
     removed = 0
-    for path in list(TRASH_DIR.glob("*.json")):
+    for path in list(store.list_files(TRASH_DIR)):
         if _DELETED_CARD_RE.match(path.name) or _PURGED_CARD_RE.match(path.name):
-            path.unlink(missing_ok=True)
+            store.delete(path)
             removed += 1
     return removed
 
@@ -1433,7 +1433,7 @@ def delete_expired_cards(retention_days: Optional[int] = None, now: Optional[dat
     cutoff = now - timedelta(days=retention_days)
 
     moved = []
-    for path in CARDS_DIR.glob("*.json"):
+    for path in store.list_files(CARDS_DIR):
         try:
             data = store.read_json(path)
             created_at = datetime.fromisoformat(data["created_at"])
