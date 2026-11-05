@@ -162,6 +162,31 @@ def naver_is_configured() -> bool:
     return bool(naver_client_id() and naver_client_secret())
 
 
+def naver_missing_for_sure() -> bool:
+    """내 네이버 키 칸이 **비어 있음을 확인했을 때만** 참. 읽지 못했으면 거짓.
+
+    **왜 「없음」과 「모름」을 가르나.** 2026-11-05에 Postgres 연결이 바닥나자 그 예외가
+    키를 읽는 자리에서 터져 **「네이버 API 키가 등록돼 있지 않습니다」라는 거짓 메시지**로
+    바뀌어 나왔고, 그날 회차 셋이 그 말만 남기고 비었다. 「키가 없으니 조용히 건너뛴다」는
+    판단은 그 거짓을 **소리 없이** 만들 수 있다 — 그래서 저장소를 실제로 읽어 비어 있는
+    것을 본 경우에만 참이고, 못 읽었으면 거짓을 돌려 **예전처럼 시끄럽게 실패하게** 둔다.
+
+    `naver_is_configured()`의 반대가 아니다 — 그쪽은 읽기 실패도 「없음」으로 뭉갠다.
+    """
+    saved_at = CREDENTIALS_FILE if _is_base_owner() else MY_CREDENTIALS_FILE
+    try:
+        data = store.read_json(saved_at)
+    except FileNotFoundError:
+        data = {}          # 자리가 아예 없다 = 아직 키를 안 넣었다(이건 확실하다)
+    except Exception:      # 연결·권한·깨진 내용 — 모른다
+        return False
+    entry = (data.get("naver") if isinstance(data, dict) else None) or {}
+    if (entry.get("client_id") or "").strip() and (entry.get("client_secret") or "").strip():
+        return False
+    env_id, env_secret = _env_naver()   # 바닥 주인에게만 보이는 `.env` 씨앗
+    return not (env_id and env_secret)
+
+
 def naver_source() -> str:
     """지금 쓰이는 값이 어디서 왔는지 — "saved"(설정 화면) / "env"(.env) / "none"."""
     saved = _naver_saved()

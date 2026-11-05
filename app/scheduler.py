@@ -108,6 +108,30 @@ def _failure_key(now: datetime, run_slot: str) -> tuple:
     return (now.date().isoformat(), store.current_owner(), run_slot)
 
 
+# {(YYYY-MM-DD, 사람)} — 「키가 없어 건너뛴다」를 **사람마다 하루 한 번**만 적기 위한 것.
+# tick이 10초라 그냥 적으면 하루 8,640줄이 된다. 메모리에만 둔다(앱을 다시 켜면 한 번 더 적는다).
+_no_key_noted: set = set()
+
+
+def _note_missing_key(now: datetime, who: Optional[str]) -> None:
+    """키가 없어 수집을 건너뛴다는 말을 하루 한 번 남긴다 — **INFO다, 오류가 아니다.**
+
+    키를 아직 안 넣은 것은 고장이 아니라 **그 사람이 할 일**이고, 화면이 이미 그렇게
+    말하고 있다(설정 › 연동 › 네이버 뉴스 API).
+    """
+    today = now.date().isoformat()
+    for stale in [k for k in _no_key_noted if k[0] != today]:
+        _no_key_noted.discard(stale)
+    key = (today, who)
+    if key in _no_key_noted:
+        return
+    _no_key_noted.add(key)
+    logger.info(
+        "네이버 키가 없어 오늘 수집을 건너뜁니다 (사람=%s) — 설정 › 연동 › 네이버 뉴스 API에서 넣으면 다음 회차부터 모읍니다",
+        who or "바닥",
+    )
+
+
 def _give_up_on(now: datetime, run_slot: str) -> bool:
     """이 회차를 오늘 더 시도하지 않기로 했는지."""
     return _slot_failures.get(_failure_key(now, run_slot), 0) >= _MAX_SLOT_ATTEMPTS
@@ -305,6 +329,14 @@ def run_scheduler(
     # (collect_agency_archive 같은 빈 람다 규칙에 걸리지 않는다) 테스트가 실제
     # data/를 건드릴 길이 없고, 혼자 쓰는 동작도 한 글자도 안 바뀐다.
     hold_lease: Callable[[datetime], bool] = scheduler_lease.hold,
+    # [추가: 2026-11-05] **자기 네이버 키가 없는 사람은 수집을 건너뛴다.** 키는 물려받지
+    # 않는 설계라(app/credentials.py) 새로 들어온 사람은 **자기 키를 넣기 전까지 전원**
+    # 이 상태다. 그대로 두면 회차마다 ERROR 세 줄과 「이 회차는 비게 됩니다」가 날마다
+    # 쌓여 **진짜 고장과 구별되지 않는다**(실측 2026-11-05: 테스트 계정 둘이 회차 다섯을
+    # 하루에 30줄로 채웠다). **기본값은 「늘 모은다」이고 main.py가 실제 판정을 주입한다** —
+    # 기본값이 진짜 함수면 run_scheduler를 부르는 테스트가 실제 data/credentials.json을
+    # 읽어 **그 컴퓨터에 키가 있느냐에 따라 결과가 갈린다**(collect_agency_archive와 같은 이유).
+    can_collect: Callable[[], bool] = lambda: True,
     should_continue: Callable[[], bool] = lambda: True,
 ) -> None:
     """앱이 켜져 있는 동안 poll_interval_sec마다 실행할 회차가 있는지 확인하고 수집한다.
@@ -385,11 +417,16 @@ def run_scheduler(
             for who in list_owners():
                 with store.owner(who):
                     try:
-                        run_due_slot(now=now, schedule_times=schedule_times, scrape=scrape)
-                        # 하루 마지막 회차의 「보충 훑기」 — 보충 시각이 아니거나 이미
-                        # 보충했으면 즉시 돌아온다(비용 0). 수집 뒤에 둬야 방금 저장된
-                        # 회차를 본다.
-                        check_topup(now, schedule_times)
+                        if can_collect():
+                            run_due_slot(now=now, schedule_times=schedule_times, scrape=scrape)
+                            # 하루 마지막 회차의 「보충 훑기」 — 보충 시각이 아니거나 이미
+                            # 보충했으면 즉시 돌아온다(비용 0). 수집 뒤에 둬야 방금 저장된
+                            # 회차를 본다.
+                            check_topup(now, schedule_times)
+                        else:
+                            # 키가 없는 사람 — **모으는 일만** 건너뛴다. 아래 자동발송·
+                            # 제목 감시·정리는 그대로 돈다(모을 게 없을 뿐 자기 화면은 쓴다).
+                            _note_missing_key(now, who)
                         # **자동발송도 사람별이다** — 받는 사람 명단과 자동발송 스위치가
                         # 사람별이라, 각자 자기 보고서를 자기 사람에게 보낸다. 공용으로
                         # 두면 한 사람이 스위치를 켠 순간 모두의 보고서가 나간다.
