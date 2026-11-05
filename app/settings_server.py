@@ -1485,7 +1485,8 @@ _LOGIN_SETTINGS_TEMPLATE = (
     켜면 이 컴퓨터에서 앱 화면을 열 때 로그인을 받습니다.
     <strong>끄면 예전과 똑같이 돕니다.</strong><br>
     수집과 자동발송은 로그인과 무관하게 계속 돕니다 — 로그인하지 않아도 회차는 정시에 모이고 보고서는 나갑니다.<br>
-    <strong>아직 데이터는 사람별로 갈리지 않습니다</strong> — 누가 로그인해도 같은 기사·같은 설정을 봅니다.
+    <strong>사람마다 자기 것을 봅니다</strong> — 검색어·수집 시간·네이버 키·받는 사람·형광펜·보고서 모양과
+    그것으로 모은 회차가 각자 따로입니다. 언론사 선택, LLM·발송 계정 키, [단독]·[속보] 알림은 모두가 같이 씁니다.
   </p>
   {error_html}
   {open_note_html}
@@ -1553,8 +1554,9 @@ _ACCOUNTS_TEMPLATE = (
 <div class="container">
   <h1>계정 목록</h1>
   <p class="hint">
-    관리자는 모두에게 같이 걸리는 설정(검색어·수집 시간·언론사·받는 사람·키)을 바꿀 수 있습니다.
-    일반 사용자는 기사를 다듬고 보내는 일을 합니다.
+    관리자는 계정과 <strong>모두에게 같이 걸리는 설정</strong>(언론사 선택, LLM·발송 계정 키,
+    [단독]·[속보] 알림, 로그인 사용)을 바꿀 수 있습니다.
+    검색어·수집 시간·네이버 키·받는 사람은 사람마다 자기 것이라 일반 사용자도 직접 바꿉니다.
   </p>
   {error_html}
   {notice_html}
@@ -1839,9 +1841,12 @@ _ADMIN_ONLY_TEMPLATE = (
 <div class="container">
   <h1>관리자만 바꿀 수 있어요</h1>
   <p class="hint">
-    이 설정은 모두에게 같이 걸립니다 — 수집 시간·검색어·언론사·받는 사람·키를 바꾸면
-    다른 사람의 수집과 보고서까지 바뀝니다.<br>
-    바꿔야 할 것이 있으면 관리자에게 알려 주세요.
+    계정과 <strong>모두에게 같이 걸리는 설정</strong>은 관리자 몫입니다 — 언론사 선택,
+    LLM·발송 계정 키, [단독]·[속보] 알림, 로그인 사용은 바꾸면 다른 사람의 화면과
+    보고서까지 바뀝니다.<br>
+    검색어·수집 시간·네이버 키·받는 사람·형광펜·보고서 모양은 사람마다 자기 것이라
+    <a href="/">설정</a>에서 직접 바꿀 수 있습니다.<br>
+    여기 있는 것을 바꿔야 하면 관리자에게 알려 주세요.
   </p>
 </div>
 </body>
@@ -6426,7 +6431,10 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         target = users.get_user(user_id)
         name = (target or {}).get("display_name", "") or "그 계정"
         label = "관리자로 올렸어요" if role == "admin" else "일반으로 내렸어요"
-        self._redirect(f"/accounts?notice=" + quote(f"{name}을 {label}."))
+        # **이름 바로 뒤에 조사를 붙이지 않는다** — 받침 유무로 을/를이 갈려서
+        # 이름을 모르는 채로는 늘 틀린다(app/renderer.py의 같은 규칙).
+        # 「테스트사용자을 관리자로」가 그렇게 나왔다.
+        self._redirect(f"/accounts?notice=" + quote(f"{name} 계정을 {label}."))
 
     def _handle_whoami(self) -> None:
         """홈 머리의 계정 버튼이 「지금 누구인가」를 물어보는 자리.
