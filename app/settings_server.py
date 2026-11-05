@@ -39,6 +39,8 @@ from app.config import (
     NAVER_DAILY_CALL_LIMIT,
     OUTLET_ORDER_JUMP_STEP,
     PALETTE,
+    SERVER_IS_HOSTED,
+    SETTINGS_SERVER_BASE,
     SETTINGS_SERVER_HOST,
     SETTINGS_SERVER_PORT,
     WEEKDAY_KEYS,
@@ -358,7 +360,7 @@ _BASE_STYLE = """
 
 # 상단바는 app/topnav.py 한 곳에서 만든다(시안 mockups/TOPBAR_NAV_MOCKUP.html).
 # 설정 하위 화면: 홈 │ ← 설정. 휴지통: 정기 묶음(켜진 칸 없음 — 초안·확정본에서 들어오는 곳).
-_TOP_BAR_HTML = plain_nav("설정", f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/")
+_TOP_BAR_HTML = plain_nav("설정", f"{SETTINGS_SERVER_BASE}/")
 
 # 로그인이 켜져 있어도 통과시키는 주소. **정확히 일치하는 것만**이다 —
 # 앞글자로 재면 `/login-settings`(설정 화면)까지 열려 버린다.
@@ -375,7 +377,7 @@ _AUTH_FREE_PATHS = {
 }
 _ACCOUNTS_TOP_BAR_HTML = plain_nav()
 _LABELS_TOP_BAR_HTML = plain_nav()
-_LABEL_MANAGE_TOP_BAR_HTML = plain_nav("라벨 보관함", f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/labels")
+_LABEL_MANAGE_TOP_BAR_HTML = plain_nav("라벨 보관함", f"{SETTINGS_SERVER_BASE}/labels")
 _HIDDEN_TOP_BAR_HTML = regular_nav(None)
 
 _MENU_TEMPLATE = (
@@ -1689,15 +1691,15 @@ _SCREEN_HTML_ROUTES = {
 def _home_href() -> str:
     # [수정: 2026-07-24] 설정 화면의 "메인 화면으로"는 스크랩 결과 화면(index.html)이
     # 아니라 로고가 있는 진입 화면(home.html)으로 가도록 변경 — 사용자 요청.
-    return f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/home.html"
+    return f"{SETTINGS_SERVER_BASE}/home.html"
 
 
 def _scrap_href() -> str:
-    return f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/index.html"
+    return f"{SETTINGS_SERVER_BASE}/index.html"
 
 
 def _preview_href() -> str:
-    return f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/preview.html"
+    return f"{SETTINGS_SERVER_BASE}/preview.html"
 
 
 def _credential_badge(source: str) -> str:
@@ -5957,7 +5959,7 @@ def render_labels_page(selected: Optional[list] = None) -> str:
         copy_text_script=copy_text_script(),
         **_theme(),
         refetch_titles_style=refetch_titles_style(),
-        refetch_titles_script=refetch_titles_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
+        refetch_titles_script=refetch_titles_script(),
         icon_tag=icon("tag"),
         icon_gear=icon("gear"),
         chips_html=chips_html,
@@ -9281,5 +9283,8 @@ def create_settings_server(port: int = SETTINGS_SERVER_PORT) -> ThreadingHTTPSer
     그래도 EADDRINUSE로 실패한다 — 자물쇠로 쓰기에 안전하다. PID 파일과 달리 앱이 강제
     종료돼도 OS가 포트를 알아서 풀어주므로 "죽은 자물쇠"가 남지 않는다.
     """
-    bind_host = "0.0.0.0" if SETTINGS_SERVER_HOST != "127.0.0.1" else "127.0.0.1"
+    # 남이 운영하는 컴퓨터에서는 `SERVER_HOST`를 안 적어도 반드시 0.0.0.0으로 들어야 한다 —
+    # 호스트는 자기 안쪽 주소로 요청을 넘기므로 127.0.0.1만 듣고 있으면 **그 요청이 아무에게도
+    # 닿지 않고** 「시작 실패」로 읽힌다. 자물쇠는 같은 사실(SERVER_IS_HOSTED)을 보고 함께 켜진다.
+    bind_host = "0.0.0.0" if (SERVER_IS_HOSTED or SETTINGS_SERVER_HOST != "127.0.0.1") else "127.0.0.1"
     return ThreadingHTTPServer((bind_host, port), _SettingsHandler)

@@ -22,8 +22,7 @@ from app.config import (
     LIVE_HEAVY_KEYWORD_RATIO,
     LIVE_HTML_PATH,
     PALETTE,
-    SETTINGS_SERVER_HOST,
-    SETTINGS_SERVER_PORT,
+    SETTINGS_SERVER_BASE,
 )
 from app.atomic_write import atomic_write_text
 from app.credentials import naver_is_configured
@@ -610,7 +609,7 @@ document.addEventListener("click", function(e) {{
   }}
 }});
 function _postToggleHighlight(word) {{
-  return fetch("http://{settings_host}:{settings_port}/keywords/toggle-highlight", {{
+  return fetch("{settings_base}/keywords/toggle-highlight", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{word: word}})
@@ -640,7 +639,7 @@ function addHighlightWord(evt) {{
 // [수정: 2026-08-05] app.renderer와 동일 — 팝오버 칩 클릭으로 색 순환(본문 클릭 방식은 삭제).
 function cycleChipColor(chip) {{
   var word = chip.dataset.word;
-  fetch("http://{settings_host}:{settings_port}/keywords/cycle-highlight-color", {{
+  fetch("{settings_base}/keywords/cycle-highlight-color", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{word: word}})
@@ -662,7 +661,7 @@ function addToScrap(btn) {{
     outlet: btn.dataset.outlet, title: btn.dataset.title,
     url: btn.dataset.url, summary: btn.dataset.summary, pubDate: btn.dataset.pubDate
   }});
-  fetch("http://{settings_host}:{settings_port}/add-manual-article", {{
+  fetch("{settings_base}/add-manual-article", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: params
@@ -689,7 +688,7 @@ function hideFromLive(btn) {{
     outlet: btn.dataset.outlet, title: btn.dataset.title,
     url: btn.dataset.url, pubDate: btn.dataset.pubDate
   }});
-  fetch("http://{settings_host}:{settings_port}/hide-article", {{
+  fetch("{settings_base}/hide-article", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: params
@@ -721,7 +720,7 @@ function hideFromLive(btn) {{
 function refetchSummary(btn) {{
   var url = btn.dataset.url;
   btn.disabled = true;
-  fetch("http://{settings_host}:{settings_port}/refetch-summary", {{
+  fetch("{settings_base}/refetch-summary", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{url: url}})
@@ -772,7 +771,7 @@ function editSummary(btn) {{
   saveBtn.textContent = "저장";
   saveBtn.onclick = function(e) {{
     e.stopPropagation();
-    fetch("http://{settings_host}:{settings_port}/edit-summary", {{
+    fetch("{settings_base}/edit-summary", {{
       method: "POST", keepalive: true,
       headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
       body: new URLSearchParams({{url: url, outlet: outletInput.value, title: titleInput.value, summary: summaryInput.value}})
@@ -794,7 +793,7 @@ function editSummary(btn) {{
 }}
 function unpinFromLive(btn) {{
   var params = new URLSearchParams({{url: btn.dataset.url}});
-  fetch("http://{settings_host}:{settings_port}/unpin-manual-article", {{
+  fetch("{settings_base}/unpin-manual-article", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: params
@@ -817,7 +816,7 @@ function unpinFromLive(btn) {{
 }}
 function unhideFromLive(btn) {{
   var params = new URLSearchParams({{url: btn.dataset.url}});
-  fetch("http://{settings_host}:{settings_port}/unhide-article", {{
+  fetch("{settings_base}/unhide-article", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: params
@@ -883,7 +882,7 @@ function bulkPinSelected(btn) {{
   btn.disabled = true;
   btn.textContent = boxes.length + "건 담는 중…";
   function restore() {{ btn.disabled = false; btn.innerHTML = label; }}
-  fetch("http://{settings_host}:{settings_port}/add-manual-article", {{
+  fetch("{settings_base}/add-manual-article", {{
     method: "POST",
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: body
@@ -1111,7 +1110,7 @@ updateLiveBulkBar();
 var AUTO_REFRESH_KEY = "liveAutoRefresh";
 var AUTO_INTERVAL_KEY = "liveAutoRefreshSec";
 var AUTO_REFRESH_DEFAULT_SEC = {auto_refresh_sec};
-var LIVE_PAGE_URL = "http://{settings_host}:{settings_port}/live.html";
+var LIVE_PAGE_URL = "{settings_base}/live.html";
 var _autoTimer = null;       // setInterval 핸들 — 끄면 즉시 멈춘다
 var _autoChecking = false;   // 확인이 겹치지 않게(한 번이 몇 초 걸린다)
 var _autoPendingHtml = null; // 마지막으로 받아온 목록 HTML(누를 때 이걸로 갈아끼운다)
@@ -1494,6 +1493,8 @@ def _theme() -> dict:
         # 톤은 live_bg, 다른 화면과 같은 파란 hover는 hover로 자리표시자 이름이 갈려
         # 있다 — 예전엔 hover를 붉은 톤으로 덮어써서, 파란 hover가 필요한 자리마다 색
         # 값을 직접 적어야 했다.
+        # 화면에 박히는 절대주소의 뿌리 — app.config 한 곳에서만 정해진다.
+        "settings_base": SETTINGS_SERVER_BASE,
         **PALETTE,
         "font_stack": FONT_STACK,
         # 새 기사 알림 띠는 모든 화면에 같은 마크업으로 들어간다(보이는 건 자동 새로고침이
@@ -1508,7 +1509,7 @@ def _theme() -> dict:
         "unhide_title_js": json.dumps(UNHIDE_BTN_TITLE, ensure_ascii=False),
         # 🏷 라벨 팝오버 — 네 화면(본문·대기·오류)이 같은 조각을 받는다.
         "label_popover_style": label_popover_style(),
-        "label_popover_script": label_popover_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
+        "label_popover_script": label_popover_script(),
         "copy_text_script": copy_text_script(),
     }
 
@@ -1537,19 +1538,19 @@ def _highlight_words_json(highlight_words: list) -> str:
 
 
 def _home_href() -> str:
-    return f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/home.html"
+    return f"{SETTINGS_SERVER_BASE}/home.html"
 
 
 def _scrap_href() -> str:
-    return f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/index.html"
+    return f"{SETTINGS_SERVER_BASE}/index.html"
 
 
 def _preview_href() -> str:
-    return f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/preview.html"
+    return f"{SETTINGS_SERVER_BASE}/preview.html"
 
 
 def _hidden_href() -> str:
-    return f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/hidden"
+    return f"{SETTINGS_SERVER_BASE}/hidden"
 
 
 def _scrapped_urls() -> set:
@@ -2083,7 +2084,7 @@ def _heavy_keyword_warning(articles: list) -> str:
         f'<div class="live-heavy-kw-warning">{icon("alert")} 검색어 \'{html.escape(heaviest_kw)}\'가 '
         f"결과의 {round(ratio * 100)}%({heaviest_count}/{len(articles)}건)예요 — "
         f"「{html.escape(heaviest_kw)}+예산」처럼 <b>+</b>로 묶거나 "
-        f'<a href="http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/keywords">검색어</a> 화면에서 '
+        f'<a href="{SETTINGS_SERVER_BASE}/keywords">검색어</a> 화면에서 '
         "더 좁은 말로 바꿔 보세요.</div>"
     )
 
@@ -2320,8 +2321,6 @@ def render_live_page(
         scrap_href=_scrap_href(),
         preview_href=_preview_href(),
         hidden_href=_hidden_href(),
-        settings_host=SETTINGS_SERVER_HOST,
-        settings_port=SETTINGS_SERVER_PORT,
         bulk_select_script=_BULK_SELECT_SCRIPT,
         outlet_order_json=json.dumps(outlet_order, ensure_ascii=False),
         highlight_words_json=_highlight_words_json(highlight_words),
@@ -2345,8 +2344,6 @@ def render_live_error_page() -> str:
         scrap_href=_scrap_href(),
         preview_href=_preview_href(),
         hidden_href=_hidden_href(),
-        settings_host=SETTINGS_SERVER_HOST,
-        settings_port=SETTINGS_SERVER_PORT,
         bulk_select_script=_BULK_SELECT_SCRIPT,
         outlet_order_json="[]",
         highlight_words_json=_highlight_words_json(load_settings().get("highlight_keywords", [])),
@@ -2360,7 +2357,7 @@ def render_live_not_configured_page() -> str:
     재사용하면 "지금은 조회할 수 없다"는 일시적 오류처럼 읽혀 새로고침을 부추기는데,
     실제로는 새로고침 백 번 해도 안 바뀌는 상태(키를 등록해야 풀림)라 오해를 막으려
     원인과 등록 링크를 담은 전용 화면을 둔다."""
-    naver_href = f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/naver"
+    naver_href = f"{SETTINGS_SERVER_BASE}/naver"
     body = (
         '<div class="error-box">🔑 네이버 검색 API 키가 없어 기사를 가져올 수 없어요.<br>'
         f'<a href="{naver_href}" style="color:{COLOR_ACCENT};font-weight:600;">'
@@ -2378,8 +2375,6 @@ def render_live_not_configured_page() -> str:
         scrap_href=_scrap_href(),
         preview_href=_preview_href(),
         hidden_href=_hidden_href(),
-        settings_host=SETTINGS_SERVER_HOST,
-        settings_port=SETTINGS_SERVER_PORT,
         bulk_select_script=_BULK_SELECT_SCRIPT,
         outlet_order_json="[]",
         highlight_words_json=_highlight_words_json(load_settings().get("highlight_keywords", [])),
@@ -2421,8 +2416,6 @@ def render_live_loading_page(keyword_count: int) -> str:
         scrap_href=_scrap_href(),
         preview_href=_preview_href(),
         hidden_href=_hidden_href(),
-        settings_host=SETTINGS_SERVER_HOST,
-        settings_port=SETTINGS_SERVER_PORT,
         bulk_select_script=_BULK_SELECT_SCRIPT,
         outlet_order_json="[]",
         highlight_words_json=_highlight_words_json(load_settings().get("highlight_keywords", [])),

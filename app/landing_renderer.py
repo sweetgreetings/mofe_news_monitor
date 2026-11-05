@@ -27,8 +27,7 @@ from app.config import (
     LANDING_HTML_PATH,
     LOGO_PATH,
     PALETTE,
-    SETTINGS_SERVER_HOST,
-    SETTINGS_SERVER_PORT,
+    SETTINGS_SERVER_BASE,
 )
 from app import store
 from app.atomic_write import atomic_write_text
@@ -403,7 +402,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 </body>
 </html>
 """
-_BASE = f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}"
+_BASE = f"{SETTINGS_SERVER_BASE}"
 
 
 def _account_html() -> str:
@@ -588,7 +587,7 @@ def _board_left_html(settings: dict, runs_today: list, now: datetime) -> str:
     judged_slots = [run["run_slot"] for run in runs_today if run["run_slot"] in state["runs"]]
     if not judged_slots:
         if not llm_is_configured():
-            llm_url = f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/llm"
+            llm_url = f"{SETTINGS_SERVER_BASE}/llm"
             wait = f'<a href="{llm_url}">AI 연동</a>을 하면 회차마다 골라 둡니다'
         elif not runs_today:
             wait = "첫 회차 뒤에 표시"
@@ -796,7 +795,7 @@ _HOME_CHART_WIDTH = 412
 def _naver_key_empty_html() -> str:
     """네이버 검색 키가 없어 정기 회차가 한 번도 못 돈 상태 — 주제·추이 두 카드가 같은 문구를 쓴다
     (원인도 할 일도 하나라서, HOME_CARD_SCOPE_MOCKUP.html)."""
-    url = f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/naver"
+    url = f"{SETTINGS_SERVER_BASE}/naver"
     return ('<p class="empty-trend">정기 회차가 돌아야 채워져요.<br>'
             f'<a href="{html.escape(url)}">네이버 검색 키</a>를 먼저 넣어주세요.</p>')
 
@@ -1069,7 +1068,7 @@ def _flow_card_html(last_run: Optional[dict], settings: dict) -> str:
     from app.scheduler import next_pending_slot
     from app.settings import active_schedule_times
 
-    base = f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}"
+    base = f"{SETTINGS_SERVER_BASE}"
     adhoc = _todays_adhoc_state()
     tips = {k: [html.escape(v[0]), html.escape(v[1]), v[2]] for k, v in _FLOW_TIPS.items()}
 
@@ -1163,12 +1162,12 @@ def render_landing_page(
         font_stack=FONT_STACK,
         shape_tokens=SHAPE_TOKENS_CSS,
         logo_html=_render_logo(),
-        gear_html=f'<a class="gearlink" href="http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/">{icon("gear")} 설정</a>',
+        gear_html=f'<a class="gearlink" href="{SETTINGS_SERVER_BASE}/">{icon("gear")} 설정</a>',
         account_html=_account_html(),
         account_js=_ACCOUNT_JS,
         today_label=today_label,
         board_html=_board_card_html(settings, runs_today if runs_today is not None else load_today_runs(today_str)),
-        trend_html=_trend_card_html(today_str, f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/trend",
+        trend_html=_trend_card_html(today_str, f"{SETTINGS_SERVER_BASE}/trend",
                                     has_today_run=last_run is not None),
         trend_chart_css=chart_css(),
         alert_hover_js=_ALERT_HOVER_JS,

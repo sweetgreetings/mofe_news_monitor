@@ -20,14 +20,13 @@ from app.config import (
     PRIVACY_CONSENT_TAIL,
     PRIVACY_CONSENT_TITLE,
     SECURITY_QUESTIONS,
-    SETTINGS_SERVER_HOST,
-    SETTINGS_SERVER_PORT,
+    SETTINGS_SERVER_BASE,
     SHAPE_TOKENS_CSS,
 )
 from app.auth_session import is_login_required
 from app.topnav import plain_nav, topnav_style
 
-_SETTINGS_HOME = f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/"
+_SETTINGS_HOME = f"{SETTINGS_SERVER_BASE}/"
 _HOME_HREF = _SETTINGS_HOME + "home.html"
 
 

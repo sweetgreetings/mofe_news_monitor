@@ -49,8 +49,7 @@ from app.config import (
     PALETTE,
     RECLASSIFY_SAFE_NOTE,
     PREVIEW_HTML_PATH,
-    SETTINGS_SERVER_HOST,
-    SETTINGS_SERVER_PORT,
+    SETTINGS_SERVER_BASE,
 )
 from app.assigned_groups import load_assigned_groups
 from app.atomic_write import atomic_write_text
@@ -1080,7 +1079,7 @@ function submitCut(btn) {{
   var at = _cutIsNow ? "" : _cutSel;
   btn.disabled = true;
   btn.textContent = "만드는 중…";
-  fetch("http://{settings_host}:{settings_port}/cut-round", {{
+  fetch("{settings_base}/cut-round", {{
     method: "POST",
     headers: {{ "Content-Type": "application/x-www-form-urlencoded" }},
     body: "at=" + encodeURIComponent(at),
@@ -1101,7 +1100,7 @@ function revertCut(btn) {{
       + "· 그 " + n + "건은 " + _cutKr(restored) + " 회차가 다시 모아요.")) return;
   btn.disabled = true;
   btn.textContent = "되돌리는 중…";
-  fetch("http://{settings_host}:{settings_port}/cut-round-cancel", {{
+  fetch("{settings_base}/cut-round-cancel", {{
     method: "POST",
     headers: {{ "Content-Type": "application/x-www-form-urlencoded" }},
     body: "end=" + encodeURIComponent(end),
@@ -1115,7 +1114,7 @@ function revertCut(btn) {{
 }}
 function cancelCut(btn) {{
   btn.disabled = true;
-  fetch("http://{settings_host}:{settings_port}/cut-round-cancel", {{
+  fetch("{settings_base}/cut-round-cancel", {{
     method: "POST",
     headers: {{ "Content-Type": "application/x-www-form-urlencoded" }},
     body: "end=" + encodeURIComponent(btn.getAttribute("data-end")),
@@ -1576,7 +1575,7 @@ function _tocApply() {{
   // 이건 "저장된 결과에서 내가 옮긴 게 어디로 갔나"다(기사 .just-moved와 같은 규칙).
   var moved = _tocItems.filter(function(item) {{ return _tocTouched[item.raw]; }})
                        .map(function(item) {{ return item.raw; }});
-  fetch("http://{settings_host}:{settings_port}/save-group-order", {{
+  fetch("{settings_base}/save-group-order", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{order: JSON.stringify(order)}})
@@ -1668,7 +1667,7 @@ document.addEventListener("click", function(e) {{
   pop.classList.remove("is-open");
 }}, true);
 function _postToggleHighlight(word) {{
-  return fetch("http://{settings_host}:{settings_port}/keywords/toggle-highlight", {{
+  return fetch("{settings_base}/keywords/toggle-highlight", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{word: word}})
@@ -1699,7 +1698,7 @@ function addHighlightWord(evt) {{
 // [수정: 2026-08-05] app.renderer와 동일 — 팝오버 칩 클릭으로 색 순환(본문 클릭 방식은 삭제).
 function cycleChipColor(chip) {{
   var word = chip.dataset.word;
-  fetch("http://{settings_host}:{settings_port}/keywords/cycle-highlight-color", {{
+  fetch("{settings_base}/keywords/cycle-highlight-color", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{word: word}})
@@ -1746,7 +1745,7 @@ function newHideBatchId() {{
 }}
 function hideArticle(btn) {{
   var article = btn.closest(".article");
-  fetch("http://{settings_host}:{settings_port}/hide-article", {{
+  fetch("{settings_base}/hide-article", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: hideArticleBody(btn)
@@ -1763,7 +1762,7 @@ function hideArticle(btn) {{
 function refetchSummary(btn) {{
   var url = btn.dataset.url;
   btn.disabled = true;
-  fetch("http://{settings_host}:{settings_port}/refetch-summary", {{
+  fetch("{settings_base}/refetch-summary", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{url: url}})
@@ -1813,7 +1812,7 @@ function editSummary(btn) {{
   saveBtn.textContent = "저장";
   saveBtn.onclick = function(e) {{
     e.stopPropagation();
-    fetch("http://{settings_host}:{settings_port}/edit-summary", {{
+    fetch("{settings_base}/edit-summary", {{
       method: "POST", keepalive: true,
       headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
       body: new URLSearchParams({{url: url, outlet: outletInput.value, title: titleInput.value, summary: summaryInput.value}})
@@ -1926,7 +1925,7 @@ function moveGroupOrder(btn, direction) {{
   var j = direction === "up" ? i - 1 : i + 1;
   if (i < 0 || j < 0 || j >= names.length) {{ return; }}
   var tmp = names[i]; names[i] = names[j]; names[j] = tmp;
-  fetch("http://{settings_host}:{settings_port}/save-group-order", {{
+  fetch("{settings_base}/save-group-order", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{order: JSON.stringify(names)}})
@@ -1992,7 +1991,7 @@ function bulkMoveOrder(direction) {{
   var body = new URLSearchParams();
   urls.forEach(function(u) {{ body.append("urls", u); }});
   body.append("direction", direction);
-  fetch("http://{settings_host}:{settings_port}/preview-bulk-move-order", {{
+  fetch("{settings_base}/preview-bulk-move-order", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: body
@@ -2031,7 +2030,7 @@ function _postGroupMove(urls, target) {{
   var body = new URLSearchParams();
   urls.forEach(function(u) {{ body.append("urls", u); }});
   body.append("target", target);
-  return fetch("http://{settings_host}:{settings_port}/bulk-move-article", {{
+  return fetch("{settings_base}/bulk-move-article", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: body
@@ -2079,7 +2078,7 @@ function assignUnclassified(btn) {{
   btn.disabled = true;
   var label = btn.innerHTML;
   btn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9Z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8Z"/></svg> 분류하는 중…';
-  fetch("http://{settings_host}:{settings_port}/assign-unclassified", {{
+  fetch("{settings_base}/assign-unclassified", {{
     method: "POST", keepalive: true
   }}).then(function(res) {{
     if (res.ok) {{
@@ -2120,7 +2119,7 @@ function assignPinnedArticles(btn) {{
   btn.disabled = true;
   var label = btn.innerHTML;
   btn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9Z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8Z"/></svg> 배정하는 중…';
-  fetch("http://{settings_host}:{settings_port}/promote-all-manual-to-draft", {{
+  fetch("{settings_base}/promote-all-manual-to-draft", {{
     method: "POST", keepalive: true
   }}).then(function(res) {{
     if (!res.ok) {{
@@ -2129,7 +2128,7 @@ function assignPinnedArticles(btn) {{
       return;
     }}
     // 승격이 끝났으면 그 기사들은 지금 📂 미분류 칸에 있다 — 같은 배정을 그대로 이어 돌린다.
-    fetch("http://{settings_host}:{settings_port}/assign-unclassified", {{
+    fetch("{settings_base}/assign-unclassified", {{
       method: "POST", keepalive: true
     }}).then(function(r2) {{
       if (r2.ok) {{
@@ -2187,7 +2186,7 @@ function regenerateSubheadings(btn) {{
   btn.disabled = true;
   var label = btn.innerHTML;
   btn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9Z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8Z"/></svg> 분류하는 중…';
-  fetch("http://{settings_host}:{settings_port}/regenerate-subheadings-draft", {{
+  fetch("{settings_base}/regenerate-subheadings-draft", {{
     method: "POST", keepalive: true
   }}).then(function(res) {{
     if (res.ok) {{ location.reload(); }}
@@ -2205,7 +2204,7 @@ function regenerateSubheadings(btn) {{
 // 같은 경로로 한 단계 되돌린다(app/undo.py가 상태를 통째로 스냅샷해둔다).
 function undoLastAction(btn) {{
   btn.disabled = true;
-  fetch("http://{settings_host}:{settings_port}/undo", {{ method: "POST", keepalive: true }})
+  fetch("{settings_base}/undo", {{ method: "POST", keepalive: true }})
     .then(function(res) {{
       // [추가: 2026-09-15] 응답의 touched = 되돌린 동작에서 담당자가 손댄 기사. 새로고침 뒤
       // 그 기사만 세이지로 칠한다(아래 justMovedUrls). 칠한 기사가 화면에 하나도 안 보이면
@@ -2241,7 +2240,7 @@ function _createCustomGroupSubmit(name) {{
   // [수정: 2026-08-04] app.renderer와 동일 — 지금 화면에 떠 있는 소제목만 중복 검사.
   var body = new URLSearchParams({{name: name}});
   getAllGroups().forEach(function(g) {{ body.append("active_names", g.value); }});
-  fetch("http://{settings_host}:{settings_port}/add-custom-group", {{
+  fetch("{settings_base}/add-custom-group", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: body
@@ -2282,7 +2281,7 @@ function toggleKeywordEditMode(btn) {{
 }}
 function saveKeywordNote() {{
   var text = document.getElementById("keyword-note-input").value;
-  fetch("http://{settings_host}:{settings_port}/save-manual-keyword-note", {{
+  fetch("{settings_base}/save-manual-keyword-note", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{text: text}})
@@ -2321,7 +2320,7 @@ function removeCustomGroup(btn) {{
   // [수정: 2026-10-21] 읽는 칸이 data-current가 아니라 data-del-current다 — 그 이름을 쓰는 이유는
   // 이 버튼이 소제목 목록 선택자에 걸리면 안 되기 때문이다(_render_preview_groups 주석).
   if (!confirm('"' + (btn.dataset.delCurrent || name) + '" 소제목을 삭제할까요?')) return;
-  fetch("http://{settings_host}:{settings_port}/remove-custom-group", {{
+  fetch("{settings_base}/remove-custom-group", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{name: name}})
@@ -2363,7 +2362,7 @@ function _applyPreviewContent(data, url) {{
 function previewMoveArticle(btn) {{
   var url = btn.dataset.url;
   var direction = btn.dataset.direction;
-  fetch("http://{settings_host}:{settings_port}/preview-move-article", {{
+  fetch("{settings_base}/preview-move-article", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{url: url, direction: direction}})
@@ -2386,7 +2385,7 @@ function _promoteManual(el, endpoint, failMsg) {{
   var url = el.dataset.url;
   var group = el.value || "";
   el.disabled = true;
-  fetch("http://{settings_host}:{settings_port}/" + endpoint, {{
+  fetch("{settings_base}/" + endpoint, {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{url: url, group: group}})
@@ -2416,7 +2415,7 @@ function _renameGroupSubmit(name, newLabel) {{
   // [수정: 2026-08-04] app.renderer와 동일 — 지금 화면에 떠 있는 소제목만 중복 검사.
   var body = new URLSearchParams({{name: name, label: newLabel}});
   getAllGroups().forEach(function(g) {{ body.append("active_names", g.value); }});
-  fetch("http://{settings_host}:{settings_port}/rename-group", {{
+  fetch("{settings_base}/rename-group", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: body
@@ -2698,6 +2697,8 @@ def _theme() -> dict:
     # seen_color/new_arrival_bg/tonal_hover 같은 값이 여기 직접 적혀 있었고, 같은 색을
     # 쓰는 app.renderer에도 따로 적혀 있어 한쪽만 바꾸면 두 화면이 어긋났다.
     return {
+        # 화면에 박히는 절대주소의 뿌리 — app.config 한 곳에서만 정해진다.
+        "settings_base": SETTINGS_SERVER_BASE,
         **PALETTE,
         "font_stack": FONT_STACK,
         "topnav_style": topnav_style(),
@@ -2712,7 +2713,7 @@ def _theme() -> dict:
         "split_button_style": split_button_style(),
         "screen_tag_style": screen_tag_style(),
         "bulk_move_bar_html": bulk_move_bar_html(split_button_html()),
-        "split_button_script": split_button_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT, "/split-group"),
+        "split_button_script": split_button_script("/split-group"),
         # [추가: 2026-09-04] "앞 회차 기사" 칩 CSS — 확정본(app.renderer)과 한 곳에서
         # 만든 값을 그대로 받는다. 초안도 확정본과 같은 창을 보게 되면서 이 칩이 여기에도
         # 붙기 때문이고, .photo-badge처럼 복붙해 두면 한쪽만 고쳤을 때 어긋난다.
@@ -2732,7 +2733,7 @@ def _theme() -> dict:
         # 한쪽만 고쳐져 어긋난다(이 파일이 render_article을 import해 쓰는 것과 같은 이유).
         "hidden_trash_style": hidden_trash_style(),
         "hidden_trash_html": hidden_trash_html(_hidden_href()),
-        "hidden_trash_script": hidden_trash_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
+        "hidden_trash_script": hidden_trash_script(),
         "scroll_top_style": scroll_top_style(),
         "scroll_top_html": scroll_top_html(),
         "scroll_top_script": scroll_top_script(),
@@ -2751,9 +2752,9 @@ def _theme() -> dict:
         "schedule_override_script": schedule_override_script(),
         "range_select_script": range_select_script(".article-select", ".article"),
         "url_add_style": url_add_style(),
-        "url_add_script": url_add_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT, "preview"),
+        "url_add_script": url_add_script("preview"),
         "label_popover_style": label_popover_style(),
-        "label_popover_script": label_popover_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
+        "label_popover_script": label_popover_script(),
         "name_picker_style": name_picker_style(),
         "name_picker_html": name_picker_html(),
         # 초안이 보여주는 회차는 **아직 저장되지 않은 진행 중인 회차**라, 저장된 회차 중
@@ -2765,19 +2766,19 @@ def _theme() -> dict:
 
 
 def _home_href() -> str:
-    return f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/home.html"
+    return f"{SETTINGS_SERVER_BASE}/home.html"
 
 
 def _scrap_href() -> str:
-    return f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/index.html"
+    return f"{SETTINGS_SERVER_BASE}/index.html"
 
 
 def _live_href() -> str:
-    return f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/live.html"
+    return f"{SETTINGS_SERVER_BASE}/live.html"
 
 
 def _hidden_href() -> str:
-    return f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/hidden"
+    return f"{SETTINGS_SERVER_BASE}/hidden"
 
 
 def _preview_keywords_signature(groups: list, slot: dict) -> dict:
@@ -3938,8 +3939,6 @@ def render_preview_page(
         scrap_href=_scrap_href(),
         live_href=_live_href(),
         hidden_href=_hidden_href(),
-        settings_host=SETTINGS_SERVER_HOST,
-        settings_port=SETTINGS_SERVER_PORT,
     )
 
 
@@ -3970,8 +3969,6 @@ def render_preview_done_page() -> str:
         scrap_href=_scrap_href(),
         live_href=_live_href(),
         hidden_href=_hidden_href(),
-        settings_host=SETTINGS_SERVER_HOST,
-        settings_port=SETTINGS_SERVER_PORT,
     )
 
 
@@ -3999,8 +3996,6 @@ def render_preview_error_page(slot: dict) -> str:
         scrap_href=_scrap_href(),
         live_href=_live_href(),
         hidden_href=_hidden_href(),
-        settings_host=SETTINGS_SERVER_HOST,
-        settings_port=SETTINGS_SERVER_PORT,
     )
 
 
@@ -4138,8 +4133,6 @@ def _rebuild_preview(settings: dict, slot: dict, keywords: list, final_articles:
         scrap_href=_scrap_href(),
         live_href=_live_href(),
         hidden_href=_hidden_href(),
-        settings_host=SETTINGS_SERVER_HOST,
-        settings_port=SETTINGS_SERVER_PORT,
     )
     atomic_write_text(PREVIEW_HTML_PATH, full_html)
     return content

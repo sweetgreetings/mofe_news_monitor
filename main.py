@@ -12,7 +12,13 @@ from app.adhoc.card import delete_expired_cards, purge_expired_deleted_cards
 from app.agency_archive import collect_tick as agency_archive_tick
 from app.title_watch import watch_tick as title_watch_tick
 from app.breaking_alert_sender import catch_up_on_wake
-from app.config import LANDING_HTML_PATH, SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT
+from app.config import (
+    LANDING_HTML_PATH,
+    SERVER_IS_HOSTED,
+    SETTINGS_SERVER_BASE,
+    SETTINGS_SERVER_HOST,
+    SETTINGS_SERVER_PORT,
+)
 from app.confirm_send import confirm_and_promote
 from app.alert_groups import transplant_alert_groups
 from app.credentials import cleanup_env_backups, transplant_env_keys
@@ -29,6 +35,27 @@ from app.storage import delete_expired_runs, purge_expired_deleted_runs
 from app.telegram_bot_name import apply_default_bot_name_once
 
 logger = logging.getLogger(__name__)
+
+
+def _apply_timezone() -> None:
+    """**이 앱의 시계를 한국 시간으로 고정한다 — 다른 무엇보다 먼저 온다.**
+
+    [추가: 2026-11-05] 남이 운영하는 컴퓨터(클라우드)는 거의 다 UTC로 돈다. 기사 날짜
+    비교는 KST로 못박아 두었지만(app.naver_api._KST), 앱의 나머지는 `datetime.now()`를
+    **164곳**에서 그대로 쓴다 — 회차 파일 이름의 날짜·「오늘」 판정·자정 초기화·보관
+    기간·발송 기록이 전부 그 값이다. UTC로 돌면 **하루의 처음 아홉 시간이 「어제」가 되어**
+    00~09시 회차가 어제 파일에 쌓이고, 자정 초기화가 아침 9시에 돌고, 「오늘」 화면이 빈다.
+    조용히 어긋나는 종류라 더 나쁘다.
+    `TZ`를 환경변수로 받아 `time.tzset()`을 부르면 그 164곳을 한 글자도 안 고치고 맞는다.
+
+    **값이 없으면 `Asia/Seoul`로 둔다** — 한국 언론을 보는 앱이라 KST가 이 앱의 시간대이고,
+    빠뜨렸을 때 날짜가 밀리는 쪽보다 정해 두는 쪽이 안전하다. 담당자 맥은 이미 KST라
+    로컬 동작은 한 글자도 안 바뀐다. `tzset`이 없는 운영체제(윈도우)에서는 조용히 넘어간다.
+    """
+    import os
+    os.environ.setdefault("TZ", "Asia/Seoul")
+    if hasattr(time, "tzset"):
+        time.tzset()
 
 
 def _wait_for_server(host: str, port: int, timeout: float = 5.0) -> bool:
@@ -48,6 +75,19 @@ def _wait_for_server(host: str, port: int, timeout: float = 5.0) -> bool:
     return False
 
 
+def _is_local_mode() -> bool:
+    """이 컴퓨터에서 혼자 쓰는 중인가 — 브라우저를 열어도 되는 상태인가.
+
+    [추가: 2026-11-05] 예전엔 두 자리가 각자 `SETTINGS_SERVER_HOST == "127.0.0.1"`을
+    봤는데, 남이 운영하는 컴퓨터(클라우드)에서는 `SERVER_HOST`를 적지 않아 그 값이
+    기본값 그대로다 — 그러면 **브라우저가 깔려 있지도 않은 환경에서 창을 열려고 들고,**
+    webbrowser가 예외를 내면 메인 스레드가 죽으면서 위에서 띄운 데몬 스레드(스케줄러·
+    설정 서버)까지 **전부 함께 강제 종료된다**(수집도 화면도 통째로 멈춘다).
+    그래서 뿌리 주소를 바깥에서 받았다는 사실도 함께 본다.
+    """
+    return not SERVER_IS_HOSTED and SETTINGS_SERVER_HOST == "127.0.0.1"
+
+
 def _open_home_in_browser() -> None:
     """홈 화면을 브라우저로 연다 (로컬 모드 전용).
 
@@ -64,7 +104,7 @@ def _open_home_in_browser() -> None:
     같은 코드를 그대로 쓰기 위해서다. 그 경로에서는 서버가 이미 남의 프로세스에서
     떠 있으므로 _wait_for_server가 즉시 성공한다.
     """
-    home_url = f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/home.html"
+    home_url = f"{SETTINGS_SERVER_BASE}/home.html"
     if not _wait_for_server(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT):
         logger.warning("설정 서버가 5초 안에 뜨지 않아 임시로 파일을 직접 엽니다 — 다운로드 버튼 등 일부 기능은 안 될 수 있습니다")
         home_url = LANDING_HTML_PATH.as_uri()
@@ -133,9 +173,18 @@ def main(open_browser: bool = True) -> None:
     담당자가 쓰던 화면을 밀어낸다. 자동 실행은 "회차를 안 놓치는 것"만 하고, 화면을 여는
     건 담당자가 앱을 직접 실행했을 때만 한다 — 그때는 포트 자물쇠에 걸려 곧바로
     _open_home_in_browser()로 빠지므로, 손으로 켜는 행동이 그대로 "화면 열기"가 된다."""
+    # [추가: 2026-11-05] 로깅보다도 먼저 시계를 맞춘다 — 아래 모든 단계와 로그
+    # 타임스탬프가 이 값을 쓴다(_apply_timezone 주석 참고).
+    _apply_timezone()
+
     # [추가: 2026-08-26] 무엇보다 먼저 로깅을 켠다 — 아래 정리·수집 단계에서 나는
     # 경고·예외가 파일에 남아야 사후에 원인을 좁힐 수 있다(app/logging_setup.py).
     setup_logging()
+
+    # 이 앱이 지금 보는 시각을 켤 때마다 한 줄 남긴다 — 시간대가 어긋나는 사고는
+    # **조용히** 일어나(회차가 어제 파일에 쌓이고 「오늘」 화면이 빈다) 나중에 원인을
+    # 좁히기가 어렵다. `+0900`이 아니면 그 자리가 곧 원인이다(_apply_timezone 참고).
+    logger.warning("앱 시계: %s", time.strftime("%Y-%m-%d %H:%M %z"))
 
     # [추가: 2026-09-02] **앱 중복 실행 자물쇠 — 데이터를 건드리는 어떤 단계보다 먼저 온다.**
     # 설정 서버 포트(기본 127.0.0.1:8765)를 여기서 동기로 bind해, 실패하면 "이미 앱이
@@ -167,7 +216,7 @@ def main(open_browser: bool = True) -> None:
             "이 앱이 이미 실행 중입니다 — 두 번째 창은 열지 않고 원래 창으로 보냅니다 "
             "(중복 실행하면 회차가 두 번 수집되고 초안 작업이 사라집니다)"
         )
-        if open_browser and SETTINGS_SERVER_HOST == "127.0.0.1":
+        if open_browser and _is_local_mode():
             _open_home_in_browser()
         return
 
@@ -190,6 +239,22 @@ def main(open_browser: bool = True) -> None:
     # 「바닥」 검사가 이 스위치를 보므로 그보다 먼저 와야 한다. 실패해도 앱은 멈추지
     # 않는다(app.settings.group_in_alert가 키 없는 그룹을 켜짐으로 읽는다).
     transplant_alert_groups()
+
+    # [수정: 2026-11-05] **화면 서버를 여기서 돌린다 — 아래 느린 단계들보다 먼저.**
+    # 위에서 이미 bind해둔 서버 객체를 그대로 돌린다(여기서 다시 열지 않는다 — 자물쇠를
+    # 놓쳤다 다시 잡는 틈이 생기면 그 사이 두 번째 앱이 끼어들 수 있다).
+    #
+    # 예전엔 이 줄이 맨 아래, 첫 수집(run_due_slot)과 몰아보내기(catch_up_on_wake)
+    # **뒤**에 있었다. 그 둘은 네이버를 키워드 수만큼 부르므로 몇 분이 걸릴 수 있다.
+    # 소켓은 bind 시점부터 열려 있어 TCP 연결은 받아지지만 **아무도 응답하지 않는다** —
+    # 남이 운영하는 컴퓨터는 켜진 직후 HTTP로 한 번 두드려 보고(헬스체크) 응답이 없으면
+    # 「시작 실패」로 읽어 **앱을 죽이고 다시 띄운다**(그 수집을 또 처음부터 하며 무한히
+    # 되풀이된다). 혼자 쓸 때도 켠 직후 화면이 곧 열리는 쪽이 낫다.
+    #
+    # 한 번만 돌아야 하는 옮겨심기 둘(위) **뒤**인 것은 그대로 지킨다 — 그 사이에 요청이
+    # 들어오면 키를 옮기는 도중의 설정을 읽는다. 아래 보관 기간 정리·수집은 요청과
+    # 부딪히지 않는다(각자 제 잠금을 쥔다).
+    threading.Thread(target=settings_server.serve_forever, daemon=True).start()
 
     # 며칠 꺼뒀다 켠 경우, 정리(cleanup)는 스케줄 루프 안에서만 비동기로 도는데(scheduler.py)
     # 그걸 기다리면 아래에서 만들 "정기 보관함"이 보관 기간을 넘긴 회차까지 잠깐 보여줄 수 있다.
@@ -239,9 +304,6 @@ def main(open_browser: bool = True) -> None:
         },
         daemon=True,
     ).start()
-    # 위에서 이미 bind해둔 서버 객체를 그대로 돌린다(여기서 다시 열지 않는다 — 자물쇠를
-    # 놓쳤다 다시 잡는 틈이 생기면 그 사이 두 번째 앱이 끼어들 수 있다).
-    threading.Thread(target=settings_server.serve_forever, daemon=True).start()
     # 이 봇에 앱이 이름을 건 적이 없으면 기본 이름을 한 번 건다(네트워크라 뒤에서).
     threading.Thread(target=_apply_default_bot_name, daemon=True).start()
 
@@ -261,20 +323,20 @@ def main(open_browser: bool = True) -> None:
     # webbrowser.open이 예외를 내면(브라우저를 못 찾음) 메인 스레드가 죽으면서 위에서
     # 띄운 데몬 스레드(스케줄러·설정 서버)까지 전부 강제 종료되므로, 원격 서버 모드에서는
     # 아예 건너뛰고 로컬 모드에서도 혹시 모를 예외를 대비해 감싼다.
-    if open_browser and SETTINGS_SERVER_HOST == "127.0.0.1":
+    if open_browser and _is_local_mode():
         _open_home_in_browser()
     elif not open_browser:
         logger.warning(
-            "백그라운드 모드(--no-browser)로 실행 중입니다 — 화면은 http://%s:%s/home.html 입니다",
-            SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT,
+            "백그라운드 모드(--no-browser)로 실행 중입니다 — 화면은 %s/home.html 입니다",
+            SETTINGS_SERVER_BASE,
         )
     else:
         # [참고] 화면(터미널)에는 WARNING 이상만 찍는다(app/logging_setup.py의
         # CONSOLE_LOG_LEVEL) — 이 안내는 반드시 눈에 띄어야 하므로 info가 아니라
         # warning으로 남긴다(실제로는 정상 상태 안내). 파일에는 INFO까지 남는다.
         logger.warning(
-            "원격 서버 모드(SERVER_HOST=%s)입니다 — 다른 컴퓨터에서 http://%s:%s/home.html 로 접속하세요",
-            SETTINGS_SERVER_HOST, SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT,
+            "원격 서버 모드입니다 — 다른 컴퓨터에서 %s/home.html 로 접속하세요 (로그인 자물쇠가 켜집니다)",
+            SETTINGS_SERVER_BASE,
         )
 
     threading.Event().wait()  # 데몬 스레드가 계속 돌도록 메인 스레드를 대기시킨다 (Ctrl+C로 종료)
