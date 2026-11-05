@@ -26,8 +26,6 @@ from typing import Optional
 from app.agency_archive import available_dates, load_day
 from app.config import (
     AGENCY_ARCHIVE_KEYWORDS,
-    SETTINGS_SERVER_HOST,
-    SETTINGS_SERVER_PORT,
     AGENCY_ARCHIVE_TITLE,
     DEFAULT_ARTICLE_LINE_TEMPLATE,
     FONT_STACK,
@@ -613,7 +611,7 @@ def render_agency_archive_page(
         font_stack=FONT_STACK,
         topnav_style=topnav_style(),
         label_popover_style=label_popover_style(),
-        label_popover_script=label_popover_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
+        label_popover_script=label_popover_script(),
         copy_text_script=copy_text_script(),
         topnav=plain_nav(),
         title=html.escape(AGENCY_ARCHIVE_TITLE),

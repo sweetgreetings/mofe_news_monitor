@@ -5968,7 +5968,7 @@ def test_agency_archive_labels():
     ]})
 
     # (1) 공용 장치의 기본값 경로 — 확정본 넷이 쓰는 길이 그대로 남아 있어야 한다.
-    js = label_popover_script("127.0.0.1", 8765)
+    js = label_popover_script()
     assert 'el.closest(".article")' in js, \
         "공용 라벨 장치의 기본값(.article)이 사라졌습니다 — 확정본·초안·정기 보관함·수시가 멈춥니다"
     assert 'btn.closest("summary")' in js, \
@@ -6050,7 +6050,7 @@ def test_live_labels():
     from app import labels as labels_mod, live_renderer
 
     # (1) 공용 장치의 기본값 경로 — 확정본 넷이 쓰는 길이 그대로 남아 있어야 한다.
-    js = label_popover_script("127.0.0.1", 8765)
+    js = label_popover_script()
     assert 'el.closest(".article")' in js, \
         "공용 라벨 장치의 기본값(.article)이 사라졌습니다 — 확정본·초안·정기 보관함·수시가 멈춥니다"
     assert 'btn.closest("summary")' in js, \
@@ -7574,7 +7574,7 @@ def test_scheduler_runs_per_person():
         with patch.object(users_mod, "USERS_FILE", tmp_dir / "users.json"):
             assert users_mod.data_owners() == [None], "계정이 없으면 [None]이어야 합니다."
             users_mod.create_user(
-                email="a@example.com", password="1234", display_name="담당자",
+                email="a@example.com", password="sijang2026!", display_name="담당자",
                 department="", phone="01000000000", question="초등학교",
                 answer="서울초등", consent=True,
             )
@@ -7582,7 +7582,7 @@ def test_scheduler_runs_per_person():
                 "계정이 하나면 [None] — 바닥 주인이 그 사람이라 루프가 한 번 돈다."
             )
             second = users_mod.create_user(
-                email="b@example.com", password="1234", display_name="큐레이터",
+                email="b@example.com", password="sijang2026!", display_name="큐레이터",
                 department="", phone="01011112222", question="초등학교",
                 answer="부산초등", consent=True,
             )
@@ -7720,12 +7720,12 @@ def test_base_owner_needs_no_migration():
             assert owner_of(_Stub(None)) is None
 
             first = users_mod.create_user(
-                email="first@example.com", password="1234", display_name="담당자",
+                email="first@example.com", password="sijang2026!", display_name="담당자",
                 department="", phone="01000000000", question="초등학교",
                 answer="서울초등", consent=True,
             )
             second = users_mod.create_user(
-                email="second@example.com", password="1234", display_name="큐레이터",
+                email="second@example.com", password="sijang2026!", display_name="큐레이터",
                 department="", phone="01011112222", question="초등학교",
                 answer="부산초등", consent=True,
             )
@@ -7799,6 +7799,21 @@ def test_network_open_forces_login():
                 with patch.object(auth_session, "SETTINGS_SERVER_HOST", host):
                     assert not auth_session.is_open_to_network(), f"{host}를 바깥으로 읽었습니다."
 
+            # ③-2 **남이 운영하는 컴퓨터(클라우드)에서 도는 경우** — 주소만 보면 못 잡는다.
+            # 거기서는 `SERVER_HOST`를 적지 않아 값이 기본값 127.0.0.1 그대로인데,
+            # **호스트가 인터넷에서 요청을 받아 넘겨준다.** 주소만 보고 판정하면
+            # 「이 컴퓨터 안」으로 읽혀 자물쇠가 꺼진 채 1년치 기사가 공개된다.
+            for host in ("127.0.0.1", "localhost"):
+                with patch.object(auth_session, "SETTINGS_SERVER_HOST", host), \
+                     patch.object(auth_session, "SERVER_IS_HOSTED", True):
+                    assert auth_session.is_open_to_network(), (
+                        "클라우드에서 도는데 주소가 기본값이라 「이 컴퓨터 안」으로 읽었습니다."
+                    )
+                    assert auth_session.is_login_required(), (
+                        "클라우드에 올렸는데 자물쇠가 꺼졌습니다 — 주소를 아는 사람 "
+                        "누구나 기사·설정·키 화면을 봅니다."
+                    )
+
     # ④ 화면이 칸을 잠그고 이유를 말한다
     import re
     local_html = settings_server.render_login_settings_page()
@@ -7824,7 +7839,16 @@ def test_network_open_forces_login():
         "(폼은 누구든 직접 보낼 수 있습니다)."
     )
 
-    print("✓ 바깥에 열리면 자물쇠 강제: 끌 수 없고(화면도 서버도), 첫 가입은 이 컴퓨터에서만")
+    # ⑥ 클라우드에서는 `SERVER_HOST`를 안 적어도 0.0.0.0으로 들어야 한다 — 호스트는
+    # 자기 안쪽 주소로 요청을 넘기므로 127.0.0.1만 듣고 있으면 그 요청이 아무에게도
+    # 닿지 않고 「시작 실패」가 된다. 바인딩과 자물쇠가 **같은 사실**을 봐야 한다.
+    bind_source = inspect.getsource(settings_server.create_settings_server)
+    assert "SERVER_IS_HOSTED" in bind_source, (
+        "클라우드 판정이 바인딩에 없습니다 — SERVER_HOST를 안 적으면 127.0.0.1만 듣게 되어 "
+        "호스트가 요청을 넘길 수 없습니다."
+    )
+
+    print("✓ 바깥에 열리면 자물쇠 강제: 끌 수 없고(화면도 서버도), 클라우드도 같은 규칙, 첫 가입은 이 컴퓨터에서만")
 
 
 def test_admin_only_settings():
@@ -7946,7 +7970,7 @@ def test_admin_only_settings():
             # 2) 켜면 — 관리자는 통과, 일반은 거절
             auth_session.set_login_required(True)
             users_mod.create_user(
-                email="admin@example.com", password="1234", display_name="관리자",
+                email="admin@example.com", password="sijang2026!", display_name="관리자",
                 department="", phone="01000000000", question="초등학교",
                 answer="서울초등", consent=True,
             )
@@ -7995,7 +8019,7 @@ def test_admin_only_settings():
                 raise AssertionError("마지막 관리자를 내릴 수 있었습니다.")
 
             second = users_mod.create_user(
-                email="member@example.com", password="1234", display_name="큐레이터",
+                email="member@example.com", password="sijang2026!", display_name="큐레이터",
                 department="", phone="01011112222", question="초등학교",
                 answer="부산초등", consent=True,
             )
@@ -9047,7 +9071,7 @@ def test_refetch_titles_widget_contract():
     assert "신현송" in inner.group(1)
 
     # (4) JS가 찾는 선택자와 서버가 내는 표식의 이름이 같은지 — 둘이 갈리면 조용히 먹통이다.
-    js = refetch_titles_script("127.0.0.1", 8765)
+    js = refetch_titles_script()
     for sel in ("[data-refetch-row]", "[data-refetch-title]", "[data-refetch-meta]",
                 ".refetch-note", "data-refetch-scope", "data-url", "data-pub"):
         assert sel in js, f"JS가 {sel}을(를) 안 봅니다"
