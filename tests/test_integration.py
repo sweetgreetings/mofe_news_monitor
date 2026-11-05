@@ -8827,6 +8827,45 @@ def test_history_word_search():
     print("55) 정기 보관함 낱말로 찾기: 통과 (걸린 기사만·노랑은 찾은 낱말·스니펫·숨김·고친 제목·+ AND)")
 
 
+def test_keys_use_forward_slashes():
+    """저장소 키의 구분자는 어느 운영체제에서나 `/`다 — 윈도우가 섞여도 같은 값.
+
+    윈도우에서 `str(path.relative_to(...))`를 쓰면 `articles\\x.json`이 나온다. 그러면
+    `_resolve`의 `rel.split("/")[0]`이 통째로 한 조각이 되어 표에 없는 칸이 되고,
+    **저장소를 건드리는 모든 동작이 KeyError로 죽는다.** DB를 같이 쓰면 더 나쁘다 —
+    맥과 윈도우가 같은 파일을 **다른 키**로 적어 서로의 회차가 안 보인다.
+
+    키는 사람이 보라고 있는 이름이 아니라 **DB가 행을 찾는 열**이라, 모양이 아니라
+    「같은 값인가」가 걸려 있다.
+    """
+    _require_isolation()
+    from app import store, store_pg
+    import app.store as store_mod
+
+    # ① 키를 만드는 자리가 전부 `as_posix()`를 쓴다 — `str(...relative_to(...))`는
+    #    윈도우에서 역슬래시를 내놓는다.
+    for mod, name in ((store_mod, "app/store.py"), (store_pg, "app/store_pg.py")):
+        src = Path(inspect.getfile(mod)).read_text(encoding="utf-8")
+        assert "str(path.relative_to(" not in src and "str(p.resolve().relative_to(" not in src, (
+            f"{name}에 키를 str()로 만드는 자리가 남아 있습니다 — "
+            "윈도우에서 역슬래시 키가 생겨 저장소가 통째로 죽습니다."
+        )
+        assert "as_posix()" in src, f"{name}이 as_posix()로 키를 만들지 않습니다."
+
+    # ② 실제로 만들어 본다 — 중첩된 자리가 `/`로 이어져야 한다.
+    with tempfile.TemporaryDirectory() as tmp:
+        data = Path(tmp) / "data"
+        (data / "adhoc" / "cards").mkdir(parents=True)
+        target = data / "adhoc" / "cards" / "20260101-000000-abcd.json"
+        target.write_text("{}", encoding="utf-8")
+        with patch.object(store_mod, "DATA_DIR", data):
+            key = store.key_of(target)
+    assert key == "adhoc/cards/20260101-000000-abcd.json", key
+    assert "\\" not in key, f"키에 역슬래시가 섞였습니다: {key!r}"
+
+    print("57) 저장소 키 구분자: 통과 (어느 운영체제에서나 `/` — 맥·윈도우가 같은 키를 쓴다)")
+
+
 def test_scheduler_lease():
     """공용 일은 한 대만 — 임차를 못 쥐면 그 tick을 통째로 건너뛴다.
 
@@ -8969,6 +9008,7 @@ if __name__ == "__main__":
         test_base_owner_needs_no_migration,
         test_settings_split_per_user,
         test_scheduler_runs_per_person,
+        test_keys_use_forward_slashes,
         test_scheduler_lease,
         test_naver_key_per_person,
         test_network_open_forces_login,

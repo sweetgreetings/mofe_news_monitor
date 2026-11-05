@@ -103,7 +103,7 @@ def cmd_verify() -> None:
     for path in sorted(Path(DATA_DIR).rglob("*")):
         if not path.is_file():
             continue
-        key = str(path.relative_to(DATA_DIR))
+        key = path.relative_to(DATA_DIR).as_posix()
         if key.split("/")[0] == "logs" or path.name.endswith(".tmp"):
             continue
         try:

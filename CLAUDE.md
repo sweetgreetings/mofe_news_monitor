@@ -89,7 +89,7 @@ FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN
   - **화면 HTML을 쓰는 렌더러 다섯은 이 규칙 밖이고 `app/atomic_write.py`를 그대로 쓴다** — 저장소가 아니라 화면이고, 2단계에서 「파일로 쓰지 않고 응답으로 돌려준다」로 바뀔 자리라 성격이 다르다. `AI_RULES.md`를 읽는 자리(프롬프트 원본)와 미리 만들어 둔 화면 파일·로고를 내보내는 자리도 밖이다.
   - **백엔드가 둘이다** — 파일(`_fs_*`)과 **Postgres**(`app/store_pg.py`). 고르는 자리는 `_route()` 하나이고 기준은 `.env`의 `DATABASE_URL`이다: **없으면 파일**(지금 혼자 쓰는 상태가 한 글자도 안 바뀐다), 있으면 Postgres(Supabase).
     - **`DATA_DIR` 밖은 언제나 파일이다** — `.env`·`AI_RULES.md`·테스트의 임시 폴더는 옮길 대상이 아니고, 그 덕에 테스트 격리가 그대로 돈다.
-    - **키가 곧 행이다** — `labels.json` · `users/{계정}/articles/…json`처럼 `DATA_DIR` 기준 상대 경로가 기본키다. 사람별 칸은 키 안에 이미 누구인지 적혀 있어 경계가 그대로 따라온다.
+    - **키가 곧 행이다** — `labels.json` · `users/{계정}/articles/…json`처럼 `DATA_DIR` 기준 상대 경로가 기본키다. **구분자는 어느 운영체제에서나 `/`이고, 만드는 자리는 `str()`이 아니라 `as_posix()`다** — 윈도우에서 `str()`을 쓰면 `articles\x.json`이 나와 `rel.split("/")[0]`이 통째로 한 조각이 되고 **저장소를 건드리는 모든 동작이 `KeyError`로 죽는다.** DB를 같이 쓰면 더 나쁘다 — 맥과 윈도우가 같은 파일을 **다른 키**로 적어 서로의 회차가 안 보인다. 키를 만드는 자리는 다섯이고(`store._rel`·`store.key_of`·`store_pg.upload_from_files`·`store_pg.restore_from_files`·`supabase_setup.cmd_verify`) `tests/test_integration.py` `test_keys_use_forward_slashes`가 지킨다. 사람별 칸은 키 안에 이미 누구인지 적혀 있어 경계가 그대로 따라온다.
     - **없는 자리를 읽으면 `FileNotFoundError`를 올린다** — 도메인 모듈 42개의 try/except가 그 예외를 잡고 있어, 다른 예외를 내면 그 판단이 전부 어긋난다. 두 백엔드가 같은 약속을 지켜야 하는 이유다.
     - `list_keys`는 **아래 칸으로 안 내려간다**(`Path.glob`과 같아야 한다). 이름 대조는 `fnmatch`로 한다 — `*.deleted-*.json` 같은 모양을 SQL `like`로 옮기면 틈이 생긴다.
     - **`psycopg`는 `requirements-postgres.txt`에 따로 둔다** — 파일로 쓰는 기본 상태는 패키지 넷뿐이라는 약속을 지킨다(SERVER_REQUIREMENTS.md §1).

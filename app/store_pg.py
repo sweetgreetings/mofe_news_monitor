@@ -215,7 +215,7 @@ def upload_from_files(data_dir, *, dry_run: bool = False) -> dict:
     for path in sorted(data_dir.rglob("*")):
         if not path.is_file():
             continue
-        key = str(path.relative_to(data_dir))
+        key = path.relative_to(data_dir).as_posix()
         top = key.split("/")[0]
         if top in skip_top or path.name.endswith(".tmp"):
             skipped.append(key)
@@ -283,7 +283,7 @@ def restore_from_files(src_dir, *, dry_run: bool = False) -> dict:
     for path in sorted(src_dir.rglob("*")):
         if not path.is_file():
             continue
-        key = str(path.relative_to(src_dir))
+        key = path.relative_to(src_dir).as_posix()
         if key.split("/")[0] == "logs" or path.name.endswith(".tmp"):
             skipped.append(key)
             continue

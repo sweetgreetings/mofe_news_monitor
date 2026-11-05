@@ -173,9 +173,16 @@ def _rel(path: Path) -> Optional[str]:
     밖이 되는 경우는 셋이다 — 테스트가 갈아끼운 임시 폴더, 설치할 때 쓰는 `.env`,
     저장소에 함께 든 `AI_RULES.md`. 그 셋은 사람별로 가를 대상이 아니라서
     `_resolve`가 손대지 않는다(테스트 격리가 그대로 도는 것도 이 덕이다).
+
+    **`str()`이 아니라 `as_posix()`다 — 키의 구분자는 어느 운영체제에서나 `/`.**
+    윈도우에서 `str()`을 쓰면 `articles\\2026-11-05_14-00.json`이 나와 바로 아래
+    `rel.split("/")[0]`이 통째로 한 조각이 되고, 표에 없는 칸이라 **저장소를 건드리는
+    모든 동작이 KeyError로 죽는다.** DB를 같이 쓰면 더 나쁘다 — 맥과 윈도우가 같은
+    파일을 **다른 키**로 적어 서로의 회차가 안 보인다. 키는 사람이 아니라 DB가 읽는
+    이름이라, 보기 좋으라고가 아니라 **같은 값이 되라고** 고정한다.
     """
     try:
-        return str(path.resolve().relative_to(Path(DATA_DIR).resolve()))
+        return path.resolve().relative_to(Path(DATA_DIR).resolve()).as_posix()
     except ValueError:
         return None
 
@@ -248,7 +255,7 @@ def key_of(path) -> str:
     """
     p = Path(path)
     try:
-        return str(p.resolve().relative_to(Path(DATA_DIR).resolve()))
+        return p.resolve().relative_to(Path(DATA_DIR).resolve()).as_posix()
     except ValueError:
         return p.name
 
