@@ -8,6 +8,14 @@
     python3 supabase_setup.py 올리기    # 실제로 올린다(이미 있는 키는 건드리지 않는다)
     python3 supabase_setup.py 대조      # 올린 것과 디스크의 것이 같은지 본다
 
+백업 (이사가 끝난 뒤, 가끔 돌린다 — 앱을 멈추지 않아도 된다):
+
+    python3 supabase_setup.py 내려받기          # DB → 날짜 폴더 (data/는 안 건드린다)
+    python3 supabase_setup.py 되돌리기 "<폴더>"  # 그 폴더로 DB를 덮는다(한 번 묻는다)
+
+**DB가 진짜 데이터가 된 뒤로는 `data/` 폴더 백업만으로는 모자란다** — 그 폴더는
+이사한 날에 얼어붙었다. `내려받기`가 그 자리를 메운다.
+
 연결 주소는 `.env`의 `DATABASE_URL`에서 읽는다. Supabase 프로젝트의
 **Settings › Database › Connection string › URI**를 그대로 넣으면 된다
 (비밀번호 자리 `[YOUR-PASSWORD]`를 실제 비밀번호로 바꿔야 한다).
@@ -16,6 +24,7 @@
 **먼저 올리고, 그다음에 앱을 재시작한다.** 거꾸로 하면 빈 DB를 보고 화면이 비어 보인다.
 """
 import sys
+from datetime import datetime
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -115,16 +124,79 @@ def cmd_verify() -> None:
         print("디스크와 DB가 같습니다.")
 
 
+BACKUP_ROOT = BASE_DIR.parent / "press-monitor-백업"
+
+
+def _backup_dir() -> Path:
+    """이번 백업이 들어갈 **빈 새 폴더**. 이미 있으면 뒤에 번호를 붙인다."""
+    stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
+    base = BACKUP_ROOT / f"db백업_{stamp}"
+    target, n = base, 2
+    while target.exists():
+        target = BACKUP_ROOT / f"db백업_{stamp} ({n})"
+        n += 1
+    return target
+
+
+def cmd_download() -> None:
+    """DB를 날짜 폴더에 받는다 — **`data/`는 건드리지 않는다.**"""
+    _need_url()
+    dest = _backup_dir()
+    print("받는 곳:", dest)
+    print("(data/ 폴더는 건드리지 않습니다 — 거기가 마지막 구명줄입니다)")
+    result = store_pg.download_to_files(dest)
+    n = len(result["downloaded"])
+    print(f"  받음 {n}개")
+    if result["skipped"]:
+        print(f"  비켜 둠(폴더 밖을 가리키는 키) {len(result['skipped'])}개")
+    size = sum(p.stat().st_size for p in dest.rglob("*") if p.is_file())
+    print(f"  크기 {size / 1024 / 1024:.1f}MB")
+    print()
+    print("되돌릴 일이 생기면:")
+    print(f'  python3 supabase_setup.py 되돌리기 "{dest}"')
+
+
+def cmd_restore() -> None:
+    """백업 폴더로 DB를 되돌린다 — **덮어쓴다.** 사람에게 한 번 묻는다."""
+    _need_url()
+    if len(sys.argv) < 3:
+        print("어느 폴더로 되돌릴지 적어주세요:")
+        print('  python3 supabase_setup.py 되돌리기 "~/press-monitor-백업/db백업_..."')
+        sys.exit(1)
+    src = Path(sys.argv[2]).expanduser()
+    if not src.is_dir():
+        print("그런 폴더가 없습니다:", src)
+        sys.exit(1)
+    plan = store_pg.restore_from_files(src, dry_run=True)
+    print("되돌릴 폴더:", src)
+    print(f"덮어쓸 줄: {len(plan['restored'])}개")
+    print()
+    print("※ 지금 DB의 그 줄들은 사라지고 이 폴더의 내용으로 바뀝니다.")
+    print("※ 폴더에 없는 줄은 DB에 그대로 둡니다(지우지 않습니다).")
+    print("※ 앱을 먼저 멈추세요.")
+    print()
+    if input('정말 되돌리려면 "되돌리기"라고 쳐주세요: ').strip() != "되돌리기":
+        print("아무것도 바꾸지 않았습니다.")
+        return
+    result = store_pg.restore_from_files(src)
+    print(f"  되돌림 {len(result['restored'])}개")
+    print()
+    print("이제 앱을 재시작하세요:")
+    print("  launchctl kickstart -k gui/$(id -u)/local.press-monitor")
+
+
 _COMMANDS = {
     "확인": cmd_check, "check": cmd_check,
     "미리보기": cmd_preview, "preview": cmd_preview,
     "올리기": cmd_upload, "upload": cmd_upload,
     "대조": cmd_verify, "verify": cmd_verify,
+    "내려받기": cmd_download, "download": cmd_download,
+    "되돌리기": cmd_restore, "restore": cmd_restore,
 }
 
 
 def main() -> None:
-    if len(sys.argv) != 2 or sys.argv[1] not in _COMMANDS:
+    if len(sys.argv) < 2 or sys.argv[1] not in _COMMANDS:
         print(__doc__)
         sys.exit(1)
     _COMMANDS[sys.argv[1]]()

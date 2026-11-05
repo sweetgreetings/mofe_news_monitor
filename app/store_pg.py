@@ -227,3 +227,67 @@ def upload_from_files(data_dir, *, dry_run: bool = False) -> dict:
             write_text(key, path.read_text(encoding="utf-8"))
         done.append(key)
     return {"uploaded": done, "already": already, "skipped": skipped}
+
+
+def _safe_rel(key: str) -> Optional[Path]:
+    """키를 폴더 안 상대 경로로 바꾼다 — 폴더 밖으로 나가는 키는 `None`.
+
+    키는 `DATA_DIR` 기준 상대 경로라 평소엔 멀쩡하지만, **받아 적는 쪽에서 한 번 더
+    본다** — 올라간 키가 `../`나 절대 경로면 받는 순간 폴더 밖 파일을 덮는다.
+    """
+    if not key or key.startswith("/") or "\\" in key:
+        return None
+    rel = Path(key)
+    if rel.is_absolute() or any(part in ("..", "") for part in rel.parts):
+        return None
+    return rel
+
+
+def download_to_files(dest_dir, *, dry_run: bool = False) -> dict:
+    """DB를 통째로 폴더에 받는다 — `upload_from_files`의 반대이고 **백업이다**.
+
+    **`data/`에 받지 않는 것이 이 함수의 전제다.** 받는 곳은 호출부가 정하는 빈
+    날짜 폴더다 — `data/`에 덮으면 DB가 상했을 때(테스트가 덮어쓴 2026-11-05 같은
+    경우) 성한 디스크 원본까지 같이 날아간다. 그 폴더가 마지막 구명줄이었다.
+
+    로그는 애초에 DB에 없다. 폴더 밖을 가리키는 키는 `skipped`로 비켜 둔다.
+    """
+    dest_dir = Path(dest_dir)
+    ensure_schema()
+    rows = _run(f"select key, body from {_TABLE} order by key", fetch="all") or []
+    done, skipped = [], []
+    for key, body in rows:
+        rel = _safe_rel(key)
+        if rel is None:
+            skipped.append(key)
+            continue
+        if not dry_run:
+            target = dest_dir / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(body, encoding="utf-8")
+        done.append(key)
+    return {"downloaded": done, "skipped": skipped}
+
+
+def restore_from_files(src_dir, *, dry_run: bool = False) -> dict:
+    """폴더의 내용으로 DB를 **덮는다** — `upload_from_files`와 달리 이미 있어도 덮는다.
+
+    되돌리기 전용이라 부르는 쪽이 반드시 사람에게 한 번 묻는다(`supabase_setup.py`).
+    폴더에 없는 키는 **DB에 그대로 둔다** — 그 폴더를 뜬 뒤에 생긴 것일 수 있어
+    지우는 쪽이 더 위험하다.
+    """
+    src_dir = Path(src_dir)
+    if not dry_run:
+        ensure_schema()
+    done, skipped = [], []
+    for path in sorted(src_dir.rglob("*")):
+        if not path.is_file():
+            continue
+        key = str(path.relative_to(src_dir))
+        if key.split("/")[0] == "logs" or path.name.endswith(".tmp"):
+            skipped.append(key)
+            continue
+        if not dry_run:
+            write_text(key, path.read_text(encoding="utf-8"))
+        done.append(key)
+    return {"restored": done, "skipped": skipped}

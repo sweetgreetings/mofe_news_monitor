@@ -6529,14 +6529,18 @@ def test_storage_goes_through_one_place():
         "store.read_json을 부르세요."
     )
 
-    # 파일에 바로 쓰는 곳 — store의 임시 파일 교체와 atomic_write뿐이다(`store.write_text`
-    # 호출은 한 겹을 지나는 것이라 세지 않는다).
+    # 파일에 바로 쓰는 곳 — store의 임시 파일 교체와 atomic_write, 그리고 `store_pg`의
+    # **백업 받기**뿐이다(`store.write_text` 호출은 한 겹을 지나는 것이라 세지 않는다).
+    #
+    # `store_pg.download_to_files`가 여기 드는 것은 **저장소에 쓰는 게 아니라서**다 —
+    # 받는 곳은 `DATA_DIR` 밖의 빈 날짜 폴더이고, 그 폴더는 저장소가 아니라 백업이다.
+    # 저장 한 겹을 거치면 오히려 그 쓰기가 다시 DB로 가 제자리를 맴돈다.
     direct_writers = {
         str(path.relative_to(app_dir))
         for path in sources
         if re.search(r"(?<!store)\.write_text\(", path.read_text(encoding="utf-8"))
     }
-    assert direct_writers == {"app/store.py", "app/atomic_write.py"}, (
+    assert direct_writers == {"app/store.py", "app/atomic_write.py", "app/store_pg.py"}, (
         f"파일에 바로 쓰는 자리가 늘었습니다 — {sorted(direct_writers)}. "
         "store.write_text/write_json을 부르세요."
     )
