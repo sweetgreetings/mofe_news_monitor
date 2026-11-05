@@ -92,10 +92,12 @@ def _refresh_locked(entries: dict) -> tuple[dict, bool]:
 
     # **목록과 서명은 app.store를 거친다** — 여기서 glob·stat을 직접 쓰면 저장 자리가
     # Postgres일 때 목록이 영원히 비어, 방금 저장한 회차가 어느 화면에도 안 보인다.
-    for path in store.list_files(_articles_dir()):
-        sig = store.signature(path)
-        if sig is None:
-            continue
+    #
+    # **둘을 한 번에 받는다**(`list_signatures`) — 파일마다 따로 물으면 DB에서는 회차
+    # 수만큼 왕복이 된다. 실측 2026-11-05: 회차 403개에 403회·5.8초이고, 홈은 이
+    # 함수를 11번 불러 4,433회·63.8초를 썼다(홈 전체의 87%). 보관이 365일이라 그냥
+    # 두면 회차가 ~1,600개가 되어 홈 한 장이 5분이 된다.
+    for path, sig in store.list_signatures(_articles_dir()).items():
         signature = {"mtime_ns": sig[0], "size": sig[1]}
         cached = entries.get(path.name)
         if (

@@ -5,8 +5,8 @@
 통째로 사라진다** — 각자 자기 `localhost`를 보고, 터널·포트 개방·고정 주소가 필요 없다.
 (MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 4번.)
 
-**갈아끼우는 자리가 여기 하나다.** `app/store.py`의 공개 함수 여덟이 백엔드 함수
-여덟을 부르게 되어 있어(①에서 그 모양으로 만들어 뒀다) 도메인 모듈 42개는 한 글자도
+**갈아끼우는 자리가 여기 하나다.** `app/store.py`의 공개 함수 아홉이 백엔드 함수
+아홉을 부르게 되어 있어(①에서 그 모양으로 만들어 뒀다) 도메인 모듈 42개는 한 글자도
 안 바뀐다.
 
 **켜는 법**: `.env`에 `DATABASE_URL`을 넣는다. **없으면 파일 백엔드 그대로다** —
@@ -169,7 +169,7 @@ def ensure_schema() -> None:
         _schema_ready = True
 
 
-# ─────────────────── 백엔드 함수 여덟 ───────────────────
+# ─────────────────── 백엔드 함수 아홉 ───────────────────
 # `app/store.py`의 `_fs_*`와 **같은 약속**을 지킨다 — 특히 없는 자리를 읽으면
 # `FileNotFoundError`(OSError의 한 종류)를 올린다. 도메인 모듈 42개가 들고 있는
 # try/except가 그 예외를 잡고 있어서, 여기서 다른 예외를 내면 그 판단이 전부 어긋난다.
@@ -217,26 +217,40 @@ def ensure_dir(key: str) -> None:
     return None
 
 
-def list_keys(prefix: str, pattern: str) -> list:
-    """그 칸에 **바로 든** 키들 — 이름 사전순.
+def _head(prefix: str) -> str:
+    """키 접두사 — 칸 이름 뒤에 `/`. 뿌리(`.`)면 빈 문자열이다."""
+    return f"{prefix}/" if prefix and prefix != "." else ""
+
+
+def _in_box(rows, head: str, pattern: str):
+    """그 칸에 **바로 든** 행만 골라 `(키, 행)`으로 흘린다.
 
     `Path.glob("*.json")`이 아래 폴더로 내려가지 않는 것과 같아야 하므로, 접두사
     뒤에 `/`가 더 있는 키(= 아래 칸의 것)는 뺀다. 이름 대조는 `fnmatch`로 한다 —
     `*.deleted-*.json` 같은 모양을 SQL `like`로 옮기면 틈이 생긴다.
     """
-    ensure_schema()
-    head = f"{prefix}/" if prefix and prefix != "." else ""
-    rows = _run(
-        f"select key from {_TABLE} where key like %s order by key", (head + "%",), fetch="all"
-    ) or []
-    out = []
-    for (key,) in rows:
+    for row in rows:
+        key = row[0]
         rest = key[len(head):]
         if "/" in rest:
             continue
         if fnmatch(rest, pattern):
-            out.append(key)
-    return out
+            yield key, row
+
+
+def _sig_of(updated_at, length: int) -> tuple:
+    """파일의 `(mtime_ns, size)` 자리를 갱신 시각·본문 길이가 받는다."""
+    return (int(updated_at.timestamp() * 1_000_000_000), length)
+
+
+def list_keys(prefix: str, pattern: str) -> list:
+    """그 칸에 **바로 든** 키들 — 이름 사전순."""
+    ensure_schema()
+    head = _head(prefix)
+    rows = _run(
+        f"select key from {_TABLE} where key like %s order by key", (head + "%",), fetch="all"
+    ) or []
+    return [key for key, _ in _in_box(rows, head, pattern)]
 
 
 def signature(key: str):
@@ -247,7 +261,25 @@ def signature(key: str):
     )
     if row is None:
         return None
-    return (int(row[0].timestamp() * 1_000_000_000), row[1])
+    return _sig_of(row[0], row[1])
+
+
+def list_signatures(prefix: str, pattern: str) -> dict:
+    """`{키: 서명}` — **목록과 서명을 한 번에** 받는다(왕복 한 번).
+
+    키마다 따로 물으면 키 수만큼 왕복이 된다 — 회차 403개면 403회(5.8초)이고, 홈은
+    그걸 11번 되풀이해 63.8초를 썼다(실측 2026-11-05 · 홈 전체의 87%). 파일일 때는
+    `stat()`이 1µs라 「목록 따로 · 서명 따로」가 공짜였지만, **DB에선 묻는 횟수가
+    유일한 비용이다.** 서명은 시각과 길이라 본문을 담지 않아 한 번에 받아도 가볍다.
+    """
+    ensure_schema()
+    head = _head(prefix)
+    rows = _run(
+        f"select key, updated_at, length(body) from {_TABLE} where key like %s order by key",
+        (head + "%",),
+        fetch="all",
+    ) or []
+    return {key: _sig_of(row[1], row[2]) for key, row in _in_box(rows, head, pattern)}
 
 
 # ─────────────────── 지금 data/를 DB로 올리기 ───────────────────

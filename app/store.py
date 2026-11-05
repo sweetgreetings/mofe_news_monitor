@@ -349,6 +349,26 @@ def signature(path):
     return backend.signature(at) if backend else _fs_signature(at)
 
 
+def list_signatures(directory, pattern: str = "*.json") -> dict:
+    """`{Path: 서명}` — **목록과 서명을 한 번에** 받는다.
+
+    `list_files` 뒤에 파일마다 `signature`를 묻는 것과 결과가 같지만, DB에서는 왕복이
+    **키 수 + 1회에서 1회로** 줄어든다. 파일일 때는 `stat()`이 1µs라 따로 묻는 것이
+    공짜였는데, DB에선 **묻는 횟수가 유일한 비용이다** — 회차 403개를 보는 홈이 그
+    차이로 73초였다(실측 2026-11-05).
+
+    **서명이 없는 자리는 뺀다** — 목록을 받은 뒤 사라진 것이라, 파일마다 묻던 자리가
+    `None`을 건너뛰던 것과 같은 결과다.
+    """
+    backend, at = _route(directory)
+    if backend:
+        return {
+            Path(DATA_DIR) / key: sig
+            for key, sig in backend.list_signatures(at, pattern).items()
+        }
+    return _fs_list_signatures(at, pattern)
+
+
 # ─────────────────── 아래가 파일 백엔드다 ───────────────────
 # Postgres로 갈 때 갈아끼우는 자리는 여기뿐이다. 위의 공개 함수는 그대로 둔다.
 
@@ -391,3 +411,12 @@ def _fs_signature(path: Path):
     except OSError:
         return None
     return (stat.st_mtime_ns, stat.st_size)
+
+
+def _fs_list_signatures(directory: Path, pattern: str) -> dict:
+    out = {}
+    for path in _fs_list(directory, pattern):
+        sig = _fs_signature(path)
+        if sig is not None:
+            out[path] = sig
+    return out
