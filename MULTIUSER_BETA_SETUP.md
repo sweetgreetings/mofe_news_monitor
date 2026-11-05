@@ -312,6 +312,18 @@ postgresql://postgres.abcdefghijkl:적어둔비밀번호@aws-0-ap-northeast-2.po
 
 ## 4. 주의할 것
 
+- ⚠️ **D(Supabase)로 할 때 — 앱을 두 대에서 「동시에」 켜지 않는다.** 아직 안 된다.
+  - **중복 실행 자물쇠가 포트(`127.0.0.1:8765`)라 한 대 안에서만 듣는다.** 다른
+    컴퓨터는 그 포트를 모르므로 자물쇠에 안 걸린다.
+  - 스케줄러는 **그 컴퓨터에서 사람 전부를 돌며** 수집한다(`data_owners()`). 두 대가
+    켜져 있으면 **같은 회차를 두 번 모으고**(네이버 호출도 두 배) **자동발송이 두 번
+    나갈 수 있다** — `main.py`가 중복 실행에 대고 경고하는 바로 그 증상이다.
+  - **지금 쓰는 법: 한 번에 한 대만 켠다.** 다른 컴퓨터에서 쓰려면 이쪽 앱을 먼저 멈춘다.
+    ```bash
+    launchctl bootout gui/$(id -u)/local.press-monitor   # 맥에서 멈추기
+    ```
+  - 고치려면 **자물쇠를 DB로 옮겨야 한다**(DB에 「지금 누가 스케줄러를 돌리나」를 적고
+    임차 시간을 둔다). 아직 안 했다.
 - **평문 HTTP다.** 개인 네트워크·Tailscale 안이면 위험이 낮지만, 공개 와이파이에서는
   쓰지 않는다. (C로 하면 https가 된다.)
 - **「복사」 버튼은 http에서도 된다** — 브라우저가 막는 경우를 앱이 받치도록 고쳐 뒀다
@@ -333,3 +345,45 @@ launchctl kickstart -k gui/$(id -u)/local.press-monitor
 
 그러면 이 컴퓨터에서만 열리고, 로그인 자물쇠도 다시 **끌 수 있는 상태**가 된다.
 참가자 데이터(`data/users/…`)는 그대로 남아 있고 담당자 화면에는 영향이 없다.
+
+---
+
+## 6. 다른 컴퓨터에 깔기 (D — Supabase를 쓸 때)
+
+데이터는 Supabase에 있으므로 **옮길 것은 코드와 `DATABASE_URL` 한 줄뿐이다.**
+API 키(네이버·Claude·텔레그램·이메일)는 `data/`에 있고 그게 곧 DB라 **저절로 따라온다.**
+
+1. **파이썬 확인** — 3.9 이상. 맥에는 들어 있다(`python3 --version`).
+2. **코드 받기**
+   ```bash
+   git clone -b multiuser https://github.com/<계정>/<저장소>.git ~/press-monitor
+   cd ~/press-monitor
+   ```
+3. **패키지 깔기**
+   ```bash
+   python3 -m pip install --user -r requirements.txt -r requirements-postgres.txt
+   ```
+4. **`.env` 만들기 — 손으로 넣는 건 이 한 줄뿐이다**
+   ```bash
+   open -e ~/press-monitor/.env     # 없으면 새로 만들어진다
+   ```
+   한 줄을 적고 저장한다(따옴표 없이, 공백 없이):
+   ```
+   DATABASE_URL=postgresql://postgres.xxxx:비밀번호@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres
+   ```
+5. **연결 확인 → 켜기**
+   ```bash
+   python3 supabase_setup.py 확인
+   python3 main.py
+   ```
+   「붙었습니다. 표에 든 줄: N 개」가 나오면 된 것이다. **`올리기`는 하지 않는다**
+   (이미 올라가 있다 — 두 번째 컴퓨터는 읽기만 하면 된다).
+
+> ⚠️ **켜기 전에 다른 컴퓨터의 앱을 먼저 멈춘다**(§4 첫 항목). 동시에 켜면 회차를 두 번
+> 모으고 자동발송이 두 번 나간다.
+
+> **자동 실행(LaunchAgent)은 맥에서만 된다.** 윈도우에서는 `python3 main.py`를 직접
+> 켜 둔다. 끄면 그동안의 회차는 못 모은다.
+
+> ⚠️ **`DATABASE_URL`은 비밀이다.** 그 한 줄이면 1년치 기사와 **API 키 전부**를 볼 수
+> 있다. 메신저로 보내지 말고 직접 쳐서 넣는다.
