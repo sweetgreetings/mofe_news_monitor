@@ -681,12 +681,18 @@ def _alert_line_html(template: str = DEFAULT_ARTICLE_LINE_TEMPLATE) -> str:
     없는" 기사가 생기면 안 된다(사용자 지적, 2026-08-26). 발송 기록이 곧 표시
     근거이므로 이 둘은 절대 어긋날 수 없다.
     """
+    # **내 것만 본다**(mine=True) — 이 기록은 공용이라 가르지 않으면 남이 모은 기사
+    # 제목이 내 홈에 뜬다(실측 2026-11-05). 보내는 쪽은 그대로다(app.alerted_urls).
     grouped: dict = {}
-    for item in alerted_items():
+    for item in alerted_items(mine=True):
         grouped.setdefault(item.get("kind"), []).append(item)
     if not any(grouped.values()):
         # items가 없는 옛 기록(이 저장 형식 이전에 나간 알림)이면 건수만 안다 —
         # 어느 쪽인지 지어내지 않고 [단독]·[속보] 둘을 나란히 적는다.
+        # **건수는 바닥 주인에게만 보인다** — 그 기록엔 누구 것인지가 없고, 가르기
+        # 전엔 담당자 혼자 썼다. 다른 사람에게 보이면 그게 곧 남의 건수다.
+        if store.current_owner() is not None:
+            return ""
         legacy_n = len(already_alerted_urls())
         if not legacy_n:
             return ""

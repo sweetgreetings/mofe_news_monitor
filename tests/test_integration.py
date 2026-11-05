@@ -6870,6 +6870,64 @@ def test_store_read_cache():
           "스레드 사이로 안 샌다 (목록+서명도 따로 묻기와 같은 결과)")
 
 
+def test_home_alerts_are_per_person():
+    """홈의 [단독]·[속보] 목록은 **내 것만** 보인다 — 알림 기록 자체는 공용이다.
+
+    기록(`alerted_urls.json`)은 공용 칸이다(app/store.py `_SHARED`) — 중복 방지와
+    [속보] 몰림 판정이 「이 기사로 알림이 나갔는가」를 사람 가리지 않고 물어야 해서다.
+    그래서 가르지 않으면 **남이 모은 기사 제목이 내 홈에 뜬다**(실측 2026-11-05:
+    시험 계정 셋 모두의 홈에 담당자 기사 5건이 보였다). 홈만 `mine=True`로 고른다.
+
+    **보내는 쪽은 그대로여야 한다** — 거기까지 가르면 같은 기사로 사람 수만큼 네이버를
+    더 부르고 알림도 그만큼 간다(따로 정할 일이다). 그래서 ③이 함께 지킨다.
+    """
+    _require_isolation()
+
+    from app import store
+
+    now = datetime(2026, 11, 5, 10, 0)
+    base_url = "https://n.news.naver.com/mnews/article/001/0000000001"
+    u2_url = "https://n.news.naver.com/mnews/article/056/0000000002"
+
+    alerted_urls.mark_alerted([base_url], now, items=[
+        {"url": base_url, "kind": "단독", "outlet": "연합뉴스",
+         "title": "담당자가 모은 단독", "pub_date": "2026-11-05 09:00"}])
+    with store.owner("u2"):
+        alerted_urls.mark_alerted([u2_url], now, items=[
+            {"url": u2_url, "kind": "속보", "outlet": "KBS",
+             "title": "u2가 모은 속보", "pub_date": "2026-11-05 09:30"}])
+
+    # ① 바닥 주인의 홈엔 자기 것만
+    mine_base = [it["title"] for it in alerted_urls.alerted_items(now, mine=True)]
+    assert mine_base == ["담당자가 모은 단독"], mine_base
+
+    # ② u2의 홈엔 자기 것만 — 담당자 기사가 보이면 샌 것이다
+    with store.owner("u2"):
+        mine_u2 = [it["title"] for it in alerted_urls.alerted_items(now, mine=True)]
+    assert mine_u2 == ["u2가 모은 속보"], mine_u2
+
+    # ③ 중복 방지·몰림 판정이 보는 목록은 **둘 다**이고 사람을 가리지 않는다
+    assert len(alerted_urls.alerted_items(now)) == 2, alerted_urls.alerted_items(now)
+    assert alerted_urls.already_alerted_urls(now) == {base_url, u2_url}
+    with store.owner("u2"):
+        assert alerted_urls.already_alerted_urls(now) == {base_url, u2_url}, (
+            "중복 방지 목록이 사람별로 갈리면 같은 기사로 알림이 사람 수만큼 간다"
+        )
+
+    # ④ owner가 없는 옛 기록(건수만 아는 형식)은 **바닥 주인에게만** 보인다
+    alerted_urls.ALERTED_URLS_FILE.write_text(
+        json.dumps({"date": "2026-11-05", "urls": [base_url, u2_url], "items": []}),
+        encoding="utf-8",
+    )
+    base_line = landing_renderer._alert_line_html()
+    with store.owner("u2"):
+        u2_line = landing_renderer._alert_line_html()
+    assert "2" in base_line and "단독" in base_line, base_line
+    assert u2_line == "", f"옛 기록의 건수가 남에게 보입니다 — {u2_line}"
+
+    print("✓ 홈 [단독]·[속보]: 내 것만 보이고, 중복 방지·몰림 판정은 사람을 안 가린다")
+
+
 def test_card_summary_asks_once():
     """수시 카드 요약은 **카드 수와 무관하게 한 번만 묻는다** — 파일마다 서명을 또 묻지 않는다.
 
@@ -9686,6 +9744,7 @@ if __name__ == "__main__":
         test_trend_today_partial_column,
         test_alert_scope_follows_keyword_switch,
         test_card_summary_asks_once,
+        test_home_alerts_are_per_person,
     ]
 
     failures = []
