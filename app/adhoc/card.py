@@ -1434,14 +1434,18 @@ def delete_expired_cards(retention_days: Optional[int] = None, now: Optional[dat
     now = now or datetime.now()
     cutoff = now - timedelta(days=retention_days)
 
+    # **요약 캐시를 쓴다**(list_card_summaries) — 나이 판정에 필요한 건 `created_at`과
+    # `id` 둘뿐인데, 예전엔 카드 **파일을 전부 열었다.** 이 함수는 **스케줄러 tick이
+    # 10초마다 부르므로**(main._cleanup_adhoc) 카드 수만큼 왕복이 10초마다 붙었다 —
+    # 카드 97장일 때 tick 한 바퀴 126회 중 97회(실측 2026-11-05). 요약 캐시는 서명이
+    # 같으면 파일을 안 열므로, 평소엔 목록·서명 한 번으로 끝난다.
+    # 깨진 파일·필수 필드가 없는 파일은 요약 단계에서 이미 빠진다(같은 방어다).
     moved = []
-    for path in store.list_files(CARDS_DIR):
+    for summary in list_card_summaries():
         try:
-            data = store.read_json(path)
-            created_at = datetime.fromisoformat(data["created_at"])
-            card_id = data["id"]
-        except (json.JSONDecodeError, KeyError, ValueError, TypeError):
-            # 판단 불가한 파일은 건드리지 않는다 — app.storage.delete_expired_runs와 같은 방어.
+            created_at = datetime.fromisoformat(summary["created_at"])
+            card_id = summary["id"]
+        except (KeyError, ValueError, TypeError):
             continue
         if created_at < cutoff and delete_card(card_id, reason="expired"):
             moved.append(card_id)

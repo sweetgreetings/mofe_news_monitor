@@ -6913,6 +6913,7 @@ def test_card_summary_asks_once():
             return real_signature(path)
 
         with patch.object(card, "CARDS_DIR", cards_dir), \
+                patch.object(card, "TRASH_DIR", Path(tmp) / "trash"), \
                 patch.object(card, "_summary_cache", {}), \
                 patch.object(store, "signature", counting_signature):
             rows = card.list_card_summaries()
@@ -6949,7 +6950,34 @@ def test_card_summary_asks_once():
                 "사안5", "사안4", "사안3 고친 이름", "사안2", "사안1"
             ], again
 
-    print("✓ 수시 카드 요약: 목록과 서명을 한 번에 받고(카드마다 안 묻고), 바뀐 카드만 다시 읽는다")
+            # ④ **보관 기한 정리도 파일을 전부 열지 않는다** — 이 정리는 스케줄러 tick이
+            #    10초마다 부른다(main._cleanup_adhoc). 나이 판정에 필요한 건 created_at과
+            #    id 둘뿐이라 요약 캐시로 충분하다.
+            opened = []
+
+            def counting_read_json_again(path):
+                opened.append(str(path))
+                return real_read_json(path)
+
+            with patch.object(store, "read_json", counting_read_json_again):
+                kept = card.delete_expired_cards(
+                    retention_days=365, now=datetime(2026, 11, 5, 12, 0)
+                )
+            assert kept == [], f"기한 안 지난 카드를 지웠습니다 — {kept}"
+            assert opened == [], (
+                f"보관 기한 정리가 카드 파일을 열고 있습니다 — {len(opened)}장. "
+                "10초마다 도는 자리라 카드 수만큼 왕복이 붙습니다"
+            )
+
+            # ⑤ 그러면서도 **기한이 지난 카드는 그대로 치운다**(싸게 만든 대가가 없어야 한다)
+            moved = card.delete_expired_cards(
+                retention_days=0, now=datetime(2026, 11, 6, 12, 0)
+            )
+            assert sorted(moved) == [f"20261105-10000{n}-aa" for n in range(1, 6)], moved
+            assert card.list_card_summaries() == [], "치운 카드가 목록에 남아 있습니다"
+
+    print("✓ 수시 카드 요약: 목록과 서명을 한 번에 받고(카드마다 안 묻고), 바뀐 카드만 "
+          "다시 읽고, 10초마다 도는 보관 기한 정리도 파일을 안 연다")
 
 
 def test_user_boundary():
