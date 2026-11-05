@@ -19,6 +19,7 @@ from typing import Optional
 
 from app import store
 from app.config import (
+    LLM_THINKING,
     NEGATIVE_GUESS_FILE,
     NEGATIVE_GUESS_KEYWORDS,
     NEGATIVE_GUESS_MAX_ATTEMPTS,
@@ -105,6 +106,7 @@ def _judge(articles: list) -> Optional[list]:
     try:
         response = _get_client().messages.create(
             model=llm_model(),
+            thinking=LLM_THINKING,
             max_tokens=4000,
             system=system_prompt,
             messages=[{"role": "user", "content": "기사 목록:\n" + body}],
