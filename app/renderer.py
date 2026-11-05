@@ -42,6 +42,7 @@ from app.config import (
     OUTPUT_HTML_PATH,
     PALETTE,
     RECLASSIFY_SAFE_NOTE,
+    SETTINGS_SERVER_BASE,
     SETTINGS_SERVER_HOST,
     SETTINGS_SERVER_PORT,
 )
@@ -1097,7 +1098,7 @@ function copyAiSummary(btn) {{
 // 전송이면 서버가 제목 앞에 "(수정)"을 자동으로 붙인다.
 function sendReport(btn) {{
   btn.disabled = true;
-  fetch("http://{settings_host}:{settings_port}/send-scrap", {{
+  fetch("{settings_base}/send-scrap", {{
     method: "POST",
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{text: PLAIN_TEXT}})
@@ -1447,7 +1448,7 @@ function _tocApply() {{
                        .map(function(item) {{ return item.raw; }});
   // [수정: 2026-08-14] moveGroupOrder와 같은 이유 — 회차(run_slot)를 같이 실어 보낸다.
   var runSlot = document.getElementById("keyword-note-zone").dataset.runSlot;
-  fetch("http://{settings_host}:{settings_port}/save-group-order", {{
+  fetch("{settings_base}/save-group-order", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{order: JSON.stringify(order), run_slot: runSlot}})
@@ -1531,7 +1532,7 @@ document.addEventListener("click", function(e) {{
   pop.classList.remove("is-open");
 }}, true);
 function _postToggleHighlight(word) {{
-  return fetch("http://{settings_host}:{settings_port}/keywords/toggle-highlight", {{
+  return fetch("{settings_base}/keywords/toggle-highlight", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{word: word}})
@@ -1569,7 +1570,7 @@ function addHighlightWord(evt) {{
 // 여전히 단어 하나에 전역으로 묶여 있으므로 본문 표시도 즉시 따라와야 한다.
 function cycleChipColor(chip) {{
   var word = chip.dataset.word;
-  fetch("http://{settings_host}:{settings_port}/keywords/cycle-highlight-color", {{
+  fetch("{settings_base}/keywords/cycle-highlight-color", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{word: word}})
@@ -1617,7 +1618,7 @@ function newHideBatchId() {{
 }}
 function hideArticle(btn) {{
   var article = btn.closest(".article");
-  fetch("http://{settings_host}:{settings_port}/hide-article", {{
+  fetch("{settings_base}/hide-article", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: hideArticleBody(btn)
@@ -1637,7 +1638,7 @@ function hideArticle(btn) {{
 function refetchSummary(btn) {{
   var url = btn.dataset.url;
   btn.disabled = true;
-  fetch("http://{settings_host}:{settings_port}/refetch-summary", {{
+  fetch("{settings_base}/refetch-summary", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{url: url}})
@@ -1689,7 +1690,7 @@ function editSummary(btn) {{
   saveBtn.textContent = "저장";
   saveBtn.onclick = function(e) {{
     e.stopPropagation();
-    fetch("http://{settings_host}:{settings_port}/edit-summary", {{
+    fetch("{settings_base}/edit-summary", {{
       method: "POST", keepalive: true,
       headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
       body: new URLSearchParams({{url: url, outlet: outletInput.value, title: titleInput.value, summary: summaryInput.value}})
@@ -1808,7 +1809,7 @@ function moveGroupOrder(btn, direction) {{
   // [수정: 2026-08-14] renameGroup과 같은 이유 — 순서도 이제 회차 단위 저장이라 이
   // 화면의 회차(run_slot)를 같이 실어 보낸다.
   var runSlot = document.getElementById("keyword-note-zone").dataset.runSlot;
-  fetch("http://{settings_host}:{settings_port}/save-group-order", {{
+  fetch("{settings_base}/save-group-order", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{order: JSON.stringify(names), run_slot: runSlot}})
@@ -1886,7 +1887,7 @@ function bulkMoveOrder(direction) {{
   var body = new URLSearchParams();
   urls.forEach(function(u) {{ body.append("urls", u); }});
   body.append("direction", direction);
-  fetch("http://{settings_host}:{settings_port}/bulk-move-order", {{
+  fetch("{settings_base}/bulk-move-order", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: body
@@ -1931,7 +1932,7 @@ function _postGroupMove(urls, target) {{
   var body = new URLSearchParams();
   urls.forEach(function(u) {{ body.append("urls", u); }});
   body.append("target", target);
-  return fetch("http://{settings_host}:{settings_port}/bulk-move-article", {{
+  return fetch("{settings_base}/bulk-move-article", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: body
@@ -1990,7 +1991,7 @@ function regenerateSubheadings(btn) {{
   btn.disabled = true;
   var label = btn.innerHTML;
   btn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9Z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8Z"/></svg> 분류하는 중…';
-  fetch("http://{settings_host}:{settings_port}/regenerate-subheadings-final", {{
+  fetch("{settings_base}/regenerate-subheadings-final", {{
     method: "POST", keepalive: true
   }}).then(function(res) {{
     if (res.ok) {{ location.reload(); }}
@@ -2007,7 +2008,7 @@ function regenerateSubheadings(btn) {{
 // 같은 경로로 한 단계 되돌린다(app/undo.py가 상태를 통째로 스냅샷해둔다).
 function undoLastAction(btn) {{
   btn.disabled = true;
-  fetch("http://{settings_host}:{settings_port}/undo", {{ method: "POST", keepalive: true }})
+  fetch("{settings_base}/undo", {{ method: "POST", keepalive: true }})
     .then(function(res) {{
       // [추가: 2026-09-15] 응답의 touched = 되돌린 동작에서 담당자가 손댄 기사. 새로고침 뒤
       // 그 기사만 세이지로 칠한다(아래 justMovedUrls). 칠한 기사가 화면에 하나도 안 보이면
@@ -2047,7 +2048,7 @@ function _createCustomGroupSubmit(name) {{
   var runSlot = document.getElementById("keyword-note-zone").dataset.runSlot;
   var body = new URLSearchParams({{name: name, run_slot: runSlot}});
   getAllGroups().forEach(function(g) {{ body.append("active_names", g.value); }});
-  fetch("http://{settings_host}:{settings_port}/add-custom-group", {{
+  fetch("{settings_base}/add-custom-group", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: body
@@ -2096,7 +2097,7 @@ function toggleKeywordEditMode(btn) {{
 function saveKeywordNote() {{
   var text = document.getElementById("keyword-note-input").value;
   var runSlot = document.getElementById("keyword-note-zone").dataset.runSlot;
-  fetch("http://{settings_host}:{settings_port}/save-manual-keyword-note", {{
+  fetch("{settings_base}/save-manual-keyword-note", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{text: text, run_slot: runSlot}})
@@ -2137,7 +2138,7 @@ function removeCustomGroup(btn) {{
   // [수정: 2026-10-21] 읽는 칸이 data-current가 아니라 data-del-current다 — 그 이름을 쓰는 이유는
   // 이 버튼이 소제목 목록 선택자에 걸리면 안 되기 때문이다(_render_groups 주석).
   if (!confirm('"' + (btn.dataset.delCurrent || name) + '" 소제목을 삭제할까요?')) return;
-  fetch("http://{settings_host}:{settings_port}/remove-custom-group", {{
+  fetch("{settings_base}/remove-custom-group", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{name: name}})
@@ -2151,7 +2152,7 @@ function removeCustomGroup(btn) {{
 function moveArticle(btn) {{
   var url = btn.dataset.url;
   var direction = btn.dataset.direction;
-  fetch("http://{settings_host}:{settings_port}/move-article", {{
+  fetch("{settings_base}/move-article", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{url: url, direction: direction}})
@@ -2171,7 +2172,7 @@ function _promoteManual(el, endpoint, failMsg) {{
   var url = el.dataset.url;
   var group = el.value || "";
   el.disabled = true;
-  fetch("http://{settings_host}:{settings_port}/" + endpoint, {{
+  fetch("{settings_base}/" + endpoint, {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{url: url, group: group}})
@@ -2210,7 +2211,7 @@ function _renameGroupSubmit(name, newLabel) {{
   var runSlot = document.getElementById("keyword-note-zone").dataset.runSlot;
   var body = new URLSearchParams({{name: name, label: newLabel, run_slot: runSlot}});
   getAllGroups().forEach(function(g) {{ body.append("active_names", g.value); }});
-  fetch("http://{settings_host}:{settings_port}/rename-group", {{
+  fetch("{settings_base}/rename-group", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: body
@@ -3583,7 +3584,7 @@ def _render_manual_section(
 def send_log_href(run_date: str, run_slot: str) -> str:
     """발송 기록 화면에서 이 회차의 가장 최근 발송 줄을 펼쳐 여는 주소."""
     return (
-        f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/send-log?run="
+        f"{SETTINGS_SERVER_BASE}/send-log?run="
         + urllib.parse.quote(f"{run_date}|{run_slot}", safe="")
     )
 
@@ -4292,14 +4293,14 @@ def render_page(
         export_filename=html.escape(export_filename),
         export_excel_filename=html.escape(export_excel_filename),
         export_rows_json=html.escape(json.dumps(export_rows, ensure_ascii=False)),
-        settings_host=SETTINGS_SERVER_HOST,
-        settings_port=SETTINGS_SERVER_PORT,
-        hidden_href=f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/hidden",
+        # 화면에 박히는 절대주소의 뿌리 — app.config 한 곳에서만 정해진다.
+        settings_base=SETTINGS_SERVER_BASE,
+        hidden_href=f"{SETTINGS_SERVER_BASE}/hidden",
         hidden_trash_style=hidden_trash_style(),
         hidden_trash_html=hidden_trash_html(
-            f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/hidden"
+            f"{SETTINGS_SERVER_BASE}/hidden"
         ),
-        hidden_trash_script=hidden_trash_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
+        hidden_trash_script=hidden_trash_script(),
         scroll_top_style=scroll_top_style(),
         scroll_top_html=scroll_top_html(),
         scroll_top_script=scroll_top_script(),
@@ -4317,21 +4318,21 @@ def render_page(
         schedule_override_script=schedule_override_script(),
         range_select_script=range_select_script(".article-select", ".article"),
         url_add_style=url_add_style(),
-        url_add_script=url_add_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT, "confirmed"),
+        url_add_script=url_add_script("confirmed"),
         label_popover_style=label_popover_style(),
-        label_popover_script=label_popover_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
+        label_popover_script=label_popover_script(),
         # [추가: 2026-09-15] 「AI 기사 나누기」 — 초안과 같은 버튼, 보내는 곳만 확정본용.
         split_button_style=split_button_style(),
         screen_tag_style=screen_tag_style(),
         bulk_move_bar_html=bulk_move_bar_html(split_button_html()),
-        split_button_script=split_button_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT, "/split-group-final"),
+        split_button_script=split_button_script("/split-group-final"),
         name_picker_style=name_picker_style(),
         name_picker_html=name_picker_html(),
         # 이름 고르기 창이 쓸 목록 — 이 화면이 보여주는 회차의 **직전** 회차가 기본 목록이
         # 된다(app.subheading_names). 회차 파일 10개를 읽어도 8ms라 매 렌더링 계산해도 무해하다.
         name_picker_script=name_picker_script(name_pool(round_id)),
-        live_href=f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/live.html",
-        preview_href=f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/preview.html",
+        live_href=f"{SETTINGS_SERVER_BASE}/live.html",
+        preview_href=f"{SETTINGS_SERVER_BASE}/preview.html",
         font_stack=FONT_STACK,
         cute_font_face=_CUTE_FONT_FACE_CSS,
         cute_font_name=CUTE_FONT_NAME,
@@ -4362,7 +4363,7 @@ def _waiting_page_html() -> str:
     if naver_is_configured():
         message = "아직 스크랩 시간 전입니다.<br>예정 시각이 되면 자동으로 시작됩니다."
     else:
-        naver_href = f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/naver"
+        naver_href = f"{SETTINGS_SERVER_BASE}/naver"
         message = (
             "네이버 검색 API 키가 없어 수집이 시작되지 않습니다.<br>"
             f'<a href="{naver_href}" style="color:{COLOR_ACCENT};font-weight:600;">'
@@ -5271,7 +5272,7 @@ def refresh_link_html(screen: str) -> str:
     새로고침하면 서버가 다시 만들지 않은 **디스크의 옛 파일**을 그대로 다시 읽는다.
     """
     path = "/preview.html" if screen == "preview" else "/index.html"
-    href = f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}{path}"
+    href = f"{SETTINGS_SERVER_BASE}{path}"
     tip = (
         "지금까지 모인 기사를 다시 불러옵니다"
         if screen == "preview"
@@ -5489,7 +5490,7 @@ function applyLabelState(btn, labelsList) {{
 function attachLabel(btn, label) {{
   label = (label || "").trim();
   if (!label) {{ return; }}
-  fetch("http://{settings_host}:{settings_port}/add-label", {{
+  fetch("{settings_base}/add-label", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{
@@ -5509,7 +5510,7 @@ function attachLabel(btn, label) {{
   .catch(function() {{ alert("라벨을 붙이지 못했습니다 — 앱이 실행 중인지 확인해주세요."); }});
 }}
 function detachLabel(btn, label) {{
-  fetch("http://{settings_host}:{settings_port}/remove-label", {{
+  fetch("{settings_base}/remove-label", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{url: btn.dataset.url, label: label}})
@@ -5893,7 +5894,7 @@ def refetch_title_marks(history: list) -> tuple:
     return chip, was, hist
 
 
-def refetch_titles_script(host: str, port: int) -> str:
+def refetch_titles_script() -> str:
     """「⟳ 제목 다시 불러오기」 JS — 한 곳이고 두 화면이 같이 쓴다.
 
     보내는 값은 **화면이 지금 보여주고 있는 제목**이다(저장소를 다시 뒤지지 않는다) —
@@ -5905,7 +5906,7 @@ def refetch_titles_script(host: str, port: int) -> str:
     """
     return (
         _REFETCH_TITLES_JS
-        .replace("__URL__", f"http://{host}:{port}/refetch-titles")
+        .replace("__URL__", f"{SETTINGS_SERVER_BASE}/refetch-titles")
         .replace("__SPIN__", icon("refresh"))
         .replace("__CHUNK__", str(REFETCH_CHUNK))
     )
@@ -5916,9 +5917,9 @@ def label_popover_style() -> str:
     return LABEL_POPOVER_STYLE.format(**PALETTE)
 
 
-def label_popover_script(host: str, port: int) -> str:
+def label_popover_script() -> str:
     """🏷 라벨 팝오버 JS — 붙이기/떼기는 설정 서버로 fetch하므로 주소를 받아 채운다."""
-    return LABEL_POPOVER_SCRIPT.format(settings_host=host, settings_port=port)
+    return LABEL_POPOVER_SCRIPT.format(settings_base=SETTINGS_SERVER_BASE)
 
 
 # [추가: 2026-09-15] 「AI 기사 나누기」 — 확정본·초안 하단바가 같이 쓴다(휴지통과 같은 이유 —
@@ -6017,7 +6018,7 @@ def bulk_move_bar_html(split_html: str) -> str:
     )
 
 
-def split_button_script(settings_host: str, settings_port: int, endpoint: str) -> str:
+def split_button_script(endpoint: str) -> str:
     """나누기 버튼 JS — 두 화면의 updateBulkMoveBar 끝에서 updateSplitButton을 부른다.
 
     endpoint: 초안은 /split-group, 확정본은 /split-group-final — 서버가 "지금 화면이 보는 소제목"을
@@ -6079,7 +6080,7 @@ function splitSelected(btn) {{
   btn.innerHTML = '{icon_html} 나누는 중…';
   var keep = "소제목은 「" + name + "」 그대로 뒀어요.";
   function fail(msg) {{ btn.disabled = false; btn.innerHTML = label; alert(msg); }}
-  fetch("http://{settings_host}:{settings_port}{endpoint}", {{
+  fetch("{SETTINGS_SERVER_BASE}{endpoint}", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: body
@@ -6187,7 +6188,7 @@ def hidden_trash_html(hidden_href: str) -> str:
     )
 
 
-def hidden_trash_script(settings_host: str, settings_port: int) -> str:
+def hidden_trash_script() -> str:
     """휴지통 팝오버 JS — 템플릿 안에 {{hidden_trash_script}}로 끼워 넣는다.
 
     복구하면 팝오버만 고쳐 그리지 않고 화면 전체를 다시 불러온다 — 숨김 해제는 기사 목록과
@@ -6213,7 +6214,7 @@ function unhideFromTrash(btn) {{
   var body = new URLSearchParams();
   urls.forEach(function (url) {{ body.append("url", url); }});
   btn.disabled = true;
-  fetch("http://{settings_host}:{settings_port}/unhide-article", {{
+  fetch("{SETTINGS_SERVER_BASE}/unhide-article", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: body
@@ -6368,7 +6369,7 @@ function submitUrlAdd() {{
     btn.textContent = "추가";
     input.focus();
   }};
-  fetch("http://{settings_host}:{settings_port}/add-article-by-url", {{
+  fetch("{settings_base}/add-article-by-url", {{
     method: "POST",
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{url: url, screen: "{screen}"}})
@@ -6434,12 +6435,12 @@ def url_add_style() -> str:
     return URL_ADD_STYLE.format(**PALETTE)
 
 
-def url_add_script(settings_host: str, settings_port: int, screen: str) -> str:
+def url_add_script(screen: str) -> str:
     """「+ 수기로 기사 추가」 JS — 확정본·초안 공용(중괄호 홑겹 완성 문자열).
 
     screen("confirmed" | "preview")을 서버에 같이 보낸다 — "이미 이 회차에 있다"를 무엇과
     대조할지가 화면마다 다르다(확정본은 저장된 회차, 초안은 아직 저장 전인 지금 초안)."""
-    return URL_ADD_SCRIPT.format(settings_host=settings_host, settings_port=settings_port, screen=screen)
+    return URL_ADD_SCRIPT.format(settings_base=SETTINGS_SERVER_BASE, screen=screen)
 
 
 # Shift+클릭 범위 선택 — 확정본·초안·수시 원본/확정본·휴지통의 기사 체크박스 공용.

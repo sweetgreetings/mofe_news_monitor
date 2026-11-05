@@ -15,6 +15,7 @@ from typing import Optional
 
 from app import store
 from app.config import (
+    SERVER_IS_HOSTED,
     SETTINGS_SERVER_HOST,
     AUTH_ATTEMPTS_FILE,
     AUTH_CONFIG_FILE,
@@ -47,11 +48,19 @@ _LOOPBACK = {"127.0.0.1", "localhost", "::1", "0:0:0:0:0:0:0:1"}
 def is_open_to_network() -> bool:
     """이 앱이 **이 컴퓨터 밖에서도** 열리는 상태인가.
 
-    `.env`의 `SERVER_HOST`를 기본값(127.0.0.1)이 아닌 주소로 두면 서버가 `0.0.0.0`으로
-    열린다(`app/settings_server.py` `create_settings_server`). 그 순간부터 그 주소에
-    닿을 수 있는 사람은 누구든 화면을 열 수 있다.
+    둘 중 하나라도 참이면 바깥에 열린 것이다:
+
+    - `.env`의 `SERVER_HOST`를 기본값(127.0.0.1)이 아닌 주소로 둔 경우. 그러면 서버가
+      `0.0.0.0`으로 열린다(`app/settings_server.py` `create_settings_server`).
+    - **남이 운영하는 컴퓨터(클라우드)에서 도는 경우**(`SERVER_IS_HOSTED`). 이쪽은
+      `SERVER_HOST`를 적지 않아도 **호스트가 요청을 인터넷에서 받아 넘겨준다** —
+      주소만 보고 판정하면 기본값 127.0.0.1이라 「이 컴퓨터 안」으로 읽히고,
+      그 순간 **인터넷에 열린 채 자물쇠가 꺼진다.** 그래서 뿌리 주소를 바깥에서
+      받았다는 사실 자체를 함께 본다(app.config.SERVER_IS_HOSTED).
+
+    그 순간부터 그 주소에 닿을 수 있는 사람은 누구든 화면을 열 수 있다.
     """
-    return SETTINGS_SERVER_HOST not in _LOOPBACK
+    return SERVER_IS_HOSTED or SETTINGS_SERVER_HOST not in _LOOPBACK
 
 
 def is_login_required() -> bool:

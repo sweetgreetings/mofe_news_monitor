@@ -1,0 +1,38 @@
+# 이 앱을 Render에 올리는 설정 — 화면에서 하나하나 고르는 대신 이 파일 하나로 정한다.
+# Render 대시보드에서 [New] → [Blueprint]로 이 저장소를 고르면 아래 내용을 그대로 읽는다.
+#
+# **직접 넣어야 하는 값은 DATABASE_URL 하나다**(아래 sync: false). Supabase의
+# 「Connection string」이고, 비밀이라 이 파일에 적지 않는다 — Render 화면에서 넣는다.
+services:
+  - type: web
+    name: press-monitor
+    runtime: python
+    # **무료 등급을 쓰면 안 된다.** 15분 아무도 안 들어오면 앱을 재우는데, 그동안
+    # 스케줄러도 같이 멈춰 **그 시간 회차를 영영 못 모은다**(이 앱의 요지가 정시 수집이다).
+    plan: starter
+    # 한국에서 가장 가까운 지역. **Supabase 프로젝트와 같은 지역으로 두는 게 좋다** —
+    # DB 왕복이 한 요청에 수천 번이라(홈 한 장에 4,900번) 거리가 그대로 체감 속도다.
+    region: singapore
+    # 기본 네 개 + Supabase용 psycopg. 파일로 쓰던 때와 달리 DB를 쓰므로 둘 다 깐다.
+    buildCommand: pip install -r requirements.txt -r requirements-postgres.txt
+    # `--no-browser`가 계약이다 — 브라우저가 없는 환경이라 창을 열려 들면 메인 스레드가
+    # 죽고 스케줄러까지 함께 내려간다(main._is_local_mode도 같은 사실을 본다).
+    startCommand: python3 main.py --no-browser
+    # 자물쇠를 통과하는 주소여야 한다(_AUTH_FREE_PATHS) — 로그인한 세션이 없는 상태로
+    # Render가 두드리므로, 보호된 주소를 쓰면 매번 「건강하지 않음」으로 읽힌다.
+    healthCheckPath: /login
+    envVars:
+      # **이 앱의 시계.** 클라우드는 UTC로 도는데 `datetime.now()`를 쓰는 자리가 164곳이라,
+      # 빠뜨리면 하루의 처음 아홉 시간이 「어제」가 된다(main._apply_timezone 참고).
+      - key: TZ
+        value: Asia/Seoul
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      # Supabase 연결 문자열 — Render 화면에서 직접 넣는다(비밀이라 파일에 안 적는다).
+      # 이 값이 있으면 저장소가 DB로 돌고, 없으면 파일로 돈다(app.store._route).
+      - key: DATABASE_URL
+        sync: false
+      # 네이버·Claude·텔레그램·이메일 키는 **환경변수로 넣지 않는다** — 이미 Supabase에
+      # 올라가 있다(data/credentials.json이 DB의 한 행이 됐다). 바꿀 때는 앱의 설정
+      # 화면에서 바꾼다. RENDER_EXTERNAL_URL은 Render가 저절로 넣어 주므로 적지 않는다
+      # (그 값이 곧 화면에 박히는 뿌리 주소다 — app.config.SETTINGS_SERVER_BASE).

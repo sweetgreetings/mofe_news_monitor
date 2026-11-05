@@ -20,8 +20,7 @@ from app.config import (
     HISTORY_HTML_PATH,
     PALETTE,
     RETENTION_DAYS,
-    SETTINGS_SERVER_HOST,
-    SETTINGS_SERVER_PORT,
+    SETTINGS_SERVER_BASE,
 )
 from app.atomic_write import atomic_write_text
 from app.classifier import run_classification_failed
@@ -582,7 +581,7 @@ function copySlotText(btn) {{
 function hideArticle(btn) {{
   var url = btn.dataset.url;
   var article = btn.closest(".article");
-  fetch("http://{settings_host}:{settings_port}/hide-article", {{
+  fetch("{settings_base}/hide-article", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{url: url}})
@@ -597,7 +596,7 @@ function hideArticle(btn) {{
 function refetchSummary(btn) {{
   var url = btn.dataset.url;
   btn.disabled = true;
-  fetch("http://{settings_host}:{settings_port}/refetch-summary", {{
+  fetch("{settings_base}/refetch-summary", {{
     method: "POST", keepalive: true,
     headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
     body: new URLSearchParams({{url: url}})
@@ -647,7 +646,7 @@ function editSummary(btn) {{
   saveBtn.textContent = "저장";
   saveBtn.onclick = function(e) {{
     e.stopPropagation();
-    fetch("http://{settings_host}:{settings_port}/edit-summary", {{
+    fetch("{settings_base}/edit-summary", {{
       method: "POST", keepalive: true,
       headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
       body: new URLSearchParams({{url: url, outlet: outletInput.value, title: titleInput.value, summary: summaryInput.value}})
@@ -675,7 +674,7 @@ function loadHistoryDay(details) {{
   if (!details.open) {{ return; }}
   var holder = details.querySelector(".lazy-day-holder");
   if (!holder) {{ return; }}
-  fetch("http://{settings_host}:{settings_port}/history/day?date=" + details.dataset.date)
+  fetch("{settings_base}/history/day?date=" + details.dataset.date)
     .then(function(res) {{ return res.ok ? res.text() : Promise.reject(); }})
     .then(function(slotsHtml) {{ holder.outerHTML = slotsHtml; applyPendingPicks(details); }})
     .catch(function() {{ holder.innerHTML = '<p class="lazy-day-hint">불러오지 못했습니다 — 다시 펼쳐보세요.</p>'; }});
@@ -685,7 +684,7 @@ function loadHistoryDay(details) {{
 // 같은 deleteRuns를 쓴다. 지운 줄은 **그 자리에서 없어지고**, 되살릴 자리는 초록 안내 한 줄이
 // 받는다([수정: 2026-10-12] — 지운 자리에 줄을 남기던 때는 같은 삭제가 보관함 안 두 자리에
 // 나타나 어디서 되살리는지 헷갈렸다). 새로고침은 없다 — 펼쳐 둔 날짜·스크롤 위치가 그대로다.
-var HIST_API = "http://{settings_host}:{settings_port}";
+var HIST_API = "{settings_base}";
 var EMPTY_RUN_KEYS = {empty_run_keys_json};
 var pendingPicks = new Set();
 function slotByKey(key) {{
@@ -845,7 +844,7 @@ function historyDateRangeLabel(dates) {{
 function historyDownloadExcelForDates(dates) {{
   var form = document.createElement('form');
   form.method = 'POST';
-  form.action = 'http://{settings_host}:{settings_port}/download-excel-history';
+  form.action = '{settings_base}/download-excel-history';
   dates.forEach(function (d) {{
     var input = document.createElement('input');
     input.type = 'hidden';
@@ -860,7 +859,7 @@ function historyDownloadExcelForDates(dates) {{
 function historyDownloadText(filename, text) {{
   var form = document.createElement('form');
   form.method = 'POST';
-  form.action = 'http://{settings_host}:{settings_port}/download-text';
+  form.action = '{settings_base}/download-text';
   var fnInput = document.createElement('input');
   fnInput.type = 'hidden'; fnInput.name = 'filename'; fnInput.value = filename;
   var txtInput = document.createElement('input');
@@ -1450,11 +1449,11 @@ def _theme() -> dict:
         "font_stack": FONT_STACK,
         "cute_font_face": _CUTE_FONT_FACE_CSS,
         "cute_font_name": CUTE_FONT_NAME,
-        "settings_host": SETTINGS_SERVER_HOST,
-        "settings_port": SETTINGS_SERVER_PORT,
-        "live_href": f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/live.html",
-        "preview_href": f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/preview.html",
+        "live_href": f"{SETTINGS_SERVER_BASE}/live.html",
+        "preview_href": f"{SETTINGS_SERVER_BASE}/preview.html",
         # [수정: 2026-08-21] 색 값은 전부 app.config.PALETTE 하나에서 온다.
+        # 화면에 박히는 절대주소의 뿌리 — app.config 한 곳에서만 정해진다.
+        "settings_base": SETTINGS_SERVER_BASE,
         **PALETTE,
         # [추가: 2026-08-18] 보관 기간을 상수에서 그대로 읽어 제목에 쓴다 — 예전엔
         # "(최근 7일)"이 화면에 박혀 있어 RETENTION_DAYS를 바꿔도 화면이 거짓말을 했다.
@@ -1464,9 +1463,9 @@ def _theme() -> dict:
         "deleted_log_title": DELETED_LOG_TITLE,
         # [추가: 2026-09-16] 🏷 라벨 팝오버 — 확정본·초안과 한 곳에서 온다.
         "refetch_titles_style": refetch_titles_style(),
-        "refetch_titles_script": refetch_titles_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
+        "refetch_titles_script": refetch_titles_script(),
         "label_popover_style": label_popover_style(),
-        "label_popover_script": label_popover_script(SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT),
+        "label_popover_script": label_popover_script(),
         "copy_text_script": copy_text_script(),
         "photo_override_script": photo_override_script(),
         "schedule_override_script": schedule_override_script(),
@@ -1552,7 +1551,7 @@ _PERIOD_PRESETS = (("day", "1일"), ("week", "7일"), ("month", "1개월"), ("al
 
 def _history_href() -> str:
     """이 화면의 주소 — 낱말 폼이 제출하는 곳이자 「조건 지우기」가 돌아가는 곳."""
-    return f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/history.html"
+    return f"{SETTINGS_SERVER_BASE}/history.html"
 
 
 def preset_range(key: str, today=None) -> tuple:
@@ -1683,7 +1682,7 @@ def _period_and_result_html(total_days: int, empty_count: int = 0) -> str:
 </div>
 <div class="result-bar">
   <p class="result-line" id="hist-result-line">전체 기간 · <b id="hist-result-count">{total_days}</b>일</p>
-  <a class="deleted-link normal-only" href="http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}/deleted">{DELETED_LOG_TITLE} →</a>
+  <a class="deleted-link normal-only" href="{SETTINGS_SERVER_BASE}/deleted">{DELETED_LOG_TITLE} →</a>
   <button type="button" class="tidy-btn normal-only" onclick="setHistoryTidy(true)">선택 삭제</button>
   <span class="tidy-bar tidy-only"><span>지울 회차를 고르세요</span>{empty_btn}
     <button type="button" class="done-btn" onclick="setHistoryTidy(false)">완료</button></span>

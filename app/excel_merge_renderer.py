@@ -19,8 +19,7 @@ from app.config import (
     DEFAULT_SUBHEADING_FORMAT_TEMPLATE,
     FONT_STACK,
     PALETTE,
-    SETTINGS_SERVER_HOST,
-    SETTINGS_SERVER_PORT,
+    SETTINGS_SERVER_BASE,
 )
 from app.excel_merge import MAX_TABLE_ROWS, MAX_UPLOAD_BYTES
 from app.icons import icon
@@ -31,7 +30,7 @@ from app.topnav import plain_nav, topnav_style
 
 EXCEL_MERGE_TITLE = "엑셀파일로 보고용 텍스트 생성"
 
-_BASE = f"http://{SETTINGS_SERVER_HOST}:{SETTINGS_SERVER_PORT}"
+_BASE = f"{SETTINGS_SERVER_BASE}"
 
 
 def _style() -> str:
