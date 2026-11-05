@@ -18,6 +18,7 @@ from typing import Optional
 
 from app.config import AI_RULES_FILE, MAX_SUBHEADINGS
 from app.config import LLM_MODEL as LLM_MODEL_DEFAULT
+from app.config import LLM_THINKING
 from app.credentials import llm_api_key, llm_is_configured, llm_model
 
 logger = logging.getLogger(__name__)
@@ -401,7 +402,12 @@ def test_llm_credentials(api_key: str, model: str) -> tuple[bool, str]:
         return False, "anthropic 패키지가 설치돼 있지 않습니다 (pip install anthropic)."
     client = anthropic.Anthropic(api_key=api_key)
     try:
-        client.messages.create(model=model, max_tokens=1, messages=[{"role": "user", "content": "hi"}])
+        client.messages.create(
+            model=model,
+            max_tokens=1,
+            thinking=LLM_THINKING,
+            messages=[{"role": "user", "content": "hi"}],
+        )
     except anthropic.AuthenticationError:
         return False, "인증 실패 (401) — 키가 만료됐거나 잘못됐습니다."
     except anthropic.NotFoundError:
@@ -810,6 +816,7 @@ def _refine_etc_bucket(groups: list, articles_total: int, max_subheadings: int, 
     try:
         response = _get_client().messages.create(
             model=llm_model(),
+            thinking=LLM_THINKING,
             max_tokens=4096,
             system=system_prompt,
             messages=[{"role": "user", "content": _build_prompt(etc_articles, room) + avoid}],
@@ -945,6 +952,7 @@ def classify_with_llm(
         try:
             response = _get_client().messages.create(
                 model=llm_model(),
+                thinking=LLM_THINKING,
                 # [수정: 2026-08-20] 2000 -> 4096. 상한을 8->15로 올린 뒤 76건 회차가
                 # 정확히 2000에서 끊긴 채(stop_reason=max_tokens) 우연히 파싱된 걸
                 # 실측으로 발견했다 — 다음 회차엔 진짜로 잘려 조용히 규칙 기반 폴백으로
@@ -1212,6 +1220,7 @@ def assign_to_existing(articles: list, groups) -> Optional[dict]:
     try:
         response = _get_client().messages.create(
             model=llm_model(),
+            thinking=LLM_THINKING,
             # [수정: 2026-08-25] 2000 -> 8000. 이 함수는 원래 초안의 "🤖 미분류 배정"
             # 버튼용(몇 건 배정)이라 2000으로 잡았는데, classify_for_finalize가 회차 마감
             # 때 "초안 이후 새로 들어온 기사 전부"를 여기로 넘기면서 규모가 완전히
@@ -1322,6 +1331,7 @@ def split_group_articles(articles: list, max_subheadings: int, current_name: str
         try:
             response = _get_client().messages.create(
                 model=llm_model(),
+                thinking=LLM_THINKING,
                 max_tokens=4096,
                 system=system_prompt,
                 messages=[{"role": "user", "content": _build_prompt(articles, max_subheadings) + request}],
