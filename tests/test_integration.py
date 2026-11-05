@@ -43,10 +43,13 @@ _FIXTURE_BY_KEYWORD = {
 
 
 def _fake_search_one_keyword(
-    keyword, after=None, before=None, include_unparsed_dates=False, day=None, day_from=None
+    keyword, after=None, before=None, include_unparsed_dates=False, day=None, day_from=None,
+    after_inclusive=False,
 ):
     # day: 어느 날짜를 모으나(지난 날짜 수집). 픽스처는 늘 "오늘" 기사를 돌려주므로
     # 값을 쓰지 않지만, 실제 함수와 시그니처가 어긋나면 호출 자체가 터진다.
+    # after_inclusive: 시간창 하한을 포함하나(수시는 True). 이 목은 after/before를
+    # 아예 보지 않아 값을 쓰지 않지만, 같은 이유로 받아는 둬야 한다.
     # [수정: 2026-08-24] _search_one_keyword의 반환값이 (기사 목록, 조회 상한에 걸렸는지)
     # 튜플로 바뀌어(app.adhoc.collector의 §6.4b AND 상한 오판 수정), 이 목도 같은 모양을
     # 돌려줘야 한다 — 테스트 픽스처는 상한에 걸릴 일이 없으므로 항상 False.
@@ -1290,7 +1293,7 @@ def test_adhoc_past_date_collect():
             seen = {}
 
             def _fake(keywords, after=None, before=None, include_unparsed_dates=False,
-                      day=None, day_from=None):
+                      day=None, day_from=None, after_inclusive=False):
                 seen["day"] = day
                 seen["day_from"] = day_from
                 seen["window"] = (after, before)
