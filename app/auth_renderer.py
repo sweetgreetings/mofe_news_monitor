@@ -257,7 +257,13 @@ def render_login_page(error: str = "", email: str = "", notice: str = "") -> str
       <label class="keep"><input type="checkbox" name="keep" value="1" checked> 로그인 상태 유지</label>
       <button class="primary" type="submit">로그인</button>
     </form>"""
-    foot = f'<p class="foot"><a href="/forgot">비밀번호 찾기</a><span class="dot">·</span><a href="/signup">회원가입</a>{_back_home()}</p>'
+    # 「회원가입」 링크를 그리지 않는다 — 이 화면은 **계정이 하나라도 있을 때만**
+    # 그려지는데(`_handle_login_page`가 0개면 `/signup`으로 보낸다), 그때 `/signup`은
+    # 닫혀 있어 다시 `/login`으로 되돌아온다. 누르면 제자리로 오는 링크는 고장으로
+    # 읽히므로, 링크 대신 계정이 어디서 오는지를 한 줄로 적는다(찾기 실패 안내의
+    # 「관리자에게 알려 주세요」와 같은 말투다). 계정을 더 만드는 것은 로그인한
+    # 관리자의 일이다(설정 → 계정 목록 → 계정 추가).
+    foot = f'<p class="foot"><a href="/forgot">비밀번호 찾기</a><span class="dot">·</span>계정은 관리자가 만들어 드려요{_back_home()}</p>'
     notice_html = _ok(notice) if notice else _warn(error)
     return _page("로그인", "AI 뉴스 모니터링", "언론 모니터링", body, foot, notice_html)
 
