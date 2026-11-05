@@ -8824,6 +8824,24 @@ def test_history_word_search():
 
 
 if __name__ == "__main__":
+    # **DB를 붙여 둔 채로는 한 줄도 돌리지 않는다 — 첫 테스트보다 먼저 멈춘다.**
+    # 테스트는 파일 백엔드를 전제하고 `data/`를 임시 폴더로 갈아끼우는데, 갈아끼우지
+    # 못하는 자리(`app/store.py`가 DATABASE_URL을 보고 Postgres로 보내는 길)가
+    # 하나라도 있으면 **진짜 DB를 덮어쓴다.** 실제로 2026-11-05에 이 상태로 돌려
+    # 검색어 그룹·API 키·제목 수정 57건이 테스트 값으로 덮였다.
+    # 「DB를 전제하면 깨지는 테스트」 한 개가 뒤에서 잡아 주는 것으로는 늦다 —
+    # 그 앞 테스트들이 이미 쓰고 지나간 뒤다.
+    if (os.environ.get("DATABASE_URL") or "").strip():
+        print(
+            "테스트를 돌리지 않았습니다 — DATABASE_URL이 설정돼 있습니다.\n"
+            "테스트는 파일 백엔드를 전제하고, 이대로 돌리면 진짜 DB를 덮어씁니다.\n"
+            "\n"
+            "    DATABASE_URL= python3 tests/test_integration.py\n"
+            "\n"
+            "앞에 빈 DATABASE_URL= 를 붙여 다시 실행하세요."
+        )
+        raise SystemExit(1)
+
     tests = [
         test_unclassified_sits_below_summary,
         test_empty_custom_group_appears_once_in_group_list,
