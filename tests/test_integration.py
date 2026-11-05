@@ -7535,6 +7535,79 @@ def test_admin_only_settings():
     print("✓ 관리자 권한: 설정은 관리자만(자물쇠가 꺼져 있으면 안 막음), 형광펜·큐레이션은 모두, 마지막 관리자는 못 내림")
 
 
+def test_signup_keeps_the_signed_in_person():
+    """**계정을 만들어도 만든 사람의 자리는 그대로다.**
+
+    `_handle_signup`이 무조건 새 계정으로 세션을 갈아 끼우고 있었다 — 관리자가
+    동료를 등록하면 그 순간 자기 계정에서 쫓겨나 **남의 계정에 앉았다**
+    (실측 2026-11-05: 관리자로 등록한 뒤 `/whoami`가 그 동료였다). 화면에 아무
+    말이 없어 알아채기도 어렵다.
+
+    반대로 **아무도 로그인하지 않았을 때**(첫 계정, 자물쇠가 꺼진 채 만드는 자기
+    계정)는 새 계정으로 들어가는 게 맞다 — 그때만 「지금 이 계정으로 로그인돼
+    있습니다」(`_SIGNUP_WELCOME`)가 사실이다. 두 길을 다 본다.
+    """
+    from app import auth_session, settings_server, users as users_mod
+
+    made = {"id": "new", "email": "x@example.com", "display_name": "새사람", "role": "member"}
+    form = {
+        "email": ["x@example.com"], "password": ["abcd"], "password2": ["abcd"],
+        "display_name": ["새사람"], "department": [""], "phone": ["01000000000"],
+        "question": ["졸업한 초등학교 이름은?"], "answer": ["답"], "consent": ["1"],
+    }
+
+    class _Stub:
+        def __init__(self, user):
+            self._user = user
+            self.sent = None
+
+        def _current_user(self):
+            return self._user
+
+        def _one(self, form_, key):
+            return (form_.get(key) or [""])[0]
+
+        def _respond(self, html_text, status=200):
+            self.sent = ("html", status)
+
+        def _redirect(self, path):
+            self.sent = ("redirect", path)
+
+        def _redirect_with_session(self, path, token, max_age):
+            self.sent = ("session", path)
+
+    handle = settings_server._SettingsHandler._handle_signup
+    sessions_made = []
+
+    def _fake_create_session(user_id, remember):
+        sessions_made.append(user_id)
+        return ("tok", 0)
+
+    with patch.object(users_mod, "create_user", return_value=made), \
+         patch.object(users_mod, "user_count", return_value=1), \
+         patch.object(auth_session, "create_session", side_effect=_fake_create_session):
+        # ① 이미 로그인한 사람이 있으면 그 자리를 지킨다
+        stub = _Stub({"id": "admin-1", "role": "admin"})
+        handle(stub, form)
+        assert stub.sent and stub.sent[0] == "redirect", (
+            f"관리자가 계정을 만들었는데 세션을 갈아 끼웠습니다: {stub.sent}"
+        )
+        assert stub.sent[1].startswith("/accounts"), (
+            f"계정을 만든 뒤 계정 목록으로 보내야 합니다: {stub.sent[1]}"
+        )
+        assert not sessions_made, "남의 계정으로 로그인시켰습니다 — 이 버그가 돌아왔습니다."
+
+        # ② 아무도 로그인하지 않았으면 새 계정으로 들어간다(첫 계정 자리)
+        stub = _Stub(None)
+        handle(stub, form)
+        assert stub.sent == ("session", "/me?welcome=1"), (
+            f"첫 계정은 바로 로그인돼야 합니다: {stub.sent}"
+        )
+        assert sessions_made == ["new"], f"새 계정으로 로그인하지 않았습니다: {sessions_made}"
+
+    print("✓ 계정 만들기: 관리자가 동료를 등록해도 자기 자리를 지키고, 첫 계정은 바로 로그인된다")
+
+
 def test_no_undefined_names():
     """import을 빼먹었거나 이름을 잘못 적은 자리가 없는지 본다 — 린터가 없는 저장소의 그물.
 
@@ -9069,6 +9142,7 @@ if __name__ == "__main__":
         test_naver_key_per_person,
         test_network_open_forces_login,
         test_admin_only_settings,
+        test_signup_keeps_the_signed_in_person,
         test_no_undefined_names,
         test_screens_render_to_response,
         test_screen_js_strings_are_not_cut_by_newlines,

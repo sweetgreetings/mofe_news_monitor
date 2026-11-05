@@ -6520,6 +6520,18 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._respond(render_signup_page(str(exc), form, first))
             return
         logger.info("계정 생성: %s (%s)", user["email"], user["role"])
+        # **자기 계정을 만드는 길과 동료 계정을 만들어 주는 길은 끝이 다르다.**
+        # 여기서 무조건 새 계정으로 세션을 갈아 끼우면, 관리자는 계정을 하나 만들
+        # 때마다 자기 자리에서 쫓겨나 **남의 계정에 앉는다**(실측 2026-11-05:
+        # 관리자로 로그인한 채 동료를 등록했더니 `/whoami`가 그 동료가 됐다).
+        # 그래서 이미 로그인한 사람이 있으면 그 자리를 그대로 두고 계정 목록으로
+        # 보낸다. 아무도 로그인하지 않았을 때(첫 계정, 자물쇠가 꺼진 채 만드는
+        # 자기 계정)만 새 계정으로 들어간다 — 그때만 「지금 이 계정으로
+        # 로그인돼 있습니다」(_SIGNUP_WELCOME)가 사실이다.
+        if self._current_user():
+            name = (user.get("display_name") or user["email"]).strip()
+            self._redirect("/accounts?notice=" + quote(f"{name} 계정을 만들었어요."))
+            return
         token, max_age = auth_session.create_session(user["id"], False)
         self._redirect_with_session("/me?welcome=1", token, max_age)
 
