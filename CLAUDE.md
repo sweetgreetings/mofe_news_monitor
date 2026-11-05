@@ -208,6 +208,7 @@ FastAPI·SQLite·APScheduler를 쓰는 PRD 원안은 폐기됐다(archive/DESIGN
 ### 자동 실행 (`autostart/`)
 
 - macOS LaunchAgent. **설치는 담당자가 직접** `bash autostart/install.sh`로 한다.
+- **윈도우는 `설치.bat`·`앱 열기.bat` 두 개다**(저장소 뿌리). `설치.bat`은 파이썬·Git을 확인하고(없으면 `winget`) 코드를 받아 꾸러미를 깔고 `DATABASE_URL`을 물은 뒤 붙는지 확인하고 켠다 — **두 번째부터는 「최신 코드 받고 켜기」**라 베타의 업데이트 수단이 곧 이 파일이다. `앱 열기.bat`은 켜기만 한다(코드를 안 받는다). **exe로 굽지 않는다**(코드가 자주 바뀌고 서명이 없어 경고창이 뜬다). 앱 폴더는 맥과 같은 뜻으로 `%USERPROFILE%\press-monitor`이고, **윈도우엔 자동 실행이 없다**(참가자가 켤 때만 돈다 — 모으는 일은 임차를 쥔 한 대가 한다). 파일은 **UTF-8(BOM 없이)·CRLF**로 두고 첫 줄에서 `chcp 65001`을 켠다(한글이 깨진다). 한글 인자를 넘기지 않는다 — `supabase_setup.py`의 ASCII 별칭(`check`)을 쓴다. 쓰는 법은 [MULTIUSER_BETA_SETUP.md](MULTIUSER_BETA_SETUP.md) §6.
 - `KeepAlive`는 `{SuccessfulExit: false}` — `true`면 중복 실행 자물쇠로 정상 종료한 경우까지 무한 재시작한다.
 - **앱 폴더는 `~/press-monitor`.** 데스크탑·서류·다운로드 폴더는 macOS가 백그라운드 접근을 조용히 막아 자동 실행이 안 된다. `install.sh`는 보호 폴더면 경고하고, 등록 뒤 실제로 떴는지 확인해 실패하면 종료 코드 1을 낸다. 폴더를 옮기면 `install.sh`를 다시 돌린다. `~/Desktop/my_app`은 이 폴더로 가는 심볼릭 링크다(`BASE_DIR`가 `resolve()`라 한 곳으로 모인다).
 - 컴퓨터가 잠들어 있으면 여전히 못 모은다(`sudo pmset`은 담당자 몫). 놓친 회차는 되살릴 수 없으므로 소급 수집 기능은 없다.
