@@ -598,13 +598,15 @@ def list_card_summaries() -> list[dict]:
     rows = []
     seen = set()
     with _summary_lock:
-        for path in store.list_files(CARDS_DIR):
+        # **목록과 서명을 한 번에 받는다** — 파일마다 `signature`를 또 묻지 않는다
+        # (CLAUDE.md 「DB에선 비용이 묻는 횟수다」 ①). 카드는 365일 쌓이므로 파일마다
+        # 묻던 자리는 카드 수만큼 왕복이 붙었다 — 카드 192개일 때 홈 한 장에 192회·3.0초
+        # (실측 2026-11-05). 서명을 저장소에 묻는 이유는 그대로다: DB 백엔드에선 디스크에
+        # 파일이 없어 `path.stat()`이 OSError로 떨어지고, 그러면 요약이 통째로 빈다.
+        # 서명이 없는 자리는 `list_signatures`가 이미 뺀다(파일마다 묻던 자리가 `None`을
+        # 건너뛴 것과 같은 결과다). 파일명 사전순으로 돌아 예전 입력 순서를 지킨다.
+        for path, sig in sorted(store.list_signatures(CARDS_DIR).items()):
             key = str(path)
-            # 서명도 저장소에 묻는다 — DB 백엔드에선 디스크에 파일이 없어
-            # path.stat()이 OSError로 떨어지고, 그러면 요약이 통째로 빈다.
-            sig = store.signature(path)
-            if sig is None:
-                continue
             hit = _summary_cache.get(key)
             if hit is not None and hit[0] == sig:
                 summary = hit[1]

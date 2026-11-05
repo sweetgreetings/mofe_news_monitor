@@ -6870,6 +6870,88 @@ def test_store_read_cache():
           "스레드 사이로 안 샌다 (목록+서명도 따로 묻기와 같은 결과)")
 
 
+def test_card_summary_asks_once():
+    """수시 카드 요약은 **카드 수와 무관하게 한 번만 묻는다** — 파일마다 서명을 또 묻지 않는다.
+
+    DB에선 묻는 횟수가 유일한 비용이다(CLAUDE.md 「DB에선 비용이 묻는 횟수다」 ①).
+    카드는 365일 쌓이는데 파일마다 `signature`를 묻던 자리는 **카드 수만큼** 왕복이
+    붙어, 카드 192개일 때 홈 한 장에 192회·3.0초였다(실측 2026-11-05). 요약 캐시가
+    받쳐 줘도 **서명 묻기는 캐시가 안 통해** 홈을 열 때마다 그대로 붙었다.
+
+    보는 것은 셋이다: ① 결과가 예전과 같은가(만든 시각 최신순) ② 카드마다 따로 묻지
+    않는가 ③ 그러면서도 **바뀐 카드만** 다시 읽는가(요약 캐시가 계속 도는가).
+    """
+    _require_isolation()
+
+    from app import store
+    from app.adhoc import card
+
+    def _card_json(n, title):
+        return json.dumps(
+            {
+                "id": f"20261105-10000{n}-aa",
+                "created_at": f"2026-11-05T10:0{n}:00",
+                "report_title": title,
+                "kind": "collect",
+            },
+            ensure_ascii=False,
+        )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        cards_dir = Path(tmp) / "cards"
+        cards_dir.mkdir(parents=True)
+        for n in range(1, 6):
+            (cards_dir / f"20261105-10000{n}-aa.json").write_text(
+                _card_json(n, f"사안{n}"), encoding="utf-8"
+            )
+
+        asked = []
+        real_signature = store.signature
+
+        def counting_signature(path):
+            asked.append(str(path))
+            return real_signature(path)
+
+        with patch.object(card, "CARDS_DIR", cards_dir), \
+                patch.object(card, "_summary_cache", {}), \
+                patch.object(store, "signature", counting_signature):
+            rows = card.list_card_summaries()
+
+            # ① 결과는 예전 그대로 — 만든 시각 최신순
+            assert [r["report_title"] for r in rows] == [
+                "사안5", "사안4", "사안3", "사안2", "사안1"
+            ], rows
+
+            # ② 카드마다 따로 묻지 않는다 — 목록과 서명을 한 번에 받아야 한다
+            assert asked == [], (
+                f"카드마다 서명을 또 묻고 있습니다 — {len(asked)}회. "
+                "store.list_signatures로 목록과 서명을 한 번에 받으세요"
+            )
+
+            # ③ 바뀐 카드만 다시 읽는다 — 요약 캐시가 계속 돌아야 한다
+            read = []
+            real_read_json = store.read_json
+
+            def counting_read_json(path):
+                read.append(str(path))
+                return real_read_json(path)
+
+            with patch.object(store, "read_json", counting_read_json):
+                card.list_card_summaries()
+                assert read == [], f"안 바뀐 카드를 다시 읽고 있습니다 — {len(read)}장"
+                (cards_dir / "20261105-100003-aa.json").write_text(
+                    _card_json(3, "사안3 고친 이름"), encoding="utf-8"
+                )
+                again = card.list_card_summaries()
+
+            assert len(read) == 1 and "100003" in read[0], read
+            assert [r["report_title"] for r in again] == [
+                "사안5", "사안4", "사안3 고친 이름", "사안2", "사안1"
+            ], again
+
+    print("✓ 수시 카드 요약: 목록과 서명을 한 번에 받고(카드마다 안 묻고), 바뀐 카드만 다시 읽는다")
+
+
 def test_user_boundary():
     """「누구의 데이터인가」 경계를 지킨다 — **그리고 혼자 쓰는 지금은 경로가 그대로인 것.**
 
@@ -9395,6 +9477,7 @@ if __name__ == "__main__":
         test_trend_end_day_follows_today_completion,
         test_trend_today_partial_column,
         test_alert_scope_follows_keyword_switch,
+        test_card_summary_asks_once,
     ]
 
     failures = []
