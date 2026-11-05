@@ -22,6 +22,7 @@ JSON 덩어리를 한 칸에 담는 모양이라 `undo_stack.json`처럼 큰 자
 """
 import logging
 import os
+import queue
 import threading
 from fnmatch import fnmatch
 from pathlib import Path
@@ -42,10 +43,21 @@ create table if not exists {_TABLE} (
 );
 """
 
-# **연결은 스레드마다 따로 쥔다** — 설정 서버는 요청마다 스레드이고 스케줄러는 또 다른
-# 스레드다(`app/store.py`의 소유자 맥락과 같은 이유). psycopg 연결은 여러 스레드가
-# 동시에 쓰면 안 되므로, 하나를 잠금으로 돌려 쓰는 대신 스레드마다 하나를 둔다.
-_local = threading.local()
+# **연결은 돌려 쓴다 — 스레드마다 하나씩 쥐면 안 된다.**
+# 설정 서버는 요청마다 새 스레드를 만든다(ThreadingHTTPServer). 스레드마다 연결을
+# 쥐면 그 스레드가 끝나도 연결이 곧바로 닫히지 않아, 화면을 몇 번 열면 Supabase
+# 풀(session mode, 15개)이 바닥난다 — 실측 2026-11-05: 앱을 띄운 지 14분 만에
+# `EMAXCONNSESSION: max clients reached`가 나고 모든 화면이 무한 로딩이 됐다.
+# 그래서 **한도 있는 주머니**에 담아 빌려 쓰고 돌려준다. 한도는 풀보다 넉넉히
+# 낮게 둔다 — 같은 DB를 보는 다른 컴퓨터·psql이 들어올 자리를 남겨야 한다.
+_MAX_CONNECTIONS = 6
+_POOL: queue.LifoQueue = queue.LifoQueue()
+_SLOTS = threading.BoundedSemaphore(_MAX_CONNECTIONS)
+
+# 빌릴 자리가 날 때까지 기다리는 한도. 여기서 지치면 화면이 오류로 끝나는 게
+# 영영 도는 것보다 낫다 — 담당자가 무엇이 잘못됐는지 알 수 있다.
+_ACQUIRE_TIMEOUT_SEC = 30.0
+
 _schema_ready = False
 _schema_lock = threading.Lock()
 
@@ -59,11 +71,8 @@ def is_enabled() -> bool:
     return database_url() is not None
 
 
-def _connect():
-    """이 스레드의 연결 — 없으면 만든다. psycopg가 없으면 바로 말해 준다."""
-    conn = getattr(_local, "conn", None)
-    if conn is not None and not conn.closed:
-        return conn
+def _new_connection():
+    """새 연결 하나. psycopg가 없으면 바로 말해 준다."""
     try:
         import psycopg
     except ImportError as exc:  # pragma: no cover - 설치 안내용
@@ -72,9 +81,52 @@ def _connect():
             "`pip install -r requirements-postgres.txt`로 설치하세요."
         ) from exc
     # autocommit: 이 백엔드의 한 호출이 곧 한 문장이라 트랜잭션을 따로 열지 않는다.
-    conn = psycopg.connect(database_url(), autocommit=True)
-    _local.conn = conn
-    return conn
+    return psycopg.connect(database_url(), autocommit=True)
+
+
+def _acquire():
+    """연결 하나를 빌린다 — 주머니에 있으면 그것, 없으면 새로 만든다."""
+    if not _SLOTS.acquire(timeout=_ACQUIRE_TIMEOUT_SEC):
+        raise RuntimeError(
+            f"Postgres 연결을 {_ACQUIRE_TIMEOUT_SEC:.0f}초 기다렸지만 자리가 안 났습니다."
+        )
+    try:
+        while True:
+            try:
+                conn = _POOL.get_nowait()
+            except queue.Empty:
+                return _new_connection()
+            if not conn.closed:
+                return conn
+    except Exception:
+        _SLOTS.release()
+        raise
+
+
+def _release(conn, *, broken: bool = False) -> None:
+    """빌린 연결을 돌려준다. 상한 것은 닫아 버리고 자리만 비운다."""
+    if conn is not None:
+        if broken or conn.closed:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        else:
+            _POOL.put(conn)
+    _SLOTS.release()
+
+
+def close_all() -> None:
+    """쥐고 있는 연결을 전부 놓는다 — 앱을 접을 때와 테스트용."""
+    while True:
+        try:
+            conn = _POOL.get_nowait()
+        except queue.Empty:
+            return
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 def _run(sql: str, params: tuple = (), *, fetch: str = ""):
@@ -84,25 +136,24 @@ def _run(sql: str, params: tuple = (), *, fetch: str = ""):
     담당자는 앱이 고장난 것으로 읽는다.
     """
     for attempt in (1, 2):
+        conn = _acquire()
         try:
-            with _connect().cursor() as cur:
+            with conn.cursor() as cur:
                 cur.execute(sql, params)
                 if fetch == "one":
-                    return cur.fetchone()
-                if fetch == "all":
-                    return cur.fetchall()
-                return cur.rowcount
+                    out = cur.fetchone()
+                elif fetch == "all":
+                    out = cur.fetchall()
+                else:
+                    out = cur.rowcount
         except Exception:
-            conn = getattr(_local, "conn", None)
-            if conn is not None:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-            _local.conn = None
+            _release(conn, broken=True)
             if attempt == 2:
                 raise
             logger.warning("Postgres 연결이 끊겨 다시 붙습니다.")
+            continue
+        _release(conn)
+        return out
     return None
 
 
