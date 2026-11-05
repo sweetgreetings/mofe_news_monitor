@@ -692,6 +692,7 @@ URL
 ## 데이터 보관
 
 - 회차 파일 365일(`RETENTION_DAYS`, `delete_expired_runs`, 앱 시작·매 tick, `run_at` 기준).
+- **DB 백업은 앱이 하루 한 번 뜬다**(`app/db_backup.py` `tick`, 스케줄러의 「한 번만」 자리 → **임차를 쥔 한 대만**). 받는 곳은 손으로 돌리던 것과 **같은 자리·같은 이름**(`~/press-monitor-백업/db백업_{날짜}_{시각}`)이라 두 가지가 한 줄에 섞여 쌓이고, 오늘 받아 둔 게 있으면(손으로 받은 것도 센다) 건너뛴다. `DB_BACKUP_KEEP`(7)개만 남기고 **우리 이름 모양의 폴더만** 지운다 — 사람이 손으로 둔 폴더는 안 건드린다. 받는 일은 스레드로, 실패하면 **반쯤 받은 폴더를 지우고**(남으면 「오늘 건 있다」로 읽힌다) 하루 세 번까지 다시 해 본다. **두 조건을 다 만족해야 돈다**: 파일이 아니라 DB로 쓰는 중일 것, 그리고 **백업 폴더가 이미 있을 것**(`.env`의 `DB_BACKUP_DIR`로 바꾼다 — 직접 적었으면 만들어 준다). 기본 자리는 **없으면 만들지 않는다** — 그래야 참가자 노트북에 남의 기사와 API 키가 통째로 쌓이지 않는다. **`data/`에는 절대 받지 않는다**(DB가 상했을 때 성한 원본까지 날아간다). 저장 한 겹을 안 거치는 자리이고(저장소 밖이다) `test_storage_goes_through_one_place`의 허용 목록에 그 이유와 함께 들어 있다.
 - 수시 카드 365일(`ADHOC_RETENTION_DAYS`, `delete_expired_cards`, `created_at` 기준, `data/adhoc/trash/`로 이동). **호출은 `main.py`가 주입한다** — `app/scheduler.py`는 `app.adhoc`를 import하지 않고 `cleanup_adhoc_cards` 콜백을 받는다.
 - `group_overrides.json` — **배정한 지 30일(`GROUP_OVERRIDE_RETENTION_DAYS`)**이 지났는가 하나로만 정리(`cleanup_group_overrides`). 형식 `{url: {"group", "at"}}`(옛 형식도 읽음, `load_group_overrides()`는 `{url: 이름}`). **"지금 어딘가에 보이는가"를 삭제 근거로 쓰지 않는다**(초안의 이동이 확정 전에 사라진다).
 - 지운 회차 되살리기 30일(`DELETED_RESTORE_DAYS`) — 지나면 껍데기만 남고(`.purged-`) 되살리기가 빠진다(위 「삭제 기록」 절).

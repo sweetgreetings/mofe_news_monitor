@@ -7,7 +7,7 @@ import threading
 import time
 import webbrowser
 
-from app import photo_body, users
+from app import db_backup, photo_body, users
 from app.adhoc.card import delete_expired_cards, purge_expired_deleted_cards
 from app.agency_archive import collect_tick as agency_archive_tick
 from app.title_watch import watch_tick as title_watch_tick
@@ -240,6 +240,8 @@ def main(open_browser: bool = True) -> None:
             # 읽어 확인했을 때만** 참이라, 연결이 끊겨 못 읽은 경우는 예전처럼 시끄럽게
             # 실패한다(app/credentials.py naver_missing_for_sure).
             "can_collect": lambda: not naver_missing_for_sure(),
+            # DB 백업 — 하루 한 번, 백업 폴더가 있는 컴퓨터에서만(app/db_backup.py).
+            "db_backup": db_backup.tick,
         },
         daemon=True,
     ).start()

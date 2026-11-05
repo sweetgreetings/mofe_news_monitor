@@ -6645,9 +6645,18 @@ def test_storage_goes_through_one_place():
             # 로고 파일 — 저장소가 아니라 코드 옆 그림이다
             "app/landing_renderer.py", "app/settings_server.py",
         }),
-        ("목록(.glob())", r"\.glob\(", {"app/store.py", "app/store_pg.py", "app/credentials.py"}),
+        ("목록(.glob())", r"\.glob\(", {
+            "app/store.py", "app/store_pg.py", "app/credentials.py",
+            # DB 백업 폴더 — **저장소 밖이 이 모듈의 전제다**(`data/`에 받으면 DB가 상했을 때
+            # 성한 원본까지 같이 날아간다). 그 폴더는 늘 디스크이고 DB로 돌아도 그대로다.
+            "app/db_backup.py",
+        }),
         ("지우기(.unlink())", r"\.unlink\(", {"app/store.py", "app/credentials.py"}),
-        ("바뀌었나(.stat())", r"\.stat\(\)", {"app/store.py", "app/credentials.py"}),
+        ("바뀌었나(.stat())", r"\.stat\(\)", {
+            "app/store.py", "app/credentials.py",
+            # 받아 둔 백업이 몇 MB인지 — 저장소 밖 폴더다(위 .glob()와 같은 이유)
+            "app/db_backup.py",
+        }),
         ("폴더 만들기(.mkdir())", r"\.mkdir\(", {
             "app/store.py", "app/store_pg.py",
             # 파일 백엔드로 돌 때를 위해 앱이 켜질 때 한 번 만든다. DB로 돌면 빈 폴더가
@@ -6655,6 +6664,8 @@ def test_storage_goes_through_one_place():
             "app/config.py", "app/adhoc/card.py", "app/adhoc/undo.py",
             # 로그는 저장소가 아니라 늘 파일이다
             "app/logging_setup.py",
+            # DB 백업 폴더 — 저장소 밖이고, `.env`에 직접 적어 준 자리만 만든다
+            "app/db_backup.py",
         }),
     ]
     for label, needle, allowed in path_api:
@@ -7276,6 +7287,97 @@ def test_naver_key_per_person():
 
     print("✓ 네이버 키 사람별: 물려받지 않고(.env도) 자기 폴더에 권한 600으로, "
           "Claude·텔레그램·이메일은 공용")
+
+
+def test_db_backup_daily():
+    """DB 백업을 **하루 한 번 앱이 뜬다** — 그리고 **아무 컴퓨터에서나 뜨지 않는다.**
+
+    `data/`는 DB로 옮긴 날 얼어붙어, 그 뒤 데이터는 Supabase에만 있다. 손으로 돌리던
+    `supabase_setup.py 내려받기`를 앱이 대신한다(체크리스트 B-3). 약속 다섯:
+      ① **파일로 쓰는 상태에서는 아예 안 돈다** — `data/`가 곧 원본이다
+      ② **백업 폴더가 없는 컴퓨터에서는 안 돈다** — 참가자 노트북에 남의 기사와 API 키가
+         통째로 쌓이면 안 된다(그 폴더를 **만들지도 않는다**)
+      ③ 오늘 받아 둔 게 있으면 **다시 받지 않는다**(손으로 받은 것도 센다)
+      ④ 오래된 것은 `DB_BACKUP_KEEP`개만 남기고 지우되 **우리 이름 모양의 폴더만** 건드린다
+      ⑤ 받다가 실패하면 **반쯤 받은 폴더를 지운다** — 남으면 「오늘 건 있다」로 읽힌다
+    """
+    _require_isolation()
+    import shutil
+
+    from app import db_backup, store_pg
+
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "press-monitor-백업"
+        calls = []
+
+        def fake_download(dest, **kwargs):
+            Path(dest).mkdir(parents=True, exist_ok=True)
+            (Path(dest) / "labels.json").write_text("{}", encoding="utf-8")
+            calls.append(Path(dest).name)
+            return {"downloaded": ["labels.json"], "skipped": []}
+
+        with patch.object(store_pg, "download_to_files", fake_download), \
+             patch.dict(os.environ, {"DB_BACKUP_DIR": str(root)}, clear=False):
+            # ① 파일 백엔드면 아무 일도 안 한다
+            with patch.object(store_pg, "is_enabled", lambda: False):
+                db_backup.tick(background=False)
+            assert calls == [] and not root.exists(), "파일 모드인데 백업을 떴습니다"
+
+            with patch.object(store_pg, "is_enabled", lambda: True):
+                # ③ 처음엔 뜬다
+                db_backup.tick(background=False)
+                assert len(calls) == 1 and calls[0].startswith(f"db백업_{today}"), calls
+                # 같은 날 다시 불러도 안 뜬다
+                db_backup.tick(background=False)
+                assert len(calls) == 1, f"하루에 두 번 떴습니다: {calls}"
+
+                # ④ 오래된 것부터 지우되 남의 폴더는 안 건드린다
+                (root / "제목 변경 알림까지_2026-10-16").mkdir()
+                for day in range(1, 12):
+                    (root / f"db백업_2026-10-{day:02d}_0300").mkdir()
+                with patch.object(db_backup, "DB_BACKUP_KEEP", 7):
+                    dropped = db_backup._prune(root)
+                mine = sorted(p.name for p in root.iterdir()
+                              if p.is_dir() and p.name.startswith("db백업_"))
+                assert len(mine) == 7, mine
+                assert mine[-1].startswith(f"db백업_{today}"), "오늘 것을 지웠습니다"
+                assert (root / "제목 변경 알림까지_2026-10-16").is_dir(), (
+                    "사람이 손으로 둔 폴더를 지웠습니다"
+                )
+                assert len(dropped) == 5, dropped
+
+                # ⑤ 실패하면 반쯤 받은 폴더를 남기지 않는다
+                db_backup._attempts.clear()
+                for path in root.glob(f"db백업_{today}*"):
+                    shutil.rmtree(path)
+
+                def boom(dest, **kwargs):
+                    Path(dest).mkdir(parents=True, exist_ok=True)
+                    (Path(dest) / "반쯤.json").write_text("{", encoding="utf-8")
+                    raise RuntimeError("연결이 끊겼다")
+
+                with patch.object(store_pg, "download_to_files", boom):
+                    db_backup.tick(background=False)
+                assert not list(root.glob(f"db백업_{today}*")), "반쯤 받은 폴더가 남았습니다"
+
+        # ② 폴더가 없는 컴퓨터(참가자) — 만들지도 않는다
+        other = Path(tmp) / "참가자"
+        other.mkdir()
+        with patch.dict(os.environ, {}, clear=False), \
+             patch.object(db_backup, "BASE_DIR", other / "press-monitor"), \
+             patch.object(store_pg, "is_enabled", lambda: True), \
+             patch.object(store_pg, "download_to_files", fake_download):
+            os.environ.pop("DB_BACKUP_DIR", None)
+            assert db_backup.backup_root() is None
+            before = len(calls)
+            db_backup.tick(background=False)
+            assert len(calls) == before, "백업 폴더가 없는 컴퓨터에서 떴습니다"
+            assert not (other / "press-monitor-백업").exists(), "없는 폴더를 만들었습니다"
+
+    print("49) DB 백업 자동: 통과 (하루 한 번, 파일 모드·폴더 없는 컴퓨터는 안 돎, "
+          "7개만 남기고 남의 폴더는 안 건드림, 실패하면 반쯤 받은 폴더를 지움)")
 
 
 def test_account_delete_and_restore():
@@ -9652,6 +9754,7 @@ if __name__ == "__main__":
         test_scheduler_runs_per_person,
         test_person_without_naver_key_is_skipped_quietly,
         test_account_delete_and_restore,
+        test_db_backup_daily,
         test_keys_use_forward_slashes,
         test_scheduler_lease,
         test_naver_key_per_person,

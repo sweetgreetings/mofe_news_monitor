@@ -337,6 +337,13 @@ def run_scheduler(
     # 기본값이 진짜 함수면 run_scheduler를 부르는 테스트가 실제 data/credentials.json을
     # 읽어 **그 컴퓨터에 키가 있느냐에 따라 결과가 갈린다**(collect_agency_archive와 같은 이유).
     can_collect: Callable[[], bool] = lambda: True,
+    # [추가: 2026-11-05] **DB 백업을 하루 한 번 앱이 뜬다**(app/db_backup.py). 아래
+    # 「한 번만」 자리에서 부르므로 **임차를 쥔 한 대만** 받는다 — 여러 대가 같은 DB를
+    # 각자 받아 봐야 같은 값이고, 참가자 노트북에 남의 기사와 키가 통째로 쌓인다.
+    # **기본값은 아무 일도 안 하는 람다이고 main.py가 실제 함수를 주입한다** — 기본값이
+    # 진짜 함수면 run_scheduler를 부르는 테스트가 네트워크와 디스크를 탄다
+    # (collect_agency_archive와 같은 이유).
+    db_backup: Callable[[datetime], None] = lambda _now: None,
     should_continue: Callable[[], bool] = lambda: True,
 ) -> None:
     """앱이 켜져 있는 동안 poll_interval_sec마다 실행할 회차가 있는지 확인하고 수집한다.
@@ -455,6 +462,8 @@ def run_scheduler(
             check_breaking_alert(now)
             check_negative_guess(now)
             collect_agency_archive(now)
+            # DB 백업도 공용 일이다 — 오늘 받아 둔 게 있으면 즉시 돌아온다(비용 0).
+            db_backup(now)
         except Exception:
             logger.exception("스크랩 회차 실행 중 오류 — 다음 회차에 다시 시도합니다")
         sleep(poll_interval_sec)
