@@ -6163,7 +6163,9 @@ class _SettingsHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self._auth_blocked() or self._admin_blocked():
             return
-        with store.owner(self._data_owner()):
+        # **읽기 캐시는 요청 하나까지다**(`store.read_cache`) — 화면 한 장이 같은 자리를
+        # 수백 번 읽는데, DB에선 그 한 번이 왕복 15.6ms다. 요청이 끝나면 버린다.
+        with store.owner(self._data_owner()), store.read_cache():
             self._route_get()
 
     def _route_get(self):
@@ -6838,7 +6840,9 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         if self._auth_blocked() or self._admin_blocked():
             return
 
-        with store.owner(self._data_owner()):
+        # 읽기 캐시는 여기서도 요청 하나까지다 — **저장소에 쓰는 순간 통째로 버리므로**
+        # 큐레이션이 방금 쓴 값을 그대로 다시 읽는다(app/store.py `read_cache`).
+        with store.owner(self._data_owner()), store.read_cache():
             self._route_post(form)
 
     def _route_post(self, form: dict) -> None:

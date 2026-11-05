@@ -165,6 +165,78 @@ def owner(user_id: Optional[str]):
         set_owner(before)
 
 
+# ──────────── 요청 하나 안에서 같은 것을 두 번 묻지 않는다 ────────────
+# **왜 있나.** 화면 한 장이 같은 자리를 수십·수백 번 읽는다 — 기사마다 「사진 추정 해제
+# 기록이 바뀌었나」를 묻고(기사 215건 보관함에서 430회), 라벨 파일을 기사마다 다시 읽는다
+# (초안에서 376회). 파일일 때는 `stat()`이 1µs라 **자주 물어 조금 아끼는** 쪽이 이겼지만,
+# DB에선 그 한 번이 왕복 15.6ms다(실측 2026-11-05). 고치는 방향은 모듈 수십 곳의 캐시를
+# 각자 손보는 게 아니라 **묻는 횟수를 이 겹에서 줄이는 것**이다.
+#
+# **범위는 요청 하나다**(`app/settings_server.py`의 `do_GET`·`do_POST`). 열어 둔 동안만
+# 기억하고 요청이 끝나면 버린다 — 오래 쥐면 다른 컴퓨터가 바꾼 값을 영영 못 본다.
+#
+# **그 안에서 저장소에 무엇이든 쓰면 통째로 버린다.** 쓴 자리만 지우지 않는 이유는
+# 읽기-수정-쓰기가 흔해서다 — 한 칸만 지우면 「방금 쓴 값」과 「캐시에 남은 옛 값」이
+# 한 화면에 섞인다. 큐레이션 한 번은 파일 한두 개를 쓸 뿐이라 통째로 버려도 손해가 없다.
+#
+# **스레드마다 따로다**(소유자 맥락과 같은 자리) — 요청 스레드와 스케줄러 스레드가 캐시를
+# 나눠 쓰면 **남의 데이터를 볼 수 있다**(키에 사람이 적혀 있지만, 요청마다 거는 사람이 다르다).
+#
+# 한 요청 안에서는 **앞뒤가 맞는 한 벌**을 본다 — 지금은 같은 화면이 키마다 다른 시각의
+# 값을 섞어 쓴다. 그래서 이 캐시는 빠르기만이 아니라 「한 화면 = 한 시점」도 준다.
+
+# 없는 자리도 기억한다 — 「있나?」를 되묻는 자리가 많다(`exists` 뒤에 `read_text`).
+_MISSING = object()
+
+
+@contextmanager
+def read_cache():
+    """`with store.read_cache():` — 이 안에서 같은 자리를 다시 읽지 않는다.
+
+    겹쳐 열어도 된다(요청이 화면 생성기를 부르고 그 안에서 또 열리는 식) — **맨 바깥이
+    끝날 때 버린다.**
+    """
+    depth = getattr(_local, "cache_depth", 0)
+    if depth == 0:
+        _local.cache = {}
+    _local.cache_depth = depth + 1
+    try:
+        yield
+    finally:
+        _local.cache_depth = depth
+        if depth == 0:
+            _local.cache = None
+
+
+def _remember(slot: tuple, compute):
+    """캐시가 열려 있으면 기억해 둔 값을, 아니면 그냥 계산한 값을.
+
+    `FileNotFoundError`(= 없는 자리)도 기억한다. 그 밖의 오류는 기억하지 않는다 —
+    권한·연결 문제는 다음 번에 성공할 수 있다.
+    """
+    cache = getattr(_local, "cache", None)
+    if cache is None:
+        return compute()
+    if slot in cache:
+        got = cache[slot]
+        if got is _MISSING:
+            raise FileNotFoundError(slot[1])
+        return got
+    try:
+        value = compute()
+    except FileNotFoundError:
+        cache[slot] = _MISSING
+        raise
+    cache[slot] = value
+    return value
+
+
+def _forget_all() -> None:
+    """저장소에 쓴 뒤 — 기억해 둔 것을 통째로 버린다(위 설명 참고)."""
+    if getattr(_local, "cache", None) is not None:
+        _local.cache = {}
+
+
 # ───────────────────────────── 키 ─────────────────────────────
 
 def _rel(path: Path) -> Optional[str]:
@@ -265,7 +337,10 @@ def key_of(path) -> str:
 def read_text(path) -> str:
     """원문 그대로. 없거나 못 읽으면 `OSError`(지금과 같다)."""
     backend, at = _route(path)
-    return backend.read_text(at) if backend else _fs_read_text(at)
+    return _remember(
+        ("read", str(at)),
+        lambda: backend.read_text(at) if backend else _fs_read_text(at),
+    )
 
 
 def read_json(path):
@@ -278,6 +353,7 @@ def read_json(path):
 def write_text(path, text: str) -> None:
     """원자적으로 쓴다 — 임시 파일에 쓴 뒤 교체해, 겹쳐 써도 반쪽 파일이 안 남는다."""
     backend, at = _route(path)
+    _forget_all()
     if backend:
         backend.write_text(at, text)
         return
@@ -297,11 +373,15 @@ def write_json(path, data, *, indent: Optional[int] = None) -> None:
 
 def exists(path) -> bool:
     backend, at = _route(path)
-    return backend.exists(at) if backend else _fs_exists(at)
+    return _remember(
+        ("exists", str(at)),
+        lambda: backend.exists(at) if backend else _fs_exists(at),
+    )
 
 
 def delete(path, *, missing_ok: bool = True) -> None:
     backend, at = _route(path)
+    _forget_all()
     if backend:
         backend.delete(at, missing_ok=missing_ok)
         return
@@ -311,6 +391,7 @@ def delete(path, *, missing_ok: bool = True) -> None:
 def move(src, dst) -> None:
     """옮긴다(같은 저장소 안). 받는 자리의 폴더는 만들어 둔다."""
     backend, to = _route(dst)
+    _forget_all()
     if backend:
         _, frm = _route(src)
         backend.move(frm, to)
@@ -321,6 +402,7 @@ def move(src, dst) -> None:
 
 def ensure_dir(path) -> None:
     backend, at = _route(path)
+    _forget_all()   # 칸이 없다고 기억해 둔 것이 있을 수 있다
     if backend:
         backend.ensure_dir(at)   # DB엔 폴더가 없다 — 할 일이 없다
         return
@@ -334,9 +416,15 @@ def list_files(directory, pattern: str = "*.json") -> list:
     이 모듈에 넘기기 때문이다(그 길이 다시 키로 풀린다).
     """
     backend, at = _route(directory)
-    if backend:
-        return [Path(DATA_DIR) / key for key in backend.list_keys(at, pattern)]
-    return _fs_list(at, pattern)
+
+    def fetch():
+        if backend:
+            return [Path(DATA_DIR) / key for key in backend.list_keys(at, pattern)]
+        return _fs_list(at, pattern)
+
+    # 돌려주는 목록은 **그때마다 새 리스트다** — 부르는 쪽이 정렬·pop을 해도
+    # 기억해 둔 것이 상하지 않게.
+    return list(_remember(("list", str(at), pattern), fetch))
 
 
 def signature(path):
@@ -346,7 +434,10 @@ def signature(path):
     (`run_index`·`curation`·`adhoc/card`). DB로 가면 갱신 시각이 그 자리를 받는다.
     """
     backend, at = _route(path)
-    return backend.signature(at) if backend else _fs_signature(at)
+    return _remember(
+        ("signature", str(at)),
+        lambda: backend.signature(at) if backend else _fs_signature(at),
+    )
 
 
 def list_signatures(directory, pattern: str = "*.json") -> dict:
@@ -361,12 +452,16 @@ def list_signatures(directory, pattern: str = "*.json") -> dict:
     `None`을 건너뛰던 것과 같은 결과다.
     """
     backend, at = _route(directory)
-    if backend:
-        return {
-            Path(DATA_DIR) / key: sig
-            for key, sig in backend.list_signatures(at, pattern).items()
-        }
-    return _fs_list_signatures(at, pattern)
+
+    def fetch():
+        if backend:
+            return {
+                Path(DATA_DIR) / key: sig
+                for key, sig in backend.list_signatures(at, pattern).items()
+            }
+        return _fs_list_signatures(at, pattern)
+
+    return dict(_remember(("list_sig", str(at), pattern), fetch))
 
 
 # ─────────────────── 아래가 파일 백엔드다 ───────────────────

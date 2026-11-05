@@ -6735,6 +6735,93 @@ def test_postgres_backend_contract():
           "DATA_DIR 밖은 늘 파일, 키 고르기·서명 목록은 아래 칸으로 안 내려감")
 
 
+def test_store_read_cache():
+    """**요청 하나 안에서 같은 자리를 두 번 묻지 않는다**(`store.read_cache`).
+
+    DB 모드에서는 읽기 한 번이 왕복 15.6ms다 — 화면 한 장이 같은 파일을 수백 번 읽던
+    자리(기사마다 사진 추정 해제 기록·라벨)가 그대로 수백 번의 왕복이 됐다(실측
+    2026-11-05: 홈 73초). 그래서 이 겹에서 횟수를 줄인다. 지켜야 하는 약속 넷:
+      ① 캐시 안에서 같은 자리를 여러 번 읽어도 **저장소는 한 번만** 두드린다
+      ② **쓰면 통째로 버린다** — 방금 쓴 값을 그대로 다시 읽는다(큐레이션이 그 모양이다)
+      ③ 캐시를 열지 않으면 **옛 동작 그대로**다(스케줄러·백그라운드가 그 상태다)
+      ④ **없는 자리도 기억한다** — `exists` 뒤에 `read_text`를 부르는 자리가 많다
+    """
+    _require_isolation()
+    import threading
+
+    from app import store
+
+    with tempfile.TemporaryDirectory() as tmp:
+        box = Path(tmp)
+        target = box / "labels.json"
+        store.write_json(target, {"a": 1})
+
+        hits = []
+        real = store._fs_read_text
+
+        def counted(path):
+            hits.append(str(path))
+            return real(path)
+
+        with patch.object(store, "_fs_read_text", counted):
+            # ③ 캐시 밖 — 읽은 만큼 두드린다
+            store.read_json(target)
+            store.read_json(target)
+            assert len(hits) == 2, hits
+
+            hits.clear()
+            with store.read_cache():
+                # ① 같은 자리를 세 번 읽어도 한 번만 두드린다
+                assert store.read_json(target) == {"a": 1}
+                store.read_json(target)
+                store.read_json(target)
+                assert len(hits) == 1, hits
+
+                # ② 쓰면 통째로 버린다 — 방금 쓴 값이 보인다
+                store.write_json(target, {"a": 2})
+                assert store.read_json(target) == {"a": 2}, "쓴 값을 못 읽었습니다"
+
+                # ④ 없는 자리도 기억한다(두 번 물어도 한 번만 두드린다)
+                missing = box / "없는것.json"
+                assert store.exists(missing) is False
+                assert store.exists(missing) is False
+                for _ in range(2):
+                    try:
+                        store.read_text(missing)
+                        raise AssertionError("없는 자리를 읽었는데 예외가 없습니다")
+                    except FileNotFoundError:
+                        pass
+
+            # 캐시를 나오면 다시 그때그때 읽는다
+            hits.clear()
+            store.read_json(target)
+            store.read_json(target)
+            assert len(hits) == 2, hits
+
+        # ⑤ **스레드마다 따로다** — 다른 스레드는 이 캐시를 보지 않는다(소유자 맥락과 같은
+        #    이유다. 나눠 쓰면 요청마다 거는 사람이 달라 남의 데이터를 볼 수 있다).
+        seen = {}
+
+        def other_thread():
+            seen["안에서도_열려있나"] = getattr(store._local, "cache", None) is not None
+
+        with store.read_cache():
+            th = threading.Thread(target=other_thread)
+            th.start()
+            th.join()
+        assert seen["안에서도_열려있나"] is False, "읽기 캐시가 스레드 사이에 새고 있습니다"
+
+        # ⑥ 목록과 서명을 한 번에 받는 것이 따로 묻는 것과 **같은 결과**여야 한다 —
+        #    갈리면 「목록엔 있는데 서명은 없는」 자리가 생겨 인덱스가 매번 다시 읽는다.
+        store.write_json(box / "b.json", {})
+        apart = {p: store.signature(p) for p in store.list_files(box)}
+        together = store.list_signatures(box)
+        assert apart == together, (apart, together)
+
+    print("✓ 저장소 읽기 캐시: 요청 하나 안에선 한 번만 묻고, 쓰면 통째로 버리고, "
+          "스레드 사이로 안 샌다 (목록+서명도 따로 묻기와 같은 결과)")
+
+
 def test_user_boundary():
     """「누구의 데이터인가」 경계를 지킨다 — **그리고 혼자 쓰는 지금은 경로가 그대로인 것.**
 
@@ -9164,6 +9251,7 @@ if __name__ == "__main__":
         test_key_paths_stay_narrow,
         test_storage_goes_through_one_place,
         test_postgres_backend_contract,
+        test_store_read_cache,
         test_user_boundary,
         test_base_owner_needs_no_migration,
         test_settings_split_per_user,
