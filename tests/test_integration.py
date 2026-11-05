@@ -7532,6 +7532,17 @@ def test_admin_only_settings():
             f"일반 사용자 메뉴에 {path}가 남아 있습니다 — 공용 설정입니다."
         )
 
+    # **홈 계정 메뉴의 관리자 몫 줄은 `hidden`만으로는 안 숨는다.**
+    # 그 줄들에 `display: flex`를 주는 규칙이 `hidden` 속성(기본 `display: none`)보다
+    # 세서, 일반 사용자에게 「계정 목록」·「로그인 사용」이 **그대로 보였다**
+    # (실측 2026-11-05, 누르면 403). 속성을 짚어 다시 누르는 규칙이 있어야 한다.
+    from app import landing_renderer
+    home_css = landing_renderer.render_landing_page()
+    assert ".acct-pop a[hidden]" in home_css, (
+        "홈 계정 메뉴에서 `hidden`을 다시 눌러 주는 CSS가 없습니다 — "
+        "`display: flex`가 `hidden`을 이겨 관리자 몫 줄이 일반 사용자에게 보입니다."
+    )
+
     print("✓ 관리자 권한: 설정은 관리자만(자물쇠가 꺼져 있으면 안 막음), 형광펜·큐레이션은 모두, 마지막 관리자는 못 내림")
 
 

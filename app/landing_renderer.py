@@ -351,6 +351,11 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     font-size: var(--fs-md); color: {text}; text-decoration: none; background: none;
     border: none; font-family: inherit; cursor: pointer; text-align: left; }}
   .acct-pop a:hover, .acct-pop button:hover {{ background: {row_hover}; }}
+  /* **`hidden`을 CSS가 이기지 않게 한다.** 바로 위에서 줄마다 `display: flex`를
+     주는데, 그 선언이 `hidden` 속성(브라우저 기본 `display: none`)보다 세서
+     관리자 몫 줄이 일반 사용자에게 **그대로 보였다**(실측 2026-11-05: 「계정 목록」
+     「로그인 사용」이 보이고 누르면 403). 속성까지 짚어 다시 눌러 준다. */
+  .acct-pop a[hidden], .acct-pop button[hidden] {{ display: none; }}
   .acct-pop .state {{ margin-left: auto; font-size: var(--fs-xs); color: {muted};
     background: {pill_bg}; border: 1px solid {border}; border-radius: var(--r-pill); padding: 1px 8px; }}
   .acct-pop .state.on {{ color: {ok_text}; background: {ok_bg}; border-color: {ok_border}; }}
