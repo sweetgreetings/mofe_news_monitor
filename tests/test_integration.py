@@ -7278,6 +7278,98 @@ def test_naver_key_per_person():
           "Claude·텔레그램·이메일은 공용")
 
 
+def test_account_delete_and_restore():
+    """계정 지우기 — **데이터는 지우지 않고 상자로 옮기고, 되살릴 수 있다.**
+
+    베타에서 참가자가 빠지거나 시험 계정을 만들면 지울 길이 있어야 한다(없어서 2026-11-05에
+    DB에서 직접 뺐다). 지켜야 하는 약속:
+      ① **첫 계정(바닥 주인)은 못 지운다** — 그 사람의 자리가 `data/` 자신이라 지우면
+         지금까지 쌓인 회차·라벨·설정이 통째로 주인을 잃는다
+      ② **자기 계정·마지막 관리자도 못 지운다**
+      ③ 지우면 그 사람의 자리가 **아래 칸까지 통째로** 상자로 옮겨진다(복사가 아니다)
+      ④ 되살리면 계정 줄과 그 자리가 **그대로** 돌아온다
+      ⑤ 그 사이 같은 이메일로 새 계정이 생겼으면 **거절한다**(로그인이 이메일로 찾는다)
+    """
+    _require_isolation()
+    from app import settings_server as server, store, users
+
+    with tempfile.TemporaryDirectory() as tmp:
+        box = Path(tmp)
+        with patch.object(users, "USERS_FILE", box / "users.json"), \
+             patch.object(users, "USERS_DATA_DIR", box / "users"), \
+             patch.object(users, "USERS_TRASH_DIR", box / "users_trash"), \
+             patch.object(store, "DATA_DIR", box):
+            users._save({"users": [
+                {"id": "base", "email": "a@x", "display_name": "담당자", "role": "admin"},
+                {"id": "u2", "email": "b@x", "display_name": "참가자", "role": "member"},
+                {"id": "u3", "email": "c@x", "display_name": "다른관리자", "role": "admin"},
+            ]})
+            deep = box / "users" / "u2" / "articles" / "2026-11-05_09-00.json"
+            deep.parent.mkdir(parents=True)
+            deep.write_text('{"run_at": "2026-11-05T09:00:00"}', encoding="utf-8")
+            store.write_json(box / "users" / "u2" / "labels.json", {"u": {"labels": ["세제"]}})
+
+            # ① 바닥 주인 ② 자기 자신
+            for user_id, by, word in (("base", None, "첫 계정"), ("u3", "u3", "자기 계정")):
+                try:
+                    users.delete_user(user_id, by=by)
+                    raise AssertionError(f"{word}을 지웠습니다 — 막아야 합니다")
+                except users.UserError as exc:
+                    assert word in str(exc), exc
+
+            # ③ 지우기 — 자리가 아래 칸까지 상자로 옮겨진다
+            removed = users.delete_user("u2", by="base")
+            assert [u["id"] for u in users.list_users()] == ["base", "u3"]
+            assert sorted(removed["files"]) == ["articles/2026-11-05_09-00.json", "labels.json"]
+            assert not deep.exists(), "원래 자리에 그대로 남았습니다(옮긴 게 아니라 복사했습니다)"
+            moved = box / "users_trash" / removed["box"] / "articles" / "2026-11-05_09-00.json"
+            assert moved.exists(), "상자 안에 자리가 없습니다"
+            listed = users.list_deleted_users()
+            assert [r["user"]["id"] for r in listed] == ["u2"], listed
+
+            # ② 마지막 관리자 — u3를 일반으로 내리면 base만 관리자인데 base는 못 지운다
+            #    그래서 반대로 base를 일반으로 둔 상태를 만들어 판정만 본다
+            users._save({"users": [
+                {"id": "base", "email": "a@x", "display_name": "담당자", "role": "member"},
+                {"id": "u3", "email": "c@x", "display_name": "다른관리자", "role": "admin"},
+            ]})
+            try:
+                users.delete_user("u3", by="base")
+                raise AssertionError("마지막 관리자를 지웠습니다")
+            except users.UserError as exc:
+                assert "관리자가 한 명뿐" in str(exc), exc
+
+            # ⑤ 같은 이메일이 다시 생겼으면 거절
+            users._save({"users": [
+                {"id": "base", "email": "a@x", "display_name": "담당자", "role": "admin"},
+                {"id": "새사람", "email": "b@x", "display_name": "새 참가자", "role": "member"},
+            ]})
+            try:
+                users.restore_user(removed["box"])
+                raise AssertionError("같은 이메일인데 되살렸습니다")
+            except users.UserError as exc:
+                assert "이메일" in str(exc), exc
+
+            # ④ 되살리기 — 계정과 자리가 그대로 돌아온다
+            users._save({"users": [
+                {"id": "base", "email": "a@x", "display_name": "담당자", "role": "admin"}]})
+            back = users.restore_user(removed["box"])
+            assert back["id"] == "u2" and back["email"] == "b@x"
+            assert [u["id"] for u in users.list_users()] == ["base", "u2"], "맨 뒤에 붙여야 합니다"
+            assert deep.exists() and "2026-11-05T09" in deep.read_text(encoding="utf-8")
+            assert users.list_deleted_users() == [], "되살린 상자가 목록에 남았습니다"
+
+            # 화면 — 못 지우는 줄은 흐리고, 지울 수 있는 줄에만 단추가 있다
+            page = server.render_accounts_page(me_id="base")
+            assert page.count('action="/accounts/delete"') == 1, "지울 수 있는 줄이 하나여야 합니다"
+            assert 'class="del" aria-disabled' in page, "바닥 주인 줄의 🗑이 흐리지 않습니다"
+            users.delete_user("u2", by="base")
+            assert 'action="/accounts/restore"' in server.render_accounts_page(me_id="base")
+
+    print("48) 계정 지우기: 통과 (첫 계정·자기·마지막 관리자는 막고, 자리는 상자로 옮기고, "
+          "되살리면 그대로 돌아오고, 같은 이메일은 거절)")
+
+
 def test_person_without_naver_key_is_skipped_quietly():
     """**자기 네이버 키가 없는 사람은 조용히 건너뛴다** — 오류로 쌓지 않는다.
 
@@ -9559,6 +9651,7 @@ if __name__ == "__main__":
         test_settings_split_per_user,
         test_scheduler_runs_per_person,
         test_person_without_naver_key_is_skipped_quietly,
+        test_account_delete_and_restore,
         test_keys_use_forward_slashes,
         test_scheduler_lease,
         test_naver_key_per_person,

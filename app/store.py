@@ -125,6 +125,8 @@ _SHARED = {
     "live_cache.json",
     # 계정·세션·잠금·자물쇠 스위치, 그리고 로그
     "users.json", "auth_sessions.json", "auth_attempts.json", "auth_config.json",
+    # 지운 계정이 머무는 자리 — 그 안은 「누구 것인지」가 상자 이름에 적혀 있다
+    "users_trash",
     "logs",
     # 사람별 데이터가 사는 칸 자체 — 그 안쪽은 이미 누구 것인지 적혀 있다
     _USERS_SEGMENT,
@@ -411,22 +413,27 @@ def ensure_dir(path) -> None:
     _fs_ensure_dir(at)
 
 
-def list_files(directory, pattern: str = "*.json") -> list:
+def list_files(directory, pattern: str = "*.json", *, recursive: bool = False) -> list:
     """그 칸에 든 것들 — 이름 사전순. 칸이 없으면 빈 목록.
 
     Postgres에서도 **`Path`를 돌려준다** — 부르는 쪽이 `.name`을 읽고 그 값을 다시
     이 모듈에 넘기기 때문이다(그 길이 다시 키로 풀린다).
+
+    `recursive=True`면 **아래 칸까지** 훑는다(`Path.rglob`과 같다). 기본이 거짓인 것은
+    `Path.glob`과 같은 답이어야 하는 자리가 대부분이라서다 — 지금 참으로 부르는 곳은
+    지운 계정의 자리를 통째로 옮기는 자리 하나다(`app/users.py`).
     """
     backend, at = _route(directory)
 
     def fetch():
         if backend:
-            return [Path(DATA_DIR) / key for key in backend.list_keys(at, pattern)]
-        return _fs_list(at, pattern)
+            return [Path(DATA_DIR) / key
+                    for key in backend.list_keys(at, pattern, recursive=recursive)]
+        return _fs_list(at, pattern, recursive=recursive)
 
     # 돌려주는 목록은 **그때마다 새 리스트다** — 부르는 쪽이 정렬·pop을 해도
     # 기억해 둔 것이 상하지 않게.
-    return list(_remember(("list", str(at), pattern), fetch))
+    return list(_remember(("list", str(at), pattern, recursive), fetch))
 
 
 def signature(path):
@@ -495,9 +502,11 @@ def _fs_ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
-def _fs_list(directory: Path, pattern: str) -> list:
+def _fs_list(directory: Path, pattern: str, *, recursive: bool = False) -> list:
     try:
-        return sorted(directory.glob(pattern))
+        found = directory.rglob(pattern) if recursive else directory.glob(pattern)
+        # **칸(폴더)은 빼고 돌려준다** — DB 쪽은 키가 전부 내용이라 폴더가 없다.
+        return sorted(p for p in found if p.is_file())
     except OSError:
         return []
 

@@ -222,7 +222,7 @@ def _head(prefix: str) -> str:
     return f"{prefix}/" if prefix and prefix != "." else ""
 
 
-def _in_box(rows, head: str, pattern: str):
+def _in_box(rows, head: str, pattern: str, recursive: bool = False):
     """그 칸에 **바로 든** 행만 골라 `(키, 행)`으로 흘린다.
 
     `Path.glob("*.json")`이 아래 폴더로 내려가지 않는 것과 같아야 하므로, 접두사
@@ -232,7 +232,7 @@ def _in_box(rows, head: str, pattern: str):
     for row in rows:
         key = row[0]
         rest = key[len(head):]
-        if "/" in rest:
+        if "/" in rest and not recursive:
             continue
         if fnmatch(rest, pattern):
             yield key, row
@@ -243,14 +243,14 @@ def _sig_of(updated_at, length: int) -> tuple:
     return (int(updated_at.timestamp() * 1_000_000_000), length)
 
 
-def list_keys(prefix: str, pattern: str) -> list:
-    """그 칸에 **바로 든** 키들 — 이름 사전순."""
+def list_keys(prefix: str, pattern: str, *, recursive: bool = False) -> list:
+    """그 칸에 **바로 든** 키들 — 이름 사전순. `recursive`면 아래 칸까지."""
     ensure_schema()
     head = _head(prefix)
     rows = _run(
         f"select key from {_TABLE} where key like %s order by key", (head + "%",), fetch="all"
     ) or []
-    return [key for key, _ in _in_box(rows, head, pattern)]
+    return [key for key, _ in _in_box(rows, head, pattern, recursive)]
 
 
 def signature(key: str):

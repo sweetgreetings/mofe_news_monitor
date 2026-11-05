@@ -1521,7 +1521,7 @@ _ACCOUNTS_TEMPLATE = (
 <style>"""
     + _BASE_STYLE
     + """
-  .acc {{ display: grid; grid-template-columns: 1fr 1fr 96px 92px; gap: 6px;
+  .acc {{ display: grid; grid-template-columns: 1fr 1fr 96px 92px 34px; gap: 6px;
     align-items: center; padding: 10px 2px; border-bottom: 1px solid {border}; }}
   .acc:last-of-type {{ border-bottom: 0; }}
   .acc-head {{ color: {muted}; font-size: var(--fs-sm); padding-bottom: 2px;
@@ -1541,8 +1541,25 @@ _ACCOUNTS_TEMPLATE = (
   .acc button:hover {{ border-color: {accent_border}; color: {accent}; }}
   /* 마지막 관리자 — 흐리게 두고 이유는 툴팁이 말한다(↑↓ 비활성과 같은 값) */
   .acc .off {{ opacity: 0.45; cursor: default; }}
+  /* 지우기 — 줄 끝 아이콘 하나. 글자를 붙이지 않는다(줄마다 되풀이된다) */
+  .acc .del {{ display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: var(--h-tb); padding: 0; background: none; border: 0;
+    color: {text_soft}; cursor: pointer; }}
+  .acc .del:hover {{ color: {error}; }}
+  .acc .del[aria-disabled="true"] {{ opacity: 0.35; cursor: default; }}
+  /* 지운 계정 — 휴지통과 같은 문법(접힌 채로, 되살리기는 줄 끝에) */
+  .trash {{ margin-top: 18px; }}
+  .trash > summary {{ cursor: pointer; color: {muted}; font-size: var(--fs-sm); }}
+  .trow {{ display: flex; align-items: center; gap: 8px; padding: 8px 2px;
+    border-bottom: 1px solid {border}; font-size: var(--fs-sm); color: {text_soft}; }}
+  .trow:last-of-type {{ border-bottom: 0; }}
+  .trow .when {{ color: {muted}; margin-left: auto; }}
+  .trow button {{ height: var(--h-tb); padding: 0 10px; font-size: var(--fs-sm);
+    background: {card}; color: {text_soft}; border: 1px solid {border};
+    border-radius: var(--r-md); cursor: pointer; }}
+  .trow button:hover {{ border-color: {accent_border}; color: {accent}; }}
   @media (max-width: 640px) {{
-    .acc {{ grid-template-columns: 1fr 96px 92px; }}
+    .acc {{ grid-template-columns: 1fr 96px 92px 34px; }}
     .acc .mail {{ display: none; }}
   }}
 </style>
@@ -1560,13 +1577,68 @@ _ACCOUNTS_TEMPLATE = (
   </p>
   {error_html}
   {notice_html}
-  <div class="acc acc-head"><div>이름</div><div>이메일</div><div>역할</div><div></div></div>
+  <div class="acc acc-head"><div>이름</div><div>이메일</div><div>역할</div><div></div><div></div></div>
   {rows_html}
+  {trash_html}
 </div>
 </body>
 </html>
 """
 )
+
+
+def _delete_account_button(user: dict, me_id: str, base_id, only_admin: bool) -> str:
+    """줄 끝 🗑 — **못 지우는 줄은 흐리게 두고 이유는 툴팁이 말한다**(역할 단추와 같은 문법).
+
+    확인창을 하나 둔다. 보관함의 줄 끝 🗑은 지운 자리에 곧바로 되살리기 줄이 남아
+    확인창이 없는데, **계정은 사람의 로그인 수단이라** 잘못 누르면 그 사람이 당장 못
+    들어온다 — 무게가 다르다.
+    """
+    user_id = user.get("id", "")
+    name = user.get("display_name", "") or user.get("email", "") or "그 계정"
+    if user_id == base_id:
+        why = "첫 계정은 지울 수 없습니다 — 지금까지 쌓인 회차·라벨·설정이 이 계정의 자리입니다."
+    elif user_id == me_id:
+        why = "자기 계정은 지울 수 없습니다 — 다른 관리자에게 부탁하세요."
+    elif users.is_admin(user) and only_admin:
+        why = "관리자가 한 명뿐입니다 — 다른 사람을 관리자로 올린 뒤에 지울 수 있습니다."
+    else:
+        why = ""
+    if why:
+        return (f'<span class="del" aria-disabled="true" title="{html.escape(why)}">'
+                f'{icon("trash")}</span>')
+    ask = f"{name} 계정을 지울까요? 그 사람이 모은 회차·설정은 아래 「최근 삭제」에 남아 되살릴 수 있습니다."
+    return (
+        f'<form method="POST" action="/accounts/delete" '
+        f'onsubmit="return confirm({json.dumps(ask, ensure_ascii=False)});">'
+        f'<input type="hidden" name="user_id" value="{html.escape(user_id)}">'
+        f'<button type="submit" class="del" title="이 계정 지우기" '
+        f'aria-label="이 계정 지우기">{icon("trash")}</button></form>'
+    )
+
+
+def _deleted_accounts_html() -> str:
+    """「최근 삭제」 — 지운 계정과 되살리기. 없으면 **아무것도 안 그린다**."""
+    boxes = users.list_deleted_users()
+    if not boxes:
+        return ""
+    rows = []
+    for saved in boxes:
+        row = saved.get("user") or {}
+        name = html.escape(row.get("display_name", "") or "이름 없음")
+        mail = html.escape(row.get("email", ""))
+        when = html.escape((saved.get("at") or "").replace("T", " ")[:16])
+        files = len(saved.get("files") or [])
+        kept = f" · 자리 {files}개 보관" if files else ""
+        rows.append(
+            f'  <div class="trow"><span>{name}</span><span>{mail}</span>'
+            f'<span class="when">{when}{kept}</span>'
+            f'<form method="POST" action="/accounts/restore">'
+            f'<input type="hidden" name="box" value="{html.escape(saved.get("box", ""))}">'
+            f'<button type="submit">↩ 되살리기</button></form></div>'
+        )
+    return ('<details class="trash"><summary>최근 삭제 '
+            f'({len(boxes)})</summary>\n' + "\n".join(rows) + "</details>")
 
 
 def render_accounts_page(me_id: str = "", error: str = "", notice: str = "") -> str:
@@ -1577,6 +1649,7 @@ def render_accounts_page(me_id: str = "", error: str = "", notice: str = "") -> 
     """
     rows = []
     only_admin = users.admin_count() <= 1
+    base_id = users.base_owner_id()
     for user in users.list_users():
         admin = users.is_admin(user)
         name = html.escape(user.get("display_name", "") or "이름 없음")
@@ -1603,13 +1676,15 @@ def render_accounts_page(me_id: str = "", error: str = "", notice: str = "") -> 
             f'<div class="mail">{html.escape(user.get("email", ""))}</div>'
             f'<div><span class="role{" admin" if admin else ""}">'
             f'{"관리자" if admin else "일반"}</span></div>'
-            f"<div>{action}</div></div>"
+            f"<div>{action}</div>"
+            f"<div>{_delete_account_button(user, me_id, base_id, only_admin)}</div></div>"
         )
     return _ACCOUNTS_TEMPLATE.format(
         **_theme(),
         error_html=f'<div class="nb nb-error">{html.escape(error)}</div>' if error else "",
         notice_html=f'<div class="nb nb-ok">{html.escape(notice)}</div>' if notice else "",
         rows_html="\n".join(rows),
+        trash_html=_deleted_accounts_html(),
     )
 
 
@@ -1816,7 +1891,7 @@ _ADMIN_ONLY_PATHS = {
     # 계정을 더 만드는 일(계정이 하나도 없을 때는 첫 계정 자리라 안 막는다 — 아래 함수)
     "/signup",
     # 계정 목록과 역할 바꾸기
-    "/accounts", "/accounts/role",
+    "/accounts", "/accounts/role", "/accounts/delete", "/accounts/restore",
     # 정책 단어 추이에 올릴 단어 — 한 벌(최대 8개)이라 모두의 그래프가 바뀐다.
     # 그래프를 보는 것(/trend)과 받아 가는 것(/trend/download-excel)은 모두 한다.
     "/trend/add-word", "/trend/remove-word",
@@ -6438,6 +6513,34 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         # 「테스트사용자을 관리자로」가 그렇게 나왔다.
         self._redirect(f"/accounts?notice=" + quote(f"{name} 계정을 {label}."))
 
+    def _handle_delete_account(self, form: dict) -> None:
+        """계정 목록의 🗑 — 막는 판정은 `users.delete_user`가 하고 여기선 되돌려 보여준다.
+
+        **그 사람의 로그인 세션도 끊는다** — 계정 줄이 사라져도 쥐고 있던 세션이 살아
+        있으면 그 화면은 「없는 사람」으로 계속 돈다.
+        """
+        user_id = self._one(form, "user_id")
+        me = (self._current_user() or {}).get("id", "")
+        try:
+            removed = users.delete_user(user_id, by=me)
+        except users.UserError as exc:
+            self._redirect("/accounts?error=" + quote(str(exc)))
+            return
+        auth_session.destroy_user_sessions(user_id)
+        name = (removed["user"].get("display_name") or "").strip() or "그"
+        self._redirect("/accounts?notice=" + quote(
+            f"{name} 계정을 지웠어요 — 아래 「최근 삭제」에서 되살릴 수 있습니다."))
+
+    def _handle_restore_account(self, form: dict) -> None:
+        """「최근 삭제」의 되살리기 — 계정 줄과 그 사람의 자리를 함께 돌려놓는다."""
+        try:
+            row = users.restore_user(self._one(form, "box"))
+        except users.UserError as exc:
+            self._redirect("/accounts?error=" + quote(str(exc)))
+            return
+        name = (row.get("display_name") or "").strip() or "그"
+        self._redirect("/accounts?notice=" + quote(f"{name} 계정을 되살렸어요."))
+
     def _handle_whoami(self) -> None:
         """홈 머리의 계정 버튼이 「지금 누구인가」를 물어보는 자리.
 
@@ -7038,6 +7141,10 @@ class _SettingsHandler(BaseHTTPRequestHandler):
             self._handle_my_password(form)
         elif self.path == "/accounts/role":
             self._handle_set_role(form)
+        elif self.path == "/accounts/delete":
+            self._handle_delete_account(form)
+        elif self.path == "/accounts/restore":
+            self._handle_restore_account(form)
         elif self.path == "/save-login-settings":
             self._handle_save_login_settings(form)
         else:

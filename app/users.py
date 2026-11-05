@@ -150,6 +150,109 @@ def data_owners() -> list:
     return [None] + [u.get("id") for u in everyone[1:] if u.get("id")]
 
 
+# 지운 계정이 머무는 자리. **상자 하나가 계정 하나**이고, 그 사람의 데이터는 통째로
+# 그 상자 안으로 **옮겨진다**(복사가 아니다 — DB에서는 키 이름만 바뀌어 0원이다).
+USERS_DATA_DIR = USERS_FILE.with_name("users")
+USERS_TRASH_DIR = USERS_FILE.with_name("users_trash")
+
+
+def _trash_index(box: str):
+    """상자 하나를 설명하는 쪽지 — 계정 줄과 옮긴 자리 목록이 여기 있다."""
+    return USERS_TRASH_DIR / f"{box}.json"
+
+
+def delete_user(user_id: str, *, by: Optional[str] = None) -> dict:
+    """계정을 지운다 — **그 사람의 자리까지 통째로 상자로 옮기고** 되살릴 수 있게 둔다.
+
+    **막는 자리 셋.**
+      - **첫 계정(바닥 주인)은 못 지운다.** 그 사람의 자리가 `data/users/{id}/`가 아니라
+        `data/` 자신이라(`base_owner_id`) 지우면 **지금까지 쌓인 회차·라벨·설정 전부가
+        주인 없는 데이터가 된다.** 옮길 자리도 없다.
+      - **자기 계정은 못 지운다** — 앉은 가지를 자르는 일이고, 지운 순간 그 화면의 세션이
+        가리키는 사람이 사라진다.
+      - **마지막 관리자는 못 지운다**(`set_role`과 같은 판정) — 아무도 설정을 못 바꾸게 된다.
+
+    **데이터는 지우지 않고 옮긴다.** 회차·수시 카드·라벨이 통째로 사라지면 잘못 눌렀을 때
+    되돌릴 길이 없다. 상자는 **나이로 비우지 않는다** — 계정은 드물게 지우는 것이고,
+    자동으로 비우면 「되살릴 수 있다」는 약속이 조용히 만료된다.
+    """
+    with _LOCK:
+        data = _load()
+        rows = data["users"]
+        target = next((u for u in rows if u.get("id") == user_id), None)
+        if target is None:
+            raise UserError("없는 계정입니다.")
+        if rows and rows[0].get("id") == user_id:
+            raise UserError(
+                "첫 계정은 지울 수 없습니다 — 지금까지 쌓인 회차·라벨·설정이 그 계정의 자리입니다."
+            )
+        if by and by == user_id:
+            raise UserError("자기 계정은 지울 수 없습니다 — 다른 관리자에게 부탁하세요.")
+        if target.get("role") == "admin" and sum(1 for u in rows if u.get("role") == "admin") <= 1:
+            raise UserError("관리자가 한 명뿐입니다 — 다른 사람을 관리자로 올린 뒤에 지울 수 있습니다.")
+
+        box = f"{user_id}.deleted-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        mine = USERS_DATA_DIR / user_id
+        moved = []
+        for path in store.list_files(mine, "*", recursive=True):
+            rel = path.relative_to(mine).as_posix()   # 아래 칸까지 그대로 보존한다
+            store.move(path, USERS_TRASH_DIR / box / rel)
+            moved.append(rel)
+        # 파일로 쓸 때는 상자 칸을 만들어 둔다(DB엔 폴더가 없어 아무 일도 안 한다).
+        # 자리가 하나도 없는 계정은 위 move가 한 번도 안 돌아 칸이 안 생긴다.
+        store.ensure_dir(USERS_TRASH_DIR)
+        store.write_json(
+            _trash_index(box),
+            {"user": target, "files": moved, "at": datetime.now().isoformat(timespec="seconds")},
+            indent=2,
+        )
+        data["users"] = [u for u in rows if u.get("id") != user_id]
+        _save(data)
+        return {"box": box, "user": target, "files": moved}
+
+
+def list_deleted_users() -> list[dict]:
+    """지운 계정 상자들 — 최근에 지운 것이 먼저."""
+    out = []
+    for path in store.list_files(USERS_TRASH_DIR):
+        try:
+            data = store.read_json(path)
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict) and isinstance(data.get("user"), dict):
+            out.append({**data, "box": path.stem})
+    return sorted(out, key=lambda row: row.get("at") or "", reverse=True)
+
+
+def restore_user(box: str) -> dict:
+    """지운 계정을 되살린다 — 계정 줄과 그 사람의 자리를 함께 돌려놓는다.
+
+    **맨 뒤에 붙인다** — 첫 자리는 바닥 주인의 것이라 순서가 뜻을 가진다
+    (`base_owner_id`·`data_owners`). 그 사이에 같은 이메일로 새 계정을 만들었으면
+    거절한다 — 로그인은 이메일로 사람을 찾으므로 둘이 되면 어느 쪽인지 알 수 없다.
+    """
+    with _LOCK:
+        try:
+            saved = store.read_json(_trash_index(box))
+        except (OSError, ValueError):
+            raise UserError("되살릴 계정을 찾지 못했습니다.")
+        row = saved.get("user") or {}
+        user_id = row.get("id")
+        data = _load()
+        if any(u.get("id") == user_id for u in data["users"]):
+            raise UserError("이미 있는 계정입니다.")
+        if any(u.get("email") == row.get("email") for u in data["users"]):
+            raise UserError("같은 이메일의 계정이 이미 있습니다 — 그 계정을 먼저 정리해주세요.")
+        for rel in saved.get("files") or []:
+            src = USERS_TRASH_DIR / box / rel
+            if store.exists(src):
+                store.move(src, USERS_DATA_DIR / user_id / rel)
+        data["users"].append(row)
+        _save(data)
+        store.delete(_trash_index(box), missing_ok=True)
+        return row
+
+
 def is_admin(user: Optional[dict]) -> bool:
     """그 사람이 관리자인가 — 「모두에게 같이 걸리는 설정」을 바꿀 수 있는지의 판정.
 
