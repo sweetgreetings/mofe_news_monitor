@@ -5433,6 +5433,66 @@ def test_outlet_override_is_one_place():
     print("48) 언론사명 직접 수정: 통과 (입히는 자리 한 곳 — 화면·보고서 한 줄·엑셀, 부분 저장, 편집 창 네 벌)")
 
 
+def test_screen_urls_go_through_one_place():
+    """화면에 박히는 주소가 `SETTINGS_SERVER_BASE` 한 곳에서만 만들어지는지.
+
+    링크·fetch가 절대주소인 이유는 하나 — `file://`로 열린 화면이 디스크의 옛 파일을
+    다시 읽지 않게 하려는 것이다. 그래서 **주소를 손으로 지을 자리가 150곳 있었고**,
+    클라우드로 올릴 때 한 번 한 곳으로 모았다.
+
+    **모았다는 것만으로는 안 지켜진다.** 실제로 `%(host)s:%(port)s`로 남아 있던 다섯
+    자리가 있었고(여러 기사 한 번에 숨기기 · 끌어서 순서 바꾸기 둘 · 📷 사진 추정 해제 ·
+    📅 일정 추정 해제) 전부 **프록시 뒤에서만** 죽는다 — 브라우저가 보는 사람 자기
+    컴퓨터의 `127.0.0.1`을 찾아가므로, 로컬에서는 멀쩡히 돌고 Render에서만 아무 일도
+    안 일어난다. 화면도 로그도 조용하다. 그래서 이 테스트가 그물이다.
+
+    둘을 지킨다:
+      (1) `app/` 어디에도 `http://` + 호스트·포트를 손으로 잇는 자리가 없다(`config.py`만 예외 —
+          거기가 그 주소를 만드는 유일한 자리다).
+      (2) 뿌리 주소를 call 시점에 읽는 스크립트 넷은 **그 값을 그대로 쓴다** — 기본값이
+          `http://127.0.0.1:8765`라 「고치기 전」과 글자가 같아지므로, 가짜 주소를 끼워
+          넣어야 비로소 갈린다.
+    """
+    _require_isolation()
+    from unittest.mock import patch
+    from app import renderer
+
+    # (1) 주소를 손으로 잇는 자리 — config.py 하나만 허용한다
+    FORBIDDEN = ("http://%(host)s", "http://{settings_host}", "http://{SETTINGS_SERVER_HOST}")
+    for path in sorted(Path("app").rglob("*.py")):
+        if path.name == "config.py":
+            continue
+        text = path.read_text(encoding="utf-8")
+        for bad in FORBIDDEN:
+            assert bad not in text, (
+                f"{path}에서 주소를 손으로 짓고 있습니다({bad}) — SETTINGS_SERVER_BASE를 쓰세요. "
+                "포트가 없고 https인 프록시 주소에서는 그 모양이 통째로 어긋나, "
+                "그 링크·버튼만 조용히 죽습니다."
+            )
+
+    # (2) 뿌리 주소를 call 시점에 읽는 스크립트 넷
+    FAKE = "https://press-monitor.test"
+    with patch.object(renderer, "SETTINGS_SERVER_BASE", FAKE):
+        cases = [
+            ("여러 기사 한 번에 숨기기", renderer.hide_batch_script(), ["/hide-article"]),
+            ("끌어서 순서 바꾸기(확정본)", renderer.drag_order_script("confirmed"), ["/reorder-article"]),
+            ("끌어서 순서 바꾸기(초안)", renderer.drag_order_script("preview"), ["/preview-reorder-article"]),
+            ("📷 사진 추정 해제", renderer.photo_override_script(), ["/set-photo-override"]),
+            ("📅 일정 추정 해제", renderer.schedule_override_script(), ["/set-schedule-override"]),
+        ]
+        for name, js, endpoints in cases:
+            for ep in endpoints:
+                assert FAKE + ep in js, f"{name}이 뿌리 주소를 안 씁니다 — {ep}"
+            assert "127.0.0.1" not in js and ":8765" not in js, (
+                f"{name}에 이 컴퓨터 주소가 박혀 있습니다 — 프록시 뒤에서 그 버튼이 죽습니다."
+            )
+            assert "%(host)s" not in js and "%(port)s" not in js, (
+                f"{name}에 치환이 남았습니다 — JS가 통째로 깨집니다."
+            )
+
+    print("✓ 화면 주소: SETTINGS_SERVER_BASE 한 곳에서만 만들고, 숨기기·끌기·추정 해제가 그 값을 쓴다")
+
+
 def test_copy_goes_through_one_place():
     """「복사」가 `pmCopy()` 한 곳을 거치는지 — 바깥 주소에서 모든 복사 버튼이 조용히 죽던 사고.
 
@@ -9797,6 +9857,7 @@ if __name__ == "__main__":
         test_refetch_titles_bulk,
         test_refetch_titles_widget_contract,
         test_title_watch_alert,
+        test_screen_urls_go_through_one_place,
         test_copy_goes_through_one_place,
         test_photo_override_is_one_place,
         test_photo_badge_css_is_in_every_screen,

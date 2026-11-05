@@ -43,8 +43,6 @@ from app.config import (
     PALETTE,
     RECLASSIFY_SAFE_NOTE,
     SETTINGS_SERVER_BASE,
-    SETTINGS_SERVER_HOST,
-    SETTINGS_SERVER_PORT,
 )
 from app.assigned_groups import load_assigned_groups
 from app.atomic_write import atomic_write_text
@@ -6532,7 +6530,7 @@ function postHideBatch(btns, batch) {
     ["url", "outlet", "title", "pubDate", "group"].forEach(function (key) { body.append(key, one.get(key) || ""); });
   });
   if (batch) { body.set("batch", batch); }
-  return fetch("http://%(host)s:%(port)s/hide-article", {
+  return fetch("%(base)s/hide-article", {
     method: "POST",
     headers: {"Content-Type": "application/x-www-form-urlencoded"},
     body: body
@@ -6563,7 +6561,7 @@ def hide_batch_style() -> str:
 
 def hide_batch_script() -> str:
     """여러 기사 한 번에 숨기기 JS — 중괄호 홑겹 완성 문자열."""
-    return HIDE_BATCH_SCRIPT % {"host": SETTINGS_SERVER_HOST, "port": SETTINGS_SERVER_PORT}
+    return HIDE_BATCH_SCRIPT % {"base": SETTINGS_SERVER_BASE}
 
 
 # 끌어서 순서 바꾸기 — 확정본·초안 공용(CSS·JS 모두 여기 한 곳). 동작을 바꾸면 두 화면이
@@ -6598,7 +6596,7 @@ DRAG_ORDER_STYLE = """
   body.drag-locked .drag-handle:hover {{ color: {border}; }}
 """
 
-# %(host)s/%(port)s 치환이라 JS 안에 %를 쓰지 않는다.
+# %(base)s 치환이라 JS 안에 %를 쓰지 않는다.
 DRAG_ORDER_SCRIPT = """
 var DRAG_SRC = null, DRAG_LINE = null;
 // 못 끄는 두 경우 — 끌어 놓은 자리를 「저장 순서의 몇 번째」로 옮겨야 할지 답이 없다.
@@ -6713,7 +6711,7 @@ new MutationObserver(syncDragLock).observe(document.body, { attributes: true, at
 
 DRAG_ORDER_POST_CONFIRMED = """
 function _postDragOrder(url, targetUrl, place) {
-  fetch("http://%(host)s:%(port)s/reorder-article", {
+  fetch("%(base)s/reorder-article", {
     method: "POST", keepalive: true,
     headers: {"Content-Type": "application/x-www-form-urlencoded"},
     body: new URLSearchParams({url: url, target: targetUrl, place: place})
@@ -6729,7 +6727,7 @@ function _postDragOrder(url, targetUrl, place) {
 
 DRAG_ORDER_POST_PREVIEW = """
 function _postDragOrder(url, targetUrl, place) {
-  fetch("http://%(host)s:%(port)s/preview-reorder-article", {
+  fetch("%(base)s/preview-reorder-article", {
     method: "POST", keepalive: true,
     headers: {"Content-Type": "application/x-www-form-urlencoded"},
     body: new URLSearchParams({url: url, target: targetUrl, place: place})
@@ -6760,8 +6758,7 @@ def drag_order_script(screen: str = "confirmed") -> str:
     """
     post = DRAG_ORDER_POST_PREVIEW if screen == "preview" else DRAG_ORDER_POST_CONFIRMED
     return (DRAG_ORDER_SCRIPT + post) % {
-        "host": SETTINGS_SERVER_HOST,
-        "port": SETTINGS_SERVER_PORT,
+        "base": SETTINGS_SERVER_BASE,
     }
 
 
@@ -6819,7 +6816,7 @@ function setPhotoOverride(btn) {
   var url = btn.dataset.url;
   var action = btn.dataset.photoAction;
   btn.disabled = true;
-  fetch("http://%(host)s:%(port)s/set-photo-override", {
+  fetch("%(base)s/set-photo-override", {
     method: "POST", keepalive: true,
     headers: {"Content-Type": "application/x-www-form-urlencoded"},
     body: new URLSearchParams({url: url, action: action})
@@ -6836,7 +6833,7 @@ function setPhotoOverride(btn) {
 
 def photo_override_script() -> str:
     """사진 추정 해제 JS — 중괄호 홑겹 완성 문자열(확정본·초안·정기 보관함 공용)."""
-    return PHOTO_OVERRIDE_SCRIPT % {"host": SETTINGS_SERVER_HOST, "port": SETTINGS_SERVER_PORT}
+    return PHOTO_OVERRIDE_SCRIPT % {"base": SETTINGS_SERVER_BASE}
 
 
 # ⋯ 더보기 > 「일정 추정 해제」·「일정 추정 되돌리기」 — 위 사진 해제와 같은 모양·같은 자리다
@@ -6846,7 +6843,7 @@ function setScheduleOverride(btn) {
   var url = btn.dataset.url;
   var action = btn.dataset.scheduleAction;
   btn.disabled = true;
-  fetch("http://%(host)s:%(port)s/set-schedule-override", {
+  fetch("%(base)s/set-schedule-override", {
     method: "POST", keepalive: true,
     headers: {"Content-Type": "application/x-www-form-urlencoded"},
     body: new URLSearchParams({url: url, action: action})
@@ -6863,7 +6860,7 @@ function setScheduleOverride(btn) {
 
 def schedule_override_script() -> str:
     """일정 추정 해제 JS — 중괄호 홑겹 완성 문자열(확정본·초안·정기 보관함 공용)."""
-    return SCHEDULE_OVERRIDE_SCRIPT % {"host": SETTINGS_SERVER_HOST, "port": SETTINGS_SERVER_PORT}
+    return SCHEDULE_OVERRIDE_SCRIPT % {"base": SETTINGS_SERVER_BASE}
 
 
 def waiting_page_html() -> str:
