@@ -17,6 +17,12 @@ from app import store
 from app.config import ALERTED_URLS_FILE
 
 
+def _owner_key(owner) -> str:
+    """기록에 적는 「누구 것인가」 — **바닥 주인은 빈 문자열이다**(app/store.py `_resolve`와
+    같은 뜻: 그 사람의 자리가 `data/` 자신이라 따로 적을 id가 없다)."""
+    return owner or ""
+
+
 def _today_str(now: Optional[datetime] = None) -> str:
     return (now or datetime.now()).strftime("%Y-%m-%d")
 
@@ -69,19 +75,37 @@ def mark_alerted(urls: list, now: Optional[datetime] = None, items: Optional[lis
             # 모두 들어간다(2026-09-18 실측: 같은 속보가 기록에 3번).
             if it.get("url") not in known:
                 known.add(it.get("url"))
-                data["items"].append(it)
+                # **누가 보낸 것인지 적는다** — 홈이 「내 것만」 보여줄 수 있어야 한다
+                # (alerted_items(mine=True)). 넘어온 값이 있으면 그걸 쓴다(몰아보내기처럼
+                # 다른 사람 맥락에서 만든 항목을 그대로 실을 수 있게).
+                data["items"].append({**it, "owner": _owner_key(
+                    it.get("owner", store.current_owner()))})
     store.write_json(ALERTED_URLS_FILE, data)
 
 
-def alerted_items(now: Optional[datetime] = None) -> list:
+def alerted_items(now: Optional[datetime] = None, mine: bool = False) -> list:
     """오늘 알림이 나간 기사 목록을 발행시각 순으로 돌려준다 (홈 화면용).
 
     **홈의 "[단독] N건"은 반드시 이 함수만 쓴다** — 회차 파일에서 말머리를 다시 세면
     알림과 숫자가 어긋난다(모듈 맨 위 주석 참고). 옛 형식(items 없음)이면 빈 목록이
     나오는데, 그때는 화면이 건수만(len(already_alerted_urls())) 보여주면 된다.
+
+    `mine=True`면 **지금 걸린 사람이 보낸 것만** 돌려준다 — 홈이 그걸 쓴다. 이 기록은
+    공용이라(app/store.py `_SHARED`) 가르지 않으면 남이 모은 기사 제목이 내 홈에
+    뜬다(실측 2026-11-05: 계정 셋 모두의 홈에 담당자 기사 5건).
+
+    기본값은 **오늘 나간 것 전부**다 — 중복 방지·[속보] 몰림 판정·같은 사건 접기는
+    「이 기사로 알림이 나갔는가」를 묻는 자리라 사람을 가리지 않는다. 그 셋까지 가르면
+    같은 기사로 사람 수만큼 네이버를 더 부르고 알림도 그만큼 가므로, **보내는 쪽을
+    가르는 것은 따로 정할 일이다**(지금은 먼저 발견한 사람이 한 번 보낸다).
+
+    **owner가 없는 옛 기록은 바닥 주인 것으로 본다** — 가르기 전엔 담당자 혼자 썼다.
     """
+    who = _owner_key(store.current_owner())
     # 중복 방어 — 고치기 전(2026-09-18)에 쌓인 기록엔 같은 URL이 여러 번 있다. 먼저 온 것 하나만.
     unique: dict = {}
     for it in _load(now)["items"]:
+        if mine and _owner_key(it.get("owner")) != who:
+            continue
         unique.setdefault(it.get("url"), it)
     return sorted(unique.values(), key=lambda it: it.get("pub_date") or "")
