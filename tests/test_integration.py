@@ -8827,6 +8827,113 @@ def test_history_word_search():
     print("55) 정기 보관함 낱말로 찾기: 통과 (걸린 기사만·노랑은 찾은 낱말·스니펫·숨김·고친 제목·+ AND)")
 
 
+def test_scheduler_lease():
+    """공용 일은 한 대만 — 임차를 못 쥐면 그 tick을 통째로 건너뛴다.
+
+    중복 실행 자물쇠가 포트(`127.0.0.1:8765`)라 **다른 컴퓨터는 안 걸린다.** 두 대가
+    켜져 있으면 같은 회차를 두 번 모으고 자동발송이 두 번 나간다. 사람별 저장소가
+    갈라 둔 것은 「누구의 데이터인가」이지 「누가 모으는가」가 아니다.
+
+    **파일로 쓸 때는 아무 일도 안 한다** — 그때는 한 대뿐이라는 것을 포트 자물쇠가
+    이미 보장하고, 혼자 쓰는 지금의 동작이 한 글자도 안 바뀐다. 이 테스트는
+    `test_postgres_backend_contract`와 같은 선을 긋는다 — **DB 없이 볼 수 있는 것만**
+    본다(실제로 두 대가 겨루는 것은 붙인 뒤에 확인한다).
+    """
+    _require_isolation()
+    from app import scheduler as sched, scheduler_lease as lease, store
+
+    # ① 파일로 쓸 때는 늘 참이고, 아무것도 안 만진다.
+    assert lease._pg() is None, "DATABASE_URL 없이 돌렸는데 Postgres를 봅니다."
+    assert lease.hold() is True, "파일로 쓸 때는 늘 공용 일을 해야 합니다."
+    assert lease.holder() == lease.INSTANCE_ID
+
+    # ② 만료 시각은 **고정 폭 UTC ISO**라 글자 비교가 곧 시각 비교다 — DB의 한 문장이
+    #    `split_part(...) < %s`로 재는 자리라, 여기가 깨지면 임차가 영영 안 풀리거나
+    #    늘 풀린다.
+    early = lease._utc_iso(datetime(2026, 1, 1, 0, 0))
+    late = lease._utc_iso(datetime(2026, 1, 1, 0, 1))
+    assert len(early) == len(late) == 20 and early < late, (early, late)
+
+    # ③ 임차를 가르는 조건이 **한 문장 안에** 있어야 한다 — 읽고 나서 쓰면 두 대가
+    #    같은 순간에 「비어 있네」를 보고 둘 다 가져간다.
+    src = inspect.getsource(lease.hold)
+    assert "on conflict" in src and "returning key" in src, (
+        "임차를 한 문장(insert … on conflict … returning)으로 쥐지 않습니다 — "
+        "읽고 나서 쓰면 두 대가 동시에 가져갑니다."
+    )
+    assert src.count("split_part") == 2, (
+        "임차 조건 둘(내가 쥔 것인가 · 만료됐는가)이 한 문장에 다 있어야 합니다."
+    )
+    assert "jsonb" not in src, (
+        "몸통을 jsonb로 읽으면 한 번 깨지는 순간 어느 대도 임차를 못 쥐어 "
+        "수집이 통째로 멈춥니다 — split_part를 씁니다."
+    )
+
+    # ④ DB를 모를 때는 **안 한다** — 모르면 하지 않는 쪽이 안전하다.
+    class _Boom:
+        _TABLE = "app_store"
+
+        @staticmethod
+        def ensure_schema():
+            raise RuntimeError("DB 안 됨")
+
+    with patch.object(lease, "_pg", lambda: _Boom):
+        assert lease.hold() is False, (
+            "DB를 못 봤는데 참을 돌려주면, 두 대가 모두 「모르겠으니 일단 한다」로 가 "
+            "막으려던 중복이 그대로 일어납니다."
+        )
+
+    # ⑤ 임차를 못 쥐면 tick의 일이 **하나도** 안 돈다.
+    def run_once(holds):
+        calls = {"collect": 0, "cleanup": 0, "send": 0, "alert": 0,
+                 "agency": 0, "title": 0, "waiting": 0}
+        ticks = [True, False]
+        with patch.object(sched, "run_exists", lambda *a, **k: False):
+            sched.run_scheduler(
+                poll_interval_sec=0,
+                sleep=lambda _s: None,
+                now_fn=lambda: datetime(2026, 1, 1, 12, 0),
+                schedule_times=[{"start": "09:00", "end": "11:00"}],
+                scrape=lambda _r, _w: calls.__setitem__("collect", calls["collect"] + 1) or {},
+                cleanup=lambda: calls.__setitem__("cleanup", calls["cleanup"] + 1) or [],
+                cleanup_overrides=lambda: 0,
+                archive_hidden=lambda: (0, 0),
+                purge_deleted=lambda: 0,
+                cleanup_adhoc_cards=lambda: [],
+                render_waiting=lambda: calls.__setitem__("waiting", calls["waiting"] + 1),
+                check_confirm_send=lambda _n: calls.__setitem__("send", calls["send"] + 1),
+                check_topup=lambda _n, _s=None: None,
+                check_breaking_alert=lambda _n: calls.__setitem__("alert", calls["alert"] + 1),
+                check_negative_guess=lambda _n: None,
+                collect_agency_archive=lambda _n: calls.__setitem__("agency", calls["agency"] + 1),
+                check_title_watch=lambda _n: calls.__setitem__("title", calls["title"] + 1),
+                hold_lease=lambda _n: holds,
+                should_continue=lambda: ticks.pop(0) if ticks else False,
+            )
+        return calls
+
+    sched._slot_failures.clear()
+    idle = run_once(holds=False)
+    assert set(idle.values()) == {0}, (
+        f"임차를 못 쥐었는데 일이 돌았습니다: {idle} — 두 대가 같은 회차를 모읍니다."
+    )
+
+    sched._slot_failures.clear()
+    busy = run_once(holds=True)
+    assert busy["collect"] == 1 and busy["cleanup"] == 1 and busy["send"] == 1, (
+        f"임차를 쥐었는데 평소 일이 안 돌았습니다: {busy}"
+    )
+
+    # ⑥ 기본값이 진짜 함수인 것이 계약이다 — 파일로 쓸 때 비용이 0이라서다.
+    default = inspect.signature(sched.run_scheduler).parameters["hold_lease"].default
+    assert default is lease.hold, (
+        "run_scheduler의 hold_lease 기본값이 app.scheduler_lease.hold가 아닙니다 — "
+        "주입을 잊은 자리에서 조용히 두 대가 함께 모읍니다."
+    )
+
+    print("56) 스케줄러 임차: 통과 (한 문장으로 쥐고, 못 쥐면 tick을 통째로 건너뛴다)")
+
+
 if __name__ == "__main__":
     # **DB를 붙여 둔 채로는 한 줄도 돌리지 않는다 — 첫 테스트보다 먼저 멈춘다.**
     # 테스트는 파일 백엔드를 전제하고 `data/`를 임시 폴더로 갈아끼우는데, 갈아끼우지
@@ -8862,6 +8969,7 @@ if __name__ == "__main__":
         test_base_owner_needs_no_migration,
         test_settings_split_per_user,
         test_scheduler_runs_per_person,
+        test_scheduler_lease,
         test_naver_key_per_person,
         test_network_open_forces_login,
         test_admin_only_settings,

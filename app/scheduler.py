@@ -4,7 +4,7 @@ import time
 from datetime import datetime
 from typing import Callable, List, Optional
 
-from app import store
+from app import scheduler_lease, store
 from app.breaking_alert_sender import poll_and_alert_tick
 from app.negative_guess import negative_guess_tick
 from app.config import MAX_RETRIES
@@ -297,6 +297,14 @@ def run_scheduler(
     # — 기본값이 진짜 함수면 run_scheduler를 부르는 테스트가 실제 data/users.json을 읽는다
     # (collect_agency_archive와 같은 이유).
     list_owners: Callable[[], list] = lambda: [None],
+    # [추가: 2026-11-05] **앱이 여러 대에서 켜질 때 공용 일을 한 대만 한다**
+    # (app.scheduler_lease). 중복 실행 자물쇠가 포트라 다른 컴퓨터는 안 걸리는데,
+    # 두 대가 켜져 있으면 같은 회차를 두 번 모으고 자동발송이 두 번 나간다.
+    # **기본값이 진짜 함수인 것은 이 함수가 파일로 쓸 때 아무것도 안 하고 참만
+    # 돌려주기 때문이다** — DATABASE_URL이 없으면 네트워크도 파일 쓰기도 0이라
+    # (collect_agency_archive 같은 빈 람다 규칙에 걸리지 않는다) 테스트가 실제
+    # data/를 건드릴 길이 없고, 혼자 쓰는 동작도 한 글자도 안 바뀐다.
+    hold_lease: Callable[[datetime], bool] = scheduler_lease.hold,
     should_continue: Callable[[], bool] = lambda: True,
 ) -> None:
     """앱이 켜져 있는 동안 poll_interval_sec마다 실행할 회차가 있는지 확인하고 수집한다.
@@ -358,6 +366,15 @@ def run_scheduler(
     while should_continue():
         try:
             now = now_fn()
+            # ── 공용 일은 한 대만 한다 ───────────────────────────────────
+            # 아래가 전부 **공용 일**이다 — 수집·보충·자동발송·제목 감시·정리·알림·
+            # 원장·대기 화면. 「누구의 데이터인가」는 사람별로 갈라 뒀지만 「누가
+            # 모으는가」는 가른 적이 없어서, 두 대가 켜져 있으면 둘 다 모두를 위해
+            # 모은다. 임차를 못 쥐면 **그 tick을 통째로 건너뛴다**(화면 서버는 이
+            # 루프 밖이라 그대로 돈다 — 임차 없는 컴퓨터에서도 보고 다듬을 수 있다).
+            if not hold_lease(now):
+                sleep(poll_interval_sec)
+                continue
             if current_active_slot(now, schedule_times) is None:
                 render_waiting()
 
