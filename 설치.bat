@@ -146,6 +146,8 @@ if not defined HAS_URL (
     pause
     exit /b 1
   )
+  rem  이미 .env가 있고 마지막 줄이 끝나 있지 않으면 두 줄이 붙어 버린다 - 한 줄 띄운다.
+  if exist "%ENV_FILE%" >>"%ENV_FILE%" echo.
   >>"%ENV_FILE%" echo DATABASE_URL=!DB_URL!
   echo.
   echo   적었습니다: %ENV_FILE%
