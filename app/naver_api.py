@@ -1144,6 +1144,7 @@ def _search_one_keyword(
     include_unparsed_dates: bool = False,
     day: Optional[str] = None,
     day_from: Optional[str] = None,
+    after_inclusive: bool = False,
 ) -> tuple[list[dict], bool]:
     """
     한 키워드로 검색해 당일(KST) 게시된 기사만 모은다 (PRD.md 기능1 규칙 2).
@@ -1151,6 +1152,13 @@ def _search_one_keyword(
     after/before를 주면(회차별 시간창 수집, PRD 규칙 2 갱신) "after < pub_date <= before"
     구간의 기사만 남긴다 — 경계 기사가 인접한 두 창에 겹쳐 들어가지 않도록 하한은
     제외, 상한은 포함한다.
+
+    after_inclusive=True면 하한도 포함한다("after <= pub_date <= before"). 정기 회차는
+    창이 맞물려 이어지므로(앞 회차의 end가 이 회차의 start) 하한을 제외해야 경계 기사가
+    두 회차에 겹치지 않지만, 수시 모니터링은 담당자가 창을 직접 적는 단발 수집이라
+    "16:00부터"가 16:00에 게시된 기사를 포함해야 한다. 네이버 pubDate의 초는 실측상
+    항상 00이라(2026-11-05 확인, 저장된 회차 198건 전수) 하한을 제외하면 1초가 아니라
+    그 1분이 통째로 빠진다 — 담당자 신고: 16:00으로 맞췄는데 16:01부터 들어왔다.
 
     sort="date"로 최신순 정렬해서 받으므로, "당일보다 오래됐거나(after 이하)"인 기사가
     한 건이라도 나오면 그 뒤로는 전부 더 오래된 기사다 — 그 지점에서 이 키워드의
@@ -1247,7 +1255,7 @@ def _search_one_keyword(
                 # 수집 날짜보다 새 기사 — 지난 날짜를 모을 때 목록 맨 앞이 여기다.
                 # 건너뛰되 페이지네이션은 계속한다(아래 before 검사와 같은 이유).
                 continue
-            if after is not None and pub_date <= after:
+            if after is not None and (pub_date < after if after_inclusive else pub_date <= after):
                 reached_older_article = True
                 break  # 이 창의 하한보다 오래된 기사 -> 여기서부터는 전부 이전 창(또는 그 이전)
             if before is not None and pub_date > before:
@@ -1357,6 +1365,7 @@ def search_keywords(
     include_unparsed_dates: bool = False,
     day: Optional[str] = None,
     day_from: Optional[str] = None,
+    after_inclusive: bool = False,
 ) -> tuple[dict[str, list[dict]], list[str], list[str]]:
     """
     키워드 목록 각각을 검색해 {키워드: 검색결과} 딕셔너리로 돌려준다. 그룹 OR/AND
@@ -1384,6 +1393,9 @@ def search_keywords(
     대체하는 건 같지만, 이번엔 "실패했다"는 사실 자체를 failed_keywords로 같이 돌려줘
     위 계층이 조용히 넘어가지 않게 한다(정상 검색됐지만 결과가 0건인 것과는 다르다).
 
+    after_inclusive: _search_one_keyword로 그대로 전달한다 — 기본 False(정기 회차의
+    `(start, end]`), app.adhoc.collector만 True로 불러 수시 창을 `[start, end]`로 쓴다.
+
     include_unparsed_dates: _search_one_keyword로 그대로 전달한다 — 기본 False(정기
     스크랩·수시 모니터링과 동일하게 pubDate 파싱 실패 기사를 건너뜀), app.live_renderer만
     True로 호출해 그 기사를 `pub_date: None`으로 담아 온다.
@@ -1408,6 +1420,7 @@ def search_keywords(
                 results, capped = _search_one_keyword(
                     keyword, after=keyword_after, before=before,
                     include_unparsed_dates=include_unparsed_dates, day=day, day_from=day_from,
+                    after_inclusive=after_inclusive,
                 )
                 return results, False, capped
             except requests.exceptions.RequestException as error:

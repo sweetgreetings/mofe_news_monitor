@@ -89,8 +89,14 @@ def _search_with_cache(
 
     # day=collect_date — 이 한 줄이 "어느 날을 모으나"를 정한다(app.naver_api._is_on_collect_day).
     # 캐시 키에 이미 collect_date가 들어 있어(_cache_key) 날짜가 다른 수집끼리 섞이지 않는다.
+    # after_inclusive=True — 수시 창은 양끝 포함(`[start, end]`)이다(아래
+    # article_out_of_window와 같은 경계). 정기 회차는 창이 맞물려 이어져 하한을
+    # 제외하지만, 수시는 담당자가 "16:00부터"를 직접 적는 단발 수집이라 16:00에
+    # 게시된 기사가 들어와야 한다. 네이버 pubDate의 초는 항상 00이라 하한을 제외하면
+    # 그 1분이 통째로 빠진다(담당자 신고: 16:00으로 맞췄는데 16:01부터 들어왔다).
     fresh, failed, fresh_capped = search_keywords(
         missing, after=after, before=before, day=collect_date, day_from=day_from,
+        after_inclusive=True,
     )
     with _search_cache_lock:
         for keyword, results in fresh.items():
@@ -154,6 +160,10 @@ def article_out_of_window(article: dict, card: dict) -> bool:
     시간창이 재수집으로 바뀌면 그 즉시 다시 맞아떨어져야 하므로, live_renderer의
     matched_keywords와 같은 이유로 값을 고정 저장하지 않는다).
 
+    창은 양끝 포함(`[start, end]`)이다 — 정기 회차의 `(start, end]`와 다르다. 검색 하한
+    (_search_with_cache의 after_inclusive)과 이 판정이 같은 경계를 써야 "들어왔는데
+    구간 밖으로 표시되는" 기사가 생기지 않는다.
+
     담아둠에서 담당자가 직접 넣은 기사(added_by == "manual")는 검사 대상에서 뺀다 —
     의도적으로 넣은 것이므로 "구간 밖" 경고가 뜨면 오히려 방해된다(ADHOC_DESIGN.md §6.4).
     """
@@ -168,11 +178,13 @@ def article_out_of_window(article: dict, card: dict) -> bool:
     if start_day != end_day:
         # [추가: 2026-10-22] 기간 카드는 **날짜까지** 봐야 한다 — 시:분만 대조하면
         # 「10/19 15:00 기사」가 끝날 창(예: 00:00~09:30)에 걸려 조건 밖으로 떨어진다.
-        # 구간은 "시작날 window.start 초과 ~ 끝날 window.end 이하"다(하루와 같은 경계).
+        # 구간은 "시작날 window.start 이상 ~ 끝날 window.end 이하"다(하루와 같은 경계).
         stamp = article["pub_date"][:16].replace("T", " ")
-        return not (f"{start_day} {window['start']}" < stamp <= f"{end_day} {window['end']}")
+        return not (f"{start_day} {window['start']}" <= stamp <= f"{end_day} {window['end']}")
     pub_hhmm = article["pub_date"][11:16]  # ISO 8601 "...THH:MM:SS+09:00"에서 시:분만
-    return not (window["start"] < pub_hhmm <= window["end"])
+    # 양끝 모두 포함 — 담당자가 적은 "16:00 ~ 17:30"은 16:00 기사와 17:30 기사를 다
+    # 포함한다는 뜻이다. 창이 맞물려 이어지는 정기 회차(`(start, end]`)와 다르다.
+    return not (window["start"] <= pub_hhmm <= window["end"])
 
 
 def _apply_options(articles: list[dict], options: dict) -> list[dict]:
