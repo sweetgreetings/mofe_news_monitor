@@ -71,6 +71,8 @@ _PER_USER = {
     "manual_articles.json",
     # 내가 쓴 한 줄 메모 · 내가 끊은 회차 · 내 되돌리기
     "manual_keyword_note.json", "today_cuts.json", "undo_stack.json",
+    # 되돌리기 스냅샷의 조각(`undo_blobs/{해시}.json`) — 스택이 사람별이면 조각도 그렇다
+    "undo_blobs",
     # 내가 고친 설정 칸만(검색어·형광펜·보고서 모양 — app/settings.py
     # _PER_USER_SETTING_KEYS). 안 고친 칸은 공용 settings.json 값을 쓴다.
     "my_settings.json",

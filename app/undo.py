@@ -22,6 +22,7 @@
 # HISTORY.md 같은 섹션 참고.
 import hashlib
 import json
+import logging
 import threading
 from datetime import date, datetime
 from typing import Optional
@@ -39,7 +40,13 @@ from app.config import (
     PREVIEW_ORDER_FILE,
 )
 
+logger = logging.getLogger(__name__)
+
 UNDO_FILE = HIDDEN_ARTICLES_FILE.with_name("undo_stack.json")
+
+# 스냅샷 **조각이 사는 칸** — 조각 하나가 자리 하나이고 이름이 그 내용의 해시다
+# (`undo_blobs/{해시}.json`). 아래 _FORMAT_VERSION 설명 참고.
+UNDO_BLOBS_DIR = HIDDEN_ARTICLES_FILE.with_name("undo_blobs")
 
 # 되돌리기 단계 상한. 사람이 실제로 "몇 단계 전"까지 기억하는 범위를 넘으면 오히려
 # 위험하고(엉뚱한 시점으로 점프), 파일도 커진다.
@@ -86,64 +93,127 @@ _lock = threading.Lock()
 # 스냅샷은 매번 전부를 다시 담았기 때문이다. 중복만 없애면 7.0MB → 2.4MB.
 # 되돌리기 스택은 큐레이션 버튼을 누를 때마다 통째로 읽고 다시 쓰므로(push) 이 크기가
 # 곧 클릭 한 번의 지연이다 — 20단계가 찬 상태에서 push 140ms를 실측하고 고쳤다.
-_FORMAT_VERSION = 2
+#
+# [수정: 2026-11-05] **조각을 이 파일 안에 담지 않고 자리 하나씩 따로 둔다**(v3,
+# `undo_blobs/{해시}.json`). 디스크에서는 둘이 같은 비용이었지만 DB(Supabase)에서는
+# 다르다 — 한 행에 다 담으면 큐레이션 한 번이 **7.6MB를 읽고 다시 쓴다**(실측
+# 2026-11-05, 읽기만 335ms). 갈라 두면 push가 **그 동작으로 바뀐 조각 한두 개와 작은
+# 목록만** 쓴다. 스냅샷에 무엇이 들어가는지도, 「통째로 되돌리면 끝」이라는 되돌리기의
+# 정의도 하나도 안 바뀐다 — 동작마다 역연산을 적는 모양으로 가지 않은 이유가 그것이다.
+# → H: 되돌리기 스택을 DB에 옮기기
+_FORMAT_VERSION = 3
 
 
-def _blob_ref(blobs: dict, value) -> str:
-    """스냅샷 조각 하나를 blobs에 넣고(이미 있으면 그대로) 그 해시를 돌려준다.
+# 조각이 사라졌을 때 — **없는 것으로 보지 않는다**. "그땐 파일이 없었다"(`null`)와
+# 구별돼야 하고, 섞이면 되돌리기가 멀쩡한 파일을 지운다.
+_LOST = object()
+
+# 조각 칸(폴더)을 파일 백엔드에서 한 번만 만든다. DB엔 폴더가 없어 아무 일도 안 한다.
+_blob_dirs_made: set = set()
+
+
+def _blob_path(digest: str):
+    return UNDO_BLOBS_DIR / f"{digest}.json"
+
+
+def _blob_write(digest: str, text: str) -> None:
+    if str(UNDO_BLOBS_DIR) not in _blob_dirs_made:
+        store.ensure_dir(UNDO_BLOBS_DIR)
+        _blob_dirs_made.add(str(UNDO_BLOBS_DIR))
+    store.write_text(_blob_path(digest), text)
+
+
+def _blob_ref(known: set, value) -> str:
+    """스냅샷 조각 하나를 제자리에 쓰고(이미 있으면 안 쓰고) 그 해시를 돌려준다.
 
     값을 JSON 문자열로 굳혀서 해시한다 — 조각이 파일 원문(str), "그땐 파일이 없었다"(None),
     LLM 캐시·회차 파일(dict)로 제각각이라 한 가지 표현으로 맞춰야 비교가 된다. None도
     `"null"`이라는 정상적인 내용이라 참조가 생긴다(키가 **아예 없는** 것과 구별돼야 한다 —
     undo()의 `if key in files` 규칙이 그 구별에 기대고 있다).
+
+    **「이미 있나」는 저장소에 묻지 않고 지금 스택이 가리키는 해시 목록으로 안다**(`known`) —
+    가리키는 데 없는 조각은 _purge_blobs가 치우므로 그 목록이 곧 있는 것의 목록이다.
+    묻지 않으면 push 한 번에 왕복 아홉 번이 줄어든다.
     """
     text = json.dumps(value, ensure_ascii=False, sort_keys=True)
     digest = hashlib.sha1(text.encode("utf-8")).hexdigest()
-    if digest not in blobs:
-        blobs[digest] = text
+    if digest not in known:
+        _blob_write(digest, text)
+        known.add(digest)
     return digest
 
 
-def _resolve(blobs: dict, ref: Optional[str]):
-    """해시 참조를 원래 값으로 되돌린다. 참조가 없거나 blob이 사라졌으면 None."""
+def _resolve(ref: Optional[str]):
+    """해시 참조를 원래 값으로. **참조가 없거나 조각이 사라졌으면 `_LOST`**(위 설명)."""
     if not isinstance(ref, str):
-        return None
-    text = blobs.get(ref)
-    if text is None:
-        return None
+        return _LOST
+    try:
+        text = store.read_text(_blob_path(ref))
+    except (FileNotFoundError, OSError):
+        logger.warning("되돌리기 조각이 없습니다(%s) — 그 파일은 건드리지 않습니다", ref[:8])
+        return _LOST
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        return None
+        logger.warning("되돌리기 조각이 깨졌습니다(%s) — 그 파일은 건드리지 않습니다", ref[:8])
+        return _LOST
 
 
-def _collect_blobs(data: dict) -> None:
-    """남은 항목이 가리키지 않는 blob을 버린다 — 상한을 넘겨 밀려난 항목의 조각 정리."""
+def _used_digests(data: dict) -> set:
+    """지금 스택이 가리키는 조각 해시 전부."""
     used = set()
     for entry in data.get("entries", []):
         used.update(ref for ref in (entry.get("files") or {}).values() if isinstance(ref, str))
         for key in ("llm_cache", "run_file"):
             if isinstance(entry.get(key), str):
                 used.add(entry[key])
-    data["blobs"] = {h: text for h, text in (data.get("blobs") or {}).items() if h in used}
+    return used
+
+
+def _purge_blobs(keep: set) -> None:
+    """가리키는 데 없는 조각을 치운다 — 상한을 넘겨 밀려난 항목·자정 초기화·clear.
+
+    **목록을 받아 지운다** — 어느 조각이 남아 있는지는 저장소가 알고, 중간에 끊긴 쓰기가
+    남긴 조각도 이때 함께 치워진다. **목록을 저장한 다음에 부른다**(거꾸로면 저장된 목록이
+    가리키는 조각을 먼저 지우게 되고, 그 사이에 앱이 죽으면 되돌릴 수 없는 항목이 남는다).
+    """
+    try:
+        paths = store.list_files(UNDO_BLOBS_DIR)
+    except OSError:
+        return
+    for path in paths:
+        if path.stem not in keep:
+            store.delete(path)
+
+
+def _migrate_v2(data: dict) -> dict:
+    """v2(조각을 이 파일 안 `blobs`에 담던 기록)를 조각 하나당 자리 하나로 옮긴다."""
+    blobs = data.get("blobs") or {}
+    for digest in _used_digests(data):
+        text = blobs.get(digest)
+        if text is not None:
+            _blob_write(digest, text)
+    data.pop("blobs", None)
+    data["v"] = _FORMAT_VERSION
+    return data
 
 
 def _migrate_legacy(data: dict) -> dict:
-    """옛 형식(조각을 항목 안에 그대로 담던 기록)을 해시 참조 형식으로 옮긴다.
+    """맨 처음 형식(조각을 항목 안에 값 그대로 담던 기록)을 해시 참조로 옮긴다.
 
     스택은 자정에 비므로 옛 형식이 살아 있는 건 바꾼 날 하루뿐이지만, 그날 쌓여 있던
     되돌리기가 통째로 날아가면 안 되므로 읽을 때 조용히 맞춰 준다.
     """
-    blobs: dict = {}
+    known: set = set()
     for entry in data.get("entries", []):
         if "files" in entry:
             entry["files"] = {
-                key: _blob_ref(blobs, value) for key, value in (entry["files"] or {}).items()
+                key: _blob_ref(known, value) for key, value in (entry["files"] or {}).items()
             }
         for key in ("llm_cache", "run_file"):
             if key in entry:
-                entry[key] = _blob_ref(blobs, entry[key])
-    data["blobs"] = blobs
+                entry[key] = _blob_ref(known, entry[key])
+    data.pop("blobs", None)
     data["v"] = _FORMAT_VERSION
     return data
 
@@ -272,13 +342,18 @@ def _load() -> dict:
         return _empty()
     if data.get("date") != date.today().isoformat():
         return _empty()
-    if data.get("v") != _FORMAT_VERSION:
-        return _migrate_legacy(data)
+    version = data.get("v")
+    if version == _FORMAT_VERSION:
+        return data
+    # 옛 형식은 **옮기고 바로 저장한다** — 안 그러면 읽을 때마다 조각을 다시 쓴다
+    # (↩ 버튼을 그릴지 보려고 화면마다 peek_label이 이 함수를 부른다).
+    data = _migrate_v2(data) if version == 2 else _migrate_legacy(data)
+    _save(data)
     return data
 
 
 def _empty() -> dict:
-    return {"date": date.today().isoformat(), "v": _FORMAT_VERSION, "entries": [], "blobs": {}}
+    return {"date": date.today().isoformat(), "v": _FORMAT_VERSION, "entries": []}
 
 
 def _save(data: dict) -> None:
@@ -334,24 +409,27 @@ def push(
                 if (last["touched"], last["batch"]) != old:
                     _save(data)
                 return
-        blobs = data.setdefault("blobs", {})
+        known = _used_digests(data)
+        if not data["entries"]:
+            # 날짜가 바뀌어(또는 clear로) 빈 상태 — 어제 조각이 남아 있으면 지금 치운다.
+            _purge_blobs(keep=set())
         data["entries"].append(
             {
                 "label": label,
                 "at": datetime.now().isoformat(timespec="seconds"),
                 "files": {
-                    key: _blob_ref(blobs, _read_raw(path)) for key, path in _SNAPSHOT_FILES.items()
+                    key: _blob_ref(known, _read_raw(path)) for key, path in _SNAPSHOT_FILES.items()
                 },
-                "llm_cache": _blob_ref(blobs, _snapshot_llm_cache()),
-                "run_file": _blob_ref(blobs, _snapshot_latest_run_file()),
+                "llm_cache": _blob_ref(known, _snapshot_llm_cache()),
+                "run_file": _blob_ref(known, _snapshot_latest_run_file()),
                 "touched": touched,
                 "batch": batch,
             }
         )
         # 오래된 것부터 버려 상한을 지킨다.
         data["entries"] = data["entries"][-_MAX_ENTRIES:]
-        _collect_blobs(data)
         _save(data)
+        _purge_blobs(keep=_used_digests(data))
 
 
 def clear() -> None:
@@ -368,6 +446,7 @@ def clear() -> None:
     """
     with _lock:
         _save(_empty())
+        _purge_blobs(keep=set())
 
 
 def peek_label() -> Optional[str]:
@@ -388,16 +467,21 @@ def undo() -> Optional[dict]:
         if not data["entries"]:
             return None
         entry = data["entries"].pop()
-        blobs = data.get("blobs") or {}
         files = entry.get("files") or {}
         for key, path in _SNAPSHOT_FILES.items():
             # [수정: 2026-09-15] 스냅샷에 그 키가 **아예 없으면**(그 파일이 목록에 들어오기 전에
             # 쌓인 기록) 건드리지 않는다. 예전처럼 get(key)의 None을 "그땐 파일이 없었다"로
             # 읽으면, 새로 추가한 파일(assigned)이 옛 기록을 되돌리는 순간 통째로 지워진다.
             if key in files:
-                _write_raw(path, _resolve(blobs, files[key]))
-        _restore_llm_cache(_resolve(blobs, entry.get("llm_cache")) or {})
-        _restore_latest_run_file(_resolve(blobs, entry.get("run_file")))
-        _collect_blobs(data)
+                value = _resolve(files[key])
+                # **조각이 사라졌으면 그 파일은 건드리지 않는다** — None("그땐 없었다")으로
+                # 읽으면 멀쩡한 파일을 지운다.
+                if value is not _LOST:
+                    _write_raw(path, value)
+        cache = _resolve(entry.get("llm_cache"))
+        _restore_llm_cache(cache if isinstance(cache, dict) else {})
+        run_file = _resolve(entry.get("run_file"))
+        _restore_latest_run_file(None if run_file is _LOST else run_file)
         _save(data)
+        _purge_blobs(keep=_used_digests(data))
         return {"label": entry["label"], "touched": list(entry.get("touched") or [])}

@@ -1923,6 +1923,7 @@ def test_undo_returns_only_what_the_user_touched():
         # 실제 큐레이션 파일·LLM 캐시·회차 파일은 절대 안 건드린다 — undo()가 되돌리며 그
         # 경로들에 쓰기 때문에, 스냅샷 대상 전부를 임시 경로/빈 동작으로 바꿔치기한다.
         with patch.object(undo, "UNDO_FILE", tmp_dir / "undo_stack.json"), \
+             patch.object(undo, "UNDO_BLOBS_DIR", tmp_dir / "undo_blobs"), \
              patch.object(undo, "_SNAPSHOT_FILES", {"hidden": tmp_dir / "hidden.json"}), \
              patch.object(undo, "_snapshot_llm_cache", lambda: {}), \
              patch.object(undo, "_restore_llm_cache", lambda data: None), \
@@ -2266,6 +2267,7 @@ def test_split_group():
         tmp_dir = Path(tmp)
         assigned_file = tmp_dir / "assigned.json"
         with patch.object(undo, "UNDO_FILE", tmp_dir / "undo_stack.json"), \
+             patch.object(undo, "UNDO_BLOBS_DIR", tmp_dir / "undo_blobs"), \
              patch.object(undo, "_SNAPSHOT_FILES", {"hidden": tmp_dir / "hidden.json", "assigned": assigned_file}), \
              patch.object(undo, "_snapshot_llm_cache", lambda: {}), \
              patch.object(undo, "_restore_llm_cache", lambda data: None), \
@@ -3746,7 +3748,8 @@ def test_today_cut_round():
     with patch.object(curation, "GROUP_LABELS_FILE", labels_file), \
          patch.object(group_order, "GROUP_ORDER_FILE", tmp / "group_order.json"), \
          patch.object(manual_keyword_note, "MANUAL_KEYWORD_NOTE_FILE", tmp / "memo.json"), \
-         patch.object(undo, "UNDO_FILE", tmp / "undo.json"):
+         patch.object(undo, "UNDO_FILE", tmp / "undo.json"), \
+         patch.object(undo, "UNDO_BLOBS_DIR", tmp / "undo_blobs"):
         # 1) 시간표 끼우기
         today_cuts.add_cut(today_s, "15:57", "17:00")
         cut_windows = [(w["start"], w["end"]) for w in today_cuts.apply_cuts(windows, today)]
@@ -5052,6 +5055,8 @@ def test_undo_stack_dedupes_snapshots():
       4) 옛 형식(조각을 항목 안에 그대로 담던 기록)도 그대로 읽히고 되돌아간다
     """
     _require_isolation()
+    import hashlib
+
     from app import undo
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -5060,6 +5065,7 @@ def test_undo_stack_dedupes_snapshots():
         custom = tmp_dir / "custom.json"
         stack = tmp_dir / "undo_stack.json"
         with patch.object(undo, "UNDO_FILE", stack), \
+             patch.object(undo, "UNDO_BLOBS_DIR", tmp_dir / "undo_blobs"), \
              patch.object(undo, "_SNAPSHOT_FILES", {"hidden": hidden, "custom": custom}), \
              patch.object(undo, "_snapshot_llm_cache", lambda: {"entries": [], "last_names": []}), \
              patch.object(undo, "_restore_llm_cache", lambda data: None), \
@@ -5071,14 +5077,19 @@ def test_undo_stack_dedupes_snapshots():
                 hidden.write_text(json.dumps({"2026-09-23": [{"url": f"u{i}"}]}), encoding="utf-8")
                 undo.push(f"기사 숨기기 {i}", coalesce_sec=0)
             saved = json.loads(stack.read_text(encoding="utf-8"))
-            assert saved["v"] == 2, saved.get("v")
+            assert saved["v"] == 3, saved.get("v")
             custom_refs = {e["files"]["custom"] for e in saved["entries"]}
             hidden_refs = {e["files"]["hidden"] for e in saved["entries"]}
             assert len(custom_refs) == 1, f"안 바뀐 파일이 {len(custom_refs)}번 저장됨"
             assert len(hidden_refs) == 5, hidden_refs
             assert len({e["llm_cache"] for e in saved["entries"]}) == 1
-            # blob은 hidden 5 + custom 1 + llm_cache 1 + run_file(None) 1 = 8개뿐
-            assert len(saved["blobs"]) == 8, len(saved["blobs"])
+            # **조각은 목록 밖에 자리 하나씩 있다** — hidden 5 + custom 1 + llm_cache 1
+            # + run_file(None) 1 = 8개. 목록 파일 자체에는 조각이 안 담긴다(v3).
+            assert "blobs" not in saved, "조각이 목록 파일 안에 다시 담겼습니다(v3)"
+            blobs = sorted(p.name for p in (tmp_dir / "undo_blobs").glob("*.json"))
+            assert len(blobs) == 8, blobs
+            # 목록 파일이 작아야 한다 — 큐레이션 한 번이 이것만 다시 쓴다
+            assert stack.stat().st_size < 4000, stack.stat().st_size
 
             # 2) 복원 — 파일이 없던 상태까지 그대로 돌아온다
             custom.unlink()
@@ -5097,7 +5108,8 @@ def test_undo_stack_dedupes_snapshots():
             assert len(saved["entries"]) == undo._MAX_ENTRIES
             used = {r for e in saved["entries"] for r in e["files"].values()}
             used |= {e["llm_cache"] for e in saved["entries"]} | {e["run_file"] for e in saved["entries"]}
-            assert set(saved["blobs"]) == used, "가리키는 데 없는 blob이 남았다"
+            left = {p.stem for p in (tmp_dir / "undo_blobs").glob("*.json")}
+            assert left == used, f"가리키는 데 없는 조각이 남았다: {left - used}"
 
             # 4) 옛 형식 기록도 그대로 읽히고 되돌아간다
             hidden.write_text('{"옛날": []}', encoding="utf-8")
@@ -5119,7 +5131,43 @@ def test_undo_stack_dedupes_snapshots():
             assert json.loads(hidden.read_text(encoding="utf-8")) == {"되돌린 뒤": []}
             assert not custom.exists(), "옛 형식의 None(파일 없음)이 재현되지 않았다"
 
-    print("46) 되돌리기 스택 중복 제거: 통과 (안 바뀐 조각은 한 번만, 복원·파일 없음 재현, 밀려난 blob 정리, 옛 형식 이관)")
+            # 5) v2(조각을 목록 파일 안에 담던 기록)도 조각 하나당 자리 하나로 옮겨진다
+            hidden.write_text('{"v2 전": []}', encoding="utf-8")
+            # 조각에 담기는 것은 **그 파일의 원문 문자열**이다(그래서 한 번 더 감싼다)
+            raw = '{"v2 되돌린 뒤": []}'
+            text = json.dumps(raw, ensure_ascii=False, sort_keys=True)
+            digest = hashlib.sha1(text.encode("utf-8")).hexdigest()
+            stack.write_text(json.dumps({
+                "date": datetime.now().date().isoformat(),
+                "v": 2,
+                "entries": [{
+                    "label": "v2 숨기기",
+                    "at": datetime.now().isoformat(timespec="seconds"),
+                    "files": {"hidden": digest},
+                    "touched": [],
+                    "batch": None,
+                }],
+                "blobs": {digest: text},
+            }, ensure_ascii=False), encoding="utf-8")
+            assert undo.peek_label() == "v2 숨기기"
+            moved = json.loads(stack.read_text(encoding="utf-8"))
+            assert moved["v"] == 3 and "blobs" not in moved, moved
+            assert undo.undo() == {"label": "v2 숨기기", "touched": []}
+            assert json.loads(hidden.read_text(encoding="utf-8")) == {"v2 되돌린 뒤": []}
+
+            # 6) **조각이 사라졌으면 그 파일은 건드리지 않는다** — "그땐 파일이 없었다"로
+            #    읽으면 멀쩡한 파일을 지운다(조각이 딴 자리에 있으니 없어질 수 있다).
+            hidden.write_text('{"살아 있어야 함": []}', encoding="utf-8")
+            undo.push("조각 잃기", coalesce_sec=0)
+            for blob in (tmp_dir / "undo_blobs").glob("*.json"):
+                blob.unlink()
+            assert undo.undo() == {"label": "조각 잃기", "touched": []}
+            assert json.loads(hidden.read_text(encoding="utf-8")) == {"살아 있어야 함": []}, (
+                "조각이 없는데 멀쩡한 파일을 지웠습니다"
+            )
+
+    print("46) 되돌리기 스택 조각: 통과 (안 바뀐 조각은 한 번만, 조각은 자리 하나씩·목록은 작게, "
+          "복원·파일 없음 재현, 밀려난 조각 정리, 옛 형식·v2 이관, 조각을 잃으면 안 건드림)")
 
 
 def test_env_key_transplant():
