@@ -15,7 +15,7 @@ from app.breaking_alert_sender import catch_up_on_wake
 from app.config import LANDING_HTML_PATH, SETTINGS_SERVER_HOST, SETTINGS_SERVER_PORT
 from app.confirm_send import confirm_and_promote
 from app.alert_groups import transplant_alert_groups
-from app.credentials import cleanup_env_backups, transplant_env_keys
+from app.credentials import cleanup_env_backups, naver_missing_for_sure, transplant_env_keys
 from app.today_cuts import after_round_collected
 from app.curation import archive_aged_hidden, cleanup_group_overrides
 from app.history_renderer import generate_history_page
@@ -236,6 +236,10 @@ def main(open_browser: bool = True) -> None:
             # 수집은 사람마다 한 바퀴 돈다 — 첫 자리는 「바닥」의 주인(None)이다
             # (app.users.data_owners). 계정이 하나면 [None]이라 한 번만 돈다.
             "list_owners": users.data_owners,
+            # 자기 네이버 키가 없는 사람은 수집을 건너뛴다 — **키 칸이 비어 있음을 실제로
+            # 읽어 확인했을 때만** 참이라, 연결이 끊겨 못 읽은 경우는 예전처럼 시끄럽게
+            # 실패한다(app/credentials.py naver_missing_for_sure).
+            "can_collect": lambda: not naver_missing_for_sure(),
         },
         daemon=True,
     ).start()

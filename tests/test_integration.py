@@ -7110,6 +7110,92 @@ def test_naver_key_per_person():
           "Claude·텔레그램·이메일은 공용")
 
 
+def test_person_without_naver_key_is_skipped_quietly():
+    """**자기 네이버 키가 없는 사람은 조용히 건너뛴다** — 오류로 쌓지 않는다.
+
+    키는 물려받지 않는 설계라(`app/credentials.py`) 새로 들어온 사람은 **키를 넣기 전까지
+    전원** 이 상태다. 그대로 두면 회차마다 ERROR 세 줄과 「이 회차는 비게 됩니다」가
+    날마다 쌓여 진짜 고장과 구별되지 않는다(실측 2026-11-05: 테스트 계정 둘이 회차
+    다섯을 하루 30줄로 채웠다). 지켜야 하는 약속 넷:
+      ① 키가 없는 사람은 **수집을 안 한다** — 그리고 **재시도 횟수도 안 태운다**
+      ② 그 사람의 나머지 일(자동발송·정리)은 그대로 돈다
+      ③ **기본값은 「늘 모은다」** — 테스트·옛 동작이 한 글자도 안 바뀐다
+      ④ 「없음」과 **「모르겠음」을 가른다** — 읽지 못했으면 건너뛰지 않는다
+         (연결이 바닥났을 때 그 예외가 「네이버 키가 없습니다」라는 **거짓 메시지**로
+         나온 적이 있다 — 그걸 소리 없이 넘기면 회차가 조용히 빈다)
+    """
+    _require_isolation()
+    from app import credentials, scheduler as sched, store
+
+    def run_tick(**extra):
+        calls = {"collect": [], "send": [], "cleanup": []}
+        ticks = [True, False]
+        kwargs = dict(
+            poll_interval_sec=0,
+            sleep=lambda _s: None,
+            now_fn=lambda: datetime(2026, 1, 1, 12, 0),
+            schedule_times=[{"start": "09:00", "end": "11:00"}],
+            scrape=lambda slot, start: calls["collect"].append(store.current_owner()) or {},
+            cleanup=lambda: calls["cleanup"].append(store.current_owner()) or [],
+            cleanup_overrides=lambda: 0,
+            archive_hidden=lambda: (0, 0),
+            purge_deleted=lambda: 0,
+            cleanup_adhoc_cards=lambda: [],
+            render_waiting=lambda: None,
+            check_confirm_send=lambda _n: calls["send"].append(store.current_owner()),
+            check_topup=lambda _n, _s=None: None,
+            check_breaking_alert=lambda _n: None,
+            check_negative_guess=lambda _n: None,
+            collect_agency_archive=lambda _n: 0,
+            check_title_watch=lambda _n: 0,
+            list_owners=lambda: [None, "u2"],
+            should_continue=lambda: ticks.pop(0) if ticks else False,
+        )
+        kwargs.update(extra)
+        sched._slot_failures.clear()
+        sched._no_key_noted.clear()
+        with patch.object(sched, "run_exists", lambda *a, **k: False):
+            sched.run_scheduler(**kwargs)
+        return calls
+
+    # ③ 기본값 — 둘 다 모은다(예전 동작 그대로)
+    calls = run_tick()
+    assert calls["collect"] == [None, "u2"], calls["collect"]
+
+    # ①② u2만 키가 없다 — 수집은 건너뛰고 나머지는 그대로, 실패 기록도 안 남는다
+    calls = run_tick(can_collect=lambda: store.current_owner() != "u2")
+    assert calls["collect"] == [None], f"키 없는 사람의 수집을 돌렸습니다: {calls['collect']}"
+    assert calls["send"] == [None, "u2"], calls["send"]
+    assert calls["cleanup"] == [None, "u2"], calls["cleanup"]
+    assert not sched._slot_failures, (
+        f"건너뛴 사람에게 실패 횟수를 매겼습니다: {sched._slot_failures} — "
+        "키를 넣은 뒤 그 날 수집이 막힙니다"
+    )
+    assert len(sched._no_key_noted) == 1, sched._no_key_noted  # 하루 한 번만 적는다
+
+    # ④ 「없음」과 「모르겠음」 — 저장소를 못 읽으면 건너뛰지 않는다
+    with tempfile.TemporaryDirectory() as tmp:
+        mine = Path(tmp) / "my_credentials.json"
+        with patch.object(credentials, "MY_CREDENTIALS_FILE", mine), \
+             patch.object(credentials, "_is_base_owner", lambda: False):
+            assert credentials.naver_missing_for_sure() is True, "자리가 없으면 「없음」이다"
+            store.write_json(mine, {"naver": {"client_id": "a", "client_secret": "b"}})
+            assert credentials.naver_missing_for_sure() is False
+            store.write_json(mine, {"naver": {"client_id": "", "client_secret": ""}})
+            assert credentials.naver_missing_for_sure() is True, "빈 칸은 「없음」이다"
+
+            def boom(_path):
+                raise RuntimeError("연결이 끊겼다")
+
+            with patch.object(credentials.store, "read_json", boom):
+                assert credentials.naver_missing_for_sure() is False, (
+                    "읽지 못했는데 「키가 없다」로 읽었습니다 — 회차가 조용히 빕니다"
+                )
+
+    print("47) 키 없는 사람: 통과 (수집만 건너뛰고 재시도 안 태움, 나머지 일은 그대로, "
+          "기본값은 늘 모음, 못 읽으면 건너뛰지 않음)")
+
+
 def test_scheduler_runs_per_person():
     """수집은 사람마다 한 바퀴, 공용 일은 한 번만 — **그리고 혼자면 지금과 똑같이 한 번.**
 
@@ -9304,6 +9390,7 @@ if __name__ == "__main__":
         test_base_owner_needs_no_migration,
         test_settings_split_per_user,
         test_scheduler_runs_per_person,
+        test_person_without_naver_key_is_skipped_quietly,
         test_keys_use_forward_slashes,
         test_scheduler_lease,
         test_naver_key_per_person,
