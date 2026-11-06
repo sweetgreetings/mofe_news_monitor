@@ -6778,20 +6778,38 @@ def test_postgres_backend_contract():
 
     stamp = datetime(2026, 1, 1, 9, 0, tzinfo=timezone.utc)
     sig_rows = [
-        ("articles/2026-01-01_09-00.json", stamp, 120),
-        ("articles/깊은칸/안쪽.json", stamp, 7),     # 아래 칸 — 빠져야 한다
-        ("articles/메모.txt", stamp, 7),              # 모양이 안 맞음 — 빠져야 한다
+        ("articles/2026-01-01_09-00.json", stamp),
+        ("articles/깊은칸/안쪽.json", stamp),     # 아래 칸 — 빠져야 한다
+        ("articles/메모.txt", stamp),              # 모양이 안 맞음 — 빠져야 한다
     ]
+    seen_sql = []
+
+    def _spy_run(sql, *a, **k):
+        seen_sql.append(sql)
+        # 한 자리만 묻는 `signature()`는 `select updated_at` 한 줄을 받는다.
+        return (stamp,) if k.get("fetch") == "one" else sig_rows
+
     with patch.object(store_pg, "ensure_schema", lambda: None), \
-         patch.object(store_pg, "_run", lambda *a, **k: sig_rows):
+         patch.object(store_pg, "_run", _spy_run):
         sigs = store_pg.list_signatures("articles", "*.json")
+        one = store_pg.signature("articles/2026-01-01_09-00.json")
     assert list(sigs) == ["articles/2026-01-01_09-00.json"], sigs
+    # ⑥ **서명은 갱신 시각 하나다 — 본문 길이를 세지 않는다.** `length(body)`는 따로
+    #    압축해 보관된 본문(TOAST)을 전부 펼쳐야 세지므로, 그 한 글자가 쿼리 하나를
+    #    17ms에서 105ms로 만든다(실측 2026-11-06, 회차 404개·본문 28MB). 둘째 값 0은
+    #    부르는 쪽이 둘을 풀어 쓰기에 자리만 지키는 값이다(app/run_index.py).
     assert sigs["articles/2026-01-01_09-00.json"] == (
-        int(stamp.timestamp() * 1_000_000_000), 120,
+        int(stamp.timestamp() * 1_000_000_000), 0,
     ), sigs
+    assert one == (int(stamp.timestamp() * 1_000_000_000), 0), one
+    for sql in seen_sql:
+        assert "length(" not in sql, (
+            f"서명 쿼리가 본문 길이를 셉니다 — 28MB를 매번 다 읽습니다: {sql}"
+        )
 
     print("✓ Postgres 백엔드 계약: 기본은 파일, 두 백엔드가 같은 이름 아홉, "
-          "DATA_DIR 밖은 늘 파일, 키 고르기·서명 목록은 아래 칸으로 안 내려감")
+          "DATA_DIR 밖은 늘 파일, 키 고르기·서명 목록은 아래 칸으로 안 내려감, "
+          "서명은 갱신 시각 하나(본문 길이를 안 셈)")
 
 
 def test_store_read_cache():

@@ -238,9 +238,26 @@ def _in_box(rows, head: str, pattern: str, recursive: bool = False):
             yield key, row
 
 
-def _sig_of(updated_at, length: int) -> tuple:
-    """파일의 `(mtime_ns, size)` 자리를 갱신 시각·본문 길이가 받는다."""
-    return (int(updated_at.timestamp() * 1_000_000_000), length)
+def _sig_of(updated_at) -> tuple:
+    """바뀌었는지 보는 값 — 파일의 `(mtime_ns, size)` 자리를 **갱신 시각만** 받는다.
+
+    **길이를 세지 않는다.** 예전엔 `length(body)`를 둘째 값으로 넣었는데, 그 함수는
+    따로 압축해 보관된 본문(TOAST)을 **전부 펼쳐야** 글자 수를 셀 수 있다 — 실측
+    2026-11-06: 회차 404개의 서명 목록이 **105ms**이고 길이를 빼면 **17ms**다(본문
+    합계 28MB를 쿼리마다 다 읽고 있었다). 회차는 365일 쌓이므로 1,600개면 그만큼
+    는다. 왕복 한 번이 15ms인 자리에서 쿼리 하나가 105ms인 것은 「느린 쿼리가 하나도
+    없다」는 전제가 깨진 첫 자리다.
+
+    **갱신 시각만으로 충분하다** — `write_text`가 쓸 때마다 `updated_at = now()`로
+    고쳐 적으므로 내용이 바뀌면 이 값이 반드시 바뀐다. 파일에서 `size`를 함께 본 것은
+    `mtime`의 해상도가 거칠어서였고, 여기선 마이크로초다. **그래서 `updated_at`을 안
+    고치는 쓰기 경로를 만들지 않는다** — 만들면 바뀐 자리를 아무도 못 알아본다.
+
+    둘째 값 `0`은 **자리를 지키려고 둔다** — 부르는 쪽(`app/run_index.py`)이 둘을
+    풀어 쓰므로 모양이 백엔드마다 달라지면 그 자리가 깨진다. 값은 같은지 보는 데만
+    쓰이고 「크기」로 읽는 자리는 없다.
+    """
+    return (int(updated_at.timestamp() * 1_000_000_000), 0)
 
 
 def list_keys(prefix: str, pattern: str, *, recursive: bool = False) -> list:
@@ -256,12 +273,10 @@ def list_keys(prefix: str, pattern: str, *, recursive: bool = False) -> list:
 def signature(key: str):
     """바뀌었는지 보는 값 — 파일의 `(mtime_ns, size)` 자리를 갱신 시각·길이가 받는다."""
     ensure_schema()
-    row = _run(
-        f"select updated_at, length(body) from {_TABLE} where key = %s", (key,), fetch="one"
-    )
+    row = _run(f"select updated_at from {_TABLE} where key = %s", (key,), fetch="one")
     if row is None:
         return None
-    return _sig_of(row[0], row[1])
+    return _sig_of(row[0])
 
 
 def list_signatures(prefix: str, pattern: str) -> dict:
@@ -270,16 +285,17 @@ def list_signatures(prefix: str, pattern: str) -> dict:
     키마다 따로 물으면 키 수만큼 왕복이 된다 — 회차 403개면 403회(5.8초)이고, 홈은
     그걸 11번 되풀이해 63.8초를 썼다(실측 2026-11-05 · 홈 전체의 87%). 파일일 때는
     `stat()`이 1µs라 「목록 따로 · 서명 따로」가 공짜였지만, **DB에선 묻는 횟수가
-    유일한 비용이다.** 서명은 시각과 길이라 본문을 담지 않아 한 번에 받아도 가볍다.
+    유일한 비용이다.** 서명은 갱신 시각 하나라 본문도 길이도 담지 않아(`_sig_of` 참고)
+    한 번에 받아도 가볍다.
     """
     ensure_schema()
     head = _head(prefix)
     rows = _run(
-        f"select key, updated_at, length(body) from {_TABLE} where key like %s order by key",
+        f"select key, updated_at from {_TABLE} where key like %s order by key",
         (head + "%",),
         fetch="all",
     ) or []
-    return {key: _sig_of(row[1], row[2]) for key, row in _in_box(rows, head, pattern)}
+    return {key: _sig_of(row[1]) for key, row in _in_box(rows, head, pattern)}
 
 
 # ─────────────────── 지금 data/를 DB로 올리기 ───────────────────
