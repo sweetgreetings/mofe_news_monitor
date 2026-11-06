@@ -8453,6 +8453,101 @@ def test_signup_keeps_the_signed_in_person():
     print("✓ 계정 만들기: 관리자가 동료를 등록해도 자기 자리를 지키고, 첫 계정은 바로 로그인된다")
 
 
+def test_screen_files_are_written_in_background():
+    """**큐레이션 클릭은 화면 파일을 기다리지 않는다**(`app/screen_files.py`).
+
+    담당자가 보는 화면은 그 파일을 안 읽는다 — 요청마다 새로 그린 글을 그대로 응답하고
+    (`_SCREEN_HTML_ROUTES`), 앱도 `http://`로 연다. 파일은 `file://`로 열어 둔 탭을 위한
+    보험인데, 예전엔 그걸 다 쓰고 나서야 응답해 **클릭 한 번의 92%가 그 쓰기였다**
+    (실측 2026-11-06: 회차 402개·기사 112건에서 기사 한 건 숨기기가 왕복 93번이고
+    그중 86번이 화면 셋이었다 — DB에선 1.5초, 빼면 7번·0.1초).
+
+    지켜야 하는 약속 넷:
+      ① `_regenerate_screens`는 **맡기기만** 한다(제 손으로 그리지 않는다)
+      ② 여러 번 맡겨도 **쓰는 일은 한 번으로 모인다**(열 번 눌러도 열 번 안 쓴다)
+      ③ **맡길 때의 사람**을 들고 간다(뒤에서 도는 스레드는 소유자를 물려받지 않는다)
+      ④ 쓰다가 터져도 **스레드가 안 죽는다**(죽으면 그 뒤 모든 클릭이 조용히 멈춘다)
+    """
+    _require_isolation()
+    import threading
+
+    from app import screen_files, settings_server, store
+
+    # ① 맡기기만 한다 — 이 자리가 다시 직접 그리면 43군데가 전부 느려진다
+    body = inspect.getsource(settings_server._SettingsHandler._regenerate_screens)
+    assert "request_refresh()" in body, (
+        "_regenerate_screens가 뒤에 맡기지 않습니다 — 클릭이 다시 화면 셋을 기다립니다."
+    )
+    # 괄호까지 봐야 한다 — 함수 **이름**만 찾으면 `_regenerate_screens`라는 제 이름이
+    # "generate_screen"을 품어 늘 걸린다.
+    for name in ("generate_screen(", "generate_history_page(", "generate_landing_page("):
+        assert name not in body, (
+            f"_regenerate_screens가 {name[:-1]}을 직접 부릅니다 — 맡기는 뜻이 없어집니다."
+        )
+
+    calls = []
+    started = threading.Event()
+    hold = threading.Event()
+
+    def fake_landing(*a, **k):
+        calls.append(store.current_owner())
+        started.set()
+        hold.wait(5)          # 첫 번째 쓰기를 붙잡아 둬 그 사이 맡긴 것이 모이게 한다
+        return None
+
+    try:
+        with patch.object(screen_files, "generate_screen", lambda *a, **k: None), \
+             patch.object(screen_files, "generate_history_page", lambda *a, **k: None), \
+             patch.object(screen_files, "generate_landing_page", fake_landing):
+            # ②③ 열 번 맡기고, 첫 쓰기를 붙잡은 동안 쌓이게 한다
+            with store.owner("u9"):
+                screen_files.request_refresh()
+                assert started.wait(5), "맡긴 일이 시작되지 않았습니다."
+                for _ in range(9):
+                    screen_files.request_refresh()
+            hold.set()
+            assert screen_files.wait_idle(10), "맡긴 일이 끝나지 않았습니다."
+
+        assert len(calls) == 2, (
+            f"열 번 맡겼는데 {len(calls)}번 썼습니다 — 한 번으로 모이지 않습니다"
+            "(도는 한 번 + 그 뒤 한 번이어야 합니다)."
+        )
+        assert calls == ["u9", "u9"], (
+            f"맡길 때의 사람을 안 들고 갔습니다: {calls} — 바닥 주인의 회차로 남의 화면을 덮습니다."
+        )
+
+        # ④ 터져도 스레드가 안 죽는다
+        hold.clear()
+        boom = []
+
+        def exploding(*a, **k):
+            boom.append(1)
+            raise RuntimeError("일부러 터뜨림")
+
+        with patch.object(screen_files, "generate_screen", lambda *a, **k: None), \
+             patch.object(screen_files, "generate_history_page", exploding), \
+             patch.object(screen_files, "generate_landing_page", lambda *a, **k: None):
+            screen_files.request_refresh()
+            assert screen_files.wait_idle(10), "터진 뒤 끝나지 않았습니다."
+        assert boom, "터뜨리는 자리를 지나지 않았습니다."
+
+        after = []
+        with patch.object(screen_files, "generate_screen", lambda *a, **k: None), \
+             patch.object(screen_files, "generate_history_page", lambda *a, **k: None), \
+             patch.object(screen_files, "generate_landing_page", lambda *a, **k: after.append(1)):
+            screen_files.request_refresh()
+            assert screen_files.wait_idle(10), "터진 뒤 다음 일이 끝나지 않았습니다."
+        assert after, (
+            "한 번 터진 뒤로 화면 파일이 영영 안 써집니다 — 스레드가 죽었습니다."
+        )
+    finally:
+        hold.set()
+        screen_files.wait_idle(10)
+
+    print("✓ 화면 파일은 뒤에서: 클릭은 맡기고 바로 응답, 여러 번 눌러도 한 번으로 모이고, "
+          "맡긴 사람을 들고 가고, 터져도 스레드가 안 죽는다")
+
+
 def test_no_undefined_names():
     """import을 빼먹었거나 이름을 잘못 적은 자리가 없는지 본다 — 린터가 없는 저장소의 그물.
 
@@ -9992,6 +10087,7 @@ if __name__ == "__main__":
         test_network_open_forces_login,
         test_admin_only_settings,
         test_signup_keeps_the_signed_in_person,
+        test_screen_files_are_written_in_background,
         test_no_undefined_names,
         test_screens_render_to_response,
         test_screen_js_strings_are_not_cut_by_newlines,

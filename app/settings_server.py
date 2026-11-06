@@ -122,7 +122,6 @@ from app.excel_export import build_workbook_bytes, format_pub_datetime, sanitize
 from app.history_renderer import (
     build_excel_rows_for_dates,
     excel_filename_for_dates,
-    generate_history_page,
     history_page_html,
     preset_range as history_preset_range,
     render_history_day_fragment,
@@ -138,7 +137,8 @@ from app.excel_merge import ASSIGN_REASONS, TableReadError, assign_subheadings, 
 from app.excel_merge_renderer import render_excel_merge_page
 from app.trend_renderer import render_trend_page
 from app.trend_export import build_trend_workbook_bytes
-from app.landing_renderer import generate_landing_page, landing_page_html
+from app.landing_renderer import landing_page_html
+from app.screen_files import request_refresh
 from app.live_renderer import live_page_or_wait_html
 from app.manual_articles import (
     add_manual_article,
@@ -214,7 +214,6 @@ from app.renderer import (
     apply_line_template,
     apply_subheading_format,
     build_group_copy_texts,
-    generate_screen,
     screen_page_html,
     waiting_page_html,
     known_label_chips_html,
@@ -8378,9 +8377,9 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         그 회차에 저장해둔 소제목 스냅샷(app.classifier.snapshot_group_names)도 같이
         갱신해야 한다 — app.settings_server._handle_move_article과 같은 이유로,
         안 그러면 이 회차가 나중에 "지난 기사 더보기"로 넘어갔을 때 방금 옮긴 결과가
-        아니라 옛 소제목으로 보인다. 완성본은 요청마다 새로 계산되는 preview.html과
-        달리 정적 파일이라 _regenerate_screens()로 즉시 다시 그려줘야 새로고침 없이도
-        (다음 접속에) 반영된다.
+        아니라 옛 소제목으로 보인다. 확정본도 초안처럼 **요청마다 새로 그려 응답하므로**
+        (2026-11-05) 이 스냅샷 갱신만으로 다음 접속에 반영된다 — _regenerate_screens()는
+        file://로 열어 둔 탭을 위해 파일을 다시 쓰라고 뒤에 맡기는 일이다.
         """
         urls = [u for u in form.get("urls", []) if u]
         target = form.get("target", [""])[0].strip()
@@ -9252,17 +9251,18 @@ class _SettingsHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def _regenerate_screens(self) -> None:
-        """숨김 상태가 바뀌면 정적 화면 3개를 즉시 다시 만든다 (새로고침해도 최신 상태가 보이도록).
+        """화면 파일 셋을 다시 쓰라고 **뒤에 맡기고 바로 돌아온다**(`app/screen_files.py`).
 
-        아직 저장된 회차가 하나도 없으면 generate_screen만 RuntimeError를 내므로,
-        메인 화면 생성 실패와 무관하게 지난 기사·진입 화면은 항상 다시 만든다.
+        **담당자가 보는 화면은 그 파일을 안 읽는다** — 요청마다 새로 그린 글을 그대로
+        응답한다(`_SCREEN_HTML_ROUTES`). 파일은 `file://`로 열어 둔 탭을 위한 보험인데,
+        예전엔 그걸 다 쓰고 나서야 응답해 **클릭 한 번의 92%가 그 쓰기였다**(실측
+        2026-11-06: 기사 한 건 숨기기 93번 → 7번, DB에선 1.5초 → 0.1초).
+
+        **맡기는 자리가 여기 하나라 부르는 쪽 43군데가 한 글자도 안 바뀐다.** 여러 번
+        연달아 눌러도 쓰는 일은 한 번으로 모이고, 누구의 화면인지는 맡길 때의 사람을
+        들고 간다(뒤에서 도는 스레드는 소유자를 물려받지 않는다).
         """
-        try:
-            generate_screen()
-        except RuntimeError:
-            pass
-        generate_history_page()
-        generate_landing_page()
+        request_refresh()
 
     def _handle_add_trend_word(self, form: dict) -> None:
         """정책 단어 추이 전용 화면(/trend)의 "+ 추가"·등록 검색어 칩·"추이에 추가" 버튼
