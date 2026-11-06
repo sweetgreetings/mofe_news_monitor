@@ -7,6 +7,7 @@ from datetime import datetime, time as dt_time, timedelta
 from pathlib import Path
 from typing import Optional
 
+from app import store
 from app.topnav import regular_nav, topnav_style
 from app.config import (
     CUTE_FONT_BASE64,
@@ -2087,9 +2088,15 @@ def generate_history_page(
 
     서버는 이 함수를 쓰지 않는다 — 요청마다 `history_page_html()`이 돌려주는 글을
     그대로 응답한다(MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 2번).
+
+    **읽기 캐시를 제 안에서 연다**(`store.read_cache`) — 이 함수를 부르는 자리는
+    요청 밖이라(수집 직후·확정·발송·보충·스케줄러 tick) 캐시가 열려 있지 않다.
+    그러면 **담당자가 같은 화면을 열 때보다 훨씬 많이 묻는다** — 실측 2026-11-06:
+    정기 보관함이 39회(캐시 켬) 대 **1,230회**(캐시 끔, 사진·일정 추정 해제를
+    기사마다 다시 묻는다)였다. 겹쳐 열어도 되므로(요청 안에서 불려도) 이 한 줄이
+    요청 경로를 바꾸지 않는다.
     """
-    atomic_write_text(
-        HISTORY_HTML_PATH,
-        history_page_html(highlight_words, line_template, subheading_format),
-    )
+    with store.read_cache():
+        html_text = history_page_html(highlight_words, line_template, subheading_format)
+    atomic_write_text(HISTORY_HTML_PATH, html_text)
     return HISTORY_HTML_PATH

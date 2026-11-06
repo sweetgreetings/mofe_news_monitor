@@ -17,6 +17,7 @@ from typing import Optional
 
 import requests
 
+from app import store
 from app.topnav import regular_nav, topnav_style
 from app.auto_classify_turn import take_turn as take_auto_classify_turn
 from app.classifier import classify_articles, forced_group_target_names
@@ -4040,7 +4041,9 @@ def generate_preview_page() -> Path:
     서버는 이 함수를 쓰지 않는다 — 요청마다 `preview_page_html()`이 돌려주는 글을
     그대로 응답한다(MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 2번).
     """
-    atomic_write_text(PREVIEW_HTML_PATH, preview_page_html())
+    with store.read_cache():
+        html_text = preview_page_html()
+    atomic_write_text(PREVIEW_HTML_PATH, html_text)
     return PREVIEW_HTML_PATH
 
 

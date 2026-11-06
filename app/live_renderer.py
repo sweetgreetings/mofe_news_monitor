@@ -10,6 +10,7 @@ from typing import Optional
 
 import requests
 
+from app import store
 from app.topnav import regular_nav, topnav_style
 from app.config import (
     COLOR_ACCENT,
@@ -2670,5 +2671,7 @@ def generate_live_page() -> Path:
     글을 그대로 응답한다(사람마다 다른 화면을 주려면 파일 한 벌로는 안 된다,
     MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 2번).
     """
-    atomic_write_text(LIVE_HTML_PATH, live_page_html())
+    with store.read_cache():
+        html_text = live_page_html()
+    atomic_write_text(LIVE_HTML_PATH, html_text)
     return LIVE_HTML_PATH

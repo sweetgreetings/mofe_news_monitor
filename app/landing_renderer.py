@@ -1254,5 +1254,7 @@ def generate_landing_page() -> Path:
     서버는 이 함수를 쓰지 않는다 — 요청마다 `landing_page_html()`이 돌려주는 글을
     그대로 응답한다(MULTIUSER_ROLLOUT_CHECKLIST.md 2단계 순서 2번).
     """
-    atomic_write_text(LANDING_HTML_PATH, landing_page_html())
+    with store.read_cache():
+        html_text = landing_page_html()
+    atomic_write_text(LANDING_HTML_PATH, html_text)
     return LANDING_HTML_PATH

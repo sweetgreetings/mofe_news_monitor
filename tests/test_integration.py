@@ -6953,8 +6953,31 @@ def test_store_read_cache():
         together = store.list_signatures(box)
         assert apart == together, (apart, together)
 
+    # ⑦ **화면을 파일로 쓰는 `generate_*` 여섯은 제 안에서 캐시를 연다.** 부르는 자리가
+    #    요청 밖이라(수집 직후·확정·발송·보충·스케줄러 tick) 캐시가 열려 있지 않은데,
+    #    그러면 담당자가 같은 화면을 열 때보다 훨씬 많이 묻는다 — 실측 2026-11-06:
+    #    정기 보관함 **39회**(캐시 켬) 대 **1,230회**(캐시 끔, 사진·일정 추정 해제를
+    #    기사마다 다시 묻는다) · 홈 50회 대 98회. 겹쳐 열어도 되므로 요청 경로는 한 글자도
+    #    안 바뀐다. 새 화면을 더하면 그 `generate_*`도 여기 목록에 넣는다.
+    from app import history_renderer, landing_renderer, live_renderer, preview_renderer
+    from app import renderer as screen_renderer
+
+    shells = [
+        screen_renderer.generate_waiting_page,
+        screen_renderer.generate_screen,
+        history_renderer.generate_history_page,
+        landing_renderer.generate_landing_page,
+        preview_renderer.generate_preview_page,
+        live_renderer.generate_live_page,
+    ]
+    for shell in shells:
+        assert "store.read_cache()" in inspect.getsource(shell), (
+            f"{shell.__module__}.{shell.__name__}이 읽기 캐시를 안 엽니다 — 요청 밖에서 "
+            "그리는 자리라 같은 자리를 수백 번 다시 묻습니다(보관함은 1,230회였다)."
+        )
+
     print("✓ 저장소 읽기 캐시: 요청 하나 안에선 한 번만 묻고, 쓰면 통째로 버리고, "
-          "스레드 사이로 안 샌다 (목록+서명도 따로 묻기와 같은 결과)")
+          "스레드 사이로 안 샌다 (목록+서명도 따로 묻기와 같은 결과, 화면을 파일로 쓰는 generate_* 여섯도 제 안에서 연다)")
 
 
 def test_home_alerts_are_per_person():
