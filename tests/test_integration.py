@@ -7001,9 +7001,16 @@ def test_home_alerts_are_per_person():
             "중복 방지 목록이 사람별로 갈리면 같은 기사로 알림이 사람 수만큼 간다"
         )
 
-    # ④ owner가 없는 옛 기록(건수만 아는 형식)은 **바닥 주인에게만** 보인다
+    # ④ owner가 없는 옛 기록(건수만 아는 형식)은 **바닥 주인에게만** 보인다.
+    #    **날짜는 오늘이어야 한다** — `_alert_line_html`은 `now`를 받지 않고 「지금」을
+    #    보므로(app.alerted_urls `_load`가 date != 오늘이면 빈 목록으로 읽는다), 여기에
+    #    고정 날짜를 적으면 **적은 그 날 하루만 통과하고 다음 날부터 조용히 깨진다**
+    #    (2026-11-05에 적어 11-06에 깨졌다 — 앱은 멀쩡한데 테스트만 썩었다).
+    #    ①②③은 `now`를 직접 넘기므로 고정 날짜로 둬도 안 썩는다.
     alerted_urls.ALERTED_URLS_FILE.write_text(
-        json.dumps({"date": "2026-11-05", "urls": [base_url, u2_url], "items": []}),
+        json.dumps(
+            {"date": date.today().isoformat(), "urls": [base_url, u2_url], "items": []}
+        ),
         encoding="utf-8",
     )
     base_line = landing_renderer._alert_line_html()
