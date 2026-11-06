@@ -84,20 +84,29 @@ def _new_connection():
     return psycopg.connect(database_url(), autocommit=True)
 
 
-def _acquire():
-    """연결 하나를 빌린다 — 주머니에 있으면 그것, 없으면 새로 만든다."""
+def _acquire(*, fresh: bool = False):
+    """연결 하나를 빌린다 — 주머니에 있으면 그것, 없으면 새로 만든다.
+
+    **`fresh`면 주머니를 건너뛰고 새로 붙는다.** 서버가 쉬고 있는 연결을 닫을 때는
+    주머니 안 여러 개가 한꺼번에 죽는데, **psycopg는 써 보기 전까지 그걸 모른다**
+    (`conn.closed`가 거짓이라 멀쩡한 것처럼 건네진다). 그래서 다시 해 볼 때 주머니에서
+    또 집으면 **또 죽은 것을 집어** 그대로 포기한다 — 실측 2026-11-06 09:02: 그 때문에
+    tick 하나가 통째로 건너뛰어졌다(사람 둘 몫의 수집·자동발송·정리가 함께 밀렸고,
+    로그에는 「연결이 끊겨 다시 붙습니다」 두 줄과 ERROR만 남았다).
+    """
     if not _SLOTS.acquire(timeout=_ACQUIRE_TIMEOUT_SEC):
         raise RuntimeError(
             f"Postgres 연결을 {_ACQUIRE_TIMEOUT_SEC:.0f}초 기다렸지만 자리가 안 났습니다."
         )
     try:
-        while True:
+        while not fresh:
             try:
                 conn = _POOL.get_nowait()
             except queue.Empty:
-                return _new_connection()
+                break
             if not conn.closed:
                 return conn
+        return _new_connection()
     except Exception:
         _SLOTS.release()
         raise
@@ -130,13 +139,17 @@ def close_all() -> None:
 
 
 def _run(sql: str, params: tuple = (), *, fetch: str = ""):
-    """문장 하나를 돌린다. 연결이 끊겨 있으면 **한 번** 다시 붙어 본다.
+    """문장 하나를 돌린다. 연결이 끊겨 있으면 **새 연결로 한 번** 다시 해 본다.
 
     노트북이 잠들었다 깨면 연결이 죽어 있는데, 그때 화면 한 번이 실패하고 끝나면
     담당자는 앱이 고장난 것으로 읽는다.
+
+    **다시 할 때는 주머니를 건너뛴다**(`fresh=True`) — 거기서 또 집으면 같이 죽은
+    연결을 또 집는다(`_acquire` 참고). 죽은 줄 알게 된 연결은 `broken=True`로 닫아
+    주머니에서 내보내므로, 여러 개가 함께 죽어도 몇 번 오가는 사이에 저절로 치워진다.
     """
     for attempt in (1, 2):
-        conn = _acquire()
+        conn = _acquire(fresh=attempt == 2)
         try:
             with conn.cursor() as cur:
                 cur.execute(sql, params)

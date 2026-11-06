@@ -6807,9 +6807,67 @@ def test_postgres_backend_contract():
             f"서명 쿼리가 본문 길이를 셉니다 — 28MB를 매번 다 읽습니다: {sql}"
         )
 
+    # ⑦ **끊긴 연결로 다시 할 때 주머니에서 또 집지 않는다.** 서버가 쉬고 있는 연결을
+    #    닫으면 주머니 안 여러 개가 함께 죽는데, psycopg는 **써 보기 전까지 모른다**
+    #    (`closed`가 거짓이라 멀쩡한 것처럼 건네진다). 다시 할 때 주머니에서 집으면 또
+    #    죽은 것을 집어 그대로 포기한다 — 실측 2026-11-06 09:02에 그 때문에 tick 하나가
+    #    통째로 건너뛰어졌다(사람 둘 몫의 수집·자동발송·정리).
+    class _FakeCursor:
+        def __init__(self, conn):
+            self.conn = conn
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def execute(self, sql, params=()):
+            if self.conn.dead:
+                raise RuntimeError("server closed the connection unexpectedly")
+
+        def fetchone(self):
+            return (1,)
+
+    class _FakeConn:
+        def __init__(self, dead):
+            self.dead, self.closed = dead, False
+
+        def cursor(self):
+            return _FakeCursor(self)
+
+        def close(self):
+            self.closed = True
+
+    stale = [_FakeConn(dead=True), _FakeConn(dead=True)]  # 함께 죽은 연결 둘
+    for dead_conn in stale:
+        store_pg._POOL.put(dead_conn)
+    made = []
+
+    def _fresh_conn():
+        conn = _FakeConn(dead=False)
+        made.append(conn)
+        return conn
+
+    try:
+        with patch.object(store_pg, "_new_connection", _fresh_conn):
+            got = store_pg._run("select 1", fetch="one")
+        assert got == (1,), got
+        assert len(made) == 1, (
+            "끊긴 연결로 다시 하면서 주머니에서 또 집었습니다 — 함께 죽은 연결이 둘이면 "
+            f"그대로 포기합니다(새로 붙은 횟수 {len(made)}회)."
+        )
+        # 주머니는 **마지막에 넣은 것부터** 꺼내므로(LifoQueue) 둘 중 어느 것이
+        # 건네졌는지는 묻지 않는다 — 건네진 그 하나가 닫혔는지만 본다.
+        assert any(c.closed for c in stale), (
+            "끊긴 줄 알게 된 연결을 닫지 않았습니다 — 주머니에 그대로 남아 다음 사람이 또 집습니다."
+        )
+    finally:
+        store_pg.close_all()
+
     print("✓ Postgres 백엔드 계약: 기본은 파일, 두 백엔드가 같은 이름 아홉, "
           "DATA_DIR 밖은 늘 파일, 키 고르기·서명 목록은 아래 칸으로 안 내려감, "
-          "서명은 갱신 시각 하나(본문 길이를 안 셈)")
+          "서명은 갱신 시각 하나(본문 길이를 안 셈), 다시 붙을 땐 새 연결로")
 
 
 def test_store_read_cache():
