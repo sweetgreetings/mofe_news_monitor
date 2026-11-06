@@ -24,6 +24,7 @@ import logging
 import os
 import queue
 import threading
+import time
 from fnmatch import fnmatch
 from pathlib import Path
 from typing import Optional
@@ -50,9 +51,31 @@ create table if not exists {_TABLE} (
 # `EMAXCONNSESSION: max clients reached`가 나고 모든 화면이 무한 로딩이 됐다.
 # 그래서 **한도 있는 주머니**에 담아 빌려 쓰고 돌려준다. 한도는 풀보다 넉넉히
 # 낮게 둔다 — 같은 DB를 보는 다른 컴퓨터·psql이 들어올 자리를 남겨야 한다.
+#
+# **주머니에 담는 것은 `(연결, 쉬기 시작한 시각)` 짝이다** — 아래 `_trim_idle`이
+# 오래 쉰 것을 닫으려면 언제부터 쉬었는지를 알아야 한다.
 _MAX_CONNECTIONS = 6
 _POOL: queue.LifoQueue = queue.LifoQueue()
 _SLOTS = threading.BoundedSemaphore(_MAX_CONNECTIONS)
+
+# **오래 쉰 연결은 놓아 준다.** 쥐고만 있으면 둘이 함께 나빠진다 — ① 아무 일도 안 하는
+# 새벽에도 Supabase 15자리 중 6을 차지하고(두 대면 12, 세 대면 아예 안 붙는다) ② 쉬는
+# 연결이 늘 여섯 개 쌓여 있어, 서버가 그걸 닫을 때마다 여러 개가 **함께** 죽는다
+# (실측 2026-11-06: 09:02·13:16·14:39 세 번. 마지막엔 여덟 자리가 한꺼번에 다시 붙다가
+# 그중 하나가 「자리가 꽉 찼다」에 걸려 [단독]·[속보] 폴링 한 번이 건너뛰어졌다).
+# 그래서 **서버가 닫기 전에 우리가 먼저 닫는다.** tick이 10초마다 DB를 두드리므로
+# 쓰는 연결 한둘은 늘 따뜻하고, 화면 한 장이 한꺼번에 빌려 쓴 나머지는 2분 뒤에 빠진다.
+#
+# **재는 시계는 `time.time()`이다 — `monotonic`이 아니다.** 노트북이 잠든 동안
+# `monotonic`은 멈추므로(macOS는 `CLOCK_UPTIME_RAW`), 여덟 시간 자고 깨어난 연결이
+# 「방금 쉬기 시작한 것」으로 읽혀 멀쩡한 줄 알고 집게 된다. 그게 바로 우리가 피하려는
+# 그 연결이다. 사람이 시계를 돌려 놓으면 멀쩡한 연결을 한 번 더 닫을 뿐이다
+# (다시 붙는 값 하나 — 실측 2026-11-06: 94ms. 왕복 15.6ms보다 비싸지만, tick이
+# 10초마다 지나가 쓰는 연결 하나는 늘 따뜻해 거의 치워지지 않는다).
+_IDLE_MAX_SEC = 120.0
+# 치우는 일은 한 번에 한 스레드만 한다 — 겹쳐 돌면 주머니를 비운 틈에 다른 스레드가
+# 「빈 주머니」를 보고 새로 붙어, 치우려는 일이 연결을 오히려 늘린다.
+_TRIM_LOCK = threading.Lock()
 
 # 빌릴 자리가 날 때까지 기다리는 한도. 여기서 지치면 화면이 오류로 끝나는 게
 # 영영 도는 것보다 낫다 — 담당자가 무엇이 잘못됐는지 알 수 있다.
@@ -71,8 +94,38 @@ def is_enabled() -> bool:
     return database_url() is not None
 
 
+# **「자리가 꽉 찼다」는 응답일 때만 기다렸다 다시 붙는다.** 서버가 쉬는 연결을 한꺼번에
+# 닫으면 우리 스레드들이 같은 순간에 새로 붙는데, 그때 서버 쪽 자리가 잠깐 모자랄 수
+# 있다 — 1초면 풀리는 일인데 지금은 거기서 곧바로 포기해 **그 일이 통째로 날아갔다**
+# (실측 2026-11-06 14:39: [단독]·[속보] 폴링 한 번).
+#
+# **비밀번호·주소가 틀린 경우는 기다리지 않는다** — 기다려도 안 되는 일이고, 켤 때
+# 수백 번 부르는 자리라 한 번에 1.6초씩 붙으면 앱이 멈춘 것처럼 보인다. 그래서 **아래
+# 말이 든 오류만** 다시 해 본다. 목록은 실측으로만 채운다(사진 표식 층과 같은 방식).
+_POOL_FULL_MARKS = (
+    "max clients",           # Supabase(supavisor, session mode): (EMAXCONNSESSION)
+    "max_client_conn",       # pgbouncer
+    "too many clients",      # Postgres: sorry, too many clients already
+    "too many connections",  # Postgres: too many connections for role …
+)
+
+# 기다리는 시간 — 이만큼 더 해 본다(여기 둘이면 모두 세 번). 자리를 쥔 채 기다리므로
+# 합이 `_ACQUIRE_TIMEOUT_SEC`(30초)보다 훨씬 짧아야 한다.
+_CONNECT_RETRY_WAITS_SEC = (0.4, 1.2)
+
+
+def _looks_pool_full(exc: Exception) -> bool:
+    """「서버 쪽 자리가 꽉 찼다」는 오류인가 — 기다렸다 다시 해 볼 값어치가 있는 것만 참."""
+    text = str(exc).lower()
+    return any(mark in text for mark in _POOL_FULL_MARKS)
+
+
 def _new_connection():
-    """새 연결 하나. psycopg가 없으면 바로 말해 준다."""
+    """새 연결 하나. psycopg가 없으면 바로 말해 준다.
+
+    **자리가 꽉 찼다면 잠깐 기다려 다시 붙는다**(위 `_POOL_FULL_MARKS`). 그 밖의
+    오류는 기다려도 안 되는 일이라 그대로 올린다.
+    """
     try:
         import psycopg
     except ImportError as exc:  # pragma: no cover - 설치 안내용
@@ -80,8 +133,49 @@ def _new_connection():
             "DATABASE_URL이 설정돼 있는데 psycopg가 없습니다 — "
             "`pip install -r requirements-postgres.txt`로 설치하세요."
         ) from exc
+
     # autocommit: 이 백엔드의 한 호출이 곧 한 문장이라 트랜잭션을 따로 열지 않는다.
+    for wait in _CONNECT_RETRY_WAITS_SEC:
+        try:
+            return psycopg.connect(database_url(), autocommit=True)
+        except Exception as exc:
+            if not _looks_pool_full(exc):
+                raise
+            logger.warning("Postgres 자리가 꽉 찼습니다 — %.1f초 뒤 다시 붙어 봅니다.", wait)
+            time.sleep(wait)
+    # 마지막 한 번 — 여기서 실패하면 그대로 올린다(포기할 때는 조용히 넘기지 않는다).
     return psycopg.connect(database_url(), autocommit=True)
+
+
+def _trim_idle() -> None:
+    """오래 쉰 연결을 닫는다 — 서버가 닫기 전에 우리가 먼저(위 `_IDLE_MAX_SEC`).
+
+    주머니를 통째로 훑는다. **위에서부터 보다가 멈추면 안 된다** — 꺼내는 순서가
+    마지막에 넣은 것부터(LifoQueue)라 **맨 위 하나만 계속 돌려 쓰이고 바닥의 것들이
+    그대로 썩는다.** 훑은 뒤에는 넣은 순서를 되돌려 놓는다(따뜻한 것이 다시 맨 위로).
+    """
+    if not _TRIM_LOCK.acquire(blocking=False):
+        return  # 다른 스레드가 이미 치우고 있다 — 겹쳐 돌 일이 아니다
+    try:
+        now = time.time()
+        keep = []
+        while True:
+            try:
+                item = _POOL.get_nowait()
+            except queue.Empty:
+                break
+            conn, idle_since = item
+            if conn.closed or now - idle_since > _IDLE_MAX_SEC:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            else:
+                keep.append(item)
+        for item in reversed(keep):  # 꺼낸 순서의 거꾸로 = 원래 순서
+            _POOL.put(item)
+    finally:
+        _TRIM_LOCK.release()
 
 
 def _acquire(*, fresh: bool = False):
@@ -99,9 +193,12 @@ def _acquire(*, fresh: bool = False):
             f"Postgres 연결을 {_ACQUIRE_TIMEOUT_SEC:.0f}초 기다렸지만 자리가 안 났습니다."
         )
     try:
+        # 빌리기 전에 오래 쉰 것을 치운다 — tick이 10초마다 여기를 지나므로 이 한 줄이
+        # 곧 「쉬는 연결을 쥐고 있지 않기」다(따로 도는 스레드를 두지 않는다).
+        _trim_idle()
         while not fresh:
             try:
-                conn = _POOL.get_nowait()
+                conn, _ = _POOL.get_nowait()
             except queue.Empty:
                 break
             if not conn.closed:
@@ -121,7 +218,8 @@ def _release(conn, *, broken: bool = False) -> None:
             except Exception:
                 pass
         else:
-            _POOL.put(conn)
+            # 돌려주는 지금이 「쉬기 시작한 시각」이다.
+            _POOL.put((conn, time.time()))
     _SLOTS.release()
 
 
@@ -129,7 +227,7 @@ def close_all() -> None:
     """쥐고 있는 연결을 전부 놓는다 — 앱을 접을 때와 테스트용."""
     while True:
         try:
-            conn = _POOL.get_nowait()
+            conn, _ = _POOL.get_nowait()
         except queue.Empty:
             return
         try:

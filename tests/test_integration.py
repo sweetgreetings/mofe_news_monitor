@@ -6840,8 +6840,11 @@ def test_postgres_backend_contract():
             self.closed = True
 
     stale = [_FakeConn(dead=True), _FakeConn(dead=True)]  # 함께 죽은 연결 둘
+    # 주머니에 담는 것은 `(연결, 쉬기 시작한 시각)` 짝이다. **방금 쉬기 시작한 것으로
+    # 둔다** — 오래 쉰 것으로 두면 아래 ⑨의 치우기가 먼저 닫아, 이 검사가 보려는
+    # 「죽은 것을 또 집는가」 자리에 닿지 못한다.
     for dead_conn in stale:
-        store_pg._POOL.put(dead_conn)
+        store_pg._POOL.put((dead_conn, store_pg.time.time()))
     made = []
 
     def _fresh_conn():
@@ -6865,9 +6868,107 @@ def test_postgres_backend_contract():
     finally:
         store_pg.close_all()
 
+    # ⑧ **「자리가 꽉 찼다」면 잠깐 기다려 다시 붙고, 비밀번호가 틀리면 바로 말한다.**
+    #    서버가 쉬는 연결을 한꺼번에 닫으면 우리 스레드들이 같은 순간에 새로 붙는데,
+    #    그때 서버 쪽 자리가 잠깐 모자랄 수 있다 — 1초면 풀리는데 거기서 곧바로
+    #    포기해 그 일이 통째로 날아갔다(실측 2026-11-06 14:39: [단독]·[속보] 폴링).
+    #    반대로 비밀번호가 틀린 경우까지 기다리면, 켤 때 수백 번 부르는 자리가
+    #    한 번에 1.6초씩 붙어 앱이 멈춘 것처럼 보인다.
+    import types
+
+    class _ConnectError(Exception):
+        pass
+
+    _FULL_MSG = (
+        "connection failed: FATAL:  (EMAXCONNSESSION) max clients reached in "
+        "session mode - max clients are limited to pool_size: 15"
+    )
+    tries, waits = [], []
+
+    def _connect_full_twice(url, autocommit=False):
+        tries.append(url)
+        if len(tries) < 3:
+            raise _ConnectError(_FULL_MSG)
+        return _FakeConn(dead=False)
+
+    fake_psycopg = types.ModuleType("psycopg")
+    fake_psycopg.connect = _connect_full_twice
+    conn, gave_up = None, None
+    with patch.dict(sys.modules, {"psycopg": fake_psycopg}), \
+         patch.object(store_pg.time, "sleep", lambda s: waits.append(s)):
+        try:
+            conn = store_pg._new_connection()
+        except _ConnectError as exc:  # 기다리지 않고 포기한 경우
+            gave_up = exc
+    # **오류를 그대로 터뜨리지 않고 받아서 본다** — 터뜨리면 뒤의 테스트가 통째로
+    # 안 돌아 무엇이 깨졌는지 한 줄로 안 보인다.
+    assert gave_up is None, (
+        "자리가 꽉 찼을 때 기다리지 않고 바로 포기했습니다 — "
+        f"붙어 본 횟수 {len(tries)}회: {gave_up}"
+    )
+    assert conn is not None and len(tries) == 3, (
+        f"자리가 꽉 찼을 때 다시 붙지 않았습니다(붙어 본 횟수 {len(tries)}회)."
+    )
+    assert waits == list(store_pg._CONNECT_RETRY_WAITS_SEC), (
+        f"기다린 시간이 정한 값과 다릅니다: {waits}"
+    )
+    assert sum(store_pg._CONNECT_RETRY_WAITS_SEC) < store_pg._ACQUIRE_TIMEOUT_SEC, (
+        "기다리는 합이 자리 기다리는 한도보다 길면, 뒤에 선 스레드가 먼저 지칩니다."
+    )
+
+    tries.clear()
+    waits.clear()
+
+    def _connect_bad_password(url, autocommit=False):
+        tries.append(url)
+        raise _ConnectError('connection failed: FATAL:  password authentication failed for user "x"')
+
+    fake_psycopg.connect = _connect_bad_password
+    with patch.dict(sys.modules, {"psycopg": fake_psycopg}), \
+         patch.object(store_pg.time, "sleep", lambda s: waits.append(s)):
+        try:
+            store_pg._new_connection()
+            assert False, "비밀번호가 틀렸는데 오류를 올리지 않았습니다."
+        except _ConnectError:
+            pass
+    assert len(tries) == 1 and waits == [], (
+        "기다려도 안 되는 오류를 기다렸습니다 — 켤 때 수백 번 부르는 자리입니다"
+        f"(붙어 본 횟수 {len(tries)}회, 기다림 {waits})."
+    )
+
+    # ⑨ **오래 쉰 연결은 서버가 닫기 전에 우리가 먼저 닫는다.** 쥐고만 있으면 ① 아무
+    #    일도 안 하는 새벽에도 Supabase 15자리 중 6을 차지하고(두 대면 12) ② 쉬는 연결이
+    #    늘 여섯 개 쌓여 있어 서버가 그걸 닫을 때마다 여러 개가 함께 죽는다(실측
+    #    2026-11-06: 09:02·13:16·14:39). **훑는 것은 주머니 전체여야 한다** — 꺼내는
+    #    순서가 마지막에 넣은 것부터라, 위에서 멈추면 맨 위만 돌려 쓰이고 바닥이 썩는다.
+    try:
+        now = store_pg.time.time()
+        bottom = _FakeConn(dead=False)   # 따뜻함 — 바닥
+        middle = _FakeConn(dead=False)   # 오래 쉼 — 빠져야 한다
+        top = _FakeConn(dead=False)      # 따뜻함 — 맨 위
+        store_pg._POOL.put((bottom, now))
+        store_pg._POOL.put((middle, now - store_pg._IDLE_MAX_SEC - 1))
+        store_pg._POOL.put((top, now))
+
+        store_pg._trim_idle()
+
+        left = [store_pg._POOL.get_nowait()[0] for _ in range(store_pg._POOL.qsize())]
+        assert middle.closed, (
+            "오래 쉰 연결을 닫지 않았습니다 — 새벽에도 Supabase 자리를 쥐고 있습니다."
+        )
+        assert not bottom.closed and not top.closed, (
+            "아직 따뜻한 연결을 닫았습니다 — 쓸 때마다 다시 붙게 됩니다."
+        )
+        assert left == [top, bottom], (
+            "치운 뒤 꺼내는 순서가 바뀌었습니다 — 따뜻한 것이 맨 위로 돌아와야 합니다."
+        )
+    finally:
+        store_pg.close_all()
+
     print("✓ Postgres 백엔드 계약: 기본은 파일, 두 백엔드가 같은 이름 아홉, "
           "DATA_DIR 밖은 늘 파일, 키 고르기·서명 목록은 아래 칸으로 안 내려감, "
-          "서명은 갱신 시각 하나(본문 길이를 안 셈), 다시 붙을 땐 새 연결로")
+          "서명은 갱신 시각 하나(본문 길이를 안 셈), 다시 붙을 땐 새 연결로, "
+          "자리가 꽉 차면 기다렸다 다시(비밀번호 오류는 바로), 오래 쉰 연결은 놓아 줌")
 
 
 def test_store_read_cache():
