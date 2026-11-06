@@ -8548,6 +8548,90 @@ def test_screen_files_are_written_in_background():
           "맡긴 사람을 들고 가고, 터져도 스레드가 안 죽는다")
 
 
+def test_trend_word_counts_are_remembered():
+    """**정책 단어 추이는 센 값을 기여 둔다**(`app.trend_data.word_counts_by_date`).
+
+    회차 파일이 안 바뀌면 센 값도 안 바뀐다 — 이 카드는 제목+요약 원문을 문자열로 대조해
+    세고 **숨긴 기사도 세므로**(2026-09-01 결정) 담당자의 큐레이션에 흔들리지 않는다.
+    그런데 홈을 열 때마다·`/trend`를 열 때마다 그 날짜의 회차 파일을 통째로 다시 읽어
+    같은 답을 냈다 — 실측 2026-11-06(회차 402개·단어 5개): 홈 50번 중 **40번이 이 카드**,
+    `/trend`는 1개월 150번 · **1년 410번(≈6.4초)**. 보관이 1년이라 그냥 두면 회차가
+    ~1,600개로 늘어 그 화면 한 장이 25초가 된다.
+
+    지켜야 하는 약속 다섯:
+      ① **센 값이 옛 계산과 같다**(기사를 모아 세는 것과 한 글자도 안 달라야 한다)
+      ② 같은 걸 또 물으면 **회차 파일을 안 읽는다**
+      ③ 그 날 회차가 바뀌면 **그 날만 다시 센다**(옛 값이 굳으면 안 된다)
+      ④ **새 단어는 그때 센다**(기여 둔 날짜라도)
+      ⑤ 회차가 없는 날은 **`None`**이다 — 0건(회차는 돌았는데 기사가 없음)과 다르다
+    """
+    _require_isolation()
+
+    from app import storage, store, trend_data
+
+    trend_data._COUNT_MEMO.clear()
+    today = datetime.now().date()
+    d1 = (today - timedelta(days=3)).isoformat()
+    d2 = (today - timedelta(days=2)).isoformat()
+    gap = (today - timedelta(days=1)).isoformat()   # 회차를 안 만드는 날
+
+    def art(url, title, summary=""):
+        return {"url": url, "title": title, "summary": summary, "outlet": "한국일보"}
+
+    storage.save_run("09:00", [art("u1", "종부세 개편 논의"), art("u2", "무관한 기사", "종부세 언급")],
+                     run_at=f"{d1}T09:00:00")
+    storage.save_run("14:00", [art("u3", "설탕세 도입"), art("u1", "종부세 개편 논의")],
+                     run_at=f"{d1}T14:00:00")       # u1은 같은 URL — 한 번만 센다
+    storage.save_run("09:00", [art("u4", "종부세 유예")], run_at=f"{d2}T09:00:00")
+
+    words = ["종부세", "설탕세"]
+
+    def old_way(start, end):
+        """고치기 전의 계산 — 날짜별 기사를 모아 센다."""
+        by = trend_data.articles_by_date_range(start, end)
+        return {d: (None if arts is None else {w: trend_data.word_hits(w, arts) for w in words})
+                for d, arts in by.items()}
+
+    # ① 옛 계산과 같은 값
+    got = trend_data.word_counts_by_date(words, d1, gap)
+    want = old_way(d1, gap)
+    assert got == want, f"센 값이 옛 계산과 다릅니다:\n  새 {got}\n  옛 {want}"
+    assert got[d1] == {"종부세": 2, "설탕세": 1}, got[d1]      # u1 중복은 한 번
+    assert got[d2] == {"종부세": 1, "설탕세": 0}, got[d2]
+    # ⑤ 회차가 없는 날은 None — fill_bucket_status가 `is not None`으로 읽는 그 값이다
+    assert got[gap] is None, f"회차가 없는 날을 0건으로 돌려줬습니다: {got[gap]}"
+
+    # ② 또 물으면 회차 파일을 안 읽는다
+    reads = []
+    real = store.read_json
+
+    def counted(path):
+        if "articles" in str(path) and "index" not in str(path):
+            reads.append(str(path))
+        return real(path)
+
+    with patch.object(store, "read_json", counted):
+        again = trend_data.word_counts_by_date(words, d1, gap)
+    assert again == got, "두 번째가 다른 값을 줬습니다"
+    assert not reads, f"세어 뒀는데 회차 파일을 또 읽었습니다: {reads}"
+
+    # ④ 새 단어는 그때 센다
+    with_new = trend_data.word_counts_by_date(words + ["유예"], d1, gap)
+    assert with_new[d2]["유예"] == 1, with_new[d2]
+    assert with_new[d1]["유예"] == 0, with_new[d1]
+
+    # ③ 그 날 회차가 바뀌면 그 날만 다시 센다
+    storage.save_run("17:00", [art("u5", "종부세 추가 기사")], run_at=f"{d2}T17:00:00")
+    after = trend_data.word_counts_by_date(words, d1, gap)
+    assert after[d2]["종부세"] == 2, (
+        f"회차가 늘었는데 옛 값이 굳었습니다: {after[d2]} — 서명이 열쇠에 안 들어갔습니다."
+    )
+    assert after[d1] == got[d1], f"안 바뀐 날짜를 다시 셌더니 값이 달라졌습니다: {after[d1]}"
+
+    print("✓ 추이 단어 셈: 옛 계산과 같은 값, 같은 걸 또 안 읽고, 회차가 바뀌면 그 날만 "
+          "다시 세고, 새 단어는 그때 세고, 회차 없는 날은 None")
+
+
 def test_no_undefined_names():
     """import을 빼먹었거나 이름을 잘못 적은 자리가 없는지 본다 — 린터가 없는 저장소의 그물.
 
@@ -10088,6 +10172,7 @@ if __name__ == "__main__":
         test_admin_only_settings,
         test_signup_keeps_the_signed_in_person,
         test_screen_files_are_written_in_background,
+        test_trend_word_counts_are_remembered,
         test_no_undefined_names,
         test_screens_render_to_response,
         test_screen_js_strings_are_not_cut_by_newlines,

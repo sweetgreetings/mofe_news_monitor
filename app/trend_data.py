@@ -5,8 +5,10 @@
 완전히 똑같이 하는 일이라 여기 한 곳에 모았다 — 렌더링(SVG·표·HTML)은 각 화면
 (app.landing_renderer/app.trend_renderer)이 따로 맡는다.
 """
+import threading
 from datetime import datetime, timedelta
 
+from app.run_index import list_run_meta
 from app.search_terms import split_terms
 from app.storage import list_run_dates, list_runs_for_date, run_exists
 
@@ -57,25 +59,108 @@ def articles_by_date_range(start_str: str, end_str: str) -> dict:
     그걸로 먼저 "회차가 있는 날짜"만 걸러낸 뒤, 그 날짜만 list_runs_for_date로 연다.
     """
     stored = set(list_run_dates())
-    start = datetime.strptime(start_str, "%Y-%m-%d")
-    end = datetime.strptime(end_str, "%Y-%m-%d")
     by_date: dict = {}
-    d = start
-    while d <= end:
-        ds = d.strftime("%Y-%m-%d")
-        if ds not in stored:
-            by_date[ds] = None
-        else:
-            seen, arts = set(), []
-            for run in list_runs_for_date(ds):
-                for a in run.get("articles", []):
-                    if a["url"] in seen:
-                        continue
-                    seen.add(a["url"])
-                    arts.append(a)
-            by_date[ds] = arts
-        d += timedelta(days=1)
+    for ds in _each_date(start_str, end_str):
+        by_date[ds] = _articles_for_date(ds) if ds in stored else None
     return by_date
+
+
+def _each_date(start_str: str, end_str: str):
+    """start~end(둘 다 포함)의 날짜 문자열 — 날짜를 훑는 자리가 셋이라 한 곳에 둔다."""
+    d = datetime.strptime(start_str, "%Y-%m-%d")
+    end = datetime.strptime(end_str, "%Y-%m-%d")
+    while d <= end:
+        yield d.strftime("%Y-%m-%d")
+        d += timedelta(days=1)
+
+
+def _articles_for_date(date_str: str, metas=None) -> list:
+    """그 날짜(run_at 기준) 회차의 기사를 URL로 한 번만 모은다 — **파일을 연다.**
+
+    `articles_by_date_range`와 `word_counts_by_date`가 같이 쓴다(가르면 한쪽만 고쳤을 때
+    두 화면의 숫자가 조용히 달라진다).
+    """
+    seen, arts = set(), []
+    for run in list_runs_for_date(date_str, metas):
+        for a in run.get("articles", []):
+            if a["url"] in seen:
+                continue
+            seen.add(a["url"])
+            arts.append(a)
+    return arts
+
+
+# ── 단어별로 세어 둔 값 ────────────────────────────────────────
+# **회차 파일이 안 바뀌면 센 값도 안 바뀐다.** 이 카드는 제목+요약 원문을 문자열로 대조해
+# 세고 **숨긴 기사도 세므로**(2026-09-01 결정), 담당자가 기사를 숨기거나 소제목을 옮겨도
+# 숫자가 안 변한다. 그런데 지금까지는 홈을 열 때마다·`/trend`를 열 때마다·클릭 뒤 화면을
+# 다시 쓸 때마다 그 날짜의 회차 파일을 **통째로 다시 읽어** 같은 답을 냈다.
+#
+# **실측 2026-11-06**(회차 402개·단어 5개, 왕복 횟수): 홈 50번 중 **40번이 이 카드**이고,
+# 구간을 넓히는 `/trend`는 1개월 150번 · **1년 410번(≈6.4초)**이다. 세어 둔 값을 쓰면
+# 홈 13번 · `/trend` 7번이 남는다. 보관이 1년이라 그냥 두면 회차가 ~1,600개로 늘어
+# 그 화면 한 장이 **25초**가 된다.
+#
+# **열쇠는 `(날짜, 그 날 회차 파일의 서명, 단어)`다.** 서명은 회차 인덱스가 이미 한 번에
+# 받아 오는 `(파일명, mtime_ns, size)`라 **대조 비용이 0**이고, 그 날에 회차가 새로
+# 저장되거나 고쳐지면 서명이 달라져 그 날만 다시 센다. 새 단어를 넣으면 그 한 번만 느리다.
+#
+# **파일로 남기지 않는다 — 메모리에만 둔다.** 새 저장 자리를 만들면 보관 기간·여러 대
+# 사이 일치를 또 정해야 하는데, 앱은 며칠씩 켜져 있어 거의 모든 열기가 세어 둔 값을 쓴다.
+# 대가는 **앱을 켠 뒤 첫 한 번만 지금처럼 느린 것**이다.
+_COUNT_MEMO: dict = {}
+_MEMO_MAX = 800
+_MEMO_LOCK = threading.Lock()
+
+
+def _date_signatures(metas) -> dict:
+    """{날짜: 그 날 회차 파일의 서명} — 날짜 가르기는 `list_runs_for_date`와 같은
+    `run_at` 기준이다(파일명 날짜는 저장 시각이라 자정을 넘겨 보충하면 어긋난다)."""
+    groups: dict = {}
+    for meta in metas:
+        groups.setdefault(meta["run_at"][:10], []).append(
+            (meta["filename"], meta.get("mtime_ns"), meta.get("size"))
+        )
+    return {ds: tuple(sorted(files)) for ds, files in groups.items()}
+
+
+def _remember(key, counts) -> None:
+    with _MEMO_LOCK:
+        _COUNT_MEMO.pop(key, None)       # 다시 넣어 「최근」 자리로 올린다
+        _COUNT_MEMO[key] = counts
+        while len(_COUNT_MEMO) > _MEMO_MAX:
+            _COUNT_MEMO.pop(next(iter(_COUNT_MEMO)))
+
+
+def word_counts_by_date(words: list, start_str: str, end_str: str) -> dict:
+    """{날짜: {단어: 센 값} 또는 None} — `None`은 **그 날 저장된 회차가 아예 없다**는 뜻.
+
+    `articles_by_date_range`와 **같은 자리에 같은 뜻의 값**을 돌려주므로
+    `fill_bucket_status`에 그대로 넘길 수 있다(거기선 `is not None`만 본다).
+
+    회차가 있는 날은 센 값을 돌려준다 — 묻지 않은 단어가 섞여 있을 수 있다(세어 둔 것을
+    그대로 준다). **부르는 쪽은 돌려받은 dict를 고치지 않는다.**
+    """
+    metas = list_run_meta()
+    sigs = _date_signatures(metas)
+    out: dict = {}
+    for ds in _each_date(start_str, end_str):
+        sig = sigs.get(ds)
+        if sig is None:
+            out[ds] = None
+            continue
+        key = (ds, sig)
+        counts = _COUNT_MEMO.get(key)
+        if counts is None:
+            counts = {}
+        missing = [w for w in words if w not in counts]
+        if missing:
+            arts = _articles_for_date(ds, metas)
+            for w in missing:
+                counts[w] = word_hits(w, arts)
+            _remember(key, counts)
+        out[ds] = counts
+    return out
 
 
 def all_registered_keywords(settings: dict) -> list:

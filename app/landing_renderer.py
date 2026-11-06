@@ -43,12 +43,11 @@ from app.settings import load_settings
 from app.storage import list_run_dates, list_runs_for_date, load_today_runs
 from app.trend_chart import chart_css, render_chart
 from app.trend_data import (
-    articles_by_date_range,
     build_buckets,
     fill_bucket_status,
     last_complete_day,
     today_partial_column,
-    word_hits,
+    word_counts_by_date,
 )
 from app.negative_guess import load_state as load_negative_guess
 
@@ -822,7 +821,11 @@ def _trend_card_html(today_str: str, trend_url: str, has_today_run: bool = False
     # 급락처럼 보였다. 일별이라 점선 칸은 안 생긴다.
     end = last_complete_day(today_str)
     start = (datetime.strptime(end, "%Y-%m-%d") - timedelta(days=6)).strftime("%Y-%m-%d")
-    by_date = articles_by_date_range(start, end)
+    # **센 값을 날짜·서명·단어로 기여 둔다**(app.trend_data.word_counts_by_date) —
+    # 회차 파일이 안 바뀌면 센 값도 안 바뀌므로 그 날짜의 회차 파일을 다시 읽지 않는다.
+    # 돌려받는 모양은 `articles_by_date_range`와 같은 자리에 같은 뜻이라(None = 그 날
+    # 회차가 아예 없음) fill_bucket_status에 그대로 넘긴다.
+    by_date = word_counts_by_date(words, start, end)
     buckets, unit = build_buckets(start, end)
     fill_bucket_status(buckets, unit, by_date, today_str)
 
@@ -846,7 +849,7 @@ def _trend_card_html(today_str: str, trend_url: str, has_today_run: bool = False
             if not b["record"]:
                 values.append(None)
                 continue
-            values.append(sum(word_hits(word, by_date[d] or []) for d in b["dates"]))
+            values.append(sum((by_date[d] or {}).get(word, 0) for d in b["dates"]))
         series.append({"word": word, "color": color, "values": values})
 
     # 낮에는 선 오른쪽에 점선으로 떼어 「오늘(집계 중)」 칸을 하나 더 그린다 — 선에 안
