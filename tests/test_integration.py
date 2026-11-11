@@ -346,6 +346,82 @@ def test_search_window_filters_by_time():
     print("6) 회차별 시간창 필터: 통과 (창 밖 기사 제외, 경계는 하한 제외·상한 포함)")
 
 
+def test_adhoc_window_includes_start_minute():
+    """수시 수집 창은 양끝 포함(`[start, end]`)이다 — "16:00부터"가 16:00에 게시된 기사를
+    가져와야 한다. 정기 회차(`(start, end]`)와 경계가 다르다는 것까지 같이 못 박는다.
+
+    네이버 pubDate의 초는 실측상 항상 00이라, 하한을 제외하면 그 1분이 통째로 빠진다
+    (담당자 신고: 16:00으로 맞췄는데 16:01부터 들어왔다).
+
+    **검색 하한과 화면 판정이 같은 경계를 써야 한다** — 한쪽만 고치면 "목록엔 들어왔는데
+    「구간 밖」으로 표시되는" 기사가 생긴다. 그래서 두 겹을 한 테스트에서 함께 본다.
+    기간 카드(여러 날)는 시:분이 아니라 날짜까지 대조하는 다른 길이라 그쪽도 함께 본다.
+    """
+    _require_isolation()
+    from app.adhoc.collector import article_out_of_window
+
+    def _item(hhmm, idx):
+        pub = naver_api.kst_today_at(hhmm)
+        return {
+            "originallink": f"https://chosun.com/{idx}",
+            "link": f"https://chosun.com/{idx}",
+            "title": f"기사{idx}",
+            "description": "설명",
+            "pubDate": pub.strftime("%a, %d %b %Y %H:%M:%S +0900"),
+        }
+
+    items = [_item("17:30", 1), _item("16:30", 2), _item("16:00", 3), _item("15:59", 4)]
+    response = MagicMock()
+    response.json.return_value = {"items": items}
+    response.raise_for_status.return_value = None
+
+    after = naver_api.kst_today_at("16:00")
+    before = naver_api.kst_today_at("17:30")
+
+    with tempfile.TemporaryDirectory() as usage_tmp, \
+         patch.object(api_usage, "API_USAGE_FILE", Path(usage_tmp) / "api_usage.json"), \
+         patch.object(naver_api.requests, "get", return_value=response):
+        inclusive, _capped = naver_api._search_one_keyword(
+            "키워드", after=after, before=before, after_inclusive=True
+        )
+        exclusive, _capped = naver_api._search_one_keyword("키워드", after=after, before=before)
+
+    titles = {r["title"] for r in inclusive}
+    assert titles == {"기사1", "기사2", "기사3"}, (
+        f"16:00~17:30(양끝 포함)이면 16:00·16:30·17:30 기사가 남아야 하는데 {titles}"
+    )
+    assert {r["title"] for r in exclusive} == {"기사1", "기사2"}, (
+        "정기 회차의 하한 제외 동작이 바뀌었다 — 경계 기사가 앞 회차와 겹친다"
+    )
+
+    # ── 화면 판정도 같은 경계여야 한다. 날짜는 늘 오늘로 짓는다(박아 두면 다음날 썩는다).
+    today = naver_api.kst_today_at("00:00").date().isoformat()
+    yesterday = (naver_api.kst_today_at("00:00") - timedelta(days=1)).date().isoformat()
+    one_day = {"window": {"start": "16:00", "end": "17:30"}, "collect_date": today}
+
+    def _art(date_str, hhmm):
+        return {"pub_date": naver_api.kst_at(date_str, hhmm).isoformat(timespec="seconds")}
+
+    assert not article_out_of_window(_art(today, "16:00"), one_day), "16:00 기사가 「구간 밖」으로 표시됨"
+    assert not article_out_of_window(_art(today, "17:30"), one_day), "17:30 기사가 「구간 밖」으로 표시됨"
+    assert article_out_of_window(_art(today, "15:59"), one_day), "15:59 기사는 구간 밖이어야 한다"
+    assert article_out_of_window(_art(today, "17:31"), one_day), "17:31 기사는 구간 밖이어야 한다"
+
+    # 기간 카드 — 「시작날 start 이상 ~ 끝날 end 이하」. 시:분만 대조하면 어기는 자리다.
+    span = {"window": {"start": "16:00", "end": "17:30"},
+            "collect_from": yesterday, "collect_date": today}
+    assert not article_out_of_window(_art(yesterday, "16:00"), span), "기간: 첫날 16:00이 빠졌다"
+    assert not article_out_of_window(_art(yesterday, "23:00"), span), "기간: 중간 날 기사가 빠졌다"
+    assert not article_out_of_window(_art(today, "17:30"), span), "기간: 끝날 17:30이 빠졌다"
+    assert article_out_of_window(_art(yesterday, "15:59"), span), "기간: 첫날 15:59는 구간 밖이어야 한다"
+    assert article_out_of_window(_art(today, "17:31"), span), "기간: 끝날 17:31은 구간 밖이어야 한다"
+
+    # 담당자가 직접 넣은 기사는 창과 무관하게 면제다(ADHOC_DESIGN.md §6.4).
+    manual = dict(_art(today, "03:00"), added_by="manual")
+    assert not article_out_of_window(manual, one_day), "수기로 넣은 기사에 「구간 밖」이 붙었다"
+    print("6b) 수시 시간창 경계: 통과 (start 분도 들어오고, 기간 카드도 양끝 포함, 정기 하한 제외는 그대로)")
+
+
 def test_retention_cleanup_removes_old_runs():
     """7일 지난 회차가 자동 삭제 대상에 걸리는지 확인한다."""
     _require_isolation()
@@ -10265,6 +10341,7 @@ if __name__ == "__main__":
         test_settings_actually_change_scraping,
         test_empty_run_shows_placeholder,
         test_search_window_filters_by_time,
+        test_adhoc_window_includes_start_minute,
         test_retention_cleanup_removes_old_runs,
         test_run_filename_follows_run_at_not_save_time,
         test_stale_run_shows_waiting_page,

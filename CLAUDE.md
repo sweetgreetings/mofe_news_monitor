@@ -839,6 +839,7 @@ URL
 
 - **카드 하나 = 파일 하나** (`app/adhoc/card.py`, `data/adhoc/cards/{id}.json`): 사안·검색어·시간창·옵션·기사·배정·수집 이력 전부. 사안 메타 `data/adhoc/issues.json`. 카드별 잠금 `card_lock`. id `YYYYMMDD-HHMMSS-hex`(파일명 사전순 = 시간순).
 - **요약 캐시** `list_card_summaries` — 파일 서명이 같으면 뽑아둔 요약 재사용. `cards_for_date`/`bundles_for_date`는 그 날짜 카드만 연다. `latest_card_id()`는 파일을 안 연다(kind를 주면 최신 30개까지만 연다).
+- **시간창은 양끝 포함(`[start, end]`)이다.** 담당자가 적은 `16:00~17:30`은 16:00 게시 기사와 17:30 게시 기사를 **다 담는다**. 창이 맞물려 이어지는 정기 회차(`(start, end]`)와 경계가 다르다 — 수시는 담당자가 창을 직접 적는 단발 수집이라 겹칠 창이 없다. **검색 하한(`search_keywords(..., after_inclusive=True)`)과 화면 판정(`article_out_of_window`)이 같은 경계를 써야 한다** — 한쪽만 고치면 들어온 기사가 「구간 밖」으로 표시된다. 네이버 `pubDate`의 초는 항상 00이라 하한을 제외하면 1초가 아니라 **그 1분이 통째로** 빠진다. 기간 카드는 시:분이 아니라 **날짜까지** 대조하고 경계는 같다(「시작날 start 이상 ~ 끝날 end 이하」). `tests/test_integration.py` `test_adhoc_window_includes_start_minute`가 두 겹과 정기 하한 제외를 함께 지킨다. → H: 수시 시간창 경계
 - **수집** (`app/adhoc/collector.py` `run_collect`): 정기와 같은 순서(화이트리스트 → 정렬 → 사진/인사 → 중복). `use_outlet_whitelist` 기본 **꺼짐**. 자동 재시도 없음. 오류(`AdhocCollectError`): 끝 시각이 미래(오늘을 모을 때만) / 날짜가 미래 / `ADHOC_PAST_COLLECT_DAYS`(365일)보다 더 지난 날짜.
 - **지난 날짜도 모은다 — 어제는 없던 검색어로 어제 기사를 찾는 게 이 기능의 요지다.** 네이버는 **검색어를 언제 등록했는지 모른다**(물어볼 때마다 전체 색인을 훑어 준다) — 오늘 처음 만든 검색어로도 그 날 기사가 그대로 나온다.
   - **「어느 날을 모으나」를 정하는 자리는 `app/naver_api.py` `_compare_collect_day` 한 곳이다.** 네이버 검색 API엔 기간 칸이 없고 최신순으로만 주므로, 「그 날짜가 아니면 페이지 넘기기를 멈춘다」는 이 판정이 곧 날짜 필터다. `search_keywords(..., day=)`로 내려가고, 안 주면 「오늘」이라 **정기·실시간·알림·원장은 한 글자도 안 바뀐다.**
