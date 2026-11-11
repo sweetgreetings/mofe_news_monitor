@@ -25,6 +25,7 @@
 | [MULTIUSER_ROLLOUT_CHECKLIST.md](MULTIUSER_ROLLOUT_CHECKLIST.md) | 여러 사람이 쓰게 될 때의 준비 항목·작업 순서. 지금 들어와 있는 것은 **자물쇠까지**다(아래 「로그인」 절) |
 | [EXPERT_QUESTIONS.md](EXPERT_QUESTIONS.md) | 혼자 정하기 어려운 결정을 자문받기 위해 모아 둔 것 (상황·실측치·후보안·묻고 싶은 것). 결정되면 규칙은 CLAUDE.md로, 기각안은 HISTORY.md로 옮기고 항목은 지운다 |
 | [TEXT_AUDIT.md](TEXT_AUDIT.md) | 화면 설명 글(말풍선·툴팁·안내줄·빈 화면·배너·확인창) 점검표. **아직 고치지 않은 문구 목록**이고, 고친 줄은 지운다 |
+| [PERF_DB.md](PERF_DB.md) | DB 모드가 느린 자리의 실측과 정리할 것. TEXT_AUDIT처럼 **아직 고치지 않은 목록**이고, 고친 줄은 지운다. 재는 도구는 `tools/measure_store_calls.py` |
 | [README.md](README.md) | 사용자용 소개·설치 |
 | `mockups/` | 결정된 화면 시안. 규칙 옆 「시안」 링크가 가리킨다 |
 
